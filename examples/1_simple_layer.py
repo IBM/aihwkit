@@ -36,7 +36,7 @@ model = AnalogLinear(4, 2, bias=True,
                      resistive_device=analog_device)
 
 # Move the model and tensors to cuda if it is available.
-if cuda.is_available():
+if cuda.is_compiled():
     x = x.cuda()
     y = y.cuda()
     model.cuda()

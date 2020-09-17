@@ -90,7 +90,7 @@ methods can be used in the same manner.
 
     For GPU-stored tiles to be used, the library needs to be compiled
     with GPU support. This can be checked by inspecting the return value of the
-    ``aihwkit.simulator.rpu_base.cuda.is_available()`` function.
+    ``aihwkit.simulator.rpu_base.cuda.is_compiled()`` function.
 
 Specifying resistive devices
 ----------------------------
