@@ -1,0 +1,4 @@
+mypy==0.782
+pycodestyle==2.6.0
+pylint==2.5.3
+pytest==5.4.3

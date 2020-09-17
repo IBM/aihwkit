@@ -1,0 +1,6 @@
+include README.md
+include src/aihwkit/VERSION.txt
+global-include CMakeLists.txt
+include cmake
+include src/aihwkit/simulator/rpu_base/*.cpp
+include src/aihwkit/simulator/rpu_base/*.h

@@ -1,0 +1,104 @@
+# (C) Copyright 2020 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
+
+# RPATH stuff
+# see https://cmake.org/Wiki/CMake_RPATH_handling
+if (APPLE)
+  set(CMAKE_MACOSX_RPATH ON)
+  set(_rpath_portable_origin "@loader_path")
+else()
+  set(_rpath_portable_origin $ORIGIN)
+endif(APPLE)
+# Use separate rpaths during build and install phases
+set(CMAKE_SKIP_BUILD_RPATH  FALSE)
+# Don't use the install-rpath during the build phase
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH "${_rpath_portable_origin}")
+# Automatically add all linked folders that are NOT in the build directory to
+# the rpath (per library?)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+
+# ---[ Threads
+if(USE_THREADS)
+  find_package(Threads REQUIRED)
+  list(APPEND RPU_DEPENDENCY_LIBS ${CMAKE_THREAD_LIBS_INIT})
+endif()
+
+
+# ---[ OpenMP
+find_package(OpenMP QUIET)
+if (OPENMP_FOUND)
+  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+else()
+  message(STATUS "OpenMP could not be found. Disabling OpenMP support.")
+endif()
+
+# ---[ BLAS
+message(STATUS "The BLAS backend of choice:" ${RPU_BLAS})
+
+if(RPU_BLAS STREQUAL "OpenBLAS")
+  find_package(OpenBLAS REQUIRED)
+  include_directories(SYSTEM ${OpenBLAS_INCLUDE_DIR})
+  list(APPEND RPU_DEPENDENCY_LIBS ${OpenBLAS_LIB})
+  add_compile_definitions(RPU_USE_OPENBLAS)
+elseif(RPU_BLAS STREQUAL "MKL")
+  find_package(MKL REQUIRED)
+  include_directories(SYSTEM ${MKL_INCLUDE_DIR})
+  list(APPEND RPU_DEPENDENCY_LIBS ${MKL_LIBRARIES} )
+  if(USE_OMP)
+    list(APPEND RPU_DEPENDENCY_LIBS ${MKL_OPENMP_LIBRARY} )
+  endif()
+  if(NOT MSVC) # not sure why this is not found for linux. Maybe also windows?
+    FIND_PACKAGE(AVX) # checks AVX and AVX2
+    set(MKL_LIB_PATH "${MKL_LIBRARIES}")
+    list(FILTER MKL_LIB_PATH INCLUDE REGEX ".*mkl_core.*")
+    list(GET MKL_LIB_PATH 0 MKL_LIB_PATH)
+    get_filename_component(MKL_LIB_PATH ${MKL_LIB_PATH} DIRECTORY)
+    IF (CXX_AVX2_FOUND)
+      MESSAGE(STATUS "AVX compiler support found")
+      file(GLOB tmp "${MKL_LIB_PATH}/*mkl_avx2*")
+      list(APPEND RPU_DEPENDENCY_LIBS "${tmp}")
+    ENDIF()
+  ENDIF()
+  add_compile_definitions(RPU_USE_MKL)
+  message(STATUS "MKL include for RPU is ${RPU_DEPENDENCY_LIBS}")
+else()
+  message(FATAL_ERROR "Invalid BLAS backend: ${RPU_BLAS}")
+endif()
+
+# --- [ Python and pybind11
+find_package(PythonLibs REQUIRED)
+include_directories(${PYTHON_INCLUDE_DIRS})  # order matters (before pybind)
+find_package(pybind11 REQUIRED)
+
+# --- [ Pytorch
+find_package(Torch REQUIRED)
+include_directories(${TORCH_INCLUDE_DIRS})
+link_directories(${TORCH_LIB_DIR})
+
+if(APPLE)
+  set(CMAKE_INSTALL_RPATH "${TORCH_LIB_DIR};${_rpath_portable_origin}/../../torch/lib")
+endif()
+
+if(RPU_USE_FASTRAND)
+  add_compile_definitions(RPU_USE_FASTRAND)
+endif()
+
+if(RPU_USE_FASTMOD)
+  add_compile_definitions(RPU_USE_FASTMOD)
+endif()
+
+if(RPU_DEBUG)
+  add_compile_definitions(RPU_DEBUG)
+endif()

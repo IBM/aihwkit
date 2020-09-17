@@ -1,0 +1,7 @@
+# Build dependencies.
+cmake>=3.18
+scikit-build>=0.11.1
+# Runtime dependencies.
+torch>=1.5
+numpy>=1.18
+dataclasses==0.7; python_version < '3.7'
