@@ -1,0 +1,115 @@
+# (C) Copyright 2020 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+notifications:
+  email: false
+
+# Disable double triggering when issuing a PR from a branch in the main repo.
+branches:
+  only:
+    - "master"
+
+sudo: required
+
+language: python
+
+services: docker
+
+stages:
+  - Test and lint
+  - Test multiple python versions
+  - Build Linux wheels
+
+# Parent stage definition, to avoid copy-pasting.
+job_compile_common: &job_compile_common
+  before_install:
+    - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+    - sudo apt-get update
+    - sudo apt-get install -y libopenblas-dev gcc-8 g++-8
+    - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+  install:
+    # Set the python executable, to force cmake picking the right one.
+    - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
+    - pip install -r requirements.txt pytest
+    # Download, compile and install pybind manually.
+    - wget https://github.com/pybind/pybind11/archive/v2.5.0.zip && unzip v2.5.0.zip
+    - cd pybind11-2.5.0 && mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=Release -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE -DPYBIND11_TEST=OFF ..
+    - sudo make install -j
+    # Install the package in editable mode.
+    - cd ../..
+    - VERBOSE=1 pip install -v -e .
+  script:
+    - make pytest
+
+
+jobs:
+  include:
+  - name: "Compile and test. Python 3.6"
+    <<: *job_compile_common
+    stage: Test and lint
+    python: "3.6"
+
+  - name: "Compile and lint. Python 3.6"
+    <<: *job_compile_common
+    stage: Test and lint
+    python: "3.6"
+    script:
+      - pip install -r requirements-dev.txt
+      - make pycodestyle
+      - make pylint
+      - make mypy
+
+  - name: "Compile and test. Python 3.7"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.7"
+
+  - name: "Compile and test. Python 3.8"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.8"
+
+  - name: "Compile and test. Python 3.6, Torch 1.5"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.6"
+    install:
+      # Set the python executable, to force cmake picking the right one.
+      - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
+      - pip install "torch==1.5.1"
+      - pip install -r requirements.txt pytest
+      # Download, compile and install pybind manually.
+      - wget https://github.com/pybind/pybind11/archive/v2.5.0.zip && unzip v2.5.0.zip
+      - cd pybind11-2.5.0 && mkdir build && cd build
+      - cmake -DCMAKE_BUILD_TYPE=Release -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE -DPYBIND11_TEST=OFF ..
+      - sudo make install -j
+      # Install the package in editable mode.
+      - cd ../..
+      - VERBOSE=1 pip install -v -e .
+
+  - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
+    stage: Build Linux wheels
+    if: (branch = master AND type = push) OR (tag IS present)
+    env:
+      - CIBW_BEFORE_ALL="yum install -y openblas-devel gtest wget"
+      - CIBW_BEFORE_BUILD="pip install -r requirements.txt mkl mkl-include pytest;wget https://github.com/pybind/pybind11/archive/v2.5.0.zip;unzip v2.5.0.zip;ls -l;cd pybind11-2.5.0;mkdir build;cd build;cmake -DPYBIND11_TEST=OFF ..;make install -j;cd ../..;rm -r pybind11-2.5.0;rm v2.5.0.zip;git clean -xdfq"
+      - CIBW_MANYLINUX_X86_64_IMAGE="manylinux2014"
+      - CIBW_MANYLINUX_I686_IMAGE="manylinux2014"
+      - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
+      # - CIBW_SKIP="cp27-* cp35-* cp38-*"
+      # - CIBW_TEST_COMMAND="pytest -v -s tests/"
+    install:
+      - python3 -m pip install cibuildwheel==1.6.0
+    script:
+      # build the wheels, put them into './wheelhouse'
+      - python3 -m cibuildwheel --output-dir wheelhouse
+      # The plan is to upload the wheels via twine only when the commit is tagged
+      # python3 -m twine <..>
