@@ -11,3 +11,5 @@
 # that they have been altered from the originals.
 
 """RPU simulator bindings."""
+
+import torch
