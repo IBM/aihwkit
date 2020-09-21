@@ -76,7 +76,10 @@ for epoch in range(10):
 ```
 
 You can find more examples in the [`examples/`] folder of the project, and
-more information about the library in the [documentation].
+more information about the library in the [documentation]. Please note that
+the examples have some additional dependencies - you can install them via
+`pip install -r requirements-examples.txt`.
+
 
 ## What is Analog AI?
 
