@@ -97,7 +97,7 @@ jobs:
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
     stage: Build Linux wheels
-    if: (branch = master AND type = push) OR (tag IS present)
+    if: tag IS present
     env:
       - CIBW_BEFORE_ALL="yum install -y openblas-devel gtest wget"
       - CIBW_BEFORE_BUILD="pip install -r requirements.txt mkl mkl-include pytest;wget https://github.com/pybind/pybind11/archive/v2.5.0.zip;unzip v2.5.0.zip;ls -l;cd pybind11-2.5.0;mkdir build;cd build;cmake -DPYBIND11_TEST=OFF ..;make install -j;cd ../..;rm -r pybind11-2.5.0;rm v2.5.0.zip;git clean -xdfq"

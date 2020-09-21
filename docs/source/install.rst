@@ -8,8 +8,8 @@ The preferred way to install this package is by using the Python package index::
 
 .. note::
     During the initial beta stage, we do not provide pip *wheels* (as in,
-    pre-compiled binaries) for all the possible platform, version and CUDA
-    architecture.
+    pre-compiled binaries) for all the possible platform, version and
+    architecture combinations (in particular, only CPU versions are provided).
 
     Please refer to the :doc:`advanced_install` page for instruction on how to
     compile the library for your environment in case you encounter errors during

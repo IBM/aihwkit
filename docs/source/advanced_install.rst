@@ -47,14 +47,14 @@ the following commands can be used for installing the minimal
 dependencies::
 
     $ sudo apt-get install python3-pybind11 python3-dev libopenblas-dev
-    $ pip install -r requirements.txt
+    $ pip install cmake scikit-build torch
 
 On an OSX-based system, the following commands can be used for installing the
 minimal dependencies (note that ``Xcode`` needs to be installed)::
 
     $ brew install pybind11
     $ brew install openblas
-    $ pip install -r requirements.txt
+    $ pip install cmake scikit-build torch
 
 Installing and compiling
 ~~~~~~~~~~~~~~~~~~~~~~~~
