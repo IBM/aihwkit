@@ -1,6 +1,9 @@
 # IBM Analog Hardware Acceleration Kit
 
+![PyPI](https://img.shields.io/pypi/v/aihwkit)
 [![Documentation Status](https://readthedocs.org/projects/aihwkit/badge/?version=latest)](https://aihwkit.readthedocs.io/en/latest/?badge=latest)
+[![Build Status](https://travis-ci.com/IBM/aihwkit.svg?branch=master)](https://travis-ci.com/IBM/aihwkit)
+![PyPI - License](https://img.shields.io/pypi/l/aihwkit)
 
 ## Description
 
