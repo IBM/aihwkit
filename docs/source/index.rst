@@ -14,6 +14,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
    design
    developer_install
    development_conventions
+   roadmap
    changelog.md
    api_reference
 
