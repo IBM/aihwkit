@@ -135,7 +135,7 @@ compiling the sources, using a build system based on `cmake`.
 ## Authors
 
 IBM Analog Hardware Acceleration Kit has been developed by IBM Research,
-with with Malte Rasch, Tayfun Gokmen, Diego Moreda and Manuel Le Gallo-Bourdeau
+with Malte Rasch, Tayfun Gokmen, Diego Moreda and Manuel Le Gallo-Bourdeau
 as the initial core authors, along with many [contributors].
 
 You can contact us by opening a new issue in the repository, or alternatively
