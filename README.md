@@ -1,6 +1,9 @@
 # IBM Analog Hardware Acceleration Kit
 
+![PyPI](https://img.shields.io/pypi/v/aihwkit)
 [![Documentation Status](https://readthedocs.org/projects/aihwkit/badge/?version=latest)](https://aihwkit.readthedocs.io/en/latest/?badge=latest)
+[![Build Status](https://travis-ci.com/IBM/aihwkit.svg?branch=master)](https://travis-ci.com/IBM/aihwkit)
+![PyPI - License](https://img.shields.io/pypi/l/aihwkit)
 
 ## Description
 
@@ -73,7 +76,10 @@ for epoch in range(10):
 ```
 
 You can find more examples in the [`examples/`] folder of the project, and
-more information about the library in the [documentation].
+more information about the library in the [documentation]. Please note that
+the examples have some additional dependencies - you can install them via
+`pip install -r requirements-examples.txt`.
+
 
 ## What is Analog AI?
 
@@ -132,7 +138,7 @@ compiling the sources, using a build system based on `cmake`.
 ## Authors
 
 IBM Analog Hardware Acceleration Kit has been developed by IBM Research,
-with with Malte Rasch, Tayfun Gokmen, Diego Moreda and Manuel Le Gallo-Bourdeau
+with Malte Rasch, Tayfun Gokmen, Diego Moreda and Manuel Le Gallo-Bourdeau
 as the initial core authors, along with many [contributors].
 
 You can contact us by opening a new issue in the repository, or alternatively
