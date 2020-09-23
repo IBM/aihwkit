@@ -361,7 +361,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
     )pbdoc")
       .def(
           py::init([](RPU::RPUPulsed<T> &rpu) {
-            // TODO: why does directly passing a stream gets
+            // TODO: why does directly passing a stream is a problem?
             return std::unique_ptr<ClassPulsed>(
                 new ClassPulsed(at::cuda::getCurrentCUDAStream(), rpu));
           }),

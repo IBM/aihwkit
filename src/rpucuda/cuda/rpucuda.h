@@ -12,8 +12,8 @@
 
 #pragma once
 
-#include "cuda_util.h"
 #include "cuda_math_util.h"
+#include "cuda_util.h"
 #include "io_iterator.h"
 #include "rng.h"
 #include "rpu.h"

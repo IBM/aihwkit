@@ -12,7 +12,7 @@
 
 """High level analog tiles."""
 
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union, Any
 
 from collections import OrderedDict
 
@@ -25,9 +25,10 @@ from torch import device as torch_device
 
 from aihwkit.simulator.devices import (
     BaseResistiveDevice,
+    FloatingPointResistiveDevice,
     ConstantStepResistiveDevice,
-    FloatingPointResistiveDevice
-)
+    )
+
 from aihwkit.simulator.rpu_base import tiles, cuda
 
 
@@ -52,7 +53,8 @@ class BaseTile:
             resistive_device: BaseResistiveDevice,
             bias: bool = True,
             in_trans: bool = False,
-            out_trans: bool = False):
+            out_trans: bool = False,
+            _from_tile: Optional[Any] = None):
         self.out_size = out_size
         self.in_size = in_size
         self.resistive_device = resistive_device
@@ -62,7 +64,11 @@ class BaseTile:
 
         x_size = in_size + 1 if self.bias else in_size
         d_size = out_size
-        self.tile = self.resistive_device.create_tile(x_size, d_size)
+
+        if _from_tile is not None:
+            self.tile = _from_tile
+        else:
+            self.tile = self.resistive_device.create_tile(x_size, d_size)
         self.device = torch_device('cpu')
 
     def __getstate__(self) -> Dict:
@@ -227,6 +233,25 @@ class BaseTile:
         """
         return self.tile.diffuse_weights()
 
+    def reset_columns(self, start_column_idx: int = 0, num_columns: int = 1,
+                      reset_prob: float = 1.0) -> None:
+        r"""Reset (a number of) columns.
+
+        Resets the weights with device-to-device and cycle-to-cycle
+        variability (depending on device type), typically::
+
+        .. math::
+           W_{ij} = \xi*\sigma_\text{reset} + b^\text{reset}_{ij}
+
+        Args:
+           start_column_idx: a start index of columns (0..x_size-1)
+           num_columns: how many consecutive columns to reset (with circular warping)
+           reset_prob: individial probability of reset.
+
+        The reset parameter are set during tile init.
+        """
+        return self.tile.reset_columns(start_column_idx, num_columns, reset_prob)
+
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
@@ -385,10 +410,12 @@ class FloatingPointTile(BaseTile):
             resistive_device: Optional[FloatingPointResistiveDevice] = None,
             bias: bool = False,
             in_trans: bool = False,
-            out_trans: bool = False):
+            out_trans: bool = False,
+            _from_tile: Optional[tiles.FloatingPointTile] = None):
         self.resistive_device: FloatingPointResistiveDevice = (
             resistive_device or FloatingPointResistiveDevice())
-        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans)
+        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans,
+                         _from_tile=_from_tile)
 
     def cuda(
             self,
@@ -401,7 +428,8 @@ class FloatingPointTile(BaseTile):
 
         with cuda_device(device):
             tile = CudaFloatingPointTile(self.out_size, self.in_size, self.resistive_device,
-                                         self.bias, self.in_trans, self.out_trans)
+                                         self.bias, self.in_trans, self.out_trans,
+                                         _from_tile=self.tile)
         return tile
 
 
@@ -569,9 +597,11 @@ class AnalogTile(BaseTile):
             resistive_device: Optional[BaseResistiveDevice] = None,
             bias: bool = False,
             in_trans: bool = False,
-            out_trans: bool = False):
+            out_trans: bool = False,
+            _from_tile: Optional[tiles.AnalogTile] = None):
         self.resistive_device = resistive_device or ConstantStepResistiveDevice()
-        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans)
+        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans,
+                         _from_tile=_from_tile)
 
     def cuda(
             self,
@@ -587,7 +617,8 @@ class AnalogTile(BaseTile):
 
         with cuda_device(device):
             tile = CudaAnalogTile(self.out_size, self.in_size, self.resistive_device,
-                                  self.bias, self.in_trans, self.out_trans)
+                                  self.bias, self.in_trans, self.out_trans,
+                                  _from_tile=self.tile)
         return tile
 
 
@@ -612,11 +643,13 @@ class CudaFloatingPointTile(FloatingPointTile):
             resistive_device: Optional[FloatingPointResistiveDevice] = None,
             bias: bool = False,
             in_trans: bool = False,
-            out_trans: bool = False):
+            out_trans: bool = False,
+            _from_tile: Optional[tiles.FloatingPointTile] = None):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans)
+        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans,
+                         _from_tile=_from_tile)
 
         self.tile = tiles.CudaFloatingPointTile(self.tile)
         self.stream = current_stream()
@@ -653,11 +686,13 @@ class CudaAnalogTile(AnalogTile):
             resistive_device: Optional[BaseResistiveDevice] = None,
             bias: bool = False,
             in_trans: bool = False,
-            out_trans: bool = False):
+            out_trans: bool = False,
+            _from_tile: Optional[tiles.AnalogTile] = None):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans)
+        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans,
+                         _from_tile=_from_tile)
 
         self.tile = tiles.CudaAnalogTile(self.tile)
         self.stream = current_stream()

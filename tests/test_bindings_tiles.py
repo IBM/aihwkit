@@ -24,14 +24,14 @@ from aihwkit.simulator.tiles import FloatingPointTile, AnalogTile
 from aihwkit.simulator.rpu_base import tiles, cuda
 
 from aihwkit.simulator.parameters import (
-    AnalogTileBackwardInputOutputParameters, FloatingPointTileParameters,
+    FloatingPointTileParameters,
     ConstantStepResistiveDeviceParameters,
     AnalogTileInputOutputParameters,
-    AnalogTileUpdateParameters,
-    PulseType
+    AnalogTileBackwardInputOutputParameters
 )
 
 from aihwkit.simulator.devices import (FloatingPointResistiveDevice,
+                                       IdealResistiveDevice,
                                        ConstantStepResistiveDevice)
 
 
@@ -207,15 +207,12 @@ class AnalogTileTest(TestCase, TileTestMixin):
 
     def get_noisefree_tile(self, out_size, in_size):
         """Return a tile of the specified dimensions with noisiness turned off."""
-        params = ConstantStepResistiveDeviceParameters()
-        io_params = AnalogTileInputOutputParameters(is_perfect=True)
-        io_params_backward = AnalogTileBackwardInputOutputParameters(is_perfect=True)
-        up_params = AnalogTileUpdateParameters(pulse_type=PulseType('None'))
-        resistive_device = ConstantStepResistiveDevice(params_devices=params,
-                                                       params_forward=io_params,
-                                                       params_backward=io_params_backward,
-                                                       params_update=up_params)
+        resistive_device = IdealResistiveDevice(
+            params_forward=AnalogTileInputOutputParameters(is_perfect=True),
+            params_backward=AnalogTileBackwardInputOutputParameters(is_perfect=True))
         python_tile = AnalogTile(out_size, in_size, resistive_device)
+
+        self.set_init_weights(python_tile)
         return python_tile
 
     def test_setters_weights(self):
@@ -257,6 +254,19 @@ class CudaFloatingPointTileTest(FloatingPointTileTest):
         """Return a CUDA floating point tile of the specified dimensions."""
         return super().get_tile(out_size, in_size, device_params).cuda()
 
+    def get_noisefree_tile(self, out_size, in_size):
+        """Return a CUDA floating point tile of the specified dimensions."""
+        return super().get_noisefree_tile(out_size, in_size).cuda()
+
+    def test_cuda_instantiation(self):
+        """ tests whether cuda weights are copied correctly"""
+        python_tile = super().get_tile(10, 12)
+        init_weights = python_tile.tile.get_weights()
+
+        cuda_python_tile = python_tile.cuda()
+        init_weigts_cuda = cuda_python_tile.tile.get_weights()
+        assert_array_almost_equal(init_weights, init_weigts_cuda)
+
 
 @skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
 class CudaAnalogTileTest(AnalogTileTest):
@@ -265,3 +275,7 @@ class CudaAnalogTileTest(AnalogTileTest):
     def get_tile(self, out_size, in_size, device_params=None):
         """Return a CUDA analog tile of the specified dimensions."""
         return super().get_tile(out_size, in_size, device_params).cuda()
+
+    def get_noisefree_tile(self, out_size, in_size):
+        """Return a CUDA floating point tile of the specified dimensions."""
+        return super().get_noisefree_tile(out_size, in_size).cuda()
