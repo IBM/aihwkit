@@ -61,7 +61,7 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   bool units_in_mbatch = false;
   int n_cols_per_transfer = 1;
   T with_reset_prob = (T)0.0;
-  bool no_self_transfer = false;
+  bool no_self_transfer = true;
   bool random_column = false;
 
   T transfer_lr = (T)1.0;

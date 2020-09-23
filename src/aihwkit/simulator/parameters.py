@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import ClassVar, Type
+from typing import ClassVar, Type, List
 
 from aihwkit.simulator.rpu_base import devices
 
@@ -274,7 +274,6 @@ class AnalogTileUpdateParameters:
 
 
 # Basic parameters.
-
 @dataclass
 class FloatingPointTileParameters:
     """Parameters that modify the behaviour of a simple device."""
@@ -307,10 +306,34 @@ class AnalogTileParameters:
     """Parameter for the update behavior."""
 
 
-# Device parameters.
+@dataclass
+class AbstractResistiveDeviceParameters(FloatingPointTileParameters):
+    """Abstract base class of all parameters."""
+
+    bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
+
+    construction_seed: int = 0
+    """ If not equal 0, will set a unique seed for hidden parameters
+    during construction"""
+
 
 @dataclass
-class PulsedResistiveDeviceParameters(FloatingPointTileParameters):
+class IdealResistiveDeviceParameters(AbstractResistiveDeviceParameters):
+    """Ideal floating point update."""
+
+    bindings_class: ClassVar[Type] = devices.IdealResistiveDeviceParameter
+
+
+@dataclass
+class PulsedResistiveDeviceBaseParameters(AbstractResistiveDeviceParameters):
+    """Abstract base class of all pulsed parameters."""
+
+    bindings_class: ClassVar[Type] = devices.PulsedBaseResistiveDeviceParameter
+
+
+# Device parameters.
+@dataclass
+class PulsedResistiveDeviceParameters(PulsedResistiveDeviceBaseParameters):
     """Parameters that modify the behaviour of a pulsed device."""
 
     bindings_class: ClassVar[Type] = devices.PulsedResistiveDeviceParameter
@@ -423,3 +446,233 @@ class ConstantStepResistiveDeviceParameters(PulsedResistiveDeviceParameters):
     """Parameters that modify the behaviour of a ConstantStep device."""
 
     bindings_class: ClassVar[Type] = devices.ConstantStepResistiveDeviceParameter
+
+
+@dataclass
+class LinearStepResistiveDeviceParameters(PulsedResistiveDeviceParameters):
+    """Parameters that modify the behaviour of a LinearStep resistive device."""
+
+    bindings_class: ClassVar[Type] = devices.LinearStepResistiveDeviceParameter
+
+    gamma_up: float = 0.0
+    r"""The value of :math:`\gamma^+`.
+
+    Intuitively, a value of 0.1 means that the update step size in up
+    direction at the weight bounds is 10% decreased relative to that
+    origin :math:`w=0`.
+
+    Note:
+
+       In principle one could fix :math:`\gamma=\gamma^-=\gamma^+` since
+       up/down variation can be given by ``up_down_dtod``, see
+       :class:`~ConstantStepResistiveDevice`.
+
+    Note:
+
+       The hard-bounds are still observed, so that the weight cannot
+       grow beyond its bounds.
+
+    """
+
+    gamma_down: float = 0.0
+    r"""The value of :math:`\gamma^-`.
+    """
+
+    gamma_up_dtod: float = 0.05
+    r""" Device-to-device variation for :math:`\gamma^+`, i.e. the
+    value of :math:`\gamma_\text{d-to-d}^+`.
+    """
+
+    gamma_down_dtod: float = 0.05
+    r""" Device-to-device variation for :math:`\gamma^-`, i.e. the
+    value of :math:`\gamma_\text{d-to-d}^-`.
+    """
+
+    allow_increasing: bool = False
+    """ Whether to allow the situation where update sizes increase
+    towards the bound instead of saturating (and thus becoming smaller)
+    """
+
+    mean_bound_reference: bool = True
+    r""" Whether to use instead of the above:
+
+    .. math::
+
+        \gamma_{ij}^+ &=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}
+
+        \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}
+
+    where :math:`b^\text{max}` and :math:`b^\text{max}` are the
+    values given by ``w_max`` and ``w_min``, see
+    :class:`~ConstantStepResistiveDevice`.
+
+    """
+
+    mult_noise: bool = True
+    """Whether to use multiplicative noise instead of additive
+    cycle-to-cycle noise"""
+
+
+@dataclass
+class SoftBoundsResistiveDeviceParameters(PulsedResistiveDeviceParameters):
+    """Parameters that modify the behaviour of a SoftBounds resistive device."""
+
+    bindings_class: ClassVar[Type] = devices.SoftBoundsResistiveDeviceParameter
+
+    mult_noise: bool = True
+    """Whether to use multiplicative noise instead of additive
+    cycle-to-cycle noise"""
+
+
+@dataclass
+class ExpStepResistiveDeviceParameters(PulsedResistiveDeviceParameters):
+    """Parameters that modify the behavior of a ExpStep resistive device."""
+    # pylint: disable=invalid-name
+
+    bindings_class: ClassVar[Type] = devices.ExpStepResistiveDeviceParameter
+
+    A_up: float = 0.00081
+    """Factor A for the up direction"""
+
+    A_down: float = 0.36833
+    """Factor A for the down direction"""
+
+    gamma_up: float = 12.44625
+    """ Exponent for the up direction."""
+
+    gamma_down: float = 12.78785
+    """ Exponent for the down direction."""
+
+    a: float = 0.244
+    """ global slope parameter"""
+
+    b: float = 0.2425
+    """ global offset parameter"""
+
+
+@dataclass
+class SoftBoundsDeviceParameters(PulsedResistiveDeviceBaseParameters):
+    """Parameters that modify the behavior of an abstract softbounds device."""
+
+    bindings_class: ClassVar[Type] = devices.SoftBoundsResistiveDeviceParameter
+
+
+@dataclass
+class VectorUnitCellParameters(PulsedResistiveDeviceBaseParameters):
+    """Parameters that modify the behavior of an abstract vector resistive device."""
+
+    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
+
+    single_device_update: bool = False
+    """Whether to only cycle one device during
+    pulsed update or pulse all devices of one crosspoint at once.
+    """
+
+    single_device_update_random: bool = False
+    """Whether to select at random (in case of ``single_device_update``)"""
+
+
+@dataclass
+class DifferenceUnitCellParameters(PulsedResistiveDeviceBaseParameters):
+    """Parameters that modify the behavior of an abstract difference resistive device."""
+
+    bindings_class: ClassVar[Type] = devices.DifferenceResistiveDeviceParameter
+
+
+@dataclass
+class TransferUnitCellParameters(PulsedResistiveDeviceBaseParameters):
+    """Parameters that modify the behavior of an abstract transfer resistive device."""
+
+    bindings_class: ClassVar[Type] = devices.TransferResistiveDeviceParameter
+
+    gamma: float = 0.0
+    """
+    Weightening factor g**(n-1) W[0] + g**(n-2) W[1] + .. + g**0 W[n-1]
+    """
+
+    gamma_vec: List[float] = field(default_factory=list)
+    """
+    User-defined weightening can be given as a list if weights in
+    which case the default weightening scheme with ``gamma`` is not
+    used.
+    """
+
+    transfer_every: float = 0.0
+    """ Transfers every :math:`n` mat-vec operations (rounded to
+    multiples/ratios of m_batch for CUDA). If ``units_in_mbatch`` is
+    set, then the units are in ``m_batch`` instead of mat-vecs, which
+    is equal to the overall the weight re-use during a while
+    mini-batch.
+
+    If 0 it is set to ``x_size / n_cols_per_transfer``.
+
+    The higher transfer cycles are geometrically scaled, the first is
+    set to transfer_every. Each next transfer cycle is multiplied by
+    by ``x_size / n_cols_per_transfer``.
+    """
+
+    no_self_transfer: bool = True
+    """ Whether to set the transfer rate of the last device (which is
+    applied to itself) to zero.
+    """
+
+    transfer_every_vec: List[float] = field(default_factory=list)
+    """A list of :math:`n` entries, to explicitly set the transfer
+    cycles lengths. In this case, the above defaults are ignored.
+    """
+
+    units_in_mbatch: bool = True
+    """ If set, then the cycle length units of ``transfer_every`` are
+    in ``m_batch`` instead of mat-vecs, which is equal to the overall
+    the weight re-use during a while mini-batch.
+    """
+
+    n_cols_per_transfer: int = 1
+    """How many consecutive columns to read (from one tile) and write
+    (to the next tile) every transfer event. For read, the input is a
+    1-hot vector. Once the final column is reached, reading starts
+    again from the first.
+    """
+
+    with_reset_prob: float = 0.0
+    """Whether to apply reset of the columns that were transferred
+    with a given probability."""
+
+    random_column: bool = False
+    """Whether to select a random starting column for each transfer
+    event and not take the next column that was previously not
+    transferred as a starting column (the default).
+    """
+
+    transfer_lr: float = 1.0
+    """ Learning rate (LR) for the update step of the transfer
+    event. Per default all learning rates are identical. If
+    ``scale_transfer_lr`` is set, the transfer LR is scaled by current
+    learning rate of the SGD.
+
+    Note:
+
+      LR is always a positive number, sign will be correctly
+      applied internally.
+    """
+
+    transfer_lr_vec: List[float] = field(default_factory=list)
+    """Transfer LR for each individual transfer in the device chain
+    can be given.
+    """
+
+    scale_transfer_lr: bool = True
+    """Whether to give the transfer_lr in relative units, ie whether
+    to scale the transfer LR with the current LR of the SGD.
+    """
+
+    params_transfer_forward: AnalogTileInputOutputParameters = AnalogTileInputOutputParameters()
+    """Input-output parameters
+    :class:`~AnalogTileInputOutputParameters` that define the read
+    (forward) of an transfer event. For instance the amount of noise
+    or whether transfer is done using a ADC/DAC etc."""
+
+    params_transfer_update: AnalogTileUpdateParameters = AnalogTileUpdateParameters()
+    """ Update parameters :class:`~AnalogTileUpdateParameters` that
+    define the type of update used for each transfer event.
+    """

@@ -405,6 +405,23 @@ void declare_rpu_tiles(py::module &m) {
                bias_no_decay: Whether to not decay the bias row
            )pbdoc")
       .def(
+          "reset_columns",
+          [](Class &self, int start_col, int n_cols, T reset_prob) {
+            return self.resetCols(start_col, n_cols, reset_prob);
+          },
+          py::arg("start_column_idx") = 0, py::arg("num_columns") = 1, py::arg("reset_prob") = 1.0,
+          R"pbdoc(
+           Resets the weights with device-to-device and cycle-to-cycle
+           variability (depending on device type), typically::
+
+              W_ij = xi*reset_std + reset_bias_ij
+
+           Args:
+               start_col: a start index of columns (0..x_size-1)
+               n_col: how many consecutive columns to reset (with circular warping)
+               reset_prob: individial probability of reset.
+           )pbdoc")
+      .def(
           "forward",
           [](Class &self, const torch::Tensor &x_input_, bool bias = false, bool x_trans = false,
              bool d_trans = false, bool is_test = false) {
@@ -615,10 +632,10 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Compute the dot product using an index matrix (forward pass).
 
-           Caution: 
+           Caution:
                Internal use for convolutions only.
 
-           Args: 
+           Args:
                x_input: 4D torch::tensor in order N,C,H,W
                d_height: height of output image(s)
                d_width: width of output image(s)
@@ -649,10 +666,10 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
-           Caution: 
+           Caution:
                Internal use for convolutions only.
 
-           Args: 
+           Args:
                d_input: 4D torch::tensor in order N,C,H,W
                x_channel: number of grad_input channels
                x_height: height of grad_input image(s)
@@ -685,7 +702,7 @@ void declare_rpu_tiles(py::module &m) {
            Caution:
                Internal use for convolutions only.
 
-           Args: 
+           Args:
                x_input: 4D torch::tensor input in order N,C,H,W
                d_input: 4D torch::tensor (grad_output) in order N,C,oH,oW
            )pbdoc")
@@ -699,10 +716,10 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Sets the index vector for the ``*_indexed`` functionality.
 
-           Caution: 
+           Caution:
                Internal use only.
 
-           Args: 
+           Args:
                indices: int torch::Tensor
           )pbdoc")
       .def(

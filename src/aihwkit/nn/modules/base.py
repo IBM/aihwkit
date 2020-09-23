@@ -44,8 +44,8 @@ class AnalogModuleBase(Module):
     """
     # pylint: disable=abstract-method
 
-    TILE_CLASS_FLOATING_POINT = FloatingPointTile
-    TILE_CLASS_ANALOG = AnalogTile
+    TILE_CLASS_FLOATING_POINT: Any = FloatingPointTile
+    TILE_CLASS_ANALOG: Any = AnalogTile
 
     def _setup_tile(
             self,

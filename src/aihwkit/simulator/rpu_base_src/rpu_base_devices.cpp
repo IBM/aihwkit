@@ -15,8 +15,16 @@
 void declare_rpu_devices(py::module &m) {
 
   using AbstractParam = RPU::AbstractRPUDeviceMetaParameter<T>;
+  using SimpleParam = RPU::SimpleRPUDeviceMetaParameter<T>;
+  using PulsedBaseParam = RPU::PulsedRPUDeviceMetaParameterBase<T>;
   using PulsedParam = RPU::PulsedRPUDeviceMetaParameter<T>;
   using ConstantStepParam = RPU::ConstantStepRPUDeviceMetaParameter<T>;
+  using LinearStepParam = RPU::LinearStepRPUDeviceMetaParameter<T>;
+  using SoftBoundsParam = RPU::SoftBoundsRPUDeviceMetaParameter<T>;
+  using ExpStepParam = RPU::ExpStepRPUDeviceMetaParameter<T>;
+  using VectorParam = RPU::VectorRPUDeviceMetaParameter<T>;
+  using DifferenceParam = RPU::DifferenceRPUDeviceMetaParameter<T>;
+  using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -36,6 +44,42 @@ void declare_rpu_devices(py::module &m) {
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD_PURE(
           RPU::AbstractRPUDevice<T> *, AbstractParam, createDevice, x_size, d_size, rng);
+    }
+  };
+  class PySimpleParam : public SimpleParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD_PURE(std::string, SimpleParam, getName, );
+    }
+    SimpleParam *clone() const override {
+      PYBIND11_OVERLOAD_PURE(SimpleParam *, SimpleParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD_PURE(RPU::DeviceUpdateType, SimpleParam, implements, );
+    }
+    RPU::SimpleRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD_PURE(
+          RPU::SimpleRPUDevice<T> *, SimpleParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  
+  class PyPulsedBaseParam : public PulsedBaseParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD_PURE(std::string, PulsedBaseParam, getName, );
+    }
+    PulsedBaseParam *clone() const override {
+      PYBIND11_OVERLOAD_PURE(PulsedBaseParam *, PulsedBaseParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD_PURE(RPU::DeviceUpdateType, PulsedBaseParam, implements, );
+    }
+    RPU::PulsedRPUDeviceBase<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD_PURE(
+          RPU::PulsedRPUDeviceBase<T> *, PulsedBaseParam, createDevice, x_size, d_size, rng);
     }
   };
 
@@ -73,6 +117,101 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
+  class PyLinearStepParam : public LinearStepParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, LinearStepParam, getName, );
+    }
+    LinearStepParam *clone() const override {
+      PYBIND11_OVERLOAD(LinearStepParam *, LinearStepParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, LinearStepParam, implements, );
+    }
+    RPU::LinearStepRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::LinearStepRPUDevice<T> *, LinearStepParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  class PySoftBoundsParam : public SoftBoundsParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, SoftBoundsParam, getName, );
+    }
+    SoftBoundsParam *clone() const override {
+      PYBIND11_OVERLOAD(SoftBoundsParam *, SoftBoundsParam, clone, );
+    }
+  };
+
+  class PyExpStepParam : public ExpStepParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, ExpStepParam, getName, );
+    }
+    ExpStepParam *clone() const override {
+      PYBIND11_OVERLOAD(ExpStepParam *, ExpStepParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, ExpStepParam, implements, );
+    }
+    RPU::ExpStepRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::ExpStepRPUDevice<T> *, ExpStepParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  class PyVectorParam : public VectorParam {
+  public:
+    std::string getName() const override { PYBIND11_OVERLOAD(std::string, VectorParam, getName, ); }
+    VectorParam *clone() const override { PYBIND11_OVERLOAD(VectorParam *, VectorParam, clone, ); }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, VectorParam, implements, );
+    }
+    RPU::VectorRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(RPU::VectorRPUDevice<T> *, VectorParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  class PyDifferenceParam : public DifferenceParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, DifferenceParam, getName, );
+    }
+    DifferenceParam *clone() const override {
+      PYBIND11_OVERLOAD(DifferenceParam *, DifferenceParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, DifferenceParam, implements, );
+    }
+    RPU::DifferenceRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::DifferenceRPUDevice<T> *, DifferenceParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  class PyTransferParam : public TransferParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, TransferParam, getName, );
+    }
+    TransferParam *clone() const override {
+      PYBIND11_OVERLOAD(TransferParam *, TransferParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, TransferParam, implements, );
+    }
+    RPU::TransferRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::TransferRPUDevice<T> *, TransferParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
   /*
    * Python class definitions.
    */
@@ -95,10 +234,8 @@ void declare_rpu_devices(py::module &m) {
   py::class_<RPU::PulsedMetaParameter<T>>(m, "AnalogTileParameter")
       .def(py::init<>())
       .def(
-          "create_array",
-          [](RPU::PulsedMetaParameter<T> &self, int n_cols, int n_rows, ConstantStepParam *dp) {
-            return self.createRPUArray(n_cols, n_rows, dp);
-          })
+          "create_array", [](RPU::PulsedMetaParameter<T> &self, int n_cols, int n_rows,
+                             AbstractParam *dp) { return self.createRPUArray(n_cols, n_rows, dp); })
       .def(
           "__str__",
           [](RPU::PulsedMetaParameter<T> &self) {
@@ -109,36 +246,6 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("forward_io", &RPU::PulsedMetaParameter<T>::f_io)
       .def_readwrite("backward_io", &RPU::PulsedMetaParameter<T>::b_io)
       .def_readwrite("update", &RPU::PulsedMetaParameter<T>::up);
-
-  py::class_<AbstractParam, PyAbstractParam, RPU::SimpleMetaParameter<T>>(
-      m, "AbstractResistiveDevicesParameter")
-      .def(py::init<>());
-
-  py::class_<PulsedParam, PyPulsedParam, AbstractParam>(m, "PulsedResistiveDeviceParameter")
-      .def(py::init<>())
-      // Properties from this class.
-      .def_readwrite("corrupt_devices_prob", &PulsedParam::corrupt_devices_prob)
-      .def_readwrite("corrupt_devices_range", &PulsedParam::corrupt_devices_range)
-      .def_readwrite("diffusion_dtod", &PulsedParam::diffusion_dtod)
-      .def_readwrite("dw_min", &PulsedParam::dw_min)
-      .def_readwrite("dw_min_dtod", &PulsedParam::dw_min_dtod)
-      .def_readwrite("dw_min_std", &PulsedParam::dw_min_std)
-      .def_readwrite("enforce_consistency", &PulsedParam::enforce_consistency)
-      .def_readwrite("lifetime_dtod", &PulsedParam::lifetime_dtod)
-      .def_readwrite("perfect_bias", &PulsedParam::perfect_bias)
-      .def_readwrite("reset", &PulsedParam::reset)
-      .def_readwrite("reset_dtod", &PulsedParam::reset_dtod)
-      .def_readwrite("reset_std", &PulsedParam::reset_std)
-      .def_readwrite("up_down", &PulsedParam::up_down)
-      .def_readwrite("up_down_dtod", &PulsedParam::up_down_dtod)
-      .def_readwrite("w_max", &PulsedParam::w_max)
-      .def_readwrite("w_max_dtod", &PulsedParam::w_max_dtod)
-      .def_readwrite("w_min", &PulsedParam::w_min)
-      .def_readwrite("w_min_dtod", &PulsedParam::w_min_dtod);
-
-  py::class_<ConstantStepParam, PyConstantStepParam, PulsedParam>(
-      m, "ConstantStepResistiveDeviceParameter")
-      .def(py::init<>());
 
   py::class_<RPU::PulsedUpdateMetaParameter<T>>(m, "AnalogTileUpdateParameter")
       .def(py::init<>())
@@ -171,6 +278,107 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("out_sto_round", &RPU::IOMetaParameter<T>::out_sto_round)
       .def_readwrite("w_noise", &RPU::IOMetaParameter<T>::w_noise)
       .def_readwrite("w_noise_type", &RPU::IOMetaParameter<T>::w_noise_type);
+
+  // device params
+  py::class_<AbstractParam, PyAbstractParam, RPU::SimpleMetaParameter<T>>(
+      m, "AbstractResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("construction_seed", &AbstractParam::construction_seed);
+
+  py::class_<PulsedBaseParam, PyPulsedBaseParam, AbstractParam>(
+      m, "PulsedBaseResistiveDeviceParameter")
+      .def(py::init<>());
+
+  py::class_<SimpleParam, PySimpleParam, AbstractParam>(
+      m, "IdealResistiveDeviceParameter")
+      .def(py::init<>());
+  
+  py::class_<PulsedParam, PyPulsedParam, AbstractParam>(m, "PulsedResistiveDeviceParameter")
+      .def(py::init<>())
+      // Properties from this class.
+      .def_readwrite("corrupt_devices_prob", &PulsedParam::corrupt_devices_prob)
+      .def_readwrite("corrupt_devices_range", &PulsedParam::corrupt_devices_range)
+      .def_readwrite("diffusion_dtod", &PulsedParam::diffusion_dtod)
+      .def_readwrite("dw_min", &PulsedParam::dw_min)
+      .def_readwrite("dw_min_dtod", &PulsedParam::dw_min_dtod)
+      .def_readwrite("dw_min_std", &PulsedParam::dw_min_std)
+      .def_readwrite("enforce_consistency", &PulsedParam::enforce_consistency)
+      .def_readwrite("lifetime_dtod", &PulsedParam::lifetime_dtod)
+      .def_readwrite("perfect_bias", &PulsedParam::perfect_bias)
+      .def_readwrite("reset", &PulsedParam::reset)
+      .def_readwrite("reset_dtod", &PulsedParam::reset_dtod)
+      .def_readwrite("reset_std", &PulsedParam::reset_std)
+      .def_readwrite("up_down", &PulsedParam::up_down)
+      .def_readwrite("up_down_dtod", &PulsedParam::up_down_dtod)
+      .def_readwrite("w_max", &PulsedParam::w_max)
+      .def_readwrite("w_max_dtod", &PulsedParam::w_max_dtod)
+      .def_readwrite("w_min", &PulsedParam::w_min)
+      .def_readwrite("w_min_dtod", &PulsedParam::w_min_dtod);
+
+  py::class_<ConstantStepParam, PyConstantStepParam, PulsedParam>(
+      m, "ConstantStepResistiveDeviceParameter")
+      .def(py::init<>());
+
+  py::class_<LinearStepParam, PyLinearStepParam, PulsedParam>(
+      m, "LinearStepResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("gamma_up", &LinearStepParam::ls_decrease_up)
+      .def_readwrite("gamma_down", &LinearStepParam::ls_decrease_down)
+      .def_readwrite("gamma_up_dtod", &LinearStepParam::ls_decrease_up_dtod)
+      .def_readwrite("gamma_down_dtod", &LinearStepParam::ls_decrease_down_dtod)
+      .def_readwrite("allow_increasing", &LinearStepParam::ls_allow_increasing_slope)
+      .def_readwrite("mean_bound_reference", &LinearStepParam::ls_mean_bound_reference)
+      .def_readwrite("mult_noise", &LinearStepParam::ls_mult_noise);
+
+  py::class_<SoftBoundsParam, PySoftBoundsParam, PulsedParam>(
+      m, "SoftBoundsResistiveDeviceParameter")
+      .def_readwrite("mult_noise", &SoftBoundsParam::ls_mult_noise)
+      .def(py::init<>());
+
+  py::class_<ExpStepParam, PyExpStepParam, PulsedParam>(m, "ExpStepResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("A_up", &ExpStepParam::es_A_up)
+      .def_readwrite("A_down", &ExpStepParam::es_A_down)
+      .def_readwrite("gamma_up", &ExpStepParam::es_gamma_up)
+      .def_readwrite("gamma_down", &ExpStepParam::es_gamma_down)
+      .def_readwrite("a", &ExpStepParam::es_a)
+      .def_readwrite("b", &ExpStepParam::es_b);
+
+  py::class_<VectorParam, PyVectorParam, PulsedBaseParam>(m, "VectorResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("single_device_update", &VectorParam::single_device_update)
+      .def_readwrite("single_device_update_random", &VectorParam::single_device_update_random)
+      .def(
+          "append_parameter",
+          [](VectorParam &self, RPU::AbstractRPUDeviceMetaParameter<T> &dp) {
+            return self.appendVecPar(dp.clone());
+          },
+          py::arg("parameter"),
+          R"pbdoc(
+           Adds a pulsed base device parameter to the vector device.
+           )pbdoc");
+
+  py::class_<DifferenceParam, PyDifferenceParam, VectorParam>(
+      m, "DifferenceResistiveDeviceParameter")
+      .def(py::init<>());
+
+  py::class_<TransferParam, PyTransferParam, VectorParam>(m, "TransferResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("gamma", &TransferParam::gamma)
+      .def_readwrite("gamma_vec", &TransferParam::gamma_vec)
+      .def_readwrite("transfer_every", &TransferParam::transfer_every)
+      .def_readwrite("no_self_transfer", &TransferParam::no_self_transfer)
+      .def_readwrite(
+          "transfer_every_vec", &TransferParam::transfer_every_vec) // can this be filled?
+      .def_readwrite("units_in_mbatch", &TransferParam::units_in_mbatch)
+      .def_readwrite("n_cols_per_transfer", &TransferParam::n_cols_per_transfer)
+      .def_readwrite("with_reset_prob", &TransferParam::with_reset_prob)
+      .def_readwrite("random_column", &TransferParam::random_column)
+      .def_readwrite("transfer_lr", &TransferParam::transfer_lr)
+      .def_readwrite("transfer_lr_vec", &TransferParam::transfer_lr_vec)
+      .def_readwrite("scale_transfer_lr", &TransferParam::scale_transfer_lr)
+      .def_readwrite("params_transfer_forward", &TransferParam::transfer_io)
+      .def_readwrite("params_transfer_update", &TransferParam::transfer_up);
 
   /**
    * Helper enums.

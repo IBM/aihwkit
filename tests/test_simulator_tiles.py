@@ -18,9 +18,20 @@ from numpy.testing import assert_array_almost_equal
 
 from torch import Tensor
 
-from aihwkit.simulator.devices import ConstantStepResistiveDevice
+from aihwkit.simulator.devices import (IdealResistiveDevice,
+                                       ConstantStepResistiveDevice,
+                                       LinearStepResistiveDevice,
+                                       ExpStepResistiveDevice,
+                                       PulsedResistiveDevice,
+                                       DifferenceUnitCell,
+                                       VectorUnitCell,
+                                       TransferUnitCell)
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile
-from aihwkit.simulator.parameters import ConstantStepResistiveDeviceParameters
+from aihwkit.simulator.parameters import (ConstantStepResistiveDeviceParameters,
+                                          LinearStepResistiveDeviceParameters,
+                                          ExpStepResistiveDeviceParameters,
+                                          SoftBoundsResistiveDeviceParameters,
+                                          AnalogTileInputOutputParameters)
 from aihwkit.simulator.rpu_base import tiles, cuda
 
 
@@ -33,6 +44,10 @@ class TileTestMixin:
         """Return an analog tile of the specified dimensions."""
         raise NotImplementedError
 
+    def get_first_hidden_field(self):
+        """Return the expected first hidden field"""
+        raise NotImplementedError
+
     def assertTensorAlmostEqual(self, tensor_a, tensor_b):
         """Assert that two tensors are almost equal."""
         # pylint: disable=invalid-name
@@ -41,11 +56,12 @@ class TileTestMixin:
         assert_array_almost_equal(array_a, array_b)
 
     def test_bias(self):
-        """Test instantiating a floating point tile."""
+        """Test instantiating a tile."""
         out_size = 2
         in_size = 3
 
         analog_tile = self.get_tile(out_size, in_size, bias=True)
+
         self.assertIsInstance(analog_tile.tile, self.simulator_tile_class)
 
         learning_rate = 0.123
@@ -102,30 +118,33 @@ class TileTestMixin:
         analog_tile = self.get_tile(4, 5)
 
         hidden_parameters = analog_tile.get_hidden_parameters()
+        field = self.get_first_hidden_field()
 
         # Check that there are hidden parameters.
-        if isinstance(analog_tile, AnalogTile):
+        if field is not None:
             self.assertGreater(len(hidden_parameters), 0)
         else:
             self.assertEqual(len(hidden_parameters), 0)
 
-        if isinstance(analog_tile, AnalogTile):
+        if field is not None:
             # Check that one of the parameters is correct.
-            self.assertIn('max_bound', hidden_parameters.keys())
-            self.assertEqual(hidden_parameters['max_bound'].shape,
+            self.assertIn(field, hidden_parameters.keys())
+            self.assertEqual(hidden_parameters[field].shape,
                              (4, 5))
             self.assertTrue(all(val == 0.6 for val in
-                                hidden_parameters['max_bound'].flatten()))
+                                hidden_parameters[field].flatten()))
 
     def test_set_hidden_parameters(self):
         """Test setting hidden parameters."""
         analog_tile = self.get_tile(3, 4)
 
         hidden_parameters = analog_tile.get_hidden_parameters()
+        field = self.get_first_hidden_field()
 
         # Update one of the values of the hidden parameters.
-        if isinstance(analog_tile, AnalogTile):
-            hidden_parameters['max_bound'][1][1] = 0.1
+        if field is not None:
+            # set higher as default otherwise hidden weight might change
+            hidden_parameters[field][1][1] = 0.8
 
         analog_tile.set_hidden_parameters(hidden_parameters)
 
@@ -135,9 +154,11 @@ class TileTestMixin:
         # Compare old and new hidden parameters tensors.
         for (_, old), (_, new) in zip(hidden_parameters.items(),
                                       new_hidden_parameters.items()):
+
             self.assertTrue(old.allclose(new))
-        if isinstance(analog_tile, AnalogTile):
-            self.assertEqual(new_hidden_parameters['max_bound'][1][1], 0.1)
+
+        if field is not None:
+            self.assertEqual(new_hidden_parameters[field][1][1], 0.8)
 
 
 class FloatingPointTileTest(TileTestMixin, TestCase):
@@ -148,9 +169,25 @@ class FloatingPointTileTest(TileTestMixin, TestCase):
     def get_tile(self, out_size, in_size, **kwargs):
         return FloatingPointTile(out_size, in_size, **kwargs)
 
+    def get_first_hidden_field(self):
+        return None
 
-class AnalogTileTest(TileTestMixin, TestCase):
-    """Tests for AnalogTile."""
+
+class AnalogTileIdealTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Ideal ."""
+
+    simulator_tile_class = tiles.AnalogTile
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = IdealResistiveDevice()
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return None
+
+
+class AnalogTileConstantStepTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/ConstantStep."""
 
     simulator_tile_class = tiles.AnalogTile
 
@@ -160,27 +197,252 @@ class AnalogTileTest(TileTestMixin, TestCase):
                                                   w_min_dtod=0))
 
         return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+class AnalogTileLinearStepTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/LinearStep."""
+
+    simulator_tile_class = tiles.AnalogTile
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = LinearStepResistiveDevice(
+            LinearStepResistiveDeviceParameters(w_max_dtod=0,
+                                                w_min_dtod=0))
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+class AnalogTilePulsedTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Pulsed/LinearStep."""
+
+    simulator_tile_class = tiles.AnalogTile
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = PulsedResistiveDevice(
+            LinearStepResistiveDeviceParameters(w_max_dtod=0,
+                                                w_min_dtod=0))
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+class AnalogTileExpStepTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/LinearStep."""
+
+    simulator_tile_class = tiles.AnalogTile
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = ExpStepResistiveDevice(
+            ExpStepResistiveDeviceParameters(w_max_dtod=0,
+                                             w_min_dtod=0))
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+class AnalogTileVectorTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Vector/ConstantStep."""
+
+    simulator_tile_class = tiles.AnalogTile
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = VectorUnitCell(
+            [ConstantStepResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0),
+             ConstantStepResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0)
+             ])
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return "max_bound_0"
+
+
+class AnalogTileDifferenceTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Difference/ConstantStep."""
+
+    simulator_tile_class = tiles.AnalogTile
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = DifferenceUnitCell(
+            ConstantStepResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0)
+            )
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return "max_bound_0"
+
+
+class AnalogTileTransferTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Transfer/ConstantStep."""
+
+    simulator_tile_class = tiles.AnalogTile
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = TransferUnitCell(
+            [SoftBoundsResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0),
+             SoftBoundsResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0)],
+            params_transfer_forward=AnalogTileInputOutputParameters(is_perfect=True)
+            )
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+
+    def get_first_hidden_field(self):
+        return "max_bound_0"
 
 
 @skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
 class CudaFloatingPointTileTest(TileTestMixin, TestCase):
     """Tests for FloatingPointTile (cuda)."""
 
-    simulator_tile_class = tiles.FloatingPointTile
+    simulator_tile_class = getattr(tiles, 'CudaFloatingPointTile', None)
 
     def get_tile(self, out_size, in_size, **kwargs):
         return FloatingPointTile(out_size, in_size, **kwargs).cuda()
 
+    def get_first_hidden_field(self):
+        return None
+
 
 @skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogTileTest(TileTestMixin, TestCase):
+class CudaAnalogTileIdealTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Ideal (cuda)."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = IdealResistiveDevice()
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return None
+
+
+@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+class CudaAnalogTileConstantStepTest(TileTestMixin, TestCase):
     """Tests for AnalogTile (cuda)."""
 
-    simulator_tile_class = tiles.AnalogTile
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
 
     def get_tile(self, out_size, in_size, **kwargs):
         resistive_device = ConstantStepResistiveDevice(
             ConstantStepResistiveDeviceParameters(w_max_dtod=0,
                                                   w_min_dtod=0))
 
-        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+class CudaAnalogTileLinearStepTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/LinearStep (cuda)."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = LinearStepResistiveDevice(
+            LinearStepResistiveDeviceParameters(w_max_dtod=0,
+                                                w_min_dtod=0))
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+class CudaAnalogTilePulsedTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Pulsed/LinearStep (cuda)."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = PulsedResistiveDevice(
+            LinearStepResistiveDeviceParameters(w_max_dtod=0,
+                                                w_min_dtod=0))
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+class CudaAnalogTileExpStepTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/ExpStep (cuda)."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = ExpStepResistiveDevice(
+            ExpStepResistiveDeviceParameters(w_max_dtod=0,
+                                             w_min_dtod=0))
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return "max_bound"
+
+
+@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+class CudaAnalogTileVectorTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Vector/ConstantStep (cuda)."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = VectorUnitCell([
+            ConstantStepResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0),
+            ConstantStepResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0),
+            ])
+
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return "max_bound_0"
+
+
+@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+class CudaAnalogTileDifferenceTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Difference/ConstantStep (cuda)."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = DifferenceUnitCell(
+            ConstantStepResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0)
+            )
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return "max_bound_0"
+
+
+@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+class CudaAnalogTileTransferTest(TileTestMixin, TestCase):
+    """Tests for AnalogTile/Transfer/ConstantStep (cuda)."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+
+    def get_tile(self, out_size, in_size, **kwargs):
+        resistive_device = TransferUnitCell(
+            [SoftBoundsResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0),
+             SoftBoundsResistiveDeviceParameters(w_max_dtod=0, w_min_dtod=0)],
+            params_transfer_forward=AnalogTileInputOutputParameters(is_perfect=True)
+            )
+        return AnalogTile(out_size, in_size, resistive_device, **kwargs).cuda()
+
+    def get_first_hidden_field(self):
+        return "max_bound_0"
