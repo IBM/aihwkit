@@ -27,7 +27,7 @@ from aihwkit.simulator.devices import (
     BaseResistiveDevice,
     FloatingPointResistiveDevice,
     ConstantStepResistiveDevice,
-    )
+)
 
 from aihwkit.simulator.rpu_base import tiles, cuda
 
@@ -42,6 +42,8 @@ class BaseTile:
         bias: whether to add a bias column to the tile.
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
+        _from_tile: if specified, the simulator tile that will be used instead
+            of creating a new tile.
     """
 
     is_cuda = False
@@ -238,15 +240,15 @@ class BaseTile:
         r"""Reset (a number of) columns.
 
         Resets the weights with device-to-device and cycle-to-cycle
-        variability (depending on device type), typically::
+        variability (depending on device type), typically:
 
         .. math::
-           W_{ij} = \xi*\sigma_\text{reset} + b^\text{reset}_{ij}
+            W_{ij} = \xi*\sigma_\text{reset} + b^\text{reset}_{ij}
 
         Args:
-           start_column_idx: a start index of columns (0..x_size-1)
-           num_columns: how many consecutive columns to reset (with circular warping)
-           reset_prob: individial probability of reset.
+            start_column_idx: a start index of columns (0..x_size-1)
+            num_columns: how many consecutive columns to reset (with circular warping)
+            reset_prob: individial probability of reset.
 
         The reset parameter are set during tile init.
         """

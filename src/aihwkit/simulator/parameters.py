@@ -313,7 +313,7 @@ class AbstractResistiveDeviceParameters(FloatingPointTileParameters):
     bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
 
     construction_seed: int = 0
-    """ If not equal 0, will set a unique seed for hidden parameters
+    """If not equal 0, will set a unique seed for hidden parameters
     during construction"""
 
 
@@ -479,22 +479,22 @@ class LinearStepResistiveDeviceParameters(PulsedResistiveDeviceParameters):
     """
 
     gamma_up_dtod: float = 0.05
-    r""" Device-to-device variation for :math:`\gamma^+`, i.e. the
+    r"""Device-to-device variation for :math:`\gamma^+`, i.e. the
     value of :math:`\gamma_\text{d-to-d}^+`.
     """
 
     gamma_down_dtod: float = 0.05
-    r""" Device-to-device variation for :math:`\gamma^-`, i.e. the
+    r"""Device-to-device variation for :math:`\gamma^-`, i.e. the
     value of :math:`\gamma_\text{d-to-d}^-`.
     """
 
     allow_increasing: bool = False
-    """ Whether to allow the situation where update sizes increase
+    """Whether to allow the situation where update sizes increase
     towards the bound instead of saturating (and thus becoming smaller)
     """
 
     mean_bound_reference: bool = True
-    r""" Whether to use instead of the above:
+    r"""Whether to use instead of the above:
 
     .. math::
 
@@ -505,7 +505,6 @@ class LinearStepResistiveDeviceParameters(PulsedResistiveDeviceParameters):
     where :math:`b^\text{max}` and :math:`b^\text{max}` are the
     values given by ``w_max`` and ``w_min``, see
     :class:`~ConstantStepResistiveDevice`.
-
     """
 
     mult_noise: bool = True
@@ -532,22 +531,22 @@ class ExpStepResistiveDeviceParameters(PulsedResistiveDeviceParameters):
     bindings_class: ClassVar[Type] = devices.ExpStepResistiveDeviceParameter
 
     A_up: float = 0.00081
-    """Factor A for the up direction"""
+    """Factor ``A`` for the up direction"""
 
     A_down: float = 0.36833
-    """Factor A for the down direction"""
+    """Factor ``A`` for the down direction"""
 
     gamma_up: float = 12.44625
-    """ Exponent for the up direction."""
+    """Exponent for the up direction."""
 
     gamma_down: float = 12.78785
-    """ Exponent for the down direction."""
+    """Exponent for the down direction."""
 
     a: float = 0.244
-    """ global slope parameter"""
+    """Global slope parameter"""
 
     b: float = 0.2425
-    """ global offset parameter"""
+    """Global offset parameter"""
 
 
 @dataclass
@@ -598,7 +597,7 @@ class TransferUnitCellParameters(PulsedResistiveDeviceBaseParameters):
     """
 
     transfer_every: float = 0.0
-    """ Transfers every :math:`n` mat-vec operations (rounded to
+    """Transfers every :math:`n` mat-vec operations (rounded to
     multiples/ratios of m_batch for CUDA). If ``units_in_mbatch`` is
     set, then the units are in ``m_batch`` instead of mat-vecs, which
     is equal to the overall the weight re-use during a while
@@ -612,7 +611,7 @@ class TransferUnitCellParameters(PulsedResistiveDeviceBaseParameters):
     """
 
     no_self_transfer: bool = True
-    """ Whether to set the transfer rate of the last device (which is
+    """Whether to set the transfer rate of the last device (which is
     applied to itself) to zero.
     """
 
@@ -622,7 +621,7 @@ class TransferUnitCellParameters(PulsedResistiveDeviceBaseParameters):
     """
 
     units_in_mbatch: bool = True
-    """ If set, then the cycle length units of ``transfer_every`` are
+    """If set, then the cycle length units of ``transfer_every`` are
     in ``m_batch`` instead of mat-vecs, which is equal to the overall
     the weight re-use during a while mini-batch.
     """
@@ -645,13 +644,12 @@ class TransferUnitCellParameters(PulsedResistiveDeviceBaseParameters):
     """
 
     transfer_lr: float = 1.0
-    """ Learning rate (LR) for the update step of the transfer
+    """Learning rate (LR) for the update step of the transfer
     event. Per default all learning rates are identical. If
     ``scale_transfer_lr`` is set, the transfer LR is scaled by current
     learning rate of the SGD.
 
     Note:
-
       LR is always a positive number, sign will be correctly
       applied internally.
     """
