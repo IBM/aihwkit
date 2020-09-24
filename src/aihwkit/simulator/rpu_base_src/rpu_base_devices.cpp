@@ -64,7 +64,6 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
-  
   class PyPulsedBaseParam : public PulsedBaseParam {
   public:
     std::string getName() const override {
@@ -289,10 +288,9 @@ void declare_rpu_devices(py::module &m) {
       m, "PulsedBaseResistiveDeviceParameter")
       .def(py::init<>());
 
-  py::class_<SimpleParam, PySimpleParam, AbstractParam>(
-      m, "IdealResistiveDeviceParameter")
+  py::class_<SimpleParam, PySimpleParam, AbstractParam>(m, "IdealResistiveDeviceParameter")
       .def(py::init<>());
-  
+
   py::class_<PulsedParam, PyPulsedParam, AbstractParam>(m, "PulsedResistiveDeviceParameter")
       .def(py::init<>())
       // Properties from this class.

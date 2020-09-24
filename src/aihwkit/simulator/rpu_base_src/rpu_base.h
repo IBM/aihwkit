@@ -11,12 +11,12 @@
  */
 #pragma once
 #include "rpu.h"
-#include "rpu_pulsed.h"
-#include "rpu_simple_device.h"
 #include "rpu_constantstep_device.h"
 #include "rpu_difference_device.h"
 #include "rpu_expstep_device.h"
 #include "rpu_linearstep_device.h"
+#include "rpu_pulsed.h"
+#include "rpu_simple_device.h"
 #include "rpu_transfer_device.h"
 #include "rpu_vector_device.h"
 

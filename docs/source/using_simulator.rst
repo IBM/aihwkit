@@ -29,19 +29,29 @@ happened).
 
 The following types of analog tiles are available:
 
-* :class:`~aihwkit.simulator.tiles.FloatingPointTile`:
-  implements a floating point or ideal analog tile.
-
-* :class:`~aihwkit.simulator.tiles.AnalogTile`:
-  implements an abstract analog tile with many cycle-to-cycle non-idealities
-  and systematic parameter-spreads that can be user-defined.
+===================================================  ========
+Tile class                                           Description
+===================================================  ========
+:class:`~aihwkit.simulator.tiles.FloatingPointTile`  implements a floating point or ideal analog tile.
+:class:`~aihwkit.simulator.tiles.AnalogTile`         implements an abstract analog tile with many cycle-to-cycle non-idealities and systematic parameter-spreads that can be user-defined.
+===================================================  ========
 
 And the following types of resistive devices are available:
 
-* :class:`~aihwkit.simulator.devices.FloatingPointResistiveDevice`:
-  implements ideal devices update behavior (floating point update).
-* :class:`~aihwkit.simulator.devices.ConstantStepResistiveDevice`:
-  implements a constant step update behavior.
+================================================================  ========
+Resistive device class                                            Description
+================================================================  ========
+:class:`~aihwkit.simulator.devices.FloatingPointResistiveDevice`  floating point reference, that implements ideal devices forward/backward/update behavior.
+:class:`~aihwkit.simulator.devices.PulsedResistiveDevice`         pulsed update resistive device containing the common properties of all pulsed devices.
+:class:`~aihwkit.simulator.devices.IdealResistiveDevice`          ideal update behavior (using floating point), but forward/backward might be non-ideal.
+:class:`~aihwkit.simulator.devices.ConstantStepResistiveDevice`   pulsed update behavioral model: constant step, where the update step of material is constant throughout the resistive range (up to hard bounds).
+:class:`~aihwkit.simulator.devices.LinearStepResistiveDevice`     pulsed update behavioral model: linear step, where the update step response size of the material is linearly dependent with resistance (up to hard bounds).
+:class:`~aihwkit.simulator.devices.SoftBoundsResistiveDevice`     pulsed update behavioral model: soft bounds, where the update step response size of the material is linearly dependent and it goes to zero at the bound.
+:class:`~aihwkit.simulator.devices.ExpStepResistiveDevice`        exponential update step or CMOS-like update behavior.
+:class:`~aihwkit.simulator.devices.VectorUnitCell`                abstract resistive device that combines multiple pulsed resistive devices in a single 'unit cell'.
+:class:`~aihwkit.simulator.devices.DifferenceUnitCell`            abstract device model takes an arbitrary device per crosspoint and implements an explicit plus-minus device pair.
+:class:`~aihwkit.simulator.devices.TransferUnitCell`              abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
+================================================================  ========
 
 
 Creating an analog tile
@@ -126,3 +136,5 @@ device, setting its weigths limits to ``[-0.4, 0.6]``::
 
 A description of the available parameters for each device can be found at
 :py:mod:`aihwkit.simulator.parameters`.
+
+.. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
