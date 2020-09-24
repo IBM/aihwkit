@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## [UNRELEASED]
+
+### Added
+
+* Added more types of resistive devices: `IdealResistiveDevice`, `LinearStep`,
+  `SoftBounds`, `ExpStep`, `VectorUnitCell`, `TransferUnitCell`,
+  `DifferenceUnitCell`. (#14)
+
 ## [0.1.0] - 2020/09/17
 
 ### Added

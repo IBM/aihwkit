@@ -12,4 +12,6 @@
 
 """RPU simulator bindings."""
 
+# This import is required in order to load the `torch` shared libraries, which
+# the simulator shared library is linked against.
 import torch
