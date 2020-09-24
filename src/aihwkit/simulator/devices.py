@@ -170,7 +170,10 @@ class PulsedResistiveDevice(BaseResistiveDevice):
 
 
 class IdealResistiveDevice(PulsedResistiveDevice):
-    """ Ideal update behavior (floating point reference), however,
+    """Ideal update behavior (using floating point), but forward/backward
+    might be non-ideal.
+
+    Ideal update behavior (using floating point), however,
     forward/backward might still have a non-ideal ADC or noise added.
     """
     def __init__(self,
@@ -186,11 +189,13 @@ class IdealResistiveDevice(PulsedResistiveDevice):
 
 
 class ConstantStepResistiveDevice(PulsedResistiveDevice):
-    r""" Pulsed update behavioral model, where the update step of
+    r"""Pulsed update behavioral model: constant step.
+
+    Pulsed update behavioral model, where the update step of
     material is constant throughout the resistive range (up to hard
     bounds).
 
-    In mare detail, the update behavior implemented for `ConstantStep`
+    In more detail, the update behavior implemented for ``ConstantStep``
     is:
 
     .. math::
@@ -213,7 +218,6 @@ class ConstantStepResistiveDevice(PulsedResistiveDevice):
 
     For parameters regarding the devices settings, see e.g.
     :class:`~aihwkit.simulator.parameters.ConstantStepResistiveDeviceParameters`.
-
     """
 
     def __init__(self,
@@ -227,7 +231,9 @@ class ConstantStepResistiveDevice(PulsedResistiveDevice):
 
 
 class LinearStepResistiveDevice(PulsedResistiveDevice):
-    r""" Pulsed update behavioral model, where the update step response
+    r"""Pulsed update behavioral model: linear step.
+
+    Pulsed update behavioral model, where the update step response
     size of the material is linearly dependent with resistance (up to
     hard bounds).
 
@@ -276,17 +282,14 @@ class LinearStepResistiveDevice(PulsedResistiveDevice):
     respectively (see description for :class:`~ConstantStepResistiveDevice`).
 
     Note:
-
        If :math:`\gamma=1` and :math:`\gamma_\text{d-to-d}=0` this
        update implements `soft bounds`, since the updates step becomes
        equal to :math:`1/b`.
 
     Note:
-
        If :math:`\gamma=0` and :math:`\gamma_\text{d-to-d}=0` and
        additive noise, this update is identical to
        :class:`~ConstantStepResistiveDevice`.
-
     """
     def __init__(self,
                  params_devices: Optional[LinearStepResistiveDeviceParameters] = None,
@@ -299,13 +302,14 @@ class LinearStepResistiveDevice(PulsedResistiveDevice):
 
 
 class SoftBoundsResistiveDevice(PulsedResistiveDevice):
-    r""" Pulsed update behavioral model, where the update step response size
-    of the material is linearly dependent and at goes to zero at the
+    r"""Pulsed update behavioral model: soft bounds.
+
+    Pulsed update behavioral model, where the update step response size
+    of the material is linearly dependent and it goes to zero at the
     bound.
 
     This model is based on :class:`~LinearStepResistiveDevice` with
     parameters set to model soft bounds.
-
     """
     def __init__(self,
                  params_devices: Optional[SoftBoundsResistiveDeviceParameters] = None,
@@ -318,10 +322,10 @@ class SoftBoundsResistiveDevice(PulsedResistiveDevice):
 
 
 class ExpStepResistiveDevice(PulsedResistiveDevice):
-    r""" Exponential update step or CMOS-like update behavior.
+    r"""Exponential update step or CMOS-like update behavior.
 
-    This model is derived from RPUPulsed and uses all its
-    parameters. RPUExpStep only implements a new 'update once'
+    This model is derived from ``PulsedResistiveDevice`` and uses all its
+    parameters. ``ExpStepResistiveDevice`` only implements a new 'update once'
     functionality, where the minimal weight step change with weight is
     fitted by an exponential function as detailed below.
 
@@ -338,7 +342,7 @@ class ExpStepResistiveDevice(PulsedResistiveDevice):
 
         y_{ij} = 1 - A^{(d)} e^{d \gamma^{(d)} z_{ij}}
 
-    where :math:`d` is the direction if the update (+ or -), see also
+    where :math:`d` is the direction of the update (+ or -), see also
     :class:`~ConstantStepResistiveDevice` for details.
 
     All additional parameter (:math:`a_\text{es}`,
@@ -360,22 +364,20 @@ class ExpStepResistiveDevice(PulsedResistiveDevice):
 
 
 class VectorUnitCell(PulsedResistiveDevice):
-    """ An abstract resistive device that combines multiple pulsed resistive
+    """Abstract resistive device that combines multiple pulsed resistive
     devices in a single 'unit cell'.
 
     For instance, a vector device can consist of 2 resistive devices
     where the sum of the two resistive values are coded for each
     weight of a cross point.
 
-    Parameters:
+    Args:
        params_devices: List of pulsed resistive device parameters
        params_forward: Parameters governing the forward pass
        params_backward: Parameters governing the backward pass
        params_update: Parameters governing update pulse selection etc.
-
        **vector_kwargs: args that we be passed to
          class:`~aihwkit.simulator.parameters.VectorUnitCellParameters`
-
     """
     def __init__(self,
                  params_devices: Optional[List[PulsedResistiveDeviceBaseParameters]] = None,
@@ -418,7 +420,7 @@ class VectorUnitCell(PulsedResistiveDevice):
 
 
 class DifferenceUnitCell(PulsedResistiveDevice):
-    """ This device model takes an arbitrary device per crosspoint and
+    """Abstract device model takes an arbitrary device per crosspoint and
     implements an explicit plus-minus device pair.
 
     A plus minus pair is implemented by using only one-sided updated
@@ -431,10 +433,8 @@ class DifferenceUnitCell(PulsedResistiveDevice):
     (however, device-to-device variation is still present).
 
     Caution:
-
        Reset needs to be added `manually` by calling the
        reset_columns method of a tile.
-
     """
     def __init__(self,
                  params_devices: Optional[PulsedResistiveDeviceBaseParameters] = None,
@@ -470,7 +470,7 @@ class DifferenceUnitCell(PulsedResistiveDevice):
 
 
 class TransferUnitCell(PulsedResistiveDevice):
-    r""" This abstract device model takes 2 or more devices per crosspoint and
+    r"""Abstract device model that takes 2 or more devices per crosspoint and
     implements a 'transfer' based learning rule.
 
     It uses a (partly) hidden weight (where the SGD update is
@@ -488,32 +488,25 @@ class TransferUnitCell(PulsedResistiveDevice):
     however, only the device parameters of the first versus the others
     can be different.
 
-
-
-    Parameters:
+    Args:
        params_devices: List of pulsed resistive device parameters
 
           Note:
-
               This has to be a list, where the length of the list is
               the length of the chain of devices to transfer
               to. However, for all resistive devices that are
               transferred two (all except the first) the device
-              parameter are taken to be the same (copied from the
-              second in this list)
+              parameters are taken to be the same (copied from the
+              second in this list).
 
        params_forward: Parameters governing the forward pass
        params_backward: Parameters governing the backward pass
        params_update: Parameters governing update pulse selection etc. of the SGD update
-
        params_transfer_update: Parameters governing the update when doing the transfer
-
        params_transfer_forward: Parameters governing the forward when
           doing the read-out for the transfer
-
        **transfer_kwargs: additional args that we be passed to
          class:`~aihwkit.simulator.parameters.TransferUnitCellParameters`
-
     """
     def __init__(self,
                  params_devices: Optional[List[PulsedResistiveDeviceBaseParameters]] = None,
@@ -543,6 +536,12 @@ class TransferUnitCell(PulsedResistiveDevice):
             x_size: number of rows.
             d_size: number of columns.
         """
+        if not isinstance(self.params_devices, list):
+            raise ValueError('`self.param_devices` must be a list of device parameters')
+        n_devices = len(self.params_devices)
+        if n_devices < 2:
+            raise RuntimeError('`self.param_devices` needs to contain at least 2 devices')
+
         # Prepare the basic parameters.
         meta_parameter = self.params.bindings_class()
         meta_parameter.forward_io = self._parameters_to_bindings(self.params.forward_io)
@@ -550,14 +549,7 @@ class TransferUnitCell(PulsedResistiveDevice):
         meta_parameter.update = self._parameters_to_bindings(self.params.update)
 
         # Create the tile.
-        if not isinstance(self.params_devices, list):
-            raise ValueError('Expect a list of device parameters!')
-
         transfer_parameters = self._parameters_to_bindings(self.transfer_params)
-
-        n_devices = len(self.params_devices)
-        if n_devices < 2:
-            raise RuntimeError('Expect at least 2 device parameters!')
 
         param_fast = self._parameters_to_bindings(self.params_devices[0])
         param_slow = self._parameters_to_bindings(self.params_devices[1])
