@@ -222,7 +222,7 @@ class CudaIndexedFloatingPointTile(IndexedFloatingPointTile):
 
     is_cuda = True
 
-    def __init__(self, source_tile: FloatingPointTile):
+    def __init__(self, source_tile: IndexedFloatingPointTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
