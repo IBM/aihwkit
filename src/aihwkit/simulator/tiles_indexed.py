@@ -12,6 +12,7 @@
 
 """High level analog tiles (indexed)."""
 
+from copy import deepcopy
 from typing import List, Optional, Union
 
 from torch import Tensor
@@ -114,9 +115,8 @@ class IndexedFloatingPointTile(FloatingPointTile):
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
         with cuda_device(device):
-            tile = CudaIndexedFloatingPointTile(
-                self.out_size, self.in_size, self.resistive_device,
-                self.bias, self.in_trans, self.out_trans)
+            tile = CudaIndexedFloatingPointTile(self)
+
         return tile
 
 
@@ -203,31 +203,38 @@ class IndexedAnalogTile(AnalogTile):
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
         with cuda_device(device):
-            tile = CudaIndexedAnalogTile(
-                self.out_size, self.in_size, self.resistive_device,
-                self.bias, self.in_trans, self.out_trans)
+            tile = CudaIndexedAnalogTile(self)
+
         return tile
 
 
 class CudaIndexedFloatingPointTile(IndexedFloatingPointTile):
-    """Floating point tile (CUDA, indexed)."""
+    """Floating point tile (CUDA, indexed).
+
+    Floating point indexed tile that uses GPU for its operation. The
+    instantiation is based on an existing non-cuda tile: all the source
+    attributes are copied except for the simulator tile, which is recreated
+    using a GPU tile.
+
+    Args:
+        source_tile: tile to be used as the source of this tile
+    """
 
     is_cuda = True
 
-    def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            resistive_device: Optional[FloatingPointResistiveDevice] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False):
+    def __init__(self, source_tile: FloatingPointTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans)
+        # Create a new instance of the resistive device.
+        new_resistive_device = deepcopy(source_tile.resistive_device)
 
-        self.tile = tiles.CudaFloatingPointTile(self.tile)
+        # Create the tile, replacing the simulator tile.
+        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+                         source_tile.bias, source_tile.in_trans, source_tile.out_trans)
+        self.tile = tiles.CudaFloatingPointTile(source_tile.tile)
+
+        # Set the cuda properties
         self.stream = current_stream()
         self.device = torch_device(current_device())
 
@@ -242,23 +249,31 @@ class CudaIndexedFloatingPointTile(IndexedFloatingPointTile):
 
 
 class CudaIndexedAnalogTile(IndexedAnalogTile):
-    """Analog tile (CUDA, indexed)."""
+    """Analog tile (CUDA, indexed).
+
+    Analog indexed tile that uses GPU for its operation. The instantiation is
+    based on an existing non-cuda tile: all the source attributes are copied
+    except for the simulator tile, which is recreated using a GPU tile.
+
+    Args:
+        source_tile: tile to be used as the source of this tile
+    """
 
     is_cuda = True
 
-    def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            resistive_device: Optional[BaseResistiveDevice] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False):
+    def __init__(self, source_tile: IndexedAnalogTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans)
 
-        self.tile = tiles.CudaAnalogTile(self.tile)
+        # Create a new instance of the resistive device.
+        new_resistive_device = deepcopy(source_tile.resistive_device)
+
+        # Create the tile, replacing the simulator tile.
+        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+                         source_tile.bias, source_tile.in_trans, source_tile.out_trans)
+        self.tile = tiles.CudaAnalogTile(source_tile.tile)
+
+        # Set the cuda properties
         self.stream = current_stream()
         self.device = torch_device(current_device())
 
