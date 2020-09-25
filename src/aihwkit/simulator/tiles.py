@@ -12,7 +12,8 @@
 
 """High level analog tiles."""
 
-from typing import Dict, Optional, Tuple, Union, Any
+from copy import deepcopy
+from typing import Dict, Optional, Tuple, Union
 
 from collections import OrderedDict
 
@@ -42,8 +43,6 @@ class BaseTile:
         bias: whether to add a bias column to the tile.
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
-        _from_tile: if specified, the simulator tile that will be used instead
-            of creating a new tile.
     """
 
     is_cuda = False
@@ -55,8 +54,8 @@ class BaseTile:
             resistive_device: BaseResistiveDevice,
             bias: bool = True,
             in_trans: bool = False,
-            out_trans: bool = False,
-            _from_tile: Optional[Any] = None):
+            out_trans: bool = False
+    ):
         self.out_size = out_size
         self.in_size = in_size
         self.resistive_device = resistive_device
@@ -67,10 +66,12 @@ class BaseTile:
         x_size = in_size + 1 if self.bias else in_size
         d_size = out_size
 
-        if _from_tile is not None:
-            self.tile = _from_tile
+        # Cuda tiles are assumed to init `self.tile` manually.
+        if self.is_cuda:
+            self.tile = None  # type: Union[tiles.FloatingPointTile, tiles.AnalogTile]
         else:
             self.tile = self.resistive_device.create_tile(x_size, d_size)
+
         self.device = torch_device('cpu')
 
     def __getstate__(self) -> Dict:
@@ -248,7 +249,7 @@ class BaseTile:
         Args:
             start_column_idx: a start index of columns (0..x_size-1)
             num_columns: how many consecutive columns to reset (with circular warping)
-            reset_prob: individial probability of reset.
+            reset_prob: individual probability of reset.
 
         The reset parameter are set during tile init.
         """
@@ -413,11 +414,10 @@ class FloatingPointTile(BaseTile):
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False,
-            _from_tile: Optional[tiles.FloatingPointTile] = None):
+    ):
         self.resistive_device: FloatingPointResistiveDevice = (
             resistive_device or FloatingPointResistiveDevice())
-        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans,
-                         _from_tile=_from_tile)
+        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans)
 
     def cuda(
             self,
@@ -429,9 +429,8 @@ class FloatingPointTile(BaseTile):
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
         with cuda_device(device):
-            tile = CudaFloatingPointTile(self.out_size, self.in_size, self.resistive_device,
-                                         self.bias, self.in_trans, self.out_trans,
-                                         _from_tile=self.tile)
+            tile = CudaFloatingPointTile(self)
+
         return tile
 
 
@@ -600,10 +599,9 @@ class AnalogTile(BaseTile):
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False,
-            _from_tile: Optional[tiles.AnalogTile] = None):
+    ):
         self.resistive_device = resistive_device or ConstantStepResistiveDevice()
-        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans,
-                         _from_tile=_from_tile)
+        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans)
 
     def cuda(
             self,
@@ -618,42 +616,37 @@ class AnalogTile(BaseTile):
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
         with cuda_device(device):
-            tile = CudaAnalogTile(self.out_size, self.in_size, self.resistive_device,
-                                  self.bias, self.in_trans, self.out_trans,
-                                  _from_tile=self.tile)
+            tile = CudaAnalogTile(self)
+
         return tile
 
 
 class CudaFloatingPointTile(FloatingPointTile):
     """Floating point tile (CUDA).
 
+    Floating point tile that uses GPU for its operation. The instantiation is
+    based on an existing non-cuda tile: all the source attributes are copied
+    except for the simulator tile, which is recreated using a GPU tile.
+
     Args:
-        out_size: output vector size of the tile.
-        in_size: input vector size of the tile.
-        resistive_device: resistive device.
-        bias: whether to add a bias column to the tile.
-        in_trans: whether to assume a transposed input (batch first)
-        out_trans: whether to assume a transposed output (batch first)
+        source_tile: tile to be used as the source of this tile
     """
 
     is_cuda = True
 
-    def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            resistive_device: Optional[FloatingPointResistiveDevice] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False,
-            _from_tile: Optional[tiles.FloatingPointTile] = None):
+    def __init__(self, source_tile: FloatingPointTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans,
-                         _from_tile=_from_tile)
+        # Create a new instance of the resistive device.
+        new_resistive_device = deepcopy(source_tile.resistive_device)
 
-        self.tile = tiles.CudaFloatingPointTile(self.tile)
+        # Create the tile, replacing the simulator tile.
+        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+                         source_tile.bias, source_tile.in_trans, source_tile.out_trans)
+        self.tile = tiles.CudaFloatingPointTile(source_tile.tile)
+
+        # Set the cuda properties
         self.stream = current_stream()
         self.device = torch_device(current_device())
 
@@ -670,33 +663,29 @@ class CudaFloatingPointTile(FloatingPointTile):
 class CudaAnalogTile(AnalogTile):
     """Analog tile (CUDA).
 
+    Analog tile that uses GPU for its operation. The instantiation is based on
+    an existing non-cuda tile: all the source attributes are copied except
+    for the simulator tile, which is recreated using a GPU tile.
+
     Args:
-        out_size: output vector size of the tile.
-        in_size: input vector size of the tile.
-        resistive_device: resistive device.
-        bias: whether to add a bias column to the tile.
-        in_trans: whether to assume a transposed input (batch first)
-        out_trans: whether to assume a transposed output (batch first)
+        source_tile: tile to be used as the source of this tile
     """
 
     is_cuda = True
 
-    def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            resistive_device: Optional[BaseResistiveDevice] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False,
-            _from_tile: Optional[tiles.AnalogTile] = None):
+    def __init__(self, source_tile: AnalogTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans,
-                         _from_tile=_from_tile)
+        # Create a new instance of the resistive device.
+        new_resistive_device = deepcopy(source_tile.resistive_device)
 
-        self.tile = tiles.CudaAnalogTile(self.tile)
+        # Create the tile, replacing the simulator tile.
+        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+                         source_tile.bias, source_tile.in_trans, source_tile.out_trans)
+        self.tile = tiles.CudaAnalogTile(source_tile.tile)
+
+        # Set the cuda properties
         self.stream = current_stream()
         self.device = torch_device(current_device())
 
