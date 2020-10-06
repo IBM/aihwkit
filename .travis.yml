@@ -47,6 +47,7 @@ job_compile_common: &job_compile_common
     - cd ../..
     - VERBOSE=1 pip install -v -e .
   script:
+    - pip install "parameterized==0.7.4"
     - make pytest
 
 
