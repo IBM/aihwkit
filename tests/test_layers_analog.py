@@ -12,27 +12,25 @@
 
 """Tests for layer abstractions."""
 
-from unittest import TestCase, skipIf
-
 from torch import Tensor, manual_seed
-from torch.nn import Sequential, Linear
+from torch.nn import Sequential, Linear as torchLinear
 from torch.nn.functional import mse_loss
 
-from aihwkit.nn.modules.linear import AnalogLinear
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.devices import FloatingPointResistiveDevice, ConstantStepResistiveDevice
 
-from aihwkit.simulator.rpu_base import cuda
+from .helpers.decorators import parametrize_over_layers
+from .helpers.layers import Linear, LinearCuda
+from .helpers.testcases import ParametrizedTestCase
+from .helpers.tiles import FloatingPoint, ConstantStep
 
 
-class LayersIntegrationMixin:
-    """Layer abstractions tests."""
-
-    USE_CUDA = False
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        raise NotImplementedError
+@parametrize_over_layers(
+    layers=[Linear, LinearCuda],
+    tiles=[FloatingPoint, ConstantStep],
+    biases=[True, False]
+)
+class LinearLayerTest(ParametrizedTestCase):
+    """Linear layer abstractions tests."""
 
     @staticmethod
     def train_model(model, loss_func, x_b, y_b):
@@ -58,7 +56,7 @@ class LayersIntegrationMixin:
 
         manual_seed(4321)
         model = self.get_layer(2, 1)
-        if self.USE_CUDA:
+        if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
             model = model.cuda()
@@ -75,7 +73,7 @@ class LayersIntegrationMixin:
 
         manual_seed(4321)
         model = Sequential(self.get_layer(2, 1))
-        if self.USE_CUDA:
+        if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
             model = model.cuda()
@@ -95,7 +93,7 @@ class LayersIntegrationMixin:
             self.get_layer(4, 2),
             self.get_layer(2, 1)
         )
-        if self.USE_CUDA:
+        if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
             model = model.cuda()
@@ -113,10 +111,10 @@ class LayersIntegrationMixin:
         manual_seed(4321)
         model = Sequential(
             self.get_layer(2, 3),
-            Linear(3, 3),
+            torchLinear(3, 3),
             self.get_layer(3, 1)
         )
-        if self.USE_CUDA:
+        if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
             model = model.cuda()
@@ -135,7 +133,7 @@ class LayersIntegrationMixin:
         layer2 = self.get_layer(3, 1)
 
         model = Sequential(layer1, layer2)
-        if self.USE_CUDA:
+        if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
             model = model.cuda()
@@ -159,7 +157,7 @@ class LayersIntegrationMixin:
         layer2 = self.get_layer(3, 1)
 
         model = Sequential(layer1, layer2)
-        if self.USE_CUDA:
+        if self.use_cuda:
             model = model.cuda()
         opt = AnalogSGD(model.parameters(), lr=0.5)
         opt.regroup_param_groups(model)
@@ -170,87 +168,3 @@ class LayersIntegrationMixin:
 
         self.assertAlmostEqual(layer1.analog_tile.get_learning_rate(), new_lr)
         self.assertAlmostEqual(layer2.analog_tile.get_learning_rate(), new_lr)
-
-
-class AnalogLinearFloatingPointNoBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``FloatingPointResistiveDevice``."""
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=False,
-                            resistive_device=FloatingPointResistiveDevice())
-
-
-class AnalogLinearFloatingPointBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``FloatingPointResistiveDevice``."""
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=True,
-                            resistive_device=FloatingPointResistiveDevice())
-
-
-class AnalogLinearConstantStepNoBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``ConstantStepResistiveDevice``."""
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=False,
-                            resistive_device=ConstantStepResistiveDevice())
-
-
-class AnalogLinearConstantStepBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``ConstantStepResistiveDevice``."""
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=True,
-                            resistive_device=ConstantStepResistiveDevice())
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogLinearFloatingPointNoBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``FloatingPointResistiveDevice``."""
-
-    USE_CUDA = True
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=False,
-                            resistive_device=FloatingPointResistiveDevice()).cuda()
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogLinearFloatingPointBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``FloatingPointResistiveDevice``."""
-
-    USE_CUDA = True
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=True,
-                            resistive_device=FloatingPointResistiveDevice()).cuda()
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogLinearConstantStepNoBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``ConstantStepResistiveDevice``."""
-
-    USE_CUDA = True
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=False,
-                            resistive_device=ConstantStepResistiveDevice()).cuda()
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogLinearConstantStepBiasTest(TestCase, LayersIntegrationMixin):
-    """Tests for the ``AnalogLinear`` layer with ``ConstantStepResistiveDevice``."""
-
-    USE_CUDA = True
-
-    def get_layer(self, cols, rows):
-        """Return a layer."""
-        return AnalogLinear(cols, rows, bias=True,
-                            resistive_device=ConstantStepResistiveDevice()).cuda()
