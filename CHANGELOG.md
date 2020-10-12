@@ -18,7 +18,15 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Added more types of resistive devices: `IdealResistiveDevice`, `LinearStep`,
   `SoftBounds`, `ExpStep`, `VectorUnitCell`, `TransferUnitCell`,
-  `DifferenceUnitCell`. (#14)
+  `DifferenceUnitCell`. (\#14)
+
+### Changed
+
+* Specifying the tile configuration (resistive device and the rest of the
+  properties) is now based on a new `RPUConfig` family of classes, that is
+  passed as a `rpu_config` argument instead of `resistive_device` to `Tiles`
+  and `Layers`. Please check the `aihwkit.simulator.config` module for more
+  details. (\#23)
 
 ## [0.1.0] - 2020/09/17
 
