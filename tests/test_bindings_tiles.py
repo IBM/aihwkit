@@ -22,16 +22,9 @@ from torch import Tensor, from_numpy
 
 from aihwkit.simulator.rpu_base import tiles, cuda
 
-from aihwkit.simulator.parameters import (
-    FloatingPointTileParameters,
-    ConstantStepResistiveDeviceParameters,
-    AnalogTileInputOutputParameters,
-    AnalogTileBackwardInputOutputParameters
-)
-
-from aihwkit.simulator.devices import (FloatingPointResistiveDevice,
-                                       IdealResistiveDevice,
-                                       ConstantStepResistiveDevice)
+from aihwkit.simulator.configs import FloatingPointRPUConfig, SingleRPUConfig
+from aihwkit.simulator.configs.devices import FloatingPointDevice, ConstantStepDevice, IdealDevice
+from aihwkit.simulator.configs.utils import BackwardIOParameters, IOParameters
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -57,14 +50,16 @@ class BindingsTilesTest(ParametrizedTestCase):
 
     def get_noisefree_tile(self, out_size, in_size):
         """Return a tile of the specified dimensions with noisiness turned off."""
-        resistive_device = None
+        rpu_config = None
 
         if 'FloatingPoint' not in self.parameter:
-            resistive_device = IdealResistiveDevice(
-                params_forward=AnalogTileInputOutputParameters(is_perfect=True),
-                params_backward=AnalogTileBackwardInputOutputParameters(is_perfect=True)
+            rpu_config = SingleRPUConfig(
+                forward=IOParameters(is_perfect=True),
+                backward=BackwardIOParameters(is_perfect=True),
+                device=IdealDevice()
             )
-        python_tile = self.get_tile(out_size, in_size, resistive_device)
+
+        python_tile = self.get_tile(out_size, in_size, rpu_config)
         self.set_init_weights(python_tile)
 
         return python_tile
@@ -72,13 +67,13 @@ class BindingsTilesTest(ParametrizedTestCase):
     def get_custom_tile(self, out_size, in_size, **parameters):
         """Return a tile with custom parameters for the resistive device."""
         if 'FloatingPoint' in self.parameter:
-            resistive_device = FloatingPointResistiveDevice(
-                FloatingPointTileParameters(**parameters))
+            rpu_config = FloatingPointRPUConfig(
+                device=FloatingPointDevice(**parameters))
         else:
-            resistive_device = ConstantStepResistiveDevice(
-                ConstantStepResistiveDeviceParameters(**parameters))
+            rpu_config = SingleRPUConfig(
+                device=ConstantStepDevice(**parameters))
 
-        python_tile = self.get_tile(out_size, in_size, resistive_device)
+        python_tile = self.get_tile(out_size, in_size, rpu_config)
         self.set_init_weights(python_tile)
 
         return python_tile

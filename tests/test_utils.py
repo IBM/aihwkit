@@ -21,12 +21,10 @@ from torch.nn.functional import mse_loss
 
 from aihwkit.nn.modules.conv import AnalogConv2d
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.devices import ConstantStepResistiveDevice
-from aihwkit.simulator.parameters import (
-    AnalogTileBackwardInputOutputParameters,
-    AnalogTileInputOutputParameters,
-    AnalogTileUpdateParameters,
-    ConstantStepResistiveDeviceParameters
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs.utils import (
+    BackwardIOParameters, IOParameters, UpdateParameters
 )
 
 from .helpers.decorators import parametrize_over_layers
@@ -156,16 +154,15 @@ class SerializationTest(ParametrizedTestCase):
 
     def test_save_load_meta_parameter(self):
         """Test saving and loading a device with custom parameters."""
-        params_devices = ConstantStepResistiveDeviceParameters(w_max=0.987)
-        params_forward = AnalogTileInputOutputParameters(inp_noise=0.321)
-        params_backward = AnalogTileBackwardInputOutputParameters(inp_noise=0.456)
-        params_update = AnalogTileUpdateParameters(desired_bl=78)
-
         # Create the device and the array.
-        resistive_device = ConstantStepResistiveDevice(
-            params_devices, params_forward, params_backward, params_update)
+        rpu_config = SingleRPUConfig(
+            forward=IOParameters(inp_noise=0.321),
+            backward=BackwardIOParameters(inp_noise=0.456),
+            update=UpdateParameters(desired_bl=78),
+            device=ConstantStepDevice(w_max=0.987)
+        )
 
-        model = self.get_layer(resistive_device=resistive_device)
+        model = self.get_layer(rpu_config=rpu_config)
 
         # Save the model to a file.
         file = TemporaryFile()

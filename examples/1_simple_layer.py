@@ -23,7 +23,8 @@ from torch.nn.functional import mse_loss
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.devices import ConstantStepResistiveDevice
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
@@ -31,9 +32,9 @@ x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
 y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 # Define a single-layer network, using a constant step device type.
-analog_device = ConstantStepResistiveDevice()
+rpu_config = SingleRPUConfig(device=ConstantStepDevice())
 model = AnalogLinear(4, 2, bias=True,
-                     resistive_device=analog_device)
+                     rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():

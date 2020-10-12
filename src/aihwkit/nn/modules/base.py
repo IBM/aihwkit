@@ -18,10 +18,8 @@ from torch import Tensor
 from torch import device as torch_device
 from torch.nn import Module
 
-from aihwkit.simulator.devices import (
-    BaseResistiveDevice,
-    ConstantStepResistiveDevice,
-    FloatingPointResistiveDevice
+from aihwkit.simulator.configs import (
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 )
 from aihwkit.simulator.tiles import AnalogTile, BaseTile, FloatingPointTile
 
@@ -52,7 +50,8 @@ class AnalogModuleBase(Module):
             in_features: int,
             out_features: int,
             bias: bool,
-            resistive_device: Optional[BaseResistiveDevice] = None,
+            rpu_config: Optional[
+                Union[FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig]] = None,
             realistic_read_write: bool = False
     ) -> BaseTile:
         """Create an analog tile and setup this layer for using it.
@@ -72,16 +71,15 @@ class AnalogModuleBase(Module):
         Args:
             in_features: input vector size (number of columns).
             out_features: output vector size (number of rows).
-            resistive_device: analog devices that define the properties of the
-                analog tile.
+            rpu_config: resistive processing unit configuration.
             bias: whether to use a bias row on the analog tile or not.
             realistic_read_write: whether to enable realistic read/write
                for setting initial weights and read out of weights.
         """
         # pylint: disable=attribute-defined-outside-init
         # Default to constant step device if not provided.
-        if not resistive_device:
-            resistive_device = ConstantStepResistiveDevice()
+        if not rpu_config:
+            rpu_config = SingleRPUConfig()
 
         # Setup the analog-related attributes of this instance.
         self.use_bias = bias
@@ -90,13 +88,13 @@ class AnalogModuleBase(Module):
         self.out_features = out_features
 
         # Create the tile.
-        if isinstance(resistive_device, FloatingPointResistiveDevice):
+        if isinstance(rpu_config, FloatingPointRPUConfig):
             tile_class = self.TILE_CLASS_FLOATING_POINT
         else:
             tile_class = self.TILE_CLASS_ANALOG  # type: ignore
 
         return tile_class(
-            out_features, in_features, resistive_device, bias=bias  # type: ignore
+            out_features, in_features, rpu_config, bias=bias  # type: ignore
         )
 
     def set_weights(

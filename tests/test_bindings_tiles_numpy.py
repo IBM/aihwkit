@@ -20,17 +20,12 @@ from numpy.testing import assert_array_almost_equal, assert_array_equal
 
 from torch import from_numpy
 
-from aihwkit.simulator.tiles_numpy import NumpyFloatingPointTile, NumpyAnalogTile
-
-from aihwkit.simulator.parameters import (
-    AnalogTileBackwardInputOutputParameters, ConstantStepResistiveDeviceParameters,
-    AnalogTileInputOutputParameters,
-    AnalogTileUpdateParameters,
-    PulseType
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.utils import (
+    BackwardIOParameters, IOParameters,
+    UpdateParameters, PulseType
 )
-
-from aihwkit.simulator.devices import (FloatingPointResistiveDevice,
-                                       ConstantStepResistiveDevice)
+from aihwkit.simulator.tiles_numpy import NumpyFloatingPointTile, NumpyAnalogTile
 
 
 class NumpyFloatingPointTileTest(TestCase):
@@ -38,8 +33,7 @@ class NumpyFloatingPointTileTest(TestCase):
 
     def get_tile(self, out_size, in_size):
         """Return a tile of the specified dimensions with noisiness turned off."""
-        resistive_device = FloatingPointResistiveDevice()
-        python_tile = NumpyFloatingPointTile(out_size, in_size, resistive_device)
+        python_tile = NumpyFloatingPointTile(out_size, in_size)
 
         # Set weights.
         init_weights = uniform(-0.5, 0.5, size=(python_tile.out_size, python_tile.in_size))
@@ -154,15 +148,12 @@ class NumpyAnalogTileTest(NumpyFloatingPointTileTest):
 
     def get_tile(self, out_size, in_size):
         """Return a tile of the specified dimensions with noisiness turned off."""
-        params = ConstantStepResistiveDeviceParameters()
-        io_params = AnalogTileInputOutputParameters(is_perfect=True)
-        io_params_backward = AnalogTileBackwardInputOutputParameters(is_perfect=True)
-        up_params = AnalogTileUpdateParameters(pulse_type=PulseType('None'))
-        resistive_device = ConstantStepResistiveDevice(params_devices=params,
-                                                       params_forward=io_params,
-                                                       params_backward=io_params_backward,
-                                                       params_update=up_params)
-        python_tile = NumpyAnalogTile(out_size, in_size, resistive_device)
+        rpu_config = SingleRPUConfig(
+            forward=IOParameters(is_perfect=True),
+            backward=BackwardIOParameters(is_perfect=True),
+            update=UpdateParameters(pulse_type=PulseType('None')),
+        )
+        python_tile = NumpyAnalogTile(out_size, in_size, rpu_config)
 
         # Set weights.
         init_weights = uniform(-0.5, 0.5, size=(python_tile.out_size, python_tile.in_size))

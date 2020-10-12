@@ -20,10 +20,8 @@ from torch.cuda import current_stream, current_device
 from torch.cuda import device as cuda_device
 from torch import device as torch_device
 
-
-from aihwkit.simulator.devices import (
-    BaseResistiveDevice,
-    FloatingPointResistiveDevice
+from aihwkit.simulator.configs import (
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 )
 from aihwkit.simulator.tiles import (
     AnalogTile,
@@ -39,11 +37,11 @@ class IndexedFloatingPointTile(FloatingPointTile):
             self,
             out_size: int,
             in_size: int,
-            resistive_device: Optional[FloatingPointResistiveDevice] = None,
+            rpu_config: Optional[FloatingPointRPUConfig] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False):
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans)
+        super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
         self.image_sizes = []  # type: List[int]
 
     def set_indexed(self, indices: Tensor, image_sizes: list) -> None:
@@ -127,11 +125,11 @@ class IndexedAnalogTile(AnalogTile):
             self,
             out_size: int,
             in_size: int,
-            resistive_device: Optional[BaseResistiveDevice] = None,
+            rpu_config: Optional[Union[SingleRPUConfig, UnitCellRPUConfig]] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False):
-        super().__init__(out_size, in_size, resistive_device, bias, in_trans, out_trans)
+        super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
         self.image_sizes = []  # type: List[int]
 
     def set_indexed(self, indices: Tensor, image_sizes: list) -> None:
@@ -226,11 +224,11 @@ class CudaIndexedFloatingPointTile(IndexedFloatingPointTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        # Create a new instance of the resistive device.
-        new_resistive_device = deepcopy(source_tile.resistive_device)
+        # Create a new instance of the rpu config.
+        new_rpu_config = deepcopy(source_tile.rpu_config)
 
         # Create the tile, replacing the simulator tile.
-        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+        super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
                          source_tile.bias, source_tile.in_trans, source_tile.out_trans)
         self.tile = tiles.CudaFloatingPointTile(source_tile.tile)
 
@@ -265,11 +263,11 @@ class CudaIndexedAnalogTile(IndexedAnalogTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        # Create a new instance of the resistive device.
-        new_resistive_device = deepcopy(source_tile.resistive_device)
+        # Create a new instance of the rpu config.
+        new_rpu_config = deepcopy(source_tile.rpu_config)
 
         # Create the tile, replacing the simulator tile.
-        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+        super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
                          source_tile.bias, source_tile.in_trans, source_tile.out_trans)
         self.tile = tiles.CudaAnalogTile(source_tile.tile)
 

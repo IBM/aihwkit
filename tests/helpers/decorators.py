@@ -61,7 +61,7 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List):
         ret['parameter'] = '{}_{}_{}'.format(layer.__name__,
                                              tile.__name__,
                                              'Bias' if bias else 'NoBias')
-        ret['get_resistive_device'] = tile.get_resistive_device
+        ret['get_rpu_config'] = tile.get_rpu_config
         ret['bias'] = bias
 
         return ret

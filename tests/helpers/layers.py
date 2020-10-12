@@ -23,7 +23,7 @@ class Linear:
     use_cuda = False
 
     def get_layer(self, in_features=3, out_features=4, **kwargs):
-        kwargs.setdefault('resistive_device', self.get_resistive_device())
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
 
         return AnalogLinear(in_features, out_features, **kwargs)
@@ -35,7 +35,7 @@ class Conv2d:
     use_cuda = False
 
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
-        kwargs.setdefault('resistive_device', self.get_resistive_device())
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
 
         return AnalogConv2d(in_channels, out_channels, kernel_size,
@@ -49,7 +49,7 @@ class LinearCuda:
     use_cuda = True
 
     def get_layer(self, in_features=3, out_features=4, **kwargs):
-        kwargs.setdefault('resistive_device', self.get_resistive_device())
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
 
         return AnalogLinear(in_features, out_features, **kwargs).cuda()
@@ -61,7 +61,7 @@ class Conv2dCuda:
     use_cuda = True
 
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
-        kwargs.setdefault('resistive_device', self.get_resistive_device())
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
 
         return AnalogConv2d(in_channels, out_channels, kernel_size,

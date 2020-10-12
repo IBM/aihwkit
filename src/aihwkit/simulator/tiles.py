@@ -13,7 +13,7 @@
 """High level analog tiles."""
 
 from copy import deepcopy
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Generic, Optional, Tuple, TypeVar, Union
 
 from collections import OrderedDict
 
@@ -23,23 +23,23 @@ from torch.cuda import current_stream, current_device
 from torch.cuda import device as cuda_device
 from torch import device as torch_device
 
-
-from aihwkit.simulator.devices import (
-    BaseResistiveDevice,
-    FloatingPointResistiveDevice,
-    ConstantStepResistiveDevice,
+from aihwkit.simulator.configs import (
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 )
+from aihwkit.simulator.configs.devices import ConstantStepDevice
 
 from aihwkit.simulator.rpu_base import tiles, cuda
 
+RPUConfigGeneric = TypeVar('RPUConfigGeneric')
 
-class BaseTile:
+
+class BaseTile(Generic[RPUConfigGeneric]):
     """Base class for tiles.
 
     Args:
         out_size: output size
         in_size: input size
-        resistive_device: resistive device.
+        rpu_config: resistive processing unit configuration.
         bias: whether to add a bias column to the tile.
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
@@ -51,14 +51,14 @@ class BaseTile:
             self,
             out_size: int,
             in_size: int,
-            resistive_device: BaseResistiveDevice,
+            rpu_config: RPUConfigGeneric,
             bias: bool = True,
             in_trans: bool = False,
             out_trans: bool = False
     ):
         self.out_size = out_size
         self.in_size = in_size
-        self.resistive_device = resistive_device
+        self.rpu_config = rpu_config
         self.bias = bias
         self.in_trans = in_trans
         self.out_trans = out_trans
@@ -70,7 +70,7 @@ class BaseTile:
         if self.is_cuda:
             self.tile = None  # type: Union[tiles.FloatingPointTile, tiles.AnalogTile]
         else:
-            self.tile = self.resistive_device.create_tile(x_size, d_size)
+            self.tile = self._create_simulator_tile(x_size, d_size, rpu_config)
 
         self.device = torch_device('cpu')
 
@@ -106,9 +106,29 @@ class BaseTile:
 
         x_size = self.in_size + 1 if self.bias else self.in_size
         d_size = self.out_size
-        self.tile = self.resistive_device.create_tile(x_size, d_size)
+
+        # Recreate the tile.
+        self.tile = self._create_simulator_tile(x_size, d_size, self.rpu_config)
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
         self.tile.set_weights(weights)
+
+    def _create_simulator_tile(
+            self,
+            x_size: int,
+            d_size: int,
+            rpu_config: RPUConfigGeneric
+    ) -> Union[tiles.FloatingPointTile, tiles.AnalogTile]:
+        """Create a simulator tile.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+        raise NotImplementedError
 
     def set_weights(
             self,
@@ -387,37 +407,31 @@ class FloatingPointTile(BaseTile):
     remainder. :math:`\xi` is a standard Gaussian process.
 
     Args:
-
         out_size: output vector size of the tile, ie. the dimension of
-          :math:`\mathbf{y}` in case of :math:`\mathbf{y} =
-          W\mathbf{x}` (or equivalently the dimension of the
-          :math:`\boldsymbol{\delta}` of the backward pass).
-
+            :math:`\mathbf{y}` in case of :math:`\mathbf{y} =
+            W\mathbf{x}` (or equivalently the dimension of the
+            :math:`\boldsymbol{\delta}` of the backward pass).
         in_size: input vector size, ie. the dimension of the vector
-          :math:`\mathbf{x}` in case of :math:`\mathbf{y} =
-          W\mathbf{x}`).
-
-        resistive_device: resistive device.
-
+            :math:`\mathbf{x}` in case of :math:`\mathbf{y} =
+            W\mathbf{x}`).
+        rpu_config: resistive processing unit configuration.
         bias: whether to add a bias column to the tile, ie. :math:`W`
-          has an extra column to code the biases. Internally, the
-          input :math:`\mathbf{x}` will be automatically expanded by
-          an extra dimension which will be set to 1 always.
-
+            has an extra column to code the biases. Internally, the
+            input :math:`\mathbf{x}` will be automatically expanded by
+            an extra dimension which will be set to 1 always.
     """
 
     def __init__(
             self,
             out_size: int,
             in_size: int,
-            resistive_device: Optional[FloatingPointResistiveDevice] = None,
+            rpu_config: Optional[FloatingPointRPUConfig] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False,
     ):
-        self.resistive_device: FloatingPointResistiveDevice = (
-            resistive_device or FloatingPointResistiveDevice())
-        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans)
+        rpu_config = rpu_config or FloatingPointRPUConfig()
+        super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
     def cuda(
             self,
@@ -432,6 +446,26 @@ class FloatingPointTile(BaseTile):
             tile = CudaFloatingPointTile(self)
 
         return tile
+
+    def _create_simulator_tile(
+            self,
+            x_size: int,
+            d_size: int,
+            rpu_config: FloatingPointRPUConfig
+    ) -> tiles.FloatingPointTile:
+        """Create a simulator tile.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+        meta_parameter = rpu_config.device.as_bindings()
+
+        return meta_parameter.create_array(x_size, d_size)
 
 
 class AnalogTile(BaseTile):
@@ -495,7 +529,6 @@ class AnalogTile(BaseTile):
     bit, it would be :math:`1/256`
 
     Note:
-
        Typically the resolution is reduced by 2 level, eg. in case of
        8 bits it is set to :math:`1/254` to account for a
        discretization mirror symmetric around zero, including the zero
@@ -570,23 +603,18 @@ class AnalogTile(BaseTile):
     :class:`~aihwkit.simulator.parameters.AnalogTileUpdateParameters`.
 
     Args:
-
         out_size: output vector size of the tile, ie. the dimension of
-          :math:`\mathbf{y}` in case of :math:`\mathbf{y} =
-          W\mathbf{x}` (or equivalently the dimension of the
-          :math:`\boldsymbol{\delta}` of the backward pass).
-
+            :math:`\mathbf{y}` in case of :math:`\mathbf{y} =
+            W\mathbf{x}` (or equivalently the dimension of the
+            :math:`\boldsymbol{\delta}` of the backward pass).
         in_size: input vector size, ie. the dimension of the vector
-          :math:`\mathbf{x}` in case of :math:`\mathbf{y} =
-          W\mathbf{x}`).
-
-        resistive_device: resistive device.
-
+            :math:`\mathbf{x}` in case of :math:`\mathbf{y} =
+            W\mathbf{x}`).
+        rpu_config: resistive processing unit configuration.
         bias: whether to add a bias column to the tile, ie. :math:`W`
-          has an extra column to code the biases. Internally, the
-          input :math:`\mathbf{x}` will be automatically expanded by
-          an extra dimension which will be set to 1 always.
-
+            has an extra column to code the biases. Internally, the
+            input :math:`\mathbf{x}` will be automatically expanded by
+            an extra dimension which will be set to 1 always.
 
     .. _Gokmen & Vlasov (2016): https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
@@ -595,13 +623,13 @@ class AnalogTile(BaseTile):
             self,
             out_size: int,
             in_size: int,
-            resistive_device: Optional[BaseResistiveDevice] = None,
+            rpu_config: Optional[Union[SingleRPUConfig, UnitCellRPUConfig]] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False,
     ):
-        self.resistive_device = resistive_device or ConstantStepResistiveDevice()
-        super().__init__(out_size, in_size, self.resistive_device, bias, in_trans, out_trans)
+        rpu_config = rpu_config or SingleRPUConfig(device=ConstantStepDevice())
+        super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
     def cuda(
             self,
@@ -619,6 +647,27 @@ class AnalogTile(BaseTile):
             tile = CudaAnalogTile(self)
 
         return tile
+
+    def _create_simulator_tile(
+            self,
+            x_size: int,
+            d_size: int,
+            rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]
+    ) -> tiles.AnalogTile:
+        """Create a simulator tile.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+        meta_parameter = rpu_config.as_bindings()
+        device_parameter = rpu_config.device.as_bindings()
+
+        return meta_parameter.create_array(x_size, d_size, device_parameter)
 
 
 class CudaFloatingPointTile(FloatingPointTile):
@@ -638,11 +687,11 @@ class CudaFloatingPointTile(FloatingPointTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        # Create a new instance of the resistive device.
-        new_resistive_device = deepcopy(source_tile.resistive_device)
+        # Create a new instance of the rpu config.
+        new_rpu_config = deepcopy(source_tile.rpu_config)
 
         # Create the tile, replacing the simulator tile.
-        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+        super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
                          source_tile.bias, source_tile.in_trans, source_tile.out_trans)
         self.tile = tiles.CudaFloatingPointTile(source_tile.tile)
 
@@ -677,11 +726,11 @@ class CudaAnalogTile(AnalogTile):
         if not cuda.is_compiled():
             raise RuntimeError('aihwkit has not been compiled with CUDA support')
 
-        # Create a new instance of the resistive device.
-        new_resistive_device = deepcopy(source_tile.resistive_device)
+        # Create a new instance of the rpu config.
+        new_rpu_config = deepcopy(source_tile.rpu_config)
 
         # Create the tile, replacing the simulator tile.
-        super().__init__(source_tile.out_size, source_tile.in_size, new_resistive_device,
+        super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
                          source_tile.bias, source_tile.in_trans, source_tile.out_trans)
         self.tile = tiles.CudaAnalogTile(source_tile.tile)
 
