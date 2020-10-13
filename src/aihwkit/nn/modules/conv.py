@@ -20,7 +20,9 @@ from torch.nn.modules.utils import _pair
 
 from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase
-from aihwkit.simulator.devices import BaseResistiveDevice
+from aihwkit.simulator.configs import (
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+)
 from aihwkit.simulator.tiles_indexed import (
     IndexedAnalogTile, IndexedFloatingPointTile
 )
@@ -51,8 +53,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             channels.
         bias: whether to use a bias row on the analog tile or not
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
-        resistive_device: analog devices that define the properties of the
-            analog tile.
+        rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
            for setting initial weights and read out of weights
     """
@@ -87,7 +88,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             groups: int = 1,
             bias: bool = True,
             padding_mode: str = 'zeros',
-            resistive_device: Optional[BaseResistiveDevice] = None,
+            rpu_config: Optional[
+                Union[FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig]] = None,
             realistic_read_write: bool = False,
     ):
         # pylint: disable=too-many-arguments
@@ -104,7 +106,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
         self.analog_tile = self._setup_tile(self.in_features,
                                             self.out_features,
                                             bias,
-                                            resistive_device,
+                                            rpu_config,
                                             realistic_read_write)
 
         # Call super() after tile creation, including ``reset_parameters``.

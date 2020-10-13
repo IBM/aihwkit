@@ -18,9 +18,9 @@ from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
     FloatingPoint, Ideal, ConstantStep, LinearStep,
-    Pulsed, ExpStep, Vector, Difference, Transfer,
+    ExpStep, Vector, Difference, Transfer,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    PulsedCuda, ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda
+    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda
 )
 
 
@@ -29,7 +29,6 @@ from .helpers.tiles import (
     Ideal,
     ConstantStep,
     LinearStep,
-    Pulsed,
     ExpStep,
     Vector,
     Difference,
@@ -38,7 +37,6 @@ from .helpers.tiles import (
     IdealCuda,
     ConstantStepCuda,
     LinearStepCuda,
-    PulsedCuda,
     ExpStepCuda,
     VectorCuda,
     DifferenceCuda,
@@ -146,7 +144,6 @@ class TileTest(ParametrizedTestCase):
         # Compare old and new hidden parameters tensors.
         for (_, old), (_, new) in zip(hidden_parameters.items(),
                                       new_hidden_parameters.items()):
-
             self.assertTrue(old.allclose(new))
 
         if field:
