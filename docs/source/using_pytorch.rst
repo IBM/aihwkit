@@ -80,12 +80,11 @@ underlying analog tile should use a ``ConstantStep`` resistive device, with
 a specific value for one of its parameters (``w_min``)::
 
     from aihwkit.nn import AnalogLinear
-    from aihwkit.simulator.devices import ConstantStepResistiveDevice
-    from aihwkit.simulator.parameters import PulsedResistiveDeviceParameters
+    from aihwkit.simulator.configs import SingleRPUConfig
+    from aihwkit.simulator.configs.devices import ConstantStepDevice
 
-    parameters = PulsedResistiveDeviceParameters(w_min=-0.4)
-    resistive_device = ConstantStepResistiveDevice(parameters)
-    model = AnalogLinear(5, 3, bias=False, resistive_device=resistive_device)
+    config = SingleRPUConfig(device=ConstantStepDevice(w_min=-0.4))
+    model = AnalogLinear(5, 3, bias=False, rpu_config=config)
 
 
 You can read more about analog tiles in the :doc:`using_simulator` section.

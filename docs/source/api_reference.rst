@@ -6,8 +6,7 @@ API Reference
 
    aihwkit
    aihwkit.simulator
-   aihwkit.simulator.devices
-   aihwkit.simulator.parameters
+   aihwkit.simulator.configs
    aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
    aihwkit.simulator.tiles_indexed
