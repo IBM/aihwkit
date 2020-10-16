@@ -20,7 +20,7 @@ from torch.nn import Linear
 from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase
 from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 )
 
 
@@ -58,7 +58,8 @@ class AnalogLinear(Linear, AnalogModuleBase):
             out_features: int,
             bias: bool = True,
             rpu_config: Optional[
-                Union[FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig]] = None,
+                Union[FloatingPointRPUConfig, SingleRPUConfig,
+                      UnitCellRPUConfig, InferenceRPUConfig]] = None,
             realistic_read_write: bool = False,
     ):
         # Create the tile.

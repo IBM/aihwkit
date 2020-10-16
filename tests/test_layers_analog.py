@@ -21,12 +21,12 @@ from aihwkit.optim.analog_sgd import AnalogSGD
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, ConstantStep
+from .helpers.tiles import FloatingPoint, ConstantStep, Inference
 
 
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
-    tiles=[FloatingPoint, ConstantStep],
+    tiles=[FloatingPoint, ConstantStep, Inference],
     biases=[True, False]
 )
 class LinearLayerTest(ParametrizedTestCase):

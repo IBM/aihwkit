@@ -12,32 +12,14 @@
 
 """Tests for general functionality of layers."""
 
-from unittest import TestCase
-
-from numpy.testing import assert_array_almost_equal, assert_raises
-
 from torch import randn
 
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel, SinglePairConductanceConverter
 
-
-class NoiseModelMixin:
-    """Common things for noise model test"""
-
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b):
-        """Assert that two tensors are almost equal."""
-        # pylint: disable=invalid-name
-        array_a = tensor_a.detach().cpu().numpy()
-        array_b = tensor_b.detach().cpu().numpy()
-        assert_array_almost_equal(array_a, array_b)
-
-    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b):
-        """Assert that two tensors are not equal."""
-        # pylint: disable=invalid-name
-        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b)
+from .helpers.testcases import AihwkitTestCase
 
 
-class NoiseModelTest(TestCase, NoiseModelMixin):
+class NoiseModelTest(AihwkitTestCase):
     """Noise model tests."""
 
     def test_apply_noise(self):
@@ -51,7 +33,7 @@ class NoiseModelTest(TestCase, NoiseModelMixin):
         self.assertNotAlmostEqualTensor(noisy_weights, weights)
 
 
-class ConductanceConverterTest(TestCase, NoiseModelMixin):
+class ConductanceConverterTest(AihwkitTestCase):
     """Conductance converter test."""
 
     def test_single_pair_converter(self):
