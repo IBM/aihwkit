@@ -32,7 +32,7 @@ class BaseConductanceConverter:
         """Converting a weight matrix into conductances.
 
         Caution:
-            The conversion is assumed deterministic and repeatable!
+            The conversion is assumed deterministic and repeatable.
 
         Args:
             weights: weight matrix tensor.
@@ -216,14 +216,14 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_programming_noise_to_conductance(self, g_target: Tensor) -> Tensor:
-        """Apply programming noise to a target conductance ``Tensor``.
+        r"""Apply programming noise to a target conductance ``Tensor``.
 
         Args:
             g_target: Target conductances
 
         Returns:
             Tensor of sampled drift coefficients :math:`\nu`, one for each
-                target conductance value.
+            target conductance value.
         """
         raise NotImplementedError
 

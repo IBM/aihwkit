@@ -33,6 +33,7 @@ Tile class                                           Description
 ===================================================  ========
 :class:`~aihwkit.simulator.tiles.FloatingPointTile`  implements a floating point or ideal analog tile.
 :class:`~aihwkit.simulator.tiles.AnalogTile`         implements an abstract analog tile with many cycle-to-cycle non-idealities and systematic parameter-spreads that can be user-defined.
+:class:`~aihwkit.simulator.tiles.InferenceTile`      implements an analog tile for inference and hardware-aware training.
 ===================================================  ========
 
 Creating an analog tile
