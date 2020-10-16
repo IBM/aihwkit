@@ -23,6 +23,7 @@ from aihwkit.nn.modules.base import AnalogModuleBase
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 )
+
 from aihwkit.simulator.tiles_indexed import (
     IndexedAnalogTile, IndexedFloatingPointTile
 )
@@ -164,7 +165,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             self.input_size = input_size
             self.analog_tile.set_indexed(self.fold_indices, image_sizes)  # type: ignore
 
-        return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias)
+        return AnalogFunction.apply(self.analog_tile, x_input, self.weight,
+                                    self.bias, not self.training)
 
     def extra_repr(self) -> str:
         output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'

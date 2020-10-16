@@ -22,10 +22,12 @@ from torch import Tensor, stack
 from torch.cuda import current_stream, current_device
 from torch.cuda import device as cuda_device
 from torch import device as torch_device
+from torch.autograd import no_grad
 
 from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 )
+
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 
 from aihwkit.simulator.rpu_base import tiles, cuda
@@ -282,6 +284,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """Return a copy of this tile in CUDA memory."""
         raise NotImplementedError
 
+    @no_grad()
     def forward(self, x_input: Tensor, is_test: bool = False) -> Tensor:
         """Perform the forward pass.
 
@@ -292,10 +295,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Returns:
             torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
         """
-        # Unset the require_grad of the tensor when chaining.
-        if x_input.grad_fn:
-            x_input = x_input.detach()
-
+        # We use no-grad as we do it explicitly in the optimizer.
         return self.tile.forward(x_input, self.bias,
                                  self.in_trans, self.out_trans, is_test)
 
@@ -623,7 +623,8 @@ class AnalogTile(BaseTile):
             self,
             out_size: int,
             in_size: int,
-            rpu_config: Optional[Union[SingleRPUConfig, UnitCellRPUConfig]] = None,
+            rpu_config: Optional[Union[SingleRPUConfig, UnitCellRPUConfig,
+                                       InferenceRPUConfig]] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False,
@@ -652,7 +653,7 @@ class AnalogTile(BaseTile):
             self,
             x_size: int,
             d_size: int,
-            rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]
+            rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig]
     ) -> tiles.AnalogTile:
         """Create a simulator tile.
 

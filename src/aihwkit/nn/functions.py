@@ -30,7 +30,8 @@ class AnalogFunction(Function):
             analog_tile: FloatingPointTile,
             input_: Tensor,
             weights: Tensor,
-            _: Optional[Tensor] = None) -> Tensor:
+            _: Optional[Tensor] = None,
+            is_test: bool = False) -> Tensor:
         """Execute the forward pass in the analog tile."""
 
         # Store in context for using during `backward()`.
@@ -39,13 +40,14 @@ class AnalogFunction(Function):
         ctx.save_for_backward(input_)
 
         # Invoke the forward pass in the tile instance.
-        return analog_tile.forward(input_)
+        return analog_tile.forward(input_, is_test)
 
     @staticmethod
     def backward(
             ctx: Any,
             grad_output: Tensor
-    ) -> Tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor], Optional[Tensor]]:
+    ) -> Tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor],
+               Optional[Tensor], Optional[Tensor]]:
         """Execute the backward pass in the analog tile."""
 
         # Call the backward function in the tile instance.
@@ -56,4 +58,4 @@ class AnalogFunction(Function):
         ctx.weights.input = input_
         ctx.weights.grad_output = grad_output
 
-        return None, grad_input, None, None
+        return None, grad_input, None, None, None

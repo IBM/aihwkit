@@ -19,9 +19,10 @@ from torch import device as torch_device
 from torch.nn import Module
 
 from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 )
 from aihwkit.simulator.tiles import AnalogTile, BaseTile, FloatingPointTile
+from aihwkit.simulator.inference_tiles import InferenceTile
 
 
 class AnalogModuleBase(Module):
@@ -44,6 +45,7 @@ class AnalogModuleBase(Module):
 
     TILE_CLASS_FLOATING_POINT: Any = FloatingPointTile
     TILE_CLASS_ANALOG: Any = AnalogTile
+    TILE_CLASS_INFERENCE: Any = InferenceTile
 
     def _setup_tile(
             self,
@@ -51,7 +53,8 @@ class AnalogModuleBase(Module):
             out_features: int,
             bias: bool,
             rpu_config: Optional[
-                Union[FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig]] = None,
+                Union[FloatingPointRPUConfig, SingleRPUConfig,
+                      UnitCellRPUConfig, InferenceRPUConfig]] = None,
             realistic_read_write: bool = False
     ) -> BaseTile:
         """Create an analog tile and setup this layer for using it.
@@ -90,6 +93,8 @@ class AnalogModuleBase(Module):
         # Create the tile.
         if isinstance(rpu_config, FloatingPointRPUConfig):
             tile_class = self.TILE_CLASS_FLOATING_POINT
+        elif isinstance(rpu_config, InferenceRPUConfig):
+            tile_class = self.TILE_CLASS_INFERENCE
         else:
             tile_class = self.TILE_CLASS_ANALOG  # type: ignore
 
@@ -218,12 +223,26 @@ class AnalogModuleBase(Module):
             device (int, optional): if specified, all parameters will be
                 copied to that GPU device
 
-        Returns:
-            Module: self
         """
+        # pylint: disable=attribute-defined-outside-init
+        # Note: this needs to be an in-place function, not a copy
+        super().cuda(device)
+        self.analog_tile = self.analog_tile.cuda(device)  # type: BaseTile
+        self.set_weights(self.weight, self.bias)
+        return self
 
-        return_value = super().cuda(device)
-        return_value.analog_tile = self.analog_tile.cuda(device)
-        # TODO: check why this is not happening on its own
-        return_value.set_weights(return_value.weight, return_value.bias)
-        return return_value
+
+def drift_analog_weights(model: Module, t_inference: float = 0.0) -> None:
+    """(Programs) and drifts all analog inference layers of a given model."""
+    model.eval()
+    for module in model.modules():
+        if isinstance(module, AnalogModuleBase) and hasattr(module.analog_tile, 'drift_weights'):
+            module.analog_tile.drift_weights(t_inference)  # type: ignore
+
+
+def program_analog_weights(model: Module) -> None:
+    """Programs all analog inference layers of a given model."""
+    model.eval()
+    for module in model.modules():
+        if isinstance(module, AnalogModuleBase) and hasattr(module.analog_tile, 'program_weights'):
+            module.analog_tile.program_weights()  # type: ignore

@@ -38,6 +38,7 @@ class AnalogSGD(SGD):
         # Create the new param groups.
         for (_, module) in model.named_modules():
             if isinstance(module, AnalogModuleBase):
+
                 new_param_groups.append({
                     'params': list(module.parameters(recurse=False)),
                     'analog_tile': module.analog_tile

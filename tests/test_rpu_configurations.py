@@ -100,8 +100,8 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         """Test modifying the tile parameters."""
         rpu_config = self.get_rpu_config()
 
-        rpu_config.forward_io = IOParameters(inp_noise=0.321)
-        rpu_config.backward_io = BackwardIOParameters(inp_noise=0.456)
+        rpu_config.forward = IOParameters(inp_noise=0.321)
+        rpu_config.backward = BackwardIOParameters(inp_noise=0.456)
         rpu_config.update = UpdateParameters(desired_bl=78)
 
         tile = self.get_tile(11, 22, rpu_config).tile

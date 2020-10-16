@@ -12,4 +12,6 @@
 
 """Configurations for resistive processing units."""
 
-from .configs import FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+from .configs import (
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
+)
