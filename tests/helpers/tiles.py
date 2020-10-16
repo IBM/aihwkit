@@ -29,7 +29,7 @@ from aihwkit.simulator.configs.devices import (
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
     SingleRPUConfig,
-    UnitCellRPUConfig
+    UnitCellRPUConfig,
 )
 
 from aihwkit.simulator.rpu_base import tiles
