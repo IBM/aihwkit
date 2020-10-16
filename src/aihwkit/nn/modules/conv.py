@@ -18,14 +18,10 @@ from torch import Tensor, arange, cat, float64, int32, ones
 from torch.nn import Conv2d, Unfold
 from torch.nn.modules.utils import _pair
 
-from aihwkit.nn.functions import AnalogFunction
+from aihwkit.nn.functions import AnalogIndexedFunction
 from aihwkit.nn.modules.base import AnalogModuleBase
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
-)
-
-from aihwkit.simulator.tiles_indexed import (
-    IndexedAnalogTile, IndexedFloatingPointTile
 )
 
 
@@ -74,9 +70,6 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
     input_size: float
     in_features: int
     out_features: int
-
-    TILE_CLASS_FLOATING_POINT = IndexedFloatingPointTile
-    TILE_CLASS_ANALOG = IndexedAnalogTile
 
     def __init__(
             self,
@@ -161,12 +154,12 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             d_height = get_size(x_height, 0)
             d_width = get_size(x_width, 1)
 
-            image_sizes = (self.in_channels, x_height, x_width, d_height, d_width)
+            image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
             self.input_size = input_size
             self.analog_tile.set_indexed(self.fold_indices, image_sizes)  # type: ignore
 
-        return AnalogFunction.apply(self.analog_tile, x_input, self.weight,
-                                    self.bias, not self.training)
+        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
+                                           self.bias, not self.training)
 
     def extra_repr(self) -> str:
         output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'

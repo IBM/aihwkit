@@ -57,5 +57,48 @@ class AnalogFunction(Function):
         input_, = ctx.saved_tensors
         ctx.weights.input = input_
         ctx.weights.grad_output = grad_output
+        ctx.weights.use_indexed = False
+
+        return None, grad_input, None, None, None
+
+
+class AnalogIndexedFunction(Function):
+    """Function that delegates into a `RPU` unit to use the indexed forward/backward/update."""
+    # pylint: disable=arguments-differ
+
+    @staticmethod
+    def forward(
+            ctx: Any,
+            analog_tile: FloatingPointTile,
+            input_: Tensor,
+            weights: Tensor,
+            _: Optional[Tensor] = None,
+            is_test: bool = False) -> Tensor:
+        """Execute the forward pass in the analog tile."""
+
+        # Store in context for using during `backward()`.
+        ctx.analog_tile = analog_tile
+        ctx.weights = weights
+        ctx.save_for_backward(input_)
+
+        # Invoke the forward pass in the tile instance.
+        return analog_tile.forward_indexed(input_, is_test)
+
+    @staticmethod
+    def backward(
+            ctx: Any,
+            grad_output: Tensor
+    ) -> Tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor],
+               Optional[Tensor], Optional[Tensor]]:
+        """Execute the backward pass in the analog tile."""
+
+        # Call the backward function in the tile instance.
+        grad_input = ctx.analog_tile.backward_indexed(grad_output)
+
+        # Store the parameters needed by the optimizer for `rpu.update_indexed()`.
+        input_, = ctx.saved_tensors
+        ctx.weights.input = input_
+        ctx.weights.grad_output = grad_output
+        ctx.weights.use_indexed = True
 
         return None, grad_input, None, None, None

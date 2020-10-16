@@ -126,6 +126,10 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         hidden_parameters_2 = tile_2.get_hidden_parameters()
 
         # Compare old and new hidden parameters tensors.
-        for (_, old), (_, new) in zip(hidden_parameters_1.items(),
-                                      hidden_parameters_2.items()):
+        for (field, old), (_, new) in zip(hidden_parameters_1.items(),
+                                          hidden_parameters_2.items()):
+
+            if 'weights' in field:
+                # exclude weights as these are not governed by construction seed
+                continue
             self.assertTrue(old.allclose(new))

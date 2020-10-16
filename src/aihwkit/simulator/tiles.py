@@ -13,7 +13,7 @@
 """High level analog tiles."""
 
 from copy import deepcopy
-from typing import Dict, Generic, Optional, Tuple, TypeVar, Union
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from collections import OrderedDict
 
@@ -46,6 +46,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
     """
+    # pylint: disable=too-many-instance-attributes
 
     is_cuda = False
 
@@ -65,6 +66,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.in_trans = in_trans
         self.out_trans = out_trans
 
+        # Only used for indexed.
+        self.image_sizes = []  # type: List[int]
+
         x_size = in_size + 1 if self.bias else in_size
         d_size = out_size
 
@@ -73,6 +77,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
             self.tile = None  # type: Union[tiles.FloatingPointTile, tiles.AnalogTile]
         else:
             self.tile = self._create_simulator_tile(x_size, d_size, rpu_config)
+            self.tile.set_learning_rate(0.01)
+            self.tile.set_weights_uniform_random(-0.01, 0.01)
 
         self.device = torch_device('cpu')
 
@@ -178,6 +184,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         if realistic:
             return self.tile.set_weights_realistic(combined_weights, n_loops)
+
         return self.tile.set_weights(combined_weights)
 
     def get_weights(
@@ -346,6 +353,62 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         hidden_parameters = stack(list(ordered_parameters.values()), dim=0)
         self.tile.set_hidden_parameters(hidden_parameters)
+
+    def set_indexed(self, indices: Tensor, image_sizes: List) -> None:
+        """Sets the index matrix for convolutions ans switches to
+        indexed forward/backward/update versions.
+
+        Args:
+            indices : torch.tensor with int indices
+            image_sizes: [C_in, H_in, W_in, H_out, W_out] sizes
+        """
+        if len(image_sizes) != 5:
+            raise ValueError('image_sizes expects 5 sizes [C_in, H_in, W_in, H_out, W_out]')
+
+        if self.in_trans or self.out_trans:
+            raise ValueError('Transposed indexed versions not supported (assumes NCHW)')
+
+        self.image_sizes = image_sizes
+        self.tile.set_matrix_indices(indices)
+
+    @no_grad()
+    def forward_indexed(self, x_input: Tensor, is_test: bool = False) -> Tensor:
+        """Perform the forward pass for convolutions.
+
+        Args:
+            x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+            is_test: whether to assume testing mode.
+
+        Returns:
+            torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+        """
+        if not self.image_sizes:
+            raise ValueError('self.image_sizes is not initialized. Please use '
+                             'set_indexed()')
+
+        _, _, _, height_out, width_out = self.image_sizes
+        return self.tile.forward_indexed(x_input, height_out, width_out, is_test)
+
+    def backward_indexed(self, d_input: Tensor) -> Tensor:
+        """Perform the backward pass for convolutions.
+
+        Args:
+            d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+
+        Returns:
+            torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+        """
+        channel_in, height_in, width_in, _, _ = self.image_sizes
+        return self.tile.backward_indexed(d_input, channel_in, height_in, width_in)
+
+    def update_indexed(self, x_input: Tensor, d_input: Tensor) -> None:
+        """Perform the update pass for convolutions.
+
+        Args:
+            x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+            d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+        """
+        return self.tile.update_indexed(x_input, d_input)
 
 
 class FloatingPointTile(BaseTile):
