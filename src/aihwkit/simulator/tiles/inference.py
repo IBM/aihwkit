@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""High level analog inference tiles."""
+"""High level analog tiles (inference)."""
 
 from copy import deepcopy
 from typing import List, Optional, Union
@@ -21,7 +21,8 @@ from torch.cuda import device as cuda_device
 from torch import device as torch_device
 from torch.autograd import no_grad
 
-from aihwkit.simulator.tiles import BaseTile, AnalogTile
+from aihwkit.simulator.tiles.base import BaseTile
+from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.rpu_base import tiles, cuda
 

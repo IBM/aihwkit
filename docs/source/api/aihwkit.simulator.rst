@@ -15,4 +15,4 @@ Submodules
    aihwkit.simulator.configs
    aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
-   aihwkit.simulator.tiles_indexed
+   aihwkit.simulator.noise_models

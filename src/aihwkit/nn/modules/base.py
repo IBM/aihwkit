@@ -21,8 +21,7 @@ from torch.nn import Module
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 )
-from aihwkit.simulator.tiles import AnalogTile, BaseTile, FloatingPointTile
-from aihwkit.simulator.inference_tiles import InferenceTile
+from aihwkit.simulator.tiles import AnalogTile, BaseTile, FloatingPointTile, InferenceTile
 
 
 class AnalogModuleBase(Module):

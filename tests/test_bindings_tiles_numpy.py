@@ -25,7 +25,7 @@ from aihwkit.simulator.configs.utils import (
     BackwardIOParameters, IOParameters,
     UpdateParameters, PulseType
 )
-from aihwkit.simulator.tiles_numpy import NumpyFloatingPointTile, NumpyAnalogTile
+from aihwkit.simulator.tiles.numpy import NumpyFloatingPointTile, NumpyAnalogTile
 
 
 class NumpyFloatingPointTileTest(TestCase):

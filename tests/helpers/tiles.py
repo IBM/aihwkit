@@ -14,8 +14,7 @@
 
 # pylint: disable=missing-function-docstring,too-few-public-methods
 
-from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile
-from aihwkit.simulator.inference_tiles import InferenceTile
+from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
 from aihwkit.simulator.configs.devices import (
     IdealDevice,
     ConstantStepDevice,
