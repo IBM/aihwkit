@@ -20,7 +20,23 @@ from numpy.testing import assert_array_almost_equal, assert_raises
 from aihwkit.simulator.rpu_base import cuda
 
 
-class ParametrizedTestCase(TestCase):
+class AihwkitTestCase(TestCase):
+    """Test case that contains common asserts and functions for aihwkit."""
+
+    def assertTensorAlmostEqual(self, tensor_a, tensor_b):
+        """Assert that two tensors are almost equal."""
+        # pylint: disable=invalid-name
+        array_a = tensor_a.detach().cpu().numpy()
+        array_b = tensor_b.detach().cpu().numpy()
+        assert_array_almost_equal(array_a, array_b)
+
+    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b):
+        """Assert that two tensors are not equal."""
+        # pylint: disable=invalid-name
+        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b)
+
+
+class ParametrizedTestCase(AihwkitTestCase):
     """Test case that is parametrized using aihwkit test decorators.
 
     Base class for aihwkit parametrized tests. This base class should be used
@@ -51,17 +67,3 @@ class ParametrizedTestCase(TestCase):
             raise SkipTest('not compiled with CUDA support')
 
         super().setUp()
-
-    # Custom asserts.
-
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b):
-        """Assert that two tensors are almost equal."""
-        # pylint: disable=invalid-name
-        array_a = tensor_a.detach().cpu().numpy()
-        array_b = tensor_b.detach().cpu().numpy()
-        assert_array_almost_equal(array_a, array_b)
-
-    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b):
-        """Assert that two tensors are not equal."""
-        # pylint: disable=invalid-name
-        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b)

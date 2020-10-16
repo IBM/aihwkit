@@ -15,6 +15,7 @@
 # pylint: disable=missing-function-docstring,too-few-public-methods
 
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile
+from aihwkit.simulator.inference_tiles import InferenceTile
 from aihwkit.simulator.configs.devices import (
     IdealDevice,
     ConstantStepDevice,
@@ -28,6 +29,7 @@ from aihwkit.simulator.configs.devices import (
 )
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
+    InferenceRPUConfig,
     SingleRPUConfig,
     UnitCellRPUConfig,
 )
@@ -168,6 +170,21 @@ class Transfer:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs)
 
 
+class Inference:
+    """Inference tile."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = None
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return InferenceRPUConfig()
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return InferenceTile(out_size, in_size, rpu_config, **kwargs)
+
+
 class FloatingPointCuda:
     """FloatingPointTile."""
 
@@ -299,3 +316,18 @@ class TransferCuda:
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
         return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class InferenceCuda:
+    """Inference tile."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = None
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return InferenceRPUConfig()
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return InferenceTile(out_size, in_size, rpu_config, **kwargs).cuda()

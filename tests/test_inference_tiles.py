@@ -12,10 +12,6 @@
 
 """Tests for inference tiles."""
 
-from unittest import TestCase, skipIf
-
-from numpy.testing import assert_array_almost_equal, assert_raises
-
 from torch import ones
 from torch import Tensor
 from torch.nn.functional import mse_loss
@@ -23,45 +19,38 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.nn.modules.base import drift_analog_weights
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.configs.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import OutputWeightNoiseType
-from aihwkit.simulator.rpu_base import cuda
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
+from .helpers.decorators import parametrize_over_tiles
+from .helpers.testcases import ParametrizedTestCase
+from .helpers.tiles import Inference, InferenceCuda
 
-class InferenceTileMixin:
-    """Common things for inference tile test"""
 
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b):
-        """Assert that two tensors are almost equal."""
-        # pylint: disable=invalid-name
-        array_a = tensor_a.detach().cpu().numpy()
-        array_b = tensor_b.detach().cpu().numpy()
-        assert_array_almost_equal(array_a, array_b)
+@parametrize_over_tiles([
+    Inference,
+    InferenceCuda
+])
+class InferenceTileTest(ParametrizedTestCase):
+    """Inference model tests."""
 
-    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b):
-        """Assert that two tensors are not equal."""
-        # pylint: disable=invalid-name
-        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b)
-
-    def get_model(self, cuda_if=False):
+    def get_model_and_x(self):
         """Trains a simple model."""
         # Prepare the datasets (input and expected output).
         x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
         y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
         # Define a single-layer network, using a constant step device type.
-        rpu_config = InferenceRPUConfig()
-        rpu_config.forward.out_res = -1.  # turn off (output) ADC discretization
+        rpu_config = self.get_rpu_config()
+        rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
         rpu_config.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
         rpu_config.forward.w_noise = 0.02
         rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
 
-        model = AnalogLinear(4, 2, bias=True,
-                             rpu_config=rpu_config)
+        model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
         # Move the model and tensors to cuda if it is available.
-        if cuda_if:
+        if self.use_cuda:
             x = x.cuda()
             y = y.cuda()
             model.cuda()
@@ -82,30 +71,9 @@ class InferenceTileMixin:
 
         return model, x
 
-
-class InferenceTileTest(TestCase, InferenceTileMixin):
-    """Inference model tests."""
-
     def test_drift(self):
         """Test using realistic weights (bias)."""
-        model, x = self.get_model()
-
-        # do inference with drift
-        pred_before = model(x)
-
-        pred_last = pred_before
-        for t_inference in [0., 1., 20., 1000., 1e5]:
-            drift_analog_weights(model, t_inference)
-            pred_drift = model(x)
-            self.assertNotAlmostEqualTensor(pred_last, pred_drift)
-            pred_last = pred_drift
-
-        self.assertNotAlmostEqualTensor(model.analog_tile.alpha, ones((1,)))
-
-    @skipIf(not cuda.is_compiled(), "No cuda available")
-    def test_drift_cuda(self):
-        """Test using realistic weights (bias)."""
-        model, x = self.get_model(True)
+        model, x = self.get_model_and_x()
 
         # do inference with drift
         pred_before = model(x)

@@ -18,9 +18,9 @@ from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
     FloatingPoint, Ideal, ConstantStep, LinearStep,
-    ExpStep, Vector, Difference, Transfer,
+    ExpStep, Vector, Difference, Transfer, Inference,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda
+    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda, InferenceCuda
 )
 
 
@@ -33,6 +33,7 @@ from .helpers.tiles import (
     Vector,
     Difference,
     Transfer,
+    Inference,
     FloatingPointCuda,
     IdealCuda,
     ConstantStepCuda,
@@ -41,6 +42,7 @@ from .helpers.tiles import (
     VectorCuda,
     DifferenceCuda,
     TransferCuda,
+    InferenceCuda
 ])
 class TileTest(ParametrizedTestCase):
     """Test floating point tile."""
