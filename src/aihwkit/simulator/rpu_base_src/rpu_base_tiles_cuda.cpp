@@ -365,7 +365,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
             return std::unique_ptr<ClassPulsed>(
                 new ClassPulsed(at::cuda::getCurrentCUDAStream(), rpu));
           }),
-          py::arg("tile"));
+          py::arg("tile"))
+      .def("get_parameters", &ClassPulsed::getMetaPar);
 }
 
 #endif

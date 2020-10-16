@@ -100,8 +100,8 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         """Test modifying the tile parameters."""
         rpu_config = self.get_rpu_config()
 
-        rpu_config.forward_io = IOParameters(inp_noise=0.321)
-        rpu_config.backward_io = BackwardIOParameters(inp_noise=0.456)
+        rpu_config.forward = IOParameters(inp_noise=0.321)
+        rpu_config.backward = BackwardIOParameters(inp_noise=0.456)
         rpu_config.update = UpdateParameters(desired_bl=78)
 
         tile = self.get_tile(11, 22, rpu_config).tile
@@ -126,6 +126,10 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         hidden_parameters_2 = tile_2.get_hidden_parameters()
 
         # Compare old and new hidden parameters tensors.
-        for (_, old), (_, new) in zip(hidden_parameters_1.items(),
-                                      hidden_parameters_2.items()):
+        for (field, old), (_, new) in zip(hidden_parameters_1.items(),
+                                          hidden_parameters_2.items()):
+
+            if 'weights' in field:
+                # exclude weights as these are not governed by construction seed
+                continue
             self.assertTrue(old.allclose(new))

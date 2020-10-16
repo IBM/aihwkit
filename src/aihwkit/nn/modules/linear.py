@@ -83,7 +83,8 @@ class AnalogLinear(Linear, AnalogModuleBase):
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
         # pylint: disable=arguments-differ
-        return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias)
+        return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias,
+                                    not self.training)
 
     def extra_repr(self) -> str:
         return '{}, is_cuda={}'.format(
