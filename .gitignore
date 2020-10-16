@@ -156,6 +156,7 @@ cython_debug/
 ## Additional convenience ignores. https://git-scm.com/docs/gitignore#_configuration
 
 # Editors
+*flymake.py
 .vscode
 \#*\#
 .\#*
