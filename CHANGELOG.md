@@ -36,6 +36,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* Improved package compatibility when using non-UTF8 encodings (version file,
+  package description). (\#13) 
 * The build system can now detect and use `openblas` directly when using the
   conda-installable version. (\#22)
 
