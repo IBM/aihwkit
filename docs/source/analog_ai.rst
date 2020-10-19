@@ -15,10 +15,11 @@ By leveraging the physical properties of memory devices, computation happens at
 the same place where the data is stored, drastically reducing energy
 consumption. Many types of memory devices such as phase-change memory (PCM),
 resistive random-access memory (RRAM), and Flash memory can be used for
-in-memory computing [1]. Because there is no movement of data, tasks can be
-performed in a fraction of the time and with much less energy. This is different
-from a conventional computer, where the data is transferred from the memory to
-the CPU every time a computation is done. 
+in-memory computing :ref:`[1] <references>`.
+Because there is no movement of data, tasks can be performed in a fraction of
+the time and with much less energy. This is different from a conventional
+computer, where the data is transferred from the memory to the CPU every time a
+computation is done. 
 
 .. image:: ../img/analog_ai_comparison.png
    :alt: Analog AI comparison
@@ -30,7 +31,7 @@ charge state or conductance state of memory devices. The devices are arranged in
 crossbar arrays, creating an artificial neural network where all matrix
 multiplications are performed in-place in an analog manner. This structure
 allows to run deep learning models at reduced energy consumption
-:ref:`[1] <references>`. 
+:ref:`[1] <references>`.
 
 An in-memory computing chip typically consists of multiple crossbar arrays of
 memory devices that communicate with each other. A neural network layer can be
