@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added more types of resistive devices: `IdealResistiveDevice`, `LinearStep`,
   `SoftBounds`, `ExpStep`, `VectorUnitCell`, `TransferUnitCell`,
   `DifferenceUnitCell`. (\#14)
+* Added a new `InferenceTile` that supports basic hardware-aware training
+  and inference using a statistical noise model that was fitted by real PCM
+  devices. (\#25)
 
 ### Changed
 
@@ -27,6 +30,16 @@ The format is based on [Keep a Changelog], and this project adheres to
   passed as a `rpu_config` argument instead of `resistive_device` to `Tiles`
   and `Layers`. Please check the `aihwkit.simulator.config` module for more
   details. (\#23)
+* The different analog tiles are now organized into a `aihwkit.simulator.tiles`
+  package. The internal `IndexedTiles` have been removed, and the rest of
+  previous top-level imports have been kept. (\#29)
+
+### Fixed
+
+* Improved package compatibility when using non-UTF8 encodings (version file,
+  package description). (\#13) 
+* The build system can now detect and use `openblas` directly when using the
+  conda-installable version. (\#22)
 
 ## [0.1.0] - 2020/09/17
 
