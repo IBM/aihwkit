@@ -24,6 +24,9 @@ from torch.autograd import no_grad
 from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.configs import InferenceRPUConfig
+from aihwkit.simulator.configs.utils import (
+    WeightClipType, WeightModifierType, parameters_to_bindings
+)
 from aihwkit.simulator.rpu_base import tiles, cuda
 
 
@@ -145,15 +148,26 @@ class InferenceTile(AnalogTile):
             The drift compensation scale will only be applied during
             testing, ie if ``is_test=True``.
         """
-        # TODO: enable additional noise training:
-        #       if not is_test and len(self.training_noise_dic):
-        #           self.tile.apply_weight_modifier(self.training_noise_dic)
+        if not is_test and (self.rpu_config.modifier.type != WeightModifierType.COPY or
+                            self.rpu_config.modifier.pdrop > 0.0):
+            weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
+            self.tile.modify_weights(weight_modify_params)
 
         if not is_test or self.drift_compensation is None:
             return super().forward(x_input, is_test)
 
         # only do drift compensation in eval mode
         return super().forward(x_input, True)*self.alpha
+
+    @no_grad()
+    def post_update_step(self) -> None:
+        """Operators that need to be called once per mini-batch."""
+        super().post_update_step()
+
+        # TODO: make this a little nicer. Now each time bindings are generated..
+        if self.rpu_config.clip.type != WeightClipType.NONE:
+            weight_clip_params = parameters_to_bindings(self.rpu_config.clip)
+            self.tile.clip_weights(weight_clip_params)
 
     def cuda(
             self,

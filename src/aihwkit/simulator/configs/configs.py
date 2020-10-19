@@ -22,6 +22,7 @@ from aihwkit.simulator.configs.devices import (
 
 from aihwkit.simulator.configs.utils import (
     BackwardIOParameters, IOParameters, UpdateParameters, PulseType,
+    WeightClipParameter, WeightModifierParameter,
     tile_parameters_to_bindings
 )
 from aihwkit.simulator.rpu_base import devices
@@ -113,6 +114,10 @@ class InferenceRPUConfig:
 
     device: IdealDevice = field(default_factory=IdealDevice)
     """Ideal device."""
+
+    clip: WeightClipParameter = field(default_factory=WeightClipParameter)
+
+    modifier: WeightModifierParameter = field(default_factory=WeightModifierParameter)
 
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""

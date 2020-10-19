@@ -41,7 +41,6 @@ void WeightModifier<T>::apply(
   if (new_weights != weights) {
     RPU::math::copy<T>(size_, weights, 1, new_weights, 1);
   }
-  enable_during_test_ = wmpar.enable_during_test;
 
   T amax = wmpar.assumed_wmax; // assumed max
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {

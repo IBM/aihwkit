@@ -22,19 +22,17 @@
   cublasHandle_t handle = context->getBlasHandle();                                                \
   CUBLAS_CALL(cublasSetStream(handle, context->getStream()))
 
-#define RPU_SET_CUBLAS_POINTER_MODE_DEVICE				\
-  cublasPointerMode_t p_mode;						\
-  CUBLAS_CALL(cublasGetPointerMode(handle, &p_mode));			\
-  CUBLAS_CALL(cublasSetPointerMode(handle,CUBLAS_POINTER_MODE_DEVICE))
+#define RPU_SET_CUBLAS_POINTER_MODE_DEVICE                                                         \
+  cublasPointerMode_t p_mode;                                                                      \
+  CUBLAS_CALL(cublasGetPointerMode(handle, &p_mode));                                              \
+  CUBLAS_CALL(cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_DEVICE))
 
-#define RPU_SET_CUBLAS_POINTER_MODE_HOST				\
-  cublasPointerMode_t p_mode;						\
-  CUBLAS_CALL(cublasGetPointerMode(handle, &p_mode));			\
-  CUBLAS_CALL(cublasSetPointerMode(handle,CUBLAS_POINTER_MODE_HOST))
+#define RPU_SET_CUBLAS_POINTER_MODE_HOST                                                           \
+  cublasPointerMode_t p_mode;                                                                      \
+  CUBLAS_CALL(cublasGetPointerMode(handle, &p_mode));                                              \
+  CUBLAS_CALL(cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST))
 
-#define RPU_RESTORE_CUBLAS_POINTER_MODE		    \
-  CUBLAS_CALL(cublasSetPointerMode(handle,p_mode))
-
+#define RPU_RESTORE_CUBLAS_POINTER_MODE CUBLAS_CALL(cublasSetPointerMode(handle, p_mode))
 
 namespace RPU {
 namespace math {
@@ -245,7 +243,6 @@ void ger<double>(
   CUBLAS_CALL(cublasDger(handle, M, N, &alpha, X, incX, Y, incY, A, lda));
   RPU_RESTORE_CUBLAS_POINTER_MODE;
 };
-
 
 // W += A
 template <typename T> __global__ void kernelElemAdd(T *dev_W, const int size, const T *dev_A) {

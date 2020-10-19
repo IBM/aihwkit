@@ -74,7 +74,6 @@ class AnalogSGD(SGD):
                 and returns the loss.
         """
         # pylint: disable=too-many-branches
-
         loss = None
         if closure is not None:
             loss = closure()
@@ -96,10 +95,14 @@ class AnalogSGD(SGD):
                 weights = next(param for param in group['params']
                                if getattr(param, 'is_weight', False))
 
+                # Call `update` in the tile.
                 if weights.use_indexed:
                     analog_tile.update_indexed(weights.input, weights.grad_output)
                 else:
                     analog_tile.update(weights.input, weights.grad_output)
+
+                # Apply post-update step operations (diffuse, decay, etc).
+                analog_tile.post_update_step()
                 continue
 
             for param in group['params']:

@@ -25,7 +25,8 @@ from aihwkit.nn import AnalogLinear
 from aihwkit.nn.modules.base import drift_analog_weights
 from aihwkit.optim.analog_sgd import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import OutputWeightNoiseType
+from aihwkit.simulator.configs.utils import (
+    OutputWeightNoiseType, WeightClipType, WeightModifierType)
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
@@ -33,11 +34,20 @@ from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
 y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
-# Define a single-layer network, using a constant step device type.
+# Define a single-layer network, using inference/hardware-aware training tile
 rpu_config = InferenceRPUConfig()
 rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
 rpu_config.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
-rpu_config.forward.w_noise = 0.02
+rpu_config.forward.w_noise = 0.02  # Short-term w-noise.
+
+rpu_config.clip.type = WeightClipType.FIXED_VALUE
+rpu_config.clip.fixed_value = 1.0
+rpu_config.modifier.pdrop = 0.03  # Drop connect.
+rpu_config.modifier.type = WeightModifierType.ADD_NORMAL  # Fwd/bwd weight noise.
+rpu_config.modifier.std_dev = 0.1
+rpu_config.modifier.rel_to_actual_wmax = True
+
+# Inference noise model.
 rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
 
 model = AnalogLinear(4, 2, bias=True,

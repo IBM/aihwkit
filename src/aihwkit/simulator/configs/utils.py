@@ -18,7 +18,7 @@ from dataclasses import dataclass, is_dataclass
 from enum import Enum
 from typing import Any, ClassVar, Type
 
-from aihwkit.simulator.rpu_base import devices
+from aihwkit.simulator.rpu_base import devices, tiles
 
 
 # Helper enums.
@@ -94,6 +94,46 @@ class PulseType(Enum):
 
     MEAN_COUNT = 'MeanCount'
     """Coincidence based in prob (:math:`p_a p_b`)."""
+
+
+class WeightModifierType(Enum):
+    """Weight modifier type."""
+
+    COPY = 'Copy'
+    """Just copy, however, could also drop."""
+
+    DISCRETIZE = 'Discretize'
+    """Quantize the weights."""
+
+    MULT_NORMAL = 'MultNormal'
+    """Mutiplicative Gaussian noise."""
+
+    ADD_NORMAL = 'AddNormal'
+    """Additive Gaussian noise."""
+
+    DISCRETIZE_ADD_NORMAL = 'DiscretizeAddNormal'
+    """First discretize and then additive Gaussian noise."""
+
+    DOREFA = 'DoReFa'
+    """DoReFa discretization."""
+
+
+class WeightClipType(Enum):
+    """Weight clipper type."""
+
+    NONE = 'None'
+    """None."""
+
+    FIXED_VALUE = 'FixedValue'
+    """Clip to fixed value give, symmetrical around zero."""
+
+    LAYER_GAUSSIAN = 'LayerGaussian'
+    """Calculates the second moment of the whole weight matrix and clips
+    at ``sigma`` times the result symmetrically around zero."""
+
+    AVERAGE_CHANNEL_MAX = 'AverageChannelMax'
+    """Calculates the abs max of each output channel (row of the weight
+    matrix) and takes the average as clipping value for all."""
 
 
 # Specialized parameters.
@@ -273,6 +313,98 @@ class UpdateParameters:
     """
 
 
+@dataclass
+class WeightModifierParameter:
+    """Parameter that modify the forward/backward weights during hardware-aware training."""
+
+    bindings_class: ClassVar[Type] = tiles.WeightModifierParameter
+
+    std_dev: float = 0.0
+    """Standard deviation of the added noise to the weight matrix.
+
+    This parameter affects the modifier types ``AddNormal``,
+    ``MultNormal`` and ``DiscretizeAddNormal``.
+
+    Note:
+
+        If the parameter ``rel_to_actual_wmax`` is set then the
+        ``std_dev`` is computed in relative terms to the abs max of the
+        given weight matrix, otherwise it in relative terms to the
+        assumed max, which is set by ``assumed_wmax``.
+    """
+
+    res: float = 0.0
+    r"""Resolution of the discretization.
+
+    The invert of ``res`` gives the number of equal sized steps in
+    :math:`-a_\text{max}\ldots,a_\text{max}` where the
+    :math:`a_\text{max}` is either given by the abs max (if
+    ``rel_to_actual_wmax`` is set) or ``assumed_wmax`` otherwise.
+
+    ``res`` is only used in the modifier types ``DoReFa``,
+    ``Discretize``, and ``DiscretizeAddNormal``.
+    """
+
+    sto_round: bool = False
+    """Whether the discretization is done with stochastic rounding enabled.
+
+    ``sto_round`` is only used in the modifier types ``DoReFa``,
+    ``Discretize``, and ``DiscretizeAddNormal``.
+    """
+
+    dorefa_clip: float = 0.6
+    """Parameter for DoReFa."""
+
+    pdrop: float = 0.0
+    """Drop connect probability.
+
+    Drop connect sets weights to zero with the given probability. This implements drop connect.
+
+    Important:
+        Drop connect can be used with any other modifier type in combination.
+    """
+
+    enable_during_test: bool = False
+    """Whether to use the last modified weight matrix during testing.
+
+    Caution:
+        This will NOT remove drop connect or any other noise
+        during evaluation, and thus should only used with care.
+    """
+
+    rel_to_actual_wmax: bool = True
+    """Whether to calculate the abs max of the weight and apply noise relative to this number.
+
+    If set to False, ``assumed_wmax`` is taken as relative units.
+    """
+
+    assumed_wmax: float = 1.0
+    """Assumed weight value that is mapped to the maximal conductance.
+
+    This is typically 1.0. This parameter will be ignored if
+    ``rel_to_actual_wmax`` is set.
+    """
+
+    type: WeightModifierType = WeightModifierType.COPY
+    """Type of the weight modification."""
+
+
+@dataclass
+class WeightClipParameter:
+    """Parameter that clip the weights during hardware-aware training."""
+
+    bindings_class: ClassVar[Type] = tiles.WeightClipParameter
+
+    fixed_value: float = 1.0
+    """Clipping value in case of ``FixedValue`` type."""
+
+    sigma: float = 2.5
+    """Sigma value for clipping for the ``LayerGaussian`` type."""
+
+    type: WeightClipType = WeightClipType.NONE
+    """Type of clipping."""
+
+
 def parameters_to_bindings(params: Any) -> Any:
     """Convert a dataclass parameter into a bindings class."""
     result = params.bindings_class()
@@ -284,7 +416,10 @@ def parameters_to_bindings(params: Any) -> Any:
             continue
 
         if isinstance(value, Enum):
-            enum_class = getattr(devices, value.__class__.__name__)
+            if hasattr(tiles, value.__class__.__name__):
+                enum_class = getattr(tiles, value.__class__.__name__)
+            else:
+                enum_class = getattr(devices, value.__class__.__name__)
             enum_value = getattr(enum_class, value.value)
             setattr(result, field, enum_value)
         elif is_dataclass(value):

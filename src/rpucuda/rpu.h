@@ -13,6 +13,7 @@
 #pragma once
 
 #include "rng.h"
+#include "weight_clipper.h"
 #include "weight_modifier.h"
 #include <cfenv>
 #include <iostream>
@@ -208,6 +209,7 @@ public:
     swap(a.fb_weights_, b.fb_weights_);
     swap(a.delta_weights_extern_, b.delta_weights_extern_);
 
+    swap(a.wclipper_, b.wclipper_);
     swap(a.fb_weight_modifier_, b.fb_weight_modifier_);
     swap(a.last_update_m_batch_, b.last_update_m_batch_);
 
@@ -293,6 +295,10 @@ public:
      applied to the current decay rate*/
   virtual void decayWeights(bool bias_no_decay);
   virtual void decayWeights(T alpha, bool bias_no_decay);
+
+  /* Clip weights once. Uses the weight clipper to clip weights in
+     some manner, only for HWA training.*/
+  virtual void clipWeights(const WeightClipParameter &wclpar);
 
   /* Applying a potential reset with given probabilties to a selection of columns */
   virtual void resetCols(int start_col, int n_cols, T reset_prob) {
@@ -569,6 +575,7 @@ private:
   int temp_tensor_size_ = 0;
 
   std::unique_ptr<WeightModifier<T>> fb_weight_modifier_ = nullptr;
+  std::unique_ptr<WeightClipper<T>> wclipper_ = nullptr;
 
   int *matrix_indices_ = nullptr;
   bool matrix_indices_set_ = false;
