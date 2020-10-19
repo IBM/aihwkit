@@ -42,9 +42,9 @@ features::
     model = AnalogLinear(5, 3)
 
 By default, the ``AnalogLinear`` layer would use bias, and use a
-:class:`~aihwkit.simulator.tiles.FloatingPointTile` tile as the underlying
-tile for the analog operations. These values can be modified by passing
-additional arguments to the constructor.
+:class:`~aihwkit.simulator.tiles.floating_point.FloatingPointTile` tile as the
+underlying tile for the analog operations. These values can be modified by
+passing additional arguments to the constructor.
 
 The analog layers will perform the ``forward`` and ``backward`` passes directly
 in the underlying tile.
@@ -68,8 +68,8 @@ layer. As an example, it can be mixed with existing layers::
     sync with the actual weights and biased used internally by the analog
     tile, as reading back the weights has a performance cost. If you need to
     ensure that the tensors are synced, please use the
-    :meth:`~aihwkit.nn.modules.linear.AnalogLinear.sync_parameters_from_tile`
-    method.
+    :meth:`~aihwkit.nn.modules.base.AnalogModuleBase.set_weights` and
+    :meth:`~aihwkit.nn.modules.base.AnalogModuleBase.get_weights` methods.
 
 
 Customizing the analog tile properties
@@ -129,7 +129,7 @@ analog layers of the model::
 
 .. note::
 
-    The :meth:`aihwkit.optim.analog_sgd.AnalogSGD.regroup_param_groups` method
+    The :meth:`~aihwkit.optim.analog_sgd.AnalogSGD.regroup_param_groups` method
     needs to be invoked in order to set up the parameter groups, as they are
     used for handling the analog layers correctly.
 
