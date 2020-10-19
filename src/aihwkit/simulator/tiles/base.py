@@ -400,3 +400,11 @@ class BaseTile(Generic[RPUConfigGeneric]):
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
         """
         return self.tile.update_indexed(x_input, d_input)
+
+    @no_grad()
+    def post_update_step(self) -> None:
+        """Operators that need to be called once per mini-batch."""
+        if self.rpu_config.device.diffusion > 0.0:  # type: ignore
+            self.diffuse_weights()
+        if self.rpu_config.device.lifetime > 0.0:  # type: ignore
+            self.decay_weights()

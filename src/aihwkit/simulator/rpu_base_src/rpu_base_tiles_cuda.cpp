@@ -272,10 +272,10 @@ void declare_rpu_tiles_cuda(py::module &m) {
           R"pbdoc(
            Compute the dot product using an index matrix (forward pass).
 
-           Caution: 
+           Caution:
               Internal use for convolutions only.
 
-           Args: 
+           Args:
               x_input: 4D torch::tensor in order N,C,H,W
               d_height: height of output image(s)
               d_width: width of output image(s)
@@ -308,10 +308,10 @@ void declare_rpu_tiles_cuda(py::module &m) {
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
-           Caution: 
+           Caution:
               Internal use for convolutions only.
 
-           Args: 
+           Args:
               d_input: 4D torch::tensor in order N,C,H,W
               x_channel: number of grad_input channels
               x_height: height of grad_input image(s)
@@ -343,10 +343,10 @@ void declare_rpu_tiles_cuda(py::module &m) {
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
-           Caution: 
+           Caution:
               Internal use for convolutions only.
 
-           Args: 
+           Args:
               x_input: 4D torch::tensor input in order N,C,H,W
               d_input: 4D torch::tensor (grad_output) in order N,C,oH,oW
            )pbdoc");

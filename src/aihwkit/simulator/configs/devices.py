@@ -685,7 +685,7 @@ class TransferUnitCellDevice(UnitCellDevice):
 
     params_transfer_update: UpdateParameters = field(
         default_factory=UpdateParameters)
-    """ Update parameters :class:`~AnalogTileUpdateParameters` that
+    """Update parameters :class:`~AnalogTileUpdateParameters` that
     define the type of update used for each transfer event.
     """
 

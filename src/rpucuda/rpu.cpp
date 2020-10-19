@@ -285,6 +285,9 @@ template <typename T> RPUSimple<T>::RPUSimple(const RPUSimple<T> &other) : RPUAb
     this->setSharedWeights(*other.weights_);
   }
 
+  // no copy needed
+  wclipper_ = nullptr;
+
   // do NOT copy external weights...
   if (other.delta_weights_extern_[0]) {
     std::cout << "WARNING cannot copy external delta weight pointer..." << std::endl;
@@ -1197,6 +1200,15 @@ template <typename T> void RPUSimple<T>::decayWeights(T alpha, bool bias_no_deca
 template <typename T> void RPUSimple<T>::decayWeights(bool bias_no_decay) {
   RPUSimple<T>::decayWeights(1., bias_no_decay);
 };
+
+template <typename T> void RPUSimple<T>::clipWeights(const WeightClipParameter &wclpar) {
+
+  if (wclipper_ == nullptr) {
+    wclipper_ = make_unique<WeightClipper<T>>(this->x_size_, this->d_size_);
+  }
+
+  wclipper_->apply(getWeightsPtr()[0], wclpar);
+}
 
 template <typename T> void RPUSimple<T>::diffuseWeights() {
 

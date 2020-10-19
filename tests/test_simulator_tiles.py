@@ -11,6 +11,7 @@
 # that they have been altered from the originals.
 
 """Tests for the high level simulator devices functionality."""
+from unittest import SkipTest
 
 from torch import Tensor
 
@@ -150,3 +151,49 @@ class TileTest(ParametrizedTestCase):
 
         if field:
             self.assertEqual(new_hidden_parameters[field][1][1], 0.8)
+
+    def test_post_update_step_diffuse(self):
+        """Tests whether post update diffusion is performed"""
+        rpu_config = self.get_rpu_config()
+
+        if not hasattr(rpu_config.device, 'diffusion'):
+            raise SkipTest('This device does not support difussion')
+
+        rpu_config.device.diffusion = 0.323
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        weights = Tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        biases = Tensor([-0.1, -0.2])
+
+        analog_tile.set_learning_rate(0.123)
+        analog_tile.set_weights(weights, biases)
+
+        analog_tile.post_update_step()
+
+        tile_weights, tile_biases = analog_tile.get_weights()
+
+        self.assertNotAlmostEqualTensor(tile_weights, weights)
+        self.assertNotAlmostEqualTensor(tile_biases, biases)
+
+    def test_post_update_step_lifetime(self):
+        """Tests whether post update decay is performed"""
+        rpu_config = self.get_rpu_config()
+
+        if not hasattr(rpu_config.device, 'lifetime'):
+            raise SkipTest('This device does not support lifetime')
+
+        rpu_config.device.lifetime = 100.
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        weights = Tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        biases = Tensor([-0.1, -0.2])
+
+        analog_tile.set_learning_rate(0.123)
+        analog_tile.set_weights(weights, biases)
+
+        analog_tile.post_update_step()
+
+        tile_weights, tile_biases = analog_tile.get_weights()
+
+        self.assertNotAlmostEqualTensor(tile_weights, weights)
+        self.assertNotAlmostEqualTensor(tile_biases, biases)
