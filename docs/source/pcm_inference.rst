@@ -109,8 +109,8 @@ can be modeled with the following equations:
    :nowrap:
 
    \begin{eqnarray*}
-   \mu_\nu &=& \min\left(\max\left(-0.0155 \log g_T + 0.0244, 0.049\right), 0.1\right)\\
-   \sigma_\nu &=& \min\left(\max\left(-0.0125 \log g_T - 0.0059,
+   \mu_\nu &=& \min\left(\max\left(-0.0155 \log (g_T) + 0.0244, 0.049\right), 0.1\right)\\
+   \sigma_\nu &=& \min\left(\max\left(-0.0125 \log (g_T) - 0.0059,
    0.008\right), 0.045\right)\\
    \end{eqnarray*}
 
@@ -142,7 +142,7 @@ is obtained by integrating the above equation over the measurement bandwidth:
 
 .. math::
 
-    σ_{nG} = g_\text{drift}(t)  Q_s  \sqrt{\log\frac{t+t_\text{read}}{2 t_{read}}}
+    σ_{nG}(t) = g_\text{drift}(t)  Q_s  \sqrt{\log\frac{t+t_\text{read}}{2 t_{read}}}
 
 where :math:`t_{read} = 250` ns is the width of the pulse applied when reading
 the devices. 
@@ -159,7 +159,7 @@ given by:
 
 .. math::
 
-    g(t)= g_\text{drift} (t)+ {\cal N}\left(0, \sigma_nG (t)\right)
+    g(t)= g_\text{drift} (t)+ {\cal N}\left(0, \sigma_{nG} (t)\right)
 
 Compensation method to mitigate the effect of drift
 ---------------------------------------------------
@@ -184,15 +184,13 @@ in hardware:
 .. image:: ../img/pcm_compensation.png
    :alt:
 
-In our case, we currently have a simple alternative drift
-compensation, where we use a forward pass with an all 1-vector as an
-input, then outputs (using the potential non-idealities defined for
-the forward pass) is summed in an absolute way. This procedure is done
-once after programming and once after applying the drift expected at
-time point of inference :math:`t_\text{inference}`. The ratio of the
-two numbers is the global drift compensation scaling factor of that
-layer, and it is applied (in digital) to the (digital) output of the
-analog tile.
+In the simulator, we implement drift compensation by performing a forward pass
+with an all 1-vector as an input, and then summing outputs (using the potential
+non-idealities defined for the forward pass) in an absolute way.
+This procedure is done once after programming and once after applying the drift
+expected as time point of inference :math:`t_\text{inference}`. The ratio of the
+two numbers is the global drift compensation scaling factor of that layer, and
+it is applied (in digital) to the (digital) output of the analog tile.
 
 Note that the drift compensation class
 :class:`~aihwkit.simulator.noise_models.BaseDriftCompensation` is user
@@ -283,6 +281,6 @@ References
 
 * [4] Papandreou, N., Pozidis, H., Pantazi, A., Sebastian, A., Breitwisch, M., Lam, C., & Eleftheriou, E. `Programming algorithms for multilevel phase-change memory <https://ieeexplore.ieee.org/abstract/document/5937569>`_. In IEEE International Symposium of Circuits and Systems (ISCAS) (pp. 329-332). 2011
 
-* [5] Le Gallo, M., Krebs, D., Zipoli, F., Salinga, M., & Sebastian, A. `Collective Structural Relaxation in Phase‐Change Memory Devices <2018 https://onlinelibrary.wiley.com/doi/full/10.1002/aelm.201700627>`_. Advanced Electronic Materials, 4(9), 1700627.
+* [5] Le Gallo, M., Krebs, D., Zipoli, F., Salinga, M., & Sebastian, A. `Collective Structural Relaxation in Phase‐Change Memory Devices <https://onlinelibrary.wiley.com/doi/full/10.1002/aelm.201700627>`_. Advanced Electronic Materials, 4(9), 1700627. 2018
 
 * [6] Le Gallo, M., Sebastian, A., Cherubini, G., Giefers, H., & Eleftheriou, E. `Compressed sensing with approximate message passing using in-memory computing <https://ieeexplore.ieee.org/abstract/document/8450603>`_. IEEE Transactions on Electron Devices, 65(10), 4304-4312. 2018
