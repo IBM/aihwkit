@@ -71,6 +71,8 @@ methods can be used in the same manner.
     with GPU support. This can be checked by inspecting the return value of the
     ``aihwkit.simulator.rpu_base.cuda.is_compiled()`` function.
 
+.. _using-simulator-analog-tiles:
+
 Using analog tiles
 """"""""""""""""""
 
