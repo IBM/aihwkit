@@ -22,13 +22,12 @@ from torch.nn.functional import mse_loss
 
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
-from aihwkit.nn.modules.base import drift_analog_weights
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.configs.configs import InferenceRPUConfig
+from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
     OutputWeightNoiseType, WeightClipType, WeightModifierType)
-from aihwkit.simulator.rpu_base import cuda
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
+from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
 x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
