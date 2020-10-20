@@ -22,15 +22,24 @@ The toolkit consists of two main components:
 A series of primitives and features that allow using the toolkit within
 [`Pytorch`]:
 
-* Analog neural network modules (fully connected layer, convolution layer).
-* Analog optimizers (SGD).
+* Analog neural network modules (fully connected layer, convolution layer,
+  sequential container).
+* Analog training using torch training workflow:
+  * Analog torch optimizers (SGD).
+  * Analog in-situ training using customizable device models and algorithms
+    (Tiki-Taka).
+* Analog inference using torch inference workflow:
+  * State-of-the-art statistical model of a phase-change memory (PCM) array
+    calibrated on hardware measurements from a 1 million PCM devices chip.
+  * Hardware-aware training with hardware non-idealities and noise included
+    in the forward pass.
 
 ### Analog devices simulator
 
 A high-performant (CUDA-capable) C++ simulator that allows for
 simulating a wide range of analog devices and crossbar configurations
 by using abstract functional models of material characteristics with
-adjustable parameters. Feature include:
+adjustable parameters. Features include:
 
 * Forward pass output-referred noise and device fluctuations, as well
   as adjustable ADC and DAC discretization and bounds

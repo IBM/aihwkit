@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [UNRELEASED]
+## [0.2.0] - 2020/10/20
 
 ### Added
 
@@ -39,7 +39,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Fixed
 
 * Improved package compatibility when using non-UTF8 encodings (version file,
-  package description). (\#13) 
+  package description). (\#13)
 * The build system can now detect and use `openblas` directly when using the
   conda-installable version. (\#22)
 * When using analog layers as children of another module, the tiles are now
@@ -56,7 +56,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.1.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/IBM/aihwkit/compare/v0.1.0..v0.2.0
 [0.1.0]: https://github.com/IBM/aihwkit/releases/tag/v0.1.0
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/
