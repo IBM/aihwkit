@@ -375,8 +375,8 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("transfer_lr", &TransferParam::transfer_lr)
       .def_readwrite("transfer_lr_vec", &TransferParam::transfer_lr_vec)
       .def_readwrite("scale_transfer_lr", &TransferParam::scale_transfer_lr)
-      .def_readwrite("params_transfer_forward", &TransferParam::transfer_io)
-      .def_readwrite("params_transfer_update", &TransferParam::transfer_up);
+      .def_readwrite("transfer_forward", &TransferParam::transfer_io)
+      .def_readwrite("transfer_update", &TransferParam::transfer_up);
 
   /**
    * Helper enums.

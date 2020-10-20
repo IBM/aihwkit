@@ -126,7 +126,7 @@ Compound devices
 ====================================================================  ========
 Resistive device class                                                Description
 ====================================================================  ========
-:class:`~aihwkit.simulator.configs.devices.TransferUnitCellDevice`    abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
+:class:`~aihwkit.simulator.configs.devices.TransferCompoundDevice`    abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
 ====================================================================  ========
 
 RPU Configurations
@@ -185,13 +185,149 @@ the tile::
     from aihwkit.simulator.configs.devices import LinearStepDevice
 
     rpu_config = SingleRPUConfig(
-        forward=IOParameters(inp_noise=0.1),
-        backward=BackwardIOParameters(inp_noise=0.2),
-        update=UpdateParameters(desired_bl=60),
+        forward=IOParameters(out_noise=0.1),
+        backward=BackwardIOParameters(out_noise=0.2),
+        update=UpdateParameters(desired_bl=20),
         device=LinearStepDevice(w_min=-0.4, w_max=0.6)
     )
 
 A description of the available parameters each configuration and device can be
 found at :py:mod:`aihwkit.simulator.configs`.
 
+An alternative way of specifying non-default parameters is first
+generating the config with the correct device and then set the fields directly::
+
+    from aihwkit.simulator.configs import SingleRPUConfig
+    from aihwkit.simulator.configs.devices import LinearStepDevice
+
+    rpu_config = SingleRPUConfig(device=LinearStepDevice())
+
+    rpu_config.forward.out_noise = 0.1
+    rpu_config.backward.out_noise = 0.1
+    rpu_config.update.desired_bl = 20
+    rpu_config.device.w_min = -0.4
+    rpu_config.device.w_max = 0.6
+
+This will generate the same analog tile settings as above.
+
+Unit Cell Device
+""""""""""""""""
+
+More complicated devices require specification of sub devices and may
+have more parameters. For instance, to configure a device that has 3
+resistive device materials per cross-point, which all have different
+pulse update behavior, one could do (see also `Example 7`_)::
+
+    from aihwkit.simulator.configs import UnitCellRPUConfig
+    from aihwkit.simulator.configs.devices import (
+        ConstantStepDevice,
+        VectorUnitCellDevice,
+        LinearStepDevice,
+        SoftBoundsDevice
+    )
+
+    # Define a single-layer network, using a vector device having multiple
+    # devices per crosspoint. Each device can be arbitrarily defined
+
+    rpu_config = UnitCellRPUConfig()
+
+    rpu_config.device = VectorUnitCellDevice(
+        unit_cell_devices=[
+            ConstantStepDevice(),
+            LinearStepDevice(w_max_dtod=0.4),
+            SoftBoundsDevice()
+        ]
+    )
+
+    # more configurations, if needed
+
+    # only one of the devices should receive a single update that is
+    # selected randomly, the effective weights is the sum of all
+    # weights
+    rpu_config.device.single_device_update = True
+    rpu_config.device.single_device_update_random = True
+
+    # use this configuration for a simple model with one analog tile
+    model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
+
+    # print information about all parameters
+    print(model.analog_tile.tile)
+
+This analog tile, although very complicated in its hardware
+configuration, can be used in any given network layer in the same way
+as simpler analog devices. Also, diffusion or decay, might affect all
+sub-devices in difference ways, as they all implement their own
+version of these operations. For the vector unit cell, each weight
+contribution simple adds up to form a joined effective weight. During
+forward/backward this joint effective weight will be used. Update,
+however, will be done on each of the "hidden" weights independently.
+
+Transfer Compound Device
+""""""""""""""""""""""""
+Compound devices are more complex than unit cell devices, which have a
+number of devices per crosspoint, however, they share the underlying
+implementation. For instance, the "Transfer Compound Device" does
+contain (at least) two full crossbar arrays internally, where the
+stochastic gradient descent update is done on one (or a subset of
+these). It does a partial transfer of content in the first array to the
+second intermittently. This transfer is accomplished by doing an
+extra forward pass (with a one-hot input vector) on the first array
+and updating the output onto the second array. The parameter of this
+extra forward and update step can be given.
+
+This compound device can be used to implement the tiki-taka learning
+rule as described in `Gokmen & Haensch 2020`_. For instance, one could
+use the following tile configuration for that (see also `Example 8`_)::
+
+
+    # Imports from aihwkit.
+    from aihwkit.simulator.configs import UnitCellRPUConfig
+    from aihwkit.simulator.configs.devices import (
+        TransferCompoundDevice,
+        SoftBoundsDevice
+    )
+
+    # The Tiki-taka learning rule can be implemented using the transfer device.
+    rpu_config = UnitCellRPUConfig(
+        device=TransferCompoundDevice(
+
+            # devices that compose the Tiki-taka compound
+            unit_cell_devices=[
+                SoftBoundsDevice(w_min=-0.3, w_max=0.3),
+                SoftBoundsDevice(w_min=-0.6, w_max=0.6)
+            ],
+
+            # Make some adjustments of the way Tiki-Taka is performed.
+            units_in_mbatch=True,   # batch_size=1 anyway
+            transfer_every=2,       # every 2 batches do a transfer-read
+            n_cols_per_transfer=1,  # one forward read for each transfer
+            gamma=0.0,              # all SGD weight in second device
+            scale_transfer_lr=True, # in relative terms to SGD LR
+            transfer_lr=1.0,        # same transfer LR as for SGD
+        )
+    )
+
+    # make more adjustments (can be made here or above)
+    rpu_config.forward.inp_res = 1/64. # 6 bit DAC
+
+    # same forward/update for transfer-read as for actual SGD
+    rpu_config.device.transfer_forward = rpu_config.forward
+
+    # SGD update/transfer-update will be done with stochastic pulsing
+    rpu_config.device.transfer_update = rpu_config.update
+
+    # use tile configuration in model
+    model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
+
+    # print some parameter infos
+    print(model.analog_tile.tile)
+
+
+Note that this analog tile now will perfom tiki-taka as the learning
+rule instead of plain SGD. Once the configuration is done, the usage
+of this complex analog tile for testing or training from the user
+point of view is however the same as for other tiles.
+
 .. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
+.. _Example 7: https://github.com/IBM/aihwkit/blob/master/examples/7_simple_layer_with_other_devices.py
+.. _Example 8: https://github.com/IBM/aihwkit/blob/master/examples/8_simple_layer_with_tiki_taka.py

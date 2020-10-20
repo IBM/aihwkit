@@ -39,6 +39,14 @@ class FloatingPointRPUConfig:
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
     """Parameters that modify the behavior of the pulsed device."""
 
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.device.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.device.lifetime > 0.0
+
 
 @dataclass
 class SingleRPUConfig:
@@ -63,6 +71,14 @@ class SingleRPUConfig:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
 
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.device.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.device.lifetime > 0.0
+
 
 @dataclass
 class UnitCellRPUConfig:
@@ -86,6 +102,14 @@ class UnitCellRPUConfig:
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
+
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return any([dev.diffusion > 0.0 for dev in self.device.unit_cell_devices])
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return any([dev.lifetime > 0.0 for dev in self.device.unit_cell_devices])
 
 
 @dataclass
@@ -140,3 +164,11 @@ class InferenceRPUConfig:
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
+
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.device.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.device.lifetime > 0.0
