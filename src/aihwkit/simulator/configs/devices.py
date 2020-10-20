@@ -221,14 +221,7 @@ class UnitCellDevice:
 
     def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
-        difference_parameters = parameters_to_bindings(self)
-        device_parameters = parameters_to_bindings(self.unit_cell_devices[0])
-
-        # need to be exactly 2 and same parameters
-        difference_parameters.append_parameter(device_parameters)
-        difference_parameters.append_parameter(device_parameters)
-
-        return difference_parameters
+        raise NotImplementedError
 
 
 ###############################################################################
@@ -563,8 +556,8 @@ class DifferenceUnitCellDevice(UnitCellDevice):
 
 
 @dataclass
-class TransferUnitCellDevice(UnitCellDevice):
-    r"""Abstract device model that takes 2 or more devices per crosspoint and
+class TransferCompoundDevice(UnitCellDevice):
+    r"""Abstract device model that takes 2 or more devices and
     implements a 'transfer' based learning rule.
 
     It uses a (partly) hidden weight (where the SGD update is
@@ -580,18 +573,14 @@ class TransferUnitCellDevice(UnitCellDevice):
 
     In principle, a deeper chain of transferred weights can be setup,
     however, only the device parameters of the first versus the others
-    can be different.
+    can be different. However, all devices need to be specified in the
+    list.
 
-    Args:
-       params_devices: List of pulsed resistive device parameters
-
-          Note:
-              This has to be a list, where the length of the list is
-              the length of the chain of devices to transfer
-              to. However, for all resistive devices that are
-              transferred two (all except the first) the device
-              parameters are taken to be the same (copied from the
-              second in this list).
+    Note:
+        Here the devices could be either transferred in analog
+        (essentially within the unit cell) or on separate arrays (using
+        the usual (non-ideal) forward pass and update steps. This can be
+        set with ``transfer_forward`` and ``transfer_update``.
     """
 
     bindings_class: ClassVar[Type] = devices.TransferResistiveDeviceParameter
@@ -676,14 +665,14 @@ class TransferUnitCellDevice(UnitCellDevice):
     to scale the transfer LR with the current LR of the SGD.
     """
 
-    params_transfer_forward: IOParameters = field(
+    transfer_forward: IOParameters = field(
         default_factory=IOParameters)
     """Input-output parameters
     :class:`~AnalogTileInputOutputParameters` that define the read
     (forward) of an transfer event. For instance the amount of noise
     or whether transfer is done using a ADC/DAC etc."""
 
-    params_transfer_update: UpdateParameters = field(
+    transfer_update: UpdateParameters = field(
         default_factory=UpdateParameters)
     """Update parameters :class:`~AnalogTileUpdateParameters` that
     define the type of update used for each transfer event.

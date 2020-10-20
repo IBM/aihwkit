@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 
 * Added more types of resistive devices: `IdealResistiveDevice`, `LinearStep`,
-  `SoftBounds`, `ExpStep`, `VectorUnitCell`, `TransferUnitCell`,
+  `SoftBounds`, `ExpStep`, `VectorUnitCell`, `TransferCompoundDevice`,
   `DifferenceUnitCell`. (\#14)
 * Added a new `InferenceTile` that supports basic hardware-aware training
   and inference using a statistical noise model that was fitted by real PCM
