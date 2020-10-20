@@ -13,13 +13,12 @@ simulator:
 Module                                  Notes
 ======================================  ========
 :py:mod:`aihwkit.simulator.tiles`       Entry point for instantiating analog tiles
-:py:mod:`aihwkit.simulator.devices`     Entry point for instantiating resistive devices
-:py:mod:`aihwkit.simulator.parameters`  Different parameters used by the resistive devices
+:py:mod:`aihwkit.simulator.configs`     Configurations and parameters for analog tiles
 :py:mod:`aihwkit.simulator.rpu_base`    Low-level bindings of the C++ simulator members
 ======================================  ========
 
-Analog tiles and resistive devices
-----------------------------------
+Analog tiles
+------------
 
 The basic primitives involved in the simulation are **analog tiles**. An
 analog tile is a two-dimensional array of **resistive devices** that determine
@@ -29,23 +28,16 @@ happened).
 
 The following types of analog tiles are available:
 
-* :class:`~aihwkit.simulator.tiles.FloatingPointTile`:
-  implements a floating point or ideal analog tile.
-
-* :class:`~aihwkit.simulator.tiles.AnalogTile`:
-  implements an abstract analog tile with many cycle-to-cycle non-idealities
-  and systematic parameter-spreads that can be user-defined.
-
-And the following types of resistive devices are available:
-
-* :class:`~aihwkit.simulator.devices.FloatingPointResistiveDevice`:
-  implements ideal devices update behavior (floating point update).
-* :class:`~aihwkit.simulator.devices.ConstantStepResistiveDevice`:
-  implements a constant step update behavior.
-
+===================================================  ========
+Tile class                                           Description
+===================================================  ========
+:class:`~aihwkit.simulator.tiles.FloatingPointTile`  implements a floating point or ideal analog tile.
+:class:`~aihwkit.simulator.tiles.AnalogTile`         implements an abstract analog tile with many cycle-to-cycle non-idealities and systematic parameter-spreads that can be user-defined.
+:class:`~aihwkit.simulator.tiles.InferenceTile`      implements an analog tile for inference and hardware-aware training.
+===================================================  ========
 
 Creating an analog tile
------------------------
+"""""""""""""""""""""""
 
 The simplest way of constructing a tile is by instantiating its class. For
 example, the following snippet would create a floating point tile of the
@@ -55,22 +47,9 @@ specified dimensions (``10x20``)::
 
     tile = FloatingPointTile(10, 20)
 
-The parameters of the resistive devices that are part of a tile can be set by
-passing a ``resistive_device=`` parameter to the constructor::
-
-    from aihwkit.simulator.tiles import AnalogTile
-    from aihwkit.simulator.devices import ConstantStepResistiveDevice
-
-    device = ConstantStepResistiveDevice()
-    tile = AnalogTile(10, 20, device)
-
-Analog arrays are low-level constructs that contain a number of functions that
-allow using them in the context of neural networks. A full description of the
-available arrays and its methods can be found at
-:py:mod:`aihwkit.simulator.tiles`.
 
 GPU-stored tiles
-~~~~~~~~~~~~~~~~~
+""""""""""""""""
 
 By default, the ``Tiles`` will be set to perform their computations in the
 CPU. They can be moved to the GPU by invoking its ``.cuda()`` method::
@@ -92,37 +71,125 @@ methods can be used in the same manner.
     with GPU support. This can be checked by inspecting the return value of the
     ``aihwkit.simulator.rpu_base.cuda.is_compiled()`` function.
 
-Specifying resistive devices
-----------------------------
+Using analog tiles
+""""""""""""""""""
 
-Each resistive device has a number of parameters an options that determines
-its behavior. A resistive device can be created by instantiating the
-corresponding class.
+Analog arrays are low-level constructs that contain a number of functions that
+allow using them in the context of neural networks. A full description of the
+available arrays and its methods can be found at
+:py:mod:`aihwkit.simulator.tiles`.
 
-For example, for creating a floating point device that has the default values
-for its parameters::
+Resistive processing units
+--------------------------
 
-    from aihwkit.simulator.devices import FloatingPointResistiveDevice
+A **resistive processing unit** is each of the elements on the crossbar array.
+The following types of resistive devices are available:
 
-    device = FloatingPointResistiveDevice()
+Floating point devices
+""""""""""""""""""""""
 
+================================================================  ========
+Resistive device class                                            Description
+================================================================  ========
+:class:`~aihwkit.simulator.configs.devices.FloatingPointDevice`   floating point reference, that implements ideal devices forward/backward/update behavior.
+================================================================  ========
+
+Single resistive devices
+""""""""""""""""""""""""
+
+================================================================  ========
+Resistive device class                                            Description
+================================================================  ========
+:class:`~aihwkit.simulator.configs.devices.PulsedDevice`          pulsed update resistive device containing the common properties of all pulsed devices.
+:class:`~aihwkit.simulator.configs.devices.IdealDevice`           ideal update behavior (using floating point), but forward/backward might be non-ideal.
+:class:`~aihwkit.simulator.configs.devices.ConstantStepDevice`    pulsed update behavioral model: constant step, where the update step of material is constant throughout the resistive range (up to hard bounds).
+:class:`~aihwkit.simulator.configs.devices.LinearStepDevice`      pulsed update behavioral model: linear step, where the update step response size of the material is linearly dependent with resistance (up to hard bounds).
+:class:`~aihwkit.simulator.configs.devices.SoftBoundsDevice`      pulsed update behavioral model: soft bounds, where the update step response size of the material is linearly dependent and it goes to zero at the bound.
+:class:`~aihwkit.simulator.configs.devices.ExpStepDevice`         exponential update step or CMOS-like update behavior.
+================================================================  ========
+
+Unit cell devices
+"""""""""""""""""
+
+====================================================================  ========
+Resistive device class                                                Description
+====================================================================  ========
+:class:`~aihwkit.simulator.configs.devices.VectorUnitCellDevice`      abstract resistive device that combines multiple pulsed resistive devices in a single 'unit cell'.
+:class:`~aihwkit.simulator.configs.devices.DifferenceUnitCellDevice`  abstract device model takes an arbitrary device per crosspoint and implements an explicit plus-minus device pair.
+====================================================================  ========
+
+Compound devices
+""""""""""""""""
+
+====================================================================  ========
+Resistive device class                                                Description
+====================================================================  ========
+:class:`~aihwkit.simulator.configs.devices.TransferUnitCellDevice`    abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
+====================================================================  ========
+
+RPU Configurations
+------------------
+
+The combination of the parameters that affect the behavior of a tile and the
+parameters that determine the characteristic of a resistive processing unit
+are referred to as **RPU configurations**.
+
+Creating a RPU configuration
+""""""""""""""""""""""""""""
+
+A configuration can be created by instantiating the class that corresponds to
+the desired tile. Each kind of configuration has different parameters depending
+on the particularities of the tile.
+
+For example, for creating a floating point configuration that has the default
+values for its parameters::
+
+    from aihwkit.simulator.configs import FloatingPointResistiveDevice
+
+    config = FloatingPointResistiveDevice()
+
+Among those parameters is the resistive device that will be used for creating
+the tile. For example, for creating a single resistive device configuration
+that uses a ``ConstantStep`` device::
+
+
+    from aihwkit.simulator.configs import SingleRPUConfig
+    from aihwkit.simulator.configs.devices import ConstantStepDevice
+
+    config = SingleRPUConfig(device=ConstantStepDevice())
 
 Device parameters
-~~~~~~~~~~~~~~~~~
+"""""""""""""""""
 
-The behavior of a device is controlled by its parameters. The parameters can
+The parameters of the resistive devices that are part of a tile can be set by
+passing a ``rpu_config=`` parameter to the constructor::
+
+    from aihwkit.simulator.tiles import AnalogTile
+    from aihwkit.simulator.configs import SingleRPUConfig
+    from aihwkit.simulator.configs.devices import ConstantStepDevice
+
+    config = SingleRPUConfig(device=ConstantStepDevice())
+    tile = AnalogTile(10, 20, rpu_config=config)
+
+Each configuration and device have a number of parameters. The parameters can
 be specified during the device instantiation, or accessed as attributes of the
 device instance.
 
-For example, the following snipped will create a ``ConstantStep`` resistive
-device, setting its weigths limits to ``[-0.4, 0.6]``::
+For example, the following snippet will create a ``LinearStepDevice`` resistive
+device, setting its weights limits to ``[-0.4, 0.6]`` and other properties of
+the tile::
 
-    from aihwkit.simulator.devices import ConstantStepResistiveDevice
-    from aihwkit.simulator.parameters import PulsedResistiveDeviceParameters
+    from aihwkit.simulator.configs import SingleRPUConfig
+    from aihwkit.simulator.configs.devices import LinearStepDevice
 
-    parameters = PulsedResistiveDeviceParameters(w_min=-0.4)
-    device = ConstantStepResistiveDevice(parameters)
-    device.params.w_max = 0.6
+    rpu_config = SingleRPUConfig(
+        forward=IOParameters(inp_noise=0.1),
+        backward=BackwardIOParameters(inp_noise=0.2),
+        update=UpdateParameters(desired_bl=60),
+        device=LinearStepDevice(w_min=-0.4, w_max=0.6)
+    )
 
-A description of the available parameters for each device can be found at
-:py:mod:`aihwkit.simulator.parameters`.
+A description of the available parameters each configuration and device can be
+found at :py:mod:`aihwkit.simulator.configs`.
+
+.. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full

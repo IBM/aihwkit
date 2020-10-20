@@ -12,14 +12,16 @@
 
 """Analog layers."""
 
-from typing import Optional
+from typing import Optional, Union
 
 from torch import Tensor
 from torch.nn import Linear
 
 from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase
-from aihwkit.simulator.devices import BaseResistiveDevice
+from aihwkit.simulator.configs import (
+    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+)
 
 
 class AnalogLinear(Linear, AnalogModuleBase):
@@ -39,8 +41,7 @@ class AnalogLinear(Linear, AnalogModuleBase):
     Args:
         in_features: input vector size (number of columns).
         out_features: output vector size (number of rows).
-        resistive_device: analog devices that define the properties of the
-            analog tile.
+        rpu_config: resistive processing unit configuration.
         bias: whether to use a bias row on the analog tile or not
         realistic_read_write: whether to enable realistic read/write
            for setting initial weights and read out of weights
@@ -56,14 +57,16 @@ class AnalogLinear(Linear, AnalogModuleBase):
             in_features: int,
             out_features: int,
             bias: bool = True,
-            resistive_device: Optional[BaseResistiveDevice] = None,
+            rpu_config: Optional[
+                Union[FloatingPointRPUConfig, SingleRPUConfig,
+                      UnitCellRPUConfig, InferenceRPUConfig]] = None,
             realistic_read_write: bool = False,
     ):
         # Create the tile.
         self.analog_tile = self._setup_tile(in_features,
                                             out_features,
                                             bias,
-                                            resistive_device,
+                                            rpu_config,
                                             realistic_read_write)
         # Call super() after tile creation, including ``reset_parameters``.
         super().__init__(in_features, out_features, bias=bias)
@@ -81,7 +84,8 @@ class AnalogLinear(Linear, AnalogModuleBase):
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
         # pylint: disable=arguments-differ
-        return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias)
+        return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias,
+                                    not self.training)
 
     def extra_repr(self) -> str:
         return '{}, is_cuda={}'.format(

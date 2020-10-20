@@ -119,6 +119,9 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
     dev_fb_weights_->assign(*other.dev_fb_weights_);
   }
 
+  // no copy needed
+  wclipper_cuda_ = nullptr;
+
   // cannot copy external weight pointer...
   if (other.dev_delta_weights_extern_) {
     std::cout << "WARNING cannot copy external delta weight pointer..." << std::endl;
@@ -536,6 +539,18 @@ template <typename T> void RPUCudaSimple<T>::diffuseWeights() {
 
 /***********************************************************************/
 
+template <typename T> void RPUCudaSimple<T>::clipWeights(const WeightClipParameter &wclpar) {
+
+  if (!wclipper_cuda_) {
+    wclipper_cuda_ =
+        make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+  }
+
+  wclipper_cuda_->apply(dev_weights_->getData(), wclpar);
+}
+
+/***********************************************************************/
+
 template <typename T> void RPUCudaSimple<T>::setDeltaWeights(T *dw_extern) {
 
   ENFORCE_NO_DELAYED_UPDATE;
@@ -556,7 +571,6 @@ template <typename T> void RPUCudaSimple<T>::modifyFBWeights(const WeightModifie
     dev_fb_weights_ = make_unique<CudaArray<T>>(context_, this->x_size_ * this->d_size_);
     fb_wmodifier_cuda_ = make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
     context_->synchronize();
-    wmpar.print();
   }
 
   // modify FB weights

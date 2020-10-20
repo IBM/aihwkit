@@ -18,12 +18,10 @@ from torch import Tensor
 from torch import device as torch_device
 from torch.nn import Module
 
-from aihwkit.simulator.devices import (
-    BaseResistiveDevice,
-    ConstantStepResistiveDevice,
-    FloatingPointResistiveDevice
+from aihwkit.simulator.configs import (
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 )
-from aihwkit.simulator.tiles import AnalogTile, BaseTile, FloatingPointTile
+from aihwkit.simulator.tiles import AnalogTile, BaseTile, FloatingPointTile, InferenceTile
 
 
 class AnalogModuleBase(Module):
@@ -44,15 +42,18 @@ class AnalogModuleBase(Module):
     """
     # pylint: disable=abstract-method
 
-    TILE_CLASS_FLOATING_POINT = FloatingPointTile
-    TILE_CLASS_ANALOG = AnalogTile
+    TILE_CLASS_FLOATING_POINT: Any = FloatingPointTile
+    TILE_CLASS_ANALOG: Any = AnalogTile
+    TILE_CLASS_INFERENCE: Any = InferenceTile
 
     def _setup_tile(
             self,
             in_features: int,
             out_features: int,
             bias: bool,
-            resistive_device: Optional[BaseResistiveDevice] = None,
+            rpu_config: Optional[
+                Union[FloatingPointRPUConfig, SingleRPUConfig,
+                      UnitCellRPUConfig, InferenceRPUConfig]] = None,
             realistic_read_write: bool = False
     ) -> BaseTile:
         """Create an analog tile and setup this layer for using it.
@@ -72,16 +73,15 @@ class AnalogModuleBase(Module):
         Args:
             in_features: input vector size (number of columns).
             out_features: output vector size (number of rows).
-            resistive_device: analog devices that define the properties of the
-                analog tile.
+            rpu_config: resistive processing unit configuration.
             bias: whether to use a bias row on the analog tile or not.
             realistic_read_write: whether to enable realistic read/write
                for setting initial weights and read out of weights.
         """
         # pylint: disable=attribute-defined-outside-init
         # Default to constant step device if not provided.
-        if not resistive_device:
-            resistive_device = ConstantStepResistiveDevice()
+        if not rpu_config:
+            rpu_config = SingleRPUConfig()
 
         # Setup the analog-related attributes of this instance.
         self.use_bias = bias
@@ -90,13 +90,15 @@ class AnalogModuleBase(Module):
         self.out_features = out_features
 
         # Create the tile.
-        if isinstance(resistive_device, FloatingPointResistiveDevice):
+        if isinstance(rpu_config, FloatingPointRPUConfig):
             tile_class = self.TILE_CLASS_FLOATING_POINT
+        elif isinstance(rpu_config, InferenceRPUConfig):
+            tile_class = self.TILE_CLASS_INFERENCE
         else:
             tile_class = self.TILE_CLASS_ANALOG  # type: ignore
 
         return tile_class(
-            out_features, in_features, resistive_device, bias=bias  # type: ignore
+            out_features, in_features, rpu_config, bias=bias  # type: ignore
         )
 
     def set_weights(
@@ -220,12 +222,26 @@ class AnalogModuleBase(Module):
             device (int, optional): if specified, all parameters will be
                 copied to that GPU device
 
-        Returns:
-            Module: self
         """
+        # pylint: disable=attribute-defined-outside-init
+        # Note: this needs to be an in-place function, not a copy
+        super().cuda(device)
+        self.analog_tile = self.analog_tile.cuda(device)  # type: BaseTile
+        self.set_weights(self.weight, self.bias)
+        return self
 
-        return_value = super().cuda(device)
-        return_value.analog_tile = self.analog_tile.cuda(device)
-        # TODO: check why this is not happening on its own
-        return_value.set_weights(return_value.weight, return_value.bias)
-        return return_value
+
+def drift_analog_weights(model: Module, t_inference: float = 0.0) -> None:
+    """(Programs) and drifts all analog inference layers of a given model."""
+    model.eval()
+    for module in model.modules():
+        if isinstance(module, AnalogModuleBase) and hasattr(module.analog_tile, 'drift_weights'):
+            module.analog_tile.drift_weights(t_inference)  # type: ignore
+
+
+def program_analog_weights(model: Module) -> None:
+    """Programs all analog inference layers of a given model."""
+    model.eval()
+    for module in model.modules():
+        if isinstance(module, AnalogModuleBase) and hasattr(module.analog_tile, 'program_weights'):
+            module.analog_tile.program_weights()  # type: ignore

@@ -6,11 +6,10 @@ API Reference
 
    aihwkit
    aihwkit.simulator
-   aihwkit.simulator.devices
-   aihwkit.simulator.parameters
+   aihwkit.simulator.configs
+   aihwkit.simulator.noise_models
    aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
-   aihwkit.simulator.tiles_indexed
    aihwkit.nn
    aihwkit.nn.functions
    aihwkit.nn.modules

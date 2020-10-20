@@ -28,26 +28,28 @@ SET(Open_BLAS_INCLUDE_SEARCH_PATHS
   $ENV{OpenBLAS_HOME}/include
   $ENV{OPENBLAS_ROOT_DIR}
   $ENV{OPENBLAS_ROOT_DIR}/include
+  $ENV{CONDA_PREFIX}/include
 )
 
 SET(Open_BLAS_LIB_SEARCH_PATHS
-        /lib/
-        /lib/openblas-base
-        /lib64/
-        /usr/lib
-        /usr/lib/openblas-base
-        /usr/lib64
-        /usr/local/lib
-        /usr/local/lib64
-        /usr/local/opt/openblas/lib
-        /opt/OpenBLAS/lib
-        $ENV{OpenBLAS}cd
-        $ENV{OpenBLAS}/lib
-        $ENV{OpenBLAS_HOME}
-        $ENV{OpenBLAS_HOME}/lib
-        $ENV{OPENBLAS_ROOT_DIR}
-        $ENV{OPENBLAS_ROOT_DIR}/lib
- )
+  /lib/
+  /lib/openblas-base
+  /lib64/
+  /usr/lib
+  /usr/lib/openblas-base
+  /usr/lib64
+  /usr/local/lib
+  /usr/local/lib64
+  /usr/local/opt/openblas/lib
+  /opt/OpenBLAS/lib
+  $ENV{OpenBLAS}
+  $ENV{OpenBLAS}/lib
+  $ENV{OpenBLAS_HOME}
+  $ENV{OpenBLAS_HOME}/lib
+  $ENV{OPENBLAS_ROOT_DIR}
+  $ENV{OPENBLAS_ROOT_DIR}/lib
+  $ENV{CONDA_PREFIX}/lib
+)
 
 FIND_PATH(OpenBLAS_INCLUDE_DIR NAMES openblas_config.h PATHS ${Open_BLAS_INCLUDE_SEARCH_PATHS})
 FIND_LIBRARY(OpenBLAS_LIB NAMES openblas PATHS ${Open_BLAS_LIB_SEARCH_PATHS})

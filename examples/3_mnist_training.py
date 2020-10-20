@@ -30,7 +30,8 @@ from torchvision import datasets, transforms
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.devices import ConstantStepResistiveDevice
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.devices import ConstantStepDevice
 
 # Path where the datasets will be stored.
 TRAIN_DATASET = 'data/TRAIN_DATASET'
@@ -73,13 +74,13 @@ def create_analog_network(input_size, hidden_sizes, output_size):
     """
     model = nn.Sequential(
         AnalogLinear(input_size, hidden_sizes[0], True,
-                     resistive_device=ConstantStepResistiveDevice()),
+                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
         nn.Sigmoid(),
         AnalogLinear(hidden_sizes[0], hidden_sizes[1], True,
-                     resistive_device=ConstantStepResistiveDevice()),
+                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
         nn.Sigmoid(),
         AnalogLinear(hidden_sizes[1], output_size, True,
-                     resistive_device=ConstantStepResistiveDevice()),
+                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
         nn.LogSoftmax(dim=1)
     )
     print(model)

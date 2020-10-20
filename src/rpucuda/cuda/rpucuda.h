@@ -12,12 +12,13 @@
 
 #pragma once
 
-#include "cuda_util.h"
 #include "cuda_math_util.h"
+#include "cuda_util.h"
 #include "io_iterator.h"
 #include "rng.h"
 #include "rpu.h"
 #include "utility_functions.h"
+#include "weight_clipper_cuda.h"
 #include "weight_modifier_cuda.h"
 #include <memory>
 #include <random>
@@ -66,6 +67,7 @@ public:
     swap(a.rnd_diffusion_context_, b.rnd_diffusion_context_);
     swap(a.dev_diffusion_nrnd_, b.dev_diffusion_nrnd_);
 
+    swap(a.wclipper_cuda_, b.wclipper_cuda_);
     swap(a.fb_wmodifier_cuda_, b.fb_wmodifier_cuda_);
   }
 
@@ -151,6 +153,8 @@ public:
 
   void decayWeights(bool bias_no_decay) override;
   void decayWeights(T alpha, bool bias_no_decay) override;
+
+  void clipWeights(const WeightClipParameter &wclpar) override;
   void diffuseWeights() override;
 
   T **getWeights() override; // host weights. implicit copy from CUDA
@@ -191,6 +195,7 @@ private:
   initFrom(const RPUSimple<T> &rpu_in); // to populate from CPU->CUDA, will be called by constructor
   void initialize(CudaContext *c);
   std::unique_ptr<WeightModifierCuda<T>> fb_wmodifier_cuda_ = nullptr;
+  std::unique_ptr<WeightClipperCuda<T>> wclipper_cuda_ = nullptr;
 };
 
 } // namespace RPU

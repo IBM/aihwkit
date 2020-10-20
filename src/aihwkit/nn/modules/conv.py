@@ -18,11 +18,10 @@ from torch import Tensor, arange, cat, float64, int32, ones
 from torch.nn import Conv2d, Unfold
 from torch.nn.modules.utils import _pair
 
-from aihwkit.nn.functions import AnalogFunction
+from aihwkit.nn.functions import AnalogIndexedFunction
 from aihwkit.nn.modules.base import AnalogModuleBase
-from aihwkit.simulator.devices import BaseResistiveDevice
-from aihwkit.simulator.tiles_indexed import (
-    IndexedAnalogTile, IndexedFloatingPointTile
+from aihwkit.simulator.configs import (
+    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 )
 
 
@@ -51,8 +50,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             channels.
         bias: whether to use a bias row on the analog tile or not
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
-        resistive_device: analog devices that define the properties of the
-            analog tile.
+        rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
            for setting initial weights and read out of weights
     """
@@ -73,9 +71,6 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
     in_features: int
     out_features: int
 
-    TILE_CLASS_FLOATING_POINT = IndexedFloatingPointTile
-    TILE_CLASS_ANALOG = IndexedAnalogTile
-
     def __init__(
             self,
             in_channels: int,
@@ -87,7 +82,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             groups: int = 1,
             bias: bool = True,
             padding_mode: str = 'zeros',
-            resistive_device: Optional[BaseResistiveDevice] = None,
+            rpu_config: Optional[
+                Union[FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig]] = None,
             realistic_read_write: bool = False,
     ):
         # pylint: disable=too-many-arguments
@@ -104,7 +100,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
         self.analog_tile = self._setup_tile(self.in_features,
                                             self.out_features,
                                             bias,
-                                            resistive_device,
+                                            rpu_config,
                                             realistic_read_write)
 
         # Call super() after tile creation, including ``reset_parameters``.
@@ -158,11 +154,12 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             d_height = get_size(x_height, 0)
             d_width = get_size(x_width, 1)
 
-            image_sizes = (self.in_channels, x_height, x_width, d_height, d_width)
+            image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
             self.input_size = input_size
             self.analog_tile.set_indexed(self.fold_indices, image_sizes)  # type: ignore
 
-        return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias)
+        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
+                                           self.bias, not self.training)
 
     def extra_repr(self) -> str:
         output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'

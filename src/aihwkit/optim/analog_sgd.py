@@ -38,6 +38,7 @@ class AnalogSGD(SGD):
         # Create the new param groups.
         for (_, module) in model.named_modules():
             if isinstance(module, AnalogModuleBase):
+
                 new_param_groups.append({
                     'params': list(module.parameters(recurse=False)),
                     'analog_tile': module.analog_tile
@@ -72,6 +73,7 @@ class AnalogSGD(SGD):
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
         """
+        # pylint: disable=too-many-branches
         loss = None
         if closure is not None:
             loss = closure()
@@ -93,7 +95,14 @@ class AnalogSGD(SGD):
                 weights = next(param for param in group['params']
                                if getattr(param, 'is_weight', False))
 
-                analog_tile.update(weights.input, weights.grad_output)
+                # Call `update` in the tile.
+                if weights.use_indexed:
+                    analog_tile.update_indexed(weights.input, weights.grad_output)
+                else:
+                    analog_tile.update(weights.input, weights.grad_output)
+
+                # Apply post-update step operations (diffuse, decay, etc).
+                analog_tile.post_update_step()
                 continue
 
             for param in group['params']:

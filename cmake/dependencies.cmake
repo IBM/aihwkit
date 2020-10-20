@@ -15,17 +15,16 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 if (APPLE)
   set(CMAKE_MACOSX_RPATH ON)
   set(_rpath_portable_origin "@loader_path")
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 else()
   set(_rpath_portable_origin $ORIGIN)
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 endif(APPLE)
 # Use separate rpaths during build and install phases
 set(CMAKE_SKIP_BUILD_RPATH  FALSE)
 # Don't use the install-rpath during the build phase
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH "${_rpath_portable_origin}")
-# Automatically add all linked folders that are NOT in the build directory to
-# the rpath (per library?)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 
 # ---[ Threads
@@ -86,10 +85,6 @@ find_package(pybind11 REQUIRED)
 find_package(Torch REQUIRED)
 include_directories(${TORCH_INCLUDE_DIRS})
 link_directories(${TORCH_LIB_DIR})
-
-if(APPLE)
-  set(CMAKE_INSTALL_RPATH "${TORCH_LIB_DIR};${_rpath_portable_origin}/../../torch/lib")
-endif()
 
 if(RPU_USE_FASTRAND)
   add_compile_definitions(RPU_USE_FASTRAND)

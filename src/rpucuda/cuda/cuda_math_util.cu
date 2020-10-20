@@ -18,8 +18,25 @@
   cublasHandle_t handle = context->getBlasHandle();                                                \
   CUBLAS_CALL(cublasSetStream(handle, context->getStream()))
 
+#define RPU_GET_CUBLAS_HANDLE                                                                      \
+  cublasHandle_t handle = context->getBlasHandle();                                                \
+  CUBLAS_CALL(cublasSetStream(handle, context->getStream()))
+
+#define RPU_SET_CUBLAS_POINTER_MODE_DEVICE                                                         \
+  cublasPointerMode_t p_mode;                                                                      \
+  CUBLAS_CALL(cublasGetPointerMode(handle, &p_mode));                                              \
+  CUBLAS_CALL(cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_DEVICE))
+
+#define RPU_SET_CUBLAS_POINTER_MODE_HOST                                                           \
+  cublasPointerMode_t p_mode;                                                                      \
+  CUBLAS_CALL(cublasGetPointerMode(handle, &p_mode));                                              \
+  CUBLAS_CALL(cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST))
+
+#define RPU_RESTORE_CUBLAS_POINTER_MODE CUBLAS_CALL(cublasSetPointerMode(handle, p_mode))
+
 namespace RPU {
 namespace math {
+
 template <>
 void gemm<float>(
     const CudaContext *context,
@@ -38,9 +55,11 @@ void gemm<float>(
     const int ldc) {
   RPU_GET_CUBLAS_HANDLE;
 
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasSgemm(
       handle, TransA ? CUBLAS_OP_T : CUBLAS_OP_N, TransB ? CUBLAS_OP_T : CUBLAS_OP_N, M, N, K,
       &alpha, A, lda, B, ldb, &beta, C, ldc));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 };
 
 template <>
@@ -60,25 +79,30 @@ void gemm<double>(
     double *C,
     const int ldc) {
   RPU_GET_CUBLAS_HANDLE;
-
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasDgemm(
       handle, TransA ? CUBLAS_OP_T : CUBLAS_OP_N, TransB ? CUBLAS_OP_T : CUBLAS_OP_N, M, N, K,
       &alpha, A, lda, B, ldb, &beta, C, ldc));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 };
 
 template <>
 int iamax<float>(const CudaContext *context, const int N, const float *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   int result = 0;
   CUBLAS_CALL(cublasIsamax(handle, N, X, incX, &result));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
   return result - 1; // make 0 based index !!
 };
 
 template <>
 int iamax<double>(const CudaContext *context, const int N, const double *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   int result;
   CUBLAS_CALL(cublasIdamax(handle, N, X, incX, &result));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
   return result - 1; // make 0 based index
 };
 
@@ -110,28 +134,36 @@ template <>
 void scal<float>(
     const CudaContext *context, const int N, const float alpha, float *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasSscal(handle, N, &alpha, X, incX));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 }
 
 template <>
 void scal<double>(
     const CudaContext *context, const int N, const double alpha, double *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasDscal(handle, N, &alpha, X, incX));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 }
 
 template <>
 void nrm2<float>(
     const CudaContext *context, const int N, const float *X, const int incX, float *res) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_DEVICE;
   CUBLAS_CALL(cublasSnrm2(handle, N, X, incX, res));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 }
 
 template <>
 void nrm2<double>(
     const CudaContext *context, const int N, const double *X, const int incX, double *res) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_DEVICE;
   CUBLAS_CALL(cublasDnrm2(handle, N, X, incX, res));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 }
 
 template <>
@@ -150,8 +182,10 @@ void gemv<float>(
     const int incY) {
   RPU_GET_CUBLAS_HANDLE;
   // col major !!
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasSgemv(
       handle, TransA ? CUBLAS_OP_T : CUBLAS_OP_N, M, N, &alpha, A, lda, X, incX, &beta, Y, incY));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 }
 template <>
 void gemv<double>(
@@ -168,8 +202,10 @@ void gemv<double>(
     double *Y,
     const int incY) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasDgemv(
       handle, TransA ? CUBLAS_OP_T : CUBLAS_OP_N, M, N, &alpha, A, lda, X, incX, &beta, Y, incY));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 }
 
 template <>
@@ -185,7 +221,9 @@ void ger<float>(
     float *A,
     const int lda) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasSger(handle, M, N, &alpha, X, incX, Y, incY, A, lda));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 };
 
 template <>
@@ -201,7 +239,9 @@ void ger<double>(
     double *A,
     const int lda) {
   RPU_GET_CUBLAS_HANDLE;
+  RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasDger(handle, M, N, &alpha, X, incX, Y, incY, A, lda));
+  RPU_RESTORE_CUBLAS_POINTER_MODE;
 };
 
 // W += A

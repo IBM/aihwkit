@@ -22,6 +22,38 @@ void declare_rpu_tiles(py::module &m) {
   using Class = RPU::RPUSimple<T>;
   using ClassPulsed = RPU::RPUPulsed<T>;
 
+  py::class_<RPU::WeightModifierParameter>(m, "WeightModifierParameter")
+      .def(py::init<>())
+      .def_readwrite("std_dev", &RPU::WeightModifierParameter::std_dev)
+      .def_readwrite("res", &RPU::WeightModifierParameter::res)
+      .def_readwrite("sto_round", &RPU::WeightModifierParameter::sto_round)
+      .def_readwrite("dorefa_clip", &RPU::WeightModifierParameter::dorefa_clip)
+      .def_readwrite("pdrop", &RPU::WeightModifierParameter::pdrop)
+      .def_readwrite("enable_during_test", &RPU::WeightModifierParameter::enable_during_test)
+      .def_readwrite("rel_to_actual_wmax", &RPU::WeightModifierParameter::rel_to_actual_wmax)
+      .def_readwrite("assumed_wmax", &RPU::WeightModifierParameter::assumed_wmax)
+      .def_readwrite("type", &RPU::WeightModifierParameter::type);
+
+  py::enum_<RPU::WeightModifierType>(m, "WeightModifierType")
+      .value("Copy", RPU::WeightModifierType::Copy)
+      .value("Discretize", RPU::WeightModifierType::Discretize)
+      .value("MultNormal", RPU::WeightModifierType::MultNormal)
+      .value("AddNormal", RPU::WeightModifierType::AddNormal)
+      .value("DiscretizeAddNormal", RPU::WeightModifierType::DiscretizeAddNormal)
+      .value("DoReFa", RPU::WeightModifierType::DoReFa);
+
+  py::class_<RPU::WeightClipParameter>(m, "WeightClipParameter")
+      .def(py::init<>())
+      .def_readwrite("fixed_value", &RPU::WeightClipParameter::fixed_value)
+      .def_readwrite("sigma", &RPU::WeightClipParameter::sigma)
+      .def_readwrite("type", &RPU::WeightClipParameter::type);
+
+  py::enum_<RPU::WeightClipType>(m, "WeightClipType")
+      .value("None", RPU::WeightClipType::None)
+      .value("FixedValue", RPU::WeightClipType::FixedValue)
+      .value("LayerGaussian", RPU::WeightClipType::LayerGaussian)
+      .value("AverageChannelMax", RPU::WeightClipType::AverageChannelMax);
+
   py::class_<Class>(
       m, "FloatingPointTile",
       R"pbdoc(
@@ -390,6 +422,31 @@ void declare_rpu_tiles(py::module &m) {
                alpha: decay scale
            )pbdoc")
       .def(
+          "clip_weights",
+          [](Class &self, ::RPU::WeightClipParameter &wclip_par) { self.clipWeights(wclip_par); },
+          py::arg("weight_clipper_params"),
+          R"pbdoc(
+           Clips the weights for use of hardware-aware training.
+
+           Several clipping types are available, see ``WeightClipParameter``.
+
+           Args:
+               weight_clipper_params: parameters of the clipping.
+           )pbdoc")
+      .def(
+          "modify_weights",
+          [](Class &self, ::RPU::WeightModifierParameter &wmpar) { self.modifyFBWeights(wmpar); },
+          py::arg("weight_modifier_params"),
+          R"pbdoc(
+           Modifies the weights in forward and backward (but not update) pass for use of hardware-aware training.
+
+           Several modifier types are available, see ``WeightModifierParameter``.
+
+           Args:
+               weight_modifier_params: parameters of the modifications.
+           )pbdoc")
+
+      .def(
           "diffuse_weights", &Class::diffuseWeights,
           R"pbdoc(
            Diffuse the weights.
@@ -403,6 +460,24 @@ void declare_rpu_tiles(py::module &m) {
            Args:
                alpha: decay scale
                bias_no_decay: Whether to not decay the bias row
+           )pbdoc")
+
+      .def(
+          "reset_columns",
+          [](Class &self, int start_col, int n_cols, T reset_prob) {
+            return self.resetCols(start_col, n_cols, reset_prob);
+          },
+          py::arg("start_column_idx") = 0, py::arg("num_columns") = 1, py::arg("reset_prob") = 1.0,
+          R"pbdoc(
+           Resets the weights with device-to-device and cycle-to-cycle
+           variability (depending on device type), typically::
+
+              W_ij = xi*reset_std + reset_bias_ij
+
+           Args:
+               start_col: a start index of columns (0..x_size-1)
+               n_col: how many consecutive columns to reset (with circular warping)
+               reset_prob: individial probability of reset.
            )pbdoc")
       .def(
           "forward",
@@ -615,10 +690,10 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Compute the dot product using an index matrix (forward pass).
 
-           Caution: 
+           Caution:
                Internal use for convolutions only.
 
-           Args: 
+           Args:
                x_input: 4D torch::tensor in order N,C,H,W
                d_height: height of output image(s)
                d_width: width of output image(s)
@@ -649,10 +724,10 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
-           Caution: 
+           Caution:
                Internal use for convolutions only.
 
-           Args: 
+           Args:
                d_input: 4D torch::tensor in order N,C,H,W
                x_channel: number of grad_input channels
                x_height: height of grad_input image(s)
@@ -685,7 +760,7 @@ void declare_rpu_tiles(py::module &m) {
            Caution:
                Internal use for convolutions only.
 
-           Args: 
+           Args:
                x_input: 4D torch::tensor input in order N,C,H,W
                d_input: 4D torch::tensor (grad_output) in order N,C,oH,oW
            )pbdoc")
@@ -699,10 +774,10 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Sets the index vector for the ``*_indexed`` functionality.
 
-           Caution: 
+           Caution:
                Internal use only.
 
-           Args: 
+           Args:
                indices: int torch::Tensor
           )pbdoc")
       .def(

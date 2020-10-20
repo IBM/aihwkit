@@ -1,6 +1,9 @@
 # IBM Analog Hardware Acceleration Kit
 
+![PyPI](https://img.shields.io/pypi/v/aihwkit)
 [![Documentation Status](https://readthedocs.org/projects/aihwkit/badge/?version=latest)](https://aihwkit.readthedocs.io/en/latest/?badge=latest)
+[![Build Status](https://travis-ci.com/IBM/aihwkit.svg?branch=master)](https://travis-ci.com/IBM/aihwkit)
+![PyPI - License](https://img.shields.io/pypi/l/aihwkit)
 
 ## Description
 
@@ -73,7 +76,10 @@ for epoch in range(10):
 ```
 
 You can find more examples in the [`examples/`] folder of the project, and
-more information about the library in the [documentation].
+more information about the library in the [documentation]. Please note that
+the examples have some additional dependencies - you can install them via
+`pip install -r requirements-examples.txt`.
+
 
 ## What is Analog AI?
 
@@ -120,42 +126,23 @@ The preferred way to install this package is by using the
 $ pip install aihwkit
 ```
 
-The packages require the following runtime libraries to be installed in your
-system:
+> :warning: Note that currently we provide CPU-only pre-built packages for
+> specific combinations of architectures and versions, and in some cases a
+> pre-built package might still not be available.
 
-| Dependency  | Version | Notes |
-| --- | --- | --- |
-| [`OpenBLAS`] | 0.3.3+ | |
-| [`CUDA Toolkit`] | 9.0+ | For GPU-enabled simulator |
-
-Note that we provide pre-built packages for specific combinations of
-architectures and versions, and in some cases a pre-built package might still
-not be available. Please check the following section for more information on
-how to build your own package.
-
-### Installing from source
-
-The following commands will download the latest sources and install the
-package from source:
-
-```bash
-$ git clone https://github.com/IBM/aihwkit.git
-$ cd aihwkit
-$ python setup.py install
-```
-
-Note that additional libraries and tools are required, as compilation of the
-sources is involved. The build system is based on `cmake` and has a number of
-options. Please check the [developer guide] for more information.
+If you encounter any issues during download or want to compile the package
+for your environment, please refer to the [advanced installation] guide.
+That section describes the additional libraries and tools required for
+compiling the sources, using a build system based on `cmake`.
 
 ## Authors
 
 IBM Analog Hardware Acceleration Kit has been developed by IBM Research,
-with Tayfun Gokmen, Manuel Le Gallo-Bourdeau, Malte Rasch and Diego Moreda
+with Malte Rasch, Tayfun Gokmen, Diego Moreda and Manuel Le Gallo-Bourdeau
 as the initial core authors, along with many [contributors].
 
 You can contact us by opening a new issue in the repository, or alternatively
-at the ``aihwkit@us.ibm.com`` email.
+at the ``aihwkit@us.ibm.com`` email address.
 
 ## License
 
@@ -163,7 +150,6 @@ This project is licensed under [Apache License 2.0].
 
 [Apache License 2.0]: LICENSE.txt
 [`CUDA Toolkit`]: https://developer.nvidia.com/accelerated-computing-toolkit
-[developer guide]: docs/source/developer_guide.rst
 [`OpenBLAS`]: https://www.openblas.net/
 [Python package index]: https://pypi.org/project/aihwkit
 [`Pytorch`]: https://pytorch.org/
@@ -171,6 +157,7 @@ This project is licensed under [Apache License 2.0].
 [`examples/`]: examples/
 [documentation]: https://aihwkit.readthedocs.io/
 [contributors]: https://github.com/IBM/aihwkit/graphs/contributors
+[advanced installation]: https://aihwkit.readthedocs.io/en/latest/advanced_install.html
 
 [von Neumann bottleneck]: https://en.wikipedia.org/wiki/Von_Neumann_architecture#Von_Neumann_bottleneck
 [phase-change memory]: https://en.wikipedia.org/wiki/Phase-change_memory

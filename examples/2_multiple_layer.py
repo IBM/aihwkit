@@ -24,7 +24,8 @@ from torch.nn import Sequential
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.devices import ConstantStepResistiveDevice
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.devices import ConstantStepDevice
 
 # Prepare the datasets (input and expected output).
 x_b = Tensor([[0.1, 0.2, 0.0, 0.0], [0.2, 0.4, 0.0, 0.0]])
@@ -32,9 +33,9 @@ y_b = Tensor([[0.3], [0.6]])
 
 # Define a multiple-layer network, using a constant step device type.
 model = Sequential(
-    AnalogLinear(4, 2, resistive_device=ConstantStepResistiveDevice()),
-    AnalogLinear(2, 2, resistive_device=ConstantStepResistiveDevice()),
-    AnalogLinear(2, 1, resistive_device=ConstantStepResistiveDevice())
+    AnalogLinear(4, 2, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
+    AnalogLinear(2, 2, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
+    AnalogLinear(2, 1, rpu_config=SingleRPUConfig(device=ConstantStepDevice()))
 )
 
 # Define an analog-aware optimizer, preparing it for using the layers.

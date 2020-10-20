@@ -12,45 +12,42 @@
 
 """Tests for layer abstractions."""
 
-from unittest import TestCase, skipIf
-
-from numpy.testing import assert_array_almost_equal
-
 from torch import randn
-from torch.nn import Conv2d, Sequential
+from torch.nn import Conv2d as torch_Conv2d, Sequential
 from torch.nn.functional import mse_loss
 
-from aihwkit.nn.modules.conv import AnalogConv2d
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.rpu_base import cuda
 
-from aihwkit.simulator.devices import FloatingPointResistiveDevice
+from .helpers.decorators import parametrize_over_layers
+from .helpers.layers import Conv2d, Conv2dCuda
+from .helpers.testcases import ParametrizedTestCase
+from .helpers.tiles import FloatingPoint
 
 
-class ConvolutionLayerMixin:
-    """Helper for testing AnalogConv2d layer."""
-
-    USE_CUDA = False
-
-    def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a layer."""
-        raise NotImplementedError
+@parametrize_over_layers(
+    layers=[Conv2d, Conv2dCuda],
+    tiles=[FloatingPoint],
+    biases=[True, False]
+)
+class ConvolutionLayerTest(ParametrizedTestCase):
+    """Convolution layer abstractions tests."""
 
     def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
         """Return a digital layer."""
-        raise NotImplementedError
+        layer = torch_Conv2d(in_channels=in_channels,
+                             out_channels=out_channels,
+                             kernel_size=kernel_size,
+                             padding=padding,
+                             bias=self.bias)
+        if self.use_cuda:
+            layer = layer.cuda()
+
+        return layer
 
     def set_weights_from_digital_model(self, analog_model, digital_model):
         """Set the analog model weights based on the digital model."""
         weights, biases = self.get_weights_from_digital_model(analog_model, digital_model)
         analog_model.analog_tile.set_weights(weights, biases, realistic=False)
-
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b):
-        """Assert that two tensors are almost equal."""
-        # pylint: disable=invalid-name
-        array_a = tensor_a.detach().cpu().numpy()
-        array_b = tensor_b.detach().cpu().numpy()
-        assert_array_almost_equal(array_a, array_b)
 
     @staticmethod
     def get_weights_from_digital_model(analog_model, digital_model):
@@ -83,7 +80,7 @@ class ConvolutionLayerMixin:
         model = self.get_digital_layer(in_channels=2, out_channels=3, kernel_size=4, padding=2)
         x = randn(3, 2, 4, 4)
 
-        if self.USE_CUDA:
+        if self.use_cuda:
             x = x.cuda()
 
         y = model(x)
@@ -104,7 +101,7 @@ class ConvolutionLayerMixin:
         y_b = randn(3, 3, 5, 5)
         x_b = randn(3, 2, 4, 4)
 
-        if self.USE_CUDA:
+        if self.use_cuda:
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
@@ -138,7 +135,7 @@ class ConvolutionLayerMixin:
         y_b = randn(3, 3, 6, 6)
         x_b = randn(3, 2, 4, 4)
 
-        if self.USE_CUDA:
+        if self.use_cuda:
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
@@ -164,93 +161,3 @@ class ConvolutionLayerMixin:
         self.assertEqual(tile_weights.numel(), 2*3*4*4)
         if model.use_bias:
             self.assertEqual(tile_biases.numel(), 3)
-
-
-class AnalogConv2dTestNoBias(TestCase, ConvolutionLayerMixin):
-    """Test for AnalogConv2d (no bias)."""
-
-    def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a layer."""
-        return AnalogConv2d(in_channels=in_channels,
-                            out_channels=out_channels,
-                            kernel_size=kernel_size,
-                            padding=padding,
-                            bias=False,
-                            resistive_device=FloatingPointResistiveDevice())
-
-    def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a digital layer."""
-        return Conv2d(in_channels=in_channels,
-                      out_channels=out_channels,
-                      kernel_size=kernel_size,
-                      padding=padding,
-                      bias=False)
-
-
-class AnalogConv2dTestBias(TestCase, ConvolutionLayerMixin):
-    """Test for AnalogConv2d (bias)."""
-
-    def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a layer."""
-        return AnalogConv2d(in_channels=in_channels,
-                            out_channels=out_channels,
-                            kernel_size=kernel_size,
-                            padding=padding,
-                            bias=True,
-                            resistive_device=FloatingPointResistiveDevice())
-
-    def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a digital layer."""
-        return Conv2d(in_channels=in_channels,
-                      out_channels=out_channels,
-                      kernel_size=kernel_size,
-                      padding=padding,
-                      bias=True)
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogConv2dTestNoBias(AnalogConv2dTestNoBias):
-    """Test for AnalogConv2d (no bias, CUDA)."""
-
-    USE_CUDA = True
-
-    def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a layer."""
-        return AnalogConv2d(in_channels=in_channels,
-                            out_channels=out_channels,
-                            kernel_size=kernel_size,
-                            padding=padding,
-                            bias=True,
-                            resistive_device=FloatingPointResistiveDevice()).cuda()
-
-    def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a digital layer."""
-        return Conv2d(in_channels=in_channels,
-                      out_channels=out_channels,
-                      kernel_size=kernel_size,
-                      padding=padding,
-                      bias=True).cuda()
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogConv2dTestBias(AnalogConv2dTestBias):
-    """Test for AnalogConv2d (bias, CUDA)."""
-
-    USE_CUDA = True
-
-    def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a layer."""
-        return AnalogConv2d(in_channels=in_channels,
-                            out_channels=out_channels,
-                            kernel_size=kernel_size,
-                            padding=padding,
-                            bias=True,
-                            resistive_device=FloatingPointResistiveDevice()).cuda()
-
-    def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a digital layer."""
-        return Conv2d(in_channels=in_channels,
-                      out_channels=out_channels,
-                      kernel_size=kernel_size,
-                      padding=padding,
-                      bias=True).cuda()

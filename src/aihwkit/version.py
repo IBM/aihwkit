@@ -15,5 +15,5 @@
 import os
 
 VERSION_FILE = os.path.join(os.path.dirname(__file__), 'VERSION.txt')
-with open(VERSION_FILE) as version_file:
+with open(VERSION_FILE, encoding='utf-8') as version_file:
     __version__ = version_file.read().strip()

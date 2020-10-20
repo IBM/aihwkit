@@ -11,41 +11,50 @@
 # that they have been altered from the originals.
 
 """Tests for the high level simulator devices functionality."""
-
-from unittest import TestCase, skipIf
-
-from numpy.testing import assert_array_almost_equal
+from unittest import SkipTest
 
 from torch import Tensor
 
-from aihwkit.simulator.devices import ConstantStepResistiveDevice
-from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile
-from aihwkit.simulator.parameters import ConstantStepResistiveDeviceParameters
-from aihwkit.simulator.rpu_base import tiles, cuda
+from .helpers.decorators import parametrize_over_tiles
+from .helpers.testcases import ParametrizedTestCase
+from .helpers.tiles import (
+    FloatingPoint, Ideal, ConstantStep, LinearStep,
+    ExpStep, Vector, Difference, Transfer, Inference,
+    FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
+    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda, InferenceCuda
+)
 
 
-class TileTestMixin:
+@parametrize_over_tiles([
+    FloatingPoint,
+    Ideal,
+    ConstantStep,
+    LinearStep,
+    ExpStep,
+    Vector,
+    Difference,
+    Transfer,
+    Inference,
+    FloatingPointCuda,
+    IdealCuda,
+    ConstantStepCuda,
+    LinearStepCuda,
+    ExpStepCuda,
+    VectorCuda,
+    DifferenceCuda,
+    TransferCuda,
+    InferenceCuda
+])
+class TileTest(ParametrizedTestCase):
     """Test floating point tile."""
 
-    simulator_tile_class = None
-
-    def get_tile(self, out_size, in_size, **kwargs):
-        """Return an analog tile of the specified dimensions."""
-        raise NotImplementedError
-
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b):
-        """Assert that two tensors are almost equal."""
-        # pylint: disable=invalid-name
-        array_a = tensor_a.detach().cpu().numpy()
-        array_b = tensor_b.detach().cpu().numpy()
-        assert_array_almost_equal(array_a, array_b)
-
     def test_bias(self):
-        """Test instantiating a floating point tile."""
+        """Test instantiating a tile."""
         out_size = 2
         in_size = 3
 
         analog_tile = self.get_tile(out_size, in_size, bias=True)
+
         self.assertIsInstance(analog_tile.tile, self.simulator_tile_class)
 
         learning_rate = 0.123
@@ -102,30 +111,33 @@ class TileTestMixin:
         analog_tile = self.get_tile(4, 5)
 
         hidden_parameters = analog_tile.get_hidden_parameters()
+        field = self.first_hidden_field
 
         # Check that there are hidden parameters.
-        if isinstance(analog_tile, AnalogTile):
+        if field:
             self.assertGreater(len(hidden_parameters), 0)
         else:
             self.assertEqual(len(hidden_parameters), 0)
 
-        if isinstance(analog_tile, AnalogTile):
+        if field:
             # Check that one of the parameters is correct.
-            self.assertIn('max_bound', hidden_parameters.keys())
-            self.assertEqual(hidden_parameters['max_bound'].shape,
+            self.assertIn(field, hidden_parameters.keys())
+            self.assertEqual(hidden_parameters[field].shape,
                              (4, 5))
             self.assertTrue(all(val == 0.6 for val in
-                                hidden_parameters['max_bound'].flatten()))
+                                hidden_parameters[field].flatten()))
 
     def test_set_hidden_parameters(self):
         """Test setting hidden parameters."""
         analog_tile = self.get_tile(3, 4)
 
         hidden_parameters = analog_tile.get_hidden_parameters()
+        field = self.first_hidden_field
 
         # Update one of the values of the hidden parameters.
-        if isinstance(analog_tile, AnalogTile):
-            hidden_parameters['max_bound'][1][1] = 0.1
+        if field:
+            # set higher as default otherwise hidden weight might change
+            hidden_parameters[field][1][1] = 0.8
 
         analog_tile.set_hidden_parameters(hidden_parameters)
 
@@ -136,51 +148,52 @@ class TileTestMixin:
         for (_, old), (_, new) in zip(hidden_parameters.items(),
                                       new_hidden_parameters.items()):
             self.assertTrue(old.allclose(new))
-        if isinstance(analog_tile, AnalogTile):
-            self.assertEqual(new_hidden_parameters['max_bound'][1][1], 0.1)
 
+        if field:
+            self.assertEqual(new_hidden_parameters[field][1][1], 0.8)
 
-class FloatingPointTileTest(TileTestMixin, TestCase):
-    """Tests for FloatingPointTile."""
+    def test_post_update_step_diffuse(self):
+        """Tests whether post update diffusion is performed"""
+        rpu_config = self.get_rpu_config()
 
-    simulator_tile_class = tiles.FloatingPointTile
+        if not hasattr(rpu_config.device, 'diffusion'):
+            raise SkipTest('This device does not support difussion')
 
-    def get_tile(self, out_size, in_size, **kwargs):
-        return FloatingPointTile(out_size, in_size, **kwargs)
+        rpu_config.device.diffusion = 0.323
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
 
+        weights = Tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        biases = Tensor([-0.1, -0.2])
 
-class AnalogTileTest(TileTestMixin, TestCase):
-    """Tests for AnalogTile."""
+        analog_tile.set_learning_rate(0.123)
+        analog_tile.set_weights(weights, biases)
 
-    simulator_tile_class = tiles.AnalogTile
+        analog_tile.post_update_step()
 
-    def get_tile(self, out_size, in_size, **kwargs):
-        resistive_device = ConstantStepResistiveDevice(
-            ConstantStepResistiveDeviceParameters(w_max_dtod=0,
-                                                  w_min_dtod=0))
+        tile_weights, tile_biases = analog_tile.get_weights()
 
-        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+        self.assertNotAlmostEqualTensor(tile_weights, weights)
+        self.assertNotAlmostEqualTensor(tile_biases, biases)
 
+    def test_post_update_step_lifetime(self):
+        """Tests whether post update decay is performed"""
+        rpu_config = self.get_rpu_config()
 
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaFloatingPointTileTest(TileTestMixin, TestCase):
-    """Tests for FloatingPointTile (cuda)."""
+        if not hasattr(rpu_config.device, 'lifetime'):
+            raise SkipTest('This device does not support lifetime')
 
-    simulator_tile_class = tiles.FloatingPointTile
+        rpu_config.device.lifetime = 100.
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
 
-    def get_tile(self, out_size, in_size, **kwargs):
-        return FloatingPointTile(out_size, in_size, **kwargs).cuda()
+        weights = Tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        biases = Tensor([-0.1, -0.2])
 
+        analog_tile.set_learning_rate(0.123)
+        analog_tile.set_weights(weights, biases)
 
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogTileTest(TileTestMixin, TestCase):
-    """Tests for AnalogTile (cuda)."""
+        analog_tile.post_update_step()
 
-    simulator_tile_class = tiles.AnalogTile
+        tile_weights, tile_biases = analog_tile.get_weights()
 
-    def get_tile(self, out_size, in_size, **kwargs):
-        resistive_device = ConstantStepResistiveDevice(
-            ConstantStepResistiveDeviceParameters(w_max_dtod=0,
-                                                  w_min_dtod=0))
-
-        return AnalogTile(out_size, in_size, resistive_device, **kwargs)
+        self.assertNotAlmostEqualTensor(tile_weights, weights)
+        self.assertNotAlmostEqualTensor(tile_biases, biases)

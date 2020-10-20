@@ -12,7 +12,7 @@
 
 """Tests for the RPU array bindings."""
 
-from unittest import TestCase, skipIf
+from unittest import SkipTest
 
 from numpy import array, std, dot
 from numpy.random import uniform
@@ -20,41 +20,63 @@ from numpy.testing import assert_array_equal, assert_array_almost_equal
 
 from torch import Tensor, from_numpy
 
-from aihwkit.simulator.tiles import FloatingPointTile, AnalogTile
 from aihwkit.simulator.rpu_base import tiles, cuda
 
-from aihwkit.simulator.parameters import (
-    AnalogTileBackwardInputOutputParameters, FloatingPointTileParameters,
-    ConstantStepResistiveDeviceParameters,
-    AnalogTileInputOutputParameters,
-    AnalogTileUpdateParameters,
-    PulseType
-)
+from aihwkit.simulator.configs import FloatingPointRPUConfig, SingleRPUConfig
+from aihwkit.simulator.configs.devices import FloatingPointDevice, ConstantStepDevice, IdealDevice
+from aihwkit.simulator.configs.utils import BackwardIOParameters, IOParameters
 
-from aihwkit.simulator.devices import (FloatingPointResistiveDevice,
-                                       ConstantStepResistiveDevice)
+from .helpers.decorators import parametrize_over_tiles
+from .helpers.testcases import ParametrizedTestCase
+from .helpers.tiles import (FloatingPoint, ConstantStep,
+                            FloatingPointCuda, ConstantStepCuda)
 
 
-class TileTestMixin:
-    """Mixin for tests over analog tiles."""
+@parametrize_over_tiles([
+    FloatingPoint,
+    ConstantStep,
+    FloatingPointCuda,
+    ConstantStepCuda
+])
+class BindingsTilesTest(ParametrizedTestCase):
+    """Tests the basic functionality of FloatingPoint and Analog tiles."""
 
-    def set_init_weights(self, python_tile):
+    @staticmethod
+    def set_init_weights(python_tile):
         """Generate and set the weight init."""
         init_weights = from_numpy(
             uniform(-0.5, 0.5, size=(python_tile.out_size, python_tile.in_size)))
         python_tile.set_weights(init_weights)
 
-    def get_device_params(self, **kwargs):
-        """ Return the default device params"""
-        raise NotImplementedError
-
-    def get_tile(self, out_size, in_size, device_params=None):
-        """Return an floating point tile of the specified dimensions."""
-        raise NotImplementedError
-
     def get_noisefree_tile(self, out_size, in_size):
         """Return a tile of the specified dimensions with noisiness turned off."""
-        raise NotImplementedError
+        rpu_config = None
+
+        if 'FloatingPoint' not in self.parameter:
+            rpu_config = SingleRPUConfig(
+                forward=IOParameters(is_perfect=True),
+                backward=BackwardIOParameters(is_perfect=True),
+                device=IdealDevice()
+            )
+
+        python_tile = self.get_tile(out_size, in_size, rpu_config)
+        self.set_init_weights(python_tile)
+
+        return python_tile
+
+    def get_custom_tile(self, out_size, in_size, **parameters):
+        """Return a tile with custom parameters for the resistive device."""
+        if 'FloatingPoint' in self.parameter:
+            rpu_config = FloatingPointRPUConfig(
+                device=FloatingPointDevice(**parameters))
+        else:
+            rpu_config = SingleRPUConfig(
+                device=ConstantStepDevice(**parameters))
+
+        python_tile = self.get_tile(out_size, in_size, rpu_config)
+        self.set_init_weights(python_tile)
+
+        return python_tile
 
     def test_instantiate(self):
         """Check that the binding is instantiable."""
@@ -75,8 +97,9 @@ class TileTestMixin:
     def test_decay_weights(self):
         """Check decaying the weights."""
         decay_rate = 0.1
-        params = self.get_device_params(lifetime=1.0/decay_rate)
-        python_tile = self.get_tile(2, 3, params)
+
+        # Use custom parameters for the tile.
+        python_tile = self.get_custom_tile(2, 3, lifetime=1.0/decay_rate)
         cpp_tile = python_tile.tile
 
         init_weights = cpp_tile.get_weights().copy()
@@ -89,8 +112,8 @@ class TileTestMixin:
         """Check diffusing the weights."""
         diffusion_rate = 0.1
 
-        params = self.get_device_params(diffusion=diffusion_rate)
-        python_tile = self.get_tile(100, 122, params)
+        # Use custom parameters for the tile.
+        python_tile = self.get_custom_tile(100, 122, diffusion=diffusion_rate)
         cpp_tile = python_tile.tile
 
         init_weights = cpp_tile.get_weights().copy()
@@ -139,25 +162,24 @@ class TileTestMixin:
 
         assert_array_almost_equal(post_rank_weights, ref_weights)
 
+    def test_cuda_instantiation(self):
+        """Test whether cuda weights are copied correctly."""
+        if not self.use_cuda and not cuda.is_compiled():
+            raise SkipTest('not compiled with CUDA support')
 
-class FloatingPointTileTest(TestCase, TileTestMixin):
+        python_tile = self.get_tile(10, 12)
+        init_weights = python_tile.tile.get_weights()
+
+        cuda_python_tile = python_tile.cuda()
+        init_weights_cuda = cuda_python_tile.tile.get_weights()
+        assert_array_almost_equal(init_weights, init_weights_cuda)
+
+
+@parametrize_over_tiles([
+    FloatingPoint, FloatingPointCuda
+])
+class FloatingPointTileTest(ParametrizedTestCase):
     """Test `rpu_base.FloatingPointTile` functionality."""
-
-    def get_device_params(self, **kwargs):
-        """ Return the default device params"""
-        return FloatingPointTileParameters(**kwargs)
-
-    def get_tile(self, out_size, in_size, device_params=None):
-        """Return an floating point tile of the specified dimensions."""
-        device_params = device_params or FloatingPointTileParameters()
-        resistive_device = FloatingPointResistiveDevice(device_params)
-        python_tile = FloatingPointTile(out_size, in_size, resistive_device)
-        self.set_init_weights(python_tile)
-        return python_tile
-
-    def get_noisefree_tile(self, out_size, in_size):
-        """Return a tile of the specified dimensions with noisiness turned off."""
-        return self.get_tile(out_size, in_size)
 
     def test_setters_weights(self):
         """Check setting and getting the weights."""
@@ -190,33 +212,11 @@ class FloatingPointTileTest(TestCase, TileTestMixin):
         assert_array_equal(cpp_tile.get_weights_realistic(), input_weights)
 
 
-class AnalogTileTest(TestCase, TileTestMixin):
+@parametrize_over_tiles([
+    ConstantStep, ConstantStepCuda
+])
+class AnalogTileTest(ParametrizedTestCase):
     """Test `rpu_base.AnalogTile` functionality."""
-
-    def get_device_params(self, **kwargs):
-        """Return the default device params"""
-        return ConstantStepResistiveDeviceParameters(**kwargs)
-
-    def get_tile(self, out_size, in_size, device_params=None):
-        """Return an analog tile of the specified dimensions."""
-        device_params = device_params or ConstantStepResistiveDeviceParameters()
-        resistive_device = ConstantStepResistiveDevice(params_devices=device_params)
-        python_tile = AnalogTile(out_size, in_size, resistive_device)
-        self.set_init_weights(python_tile)
-        return python_tile
-
-    def get_noisefree_tile(self, out_size, in_size):
-        """Return a tile of the specified dimensions with noisiness turned off."""
-        params = ConstantStepResistiveDeviceParameters()
-        io_params = AnalogTileInputOutputParameters(is_perfect=True)
-        io_params_backward = AnalogTileBackwardInputOutputParameters(is_perfect=True)
-        up_params = AnalogTileUpdateParameters(pulse_type=PulseType('None'))
-        resistive_device = ConstantStepResistiveDevice(params_devices=params,
-                                                       params_forward=io_params,
-                                                       params_backward=io_params_backward,
-                                                       params_update=up_params)
-        python_tile = AnalogTile(out_size, in_size, resistive_device)
-        return python_tile
 
     def test_setters_weights(self):
         """Check setting and getting the weights."""
@@ -247,21 +247,3 @@ class AnalogTileTest(TestCase, TileTestMixin):
         input_weights = array([[6, 5, 4], [3, 2, 1]])
         cpp_tile.set_weights_realistic(input_weights, 10)
         self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaFloatingPointTileTest(FloatingPointTileTest):
-    """Test `rpu_base.CudaFloatingPointTile` functionality."""
-
-    def get_tile(self, out_size, in_size, device_params=None):
-        """Return a CUDA floating point tile of the specified dimensions."""
-        return super().get_tile(out_size, in_size, device_params).cuda()
-
-
-@skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
-class CudaAnalogTileTest(AnalogTileTest):
-    """Test `rpu_base.CudaAnalogTile` functionality."""
-
-    def get_tile(self, out_size, in_size, device_params=None):
-        """Return a CUDA analog tile of the specified dimensions."""
-        return super().get_tile(out_size, in_size, device_params).cuda()

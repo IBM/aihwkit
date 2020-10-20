@@ -42,19 +42,35 @@ CUDA                             9.0+      Optional, for GPU-enabled simulator
 ===============================  ========  ======
 
 Please refer to your operative system documentation for instructions on how
-to install the different dependencies. On a Debian-based operative system,
-the following commands can be used for installing the minimal
-dependencies::
+to install the different dependencies. The following section contains quick
+instructions for several operative systems:
+
+Debian-based
+""""""""""""
+On a Debian-based operative system, the following commands can be used for
+installing the minimal dependencies::
 
     $ sudo apt-get install python3-pybind11 python3-dev libopenblas-dev
-    $ pip install -r requirements.txt
+    $ pip install cmake scikit-build torch
+
+OSX
+"""
 
 On an OSX-based system, the following commands can be used for installing the
 minimal dependencies (note that ``Xcode`` needs to be installed)::
 
     $ brew install pybind11
     $ brew install openblas
-    $ pip install -r requirements.txt
+    $ pip install cmake scikit-build torch
+
+miniconda
+"""""""""
+
+On a miniconda-based system, the following commands can be used for installing
+the minimal dependencies [#f3]_::
+
+    $ conda install cmake openblas pybind11 scikit-build
+    $ conda install pytorch -c pytorch
 
 Installing and compiling
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,6 +108,9 @@ of the command will help diagnosing the issue.
    dependency. Please ensure that your torch installation includes ``libtorch``
    and the development headers - they are included by default if installing
    torch from ``pip``.
+
+.. [#f3] Please note that currently support for conda-based distributions is
+   experimental, and further commands might be needed.
 
 .. _virtual environment: https://docs.python.org/3/library/venv.html
 
