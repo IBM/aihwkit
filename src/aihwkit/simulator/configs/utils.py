@@ -434,20 +434,17 @@ def tile_parameters_to_bindings(params: Any) -> Any:
     """Convert a tile dataclass parameter into a bindings class."""
     field_map = {'forward': 'forward_io',
                  'backward': 'backward_io'}
+    excuded_fields = ('device', 'noise_model', 'drift_compensation',
+                      'clip', 'modifier')
 
-    result = params['bindings_class']() if isinstance(params, dict) \
-        else params.bindings_class()
-
-    params_dic = params if isinstance(params, dict) else params.__dict__
-
-    for field, value in params_dic.items():
+    result = params.bindings_class()
+    for field, value in params.__dict__.items():
         # Get the mapped field name, if needed.
         field = field_map.get(field, field)
 
         # Convert enums to the bindings enums.
-        if field in ['bindings_class', 'device']:
-            # Exclude `device`, as it is a special field that is not
-            # present in the bindings.
+        if field in excuded_fields:
+            # Exclude special fields that are not present in the bindings.
             continue
 
         if isinstance(value, Enum):

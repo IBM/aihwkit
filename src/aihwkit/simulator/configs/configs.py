@@ -98,8 +98,8 @@ class InferenceRPUConfig:
 
     During inference, statistical models of programming, drift
     and read noise can be used.
-
     """
+    # pylint: disable=too-many-instance-attributes
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -112,21 +112,31 @@ class InferenceRPUConfig:
     drift_compensation: BaseDriftCompensation = field(default_factory=GlobalDriftCompensation)
     """For compensating the drift during inference only."""
 
-    device: IdealDevice = field(default_factory=IdealDevice)
-    """Ideal device."""
-
     clip: WeightClipParameter = field(default_factory=WeightClipParameter)
+    """Parameters for weight clip."""
 
     modifier: WeightModifierParameter = field(default_factory=WeightModifierParameter)
+    """Parameters for weight modifier."""
+
+    # The following fields are not included in `__init__`, and should be
+    # treated as read-only.
+
+    device: IdealDevice = field(default_factory=IdealDevice,
+                                init=False)
+    """Parameters that modify the behavior of the pulsed device: ideal device."""
+
+    backward: BackwardIOParameters = field(
+        default_factory=lambda: BackwardIOParameters(is_perfect=True),
+        init=False
+    )
+    """Input-output parameter setting for the backward direction: perfect."""
+
+    update: UpdateParameters = field(
+        default_factory=lambda: UpdateParameters(pulse_type=PulseType.NONE),
+        init=False
+    )
+    """Parameter for the update behavior: ``NONE`` pulse type."""
 
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
-
-        # backward/update/device technically read-only properties, so we set
-        # them here instead
-        params_dic = {'forward': self.forward,
-                      'backward': BackwardIOParameters(is_perfect=True),
-                      'update': UpdateParameters(pulse_type=PulseType.NONE),
-                      'bindings_class': self.bindings_class
-                      }
-        return tile_parameters_to_bindings(params_dic)
+        return tile_parameters_to_bindings(self)
