@@ -28,7 +28,7 @@ from aihwkit.simulator.configs.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
     OutputWeightNoiseType, WeightClipType, WeightModifierType)
 from aihwkit.simulator.rpu_base import cuda
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel
+from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
 
 # Prepare the datasets (input and expected output).
 x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
@@ -49,6 +49,9 @@ rpu_config.modifier.rel_to_actual_wmax = True
 
 # Inference noise model.
 rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
+
+# drift compensation
+rpu_config.drift_compensation = GlobalDriftCompensation()
 
 model = AnalogLinear(4, 2, bias=True,
                      rpu_config=rpu_config)

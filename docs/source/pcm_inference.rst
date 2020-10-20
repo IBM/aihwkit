@@ -42,7 +42,7 @@ hardware. When the final converged network weights :math:`W` have been
 obtained after training, they must be converted to target conductance values
 :math:`G_T` that will be programmed on the hardware, within the range that it
 supports. In the statistical model, this range is set to :math:`[0,1]`, where
-:math:`1` corresponds to the largest conductance value :math:`G_{max}` that
+:math:`1` corresponds to the largest conductance value :math:`g_\text{max}` that
 can be reliably programmed on the hardware.
 
 The statistical model assumes that each weight is programmed on two PCM devices
@@ -51,7 +51,7 @@ either the device encoding the positive part of the weight or the negative part
 is programmed, and the other device is set to 0. Thus, the simplest way to map
 the weights to conductances is to multiply the weights by scaling factor
 :math:`\beta`, which is different for every network layer. A simple approach is
-to use :math:`\beta = 1/W_{max}`, where :math:`W_{max}` is the maximum
+to use :math:`\beta = 1/w_\text{max}`, where :math:`w_\text{max}` is the maximum
 absolute weight value of a layer. 
 
 Programming noise
@@ -67,15 +67,17 @@ deviation of the iteratively programmed conductance values measured from
 hardware.
 
 The equations used in the statistical model to implement the programming noise
-are:
+are (where we use small letters for the elements of the matrices
+:math:`W` and :math:`G_T`, etc., and omit the indeces for brevity):
 
 .. math::
 
-    G_{PROG} = G_{T} + N(0,\sigma_{PROG}^2)
+    g_\text{prog} = g_{T} + {\cal N}(0,\sigma_\text{prog})
 
 .. math::
 
-    \sigma_{PROG}=max(-1.1731(G_{T} )^2+ 1.9650(G_{T})+0.2635, 0)
+    \sigma_\text{prog} = \max\left(-1.1731 \, g_{T}^2 +
+    1.9650 \, g_{T} + 0.2635, 0 \right)
 
 The fit between this equation and the hardware measurement is shown below:
 
@@ -90,23 +92,27 @@ over time. This drift is an intrinsic property of the phase-change material of
 a PCM device and is due to structural relaxation of the amorphous phase
 :ref:`[5] <references_pcm>`.
 Knowing the conductance at time :math:`t_c` from the last programming pulse,
-:math:`G_{PROG}`, the conductance evolution can be modeled as:
+:math:`g_\text{prog}`, the conductance evolution can be modeled as:
 
 .. math::
 
-    G_{DRIFT} (t)= G_{PROG}  ×(t/t_c )^(-\nu)
+    g_\text{drift}(t) = g_\text{prog} \left(\frac{t}{t_c}\right)^{-\nu}
 
-where :math:`\nu = N(\mu_\nu,\sigma^2_\nu)` is the so-called drift exponent.
-:math:`\nu` exhibits variability across a PCM array and a dependence on the
-target conductance state :math:`G_T`. The mean drift exponent
-:math:`\mu_\nu` and its standard deviation :math:`\sigma_\nu` measured from
-hardware can be modeled with the following equations:
+where :math:`\nu` is the so-called drift exponent and is sampled from
+:math:`{\cal N}(\mu_\nu,\sigma_\nu)`.  :math:`\nu` exhibits
+variability across a PCM array and a dependence on the target
+conductance state :math:`g_T`. The mean drift exponent :math:`\mu_\nu`
+and its standard deviation :math:`\sigma_\nu` measured from hardware
+can be modeled with the following equations:
 
 .. math::
+   :nowrap:
 
-    \mu_ν=min(max(-0.0155 ×log(G_T)+0.0244, 0.049), 0.1)
-
-    \sigma_ν=min(max(-0.0125 ×log(G_T)-0.0059, 0.008), 0.045)
+   \begin{eqnarray*}
+   \mu_\nu &=& \min\left(\max\left(-0.0155 \log g_T + 0.0244, 0.049\right), 0.1\right)\\
+   \sigma_\nu &=& \min\left(\max\left(-0.0125 \log g_T - 0.0059,
+   0.008\right), 0.045\right)\\
+   \end{eqnarray*}
 
 The fits between these equations and the hardware measurements are shown below:
 
@@ -136,24 +142,24 @@ is obtained by integrating the above equation over the measurement bandwidth:
 
 .. math::
 
-    σ_{nG}=G_{DRIFT} (t) \times Q_s \times sqrt{\log((t+T_{read})/2T_{read} )}
+    σ_{nG} = g_\text{drift}(t)  Q_s  \sqrt{\log\frac{t+t_\text{read}}{2 t_{read}}}
 
-where :math:`T_{read} = 250` ns is the width of the pulse applied when reading
+where :math:`t_{read} = 250` ns is the width of the pulse applied when reading
 the devices. 
 
-The :math:`Q_s` measured from the PCM devices as a function of :math:`G_T`
+The :math:`Q_s` measured from the PCM devices as a function of :math:`g_T`
 is given by:
 
 .. math::
 
-    Q_s=min(0.0088/(G_T )^0.65 , 2 \cdot 10^(-1) )
+    Q_s=\min\left(0.0088/g_T^{0.65}, 0.2\right)
 
-The final simulated PCM conductance from the model at time :math:`t, G(t)`, is
+The final simulated PCM conductance from the model at time :math:`t`, :math:`g(t)`, is
 given by:
 
-.. math:::
+.. math::
 
-    G(t)= G_{DRIFT} (t)+N(0,\sigma_nG^2 (t))
+    g(t)= g_\text{drift} (t)+ {\cal N}\left(0, \sigma_nG (t)\right)
 
 Compensation method to mitigate the effect of drift
 ---------------------------------------------------
@@ -177,6 +183,92 @@ in hardware:
 
 .. image:: ../img/pcm_compensation.png
    :alt:
+
+In our case, we currently have a simple alternative drift
+compensation, where we use a forward pass with an all 1-vector as an
+input, then outputs (using the potential non-idealities defined for
+the forward pass) is summed in an absolute way. This procedure is done
+once after programming and once after applying the drift expected at
+time point of inference :math:`t_\text{inference}`. The ratio of the
+two numbers is the global drift compensation scaling factor of that
+layer, and it is applied (in digital) to the (digital) output of the
+analog tile.
+
+Note that the drift compensation class
+:class:`~aihwkit.simulator.noise_models.BaseDriftCompensation` is user
+extendable, so that new drift compensation methods can be added
+easily.
+
+Example of how to use the PCM noise model for inference
+-------------------------------------------------------
+
+The above noise model for inference can be used in our package
+in the following way. Instead of using a regular analog tile, that is catered
+to doing training on analog with pulsed update and others (see Section
+:ref:`using-simulator-analog-tiles`), you can use an _inference_ tile that
+only has non-idealities in the forward pass, but a perfect update and
+backward pass. Moreover, for inference, weights can be subject to
+realistic weight noise and drift as described above. To enable this
+inference features, one has to build an model using our
+:class:`~aihwkit.simulator.tiles.inference.InferenceTile` (see also
+`example 5 <https://github.com/IBM/aihwkit/blob/master/examples/5_simple_layer_hardware_aware.py>`_)::
+
+    # Define a single-layer network, using inference/hardware-aware training tile
+    rpu_config = InferenceRPUConfig()
+
+    # specify additional options of the non-idealities in forward to your liking
+    rpu_config.forward.inp_res = 1/64.  # 6-bit DAC discretization.
+    rpu_config.forward.out_res = 1/256. # 8-bit ADC discretization.
+    rpu_config.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
+    rpu_config.forward.w_noise = 0.02   # Some short-term w-noise.
+    rpu_config.forward.out_noise = 0.02 # Some output noise.
+
+    # specify the noise model to be used for inference only
+    rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0) # the model described
+
+    # specify the drift compensation
+    rpu_config.drift_compensation = GlobalDriftCompensation()
+
+    # build the model (here just one simple linear layer)
+    model = AnalogLinear(4, 2, rpu_config=rpu_config)
+
+
+Once the DNN is trained (automatically using hardware-aware training, if the forward
+pass has some non-idealities and noise included), then the inference
+with drift and drift compensation is done in the following manner::
+
+    model.eval()        # model needs to be in inference mode
+    t_inference = 3600. # time of inference in seconds (after programming)
+
+    program_analog_weights(model) # can also omitted as it is called below in any case
+    drift_analog_weights(model, t_inference) # modifies weights according to noise model
+
+    # now the model can be evaluated with programmed/drifted/compensated weights
+
+
+Note that we here have two types of non-linearities included.  For the
+first, longer-term weight noise and drift (as described above), we assume
+that during the evaluation the weight related PCM noise and the drift
+is done once and then weights are kept constant. Thus, a subsequent
+test error calculation over the full test set would signify the
+`expected` test error for the model at a given time. Ideally, one would
+want to repeat this for different weight noise and drift instance and
+or different inference times to access the accuracy degradation
+properly.
+
+The second type of non-idealities are short-term and on the level of
+a single analog MACC (Multiply and Accumulate). Noise on that level vary
+with each usage of the analog tile and are specified in the
+``rpu_config.forward``.
+
+For details on the implementation of our inference noise model, please
+consult :class:`~aihwkit.simulator.noise_models.PCMLikeNoiseModel`. In
+particular, we use a
+:class:`~aihwkit.simulator.noise_models.SinglePairConductanceConverter`
+to convert weights into conductance paris and then apply the noise pn
+both of these pairs. More elaborate mapping schemes can be
+incorporated by extending
+:class:`~aihwkit.simulator.noise_models.BaseConductanceConverter`.
 
 .. _references_pcm:
 
