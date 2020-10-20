@@ -85,7 +85,7 @@ print('Correct value:\t {}'.format(y.detach().cpu().numpy().flatten()))
 print('Prediction after training:\t {}'.format(pred_before.detach().cpu().numpy().flatten()))
 
 for t_inference in [0., 1., 20., 1000., 1e5]:
-    drift_analog_weights(model, t_inference)
+    model.drift_analog_weights(t_inference)
     pred_drift = model(x)
     print('Prediction after drift (t={}, correction={:1.3f}):\t {}'.format(
         t_inference, model.analog_tile.alpha.cpu().numpy(),

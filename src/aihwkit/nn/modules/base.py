@@ -221,7 +221,6 @@ class AnalogModuleBase(Module):
         Arguments:
             device (int, optional): if specified, all parameters will be
                 copied to that GPU device
-
         """
         # pylint: disable=attribute-defined-outside-init
         # Note: this needs to be an in-place function, not a copy
@@ -230,18 +229,24 @@ class AnalogModuleBase(Module):
         self.set_weights(self.weight, self.bias)
         return self
 
+    def drift_analog_weights(self, t_inference: float = 0.0) -> None:
+        """(Program) and drift the analog weights.
 
-def drift_analog_weights(model: Module, t_inference: float = 0.0) -> None:
-    """(Programs) and drifts all analog inference layers of a given model."""
-    model.eval()
-    for module in model.modules():
-        if isinstance(module, AnalogModuleBase) and hasattr(module.analog_tile, 'drift_weights'):
-            module.analog_tile.drift_weights(t_inference)  # type: ignore
+        Args:
+            t_inference: assumed time of inference (in sec)
+        """
+        if self.training:
+            raise RuntimeError('drift_analog_weights can only be applied in '
+                               'evaluation mode')
 
+        if isinstance(self.analog_tile, InferenceTile):
+            self.analog_tile.drift_weights(t_inference)
 
-def program_analog_weights(model: Module) -> None:
-    """Programs all analog inference layers of a given model."""
-    model.eval()
-    for module in model.modules():
-        if isinstance(module, AnalogModuleBase) and hasattr(module.analog_tile, 'program_weights'):
-            module.analog_tile.program_weights()  # type: ignore
+    def program_analog_weights(self) -> None:
+        """Program the analog weights."""
+        if self.training:
+            raise RuntimeError('program_analog_weights can only be applied in '
+                               'evaluation mode')
+
+        if isinstance(self.analog_tile, InferenceTile):
+            self.analog_tile.program_weights()

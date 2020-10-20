@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Tests for layer abstractions."""
+"""Tests for linear layer."""
 
 from torch import Tensor, manual_seed
 from torch.nn import Sequential, Linear as torchLinear

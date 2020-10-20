@@ -21,7 +21,7 @@ Analog layers
 An **analog layer** is a neural network module that stores its weights in an
 analog tile. The library current includes the following analog layers:
 
-* :class:`~aihwkit.nn.layers.linear.AnalogLiner`:
+* :class:`~aihwkit.nn.layers.linear.AnalogLinear`:
   applies a linear transformation to the input data. It is the counterpart
   of PyTorch `nn.Linear`_ layer.
 
@@ -101,6 +101,15 @@ This would move the layers parameters (weights and biases tensors) to CUDA
 tensors, and move the analog tiles of the layers to a CUDA-enabled analog
 tile.
 
+.. note::
+
+    Note that if you use analog layers that are children of other modules,
+    some of the features require manually performing them on the analog layers
+    directly (instead of only on the parent module).
+    Please check the rest of the document for more information about using
+    :class:`~aihwkit.nn.layers.container.AnalogSequential` as the parent class
+    instead of ``nn.Sequential``, for convenience.
+
 Optimizers
 ----------
 
@@ -163,6 +172,46 @@ in order to perform training::
         loss.backward()
         optimizer.step()
         print("Loss error: " + str(loss))
+
+
+Using analog layers as part of other modules
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When using analog layers in other modules, you can use the usual torch
+mechanisms for including them as part of the model.
+
+However, as a number of torch functions are applied only to the parameters and
+buffers of a regular module, in some cases they would need to be applied
+directly to the analog layers themselves (as opposed to applying the parent
+container).
+
+In order to bypass the need of applying the functions to the analog layers,
+you can use the :class:`~aihwkit.nn.layers.container.AnalogSequential` as both
+a compatible replacement for ``nn.Sequential``, and as the superclass in case
+of custom analog modules. By using this convenience module, the operations are
+guaranteed to be applied correctly to its children. For example::
+
+    from aihwkit.nn import AnalogLinear, AnalogSequential
+
+    model = AnalogSequential(
+        AnalogLinear(10, 20)
+    )
+    model.cuda()
+    model.eval()
+    model.program_analog_weights()
+
+Or in the case of custom classes::
+
+    from aihwkit.nn import AnalogConv2d, AnalogSequential
+
+    class Example(AnalogSequential):
+
+    def __init__(self):
+        super().__init__()
+
+        self.feature_extractor = AnalogConv2d(
+            in_channels=1, out_channels=16, kernel_size=5, stride=1
+        )
 
 
 .. _PyTorch: https://pytorch.org

@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a new `InferenceTile` that supports basic hardware-aware training
   and inference using a statistical noise model that was fitted by real PCM
   devices. (\#25)
+* Added a new `AnalogSequential` layer that can be used in place of `Sequential`
+  for easier operation on children analog layers. (\#34)
 
 ### Changed
 
@@ -40,6 +42,9 @@ The format is based on [Keep a Changelog], and this project adheres to
   package description). (\#13) 
 * The build system can now detect and use `openblas` directly when using the
   conda-installable version. (\#22)
+* When using analog layers as children of another module, the tiles are now
+  correctly moved to CUDA if using `AnalogSequential` (or by the optimizer if
+  using regular torch container modules). (\#34)
 
 ## [0.1.0] - 2020/09/17
 
