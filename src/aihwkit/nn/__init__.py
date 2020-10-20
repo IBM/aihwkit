@@ -12,5 +12,6 @@
 
 """Neural network modules."""
 
+from aihwkit.nn.modules.container import AnalogSequential
 from aihwkit.nn.modules.conv import AnalogConv2d
 from aihwkit.nn.modules.linear import AnalogLinear

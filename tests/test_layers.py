@@ -12,7 +12,13 @@
 
 """Tests for general functionality of layers."""
 
+from unittest import SkipTest
+
 from torch import Tensor
+
+from aihwkit.nn.modules.container import AnalogSequential
+from aihwkit.simulator.tiles import AnalogTile, CudaAnalogTile
+from aihwkit.simulator.rpu_base import cuda
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, Conv2d, LinearCuda, Conv2dCuda
@@ -105,3 +111,24 @@ class AnalogLayerTest(ParametrizedTestCase):
         self.assertTensorAlmostEqual(gotten_weights, tile_weights)
         if self.bias:
             self.assertTensorAlmostEqual(gotten_biases, tile_biases)
+
+    def test_sequential_move_to_cuda(self):
+        """Test sequential cuda."""
+        if not cuda.is_compiled():
+            raise SkipTest('not compiled with CUDA support')
+
+        # Map the original tile classes to the expected ones after `cuda()`.
+        tile_classes = {
+            AnalogTile: CudaAnalogTile,
+            CudaAnalogTile: CudaAnalogTile
+        }
+
+        layer = self.get_layer()
+        expected_class = tile_classes[layer.analog_tile.__class__]
+
+        # Create a container and move to cuda.
+        model = AnalogSequential(layer)
+        model.cuda()
+
+        # Assert the tile has been moved to cuda.
+        self.assertIsInstance(layer.analog_tile, expected_class)

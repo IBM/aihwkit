@@ -31,8 +31,7 @@ from torch import nn
 from torchvision import datasets, transforms
 
 # Imports from aihwkit.
-from aihwkit.nn.modules.conv import AnalogConv2d
-from aihwkit.nn.modules.linear import AnalogLinear
+from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim.analog_sgd import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, FloatingPointDevice
@@ -78,7 +77,7 @@ def load_images():
     return train_data, validation_data
 
 
-class LeNet5(nn.Module):
+class LeNet5(AnalogSequential):
     """LeNet5 inspired analog model."""
 
     def __init__(self):
@@ -278,8 +277,7 @@ def main():
     # Prepare the model.
     model = LeNet5()
     if USE_CUDA:
-        [m.cuda() for m in model.modules()]
-    model.to(DEVICE)
+        model.cuda()
     print(model)
 
     print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
