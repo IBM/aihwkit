@@ -24,7 +24,7 @@ from aihwkit.optim.analog_sgd import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.configs.utils import (
-    BackwardIOParameters, IOParameters, UpdateParameters
+    IOParameters, UpdateParameters
 )
 
 from .helpers.decorators import parametrize_over_layers
@@ -157,7 +157,7 @@ class SerializationTest(ParametrizedTestCase):
         # Create the device and the array.
         rpu_config = SingleRPUConfig(
             forward=IOParameters(inp_noise=0.321),
-            backward=BackwardIOParameters(inp_noise=0.456),
+            backward=IOParameters(inp_noise=0.456),
             update=UpdateParameters(desired_bl=78),
             device=ConstantStepDevice(w_max=0.987)
         )

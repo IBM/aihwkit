@@ -105,7 +105,7 @@ template <typename T> void IOMetaParameter<T>::initializeForBackward() {
 
     if (this->bound_management != BoundManagementType::None) {
       this->bound_management = BoundManagementType::None;
-      RPU_FATAL("Backward does not support bound management!");
+      // keep silent.
     }
   }
 }

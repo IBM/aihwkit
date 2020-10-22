@@ -54,7 +54,10 @@ rpu_config = UnitCellRPUConfig(
 )
 
 # Make more adjustments (can be made here or above).
-rpu_config.forward.inp_res = 1/64.  # 6 bit DAC
+rpu_config.forward.inp_res = 1/64.   # 6 bit DAC
+
+# same backward pass settings as forward
+rpu_config.backward = rpu_config.forward
 
 # Same forward/update for transfer-read as for actual SGD.
 rpu_config.device.transfer_forward = rpu_config.forward

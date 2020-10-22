@@ -22,8 +22,7 @@ from torch import from_numpy
 
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.utils import (
-    BackwardIOParameters, IOParameters,
-    UpdateParameters, PulseType
+    IOParameters, UpdateParameters, PulseType
 )
 from aihwkit.simulator.tiles.numpy import NumpyFloatingPointTile, NumpyAnalogTile
 
@@ -150,7 +149,7 @@ class NumpyAnalogTileTest(NumpyFloatingPointTileTest):
         """Return a tile of the specified dimensions with noisiness turned off."""
         rpu_config = SingleRPUConfig(
             forward=IOParameters(is_perfect=True),
-            backward=BackwardIOParameters(is_perfect=True),
+            backward=IOParameters(is_perfect=True),
             update=UpdateParameters(pulse_type=PulseType('None')),
         )
         python_tile = NumpyAnalogTile(out_size, in_size, rpu_config)
