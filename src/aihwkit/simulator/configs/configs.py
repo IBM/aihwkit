@@ -21,7 +21,7 @@ from aihwkit.simulator.configs.devices import (
 )
 
 from aihwkit.simulator.configs.utils import (
-    BackwardIOParameters, IOParameters, UpdateParameters, PulseType,
+    IOParameters, UpdateParameters, PulseType,
     WeightClipParameter, WeightModifierParameter,
     tile_parameters_to_bindings
 )
@@ -60,8 +60,7 @@ class SingleRPUConfig:
     forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the forward direction."""
 
-    backward: BackwardIOParameters = field(
-        default_factory=BackwardIOParameters)
+    backward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the backward direction."""
 
     update: UpdateParameters = field(default_factory=UpdateParameters)
@@ -92,8 +91,7 @@ class UnitCellRPUConfig:
     forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the forward direction."""
 
-    backward: BackwardIOParameters = field(
-        default_factory=BackwardIOParameters)
+    backward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the backward direction."""
 
     update: UpdateParameters = field(default_factory=UpdateParameters)
@@ -149,8 +147,8 @@ class InferenceRPUConfig:
                                 init=False)
     """Parameters that modify the behavior of the pulsed device: ideal device."""
 
-    backward: BackwardIOParameters = field(
-        default_factory=lambda: BackwardIOParameters(is_perfect=True),
+    backward: IOParameters = field(
+        default_factory=lambda: IOParameters(is_perfect=True),
         init=False
     )
     """Input-output parameter setting for the backward direction: perfect."""

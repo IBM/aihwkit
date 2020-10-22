@@ -24,7 +24,7 @@ from aihwkit.simulator.rpu_base import tiles, cuda
 
 from aihwkit.simulator.configs import FloatingPointRPUConfig, SingleRPUConfig
 from aihwkit.simulator.configs.devices import FloatingPointDevice, ConstantStepDevice, IdealDevice
-from aihwkit.simulator.configs.utils import BackwardIOParameters, IOParameters
+from aihwkit.simulator.configs.utils import IOParameters
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -55,7 +55,7 @@ class BindingsTilesTest(ParametrizedTestCase):
         if 'FloatingPoint' not in self.parameter:
             rpu_config = SingleRPUConfig(
                 forward=IOParameters(is_perfect=True),
-                backward=BackwardIOParameters(is_perfect=True),
+                backward=IOParameters(is_perfect=True),
                 device=IdealDevice()
             )
 

@@ -13,7 +13,7 @@
 """Tests for the high level simulator devices functionality."""
 
 from aihwkit.simulator.configs.utils import (
-    BackwardIOParameters, IOParameters, UpdateParameters
+    IOParameters, UpdateParameters
 )
 
 from .helpers.decorators import parametrize_over_tiles
@@ -101,7 +101,7 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         rpu_config = self.get_rpu_config()
 
         rpu_config.forward = IOParameters(inp_noise=0.321)
-        rpu_config.backward = BackwardIOParameters(inp_noise=0.456)
+        rpu_config.backward = IOParameters(inp_noise=0.456)
         rpu_config.update = UpdateParameters(desired_bl=78)
 
         tile = self.get_tile(11, 22, rpu_config).tile

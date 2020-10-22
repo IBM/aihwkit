@@ -12,6 +12,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+
+## [UNRELEASED]
+
+### Removed
+
+* The `BackwardIOParameters` specialization has been removed, as bound
+  management is now automatically ignored for the backward pass. Please use the
+  more general `IOParameters` instead. (\#45)
+
+
 ## [0.2.0] - 2020/10/20
 
 ### Added
