@@ -90,5 +90,6 @@ if (BUILD_TEST)
 
     add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
     set_target_properties(${test_name} PROPERTIES FOLDER tests)
+    add_dependencies(RPU_CPU GTest)
   endforeach()
 endif()
