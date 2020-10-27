@@ -25,8 +25,6 @@
 
 #define TOLERANCE 1e-5
 
-#define GPU_ID 0
-
 namespace {
 
 using namespace RPU;
@@ -112,7 +110,9 @@ public:
     layer_pulsed->disp();
 
     // copy-construct on GPU
-    context = new CudaContext(GPU_ID);
+    context_container = make_unique<CudaContext>(-1, false);
+    context = &*context_container;
+
     culayer_pulsed = make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
@@ -171,9 +171,9 @@ public:
   void TearDown() {
     delete[] w_other;
     delete[] w_other_trans;
-    delete context;
   }
 
+  std::unique_ptr<CudaContext> context_container;
   CudaContext *context;
 
   std::unique_ptr<RPUPulsed<T>> layer_pulsed;
@@ -211,7 +211,9 @@ public:
 
     is_test = false;
 
-    context = new CudaContext(GPU_ID);
+    context_container = make_unique<CudaContext>(-1, false);
+    context = &*context_container;
+
     x_size = 41;
     d_size = 50;
     repeats = 100;
@@ -328,12 +330,11 @@ public:
     }
   }
 
-  void TearDown() {
-    delete context;
-    delete batch_indices;
-  }
+  void TearDown() { delete batch_indices; }
 
+  std::unique_ptr<CudaContext> context_container;
   CudaContext *context;
+
   std::unique_ptr<RPUSimple<T>> layer;
   std::unique_ptr<RPUPulsed<T>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<T>> culayer_pulsed;
