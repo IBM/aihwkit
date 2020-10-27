@@ -31,11 +31,12 @@ Dependency                       Version   Notes
 ===============================  ========  ======
 C++11 compatible compiler
 `cmake`_                         3.18+
-`pybind11`_                      2.5.0+    Installing from ``pip`` is not supported [#f1]_
+`pybind11`_                      2.6.0+    Version 2.6.0 can be installed using ``pip``(recommended)
 `scikit-build`_                  0.11.0+
 `Python 3 development headers`_  3.6+
 BLAS implementation                        `OpenBLAS`_ or `Intel MKL`_
-`PyTorch`_                       1.5+      The libtorch library and headers are needed [#f2]_
+`PyTorch`_                       1.5+      The libtorch library and headers are needed [#f1]_
+`OpenMP`_                        11.0.0+   Optional, OpenMP library and headers [#f2]_
 CUDA                             9.0+      Optional, for GPU-enabled simulator
 `Nvidia CUB`_                    1.8.0     Optional, for GPU-enabled simulator [#f4]_
 `googletest`_                    1.10.0    Optional, for building the C++ tests [#f4]_
@@ -50,8 +51,8 @@ Debian-based
 On a Debian-based operative system, the following commands can be used for
 installing the minimal dependencies::
 
-    $ sudo apt-get install python3-pybind11 python3-dev libopenblas-dev
-    $ pip install cmake scikit-build torch
+    $ sudo apt-get install python3-dev libopenblas-dev
+    $ pip install cmake scikit-build torch pybind11
 
 OSX
 """
@@ -59,9 +60,8 @@ OSX
 On an OSX-based system, the following commands can be used for installing the
 minimal dependencies (note that ``Xcode`` needs to be installed)::
 
-    $ brew install pybind11
     $ brew install openblas
-    $ pip install cmake scikit-build torch
+    $ pip install cmake scikit-build torch pybind11
 
 miniconda
 """""""""
@@ -99,15 +99,15 @@ of the command will help diagnosing the issue.
     setup and tips can be found at the :doc:`developer_install` section that
     is more tuned towards the needs of a development cycle.
 
-.. [#f1] The current (2.5.0) version of ``pybind1`` does not include the
-   necessary ``cmake`` helpers on its ``pip`` release. It is recommended to either
-   install ``pybind11`` using your operative system package manager or compile and
-   install it manually.
-
-.. [#f2] This library uses PyTorch as both a build dependency and a runtime
+.. [#f1] This library uses PyTorch as both a build dependency and a runtime
    dependency. Please ensure that your torch installation includes ``libtorch``
    and the development headers - they are included by default if installing
    torch from ``pip``.
+
+.. [#f2] Support for the parts of the OpenMP 4.0+. Some compilers like LLVM or
+   Clang do not support OpenMP. In case of you want to add shared memory
+   processing support to the library using one of these compilers, you will
+   need to install OpenMP library in your system.
 
 .. [#f3] Please note that currently support for conda-based distributions is
    experimental, and further commands might be needed.
@@ -127,3 +127,4 @@ of the command will help diagnosing the issue.
 .. _scikit-build: https://github.com/scikit-build/scikit-build
 .. _googletest: https://github.com/google/googletest
 .. _PyTorch: https://pytorch.org
+.. _OpenMP: https://openmp.llvm.org
