@@ -308,8 +308,10 @@ public:
     up.res = resolution;
     up.sto_round = false;
 
-    context = make_unique<CudaContext>(-1, false); // blocking for timings
-    blm = make_unique<BitLineMaker<num_t>>(&*context, x_size, d_size);
+    context_container = make_unique<CudaContext>(-1, false); // blocking for timings
+    context = &*context_container;
+
+    blm = make_unique<BitLineMaker<num_t>>(context, x_size, d_size);
 
     rx = new num_t[x_size * m_batch];
     rd = new num_t[d_size * m_batch];
@@ -337,8 +339,8 @@ public:
     transpose(rd_trans, rd, d_size, m_batch);
     transpose(rx_trans, rx, x_size, m_batch);
 
-    curx = make_unique<CudaArray<num_t>>(&*context, x_size * m_batch, rx);
-    curd = make_unique<CudaArray<num_t>>(&*context, d_size * m_batch, rd);
+    curx = make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx);
+    curd = make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd);
   }
 
   void TearDown() {
@@ -350,7 +352,8 @@ public:
     delete[] d_counts;
   }
 
-  std::shared_ptr<CudaContext> context;
+  std::unique_ptr<CudaContext> context_container;
+  CudaContext *context;
   int nK32;
   int x_size;
   int d_size;
