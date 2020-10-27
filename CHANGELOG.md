@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The `Exceptions` raised by the library have been revised, making use in some
   cases of the ones introduced in a new `aihwkit.exceptions` module. (\#49)
 
+* `Pybind11` version 2.6.0 can be installed from `pip` and system-wide installation
+  is no longer required, what simplifies the process to compile the library.
+  This is a breaking change that requires to update `Pybind11` to 2.6.0. (\#44)
+
 ### Removed
 
 * The `BackwardIOParameters` specialization has been removed, as bound
