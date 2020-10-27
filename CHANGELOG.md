@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [UNRELEASED]
 
+### Changed
+
+* The `Exceptions` raised by the library have been revised, making use in some
+  cases of the ones introduced in a new `aihwkit.exceptions` module. (\#49)
+
 ### Removed
 
 * The `BackwardIOParameters` specialization has been removed, as bound

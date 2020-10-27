@@ -18,6 +18,7 @@ from torch import Tensor
 from torch import device as torch_device
 from torch.nn import Module
 
+from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 )
@@ -236,8 +237,8 @@ class AnalogModuleBase(Module):
             t_inference: assumed time of inference (in sec)
         """
         if self.training:
-            raise RuntimeError('drift_analog_weights can only be applied in '
-                               'evaluation mode')
+            raise ModuleError('drift_analog_weights can only be applied in '
+                              'evaluation mode')
 
         if isinstance(self.analog_tile, InferenceTile):
             self.analog_tile.drift_weights(t_inference)
@@ -245,8 +246,8 @@ class AnalogModuleBase(Module):
     def program_analog_weights(self) -> None:
         """Program the analog weights."""
         if self.training:
-            raise RuntimeError('program_analog_weights can only be applied in '
-                               'evaluation mode')
+            raise ModuleError('program_analog_weights can only be applied in '
+                              'evaluation mode')
 
         if isinstance(self.analog_tile, InferenceTile):
             self.analog_tile.program_weights()

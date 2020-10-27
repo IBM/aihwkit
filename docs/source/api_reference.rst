@@ -5,6 +5,7 @@ API Reference
    :recursive:
 
    aihwkit
+   aihwkit.exceptions
    aihwkit.simulator
    aihwkit.simulator.configs
    aihwkit.simulator.noise_models

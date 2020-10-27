@@ -23,6 +23,8 @@ from torch.autograd import no_grad
 
 from aihwkit.simulator.rpu_base import tiles
 
+from aihwkit.exceptions import TileError
+
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
 
 
@@ -165,7 +167,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         if self.bias:
             # Create a ``[out_size, in_size (+ 1)]`` matrix.
             if biases is None:
-                raise RuntimeError("Analog tile has a bias, but no bias given!")
+                raise ValueError("Analog tile has a bias, but no bias given")
 
             biases_numpy = expand_dims(biases.clone().detach().cpu().numpy(), 1)
             combined_weights = concatenate([weights_numpy, biases_numpy], axis=1)
@@ -357,7 +359,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             raise ValueError('image_sizes expects 5 sizes [C_in, H_in, W_in, H_out, W_out]')
 
         if self.in_trans or self.out_trans:
-            raise ValueError('Transposed indexed versions not supported (assumes NCHW)')
+            raise TileError('Transposed indexed versions not supported (assumes NCHW)')
 
         self.image_sizes = image_sizes
         self.tile.set_matrix_indices(indices)
@@ -374,8 +376,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
             torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
         """
         if not self.image_sizes:
-            raise ValueError('self.image_sizes is not initialized. Please use '
-                             'set_indexed()')
+            raise TileError('self.image_sizes is not initialized. Please use '
+                            'set_indexed()')
 
         _, _, _, height_out, width_out = self.image_sizes
         return self.tile.forward_indexed(x_input, height_out, width_out, is_test)

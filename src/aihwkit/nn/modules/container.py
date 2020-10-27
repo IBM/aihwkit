@@ -17,6 +17,7 @@ from typing import Callable, Optional, Union
 from torch import device as torch_device
 from torch.nn import Sequential
 
+from aihwkit.exceptions import ModuleError
 from aihwkit.nn.modules.base import AnalogModuleBase
 
 
@@ -67,15 +68,15 @@ class AnalogSequential(Sequential):
             t_inference: assumed time of inference (in sec
         """
         if self.training:
-            raise RuntimeError('drift_analog_weights can only be applied in '
-                               'evaluation mode')
+            raise ModuleError('drift_analog_weights can only be applied in '
+                              'evaluation mode')
 
         self._apply_to_analog(lambda m: m.drift_analog_weights(t_inference))
 
     def program_analog_weights(self) -> None:
         """Program all analog inference layers of a given model."""
         if self.training:
-            raise RuntimeError('program_analog_weights can only be applied in '
-                               'evaluation mode')
+            raise ModuleError('program_analog_weights can only be applied in '
+                              'evaluation mode')
 
         self._apply_to_analog(lambda m: m.program_weights())

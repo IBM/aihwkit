@@ -88,9 +88,9 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
     ):
         # pylint: disable=too-many-arguments
         if groups != 1:
-            raise RuntimeError('Only one group is supported')
+            raise ValueError('Only one group is supported')
         if padding_mode != 'zeros':
-            raise RuntimeError('Only "zeros" padding mode is supported')
+            raise ValueError('Only "zeros" padding mode is supported')
 
         kernel_size = _pair(kernel_size)
         self.in_features = (in_channels // groups) * kernel_size[0] * kernel_size[1]  # type: ignore
