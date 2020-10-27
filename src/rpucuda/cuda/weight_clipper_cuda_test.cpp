@@ -24,6 +24,9 @@ class WeightClipperTestFixture : public ::testing::TestWithParam<bool> {
 public:
   void SetUp() {
 
+    context_container = make_unique<CudaContext>(-1, false);
+    context = &*context_container;
+
     x_size = 100;
     d_size = 130;
     size = d_size * x_size;
@@ -37,22 +40,25 @@ public:
     auto nrnd = std::bind(ndist, generator);
 
     wclipper = make_unique<WeightClipper<num_t>>(x_size, d_size);
-    wclipper_cuda = make_unique<WeightClipperCuda<num_t>>(&context, x_size, d_size);
+    wclipper_cuda = make_unique<WeightClipperCuda<num_t>>(context, x_size, d_size);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < size; i++) {
       w[i] = nrnd();
     }
 
-    dev_w = make_unique<CudaArray<num_t>>(&context, size, w);
+    dev_w = make_unique<CudaArray<num_t>>(context, size, w);
     dev_w->assignTranspose(w, d_size, x_size);
-    context.synchronize();
+    context->synchronize();
   }
 
   void TearDown() {
     delete[] w;
     delete[] v;
   }
+
+  std::unique_ptr<CudaContext> context_container;
+  CudaContext *context;
 
   int x_size, d_size;
   int size;
@@ -61,7 +67,6 @@ public:
   std::unique_ptr<WeightClipperCuda<num_t>> wclipper_cuda;
   num_t *w, *v;
   std::unique_ptr<CudaArray<num_t>> dev_w;
-  CudaContext context{0};
 };
 
 TEST_F(WeightClipperTestFixture, FixedValue) {
@@ -71,7 +76,7 @@ TEST_F(WeightClipperTestFixture, FixedValue) {
 
   wclipper->apply(w, wclpar);
   wclipper_cuda->apply(dev_w->getData(), wclpar);
-  context.synchronize();
+  context->synchronize();
 
   num_t w_max = Find_Absolute_Max<num_t>(w, size);
 
@@ -89,7 +94,7 @@ TEST_F(WeightClipperTestFixture, LayerGaussian) {
 
   wclipper->apply(w, wclpar);
   wclipper_cuda->apply(dev_w->getData(), wclpar);
-  context.synchronize();
+  context->synchronize();
 
   num_t w_max = Find_Absolute_Max<num_t>(w, size);
 
@@ -106,7 +111,7 @@ TEST_F(WeightClipperTestFixture, AverageChannelMax) {
 
   wclipper->apply(w, wclpar);
   wclipper_cuda->apply(dev_w->getData(), wclpar);
-  context.synchronize();
+  context->synchronize();
 
   num_t w_max = Find_Absolute_Max<num_t>(w, size);
 

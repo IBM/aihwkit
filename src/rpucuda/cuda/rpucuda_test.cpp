@@ -34,7 +34,9 @@ using namespace RPU;
 template <typename T> class RPUCudaSimpleTestFixture : public ::testing::Test {
 public:
   void SetUp() {
-    context = new CudaContext();
+
+    context_container = make_unique<CudaContext>(-1, false);
+    context = &*context_container;
 
     is_test = true;
 
@@ -81,19 +83,19 @@ public:
     d_vec2.resize(d_size);
   }
 
-  void TearDown() { delete context; }
+  std::unique_ptr<CudaContext> context_container;
+  CudaContext *context;
 
-  std::shared_ptr<RPUSimple<T>> layer_simple;
-  std::shared_ptr<RPUCudaSimple<T>> culayer_simple;
+  std::unique_ptr<RPUSimple<T>> layer_simple;
+  std::unique_ptr<RPUCudaSimple<T>> culayer_simple;
   std::vector<T> x_vec, x_vec2, d_vec, d_vec2, x1, x2, d1, d2, rx, rd;
 
-  std::shared_ptr<CudaArray<T>> x_cuvec;
-  std::shared_ptr<CudaArray<T>> d_cuvec;
+  std::unique_ptr<CudaArray<T>> x_cuvec;
+  std::unique_ptr<CudaArray<T>> d_cuvec;
   int x_size;
   int d_size;
   int repeats;
   bool is_test;
-  CudaContext *context;
 };
 
 class RPUCudaSimpleTestFixtureBatch : public ::testing::TestWithParam<bool> {

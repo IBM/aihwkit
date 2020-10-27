@@ -38,7 +38,9 @@ class RPUCudaLinearStepTestFixture : public ::testing::TestWithParam<bool> {
 public:
   void SetUp() {
 
-    context = new CudaContext();
+    context_container = make_unique<CudaContext>(-1, false);
+    context = &*context_container;
+
     x_size = 100;
     d_size = 110;
     repeats = 100;
@@ -137,8 +139,7 @@ public:
     d_vec_batch.resize(m_batch * d_size);
   }
 
-  void TearDown() { delete context; }
-
+  std::unique_ptr<CudaContext> context_container;
   CudaContext *context;
 
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;

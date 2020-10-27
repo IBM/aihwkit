@@ -61,7 +61,10 @@ template <> void setAdditionalValues(TransferRPUDeviceMetaParameter<num_t> *vp, 
 template <typename VectorDeviceParT> class RPUDeviceTestFixture : public ::testing::Test {
 public:
   void SetUp() {
-    this->context = new CudaContext();
+
+    this->context_container = make_unique<CudaContext>(-1, false);
+    this->context = &*context_container;
+
     this->x_size = 4;
     this->d_size = 5;
     this->K = 10;
@@ -257,11 +260,9 @@ public:
     delete[] d_counts32;
   };
 
-  void TearDown() {
-    Array_2D_Free(refweights);
-    delete context;
-  }
+  void TearDown() { Array_2D_Free(refweights); }
 
+  std::unique_ptr<CudaContext> context_container;
   CudaContext *context;
 
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;

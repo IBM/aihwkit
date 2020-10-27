@@ -93,8 +93,9 @@ public:
     d_size = 490;
     m_batch = 100;
 
-    context = make_unique<CudaContext>(-1, false); // blocking for timings
-    iom = make_unique<InputOutputManager<num_t>>(&*context, x_size, d_size);
+    context_container = make_unique<CudaContext>(-1, false); // blocking for timings
+    context = &*context_container;
+    iom = make_unique<InputOutputManager<num_t>>(context, x_size, d_size);
 
     num_t bound = 0.8;
     num_t res = 0.01;
@@ -146,13 +147,13 @@ public:
     transpose(rd_trans, rd, d_size, m_batch);
     transpose(rx_trans, rx, x_size, m_batch);
 
-    curx = make_unique<CudaArray<num_t>>(&*context, x_size * m_batch, rx);
-    curd = make_unique<CudaArray<num_t>>(&*context, d_size * m_batch, rd);
+    curx = make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx);
+    curd = make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd);
 
-    curx_trans = make_unique<CudaArray<num_t>>(&*context, x_size * m_batch, rx_trans);
-    curd_trans = make_unique<CudaArray<num_t>>(&*context, d_size * m_batch, rd_trans);
+    curx_trans = make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx_trans);
+    curd_trans = make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd_trans);
 
-    dev_W = make_unique<CudaArray<num_t>>(&*context, d_size * x_size, W);
+    dev_W = make_unique<CudaArray<num_t>>(context, d_size * x_size, W);
   }
 
   void TearDown() {
@@ -169,13 +170,15 @@ public:
     delete[] W;
   }
 
-  std::shared_ptr<CudaContext> context;
+  std::unique_ptr<CudaContext> context_container;
+  CudaContext *context;
+
   int x_size;
   int d_size;
   int m_batch;
-  std::shared_ptr<InputOutputManager<num_t>> iom;
-  std::shared_ptr<CudaArray<num_t>> curx, curx_trans;
-  std::shared_ptr<CudaArray<num_t>> curd, curd_trans, dev_W;
+  std::unique_ptr<InputOutputManager<num_t>> iom;
+  std::unique_ptr<CudaArray<num_t>> curx, curx_trans;
+  std::unique_ptr<CudaArray<num_t>> curd, curd_trans, dev_W;
 
   IOMetaParameter<num_t> io;
   num_t *rx, *x1, *x2, *rd, *rx_trans, *rd_trans;
@@ -356,7 +359,7 @@ TEST_P(IOManagerTestFixture, InputBoundManagementBatch) {
 
   CUDA_TIMING_INIT;
 
-  CudaArray<num_t> cubu(&*context, d_size * m_batch);
+  CudaArray<num_t> cubu(context, d_size * m_batch);
   cubu.setConst(2.0 * io.out_bound);
   context->synchronize();
 
@@ -498,9 +501,7 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   io.out_bound = 0.2;
   io.inp_sto_round = false;
 
-  auto D_buffer = CudaArray<num_t>(&*this->context, d_size * m_batch);
-
-  // ASSERT_EQ(d_size==x_size,true); // otherwise simplification below will fail
+  auto D_buffer = CudaArray<num_t>(this->context, d_size * m_batch);
 
   for (int i = 0; i < x_size * m_batch; i++) {
     rx[i] = (float)i / (x_size * m_batch) * 2.2 - 1.1;
@@ -514,7 +515,7 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   // first make reference
   bool x_trans = false;
   RPU::math::gemm<num_t>(
-      &*context,
+      context,
       false, // d_trans
       x_trans, d_size,
       m_batch, // M
@@ -539,17 +540,9 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   while (!success) {
     int current_m_batch = iom->applyToInput(curx->getDataConst());
 
-    // std::cout << "new round with m_batch " << current_m_batch << std::endl;
-    // iom->copyTempArrayToHost(rx_res);
-    // curx_trans->assign(rx_res);
-    // context->synchronize();
-
-    // std::cout << "tmp x "  << std::endl;
-    // curx_trans->printValues(5);
-
     x_trans = false;
     RPU::math::gemm<num_t>(
-        &*context,
+        context,
         false, // d_trans
         x_trans, d_size,
         current_m_batch, // M
@@ -559,9 +552,6 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
         temp_x, (x_trans) ? current_m_batch : x_size, (num_t)0.0, temp_d, d_size);
 
     success = iom->applyToOutput(curd->getData(), nullptr, false); // first round
-
-    // std::cout << "out d "  << std::endl;
-    // curd->printValues(5);
   }
 
   if (GetParam()) {
@@ -574,7 +564,6 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   for (int i = 0; i < d_size * m_batch; i++) {
 
     ASSERT_NEAR(rd_res[i], rd[i], 1e-3);
-    // std::cout << "x " << rx[i] << " d " << rd[i] << std::endl;
   }
 
   // trans
@@ -594,24 +583,13 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   while (!success) {
     int current_m_batch = iom->applyToInput(curx->getDataConst());
 
-    // std::cout << "TRANS: new round with m_batch " << current_m_batch << std::endl;
-    // iom->copyTempArrayToHost(rx_res);
-    // curx_trans->assign(rx_res);
-    // context->synchronize();
-
-    // std::cout << "tmp x "  << std::endl;
-    // curx_trans->printValues(5);
-
     x_trans = true;
     RPU::math::gemm<num_t>(
-        &*context, !x_trans, true, current_m_batch, d_size, x_size, (num_t)1.0, temp_x,
+        context, !x_trans, true, current_m_batch, d_size, x_size, (num_t)1.0, temp_x,
         (x_trans) ? current_m_batch : x_size, dev_W->getData(), d_size, (num_t)0.0, temp_d,
         current_m_batch);
 
     success = iom->applyToOutput(curd->getData(), nullptr, true); // first round
-
-    // std::cout << "out d "  << std::endl;
-    // curd->printValues(5);
   }
 
   if (GetParam()) {
