@@ -19,6 +19,7 @@ from torch import device as torch_device
 from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
 
+from aihwkit.exceptions import CudaError
 from aihwkit.simulator.configs import (InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig)
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.tiles.base import BaseTile
@@ -199,7 +200,7 @@ class AnalogTile(BaseTile):
             device: CUDA device
         """
         if not cuda.is_compiled():
-            raise RuntimeError('aihwkit has not been compiled with CUDA support')
+            raise CudaError('aihwkit has not been compiled with CUDA support')
 
         with cuda_device(device):
             tile = CudaAnalogTile(self)
@@ -243,7 +244,7 @@ class CudaAnalogTile(AnalogTile):
 
     def __init__(self, source_tile: AnalogTile):
         if not cuda.is_compiled():
-            raise RuntimeError('aihwkit has not been compiled with CUDA support')
+            raise CudaError('aihwkit has not been compiled with CUDA support')
 
         # Create a new instance of the rpu config.
         new_rpu_config = deepcopy(source_tile.rpu_config)
@@ -262,6 +263,6 @@ class CudaAnalogTile(AnalogTile):
             device: Optional[Union[torch_device, str, int]] = None
     ) -> 'CudaAnalogTile':
         if self.stream != current_stream(device):
-            raise ValueError("Cannot switch CUDA devices of existing Cuda tiles")
+            raise CudaError("Cannot switch CUDA devices of existing Cuda tiles")
 
         return self
