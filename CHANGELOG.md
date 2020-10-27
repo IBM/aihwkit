@@ -12,16 +12,33 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+
 ## [UNRELEASED]
+
+### Changed
+
+* The `Exceptions` raised by the library have been revised, making use in some
+  cases of the ones introduced in a new `aihwkit.exceptions` module. (\#49)
+
+### Removed
+
+* The `BackwardIOParameters` specialization has been removed, as bound
+  management is now automatically ignored for the backward pass. Please use the
+  more general `IOParameters` instead. (\#45)
+
+
+## [0.2.0] - 2020/10/20
 
 ### Added
 
 * Added more types of resistive devices: `IdealResistiveDevice`, `LinearStep`,
-  `SoftBounds`, `ExpStep`, `VectorUnitCell`, `TransferUnitCell`,
+  `SoftBounds`, `ExpStep`, `VectorUnitCell`, `TransferCompoundDevice`,
   `DifferenceUnitCell`. (\#14)
 * Added a new `InferenceTile` that supports basic hardware-aware training
   and inference using a statistical noise model that was fitted by real PCM
   devices. (\#25)
+* Added a new `AnalogSequential` layer that can be used in place of `Sequential`
+  for easier operation on children analog layers. (\#34)
 
 ### Changed
 
@@ -37,9 +54,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Fixed
 
 * Improved package compatibility when using non-UTF8 encodings (version file,
-  package description). (\#13) 
+  package description). (\#13)
 * The build system can now detect and use `openblas` directly when using the
   conda-installable version. (\#22)
+* When using analog layers as children of another module, the tiles are now
+  correctly moved to CUDA if using `AnalogSequential` (or by the optimizer if
+  using regular torch container modules). (\#34)
 
 ## [0.1.0] - 2020/09/17
 
@@ -51,7 +71,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.1.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/IBM/aihwkit/compare/v0.1.0..v0.2.0
 [0.1.0]: https://github.com/IBM/aihwkit/releases/tag/v0.1.0
 
 [Keep a Changelog]: https://keepachangelog.com/en/1.0.0/

@@ -13,6 +13,7 @@
 """Analog-aware stochastic gradient descent optimizer."""
 
 from typing import Callable, Optional
+from warnings import warn
 
 from torch import clone, no_grad
 from torch.nn import Module
@@ -34,16 +35,25 @@ class AnalogSGD(SGD):
             model: model for the optimizer.
         """
         new_param_groups = []
+        manual_cuda_move = False  # For showing only one warning.
 
         # Create the new param groups.
         for (_, module) in model.named_modules():
             if isinstance(module, AnalogModuleBase):
-
+                params = list(module.parameters(recurse=False))
                 new_param_groups.append({
                     'params': list(module.parameters(recurse=False)),
                     'analog_tile': module.analog_tile
                 })
                 module.analog_tile.set_learning_rate(self.defaults['lr'])
+
+                # Pytorch module applies everything only to the parameters
+                # and buffers, including the device, so we might need to change
+                # the device of the module to put the analog layer on the
+                # correct device.
+                if params[0].device != module.analog_tile.device:
+                    module.cuda(params[0].device)
+                    manual_cuda_move = True
 
         # Remove the analog parameters from the main param group, and add
         # the group.
@@ -60,6 +70,11 @@ class AnalogSGD(SGD):
         # Cleanup the main parameter group.
         if not self.param_groups[0]['params']:
             self.param_groups.pop(0)
+
+        if manual_cuda_move:
+            warn('The tiles of the analog layers have been move to cuda '
+                 'manually. Please use `.cuda()` directly on the analog layers '
+                 'or `AnalogSequential.cuda()` for automatic handling.')
 
     @no_grad()
     def step(self, closure: Optional[Callable] = None) -> Optional[float]:

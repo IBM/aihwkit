@@ -20,6 +20,7 @@ from torch import device as torch_device
 from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
 
+from aihwkit.exceptions import CudaError
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig
 )
@@ -119,7 +120,7 @@ class FloatingPointTile(BaseTile):
         """Return a copy of this tile in CUDA memory."""
 
         if not cuda.is_compiled():
-            raise RuntimeError('aihwkit has not been compiled with CUDA support')
+            raise CudaError('aihwkit has not been compiled with CUDA support')
 
         with cuda_device(device):
             tile = CudaFloatingPointTile(self)
@@ -162,7 +163,7 @@ class CudaFloatingPointTile(FloatingPointTile):
 
     def __init__(self, source_tile: FloatingPointTile):
         if not cuda.is_compiled():
-            raise RuntimeError('aihwkit has not been compiled with CUDA support')
+            raise CudaError('aihwkit has not been compiled with CUDA support')
 
         # Create a new instance of the rpu config.
         new_rpu_config = deepcopy(source_tile.rpu_config)
@@ -181,6 +182,6 @@ class CudaFloatingPointTile(FloatingPointTile):
             device: Optional[Union[torch_device, str, int]] = None
     ) -> 'CudaFloatingPointTile':
         if self.stream != current_stream(device):
-            raise ValueError("Cannot switch streams of existing Cuda tiles")
+            raise CudaError("Cannot switch streams of existing Cuda tiles")
 
         return self

@@ -21,7 +21,7 @@ from aihwkit.simulator.configs.devices import (
 )
 
 from aihwkit.simulator.configs.utils import (
-    BackwardIOParameters, IOParameters, UpdateParameters, PulseType,
+    IOParameters, UpdateParameters, PulseType,
     WeightClipParameter, WeightModifierParameter,
     tile_parameters_to_bindings
 )
@@ -39,6 +39,14 @@ class FloatingPointRPUConfig:
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
     """Parameters that modify the behavior of the pulsed device."""
 
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.device.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.device.lifetime > 0.0
+
 
 @dataclass
 class SingleRPUConfig:
@@ -52,8 +60,7 @@ class SingleRPUConfig:
     forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the forward direction."""
 
-    backward: BackwardIOParameters = field(
-        default_factory=BackwardIOParameters)
+    backward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the backward direction."""
 
     update: UpdateParameters = field(default_factory=UpdateParameters)
@@ -62,6 +69,14 @@ class SingleRPUConfig:
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
+
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.device.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.device.lifetime > 0.0
 
 
 @dataclass
@@ -76,8 +91,7 @@ class UnitCellRPUConfig:
     forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the forward direction."""
 
-    backward: BackwardIOParameters = field(
-        default_factory=BackwardIOParameters)
+    backward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the backward direction."""
 
     update: UpdateParameters = field(default_factory=UpdateParameters)
@@ -86,6 +100,14 @@ class UnitCellRPUConfig:
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
+
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return any([dev.diffusion > 0.0 for dev in self.device.unit_cell_devices])
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return any([dev.lifetime > 0.0 for dev in self.device.unit_cell_devices])
 
 
 @dataclass
@@ -98,8 +120,8 @@ class InferenceRPUConfig:
 
     During inference, statistical models of programming, drift
     and read noise can be used.
-
     """
+    # pylint: disable=too-many-instance-attributes
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -112,21 +134,39 @@ class InferenceRPUConfig:
     drift_compensation: BaseDriftCompensation = field(default_factory=GlobalDriftCompensation)
     """For compensating the drift during inference only."""
 
-    device: IdealDevice = field(default_factory=IdealDevice)
-    """Ideal device."""
-
     clip: WeightClipParameter = field(default_factory=WeightClipParameter)
+    """Parameters for weight clip."""
 
     modifier: WeightModifierParameter = field(default_factory=WeightModifierParameter)
+    """Parameters for weight modifier."""
+
+    # The following fields are not included in `__init__`, and should be
+    # treated as read-only.
+
+    device: IdealDevice = field(default_factory=IdealDevice,
+                                init=False)
+    """Parameters that modify the behavior of the pulsed device: ideal device."""
+
+    backward: IOParameters = field(
+        default_factory=lambda: IOParameters(is_perfect=True),
+        init=False
+    )
+    """Input-output parameter setting for the backward direction: perfect."""
+
+    update: UpdateParameters = field(
+        default_factory=lambda: UpdateParameters(pulse_type=PulseType.NONE),
+        init=False
+    )
+    """Parameter for the update behavior: ``NONE`` pulse type."""
 
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
+        return tile_parameters_to_bindings(self)
 
-        # backward/update/device technically read-only properties, so we set
-        # them here instead
-        params_dic = {'forward': self.forward,
-                      'backward': BackwardIOParameters(is_perfect=True),
-                      'update': UpdateParameters(pulse_type=PulseType.NONE),
-                      'bindings_class': self.bindings_class
-                      }
-        return tile_parameters_to_bindings(params_dic)
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.device.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.device.lifetime > 0.0

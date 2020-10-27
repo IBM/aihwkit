@@ -10,12 +10,9 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example 4: analog CNN.
+"""aihwkit example 6: analog CNN with hardware aware training.
 
-Mnist dataset on a LeNet5 inspired network based on the paper:
-https://www.frontiersin.org/articles/10.3389/fnins.2017.00538/full
-
-Learning rates of η = 0.01 for all the epochs with minibatch 8.
+Mnist dataset on a LeNet5 inspired network.
 """
 
 import os
@@ -33,9 +30,9 @@ from torchvision import datasets, transforms
 # Imports from aihwkit.
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice, FloatingPointDevice
-
+from aihwkit.simulator.configs import InferenceRPUConfig
+from aihwkit.simulator.configs.utils import OutputWeightNoiseType
+from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
 # Check device
 USE_CUDA = 0
@@ -57,13 +54,13 @@ BATCH_SIZE = 8
 LEARNING_RATE = 0.01
 N_CLASSES = 10
 
-# Select the device model to use in the training.
-# * If `SingleRPUConfig(device=ConstantStepDevice())` then analog tiles with
-#   constant step devices will be used,
-# * If `FloatingPointRPUConfig(device=FloatingPointDevice())` then standard
-#   floating point devices will be used
-RPU_CONFIG = SingleRPUConfig(device=ConstantStepDevice())
-# RPU_CONFIG = FloatingPointRPUConfig(device=FloatingPointDevice())
+# Define the properties of the neural network in terms of noise simulated during
+# the inference/training pass
+RPU_CONFIG = InferenceRPUConfig()
+RPU_CONFIG.forward.out_res = -1.  # Turn off (output) ADC discretization.
+RPU_CONFIG.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
+RPU_CONFIG.forward.w_noise = 0.02
+RPU_CONFIG.noise_model = PCMLikeNoiseModel(g_max=25.0)
 
 
 def load_images():
@@ -264,6 +261,98 @@ def plot_results(train_losses, valid_losses, test_error):
     plt.close()
 
 
+def training_phase(model, criterion, optimizer, train_data, validation_data):
+    """Training phase.
+
+    Args:
+        model (nn.Module): Trained model to be evaluated
+        criterion (nn.CrossEntropyLoss): criterion to compute loss
+        optimizer (Optimizer): analog model optimizer
+        train_data (DataLoader): Validation set to perform the evaluation
+        validation_data (DataLoader): Validation set to perform the evaluation
+    """
+    print('\n ********************************************************* \n')
+    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
+          f'Started LeNet5 Training')
+
+    model, optimizer, _ = training_loop(model, criterion, optimizer, train_data, validation_data,
+                                        N_EPOCHS)
+
+    print(f'{datetime.now().time().replace(microsecond=0)} --- '
+          f'Completed LeNet5 Training')
+
+
+def inference_phase(model, criterion, optimizer, validation_data):
+    """Inference phase.
+
+    Args:
+        model (nn.Module): Trained model to be evaluated
+        criterion (nn.CrossEntropyLoss): criterion to compute loss
+        optimizer (Optimizer): analog model optimizer
+        validation_data (DataLoader): Validation set to perform the evaluation
+
+    """
+    total_loss = 0
+    predicted_ok = 0
+    total_images = 0
+    accuracy_pre = 0
+    error_pre = 0
+
+    model.eval()
+
+    print('\n ********************************************************* \n')
+    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
+          f'Started LeNet5 Inference')
+
+    # Accuracy after the training phase is completed.
+    for images, labels in validation_data:
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
+
+        pred = model(images)
+        loss = criterion(pred, labels)
+        total_loss += loss.item() * images.size(0)
+
+        _, predicted = torch.max(pred.data, 1)
+        total_images += labels.size(0)
+        predicted_ok += (predicted == labels).sum().item()
+        accuracy_pre = predicted_ok/total_images*100
+        error_pre = (1-predicted_ok/total_images)*100
+
+    print(f'{datetime.now().time().replace(microsecond=0)} --- '
+          f'Error after training: {error_pre:.2f}%\t'
+          f'Accuracy after training: {accuracy_pre:.2f}%\t')
+
+    # Simulation of inference pass at different times after training.
+    for t_inference in [0., 1., 20., 1000., 1e5]:
+        model.drift_analog_weights(t_inference)
+
+        time_since = t_inference
+        accuracy_post = 0
+        error_post = 0
+        predicted_ok = 0
+        total_images = 0
+
+        for images, labels in validation_data:
+            images = images.to(DEVICE)
+            labels = labels.to(DEVICE)
+
+            pred = model(images)
+            loss = criterion(pred, labels)
+            total_loss += loss.item() * images.size(0)
+
+            _, predicted = torch.max(pred.data, 1)
+            total_images += labels.size(0)
+            predicted_ok += (predicted == labels).sum().item()
+            accuracy_post = predicted_ok/total_images*100
+            error_post = (1-predicted_ok/total_images)*100
+
+        print(f'{datetime.now().time().replace(microsecond=0)} --- '
+              f'Error after inference: {error_post:.2f}%\t'
+              f'Accuracy after inference: {accuracy_post:.2f}%\t'
+              f'Drift t={time_since: .2e}\t')
+
+
 def main():
     """Train a PyTorch CNN analog model with the MNIST dataset."""
     # Make sure the directory where to save the results exist.
@@ -280,18 +369,15 @@ def main():
         model.cuda()
     print(model)
 
-    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
-          f'Started LeNet5 Example')
-
     optimizer = create_sgd_optimizer(model, LEARNING_RATE)
 
     criterion = nn.CrossEntropyLoss()
 
-    model, optimizer, _ = training_loop(model, criterion, optimizer, train_data, validation_data,
-                                        N_EPOCHS)
+    # Train the model
+    training_phase(model, criterion, optimizer, train_data, validation_data)
 
-    print(f'{datetime.now().time().replace(microsecond=0)} --- '
-          f'Completed LeNet5 Example')
+    # Test model inference over time
+    inference_phase(model, criterion, optimizer, validation_data)
 
 
 if __name__ == '__main__':

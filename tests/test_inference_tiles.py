@@ -17,7 +17,6 @@ from torch import Tensor
 from torch.nn.functional import mse_loss
 
 from aihwkit.nn import AnalogLinear
-from aihwkit.nn.modules.base import drift_analog_weights
 from aihwkit.optim.analog_sgd import AnalogSGD
 from aihwkit.simulator.configs.utils import (
     OutputWeightNoiseType, WeightClipType, WeightModifierType
@@ -81,8 +80,9 @@ class InferenceTileTest(ParametrizedTestCase):
         pred_before = model(x)
 
         pred_last = pred_before
+        model.eval()
         for t_inference in [0., 1., 20., 1000., 1e5]:
-            drift_analog_weights(model, t_inference)
+            model.drift_analog_weights(t_inference)
             pred_drift = model(x)
             self.assertNotAlmostEqualTensor(pred_last, pred_drift)
             pred_last = pred_drift

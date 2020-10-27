@@ -22,13 +22,12 @@ from torch.nn.functional import mse_loss
 
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
-from aihwkit.nn.modules.base import drift_analog_weights
 from aihwkit.optim.analog_sgd import AnalogSGD
-from aihwkit.simulator.configs.configs import InferenceRPUConfig
+from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
     OutputWeightNoiseType, WeightClipType, WeightModifierType)
+from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.simulator.rpu_base import cuda
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
 # Prepare the datasets (input and expected output).
 x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
@@ -49,6 +48,9 @@ rpu_config.modifier.rel_to_actual_wmax = True
 
 # Inference noise model.
 rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
+
+# drift compensation
+rpu_config.drift_compensation = GlobalDriftCompensation()
 
 model = AnalogLinear(4, 2, bias=True,
                      rpu_config=rpu_config)
@@ -85,7 +87,7 @@ print('Correct value:\t {}'.format(y.detach().cpu().numpy().flatten()))
 print('Prediction after training:\t {}'.format(pred_before.detach().cpu().numpy().flatten()))
 
 for t_inference in [0., 1., 20., 1000., 1e5]:
-    drift_analog_weights(model, t_inference)
+    model.drift_analog_weights(t_inference)
     pred_drift = model(x)
     print('Prediction after drift (t={}, correction={:1.3f}):\t {}'.format(
         t_inference, model.analog_tile.alpha.cpu().numpy(),

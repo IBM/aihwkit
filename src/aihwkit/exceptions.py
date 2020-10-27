@@ -10,8 +10,20 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Neural network modules."""
+"""Custom Exceptions for aihwkit."""
 
-from aihwkit.nn.modules.container import AnalogSequential
-from aihwkit.nn.modules.conv import AnalogConv2d
-from aihwkit.nn.modules.linear import AnalogLinear
+
+class AihwkitException(Exception):
+    """Base class for exceptions related to aihwkit."""
+
+
+class ModuleError(AihwkitException):
+    """Exceptions related to analog neural network modules."""
+
+
+class TileError(AihwkitException):
+    """Exceptions related to analog tiles."""
+
+
+class CudaError(AihwkitException):
+    """Exceptions related to CUDA."""

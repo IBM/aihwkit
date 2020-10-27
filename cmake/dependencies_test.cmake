@@ -11,5 +11,19 @@
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
 if(BUILD_TEST)
-  find_package(GTest REQUIRED)
+  include(ExternalProject)
+  ExternalProject_Add(GTest
+    URL               https://github.com/google/googletest/archive/release-1.10.0.zip
+    URL_HASH          MD5=82358affdd7ab94854c8ee73a180fc53
+    CMAKE_ARGS        "-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI\=0"
+    INSTALL_COMMAND   ""
+  )
+
+  ExternalProject_Get_Property(GTest source_dir)
+  ExternalProject_Get_Property(GTest binary_dir)
+  set(GTest_INCLUDE_DIR ${source_dir}/googletest/include)
+  set(GTest_LIBRARY_DIR ${binary_dir}/lib)
+
+  include_directories(SYSTEM ${GTest_INCLUDE_DIR})
+  link_directories(SYSTEM ${GTest_LIBRARY_DIR})
 endif()

@@ -35,10 +35,10 @@ C++11 compatible compiler
 `scikit-build`_                  0.11.0+
 `Python 3 development headers`_  3.6+
 BLAS implementation                        `OpenBLAS`_ or `Intel MKL`_
-CUDA                             9.0+      Optional, for GPU-enabled simulator
-`Nvidia CUB`_                    1.8.0     Optional, for GPU-enabled simulator
-`googletest`_                    1.10.0    Optional, for building the C++ tests
 `PyTorch`_                       1.5+      The libtorch library and headers are needed [#f2]_
+CUDA                             9.0+      Optional, for GPU-enabled simulator
+`Nvidia CUB`_                    1.8.0     Optional, for GPU-enabled simulator [#f4]_
+`googletest`_                    1.10.0    Optional, for building the C++ tests [#f4]_
 ===============================  ========  ======
 
 Please refer to your operative system documentation for instructions on how
@@ -111,6 +111,10 @@ of the command will help diagnosing the issue.
 
 .. [#f3] Please note that currently support for conda-based distributions is
    experimental, and further commands might be needed.
+
+.. [#f4] Both ``Nvidia CUB`` and ``googletest`` are downloaded and compiled
+   automatically during the build process. As a result, they do not need to be
+   installed manually.
 
 .. _virtual environment: https://docs.python.org/3/library/venv.html
 

@@ -28,6 +28,10 @@ class BoundManagementType(Enum):
 
     In the case ``Iterative`` the MAC is iteratively recomputed with
     inputs iteratively halved, when the output bound was hit.
+
+    Caution:
+        Bound management is **only** available for the forward pass. It
+        will be ignored when used for the backward pass.
     """
 
     NONE = 'None'
@@ -147,7 +151,12 @@ class IOParameters:
     bm_test_negative_bound: bool = True
 
     bound_management: BoundManagementType = BoundManagementType.ITERATIVE
-    """Type of bound management, see :class:`BoundManagementType`."""
+    """Type of bound management, see :class:`BoundManagementType`.
+
+    Caution:
+        Bound management is **only** available for the forward pass. It
+        will be ignored when used for the backward pass.
+    """
 
     inp_bound: float = 1.0
     """Input bound and ranges for the digital-to-analog converter (DAC)."""
@@ -226,25 +235,11 @@ class IOParameters:
     """Type as specified in :class:`OutputWeightNoiseType`.
 
     Note:
-
-     This noise us applied each time anew as it is referred to
-     the output. It will not change the conductance values of
-     the weight matrix. For the latter one can apply
-     :meth:`diffuse_weights`.
+        This noise us applied each time anew as it is referred to
+        the output. It will not change the conductance values of
+        the weight matrix. For the latter one can apply
+        :meth:`diffuse_weights`.
     """
-
-
-@dataclass
-class BackwardIOParameters(IOParameters):
-    """Parameters that modify the backward IO behavior.
-
-    This class contains the same parameters as
-    ``AnalogTileInputOutputParameters``, specializing the default value of
-    ``bound_management`` (as backward does not support bound management).
-    """
-
-    bound_management: BoundManagementType = BoundManagementType.NONE
-    """Type of noise management, see :class:`NoiseManagementType`."""
 
 
 @dataclass
@@ -278,10 +273,9 @@ class UpdateParameters:
     """Switching between different pulse types. See :class:`PulseTypeMap` for details.
 
     Important:
-
-       Pulsing can also be turned off in which case
-       the update is done as if in floating point and all
-       other update related parameter are ignored.
+        Pulsing can also be turned off in which case
+        the update is done as if in floating point and all
+        other update related parameter are ignored.
    """
 
     res: float = 0
@@ -326,7 +320,6 @@ class WeightModifierParameter:
     ``MultNormal`` and ``DiscretizeAddNormal``.
 
     Note:
-
         If the parameter ``rel_to_actual_wmax`` is set then the
         ``std_dev`` is computed in relative terms to the abs max of the
         given weight matrix, otherwise it in relative terms to the
@@ -368,7 +361,7 @@ class WeightModifierParameter:
     """Whether to use the last modified weight matrix during testing.
 
     Caution:
-        This will NOT remove drop connect or any other noise
+        This will **not** remove drop connect or any other noise
         during evaluation, and thus should only used with care.
     """
 
@@ -434,20 +427,17 @@ def tile_parameters_to_bindings(params: Any) -> Any:
     """Convert a tile dataclass parameter into a bindings class."""
     field_map = {'forward': 'forward_io',
                  'backward': 'backward_io'}
+    excuded_fields = ('device', 'noise_model', 'drift_compensation',
+                      'clip', 'modifier')
 
-    result = params['bindings_class']() if isinstance(params, dict) \
-        else params.bindings_class()
-
-    params_dic = params if isinstance(params, dict) else params.__dict__
-
-    for field, value in params_dic.items():
+    result = params.bindings_class()
+    for field, value in params.__dict__.items():
         # Get the mapped field name, if needed.
         field = field_map.get(field, field)
 
         # Convert enums to the bindings enums.
-        if field in ['bindings_class', 'device']:
-            # Exclude `device`, as it is a special field that is not
-            # present in the bindings.
+        if field in excuded_fields:
+            # Exclude special fields that are not present in the bindings.
             continue
 
         if isinstance(value, Enum):
