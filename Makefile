@@ -13,7 +13,7 @@
 .PHONY: build_inplace clean clang-tidy clang-format mypy pycodestyle pylint pytest
 
 build_inplace:
-	 python setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace
+	python setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace
 
 clean:
 	python setup.py clean

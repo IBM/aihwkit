@@ -39,6 +39,7 @@ find_package(OpenMP QUIET)
 if (OPENMP_FOUND)
   set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  include_directories(SYSTEM ${OpenMP_CXX_INCLUDE_DIR})
 else()
   message(STATUS "OpenMP could not be found. Disabling OpenMP support.")
 endif()
@@ -79,7 +80,15 @@ endif()
 # --- [ Python and pybind11
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS})  # order matters (before pybind)
-find_package(pybind11 REQUIRED)
+
+# Find pybind11Config.cmake
+execute_process(COMMAND python -c "import pybind11; print(pybind11.get_cmake_dir())"
+    OUTPUT_VARIABLE CUSTOM_PYTHON_PYBIND11_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+set (pybind11_DIR ${CUSTOM_PYTHON_PYBIND11_PATH})
+
+find_package(pybind11 CONFIG REQUIRED)
+include_directories(${pybind11_INCLUDE_DIR})
 
 # --- [ Pytorch
 find_package(Torch REQUIRED)

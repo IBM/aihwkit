@@ -22,6 +22,10 @@ language: python
 
 services: docker
 
+# Setup Travis to use Ubuntu 18.04 - Bionic
+os: linux
+dist: bionic
+
 stages:
   - Test and lint
   - Test multiple python versions
@@ -38,13 +42,7 @@ job_compile_common: &job_compile_common
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
     - pip install -r requirements.txt pytest
-    # Download, compile and install pybind manually.
-    - wget https://github.com/pybind/pybind11/archive/v2.5.0.zip && unzip v2.5.0.zip
-    - cd pybind11-2.5.0 && mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=Release -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE -DPYBIND11_TEST=OFF ..
-    - sudo make install -j
     # Install the package in editable mode.
-    - cd ../..
     - VERBOSE=1 pip install -v -e .
   script:
     - pip install "parameterized==0.7.4"
@@ -87,13 +85,7 @@ jobs:
       - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
       - pip install "torch==1.5.1"
       - pip install -r requirements.txt pytest
-      # Download, compile and install pybind manually.
-      - wget https://github.com/pybind/pybind11/archive/v2.5.0.zip && unzip v2.5.0.zip
-      - cd pybind11-2.5.0 && mkdir build && cd build
-      - cmake -DCMAKE_BUILD_TYPE=Release -DPYTHON_EXECUTABLE=$PYTHON_EXECUTABLE -DPYBIND11_TEST=OFF ..
-      - sudo make install -j
       # Install the package in editable mode.
-      - cd ../..
       - VERBOSE=1 pip install -v -e .
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
@@ -101,7 +93,7 @@ jobs:
     if: tag IS present
     env:
       - CIBW_BEFORE_ALL="yum install -y openblas-devel gtest wget"
-      - CIBW_BEFORE_BUILD="pip install -r requirements.txt mkl mkl-include pytest;wget https://github.com/pybind/pybind11/archive/v2.5.0.zip;unzip v2.5.0.zip;ls -l;cd pybind11-2.5.0;mkdir build;cd build;cmake -DPYBIND11_TEST=OFF ..;make install -j;cd ../..;rm -r pybind11-2.5.0;rm v2.5.0.zip;git clean -xdfq"
+      - CIBW_BEFORE_BUILD="pip install -r requirements.txt mkl mkl-include pytest"
       - CIBW_MANYLINUX_X86_64_IMAGE="manylinux2014"
       - CIBW_MANYLINUX_I686_IMAGE="manylinux2014"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
