@@ -16,7 +16,7 @@ from torch import randn
 from torch.nn import Conv2d as torch_Conv2d, Sequential
 from torch.nn.functional import mse_loss
 
-from aihwkit.optim.analog_sgd import AnalogSGD
+from aihwkit.optim import AnalogSGD
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv2d, Conv2dCuda
