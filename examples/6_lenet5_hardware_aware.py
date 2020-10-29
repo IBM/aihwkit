@@ -29,7 +29,7 @@ from torchvision import datasets, transforms
 
 # Imports from aihwkit.
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
-from aihwkit.optim.analog_sgd import AnalogSGD
+from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import OutputWeightNoiseType
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel

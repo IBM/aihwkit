@@ -29,7 +29,7 @@ from torchvision import datasets, transforms
 
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
-from aihwkit.optim.analog_sgd import AnalogSGD
+from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 
