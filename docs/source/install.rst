@@ -33,13 +33,20 @@ creating an analog layer and predicting the output::
     model = AnalogLinear(3, 2)
     model(Tensor([[0.1, 0.2], [0.3, 0.4]]))
 
+If you encounter any issues during the installation or executing the snippet,
+please refer to the :doc:`advanced_install` for more details and don't
+hesitate on using the `issue tracker`_ for additional support.
+
+Next steps
+----------
+
 You can read more about the Pytorch layers in the :doc:`using_pytorch`
 section, and about the internal analog tiles in the :doc:`using_simulator`
 section.
 
-.. _OpenBLAS: https://www.openblas.net
-.. _CUDA Toolkit: https://developer.nvidia.com/accelerated-computing-toolkit
-
-
 .. [#f1] Note that GPU support is not available in OSX, as it depends on a
    platform that has official CUDA support.
+
+.. _OpenBLAS: https://www.openblas.net
+.. _CUDA Toolkit: https://developer.nvidia.com/accelerated-computing-toolkit
+.. _issue tracker: https://github.com/IBM/aihwkit/issues

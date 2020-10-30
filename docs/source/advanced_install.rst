@@ -31,7 +31,7 @@ Dependency                       Version   Notes
 ===============================  ========  ======
 C++11 compatible compiler
 `cmake`_                         3.18+
-`pybind11`_                      2.6.0+    Version 2.6.0 can be installed using ``pip``(recommended)
+`pybind11`_                      2.6.0+    Version 2.6.0 can be installed using ``pip`` (recommended)
 `scikit-build`_                  0.11.0+
 `Python 3 development headers`_  3.6+
 BLAS implementation                        `OpenBLAS`_ or `Intel MKL`_
