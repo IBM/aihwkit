@@ -391,7 +391,7 @@ void declare_rpu_devices(py::module &m) {
       .value("Constant", RPU::NoiseManagementType::Constant)
       .value("Max", RPU::NoiseManagementType::Max);
 
-  py::enum_<RPU::OutputWeightNoiseType>(m, "OutputWeightNoiseType")
+  py::enum_<RPU::OutputWeightNoiseType>(m, "WeightNoiseType")
       .value("None", RPU::OutputWeightNoiseType::None)
       .value("AdditiveConstant", RPU::OutputWeightNoiseType::AdditiveConstant);
 

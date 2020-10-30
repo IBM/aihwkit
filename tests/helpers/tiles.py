@@ -22,9 +22,9 @@ from aihwkit.simulator.configs.devices import (
     ExpStepDevice,
     SoftBoundsDevice,
     IOParameters,
-    DifferenceUnitCellDevice,
-    VectorUnitCellDevice,
-    TransferCompoundDevice
+    DifferenceUnitCell,
+    VectorUnitCell,
+    TransferCompound
 )
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
@@ -119,7 +119,7 @@ class Vector:
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=VectorUnitCellDevice(
+        return UnitCellRPUConfig(device=VectorUnitCell(
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
@@ -138,7 +138,7 @@ class Difference:
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=DifferenceUnitCellDevice(
+        return UnitCellRPUConfig(device=DifferenceUnitCell(
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
             ]))
@@ -156,7 +156,7 @@ class Transfer:
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=TransferCompoundDevice(
+        return UnitCellRPUConfig(device=TransferCompound(
             unit_cell_devices=[
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
@@ -267,7 +267,7 @@ class VectorCuda:
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=VectorUnitCellDevice(
+        return UnitCellRPUConfig(device=VectorUnitCell(
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
@@ -286,7 +286,7 @@ class DifferenceCuda:
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=DifferenceUnitCellDevice(
+        return UnitCellRPUConfig(device=DifferenceUnitCell(
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
             ]))
@@ -304,7 +304,7 @@ class TransferCuda:
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=TransferCompoundDevice(
+        return UnitCellRPUConfig(device=TransferCompound(
             unit_cell_devices=[
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)

@@ -43,7 +43,10 @@ using namespace RPU;
 template <typename DeviceParT> class RPUDeviceTestFixture : public ::testing::Test {
 public:
   void SetUp() {
-    this->context = new CudaContext();
+
+    this->context_container = make_unique<CudaContext>(-1, false);
+    this->context = &*context_container;
+
     this->x_size = 253;
     this->d_size = 243;
     this->repeats = 100;
@@ -224,9 +227,9 @@ public:
     delete[] rx;
     delete[] rd;
     Array_2D_Free(refweights);
-    delete context;
   }
 
+  std::unique_ptr<CudaContext> context_container;
   CudaContext *context;
 
   std::unique_ptr<RPUPulsed<num_t>> pulsed;

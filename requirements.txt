@@ -1,6 +1,7 @@
 # Build dependencies.
 cmake>=3.18
 scikit-build>=0.11.1
+pybind11>=2.6.0
 # Runtime dependencies.
 torch>=1.5
 numpy>=1.18

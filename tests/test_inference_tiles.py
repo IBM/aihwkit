@@ -17,9 +17,9 @@ from torch import Tensor
 from torch.nn.functional import mse_loss
 
 from aihwkit.nn import AnalogLinear
-from aihwkit.optim.analog_sgd import AnalogSGD
+from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.utils import (
-    OutputWeightNoiseType, WeightClipType, WeightModifierType
+    WeightNoiseType, WeightClipType, WeightModifierType
 )
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
@@ -44,7 +44,7 @@ class InferenceTileTest(ParametrizedTestCase):
         # Define a single-layer network, using a constant step device type.
         rpu_config = self.get_rpu_config()
         rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
-        rpu_config.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
+        rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
         rpu_config.forward.w_noise = 0.02
         rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
 

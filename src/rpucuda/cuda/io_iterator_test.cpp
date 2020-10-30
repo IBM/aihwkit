@@ -27,15 +27,6 @@ namespace {
 
 using namespace RPU;
 
-// void transpose(T * x_trans, T* x, int size, int m_batch) {
-
-//   for (int i=0;i<size;i++) {
-//     for (int j=0;j<m_batch;j++) {
-// 	x_trans[j + i*m_batch] = x[i+j*size];
-//     }
-//   }
-// }
-
 template <typename T> class IteratorTestFixture : public ::testing::Test {
 public:
   void SetUp() {
@@ -72,14 +63,15 @@ public:
       unfolded_vector2[i] = unfolded_vector[i];
     }
 
-    context = make_unique<CudaContext>(-1, false);
-    dev_orig_vector = make_unique<CudaArray<T>>(&*context, orig_matrix_size * N, orig_vector);
-    dev_orig_vector2 = make_unique<CudaArray<T>>(&*context, orig_matrix_size * N, orig_vector2);
+    context_container = make_unique<CudaContext>(-1, false);
+    context = &*context_container;
+    dev_orig_vector = make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector);
+    dev_orig_vector2 = make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector2);
     dev_unfolded_vector =
-        make_unique<CudaArray<T>>(&*context, unfolded_matrix_size * N, unfolded_vector);
+        make_unique<CudaArray<T>>(context, unfolded_matrix_size * N, unfolded_vector);
     dev_unfolded_vector2 =
-        make_unique<CudaArray<T>>(&*context, unfolded_matrix_size * N, unfolded_vector2);
-    dev_index = make_unique<CudaArray<int>>(&*context, unfolded_matrix_size, index);
+        make_unique<CudaArray<T>>(context, unfolded_matrix_size * N, unfolded_vector2);
+    dev_index = make_unique<CudaArray<int>>(context, unfolded_matrix_size, index);
 
     std::vector<int> v(m);
     std::iota(v.begin(), v.end(), 0);
@@ -93,7 +85,7 @@ public:
         batch_indices[s++] = v[j];
       }
     }
-    dev_batch_indices = make_unique<CudaArray<int>>(&*context, N * m, batch_indices);
+    dev_batch_indices = make_unique<CudaArray<int>>(context, N * m, batch_indices);
 
     context->synchronizeDevice();
   };
@@ -107,13 +99,14 @@ public:
     delete[] batch_indices;
   };
 
-  std::shared_ptr<CudaContext> context;
-  std::shared_ptr<CudaArray<T>> dev_orig_vector;
-  std::shared_ptr<CudaArray<T>> dev_orig_vector2;
-  std::shared_ptr<CudaArray<T>> dev_unfolded_vector;
-  std::shared_ptr<CudaArray<T>> dev_unfolded_vector2;
-  std::shared_ptr<CudaArray<int>> dev_index;
-  std::shared_ptr<CudaArray<int>> dev_batch_indices;
+  std::unique_ptr<CudaContext> context_container;
+  CudaContext *context;
+  std::unique_ptr<CudaArray<T>> dev_orig_vector;
+  std::unique_ptr<CudaArray<T>> dev_orig_vector2;
+  std::unique_ptr<CudaArray<T>> dev_unfolded_vector;
+  std::unique_ptr<CudaArray<T>> dev_unfolded_vector2;
+  std::unique_ptr<CudaArray<int>> dev_index;
+  std::unique_ptr<CudaArray<int>> dev_batch_indices;
 
   T *unfolded_vector, *unfolded_vector2;
   T *orig_vector, *orig_vector2;
@@ -131,10 +124,10 @@ typedef ::testing::Types<float> num_types;
 TYPED_TEST_CASE(IteratorTestFixture, num_types);
 
 TYPED_TEST(IteratorTestFixture, copyWithIteratorNoIterator) {
-  CUDA_TIMING_INIT(*this->context);
+  CUDA_TIMING_INIT;
   CUDA_TIMING_START(*this->context);
   math::copyWithIterator(
-      &*this->context, this->dev_unfolded_vector->getData(),
+      this->context, this->dev_unfolded_vector->getData(),
       this->dev_unfolded_vector2->getDataConst(), this->unfolded_matrix_size * this->N);
   CUDA_TIMING_STOP(*this->context, "Copy without iterator");
 
@@ -148,7 +141,7 @@ TYPED_TEST(IteratorTestFixture, copyWithIteratorNoIterator) {
 }
 
 TYPED_TEST(IteratorTestFixture, IndexReaderInputIterator) {
-  CUDA_TIMING_INIT(*this->context);
+  CUDA_TIMING_INIT;
 
   IndexReaderInputIterator<TypeParam> in_iter(
       this->dev_orig_vector->getDataConst(), this->dev_index->getDataConst(),
@@ -158,7 +151,7 @@ TYPED_TEST(IteratorTestFixture, IndexReaderInputIterator) {
 
   CUDA_TIMING_START(*this->context);
   math::copyWithIterator(
-      &*this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
       this->unfolded_matrix_size * this->N);
 
   CUDA_TIMING_STOP(*this->context, "Copy with IndexReaderInputIterator");
@@ -174,7 +167,7 @@ TYPED_TEST(IteratorTestFixture, IndexReaderInputIterator) {
 }
 
 TYPED_TEST(IteratorTestFixture, IndexReaderTransInputIterator) {
-  CUDA_TIMING_INIT(*this->context);
+  CUDA_TIMING_INIT;
 
   RPU::math::permute132(
       this->unfolded_vector2, this->unfolded_vector, this->m, this->size, this->N, false);
@@ -187,7 +180,7 @@ TYPED_TEST(IteratorTestFixture, IndexReaderTransInputIterator) {
 
   CUDA_TIMING_START(*this->context);
   math::copyWithIterator(
-      &*this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
       this->unfolded_matrix_size * this->N);
 
   CUDA_TIMING_STOP(*this->context, "Copy with IndexReaderTransInputIterator");
@@ -203,7 +196,7 @@ TYPED_TEST(IteratorTestFixture, IndexReaderTransInputIterator) {
 }
 
 TYPED_TEST(IteratorTestFixture, PermuterTransInputIterator) {
-  CUDA_TIMING_INIT(*this->context);
+  CUDA_TIMING_INIT;
 
   RPU::math::permute132(
       this->unfolded_vector, this->unfolded_vector2, this->m, this->size, this->N, false);
@@ -215,7 +208,7 @@ TYPED_TEST(IteratorTestFixture, PermuterTransInputIterator) {
 
   CUDA_TIMING_START(*this->context);
   math::copyWithIterator(
-      &*this->context, this->dev_unfolded_vector2->getData(), in_iter,
+      this->context, this->dev_unfolded_vector2->getData(), in_iter,
       this->unfolded_matrix_size * this->N);
 
   CUDA_TIMING_STOP(*this->context, "Copy with PermuterTransInputIterator");
@@ -231,7 +224,7 @@ TYPED_TEST(IteratorTestFixture, PermuterTransInputIterator) {
 }
 
 TYPED_TEST(IteratorTestFixture, PermuterTransOutputIterator) {
-  CUDA_TIMING_INIT(*this->context);
+  CUDA_TIMING_INIT;
 
   // first permute and set to device. PermuterTrans should de-permute it to match the original
   RPU::math::permute132(
@@ -246,7 +239,7 @@ TYPED_TEST(IteratorTestFixture, PermuterTransOutputIterator) {
 
   CUDA_TIMING_START(*this->context);
   math::copyWithIterator(
-      &*this->context, out_iter, this->dev_unfolded_vector->getDataConst(),
+      this->context, out_iter, this->dev_unfolded_vector->getDataConst(),
       this->unfolded_matrix_size * this->N);
 
   CUDA_TIMING_STOP(*this->context, "Copy with PermuterTransOutputIterator");
@@ -262,7 +255,7 @@ TYPED_TEST(IteratorTestFixture, PermuterTransOutputIterator) {
 }
 
 TYPED_TEST(IteratorTestFixture, IndexReaderTransOutputIterator) {
-  CUDA_TIMING_INIT(*this->context);
+  CUDA_TIMING_INIT;
 
   RPU::math::permute132(
       this->unfolded_vector2, this->unfolded_vector, this->m, this->size, this->N, false);
@@ -277,7 +270,7 @@ TYPED_TEST(IteratorTestFixture, IndexReaderTransOutputIterator) {
 
   CUDA_TIMING_START(*this->context);
   math::copyWithIterator(
-      &*this->context, out_iter,
+      this->context, out_iter,
       this->dev_unfolded_vector->getDataConst(), // transposed
       this->unfolded_matrix_size * this->N);
 
@@ -304,7 +297,7 @@ TYPED_TEST(IteratorTestFixture, IndexReaderTransOutputIterator) {
 }
 
 TYPED_TEST(IteratorTestFixture, IndexReaderOutputIterator) {
-  CUDA_TIMING_INIT(*this->context);
+  CUDA_TIMING_INIT;
 
   this->dev_orig_vector2->setConst(0);
   this->context->synchronizeDevice();
@@ -315,7 +308,7 @@ TYPED_TEST(IteratorTestFixture, IndexReaderOutputIterator) {
 
   CUDA_TIMING_START(*this->context);
   math::copyWithIterator(
-      &*this->context, out_iter, this->dev_unfolded_vector->getDataConst(),
+      this->context, out_iter, this->dev_unfolded_vector->getDataConst(),
       this->unfolded_matrix_size * this->N);
 
   CUDA_TIMING_STOP(*this->context, "Copy with IndexReaderOutputIterator");

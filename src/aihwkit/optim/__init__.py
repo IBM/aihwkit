@@ -11,3 +11,7 @@
 # that they have been altered from the originals.
 
 """Analog Optimizers."""
+
+# Convenience imports for easier access to the classes.
+
+from aihwkit.optim.analog_sgd import AnalogSGD

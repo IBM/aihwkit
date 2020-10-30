@@ -17,8 +17,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
+* The unit cell items in `aihwkit.simulator.configs` have been renamed, removing
+  their `Device` suffix, for having a more consistent naming scheme. (\#57)
 * The `Exceptions` raised by the library have been revised, making use in some
   cases of the ones introduced in a new `aihwkit.exceptions` module. (\#49)
+* The `pybind11` version required has been bumped to 2.6.0, which can be
+  installed from `pip` and makes system-wide installation no longer required.
+  Please update your `pybind11` accordingly for compiling the library. (\#44)
 
 ### Removed
 

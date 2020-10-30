@@ -12,6 +12,8 @@
 
 """High level analog tiles."""
 
+# Convenience imports for easier access to the classes.
+
 from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.tiles.floating_point import FloatingPointTile, CudaFloatingPointTile
 from aihwkit.simulator.tiles.analog import AnalogTile, CudaAnalogTile
