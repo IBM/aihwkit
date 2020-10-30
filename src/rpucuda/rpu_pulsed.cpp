@@ -87,11 +87,11 @@ template <typename T> void RPUPulsed<T>::initialize(PulsedMetaParameter<T> *p, i
 
   // forward/backward pass
   // one could even choose the favorate forward/backward here... (based on par)
-  fb_pass_ = make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, this->rng_);
+  fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, this->rng_);
   fb_pass_->setIOPar(p->f_io, p->b_io);
 
   // pulsed update pass
-  pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, this->rng_);
+  pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, this->rng_);
   pwu_->setUpPar(p->up);
 }
 
