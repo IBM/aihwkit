@@ -25,7 +25,7 @@ from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
-    OutputWeightNoiseType, WeightClipType, WeightModifierType)
+    WeightNoiseType, WeightClipType, WeightModifierType)
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.simulator.rpu_base import cuda
 
@@ -36,7 +36,7 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 # Define a single-layer network, using inference/hardware-aware training tile
 rpu_config = InferenceRPUConfig()
 rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
-rpu_config.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
+rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
 rpu_config.forward.w_noise = 0.02  # Short-term w-noise.
 
 rpu_config.clip.type = WeightClipType.FIXED_VALUE

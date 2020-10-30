@@ -31,7 +31,7 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import OutputWeightNoiseType
+from aihwkit.simulator.configs.utils import WeightNoiseType
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
 # Check device
@@ -58,7 +58,7 @@ N_CLASSES = 10
 # the inference/training pass
 RPU_CONFIG = InferenceRPUConfig()
 RPU_CONFIG.forward.out_res = -1.  # Turn off (output) ADC discretization.
-RPU_CONFIG.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
+RPU_CONFIG.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
 RPU_CONFIG.forward.w_noise = 0.02
 RPU_CONFIG.noise_model = PCMLikeNoiseModel(g_max=25.0)
 

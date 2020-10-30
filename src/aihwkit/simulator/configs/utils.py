@@ -62,7 +62,7 @@ class NoiseManagementType(Enum):
     r"""A constant value (given by parameter ``nm_thres``)."""
 
 
-class OutputWeightNoiseType(Enum):
+class WeightNoiseType(Enum):
     r"""Output weight noise type.
 
     The weight noise is applied for each MAC computation, while not
@@ -231,7 +231,7 @@ class IOParameters:
     r"""Scale of output referred weight noise (:math:`\sigma_w`) for a given
     ``w_noise_type``."""
 
-    w_noise_type: OutputWeightNoiseType = OutputWeightNoiseType.NONE
+    w_noise_type: WeightNoiseType = WeightNoiseType.NONE
     """Type as specified in :class:`OutputWeightNoiseType`.
 
     Note:

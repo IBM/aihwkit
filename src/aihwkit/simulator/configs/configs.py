@@ -17,7 +17,7 @@ from typing import ClassVar, Type
 
 from aihwkit.simulator.configs.devices import (
     FloatingPointDevice, ConstantStepDevice, PulsedDevice,
-    UnitCellDevice, IdealDevice
+    UnitCell, IdealDevice
 )
 
 from aihwkit.simulator.configs.utils import (
@@ -85,7 +85,7 @@ class UnitCellRPUConfig:
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
-    device: UnitCellDevice = field(default_factory=UnitCellDevice)
+    device: UnitCell = field(default_factory=UnitCell)
     """Parameters that modify the behavior of the pulsed device."""
 
     forward: IOParameters = field(default_factory=IOParameters)
