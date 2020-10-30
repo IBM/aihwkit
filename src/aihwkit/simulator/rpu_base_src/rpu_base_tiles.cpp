@@ -805,7 +805,7 @@ void declare_rpu_tiles(py::module &m) {
               return torch::empty({0});
             }
             torch::Tensor hidden_parameters =
-                torch::empty({v.size(), self.getDSize(), self.getXSize()});
+                torch::empty({(int)v.size(), self.getDSize(), self.getXSize()});
 
             std::vector<T *> data_ptrs(v.size());
             size_t size = self.getDSize() * self.getXSize();

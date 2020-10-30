@@ -301,11 +301,11 @@ void TransferRPUDevice<T>::populate(
   par.initializeWithSize(this->x_size_, this->d_size_);
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   transfer_fb_pass_ =
-      make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
+      RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
   transfer_fb_pass_->setIOPar(par.transfer_io, par.transfer_io);
   // NOTE: the OUT_SCALE might be different for the transfer!! How to account for that?!?
 
-  transfer_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
+  transfer_pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
   transfer_pwu_->setUpPar(par.transfer_up);
 
   this->reduce_weightening_.resize(this->n_devices_);

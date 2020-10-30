@@ -72,6 +72,29 @@ the minimal dependencies [#f3]_::
     $ conda install cmake openblas pybind11 scikit-build
     $ conda install pytorch -c pytorch
 
+
+Windows (Experimental)
+""""""""""""""""""""""
+
+On a Windows-based system, we recommend to install OpenBLAS following this
+`OpenBLAS - Visual Studio`_ installation and usage guide. It will require to
+install `MS Visual Studio 2019`_ and `Miniconda`_.
+
+After compile and install OpenBLAS, in the same Miniconda terminal, the
+following commands can be used for installing the minimal dependencies::
+
+    $ conda install pybind11 scikit-build
+    $ conda install pytorch -c pytorch
+
+To compile aihwkit, it is recommended to use the x64 Native Tools Command
+Promp for VS 2019.
+
+Note: If you want to use Pip instead Conda, you can use following commands::
+
+    $ pip install cmake scikit-build pybind11
+    $ pip install torch -f https://download.pytorch.org/whl/torch_stable.html
+
+
 Installing and compiling
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -128,3 +151,6 @@ of the command will help diagnosing the issue.
 .. _googletest: https://github.com/google/googletest
 .. _PyTorch: https://pytorch.org
 .. _OpenMP: https://openmp.llvm.org
+.. _OpenBLAS - Visual Studio: https://github.com/xianyi/OpenBLAS/wiki/How-to-use-OpenBLAS-in-Microsoft-Visual-Studio
+.. _MS Visual Studio 2019: https://visualstudio.microsoft.com/vs/
+.. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
