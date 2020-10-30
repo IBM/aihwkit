@@ -17,7 +17,7 @@ from torch import Tensor
 from torch.nn.functional import mse_loss
 
 from aihwkit.nn import AnalogLinear
-from aihwkit.optim.analog_sgd import AnalogSGD
+from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.utils import (
     OutputWeightNoiseType, WeightClipType, WeightModifierType
 )

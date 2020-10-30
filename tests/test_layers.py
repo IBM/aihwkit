@@ -16,7 +16,7 @@ from unittest import SkipTest
 
 from torch import Tensor
 
-from aihwkit.nn.modules.container import AnalogSequential
+from aihwkit.nn import AnalogSequential
 from aihwkit.simulator.tiles import AnalogTile, CudaAnalogTile
 from aihwkit.simulator.rpu_base import cuda
 

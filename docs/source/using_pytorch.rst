@@ -130,7 +130,7 @@ snippet would create an analog-aware stochastic gradient descent optimizer
 with a learning rate of ``0.1``, and set it up for using with the
 analog layers of the model::
 
-    from aihwkit.optim.analog_sgd import AnalogSGD
+    from aihwkit.optim import AnalogSGD
 
     optimizer = AnalogSGD(model.parameters(), lr=0.1)
     optimizer.regroup_param_groups(model)
@@ -157,7 +157,7 @@ in order to perform training::
     from torch.nn.functional import mse_loss
 
     from aihwkit.nn import AnalogLinear
-    from aihwkit.optim.analog_sgd import AnalogSGD
+    from aihwkit.optim import AnalogSGD
 
     x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
     y = Tensor([[1.0, 0.5], [0.7, 0.3]])

@@ -16,7 +16,7 @@ from torch import Tensor, manual_seed
 from torch.nn import Sequential, Linear as torchLinear
 from torch.nn.functional import mse_loss
 
-from aihwkit.optim.analog_sgd import AnalogSGD
+from aihwkit.optim import AnalogSGD
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearCuda

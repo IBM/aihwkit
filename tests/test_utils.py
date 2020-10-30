@@ -19,8 +19,8 @@ from numpy.testing import assert_array_almost_equal, assert_raises
 from torch import Tensor, save, load
 from torch.nn.functional import mse_loss
 
-from aihwkit.nn.modules.conv import AnalogConv2d
-from aihwkit.optim.analog_sgd import AnalogSGD
+from aihwkit.nn import AnalogConv2d
+from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.configs.utils import (
