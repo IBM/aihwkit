@@ -26,7 +26,7 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import UnitCellRPUConfig
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
-    VectorUnitCellDevice,
+    VectorUnitCell,
     LinearStepDevice,
     SoftBoundsDevice)
 from aihwkit.simulator.rpu_base import cuda
@@ -40,7 +40,7 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 rpu_config = UnitCellRPUConfig()
 # 3 arbitrary devices per cross-point.
-rpu_config.device = VectorUnitCellDevice(
+rpu_config.device = VectorUnitCell(
     unit_cell_devices=[
         ConstantStepDevice(),
         LinearStepDevice(w_max_dtod=0.4),

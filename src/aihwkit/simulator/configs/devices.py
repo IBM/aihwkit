@@ -211,7 +211,7 @@ class PulsedDevice:
 
 
 @dataclass
-class UnitCellDevice:
+class UnitCell:
     """Parameters that modify the behaviour of a unit cell."""
 
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
@@ -492,7 +492,7 @@ class ExpStepDevice(PulsedDevice):
 ###############################################################################
 
 @dataclass
-class VectorUnitCellDevice(UnitCellDevice):
+class VectorUnitCell(UnitCell):
     """Abstract resistive device that combines multiple pulsed resistive
     devices in a single 'unit cell'.
 
@@ -523,7 +523,7 @@ class VectorUnitCellDevice(UnitCellDevice):
 
 
 @dataclass
-class DifferenceUnitCellDevice(UnitCellDevice):
+class DifferenceUnitCell(UnitCell):
     """Abstract device model takes an arbitrary device per crosspoint and
     implements an explicit plus-minus device pair.
 
@@ -556,7 +556,7 @@ class DifferenceUnitCellDevice(UnitCellDevice):
 
 
 @dataclass
-class TransferCompoundDevice(UnitCellDevice):
+class TransferCompound(UnitCell):
     r"""Abstract device model that takes 2 or more devices and
     implements a 'transfer' based learning rule.
 

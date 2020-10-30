@@ -217,7 +217,7 @@ inference features, one has to build an model using our
     # specify additional options of the non-idealities in forward to your liking
     rpu_config.forward.inp_res = 1/64.  # 6-bit DAC discretization.
     rpu_config.forward.out_res = 1/256. # 8-bit ADC discretization.
-    rpu_config.forward.w_noise_type = OutputWeightNoiseType.ADDITIVE_CONSTANT
+    rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
     rpu_config.forward.w_noise = 0.02   # Some short-term w-noise.
     rpu_config.forward.out_noise = 0.02 # Some output noise.
 

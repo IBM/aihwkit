@@ -25,7 +25,7 @@ from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import UnitCellRPUConfig
 from aihwkit.simulator.configs.devices import (
-    TransferCompoundDevice,
+    TransferCompound,
     SoftBoundsDevice)
 from aihwkit.simulator.rpu_base import cuda
 
@@ -35,7 +35,7 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 # The Tiki-taka learning rule can be implemented using the transfer device.
 rpu_config = UnitCellRPUConfig(
-    device=TransferCompoundDevice(
+    device=TransferCompound(
 
         # Devices that compose the Tiki-taka compound.
         unit_cell_devices=[

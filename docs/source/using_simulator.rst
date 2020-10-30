@@ -116,8 +116,8 @@ Unit cell devices
 ====================================================================  ========
 Resistive device class                                                Description
 ====================================================================  ========
-:class:`~aihwkit.simulator.configs.devices.VectorUnitCellDevice`      abstract resistive device that combines multiple pulsed resistive devices in a single 'unit cell'.
-:class:`~aihwkit.simulator.configs.devices.DifferenceUnitCellDevice`  abstract device model takes an arbitrary device per crosspoint and implements an explicit plus-minus device pair.
+:class:`~aihwkit.simulator.configs.devices.VectorUnitCell`            abstract resistive device that combines multiple pulsed resistive devices in a single 'unit cell'.
+:class:`~aihwkit.simulator.configs.devices.DifferenceUnitCell`        abstract device model takes an arbitrary device per crosspoint and implements an explicit plus-minus device pair.
 ====================================================================  ========
 
 Compound devices
@@ -126,7 +126,7 @@ Compound devices
 ====================================================================  ========
 Resistive device class                                                Description
 ====================================================================  ========
-:class:`~aihwkit.simulator.configs.devices.TransferCompoundDevice`    abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
+:class:`~aihwkit.simulator.configs.devices.TransferCompound`          abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
 ====================================================================  ========
 
 RPU Configurations
@@ -221,7 +221,7 @@ pulse update behavior, one could do (see also `Example 7`_)::
     from aihwkit.simulator.configs import UnitCellRPUConfig
     from aihwkit.simulator.configs.devices import (
         ConstantStepDevice,
-        VectorUnitCellDevice,
+        VectorUnitCell,
         LinearStepDevice,
         SoftBoundsDevice
     )
@@ -231,7 +231,7 @@ pulse update behavior, one could do (see also `Example 7`_)::
 
     rpu_config = UnitCellRPUConfig()
 
-    rpu_config.device = VectorUnitCellDevice(
+    rpu_config.device = VectorUnitCell(
         unit_cell_devices=[
             ConstantStepDevice(),
             LinearStepDevice(w_max_dtod=0.4),
@@ -283,13 +283,13 @@ use the following tile configuration for that (see also `Example 8`_)::
     # Imports from aihwkit.
     from aihwkit.simulator.configs import UnitCellRPUConfig
     from aihwkit.simulator.configs.devices import (
-        TransferCompoundDevice,
+        TransferCompound,
         SoftBoundsDevice
     )
 
     # The Tiki-taka learning rule can be implemented using the transfer device.
     rpu_config = UnitCellRPUConfig(
-        device=TransferCompoundDevice(
+        device=TransferCompound(
 
             # devices that compose the Tiki-taka compound
             unit_cell_devices=[
