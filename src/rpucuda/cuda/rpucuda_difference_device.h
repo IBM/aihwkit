@@ -46,6 +46,8 @@ public:
     return new DifferenceRPUDeviceCuda<T>(*this);
   };
 
+  void setHiddenUpdateIdx(int idx) override{};
+
   void runUpdateKernel(
       pwukp_t<T> kpars,
       CudaContext *up_context,

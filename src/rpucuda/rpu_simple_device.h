@@ -100,6 +100,9 @@ public:
   virtual void setDeviceParameter(const std::vector<T *> &data_ptrs) = 0;
   virtual int getHiddenWeightsCount() const = 0;
   virtual void setHiddenWeights(const std::vector<T> &data) = 0;
+  virtual int getHiddenUpdateIdx() const { return 0; };
+  virtual void setHiddenUpdateIdx(int idx){};
+
   virtual void printDP(int x_count, int d_count) const = 0;
   void dispMetaParameter() const {
     std::stringstream ss;

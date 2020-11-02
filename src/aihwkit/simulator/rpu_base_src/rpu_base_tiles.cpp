@@ -856,7 +856,26 @@ void declare_rpu_tiles(py::module &m) {
            Args:
                3D tensor: Each 2D slice tensor is of size [d_size, x_size] (in row-major order)
                    corresponding to the parameter name.
-          )pbdoc");
+          )pbdoc")
+      .def(
+          "set_hidden_update_index", &Class::setHiddenUpdateIdx,
+          R"pbdoc(
+           Set the updated device index (in case multiple devices per cross-point).
+
+           Note: 
+              Only used for vector unit cells, so far. Ignored in other cases.
+
+           Args:
+               idx: index of the (unit cell) devices
+           )pbdoc")
+      .def(
+          "get_hidden_update_index", &Class::getHiddenUpdateIdx,
+          R"pbdoc(
+           Get the current device index that is updated (in case multiple devices per cross-point).
+
+           Args:
+               idx: index of the (unit cell) devices, returns 0 in all other cases.
+           )pbdoc");
 
   py::class_<ClassPulsed, Class>(
       m, "AnalogTile",

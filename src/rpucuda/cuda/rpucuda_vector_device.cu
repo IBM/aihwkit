@@ -141,7 +141,7 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 
   // populate vector device
   current_update_idx_ = 0;
-  current_device_idx_ = 0;
+  current_device_idx_ = getPar().first_update_idx;
   n_devices_ = 0;
 
   dw_min_ = rpu_device.getDwMin();
@@ -182,9 +182,6 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
   }
 
   this->context_->synchronizeDevice();
-
-  current_update_idx_ = 0;
-  current_device_idx_ = 0;
 }
 
 template <typename T> void VectorRPUDeviceCuda<T>::reduceToWeights(CudaContext *c, T *dev_weights) {
@@ -254,7 +251,7 @@ pwukpvec_t<T> VectorRPUDeviceCuda<T>::getUpdateKernels(
   pwukpvec_t<T> v =
       rpucuda_device_vec_[0]->getUpdateKernels(m_batch, nK32, use_bo64, out_trans, up);
 
-  if (!getPar().single_device_update) {
+  if (!getPar().singleDeviceUpdate()) {
     // need to adjust the number of requested states for execution on multiple streams
     int m = rpucuda_device_vec_.size();
     for (int i = 0; i < v.size(); i++) {
@@ -283,11 +280,11 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
   int m = rpucuda_device_vec_.size();
   const auto &par = getPar();
 
-  if (par.single_device_update) {
+  if (par.singleDeviceUpdate()) {
     // random states and context are shared, since only one is updated at a time.
-    if (par.single_device_update_random) {
+    if (par.update_policy == VectorDeviceUpdatePolicy::SingleRandom) {
       current_device_idx_ = floor(rw_rng_.sampleUniform() * m);
-    } else {
+    } else if (par.update_policy == VectorDeviceUpdatePolicy::SingleSequential) {
       current_device_idx_ = ++current_device_idx_ % m;
     }
 
@@ -298,6 +295,7 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
         up, dev_states, one_sided, x_counts_chunk, d_counts_chunk);
 
   } else {
+    // VectorDeviceUpdatePolicy::All
 
     if (!par.same_context) {
       up_context->recordEvent();
@@ -326,6 +324,14 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
 
   reduceToWeights(up_context, dev_weights);
   current_update_idx_++;
+}
+
+template <typename T> void VectorRPUDeviceCuda<T>::setHiddenUpdateIdx(int idx) {
+  current_device_idx_ = idx;
+}
+
+template <typename T> int VectorRPUDeviceCuda<T>::getHiddenUpdateIdx() const {
+  return current_device_idx_;
 }
 
 template <typename T> std::vector<T> VectorRPUDeviceCuda<T>::getHiddenWeights() const {

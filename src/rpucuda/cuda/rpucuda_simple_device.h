@@ -32,6 +32,8 @@ public:
   virtual std::vector<T> getHiddenWeights() const = 0;
   virtual void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) = 0;
   virtual AbstractRPUDeviceMetaParameter<T> &getPar() const = 0;
+  virtual int getHiddenUpdateIdx() const { return 0; };
+  virtual void setHiddenUpdateIdx(int idx){};
 
   virtual void populateFrom(const AbstractRPUDevice<T> &rpu_device) = 0;
   virtual DeviceUpdateType implements() const = 0;

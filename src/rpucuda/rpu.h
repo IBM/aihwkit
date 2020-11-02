@@ -291,6 +291,9 @@ public:
   virtual void getDeviceParameter(std::vector<T *> &data_ptrs) const {};
   virtual void setDeviceParameter(const std::vector<T *> &data_ptrs){};
 
+  virtual int getHiddenUpdateIdx() const { return 0; };
+  virtual void setHiddenUpdateIdx(int idx){};
+
   /* Decaying the weights once. Alpha can be a factor additionally
      applied to the current decay rate*/
   virtual void decayWeights(bool bias_no_decay);

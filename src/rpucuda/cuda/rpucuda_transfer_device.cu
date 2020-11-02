@@ -96,7 +96,7 @@ void TransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
 
   const auto &par = getPar();
 
-  if (!par.single_device_update) {
+  if (!par.singleDeviceUpdate()) {
     RPU_FATAL("Multiple device update not supported for Transfer Device");
   }
 

@@ -87,7 +87,8 @@ template <typename T> void RPUPulsed<T>::initialize(PulsedMetaParameter<T> *p, i
 
   // forward/backward pass
   // one could even choose the favorate forward/backward here... (based on par)
-  fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, this->rng_);
+  fb_pass_ =
+      RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, this->rng_);
   fb_pass_->setIOPar(p->f_io, p->b_io);
 
   // pulsed update pass
@@ -346,6 +347,16 @@ template <typename T> void RPUPulsed<T>::setDeviceParameter(const std::vector<T 
   CHECK_RPU_DEVICE_INIT;
   rpu_device_->setDeviceParameter(data_ptrs);
   rpu_device_->onSetWeights(this->getWeightsPtr());
+};
+
+template <typename T> void RPUPulsed<T>::setHiddenUpdateIdx(int idx) {
+  CHECK_RPU_DEVICE_INIT;
+  rpu_device_->setHiddenUpdateIdx(idx);
+};
+
+template <typename T> int RPUPulsed<T>::getHiddenUpdateIdx() const {
+  CHECK_RPU_DEVICE_INIT;
+  return rpu_device_->getHiddenUpdateIdx();
 };
 
 /*********************************************************************************/
