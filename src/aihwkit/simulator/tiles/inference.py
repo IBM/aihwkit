@@ -26,8 +26,9 @@ from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
-    WeightClipType, WeightModifierType, parameters_to_bindings
+    WeightClipType, WeightModifierType
 )
+from aihwkit.simulator.configs.helpers import parameters_to_bindings
 from aihwkit.simulator.rpu_base import tiles, cuda
 
 

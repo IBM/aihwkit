@@ -89,6 +89,11 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
         if self.g_min > self.g_max:
             raise ValueError('g_min should be smaller than g_max')
 
+    def __str__(self) -> str:
+        return '{}(g_max={:1.2f}, g_min={:1.2f})'.format(
+            self.__class__.__name__, self.g_max, self.g_min
+        )
+
     @no_grad()
     def convert_to_conductances(self, weights: Tensor) -> Tuple[List[Tensor], Dict]:
         abs_max = torch_abs(weights).max()
@@ -286,6 +291,12 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         self.t_0 = t_0
         self.t_read = t_read
 
+    def __str__(self) -> str:
+        return ('{}(prog_coeff={}, g_converter={}, g_max={:1.2f}, t_read={}, '
+                't_0={:1.2f})').format(
+                    self.__class__.__name__, self.prog_coeff, self.g_converter,
+                    self.g_max, self.t_read, self.t_0)
+
     @no_grad()
     def apply_programming_noise_to_conductance(self, g_target: Tensor) -> Tensor:
         """Apply programming noise to a target conductance Tensor.
@@ -409,3 +420,6 @@ class GlobalDriftCompensation(BaseDriftCompensation):
         Uses a single all one vector.
         """
         return ones((1, in_size))
+
+    def __str__(self) -> str:
+        return '{}()'.format(self.__class__.__name__)

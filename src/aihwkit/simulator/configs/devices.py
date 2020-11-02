@@ -19,13 +19,16 @@ from typing import ClassVar, List, Type
 
 from aihwkit.simulator.rpu_base import devices
 
+from aihwkit.simulator.configs.helpers import (
+    _PrintableMixin, parameters_to_bindings
+)
 from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters, parameters_to_bindings
+    IOParameters, UpdateParameters
 )
 
 
 @dataclass
-class FloatingPointDevice:
+class FloatingPointDevice(_PrintableMixin):
     """Floating point reference.
 
     Implements ideal devices forward/backward/update behavior.
@@ -45,7 +48,7 @@ class FloatingPointDevice:
 
 
 @dataclass
-class PulsedDevice:
+class PulsedDevice(_PrintableMixin):
     r"""Pulsed update resistive devices.
 
     Device are used as part of an
@@ -211,7 +214,7 @@ class PulsedDevice:
 
 
 @dataclass
-class UnitCell:
+class UnitCell(_PrintableMixin):
     """Parameters that modify the behaviour of a unit cell."""
 
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
@@ -229,7 +232,7 @@ class UnitCell:
 ###############################################################################
 
 @dataclass
-class IdealDevice:
+class IdealDevice(_PrintableMixin):
     """Ideal update behavior (using floating point), but forward/backward
     might be non-ideal.
 
@@ -590,7 +593,8 @@ class TransferCompound(UnitCell):
     Weightening factor g**(n-1) W[0] + g**(n-2) W[1] + .. + g**0 W[n-1]
     """
 
-    gamma_vec: List[float] = field(default_factory=list)
+    gamma_vec: List[float] = field(default_factory=list,
+                                   metadata={'hide_if_empty': True})
     """
     User-defined weightening can be given as a list if weights in
     which case the default weightening scheme with ``gamma`` is not
@@ -616,7 +620,8 @@ class TransferCompound(UnitCell):
     applied to itself) to zero.
     """
 
-    transfer_every_vec: List[float] = field(default_factory=list)
+    transfer_every_vec: List[float] = field(default_factory=list,
+                                            metadata={'hide_if_empty': True})
     """A list of :math:`n` entries, to explicitly set the transfer
     cycles lengths. In this case, the above defaults are ignored.
     """
@@ -655,7 +660,8 @@ class TransferCompound(UnitCell):
       applied internally.
     """
 
-    transfer_lr_vec: List[float] = field(default_factory=list)
+    transfer_lr_vec: List[float] = field(default_factory=list,
+                                         metadata={'hide_if_empty': True})
     """Transfer LR for each individual transfer in the device chain
     can be given.
     """

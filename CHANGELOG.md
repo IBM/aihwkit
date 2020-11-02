@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The `pybind11` version required has been bumped to 2.6.0, which can be
   installed from `pip` and makes system-wide installation no longer required.
   Please update your `pybind11` accordingly for compiling the library. (\#44)
+* Pretty print the `rpu_config` in a readable manner (excluding all the default 
+  settings). (\#60)
 
 ### Removed
 
