@@ -19,11 +19,12 @@ from aihwkit.simulator.configs.devices import (
     FloatingPointDevice, ConstantStepDevice, PulsedDevice,
     UnitCell, IdealDevice
 )
-
+from aihwkit.simulator.configs.helpers import (
+    _PrintableMixin, tile_parameters_to_bindings
+)
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, PulseType,
-    WeightClipParameter, WeightModifierParameter,
-    tile_parameters_to_bindings
+    WeightClipParameter, WeightModifierParameter
 )
 from aihwkit.simulator.rpu_base import devices
 from aihwkit.simulator.noise_models import (
@@ -33,7 +34,7 @@ from aihwkit.simulator.noise_models import (
 
 
 @dataclass
-class FloatingPointRPUConfig:
+class FloatingPointRPUConfig(_PrintableMixin):
     """Configuration for a floating point resistive processing unit."""
 
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
@@ -49,7 +50,7 @@ class FloatingPointRPUConfig:
 
 
 @dataclass
-class SingleRPUConfig:
+class SingleRPUConfig(_PrintableMixin):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
@@ -80,7 +81,7 @@ class SingleRPUConfig:
 
 
 @dataclass
-class UnitCellRPUConfig:
+class UnitCellRPUConfig(_PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
@@ -111,7 +112,7 @@ class UnitCellRPUConfig:
 
 
 @dataclass
-class InferenceRPUConfig:
+class InferenceRPUConfig(_PrintableMixin):
     """Configuration for an analog tile that is used only for inference.
 
     Training is done in *hardware-aware* manner, thus using only the

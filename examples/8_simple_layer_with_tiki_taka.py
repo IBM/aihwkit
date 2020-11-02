@@ -64,8 +64,17 @@ rpu_config.device.transfer_forward = rpu_config.forward
 # SGD update/transfer-update will be done with stochastic pulsing.
 rpu_config.device.transfer_update = rpu_config.update
 
+# print the config (default values are omitted)
+print('\nPretty-print of non-default settings:\n')
+print(rpu_config)
+
+print('\nInfo about all settings:\n')
+print(repr(rpu_config))
+
 model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
+# a more detailed printout of the instantiated
+print('\nInfo about the instantiated C++ tile:\n')
 print(model.analog_tile.tile)
 
 # Move the model and tensors to cuda if it is available.

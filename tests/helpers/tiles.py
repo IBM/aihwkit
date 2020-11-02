@@ -161,7 +161,10 @@ class Transfer:
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ],
-            transfer_forward=IOParameters(is_perfect=True)
+            transfer_forward=IOParameters(is_perfect=True),
+            transfer_every=1,
+            gamma=0.1
+
         ))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
@@ -309,7 +312,9 @@ class TransferCuda:
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ],
-            transfer_forward=IOParameters(is_perfect=True)
+            transfer_forward=IOParameters(is_perfect=True),
+            transfer_every=1,
+            gamma=0.1
         ))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
