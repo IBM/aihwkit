@@ -145,10 +145,9 @@ class _PrintableMixin:
             if value == field.default:
                 # Skip fields with the default value.
                 return True
-            if isinstance(value, list) and len(value) == 0:
-                # For empty lists, skip based on the field metadata.
-                if field.metadata.get('hide_if_empty', False):
-                    return True
+
+            if 'hide_if' in field.metadata and field.metadata.get('hide_if') == value:
+                return True
 
             return False
 

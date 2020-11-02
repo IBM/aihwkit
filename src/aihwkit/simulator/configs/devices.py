@@ -551,7 +551,7 @@ class VectorUnitCell(UnitCell):
     ``VectorUnitCellUpdatePolicy.SINGLE_FIXED``.
     """
 
-    gamma_vec: List[float] = field(default_factory=list, metadata={'hide_if_empty': True})
+    gamma_vec: List[float] = field(default_factory=list, metadata={'hide_if': []})
 
     """ Weighting of the unit cell devices to reduce to final weight.
 
@@ -614,7 +614,8 @@ class ReferenceUnitCell(UnitCell):
     """Device that receives the update.
     """
 
-    gamma_vec: List[float] = field(default_factory=lambda: [1., -1.])
+    gamma_vec: List[float] = field(default_factory=lambda: [1., -1.],
+                                   metadata={'hide_if': [1., -1.]})
     """Weighting of the unit cell devices to reduce to final weight.
 
     Note:
@@ -723,7 +724,7 @@ class TransferCompound(UnitCell):
     """
 
     gamma_vec: List[float] = field(default_factory=list,
-                                   metadata={'hide_if_empty': True})
+                                   metadata={'hide_if': []})
     """
     User-defined weightening can be given as a list if weights in
     which case the default weightening scheme with ``gamma`` is not
@@ -750,7 +751,7 @@ class TransferCompound(UnitCell):
     """
 
     transfer_every_vec: List[float] = field(default_factory=list,
-                                            metadata={'hide_if_empty': True})
+                                            metadata={'hide_if': []})
     """A list of :math:`n` entries, to explicitly set the transfer
     cycles lengths. In this case, the above defaults are ignored.
     """
@@ -790,7 +791,7 @@ class TransferCompound(UnitCell):
     """
 
     transfer_lr_vec: List[float] = field(default_factory=list,
-                                         metadata={'hide_if_empty': True})
+                                         metadata={'hide_if': []})
     """Transfer LR for each individual transfer in the device chain
     can be given.
     """
