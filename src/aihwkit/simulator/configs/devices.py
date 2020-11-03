@@ -546,7 +546,7 @@ class VectorUnitCell(UnitCell):
 
     first_update_idx: int = 0
     """Device that receives the first mini-batch.
-    
+
     Useful only for ``VectorUnitCellUpdatePolicy.SINGLE_FIXED``.
     """
 
@@ -564,12 +564,12 @@ class VectorUnitCell(UnitCell):
         vector_parameters = parameters_to_bindings(self)
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ValueError("Expect a list of devices as unit cell device!")
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         for param in self.unit_cell_devices:
             device_parameters = param.as_bindings()
             if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError("Could not add unit cell device parameter. ")
+                raise ConfigError("Could not add unit cell device parameter")
 
         return vector_parameters
 
@@ -625,7 +625,7 @@ class ReferenceUnitCell(UnitCell):
         vector_parameters = parameters_to_bindings(self)
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ValueError("Expect a list of devices as unit cell device!")
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         if len(self.unit_cell_devices) > 2:
             self.unit_cell_devices = self.unit_cell_devices[:2]
@@ -633,12 +633,12 @@ class ReferenceUnitCell(UnitCell):
             self.unit_cell_devices = [self.unit_cell_devices[0],
                                       deepcopy(self.unit_cell_devices[0])]
         elif len(self.unit_cell_devices) != 2:
-            raise ValueError("ReferenceUnitCell expects two unit_cell_devices!")
+            raise ConfigError("ReferenceUnitCell expects two unit_cell_devices")
 
         for param in self.unit_cell_devices:
             device_parameters = param.as_bindings()
             if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError("Could not add unit cell device parameter. ")
+                raise ConfigError("Could not add unit cell device parameter")
 
         return vector_parameters
 
@@ -668,17 +668,17 @@ class DifferenceUnitCell(UnitCell):
         """Return a representation of this instance as a simulator bindings object."""
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ValueError("Expect a list of devices as unit cell device!")
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         difference_parameters = parameters_to_bindings(self)
         device_parameters = self.unit_cell_devices[0].as_bindings()
 
         # need to be exactly 2 and same parameters
         if not difference_parameters.append_parameter(device_parameters):
-            raise ConfigError("Could not add unit cell device parameter. ")
+            raise ConfigError("Could not add unit cell device parameter")
 
         if not difference_parameters.append_parameter(device_parameters):
-            raise ConfigError("Could not add unit cell device parameter. ")
+            raise ConfigError("Could not add unit cell device parameter")
 
         return difference_parameters
 
@@ -813,7 +813,7 @@ class TransferCompound(UnitCell):
         """Return a representation of this instance as a simulator bindings object."""
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ValueError("Expect a list of devices as unit cell device!")
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         n_devices = len(self.unit_cell_devices)
 
@@ -823,10 +823,10 @@ class TransferCompound(UnitCell):
         param_slow = self.unit_cell_devices[1].as_bindings()
 
         if not transfer_parameters.append_parameter(param_fast):
-            raise ConfigError("Could not add unit cell device parameter. ")
+            raise ConfigError("Could not add unit cell device parameter")
 
         for _ in range(n_devices - 1):
             if not transfer_parameters.append_parameter(param_slow):
-                raise ConfigError("Could not add unit cell device parameter. ")
+                raise ConfigError("Could not add unit cell device parameter")
 
         return transfer_parameters
