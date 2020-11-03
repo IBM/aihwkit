@@ -24,7 +24,8 @@ from aihwkit.simulator.configs.devices import (
     IOParameters,
     DifferenceUnitCell,
     VectorUnitCell,
-    TransferCompound
+    TransferCompound,
+    ReferenceUnitCell
 )
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
@@ -123,6 +124,25 @@ class Vector:
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
+            ]))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
+class Reference:
+    """AnalogTile with ReferenceUnitCell."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound_0'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return UnitCellRPUConfig(device=ReferenceUnitCell(
+            unit_cell_devices=[
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ]))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
@@ -274,6 +294,25 @@ class VectorCuda:
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
+            ]))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class ReferenceCuda:
+    """AnalogTile with ReferenceUnitCell."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound_0'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return UnitCellRPUConfig(device=ReferenceUnitCell(
+            unit_cell_devices=[
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ]))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):

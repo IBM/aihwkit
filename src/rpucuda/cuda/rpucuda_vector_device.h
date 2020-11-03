@@ -47,6 +47,9 @@ public:
 
   // implement abstract functions
   std::vector<T> getHiddenWeights() const override;
+  int getHiddenUpdateIdx() const override;
+  void setHiddenUpdateIdx(int idx) override;
+
   void decayWeights(T *dev_weights, bool bias_no_decay) override;
   void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override;
   void diffuseWeights(T *dev_weights) override;

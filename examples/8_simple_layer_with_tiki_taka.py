@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example 7: simple network with one layer using Tiki-taka learning rule.
+"""aihwkit example 8: simple network with one layer using Tiki-taka learning rule.
 
 Simple network that consist of one analog layer. The network aims to learn
 to sum all the elements from one array.

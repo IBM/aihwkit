@@ -141,6 +141,23 @@ class WeightClipType(Enum):
     matrix) and takes the average as clipping value for all."""
 
 
+class VectorUnitCellUpdatePolicy(Enum):
+    """ Vector unit cell update policy."""
+
+    ALL = 'All'
+    """ All devices updated simultaneously """
+
+    SINGLE_FIXED = 'SingleFixed'
+    """Device index is not changed. Can be set initially and/or updated on
+    the fly."""
+
+    SINGLE_SEQUENTIAL = 'SingleSequential'
+    """Each device one at a time in sequence """
+
+    SINGLE_RANDOM = 'SingleRandom'
+    """A single device is selected by random choice each mini-batch."""
+
+
 # Specialized parameters.
 
 @dataclass

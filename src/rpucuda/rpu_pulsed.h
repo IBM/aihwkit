@@ -77,6 +77,9 @@ public:
   void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
 
+  int getHiddenUpdateIdx() const override;
+  void setHiddenUpdateIdx(int idx) override;
+
   void setLearningRate(T lrate) override;
   void printToStream(std::stringstream &ss) const override;
   void printParametersToStream(std::stringstream &ss) const override;

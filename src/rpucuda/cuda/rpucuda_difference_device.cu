@@ -115,7 +115,7 @@ pwukpvec_t<T> DifferenceRPUDeviceCuda<T>::getUpdateKernels(
   if (this->rpucuda_device_vec_.size() != 2) {
     RPU_FATAL("Expect exactly two devices.");
   }
-  if (getPar().single_device_update) {
+  if (getPar().singleDeviceUpdate()) {
     RPU_FATAL("Single device update not supported for Difference Device");
   }
 

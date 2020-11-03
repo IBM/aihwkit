@@ -21,13 +21,15 @@ namespace RPU {
 
 template <typename T> class VectorRPUDevice;
 
+enum class VectorDeviceUpdatePolicy { All, SingleFixed, SingleSequential, SingleRandom };
+
 template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaParameterBase<T> {
 
   std::vector<std::unique_ptr<PulsedRPUDeviceMetaParameterBase<T>>> vec_par;
   bool same_context = true; // only effects cuda
-  bool single_device_update =
-      false; // only one device will be updated, instead of all [LR is NOT scaled internally]
-  bool single_device_update_random = true; // select device randomly instead of in sequence
+  VectorDeviceUpdatePolicy update_policy = VectorDeviceUpdatePolicy::All;
+  int first_update_idx = 0;
+  std::vector<T> gamma_vec;
 
   VectorRPUDeviceMetaParameter(){};
   explicit VectorRPUDeviceMetaParameter(
@@ -48,8 +50,12 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     swap(a.construction_seed, b.construction_seed);
     swap(a.vec_par, b.vec_par);
     swap(a.same_context, b.same_context);
-    swap(a.single_device_update, b.single_device_update);
+    swap(a.update_policy, b.update_policy);
+    swap(a.gamma_vec, b.gamma_vec);
+    swap(a.first_update_idx, b.first_update_idx);
   }
+
+  inline bool singleDeviceUpdate() const { return update_policy != VectorDeviceUpdatePolicy::All; }
 
   std::string getName() const override {
     std::ostringstream ss;
@@ -87,12 +93,7 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
 
   void printToStream(std::stringstream &ss) const override {
     ss << this->getName();
-    if (single_device_update) {
-      ss << " with single device update";
-      if (single_device_update_random) {
-        ss << " [random select]";
-      }
-    }
+    ss << " [update policy " << (int)update_policy << " (" << first_update_idx << ")]" << std::endl;
     ss << std::endl;
     for (size_t k = 0; k < vec_par.size(); k++) {
       ss << "Device Parameter " << k << ": " << vec_par[k]->getName() << std::endl;
@@ -135,8 +136,10 @@ public:
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
+  int getHiddenUpdateIdx() const override;
+  void setHiddenUpdateIdx(int idx) override;
 
-  void printDP(int x_count, int d_count) const override;
+  void printDP(int x_cunt, int d_count) const override;
   void printToStream(std::stringstream &ss) const override { this->getPar().printToStream(ss); };
   void disp(std::stringstream &ss) const override {
     ss << "Device " << this->getPar().getName() << " [" << this->x_size_ << "," << this->d_size_
@@ -153,7 +156,7 @@ public:
     return rpu_device_vec_;
   };
   inline T ***getWeightVec() const { return weights_vec_; };
-  inline const T *getReduceWeightening() const { return &reduce_weightening_[0]; };
+  inline const T *getReduceWeightening() const { return reduce_weightening_.data(); };
 
   VectorRPUDevice<T> *clone() const override { return new VectorRPUDevice<T>(*this); };
 
