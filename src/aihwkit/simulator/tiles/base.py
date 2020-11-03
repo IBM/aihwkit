@@ -362,7 +362,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
             Depending on the update and learning policy implemented
             in the tile, updated devices might switch internally as
             well.
-
         """
         return self.tile.get_hidden_update_index()
 
@@ -383,7 +382,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
             Depending on the update and learning policy implemented
             in the tile, updated devices might switch internally as
             well.
-
         """
         self.tile.set_hidden_update_index(index)
 

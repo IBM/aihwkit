@@ -24,8 +24,7 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import UnitCellRPUConfig
-from aihwkit.simulator.configs.utils import (
-    VectorUnitCellUpdatePolicy)
+from aihwkit.simulator.configs.utils import VectorUnitCellUpdatePolicy
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
     VectorUnitCell,

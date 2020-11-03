@@ -142,10 +142,10 @@ class WeightClipType(Enum):
 
 
 class VectorUnitCellUpdatePolicy(Enum):
-    """ Vector unit cell update policy."""
+    """Vector unit cell update policy."""
 
     ALL = 'All'
-    """ All devices updated simultaneously """
+    """All devices updated simultaneously."""
 
     SINGLE_FIXED = 'SingleFixed'
     """Device index is not changed. Can be set initially and/or updated on
@@ -213,11 +213,11 @@ class IOParameters(_PrintableMixin):
     `AbsMax`:
 
     .. math::
-       :nowrap:
+        :nowrap:
 
-       \begin{equation*} \alpha=\begin{cases}\max_i|x_i|, &
-       \text{if} \max_i|x_i|<\theta \\ \theta, &
-       \text{otherwise}\end{cases} \end{equation*}
+        \begin{equation*} \alpha=\begin{cases}\max_i|x_i|, &
+        \text{if} \max_i|x_i|<\theta \\ \theta, &
+        \text{otherwise}\end{cases} \end{equation*}
 
     Caution:
         If ``nm_thres`` is set (and type is not ``Constant``), the

@@ -252,10 +252,10 @@ class UnitCell(_PrintableMixin):
         """Return whether device has decay enabled."""
         return any(dev.requires_decay() for dev in self.unit_cell_devices)
 
+
 ###############################################################################
 # Specific devices based on ``pulsed``.
 ###############################################################################
-
 
 @dataclass
 class IdealDevice(_PrintableMixin):
@@ -542,23 +542,21 @@ class VectorUnitCell(UnitCell):
 
     update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.ALL
     """The update policy of which if the devices will be receiving the
-    update of a mini-batch.
-
-    """
+    update of a mini-batch."""
 
     first_update_idx: int = 0
-    """Device that receives the first mini-batch. Useful only for
-    ``VectorUnitCellUpdatePolicy.SINGLE_FIXED``.
+    """Device that receives the first mini-batch.
+    
+    Useful only for ``VectorUnitCellUpdatePolicy.SINGLE_FIXED``.
     """
 
     gamma_vec: List[float] = field(default_factory=list, metadata={'hide_if': []})
 
-    """ Weighting of the unit cell devices to reduce to final weight.
+    """Weighting of the unit cell devices to reduce to final weight.
 
     User-defined weightening can be given as a list if factors. If not
     given, each device index of the unit cell is weighted by equal
-    amounts (:math:`1/n`)
-
+    amounts (:math:`1/n`).
     """
 
     def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
@@ -586,19 +584,19 @@ class ReferenceUnitCell(UnitCell):
     the two.
 
     Note:
-      Exactly 2 devices are used, if more are given the are
-      discarded, if less, the same device will be used twice.
+        Exactly 2 devices are used, if more are given the are
+        discarded, if less, the same device will be used twice.
 
     Note:
-      The reference device weights will all zero on default. To set
-      the reference device with a particular value one can select the
-      device update index::
+        The reference device weights will all zero on default. To set
+        the reference device with a particular value one can select the
+        device update index::
 
-        analog_tile.set_hidden_update_index(1)
-        analog_tile.set_weights(W)
-        analog_tile.set_hidden_update_index(0) # set back to 0 for the following updates
-
+            analog_tile.set_hidden_update_index(1)
+            analog_tile.set_weights(W)
+            analog_tile.set_hidden_update_index(0) # set back to 0 for the following updates
     """
+
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
 
     update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.SINGLE_FIXED
@@ -606,23 +604,20 @@ class ReferenceUnitCell(UnitCell):
     update of a mini-batch.
 
     Caution:
-       Should be kept to SINGLE_FIXED for this device.
-
+        This parameter should be kept to SINGLE_FIXED for this device.
     """
 
     first_update_idx: int = 0
-    """Device that receives the update.
-    """
+    """Device that receives the update."""
 
     gamma_vec: List[float] = field(default_factory=lambda: [1., -1.],
                                    metadata={'hide_if': [1., -1.]})
     """Weighting of the unit cell devices to reduce to final weight.
 
     Note:
-       While user-defined weighting can be given it is suggested to
-       keep it to the default ``[1, -1]`` to implement the reference
-       device subtraction.
-
+        While user-defined weighting can be given it is suggested to
+        keep it to the default ``[1, -1]`` to implement the reference
+        device subtraction.
     """
 
     def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
@@ -663,8 +658,8 @@ class DifferenceUnitCell(UnitCell):
     (however, device-to-device variation is still present).
 
     Caution:
-       Reset needs to be added `manually` by calling the
-       reset_columns method of a tile.
+        Reset needs to be added `manually` by calling the
+        reset_columns method of a tile.
     """
 
     bindings_class: ClassVar[Type] = devices.DifferenceResistiveDeviceParameter
@@ -786,8 +781,8 @@ class TransferCompound(UnitCell):
     learning rate of the SGD.
 
     Note:
-      LR is always a positive number, sign will be correctly
-      applied internally.
+        LR is always a positive number, sign will be correctly
+        applied internally.
     """
 
     transfer_lr_vec: List[float] = field(default_factory=list,
