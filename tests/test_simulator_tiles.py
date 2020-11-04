@@ -11,6 +11,7 @@
 # that they have been altered from the originals.
 
 """Tests for the high level simulator devices functionality."""
+
 from unittest import SkipTest
 
 from torch import Tensor, zeros
@@ -24,11 +25,11 @@ from aihwkit.simulator.configs import UnitCellRPUConfig
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
-    FloatingPoint, Ideal, ConstantStep, LinearStep,
+    FloatingPoint, Ideal, ConstantStep, LinearStep, SoftBounds,
     ExpStep, Vector, Difference, Transfer, Inference,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda, InferenceCuda,
-    Reference, ReferenceCuda
+    SoftBoundsCuda, ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda,
+    InferenceCuda, Reference, ReferenceCuda
 )
 
 
@@ -38,6 +39,7 @@ from .helpers.tiles import (
     ConstantStep,
     LinearStep,
     ExpStep,
+    SoftBounds,
     Vector,
     Difference,
     Transfer,
@@ -48,6 +50,7 @@ from .helpers.tiles import (
     ConstantStepCuda,
     LinearStepCuda,
     ExpStepCuda,
+    SoftBoundsCuda,
     VectorCuda,
     DifferenceCuda,
     TransferCuda,
