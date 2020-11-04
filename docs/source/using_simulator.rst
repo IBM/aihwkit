@@ -118,6 +118,7 @@ Resistive device class                                                Descriptio
 ====================================================================  ========
 :class:`~aihwkit.simulator.configs.devices.VectorUnitCell`            abstract resistive device that combines multiple pulsed resistive devices in a single 'unit cell'.
 :class:`~aihwkit.simulator.configs.devices.DifferenceUnitCell`        abstract device model takes an arbitrary device per crosspoint and implements an explicit plus-minus device pair.
+:class:`~aihwkit.simulator.configs.devices.ReferenceUnitCell`         abstract device model takes two arbitrary device per cross-point and implements an device with reference pair.
 ====================================================================  ========
 
 Compound devices
