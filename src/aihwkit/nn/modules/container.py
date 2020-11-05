@@ -44,7 +44,6 @@ class AnalogSequential(Sequential):
         Args:
             fn: function to be applied.
         """
-        # pylint: disable=invalid-name
         for module in self.modules():
             if isinstance(module, AnalogModuleBase):
                 fn(module)
