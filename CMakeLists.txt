@@ -10,6 +10,7 @@
 
 cmake_minimum_required(VERSION 3.18.0)
 project(aihwkit C CXX)
+set(ignoreMe "${SKBUILD}")
 
 # Project options.
 option(BUILD_TEST "Build C++ test binaries" OFF)
