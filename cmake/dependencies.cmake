@@ -85,7 +85,7 @@ include_directories(${PYTHON_INCLUDE_DIRS})  # order matters (before pybind)
 execute_process(COMMAND python -c "import pybind11; print(pybind11.get_cmake_dir())"
     OUTPUT_VARIABLE CUSTOM_PYTHON_PYBIND11_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
-    OUTPUT_QUIET ERROR_QUIET)
+    ERROR_QUIET)
 set (pybind11_DIR ${CUSTOM_PYTHON_PYBIND11_PATH})
 
 find_package(pybind11 CONFIG REQUIRED)
