@@ -38,7 +38,7 @@ template <typename Tio> class RPUCudaExpstepStateTestFixture : public ::testing:
 public:
   void SetUp() {
 
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
 
     x_size = 100;
@@ -99,7 +99,7 @@ public:
 
     num_t lr = 0.01;
 
-    layer_pulsed = make_unique<RPUPulsed<num_t>>(x_size, d_size);
+    layer_pulsed = RPU::make_unique<RPUPulsed<num_t>>(x_size, d_size);
     layer_pulsed->populateParameter(&p, &dp);
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
@@ -107,7 +107,7 @@ public:
     layer_pulsed->disp();
 
     // culayer
-    culayer_pulsed = make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
+    culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -123,19 +123,19 @@ public:
       rd[j] = urnd();
     }
 
-    x_cuvec = make_unique<CudaArray<num_t>>(context, x_size);
+    x_cuvec = RPU::make_unique<CudaArray<num_t>>(context, x_size);
     x_vec.resize(x_size);
     x_vec2.resize(x_size);
 
-    d_cuvec = make_unique<CudaArray<num_t>>(context, d_size);
+    d_cuvec = RPU::make_unique<CudaArray<num_t>>(context, d_size);
     d_vec.resize(d_size);
     d_vec2.resize(d_size);
 
-    x_cuvec_batch = make_unique<CudaArray<num_t>>(context, m_batch * x_size);
+    x_cuvec_batch = RPU::make_unique<CudaArray<num_t>>(context, m_batch * x_size);
     x_vec_batch.resize(m_batch * x_size);
     x_vec2_batch.resize(m_batch * x_size);
 
-    d_cuvec_batch = make_unique<CudaArray<num_t>>(context, m_batch * d_size);
+    d_cuvec_batch = RPU::make_unique<CudaArray<num_t>>(context, m_batch * d_size);
     d_vec_batch.resize(m_batch * d_size);
     d_vec2_batch.resize(m_batch * d_size);
   }

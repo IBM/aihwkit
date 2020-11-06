@@ -43,7 +43,7 @@ WeightClipperCuda<T>::WeightClipperCuda(CudaContext *context, int x_size, int d_
 
   cub::DeviceReduce::Sum(
       nullptr, temp_storage_bytes_, std_input, tmp, size_, context_->getStream());
-  dev_temp_storage_ = make_unique<CudaArray<char>>(context, temp_storage_bytes_);
+  dev_temp_storage_ = RPU::make_unique<CudaArray<char>>(context, temp_storage_bytes_);
 }
 
 template <typename T>
@@ -62,8 +62,8 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
   case WeightClipType::AverageChannelMax: {
 
     if (!row_amaximizer_) {
-      row_amaximizer_ = make_unique<Maximizer<T>>(context_, x_size_, true);
-      dev_sum_value_ = make_unique<CudaArray<T>>(context_, 1);
+      row_amaximizer_ = RPU::make_unique<Maximizer<T>>(context_, x_size_, true);
+      dev_sum_value_ = RPU::make_unique<CudaArray<T>>(context_, 1);
     }
     row_amaximizer_->compute(weights, d_size_, true);
 
@@ -79,10 +79,10 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
   case WeightClipType::LayerGaussian: {
 
     if (!dev_sum_value_) {
-      dev_sum_value_ = make_unique<CudaArray<T>>(context_, 1);
+      dev_sum_value_ = RPU::make_unique<CudaArray<T>>(context_, 1);
     }
     if (!dev_std_value_) {
-      dev_std_value_ = make_unique<CudaArray<T>>(context_, 1);
+      dev_std_value_ = RPU::make_unique<CudaArray<T>>(context_, 1);
     }
 
     StdFunctor<T> std_functor((T)size_, dev_sum_value_->getData());

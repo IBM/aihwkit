@@ -42,20 +42,20 @@ template <typename T> void RPUCudaPulsed<T>::initialize() {
   dev_batch_buffer_d_size_ = std::make_shared<CudaArray<T>>(c, d_size);
 
   // forward arrays
-  f_iom_ = make_unique<InputOutputManager<T>>(c, x_size, d_size);
-  dev_f_x_vector_inc1_ = make_unique<CudaArray<T>>(c, x_size);
-  dev_f_d_vector_inc1_ = make_unique<CudaArray<T>>(c, d_size);
+  f_iom_ = RPU::make_unique<InputOutputManager<T>>(c, x_size, d_size);
+  dev_f_x_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, x_size);
+  dev_f_d_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, d_size);
 
   // backward arrays
-  b_iom_ = make_unique<InputOutputManager<T>>(c, d_size, x_size);
-  dev_b_x_vector_inc1_ = make_unique<CudaArray<T>>(c, x_size);
-  dev_b_d_vector_inc1_ = make_unique<CudaArray<T>>(c, d_size);
+  b_iom_ = RPU::make_unique<InputOutputManager<T>>(c, d_size, x_size);
+  dev_b_x_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, x_size);
+  dev_b_d_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, d_size);
 
   // update arrays
-  up_pwu_ = make_unique<PulsedWeightUpdater<T>>(c, x_size, d_size);
+  up_pwu_ = RPU::make_unique<PulsedWeightUpdater<T>>(c, x_size, d_size);
 
-  dev_up_x_vector_inc1_ = make_unique<CudaArray<T>>(c, x_size);
-  dev_up_d_vector_inc1_ = make_unique<CudaArray<T>>(c, d_size);
+  dev_up_x_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, x_size);
+  dev_up_d_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, d_size);
 
   this->context_->synchronize();
 

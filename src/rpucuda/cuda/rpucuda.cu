@@ -29,16 +29,16 @@ namespace RPU {
 template <typename T> void RPUCudaSimple<T>::initialize(CudaContext *c) {
 
   context_ = c;
-  dev_weights_ = make_unique<CudaArray<T>>(c, this->x_size_ * this->d_size_);
+  dev_weights_ = RPU::make_unique<CudaArray<T>>(c, this->x_size_ * this->d_size_);
   dev_weights_buffer_ = nullptr;
   dev_fb_weights_ = nullptr;
   dev_delta_weights_extern_ = nullptr;
 
-  dev_x_vector_bias_ = make_unique<CudaArray<T>>(c, this->x_size_);
+  dev_x_vector_bias_ = RPU::make_unique<CudaArray<T>>(c, this->x_size_);
   dev_x_vector_bias_->setConst(1.0);
 
-  dev_d_vector_ = make_unique<CudaArray<T>>(c, this->d_size_);
-  dev_x_vector_ = make_unique<CudaArray<T>>(c, this->x_size_);
+  dev_d_vector_ = RPU::make_unique<CudaArray<T>>(c, this->d_size_);
+  dev_x_vector_ = RPU::make_unique<CudaArray<T>>(c, this->x_size_);
 
   dev_x_matrix_bias_ = nullptr;
   dev_x_matrix_bias_size_ = 0;
@@ -60,7 +60,7 @@ RPUCudaSimple<T>::RPUCudaSimple(CudaContext *c, int x_size, int d_size)
 template <typename T>
 RPUCudaSimple<T>::RPUCudaSimple(cudaStream_t s, int x_size, int d_size)
     : RPUSimple<T>(x_size, d_size) {
-  shared_context_ = make_unique<CudaContext>(s);
+  shared_context_ = RPU::make_unique<CudaContext>(s);
 
   this->initialize(&*shared_context_);
 
@@ -86,7 +86,7 @@ template <typename T>
 RPUCudaSimple<T>::RPUCudaSimple(cudaStream_t s, RPUSimple<T> &o) : RPUSimple<T>(o) {
 
   // we are using the copy constructor of the base class RPUSimple
-  shared_context_ = make_unique<CudaContext>(s);
+  shared_context_ = RPU::make_unique<CudaContext>(s);
   this->initialize(&*shared_context_);
   initFrom(o);
 
@@ -115,7 +115,7 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
     dev_weights_buffer_->assign(*other.dev_weights_buffer_);
   }
   if (other.dev_fb_weights_) {
-    dev_fb_weights_ = make_unique<CudaArray<T>>(context_, this->x_size_ * this->d_size_);
+    dev_fb_weights_ = RPU::make_unique<CudaArray<T>>(context_, this->x_size_ * this->d_size_);
     dev_fb_weights_->assign(*other.dev_fb_weights_);
   }
 
@@ -130,7 +130,7 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
 
   if (other.fb_wmodifier_cuda_) {
     // no copy... just new.. No parameters involved anyway
-    fb_wmodifier_cuda_ = make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
+    fb_wmodifier_cuda_ = RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
   }
 
   dev_x_vector_->assign(*other.dev_x_vector_);
@@ -266,7 +266,7 @@ template <typename T> void RPUCudaSimple<T>::printToStream(std::stringstream &ss
 
 template <typename T> T *RPUCudaSimple<T>::getWeightsBufferCuda() {
   if (dev_weights_buffer_ == nullptr) {
-    dev_weights_buffer_ = make_unique<CudaArray<T>>(this->context_, this->x_size_ * this->d_size_);
+    dev_weights_buffer_ = RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * this->d_size_);
   }
   return dev_weights_buffer_->getData();
 };
@@ -290,7 +290,7 @@ template <typename T> T *RPUCudaSimple<T>::getMatrixBiasBuffer(int m_batch) {
     dev_x_matrix_bias_ = nullptr;
     dev_x_matrix_bias_size_ = m_batch;
     dev_x_matrix_bias_ =
-        make_unique<CudaArray<T>>(this->context_, this->x_size_ * dev_x_matrix_bias_size_);
+        RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * dev_x_matrix_bias_size_);
   }
   return dev_x_matrix_bias_->getData();
 }
@@ -338,7 +338,7 @@ void RPUCudaSimple<T>::getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, 
 
   int n = (x_size + d_size) * dim3 * m_batch;
   if ((dev_temp_tensor_ == nullptr) || (dev_temp_tensor_->getSize() < n)) {
-    dev_temp_tensor_ = make_unique<CudaArray<T>>(context_, n);
+    dev_temp_tensor_ = RPU::make_unique<CudaArray<T>>(context_, n);
   }
   *x_tensor = dev_temp_tensor_->getData();
   *d_tensor = *x_tensor + (x_size)*dim3 * m_batch;
@@ -517,8 +517,8 @@ template <typename T> void RPUCudaSimple<T>::diffuseWeights() {
 
   if (rnd_diffusion_context_ == nullptr) {
     // first time: init
-    rnd_diffusion_context_ = make_unique<CudaContext>(context_->getGPUId());
-    dev_diffusion_nrnd_ = make_unique<CudaArray<float>>(
+    rnd_diffusion_context_ = RPU::make_unique<CudaContext>(context_->getGPUId());
+    dev_diffusion_nrnd_ = RPU::make_unique<CudaArray<float>>(
         &*rnd_diffusion_context_, (dev_weights_->getSize() + 31) / 32 * 32);
 
     rnd_diffusion_context_->setRandomSeed(0);
@@ -543,7 +543,7 @@ template <typename T> void RPUCudaSimple<T>::clipWeights(const WeightClipParamet
 
   if (!wclipper_cuda_) {
     wclipper_cuda_ =
-        make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+        RPU::make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
   }
 
   wclipper_cuda_->apply(dev_weights_->getData(), wclpar);
@@ -568,8 +568,8 @@ template <typename T> void RPUCudaSimple<T>::modifyFBWeights(const WeightModifie
   ENFORCE_NO_DELAYED_UPDATE; // will get confused with the buffer
 
   if (dev_fb_weights_ == nullptr) {
-    dev_fb_weights_ = make_unique<CudaArray<T>>(context_, this->x_size_ * this->d_size_);
-    fb_wmodifier_cuda_ = make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
+    dev_fb_weights_ = RPU::make_unique<CudaArray<T>>(context_, this->x_size_ * this->d_size_);
+    fb_wmodifier_cuda_ = RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
     context_->synchronize();
   }
 

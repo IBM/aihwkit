@@ -63,15 +63,15 @@ public:
       unfolded_vector2[i] = unfolded_vector[i];
     }
 
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
-    dev_orig_vector = make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector);
-    dev_orig_vector2 = make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector2);
+    dev_orig_vector = RPU::make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector);
+    dev_orig_vector2 = RPU::make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector2);
     dev_unfolded_vector =
-        make_unique<CudaArray<T>>(context, unfolded_matrix_size * N, unfolded_vector);
+        RPU::make_unique<CudaArray<T>>(context, unfolded_matrix_size * N, unfolded_vector);
     dev_unfolded_vector2 =
-        make_unique<CudaArray<T>>(context, unfolded_matrix_size * N, unfolded_vector2);
-    dev_index = make_unique<CudaArray<int>>(context, unfolded_matrix_size, index);
+        RPU::make_unique<CudaArray<T>>(context, unfolded_matrix_size * N, unfolded_vector2);
+    dev_index = RPU::make_unique<CudaArray<int>>(context, unfolded_matrix_size, index);
 
     std::vector<int> v(m);
     std::iota(v.begin(), v.end(), 0);
@@ -85,7 +85,7 @@ public:
         batch_indices[s++] = v[j];
       }
     }
-    dev_batch_indices = make_unique<CudaArray<int>>(context, N * m, batch_indices);
+    dev_batch_indices = RPU::make_unique<CudaArray<int>>(context, N * m, batch_indices);
 
     context->synchronizeDevice();
   };

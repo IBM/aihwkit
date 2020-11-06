@@ -35,7 +35,7 @@ template <typename T> class RPUCudaSimpleTestFixture : public ::testing::Test {
 public:
   void SetUp() {
 
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
 
     is_test = true;
@@ -60,7 +60,7 @@ public:
     layer_simple->setLearningRate(1);
     layer_simple->setWeightsUniformRandom(bmin, bmax);
 
-    culayer_simple = make_unique<RPUCudaSimple<T>>(context, *layer_simple);
+    culayer_simple = RPU::make_unique<RPUCudaSimple<T>>(context, *layer_simple);
 
     // generate random numbers
     auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -74,11 +74,11 @@ public:
     for (int j = 0; j < d_size; j++)
       rd[j] = urnd();
 
-    x_cuvec = make_unique<CudaArray<T>>(context, x_size);
+    x_cuvec = RPU::make_unique<CudaArray<T>>(context, x_size);
     x_vec.resize(x_size);
     x_vec2.resize(x_size);
 
-    d_cuvec = make_unique<CudaArray<T>>(context, d_size);
+    d_cuvec = RPU::make_unique<CudaArray<T>>(context, d_size);
     d_vec.resize(d_size);
     d_vec2.resize(d_size);
   }
@@ -126,7 +126,7 @@ public:
     layer_simple->setLearningRate(1);
     layer_simple->setWeightsUniformRandom(bmin, bmax);
 
-    culayer_simple = make_unique<RPUCudaSimple<num_t>>(context, *layer_simple);
+    culayer_simple = RPU::make_unique<RPUCudaSimple<num_t>>(context, *layer_simple);
 
     // generate random numbers
     auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -140,11 +140,11 @@ public:
     for (int j = 0; j < d_size * m_batch; j++)
       rd[j] = urnd();
 
-    x_cuvec = make_unique<CudaArray<num_t>>(context, x_size * m_batch);
+    x_cuvec = RPU::make_unique<CudaArray<num_t>>(context, x_size * m_batch);
     x_vec.resize(x_size * m_batch);
     x_vec2.resize(x_size * m_batch);
 
-    d_cuvec = make_unique<CudaArray<num_t>>(context, d_size * m_batch);
+    d_cuvec = RPU::make_unique<CudaArray<num_t>>(context, d_size * m_batch);
     d_vec.resize(d_size * m_batch);
     d_vec2.resize(d_size * m_batch);
   }
@@ -403,7 +403,7 @@ TEST_P(RPUCudaSimpleTestFixtureBatch, UpdateMatrixBatchDelayed) {
       std::unique_ptr<RPUSimple<num_t>>(p.createRPUArray(this->x_size, this->d_size));
   this->layer_simple->setLearningRate(1);
   this->layer_simple->setWeightsUniformRandom(-0.5, 0.5);
-  this->culayer_simple = make_unique<RPUCudaSimple<num_t>>(this->context, *this->layer_simple);
+  this->culayer_simple = RPU::make_unique<RPUCudaSimple<num_t>>(this->context, *this->layer_simple);
 
   ASSERT_TRUE(this->culayer_simple->isDelayedUpdate());
   ASSERT_TRUE(this->layer_simple->isDelayedUpdate());

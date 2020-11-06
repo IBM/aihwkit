@@ -25,8 +25,8 @@ namespace RPU {
 */
 
 template <typename T> void TransferRPUDeviceCuda<T>::initialize() {
-  transfer_pwu_ = make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
-  transfer_iom_ = make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
+  transfer_pwu_ = RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
+  transfer_iom_ = RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
 }
 
 template <typename T>
@@ -42,7 +42,7 @@ TransferRPUDeviceCuda<T>::TransferRPUDeviceCuda(const TransferRPUDeviceCuda<T> &
     : VectorRPUDeviceCuda<T>(other) {
 
   if (other.transfer_vecs_ != nullptr) {
-    transfer_vecs_ = make_unique<CudaArray<T>>(*other.transfer_vecs_);
+    transfer_vecs_ = RPU::make_unique<CudaArray<T>>(*other.transfer_vecs_);
   }
 
   initialize();
@@ -114,7 +114,7 @@ void TransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
     }
   }
 
-  transfer_vecs_ = make_unique<CudaArray<T>>(
+  transfer_vecs_ = RPU::make_unique<CudaArray<T>>(
       this->context_, this->x_size_ * this->x_size_, rpu_device.getTransferVecs());
 
   initialize(); // pwu/iom
@@ -144,7 +144,7 @@ void TransferRPUDeviceCuda<T>::forwardUpdate(
   }
 
   if ((transfer_tmp_ == nullptr) || transfer_tmp_->getSize() < n_vec * this->d_size_) {
-    transfer_tmp_ = make_unique<CudaArray<T>>(this->context_, this->d_size_ * n_vec);
+    transfer_tmp_ = RPU::make_unique<CudaArray<T>>(this->context_, this->d_size_ * n_vec);
   }
 
   // forward with transfer vectors

@@ -43,7 +43,7 @@ template <typename DeviceParT> class RPUDeviceTestFixture : public ::testing::Te
 public:
   void SetUp() {
 
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
 
     this->x_size = 53;
@@ -102,7 +102,7 @@ public:
 
     num_t lr = 0.05;
 
-    layer_pulsed = make_unique<RPUPulsed<num_t>>(x_size, d_size);
+    layer_pulsed = RPU::make_unique<RPUPulsed<num_t>>(x_size, d_size);
 
     layer_pulsed->populateParameter(&p, &dp);
     layer_pulsed->setLearningRate(lr);
@@ -112,7 +112,7 @@ public:
     this->layer_pulsed->getWeights(refweights[0]);
 
     // culayer
-    culayer_pulsed = make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
+    culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -128,10 +128,10 @@ public:
       rd[j] = urnd();
     }
 
-    x_cuvec = make_unique<CudaArray<num_t>>(this->context, this->x_size);
+    x_cuvec = RPU::make_unique<CudaArray<num_t>>(this->context, this->x_size);
     x_vec.resize(this->x_size);
 
-    d_cuvec = make_unique<CudaArray<num_t>>(this->context, this->d_size);
+    d_cuvec = RPU::make_unique<CudaArray<num_t>>(this->context, this->d_size);
     d_vec.resize(this->d_size);
     this->context->synchronizeDevice();
   };
