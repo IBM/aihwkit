@@ -34,10 +34,10 @@ template <typename T>
 NoiseManager<T>::NoiseManager(CudaContext *c, int size)
     : size_(size), context_(c), const_set_if_(false) {
   // initialize for m_batch=1
-  dev_scale_values_ = make_unique<CudaArray<float>>(context_, 1);
+  dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);
 
-  amaximizer_ = make_unique<Maximizer<T>>(context_, size, true);
-  maximizer_ = make_unique<Maximizer<T>>(context_, size, false);
+  amaximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, true);
+  maximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, false);
 
   context_->synchronize();
 }
@@ -61,7 +61,7 @@ void NoiseManager<T>::compute(
   }
   case NoiseManagementType::Constant: {
     if (m_batch > dev_scale_values_->getSize()) {
-      dev_scale_values_ = make_unique<CudaArray<float>>(context_, m_batch);
+      dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
       const_set_if_ = false;
     }
     if (!const_set_if_) {

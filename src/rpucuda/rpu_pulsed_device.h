@@ -35,8 +35,8 @@ template <typename T> struct PulsedRPUDeviceMetaParameterBase : SimpleRPUDeviceM
   PulsedRPUDeviceMetaParameterBase() {}
 
   std::string getName() const override { return "PulsedRPUDeviceParameterBase"; };
-  PulsedRPUDeviceBase<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override = 0;
-  PulsedRPUDeviceMetaParameterBase<T> *clone() const override = 0;
+  PulsedRPUDeviceBase<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {RPU_FATAL("Needs implementation");};
+  PulsedRPUDeviceMetaParameterBase<T> *clone() const override {RPU_FATAL("Needs implementation");};
   DeviceUpdateType implements() const override { return DeviceUpdateType::Undefined; };
 };
 
@@ -76,8 +76,8 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   void printToStream(std::stringstream &ss) const override;
   using SimpleMetaParameter<T>::print;
   std::string getName() const override { return "PulsedRPUDeviceParameter"; };
-  PulsedRPUDevice<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override = 0;
-  PulsedRPUDeviceMetaParameter<T> *clone() const override = 0;
+  PulsedRPUDevice<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {RPU_FATAL("Needs implementation");};
+  PulsedRPUDeviceMetaParameter<T> *clone() const override {RPU_FATAL("Needs implementation");};
   DeviceUpdateType implements() const override { return DeviceUpdateType::Undefined; };
 };
 
@@ -104,11 +104,11 @@ public:
   }
 
   bool isPulsedDevice() const override { return true; };
-  PulsedRPUDeviceBase<T> *clone() const override = 0;
+  PulsedRPUDeviceBase<T> *clone() const override {RPU_FATAL("Needs implementation");};
 
   virtual T getDwMin() const = 0;
   void resetCols(
-      T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override = 0;
+      T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override {RPU_FATAL("Needs implementation");};
   virtual void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
     RPU_FATAL("Sparse update not available for this device!");

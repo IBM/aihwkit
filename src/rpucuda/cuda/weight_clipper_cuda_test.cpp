@@ -24,7 +24,7 @@ class WeightClipperTestFixture : public ::testing::TestWithParam<bool> {
 public:
   void SetUp() {
 
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
 
     x_size = 100;
@@ -39,15 +39,15 @@ public:
     std::normal_distribution<num_t> ndist{0.0, 1.0};
     auto nrnd = std::bind(ndist, generator);
 
-    wclipper = make_unique<WeightClipper<num_t>>(x_size, d_size);
-    wclipper_cuda = make_unique<WeightClipperCuda<num_t>>(context, x_size, d_size);
+    wclipper = RPU::make_unique<WeightClipper<num_t>>(x_size, d_size);
+    wclipper_cuda = RPU::make_unique<WeightClipperCuda<num_t>>(context, x_size, d_size);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < size; i++) {
       w[i] = nrnd();
     }
 
-    dev_w = make_unique<CudaArray<num_t>>(context, size, w);
+    dev_w = RPU::make_unique<CudaArray<num_t>>(context, size, w);
     dev_w->assignTranspose(w, d_size, x_size);
     context->synchronize();
   }

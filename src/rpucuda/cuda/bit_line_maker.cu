@@ -1204,22 +1204,22 @@ template <typename T> void BitLineMaker<T>::initializeBLBuffers(int m_batch, int
   format_ = getFormat(use_bo64);
 
   if (format_ == BLMOutputFormat::FP) {
-    dev_d_ = make_unique<CudaArray<T>>(context_, d_size_ * m_batch);
-    dev_x_ = make_unique<CudaArray<T>>(context_, x_size_ * m_batch);
+    dev_d_ = RPU::make_unique<CudaArray<T>>(context_, d_size_ * m_batch);
+    dev_x_ = RPU::make_unique<CudaArray<T>>(context_, x_size_ * m_batch);
 
   } else {
     int nK32 = BL / 32 + 1; // equivalent to ((BL+1) + 31)/32
     if (format_ == BLMOutputFormat::UI32 || format_ == BLMOutputFormat::UI32BO64) {
-      dev_d_counts_ = make_unique<CudaArray<uint32_t>>(context_, d_size_ * (nK32)*m_batch);
-      dev_x_counts_ = make_unique<CudaArray<uint32_t>>(context_, x_size_ * (nK32)*m_batch);
+      dev_d_counts_ = RPU::make_unique<CudaArray<uint32_t>>(context_, d_size_ * (nK32)*m_batch);
+      dev_x_counts_ = RPU::make_unique<CudaArray<uint32_t>>(context_, x_size_ * (nK32)*m_batch);
     }
 
     if (format_ == BLMOutputFormat::BO64 || format_ == BLMOutputFormat::UI32BO64) {
       if (nK32 > 1) {
         RPU_FATAL("BL>31 is not supported for BO64");
       }
-      dev_d_counts_bo64_ = make_unique<CudaArray<uint64_t>>(context_, d_size_ * m_batch);
-      dev_x_counts_bo64_ = make_unique<CudaArray<uint64_t>>(context_, x_size_ * m_batch);
+      dev_d_counts_bo64_ = RPU::make_unique<CudaArray<uint64_t>>(context_, d_size_ * m_batch);
+      dev_x_counts_bo64_ = RPU::make_unique<CudaArray<uint64_t>>(context_, x_size_ * m_batch);
     }
   }
   context_->synchronize();
@@ -1293,7 +1293,7 @@ void BitLineMaker<T>::makeCounts(
 
   if (um_if || use_bo64 > 0) {
     if (umh_ == nullptr) {
-      umh_ = make_unique<UpdateManagementHelper<T>>(context_, x_size_, d_size_);
+      umh_ = RPU::make_unique<UpdateManagementHelper<T>>(context_, x_size_, d_size_);
     }
     if (um_if) {
       umh_->computeKandScaleValues(

@@ -93,9 +93,9 @@ public:
     d_size = 490;
     m_batch = 100;
 
-    context_container = make_unique<CudaContext>(-1, false); // blocking for timings
+    context_container = RPU::make_unique<CudaContext>(-1, false); // blocking for timings
     context = &*context_container;
-    iom = make_unique<InputOutputManager<num_t>>(context, x_size, d_size);
+    iom = RPU::make_unique<InputOutputManager<num_t>>(context, x_size, d_size);
 
     num_t bound = 0.8;
     num_t res = 0.01;
@@ -147,13 +147,13 @@ public:
     transpose(rd_trans, rd, d_size, m_batch);
     transpose(rx_trans, rx, x_size, m_batch);
 
-    curx = make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx);
-    curd = make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd);
+    curx = RPU::make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx);
+    curd = RPU::make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd);
 
-    curx_trans = make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx_trans);
-    curd_trans = make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd_trans);
+    curx_trans = RPU::make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx_trans);
+    curd_trans = RPU::make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd_trans);
 
-    dev_W = make_unique<CudaArray<num_t>>(context, d_size * x_size, W);
+    dev_W = RPU::make_unique<CudaArray<num_t>>(context, d_size * x_size, W);
   }
 
   void TearDown() {

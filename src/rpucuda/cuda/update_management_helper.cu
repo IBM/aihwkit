@@ -480,24 +480,24 @@ template <typename T>
 UpdateManagementHelper<T>::UpdateManagementHelper(CudaContext *c, int x_size, int d_size)
     : context_{c}, x_size_{x_size}, d_size_{d_size}, buffer_m_batch_{0} {
   nthreads_ = RPU_THREADS_PER_BLOCK_UPDATE;
-  x_maximizer_ = make_unique<Maximizer<T>>(c, x_size_);
-  d_maximizer_ = make_unique<Maximizer<T>>(c, d_size_);
-  dev_Kn_ = make_unique<CudaArray<kagg_t>>(c, 1);
+  x_maximizer_ = RPU::make_unique<Maximizer<T>>(c, x_size_);
+  d_maximizer_ = RPU::make_unique<Maximizer<T>>(c, d_size_);
+  dev_Kn_ = RPU::make_unique<CudaArray<kagg_t>>(c, 1);
 }
 
 template <typename T> void UpdateManagementHelper<T>::initializeBuffers(int m_batch) {
 
   buffer_m_batch_ = m_batch;
-  dev_K_values_ = make_unique<CudaArray<int>>(context_, m_batch);
-  dev_Kc_values_ = make_unique<CudaArray<kagg_t>>(context_, m_batch);
-  dev_scale_values_ = make_unique<CudaArray<T>>(context_, m_batch);
+  dev_K_values_ = RPU::make_unique<CudaArray<int>>(context_, m_batch);
+  dev_Kc_values_ = RPU::make_unique<CudaArray<kagg_t>>(context_, m_batch);
+  dev_scale_values_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
 
   // for translate
   const int nthreads = RPU_UMH_B64_NTHREADS;
   int nblocks = context_->getNBlocks(m_batch, nthreads);
 
-  dev_Kc_block_ = make_unique<CudaArray<kagg_t>>(context_, m_batch);
-  dev_Kc_block_aggregate_ = make_unique<CudaArray<kagg_t>>(context_, nblocks);
+  dev_Kc_block_ = RPU::make_unique<CudaArray<kagg_t>>(context_, m_batch);
+  dev_Kc_block_aggregate_ = RPU::make_unique<CudaArray<kagg_t>>(context_, nblocks);
 
   // Determine temporary device storage requirements
   void *temp_storage = NULL;
@@ -506,14 +506,14 @@ template <typename T> void UpdateManagementHelper<T>::initializeBuffers(int m_ba
       temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kn_->getData(), m_batch,
       context_->getStream()));
   context_->synchronize();
-  dev_Kn_temp_storage_ = make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
+  dev_Kn_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
   context_->synchronize();
 
   CUDA_CALL(cub::DeviceScan::ExclusiveSum(
       temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kc_values_->getData(),
       m_batch, context_->getStream()));
   context_->synchronize();
-  dev_Kc_temp_storage_ = make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
+  dev_Kc_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
   context_->synchronize();
 }
 

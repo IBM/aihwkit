@@ -35,7 +35,7 @@ class RPUDeviceCudaTestFixture : public ::testing::TestWithParam<float> {
 public:
   void SetUp() {
 
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
 
     x_size = 2;
@@ -87,12 +87,12 @@ public:
 
     rng = new RNG<num_t>(0);
 
-    up_pwu = make_unique<PulsedWeightUpdater<num_t>>(context, x_size, d_size);
+    up_pwu = RPU::make_unique<PulsedWeightUpdater<num_t>>(context, x_size, d_size);
 
     rpu_device = this->dp->createDeviceUnique(x_size, d_size, &rw_rng);
     rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(context, *rpu_device);
 
-    dev_weights = make_unique<CudaArray<num_t>>(context, x_size * d_size);
+    dev_weights = RPU::make_unique<CudaArray<num_t>>(context, x_size * d_size);
     dev_weights->assignTranspose(weights[0], d_size, x_size);
     context->synchronize();
   };
@@ -137,7 +137,7 @@ TEST_P(RPUDeviceCudaTestFixture, onSetWeights) {
   for (int i = 0; i < this->x_size * this->d_size; i++) {
     this->weights[0][i] = w_ref[0][i];
   }
-  dev_weights = make_unique<CudaArray<num_t>>(context, x_size * d_size);
+  dev_weights = RPU::make_unique<CudaArray<num_t>>(context, x_size * d_size);
   dev_weights->assignTranspose(weights[0], d_size, x_size);
   context->synchronize();
 

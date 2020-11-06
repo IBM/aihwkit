@@ -687,7 +687,7 @@ template void elemconst<double>(const CudaContext *, double *, const int, const 
 template void
 elemconst<unsigned int>(const CudaContext *, unsigned int *, const int, const unsigned int);
 template void
-elemconst<unsigned long>(const CudaContext *, unsigned long *, const int, const unsigned long);
+elemconst<uint64_t>(const CudaContext *, uint64_t *, const int, const uint64_t);
 template void elemconst<int>(const CudaContext *, int *, const int, const int);
 template void elemconst<char>(const CudaContext *, char *, const int, const char);
 

@@ -101,7 +101,7 @@ public:
 
     T lr = 0.01;
 
-    layer_pulsed = make_unique<RPUPulsed<T>>(x_size, d_size);
+    layer_pulsed = RPU::make_unique<RPUPulsed<T>>(x_size, d_size);
     layer_pulsed->populateParameter(&p, &dp);
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
@@ -110,10 +110,10 @@ public:
     layer_pulsed->disp();
 
     // copy-construct on GPU
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
 
-    culayer_pulsed = make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
+    culayer_pulsed = RPU::make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
     x1.resize(x_size * m_batch);
@@ -148,23 +148,23 @@ public:
     }
     transpose(w_other_trans, w_other, x_size, d_size);
 
-    x_cuvec = make_unique<CudaArray<T>>(context, x_size);
+    x_cuvec = RPU::make_unique<CudaArray<T>>(context, x_size);
     x_vec.resize(x_size);
     x_vec2.resize(x_size);
 
-    d_cuvec = make_unique<CudaArray<T>>(context, d_size);
+    d_cuvec = RPU::make_unique<CudaArray<T>>(context, d_size);
     d_vec.resize(d_size);
     d_vec2.resize(d_size);
 
-    x_cuvec_batch = make_unique<CudaArray<T>>(context, m_batch * x_size);
+    x_cuvec_batch = RPU::make_unique<CudaArray<T>>(context, m_batch * x_size);
     x_vec_batch.resize(m_batch * x_size);
     x_vec2_batch.resize(m_batch * x_size);
 
-    d_cuvec_batch = make_unique<CudaArray<T>>(context, m_batch * d_size);
+    d_cuvec_batch = RPU::make_unique<CudaArray<T>>(context, m_batch * d_size);
     d_vec_batch.resize(m_batch * d_size);
     d_vec2_batch.resize(m_batch * d_size);
 
-    w_cuother = make_unique<CudaArray<T>>(context, x_size * d_size);
+    w_cuother = RPU::make_unique<CudaArray<T>>(context, x_size * d_size);
     w_cuother->assignTranspose(w_other, d_size, x_size);
   }
 
@@ -211,7 +211,7 @@ public:
 
     is_test = false;
 
-    context_container = make_unique<CudaContext>(-1, false);
+    context_container = RPU::make_unique<CudaContext>(-1, false);
     context = &*context_container;
 
     x_size = 41;
@@ -271,10 +271,10 @@ public:
     rd.resize(d_size * m_batch);
 
     T lr = 0.01;
-    layer = make_unique<RPUSimple<T>>(x_size, d_size);
+    layer = RPU::make_unique<RPUSimple<T>>(x_size, d_size);
     layer->setLearningRate(lr);
 
-    layer_pulsed = make_unique<RPUPulsed<T>>(x_size, d_size);
+    layer_pulsed = RPU::make_unique<RPUPulsed<T>>(x_size, d_size);
     layer_pulsed->populateParameter(&p, &dp);
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
@@ -283,7 +283,7 @@ public:
     layer_pulsed->disp();
 
     // culayer
-    culayer_pulsed = make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
+    culayer_pulsed = RPU::make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -299,19 +299,19 @@ public:
       rd[j] = urnd();
     }
 
-    x_cuvec = make_unique<CudaArray<T>>(context, x_size);
+    x_cuvec = RPU::make_unique<CudaArray<T>>(context, x_size);
     x_vec.resize(x_size);
     x_vec2.resize(x_size);
 
-    d_cuvec = make_unique<CudaArray<T>>(context, d_size);
+    d_cuvec = RPU::make_unique<CudaArray<T>>(context, d_size);
     d_vec.resize(d_size);
     d_vec2.resize(d_size);
 
-    x_cuvec_batch = make_unique<CudaArray<T>>(context, m_batch * x_size);
+    x_cuvec_batch = RPU::make_unique<CudaArray<T>>(context, m_batch * x_size);
     x_vec_batch.resize(m_batch * x_size);
     x_vec2_batch.resize(m_batch * x_size);
 
-    d_cuvec_batch = make_unique<CudaArray<T>>(context, m_batch * d_size);
+    d_cuvec_batch = RPU::make_unique<CudaArray<T>>(context, m_batch * d_size);
     d_vec_batch.resize(m_batch * d_size);
     d_vec2_batch.resize(m_batch * d_size);
 
