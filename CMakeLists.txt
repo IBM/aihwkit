@@ -70,7 +70,6 @@ endif()
 set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 11
                                          POSITION_INDEPENDENT_CODE ON)
 
-
 if (USE_CUDA)
   add_subdirectory(src/rpucuda/cuda)
   include_directories(SYSTEM src/rpucuda/cuda)
