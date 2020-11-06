@@ -76,7 +76,7 @@ if (USE_CUDA)
 
   target_link_libraries(RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
   if(WIN32)
-    target_link_libraries(RPU_GPU c10.lib torch_cuda.lib)
+    target_link_libraries(RPU_GPU c10_cuda.lib torch_cuda.lib)
   endif(WIN32)
 
   set_target_properties(RPU_GPU PROPERTIES ${CUDA_TARGET_PROPERTIES})

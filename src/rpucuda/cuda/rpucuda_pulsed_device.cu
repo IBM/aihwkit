@@ -31,10 +31,10 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(CudaContext *c, int x_size, int d_si
 
 template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
 
-  dev_4params_ = make_unique<CudaArray<float>>(this->context_, 4 * this->size_);
-  dev_diffusion_rate_ = make_unique<CudaArray<T>>(this->context_, this->size_);
-  dev_reset_bias_ = make_unique<CudaArray<T>>(this->context_, this->size_);
-  dev_decay_scale_ = make_unique<CudaArray<T>>(this->context_, this->size_);
+  dev_4params_ = RPU::make_unique<CudaArray<float>>(this->context_, 4 * this->size_);
+  dev_diffusion_rate_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
+  dev_reset_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
+  dev_decay_scale_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
 
   this->context_->synchronize();
 };

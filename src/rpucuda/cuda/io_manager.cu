@@ -829,10 +829,10 @@ __global__ void kernelOutputBoundManagementBatchSelected(
 template <typename T>
 InputOutputManager<T>::InputOutputManager(CudaContext *c, int in_size, int out_size)
     : context_(c), in_size_(in_size), out_size_(out_size) {
-  noise_manager_ = make_unique<NoiseManager<T>>(context_, in_size_);
+  noise_manager_ = RPU::make_unique<NoiseManager<T>>(context_, in_size_);
 
-  dev_any_exceeded_ = make_unique<CudaArray<int>>(context_, 1);
-  dev_selected_m_batch_ = make_unique<CudaArray<int>>(context_, 1);
+  dev_any_exceeded_ = RPU::make_unique<CudaArray<int>>(context_, 1);
+  dev_selected_m_batch_ = RPU::make_unique<CudaArray<int>>(context_, 1);
 
   CUDA_CALL(cudaMallocHost((void **)&h_exceeded_, sizeof(int)));
 
@@ -884,10 +884,10 @@ template <typename T> void InputOutputManager<T>::initializeBatchBuffer(int m_ba
       dev_output_applied_ = std::make_shared<CudaArray<T>>(context_, m_batch * out_size_);
     }
 
-    dev_scale_values_ = make_unique<CudaArray<float>>(context_, m_batch);
-    dev_bound_exceeded_ = make_unique<CudaArray<int>>(context_, m_batch);
+    dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
+    dev_bound_exceeded_ = RPU::make_unique<CudaArray<int>>(context_, m_batch);
 
-    dev_selected_bidx_ = make_unique<CudaArray<int>>(context_, m_batch);
+    dev_selected_bidx_ = RPU::make_unique<CudaArray<int>>(context_, m_batch);
 
     nblocks_om_batch_ =
         MIN(nblocks_batch_max_, this->context_->getNBlocks(out_size_ * m_batch, nthreads_));
@@ -901,7 +901,7 @@ template <typename T> void InputOutputManager<T>::initializeBatchBuffer(int m_ba
         dev_selected_bidx_->getData(), dev_selected_m_batch_->getData(), m_batch,
         context_->getStream());
 
-    dev_flagged_temp_storage_ = make_unique<CudaArray<char>>(context_, (byte_size + 31) / 32 * 32);
+    dev_flagged_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (byte_size + 31) / 32 * 32);
   }
 }
 
@@ -1185,8 +1185,8 @@ template <typename T> void InputOutputManager<T>::applyOutputWeightNoise(const b
 
     if (!dev_wnoise_buffer_ || dev_wnoise_buffer_->getSize() < m_batch) {
       // on the fly init when wnoise is requested to save a little memory
-      dev_wnoise_buffer_ = make_unique<CudaArray<T>>(context_, m_batch);
-      dev_wnoise_ones_ = make_unique<CudaArray<T>>(context_, in_size_);
+      dev_wnoise_buffer_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
+      dev_wnoise_ones_ = RPU::make_unique<CudaArray<T>>(context_, in_size_);
       dev_wnoise_ones_->setConst((T)1.0);
     }
 

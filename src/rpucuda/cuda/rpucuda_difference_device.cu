@@ -38,7 +38,7 @@ DifferenceRPUDeviceCuda<T>::DifferenceRPUDeviceCuda(const DifferenceRPUDeviceCud
   g_minus_ = other.g_minus_;
   dev_reduce_weightening_inverted_ = nullptr;
   if (other.dev_reduce_weightening_inverted_ != nullptr) {
-    dev_reduce_weightening_inverted_ = make_unique<CudaArray<T>>(this->context_, 2);
+    dev_reduce_weightening_inverted_ = RPU::make_unique<CudaArray<T>>(this->context_, 2);
     dev_reduce_weightening_inverted_->assign(*other.dev_reduce_weightening_inverted_);
     dev_reduce_weightening_inverted_->synchronize();
   }
@@ -89,7 +89,7 @@ void DifferenceRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_de
   rw_inv[1] = rw[0];
 
   this->dev_reduce_weightening_->assign(rw);
-  dev_reduce_weightening_inverted_ = make_unique<CudaArray<T>>(this->context_, 2, &rw_inv[0]);
+  dev_reduce_weightening_inverted_ = RPU::make_unique<CudaArray<T>>(this->context_, 2, &rw_inv[0]);
 
   this->context_->synchronize();
 }

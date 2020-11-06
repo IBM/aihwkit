@@ -44,7 +44,7 @@ template <typename DeviceParT> class RPUDeviceTestFixture : public ::testing::Te
 public:
   void SetUp() {
 
-    this->context_container = make_unique<CudaContext>(-1, false);
+    this->context_container = RPU::make_unique<CudaContext>(-1, false);
     this->context = &*context_container;
 
     this->x_size = 253;
@@ -91,8 +91,8 @@ public:
     num_t lr = 0.01;
 
     // cpu
-    simple = make_unique<RPUSimple<num_t>>(x_size, d_size);
-    pulsed = make_unique<RPUPulsed<num_t>>(x_size, d_size);
+    simple = RPU::make_unique<RPUSimple<num_t>>(x_size, d_size);
+    pulsed = RPU::make_unique<RPUPulsed<num_t>>(x_size, d_size);
 
     pulsed->populateParameter(&p, &dp);
     pulsed->setLearningRate(lr);
@@ -106,11 +106,11 @@ public:
     simple->setWeights(refweights[0]);
 
     // cuda
-    pulsed_cuda = make_unique<RPUCudaPulsed<num_t>>(context, *pulsed);
+    pulsed_cuda = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *pulsed);
     pulsed_cuda->setLearningRate(lr);
     pulsed_cuda->disp();
 
-    simple_cuda = make_unique<RPUCudaSimple<num_t>>(context, x_size, d_size);
+    simple_cuda = RPU::make_unique<RPUCudaSimple<num_t>>(context, x_size, d_size);
     simple_cuda->populateParameter(&sp);
     simple_cuda->setWeights(refweights[0]);
     simple_cuda->setLearningRate(lr);
@@ -128,8 +128,8 @@ public:
       rd[j] = urnd();
     }
 
-    rx_cuda = make_unique<CudaArray<num_t>>(context, x_size, rx);
-    rd_cuda = make_unique<CudaArray<num_t>>(context, d_size, rd);
+    rx_cuda = RPU::make_unique<CudaArray<num_t>>(context, x_size, rx);
+    rd_cuda = RPU::make_unique<CudaArray<num_t>>(context, d_size, rd);
 
     context->synchronizeDevice();
   };
