@@ -40,8 +40,16 @@ include(cmake/dependencies_cuda.cmake)
 include(cmake/dependencies_test.cmake)
 
 # Set compilation flags.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-narrowing -Wno-strict-overflow")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ftree-vectorize")
+if(WIN32)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2")
+  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+else()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-narrowing -Wno-strict-overflow")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ftree-vectorize")
+endif()
+
+
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 if (APPLE)
   string(APPEND CMAKE_CXX_FLAGS " -fvisibility=hidden")
@@ -52,20 +60,29 @@ add_subdirectory(src/rpucuda)
 include_directories(SYSTEM src/rpucuda)
 
 add_library(RPU_CPU ${RPU_CPU_SRCS})
+
 target_link_libraries(RPU_CPU ${RPU_DEPENDENCY_LIBS})
+if(WIN32)
+  target_link_libraries(RPU_CPU c10.lib torch_cpu.lib)
+endif()
+
 set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 11
                                          POSITION_INDEPENDENT_CODE ON)
 
 if (USE_CUDA)
   add_subdirectory(src/rpucuda/cuda)
   include_directories(SYSTEM src/rpucuda/cuda)
-
   add_library(RPU_GPU ${RPU_GPU_SRCS})
+
   target_link_libraries(RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
+  if(WIN32)
+    target_link_libraries(RPU_GPU c10.lib torch_cuda.lib)
+  endif(WIN32)
+
   set_target_properties(RPU_GPU PROPERTIES ${CUDA_TARGET_PROPERTIES})
   set_property(TARGET RPU_GPU PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
   add_dependencies(RPU_GPU cub)
-endif()
+endif(USE_CUDA)
 
 # Add aihwkit targets.
 add_subdirectory(src/aihwkit/simulator)

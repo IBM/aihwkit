@@ -1,3 +1,4 @@
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -15,6 +16,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [UNRELEASED]
 
+### Added
+
+* The `rpu_config` is now pretty-printed in a readable manner (excluding the
+  default settings and other readability tweak). (\#60)
+* Added a new `ReferenceUnitCell` which has two devices, where one is fixed and
+  the other updated and the effective weight is computed a difference between
+  the two. (\#61)
+* `VectorUnitCell` accepts now arbitrary weighting schemes that can be
+  user-defined by using a new `gamma_vec` property that specifies how to combine
+  the unit cell devices to form the effective weight. (\#61)
+
 ### Changed
 
 * The unit cell items in `aihwkit.simulator.configs` have been renamed, removing
@@ -24,13 +36,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The `pybind11` version required has been bumped to 2.6.0, which can be
   installed from `pip` and makes system-wide installation no longer required.
   Please update your `pybind11` accordingly for compiling the library. (\#44)
+* Some `VectorUnitCell` properties have been renamed and extended with an update
+  policy specifying how to select the hidden devices. (\#61)
 
 ### Removed
 
 * The `BackwardIOParameters` specialization has been removed, as bound
   management is now automatically ignored for the backward pass. Please use the
   more general `IOParameters` instead. (\#45)
-
 
 ## [0.2.0] - 2020/10/20
 

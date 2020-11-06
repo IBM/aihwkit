@@ -16,16 +16,21 @@
 
 from dataclasses import dataclass, field
 from typing import ClassVar, List, Type
+from copy import deepcopy
 
+from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.rpu_base import devices
 
+from aihwkit.simulator.configs.helpers import (
+    _PrintableMixin, parameters_to_bindings
+)
 from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters, parameters_to_bindings
+    IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
 )
 
 
 @dataclass
-class FloatingPointDevice:
+class FloatingPointDevice(_PrintableMixin):
     """Floating point reference.
 
     Implements ideal devices forward/backward/update behavior.
@@ -43,9 +48,17 @@ class FloatingPointDevice:
         """Return a representation of this instance as a simulator bindings object."""
         return parameters_to_bindings(self)
 
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.lifetime > 0.0
+
 
 @dataclass
-class PulsedDevice:
+class PulsedDevice(_PrintableMixin):
     r"""Pulsed update resistive devices.
 
     Device are used as part of an
@@ -209,9 +222,17 @@ class PulsedDevice:
         """Return a representation of this instance as a simulator bindings object."""
         return parameters_to_bindings(self)
 
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.lifetime > 0.0
+
 
 @dataclass
-class UnitCell:
+class UnitCell(_PrintableMixin):
     """Parameters that modify the behaviour of a unit cell."""
 
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
@@ -223,13 +244,21 @@ class UnitCell:
         """Return a representation of this instance as a simulator bindings object."""
         raise NotImplementedError
 
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return any(dev.requires_diffusion() for dev in self.unit_cell_devices)
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return any(dev.requires_decay() for dev in self.unit_cell_devices)
+
 
 ###############################################################################
 # Specific devices based on ``pulsed``.
 ###############################################################################
 
 @dataclass
-class IdealDevice:
+class IdealDevice(_PrintableMixin):
     """Ideal update behavior (using floating point), but forward/backward
     might be non-ideal.
 
@@ -252,6 +281,14 @@ class IdealDevice:
     def as_bindings(self) -> devices.IdealResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return parameters_to_bindings(self)
+
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.diffusion > 0.0
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.lifetime > 0.0
 
 
 @dataclass
@@ -503,21 +540,105 @@ class VectorUnitCell(UnitCell):
 
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
 
-    single_device_update: bool = False
-    """Whether to only cycle one device during
-    pulsed update or pulse all devices of one crosspoint at once.
+    update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.ALL
+    """The update policy of which if the devices will be receiving the
+    update of a mini-batch."""
+
+    first_update_idx: int = 0
+    """Device that receives the first mini-batch.
+
+    Useful only for ``VectorUnitCellUpdatePolicy.SINGLE_FIXED``.
     """
 
-    single_device_update_random: bool = False
-    """Whether to select at random (in case of ``single_device_update``)"""
+    gamma_vec: List[float] = field(default_factory=list, metadata={'hide_if': []})
+
+    """Weighting of the unit cell devices to reduce to final weight.
+
+    User-defined weightening can be given as a list if factors. If not
+    given, each device index of the unit cell is weighted by equal
+    amounts (:math:`1/n`).
+    """
 
     def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
         vector_parameters = parameters_to_bindings(self)
 
+        if not isinstance(self.unit_cell_devices, list):
+            raise ConfigError("unit_cell_devices should be a list of devices")
+
         for param in self.unit_cell_devices:
-            device_parameters = parameters_to_bindings(param)
-            vector_parameters.append_parameter(device_parameters)
+            device_parameters = param.as_bindings()
+            if not vector_parameters.append_parameter(device_parameters):
+                raise ConfigError("Could not add unit cell device parameter")
+
+        return vector_parameters
+
+
+@dataclass
+class ReferenceUnitCell(UnitCell):
+    """Abstract device model takes two arbitrary device per cross-point and
+    implements an device with reference pair.
+
+    The update will only be on the 0-th device whereas the other will
+    stay fixed. The resulting effective weight is the difference of
+    the two.
+
+    Note:
+        Exactly 2 devices are used, if more are given the are
+        discarded, if less, the same device will be used twice.
+
+    Note:
+        The reference device weights will all zero on default. To set
+        the reference device with a particular value one can select the
+        device update index::
+
+            analog_tile.set_hidden_update_index(1)
+            analog_tile.set_weights(W)
+            analog_tile.set_hidden_update_index(0) # set back to 0 for the following updates
+    """
+
+    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
+
+    update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.SINGLE_FIXED
+    """The update policy of which if the devices will be receiving the
+    update of a mini-batch.
+
+    Caution:
+        This parameter should be kept to SINGLE_FIXED for this device.
+    """
+
+    first_update_idx: int = 0
+    """Device that receives the update."""
+
+    gamma_vec: List[float] = field(default_factory=lambda: [1., -1.],
+                                   metadata={'hide_if': [1., -1.]})
+    """Weighting of the unit cell devices to reduce to final weight.
+
+    Note:
+        While user-defined weighting can be given it is suggested to
+        keep it to the default ``[1, -1]`` to implement the reference
+        device subtraction.
+    """
+
+    def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+        vector_parameters = parameters_to_bindings(self)
+
+        if not isinstance(self.unit_cell_devices, list):
+            raise ConfigError("unit_cell_devices should be a list of devices")
+
+        if len(self.unit_cell_devices) > 2:
+            self.unit_cell_devices = self.unit_cell_devices[:2]
+        elif len(self.unit_cell_devices) == 1:
+            self.unit_cell_devices = [self.unit_cell_devices[0],
+                                      deepcopy(self.unit_cell_devices[0])]
+        elif len(self.unit_cell_devices) != 2:
+            raise ConfigError("ReferenceUnitCell expects two unit_cell_devices")
+
+        for param in self.unit_cell_devices:
+            device_parameters = param.as_bindings()
+            if not vector_parameters.append_parameter(device_parameters):
+                raise ConfigError("Could not add unit cell device parameter")
 
         return vector_parameters
 
@@ -537,20 +658,27 @@ class DifferenceUnitCell(UnitCell):
     (however, device-to-device variation is still present).
 
     Caution:
-       Reset needs to be added `manually` by calling the
-       reset_columns method of a tile.
+        Reset needs to be added `manually` by calling the
+        reset_columns method of a tile.
     """
 
     bindings_class: ClassVar[Type] = devices.DifferenceResistiveDeviceParameter
 
     def as_bindings(self) -> devices.DifferenceResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
+
+        if not isinstance(self.unit_cell_devices, list):
+            raise ConfigError("unit_cell_devices should be a list of devices")
+
         difference_parameters = parameters_to_bindings(self)
-        device_parameters = parameters_to_bindings(self.unit_cell_devices[0])
+        device_parameters = self.unit_cell_devices[0].as_bindings()
 
         # need to be exactly 2 and same parameters
-        difference_parameters.append_parameter(device_parameters)
-        difference_parameters.append_parameter(device_parameters)
+        if not difference_parameters.append_parameter(device_parameters):
+            raise ConfigError("Could not add unit cell device parameter")
+
+        if not difference_parameters.append_parameter(device_parameters):
+            raise ConfigError("Could not add unit cell device parameter")
 
         return difference_parameters
 
@@ -590,7 +718,8 @@ class TransferCompound(UnitCell):
     Weightening factor g**(n-1) W[0] + g**(n-2) W[1] + .. + g**0 W[n-1]
     """
 
-    gamma_vec: List[float] = field(default_factory=list)
+    gamma_vec: List[float] = field(default_factory=list,
+                                   metadata={'hide_if': []})
     """
     User-defined weightening can be given as a list if weights in
     which case the default weightening scheme with ``gamma`` is not
@@ -616,7 +745,8 @@ class TransferCompound(UnitCell):
     applied to itself) to zero.
     """
 
-    transfer_every_vec: List[float] = field(default_factory=list)
+    transfer_every_vec: List[float] = field(default_factory=list,
+                                            metadata={'hide_if': []})
     """A list of :math:`n` entries, to explicitly set the transfer
     cycles lengths. In this case, the above defaults are ignored.
     """
@@ -651,11 +781,12 @@ class TransferCompound(UnitCell):
     learning rate of the SGD.
 
     Note:
-      LR is always a positive number, sign will be correctly
-      applied internally.
+        LR is always a positive number, sign will be correctly
+        applied internally.
     """
 
-    transfer_lr_vec: List[float] = field(default_factory=list)
+    transfer_lr_vec: List[float] = field(default_factory=list,
+                                         metadata={'hide_if': []})
     """Transfer LR for each individual transfer in the device chain
     can be given.
     """
@@ -680,16 +811,22 @@ class TransferCompound(UnitCell):
 
     def as_bindings(self) -> devices.TransferResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
+
+        if not isinstance(self.unit_cell_devices, list):
+            raise ConfigError("unit_cell_devices should be a list of devices")
+
         n_devices = len(self.unit_cell_devices)
 
         transfer_parameters = parameters_to_bindings(self)
 
-        param_fast = parameters_to_bindings(self.unit_cell_devices[0])
-        param_slow = parameters_to_bindings(self.unit_cell_devices[1])
+        param_fast = self.unit_cell_devices[0].as_bindings()
+        param_slow = self.unit_cell_devices[1].as_bindings()
 
-        transfer_parameters.append_parameter(param_fast)
+        if not transfer_parameters.append_parameter(param_fast):
+            raise ConfigError("Could not add unit cell device parameter")
 
         for _ in range(n_devices - 1):
-            transfer_parameters.append_parameter(param_slow)
+            if not transfer_parameters.append_parameter(param_slow):
+                raise ConfigError("Could not add unit cell device parameter")
 
         return transfer_parameters

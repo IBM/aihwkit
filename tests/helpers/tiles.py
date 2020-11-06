@@ -24,7 +24,8 @@ from aihwkit.simulator.configs.devices import (
     IOParameters,
     DifferenceUnitCell,
     VectorUnitCell,
-    TransferCompound
+    TransferCompound,
+    ReferenceUnitCell
 )
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
@@ -52,7 +53,7 @@ class FloatingPoint:
 
 
 class Ideal:
-    """AnalogTile with IdealResistiveDevice."""
+    """AnalogTile with IdealDevice."""
 
     simulator_tile_class = tiles.AnalogTile
     first_hidden_field = None
@@ -67,7 +68,7 @@ class Ideal:
 
 
 class ConstantStep:
-    """AnalogTile with ConstantStepResistiveDevice."""
+    """AnalogTile with ConstantStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
     first_hidden_field = 'max_bound'
@@ -82,7 +83,7 @@ class ConstantStep:
 
 
 class LinearStep:
-    """AnalogTile with LinearStepResistiveDevice."""
+    """AnalogTile with LinearStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
     first_hidden_field = 'max_bound'
@@ -96,8 +97,23 @@ class LinearStep:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs)
 
 
+class SoftBounds:
+    """AnalogTile with SoftBoundsDevice."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
 class ExpStep:
-    """AnalogTile with ExpStepResistiveDevice."""
+    """AnalogTile with ExpStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
     first_hidden_field = 'max_bound'
@@ -123,6 +139,25 @@ class Vector:
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
+            ]))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
+class Reference:
+    """AnalogTile with ReferenceUnitCell."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound_0'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return UnitCellRPUConfig(device=ReferenceUnitCell(
+            unit_cell_devices=[
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ]))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
@@ -161,7 +196,10 @@ class Transfer:
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ],
-            transfer_forward=IOParameters(is_perfect=True)
+            transfer_forward=IOParameters(is_perfect=True),
+            transfer_every=1,
+            gamma=0.1
+
         ))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
@@ -200,7 +238,7 @@ class FloatingPointCuda:
 
 
 class IdealCuda:
-    """AnalogTile with IdealResistiveDevice."""
+    """AnalogTile with IdealDevice."""
 
     simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
     first_hidden_field = None
@@ -215,7 +253,7 @@ class IdealCuda:
 
 
 class ConstantStepCuda:
-    """AnalogTile with ConstantStepResistiveDevice."""
+    """AnalogTile with ConstantStepDevice."""
 
     simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
     first_hidden_field = 'max_bound'
@@ -230,7 +268,7 @@ class ConstantStepCuda:
 
 
 class LinearStepCuda:
-    """AnalogTile with LinearStepResistiveDevice."""
+    """AnalogTile with LinearStepDevice."""
 
     simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
     first_hidden_field = 'max_bound'
@@ -244,8 +282,23 @@ class LinearStepCuda:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
+class SoftBoundsCuda:
+    """AnalogTile with SoftBoundsDevice."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
 class ExpStepCuda:
-    """AnalogTile with ExpStepResistiveDevice."""
+    """AnalogTile with ExpStepDevice."""
 
     simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
     first_hidden_field = 'max_bound'
@@ -271,6 +324,25 @@ class VectorCuda:
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
+            ]))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class ReferenceCuda:
+    """AnalogTile with ReferenceUnitCell."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound_0'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return UnitCellRPUConfig(device=ReferenceUnitCell(
+            unit_cell_devices=[
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ]))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
@@ -309,7 +381,9 @@ class TransferCuda:
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
             ],
-            transfer_forward=IOParameters(is_perfect=True)
+            transfer_forward=IOParameters(is_perfect=True),
+            transfer_every=1,
+            gamma=0.1
         ))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):

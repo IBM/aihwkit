@@ -57,7 +57,9 @@ template <typename T> struct DifferenceRPUDeviceMetaParameter : VectorRPUDeviceM
     this->vec_par.resize(1);
     this->appendVecPar(this->vec_par[0]->clone());
 
-    this->single_device_update = false;
+    this->update_policy = VectorDeviceUpdatePolicy::All;
+    this->first_update_idx = 0;
+    this->gamma_vec.clear(); // fixed
   }
 
   DifferenceRPUDevice<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {
@@ -113,6 +115,8 @@ public:
       const PulsedUpdateMetaParameter<T> &up,
       T current_lr,
       int m_batch_info) override{};
+
+  void setHiddenUpdateIdx(int idx) override{};
 
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)

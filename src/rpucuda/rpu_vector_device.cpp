@@ -39,7 +39,9 @@ VectorRPUDeviceMetaParameter<T>::VectorRPUDeviceMetaParameter(
     appendVecPar(other.vec_par[i]->clone());
   }
   same_context = other.same_context;
-  single_device_update = other.single_device_update;
+  update_policy = other.update_policy;
+  gamma_vec = other.gamma_vec;
+  first_update_idx = other.first_update_idx;
 }
 
 // copy assignment
@@ -67,10 +69,10 @@ VectorRPUDeviceMetaParameter<T>::operator=(VectorRPUDeviceMetaParameter<T> &&oth
 
   SimpleRPUDeviceMetaParameter<T>::operator=(std::move(other));
   same_context = other.same_context;
-  single_device_update = other.single_device_update;
-
+  update_policy = other.update_policy;
+  first_update_idx = other.first_update_idx;
+  gamma_vec = std::move(other.gamma_vec);
   vec_par = std::move(other.vec_par);
-  other.vec_par.clear();
 
   return *this;
 }
@@ -99,6 +101,13 @@ template <typename T> void VectorRPUDevice<T>::allocateContainers(int n_devices)
   freeContainers();
   n_devices_ = n_devices;
   weights_vec_ = Array_3D_Get<T>(n_devices_, this->d_size_, this->x_size_);
+
+  // set zero
+  for (int k = 0; k < n_devices_; k++) {
+    for (int i = 0; i < this->size_; i++) {
+      weights_vec_[k][0][i] = (T)0.0;
+    }
+  }
 }
 
 template <typename T> void VectorRPUDevice<T>::freeContainers() {
@@ -183,7 +192,6 @@ VectorRPUDevice<T> &VectorRPUDevice<T>::operator=(VectorRPUDevice<T> &&other) {
 
   other.reduce_weightening_.clear();
   other.weights_vec_ = nullptr;
-  other.rpu_device_vec_.clear();
 
   return *this;
 }
@@ -274,6 +282,16 @@ template <typename T> void VectorRPUDevice<T>::setHiddenWeights(const std::vecto
   }
 }
 
+template <typename T> void VectorRPUDevice<T>::setHiddenUpdateIdx(int idx) {
+  // we only change the current idx
+  current_device_idx_ = idx;
+}
+
+template <typename T> int VectorRPUDevice<T>::getHiddenUpdateIdx() const {
+  // we only change the current idx
+  return current_device_idx_;
+}
+
 template <typename T>
 void VectorRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
 
@@ -347,13 +365,12 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
 
   auto &par = getPar();
 
-  current_device_idx_ = 0;
+  allocateContainers((int)par.vec_par.size()); // will set n_devices
+  reduce_weightening_.clear();
+
+  current_device_idx_ = par.first_update_idx;
   current_update_idx_ = 0;
 
-  allocateContainers((int)par.vec_par.size()); // will set n_devices
-
-  rpu_device_vec_.clear();
-  reduce_weightening_.clear();
   dw_min_ = (T)0.0;
   for (int k = 0; k < n_devices_; k++) {
     rpu_device_vec_.push_back(std::unique_ptr<PulsedRPUDeviceBase<T>>(
@@ -363,6 +380,14 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
     reduce_weightening_.push_back((T)1.0 / n_devices_); // average per default
   }
   dw_min_ = dw_min_ / n_devices_;
+
+  // default weightening can be overwritten by given gamma_vec
+  if (par.gamma_vec.size()) {
+    if (par.gamma_vec.size() != (size_t)n_devices_) {
+      RPU_FATAL("Gamma vector should have the same length as number of devices (or empty)!");
+    }
+    reduce_weightening_ = par.gamma_vec;
+  }
 }
 
 /*********************************************************************************/
@@ -371,21 +396,27 @@ template <typename T>
 void VectorRPUDevice<T>::initUpdateCycle(
     T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {
   const auto &par = getPar();
-  if (par.single_device_update) {
-    // just loop through the devices.
-    if (par.single_device_update_random) {
-      this->current_device_idx_ = floor(rw_rng_.sampleUniform() * this->n_devices_);
-    } else {
-      this->current_device_idx_ += 1;
-      this->current_device_idx_ = this->current_device_idx_ % this->n_devices_;
-    }
+
+  switch (par.update_policy) {
+  case VectorDeviceUpdatePolicy::SingleRandom: {
+    this->current_device_idx_ = floor(rw_rng_.sampleUniform() * this->n_devices_);
+    break;
   }
+  case VectorDeviceUpdatePolicy::SingleSequential: {
+    this->current_device_idx_ += 1;
+    this->current_device_idx_ = this->current_device_idx_ % this->n_devices_;
+    break;
+  }
+  default: {
+  }
+  };
 }
 
 template <typename T>
 void VectorRPUDevice<T>::doSparseUpdate(
     T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
-  if (getPar().single_device_update) {
+
+  if (getPar().singleDeviceUpdate()) {
     rpu_device_vec_[current_device_idx_]->doSparseUpdate(
         weights_vec_[current_device_idx_], i, x_signed_indices, x_count, d_sign, rng);
   } else {
@@ -420,11 +451,10 @@ void VectorRPUDevice<T>::finishUpdateCycle(
 /* compute functions  */
 template <typename T> void VectorRPUDevice<T>::reduceToWeights(T **weights) const {
   // here: average weights from all devices
-
   // use gemv
   RPU::math::gemv(
       CblasColMajor, CblasNoTrans, this->size_, n_devices_, (T)1.0, weights_vec_[0][0], this->size_,
-      (T *)&reduce_weightening_[0], 1, (T)0.0, weights[0], 1);
+      reduce_weightening_.data(), 1, (T)0.0, weights[0], 1);
 }
 
 template <typename T> void VectorRPUDevice<T>::decayWeights(T **weights, bool bias_no_decay) {
@@ -475,9 +505,16 @@ template <typename T> bool VectorRPUDevice<T>::onSetWeights(T **weights) {
   T *w = weights[0];
 
   // e.g. apply hard bounds
-#pragma omp parallel for
   for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {
+    // only in case of SingleFixed policy set the weight chosen.
+    if (getPar().update_policy == VectorDeviceUpdatePolicy::SingleFixed) {
+      if (k != current_device_idx_) {
+        continue;
+      }
+    }
+
     for (int i = 0; i < this->size_; i++) {
+
       weights_vec_[k][0][i] = w[i];
     }
     rpu_device_vec_[k]->onSetWeights(weights_vec_[k]);

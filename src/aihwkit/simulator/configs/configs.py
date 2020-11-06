@@ -19,11 +19,12 @@ from aihwkit.simulator.configs.devices import (
     FloatingPointDevice, ConstantStepDevice, PulsedDevice,
     UnitCell, IdealDevice
 )
-
+from aihwkit.simulator.configs.helpers import (
+    _PrintableMixin, tile_parameters_to_bindings
+)
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, PulseType,
-    WeightClipParameter, WeightModifierParameter,
-    tile_parameters_to_bindings
+    WeightClipParameter, WeightModifierParameter
 )
 from aihwkit.simulator.rpu_base import devices
 from aihwkit.simulator.noise_models import (
@@ -33,23 +34,15 @@ from aihwkit.simulator.noise_models import (
 
 
 @dataclass
-class FloatingPointRPUConfig:
+class FloatingPointRPUConfig(_PrintableMixin):
     """Configuration for a floating point resistive processing unit."""
 
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
     """Parameters that modify the behavior of the pulsed device."""
 
-    def requires_diffusion(self) -> bool:
-        """Return whether device has diffusion enabled."""
-        return self.device.diffusion > 0.0
-
-    def requires_decay(self) -> bool:
-        """Return whether device has decay enabled."""
-        return self.device.lifetime > 0.0
-
 
 @dataclass
-class SingleRPUConfig:
+class SingleRPUConfig(_PrintableMixin):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
@@ -70,17 +63,9 @@ class SingleRPUConfig:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
 
-    def requires_diffusion(self) -> bool:
-        """Return whether device has diffusion enabled."""
-        return self.device.diffusion > 0.0
-
-    def requires_decay(self) -> bool:
-        """Return whether device has decay enabled."""
-        return self.device.lifetime > 0.0
-
 
 @dataclass
-class UnitCellRPUConfig:
+class UnitCellRPUConfig(_PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
@@ -101,17 +86,9 @@ class UnitCellRPUConfig:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
 
-    def requires_diffusion(self) -> bool:
-        """Return whether device has diffusion enabled."""
-        return any([dev.diffusion > 0.0 for dev in self.device.unit_cell_devices])
-
-    def requires_decay(self) -> bool:
-        """Return whether device has decay enabled."""
-        return any([dev.lifetime > 0.0 for dev in self.device.unit_cell_devices])
-
 
 @dataclass
-class InferenceRPUConfig:
+class InferenceRPUConfig(_PrintableMixin):
     """Configuration for an analog tile that is used only for inference.
 
     Training is done in *hardware-aware* manner, thus using only the
@@ -162,11 +139,3 @@ class InferenceRPUConfig:
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
-
-    def requires_diffusion(self) -> bool:
-        """Return whether device has diffusion enabled."""
-        return self.device.diffusion > 0.0
-
-    def requires_decay(self) -> bool:
-        """Return whether device has decay enabled."""
-        return self.device.lifetime > 0.0

@@ -10,14 +10,15 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Utility parameters for resistive processing units."""
-
 # pylint: disable=too-many-instance-attributes
 
-from dataclasses import dataclass, is_dataclass
-from enum import Enum
-from typing import Any, ClassVar, Type
+"""Utility parameters for resistive processing units."""
 
+from dataclasses import dataclass
+from enum import Enum
+from typing import ClassVar, Type
+
+from aihwkit.simulator.configs.helpers import _PrintableMixin
 from aihwkit.simulator.rpu_base import devices, tiles
 
 
@@ -140,10 +141,27 @@ class WeightClipType(Enum):
     matrix) and takes the average as clipping value for all."""
 
 
+class VectorUnitCellUpdatePolicy(Enum):
+    """Vector unit cell update policy."""
+
+    ALL = 'All'
+    """All devices updated simultaneously."""
+
+    SINGLE_FIXED = 'SingleFixed'
+    """Device index is not changed. Can be set initially and/or updated on
+    the fly."""
+
+    SINGLE_SEQUENTIAL = 'SingleSequential'
+    """Each device one at a time in sequence """
+
+    SINGLE_RANDOM = 'SingleRandom'
+    """A single device is selected by random choice each mini-batch."""
+
+
 # Specialized parameters.
 
 @dataclass
-class IOParameters:
+class IOParameters(_PrintableMixin):
     """Parameters that modify the IO behavior."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileInputOutputParameter
@@ -195,11 +213,11 @@ class IOParameters:
     `AbsMax`:
 
     .. math::
-       :nowrap:
+        :nowrap:
 
-       \begin{equation*} \alpha=\begin{cases}\max_i|x_i|, &
-       \text{if} \max_i|x_i|<\theta \\ \theta, &
-       \text{otherwise}\end{cases} \end{equation*}
+        \begin{equation*} \alpha=\begin{cases}\max_i|x_i|, &
+        \text{if} \max_i|x_i|<\theta \\ \theta, &
+        \text{otherwise}\end{cases} \end{equation*}
 
     Caution:
         If ``nm_thres`` is set (and type is not ``Constant``), the
@@ -243,7 +261,7 @@ class IOParameters:
 
 
 @dataclass
-class UpdateParameters:
+class UpdateParameters(_PrintableMixin):
     """Parameter that modify the update behaviour of a pulsed device."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileUpdateParameter
@@ -308,7 +326,7 @@ class UpdateParameters:
 
 
 @dataclass
-class WeightModifierParameter:
+class WeightModifierParameter(_PrintableMixin):
     """Parameter that modify the forward/backward weights during hardware-aware training."""
 
     bindings_class: ClassVar[Type] = tiles.WeightModifierParameter
@@ -383,7 +401,7 @@ class WeightModifierParameter:
 
 
 @dataclass
-class WeightClipParameter:
+class WeightClipParameter(_PrintableMixin):
     """Parameter that clip the weights during hardware-aware training."""
 
     bindings_class: ClassVar[Type] = tiles.WeightClipParameter
@@ -396,57 +414,3 @@ class WeightClipParameter:
 
     type: WeightClipType = WeightClipType.NONE
     """Type of clipping."""
-
-
-def parameters_to_bindings(params: Any) -> Any:
-    """Convert a dataclass parameter into a bindings class."""
-    result = params.bindings_class()
-    for field, value in params.__dict__.items():
-        # Convert enums to the bindings enums.
-        if field == 'unit_cell_devices':
-            # Exclude `unit_cell_devices`, as it is a special field that is not
-            # present in the bindings.
-            continue
-
-        if isinstance(value, Enum):
-            if hasattr(tiles, value.__class__.__name__):
-                enum_class = getattr(tiles, value.__class__.__name__)
-            else:
-                enum_class = getattr(devices, value.__class__.__name__)
-            enum_value = getattr(enum_class, value.value)
-            setattr(result, field, enum_value)
-        elif is_dataclass(value):
-            setattr(result, field, parameters_to_bindings(value))
-        else:
-            setattr(result, field, value)
-
-    return result
-
-
-def tile_parameters_to_bindings(params: Any) -> Any:
-    """Convert a tile dataclass parameter into a bindings class."""
-    field_map = {'forward': 'forward_io',
-                 'backward': 'backward_io'}
-    excuded_fields = ('device', 'noise_model', 'drift_compensation',
-                      'clip', 'modifier')
-
-    result = params.bindings_class()
-    for field, value in params.__dict__.items():
-        # Get the mapped field name, if needed.
-        field = field_map.get(field, field)
-
-        # Convert enums to the bindings enums.
-        if field in excuded_fields:
-            # Exclude special fields that are not present in the bindings.
-            continue
-
-        if isinstance(value, Enum):
-            enum_class = getattr(devices, value.__class__.__name__)
-            enum_value = getattr(enum_class, value.value)
-            setattr(result, field, enum_value)
-        elif is_dataclass(value):
-            setattr(result, field, parameters_to_bindings(value))
-        else:
-            setattr(result, field, value)
-
-    return result

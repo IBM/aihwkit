@@ -55,8 +55,7 @@ template <typename T> class TransferRPUDevice;
 
 template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMetaParameter<T> {
 
-  T gamma = (T)0.0; // weightening factor.
-  std::vector<T> gamma_vec;
+  T gamma = (T)0.0; // weightening factor. [gamma vec optionally inherited from vector]
   T transfer_every = (T)1.0;
   bool units_in_mbatch = false;
   int n_cols_per_transfer = 1;
@@ -85,7 +84,7 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   virtual void initializeWithSize(int x_size, int d_size);
   void initialize() override{/* do nothing */};
 
-  inline bool fullyHidden() const { return (!gamma && gamma_vec.back() == 1.0); };
+  inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == 1.0); };
 
   std::string getName() const override {
     std::ostringstream ss;
@@ -150,6 +149,8 @@ public:
   void clipWeights(T **weights, T clip) override;
 
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void setHiddenUpdateIdx(int idx) override{}; // ignored
+
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
 

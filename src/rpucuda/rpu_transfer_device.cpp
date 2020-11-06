@@ -42,8 +42,8 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
   // gamma
   ss << "\tgamma:\t\t\t";
   if (this->_par_initialized)
-    for (size_t k = 0; k < gamma_vec.size(); k++) {
-      ss << gamma_vec[k] << " ";
+    for (size_t k = 0; k < this->gamma_vec.size(); k++) {
+      ss << this->gamma_vec[k] << " ";
     }
   else {
     ss << gamma;
@@ -112,7 +112,8 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     RPU_FATAL("Need at least 2 devices");
   }
 
-  this->single_device_update = true; // needs turned on.
+  this->update_policy = VectorDeviceUpdatePolicy::SingleFixed;
+  this->first_update_idx = 0; // only first is updated
   this->same_context = true;
 
   // Only the first device might be difference from the rest,
@@ -125,24 +126,24 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
   }
 
   // weightening of devices to get final weights
-  if (gamma_vec.size() > 0) {
-    if (gamma_vec.size() != n_devices) {
+  if (this->gamma_vec.size() > 0) {
+    if (this->gamma_vec.size() != n_devices) {
       RPU_FATAL("If gamma_vec is set manually expect the same size as number of devices.");
     }
     T g = 0;
     for (size_t i = 0; i < n_devices - 1; i++) {
-      g += gamma_vec[i];
+      g += this->gamma_vec[i];
     }
-    if (gamma_vec[n_devices - 1] == 0) {
+    if (this->gamma_vec[n_devices - 1] == 0) {
       RPU_FATAL("Expect that last device has some constribution to the network weights. [otherwise "
                 "why transfer?]");
     }
     gamma = g;
   }
-  if (gamma_vec.size() == 0) {
-    gamma_vec.resize(n_devices);
+  if (this->gamma_vec.size() == 0) {
+    this->gamma_vec.resize(n_devices);
     for (size_t i = 0; i < n_devices; i++) {
-      gamma_vec[n_devices - i - 1] = pow(gamma, (T)i);
+      this->gamma_vec[n_devices - i - 1] = pow(gamma, (T)i);
     }
   }
 
@@ -301,11 +302,12 @@ void TransferRPUDevice<T>::populate(
   par.initializeWithSize(this->x_size_, this->d_size_);
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   transfer_fb_pass_ =
-      make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
+      RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
   transfer_fb_pass_->setIOPar(par.transfer_io, par.transfer_io);
   // NOTE: the OUT_SCALE might be different for the transfer!! How to account for that?!?
 
-  transfer_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
+  transfer_pwu_ =
+      RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
   transfer_pwu_->setUpPar(par.transfer_up);
 
   this->reduce_weightening_.resize(this->n_devices_);
@@ -320,7 +322,7 @@ void TransferRPUDevice<T>::populate(
   current_col_indices_.resize(this->n_devices_);
   std::fill(current_col_indices_.begin(), current_col_indices_.end(), 0);
 
-  this->current_device_idx_ = 0; // only zero is updated
+  this->current_device_idx_ = 0; // only zero is updated, ignore current idx
 
   fully_hidden_ = getPar().fullyHidden(); // save
 }

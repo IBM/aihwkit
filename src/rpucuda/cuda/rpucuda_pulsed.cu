@@ -397,6 +397,17 @@ template <typename T> void RPUCudaPulsed<T>::setDeviceParameter(const std::vecto
   this->setWeights(this->copyWeightsToHost()[0]); // might re-copy device. Ignore
 };
 
+template <typename T> int RPUCudaPulsed<T>::getHiddenUpdateIdx() const {
+  CHECK_RPU_DEVICE_INIT;
+  return rpucuda_device_->getHiddenUpdateIdx();
+};
+
+template <typename T> void RPUCudaPulsed<T>::setHiddenUpdateIdx(int idx) {
+  CHECK_RPU_DEVICE_INIT;
+  rpucuda_device_->setHiddenUpdateIdx(idx);
+  rpu_device_->setHiddenUpdateIdx(idx);
+};
+
 template <typename T> void RPUCudaPulsed<T>::setWeights(const T *host_source) {
 
   CHECK_RPU_DEVICE_INIT;

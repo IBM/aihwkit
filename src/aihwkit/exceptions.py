@@ -27,3 +27,7 @@ class TileError(AihwkitException):
 
 class CudaError(AihwkitException):
     """Exceptions related to CUDA."""
+
+
+class ConfigError(AihwkitException):
+    """Exception related to tile configuration. """

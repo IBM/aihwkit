@@ -135,6 +135,9 @@ public:
   void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
 
+  int getHiddenUpdateIdx() const override;
+  void setHiddenUpdateIdx(int idx) override;
+
   void populateParameter(PulsedMetaParameter<T> *p, PulsedRPUDeviceMetaParameter<T> *dp);
 
   void printRPUParameter(int x_count, int d_count) const;

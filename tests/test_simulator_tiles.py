@@ -11,17 +11,25 @@
 # that they have been altered from the originals.
 
 """Tests for the high level simulator devices functionality."""
+
 from unittest import SkipTest
 
-from torch import Tensor
+from torch import Tensor, zeros
+
+from aihwkit.simulator.configs.devices import (
+    VectorUnitCell,
+    ReferenceUnitCell)
+from aihwkit.simulator.configs.utils import VectorUnitCellUpdatePolicy
+from aihwkit.simulator.configs import UnitCellRPUConfig
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
-    FloatingPoint, Ideal, ConstantStep, LinearStep,
+    FloatingPoint, Ideal, ConstantStep, LinearStep, SoftBounds,
     ExpStep, Vector, Difference, Transfer, Inference,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda, InferenceCuda
+    SoftBoundsCuda, ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda,
+    InferenceCuda, Reference, ReferenceCuda
 )
 
 
@@ -31,19 +39,23 @@ from .helpers.tiles import (
     ConstantStep,
     LinearStep,
     ExpStep,
+    SoftBounds,
     Vector,
     Difference,
     Transfer,
     Inference,
+    Reference,
     FloatingPointCuda,
     IdealCuda,
     ConstantStepCuda,
     LinearStepCuda,
     ExpStepCuda,
+    SoftBoundsCuda,
     VectorCuda,
     DifferenceCuda,
     TransferCuda,
-    InferenceCuda
+    InferenceCuda,
+    ReferenceCuda,
 ])
 class TileTest(ParametrizedTestCase):
     """Test floating point tile."""
@@ -207,3 +219,66 @@ class TileTest(ParametrizedTestCase):
 
         self.assertNotAlmostEqualTensor(tile_weights, weights)
         self.assertNotAlmostEqualTensor(tile_biases, biases)
+
+    def test_set_hidden_update_index(self):
+        """Tests hidden update index"""
+        rpu_config = self.get_rpu_config()
+
+        if not isinstance(rpu_config, UnitCellRPUConfig) \
+           or not isinstance(rpu_config.device, (VectorUnitCell, ReferenceUnitCell)):
+            analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=False)
+            index = analog_tile.get_hidden_update_index()
+            self.assertEqual(index, 0)
+            analog_tile.set_hidden_update_index(1)
+            index = analog_tile.get_hidden_update_index()
+            self.assertEqual(index, 0)
+        else:
+            rpu_config.device.first_update_idx = 0
+            rpu_config.device.update_policy = VectorUnitCellUpdatePolicy.SINGLE_FIXED
+            analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=False)
+            analog_tile.set_learning_rate(0.123)
+
+            # update index
+            index = analog_tile.get_hidden_update_index()
+            self.assertEqual(index, 0)
+            analog_tile.set_hidden_update_index(1)
+            index = analog_tile.get_hidden_update_index()
+            self.assertEqual(index, 1)
+
+            # set weights index 0
+            analog_tile.set_hidden_update_index(0)
+            weights_0 = Tensor([[0.1, 0.2, 0.3], [0.4, -0.5, -0.6]])
+            analog_tile.tile.set_weights(weights_0)
+            hidden_par = analog_tile.get_hidden_parameters()
+            self.assertTensorAlmostEqual(hidden_par['hidden_weights_0'],
+                                         weights_0)
+            self.assertTensorAlmostEqual(hidden_par['hidden_weights_1'],
+                                         zeros((2, 3)))
+
+            # set weights index 1
+            analog_tile.set_hidden_update_index(1)
+            weights_1 = Tensor([[0.4, 0.1, 0.2], [0.5, -0.2, -0.1]])
+            analog_tile.tile.set_weights(weights_1)
+
+            hidden_par = analog_tile.get_hidden_parameters()
+
+            self.assertTensorAlmostEqual(hidden_par['hidden_weights_0'],
+                                         weights_0)
+            self.assertTensorAlmostEqual(hidden_par['hidden_weights_1'],
+                                         weights_1)
+
+            # update
+            analog_tile.set_hidden_update_index(1)
+            x = Tensor([[0.1, 0.2, 0.3], [0.4, -0.5, -0.6]])
+            d = Tensor([[0.5, 0.1], [0.4, -0.5]])
+            if analog_tile.is_cuda:
+                x = x.cuda()
+                d = d.cuda()
+            analog_tile.update(x, d)
+
+            hidden_par_after = analog_tile.get_hidden_parameters()
+
+            self.assertTensorAlmostEqual(hidden_par['hidden_weights_0'],
+                                         hidden_par_after['hidden_weights_0'])
+            self.assertNotAlmostEqualTensor(hidden_par['hidden_weights_1'],
+                                            hidden_par_after['hidden_weights_1'])

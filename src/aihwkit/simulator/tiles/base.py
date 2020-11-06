@@ -347,6 +347,44 @@ class BaseTile(Generic[RPUConfigGeneric]):
         hidden_parameters = stack(list(ordered_parameters.values()), dim=0)
         self.tile.set_hidden_parameters(hidden_parameters)
 
+    def get_hidden_update_index(self) -> int:
+        """Get the current updated device index of the hidden devices.
+
+        Usually this is 0 as only one device is present per
+        cross-point for many tile RPU configs. However, some RPU
+        configs maintain internally multiple devices per cross-point
+        (e.g. :class:`~aihwkit.simulator.config.devices.VectorUnitCell`).
+
+        Returns:
+            The next mini-batch updated device index.
+
+        Note:
+            Depending on the update and learning policy implemented
+            in the tile, updated devices might switch internally as
+            well.
+        """
+        return self.tile.get_hidden_update_index()
+
+    def set_hidden_update_index(self, index: int) -> None:
+        """set the current updated hidden device index.
+
+        Usually this is ignored and fixed to 0 as only one device is
+        present per cross-point. Other devices, might not allow
+        explicit setting as it would interfere with the implemented
+        learning However rule. However, some tiles have internally
+        multiple devices per cross-point (eg. unit cell) that can be
+        chosen depending on the update policy.
+
+        Args:
+            index: device index to be updated in the next mini-batch
+
+        Note:
+            Depending on the update and learning policy implemented
+            in the tile, updated devices might switch internally as
+            well.
+        """
+        self.tile.set_hidden_update_index(index)
+
     def set_indexed(self, indices: Tensor, image_sizes: List) -> None:
         """Sets the index matrix for convolutions ans switches to
         indexed forward/backward/update versions.
@@ -406,7 +444,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
     @no_grad()
     def post_update_step(self) -> None:
         """Operators that need to be called once per mini-batch."""
-        if self.rpu_config.requires_diffusion():  # type: ignore
+        if self.rpu_config.device.requires_diffusion():  # type: ignore
             self.diffuse_weights()
-        if self.rpu_config.requires_decay():  # type: ignore
+        if self.rpu_config.device.requires_decay():  # type: ignore
             self.decay_weights()

@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example 6: simple network with one layer using other devices.
+"""aihwkit example 7: simple network with one layer using other devices.
 
 Simple network that consist of one analog layer. The network aims to learn
 to sum all the elements from one array.
@@ -24,11 +24,13 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import UnitCellRPUConfig
+from aihwkit.simulator.configs.utils import VectorUnitCellUpdatePolicy
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
     VectorUnitCell,
     LinearStepDevice,
-    SoftBoundsDevice)
+    SoftBoundsDevice,
+    ReferenceUnitCell)
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
@@ -42,20 +44,21 @@ rpu_config = UnitCellRPUConfig()
 # 3 arbitrary devices per cross-point.
 rpu_config.device = VectorUnitCell(
     unit_cell_devices=[
+        ReferenceUnitCell(unit_cell_devices=[SoftBoundsDevice(w_max=1.0)]),
         ConstantStepDevice(),
         LinearStepDevice(w_max_dtod=0.4),
         SoftBoundsDevice()
     ])
 
 # Only one of the devices should receive a single update.
-rpu_config.device.single_device_update = True
 # That is selected randomly, the effective weights is the sum of all
 # weights.
-rpu_config.device.single_device_update_random = True
+rpu_config.device.update_policy = VectorUnitCellUpdatePolicy.SINGLE_RANDOM
+
 
 model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
-print(model.analog_tile.tile)
+print(rpu_config)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
