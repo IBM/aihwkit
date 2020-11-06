@@ -42,7 +42,7 @@ public:
   }
   bool isPulsedDevice() const override { return true; };
   /* Resets columns of the weights matrix to 0 (with noise reset_std)*/
-  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) = 0;
+  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) {RPU_FATAL("Needs implementation");};
 
   virtual T getDwMin() const = 0;
   virtual void runUpdateKernel(
@@ -63,7 +63,7 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) = 0;
 
-  PulsedRPUDeviceCudaBase<T> *clone() const override = 0;
+  PulsedRPUDeviceCudaBase<T> *clone() const override {RPU_FATAL("Needs implementation");};
 };
 
 /* Base class for all devices that do a simple pulsed update with 6 parameters*/
@@ -217,15 +217,15 @@ public:                                                                         
                                                                                                    \
     pwukpvec_t<T> v;                                                                               \
                                                                                                    \
-    v.push_back(make_unique<PWUKernelParameterSingleFunctor<T, FUNCTOR, GPCOUNT>>(                 \
+    v.push_back(RPU::make_unique<PWUKernelParameterSingleFunctor<T, FUNCTOR, GPCOUNT>>(            \
         this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,      \
         getPar().getName()));                                                                      \
                                                                                                    \
-    v.push_back(make_unique<PWUKernelParameterBatchFunctor<T, FUNCTOR, GPCOUNT>>(                  \
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchFunctor<T, FUNCTOR, GPCOUNT>>(             \
         this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,      \
         getPar().getName()));                                                                      \
                                                                                                    \
-    v.push_back(make_unique<PWUKernelParameterBatchSharedFunctor<T, FUNCTOR, GPCOUNT>>(            \
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, FUNCTOR, GPCOUNT>>(       \
         this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,      \
         getPar().getName()));                                                                      \
                                                                                                    \

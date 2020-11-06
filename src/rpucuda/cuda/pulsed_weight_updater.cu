@@ -36,7 +36,7 @@ PulsedWeightUpdater<T>::PulsedWeightUpdater(CudaContext *c, int x_size, int d_si
     : context_{c}, x_size_{x_size}, d_size_{d_size}
 
 {
-  blm_ = make_unique<BitLineMaker<T>>(c, x_size, d_size);
+  blm_ = RPU::make_unique<BitLineMaker<T>>(c, x_size, d_size);
   up_context_ = nullptr;
   is_async_update_ = false;
 };
@@ -68,7 +68,7 @@ pwukpvec_t<T> PulsedWeightUpdater<T>::getValidUpdateKernels(
 template <typename T> void PulsedWeightUpdater<T>::makeUpdateAsync() {
   if (!is_async_update_) {
     is_async_update_ = true;
-    up_context_ = make_unique<CudaContext>(context_->getGPUId());
+    up_context_ = RPU::make_unique<CudaContext>(context_->getGPUId());
   }
 }
 

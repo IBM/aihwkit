@@ -70,31 +70,31 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
 
   if (getPar().dw_min_std > 0.33) { // 3 sigma
     v.push_back(
-        make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
+        RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
             ARGS(FunctorLargeNoise));
     v.push_back(
-        make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
+        RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
             ARGS(FunctorLargeNoise));
-    v.push_back(make_unique<PWUKernelParameterBatchSharedFunctor<
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedFunctor<
                     T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
 
   } else {
     // use summing approximation is save in this case
     // Update functor and kernels are in pwu_kernels.h
-    v.push_back(make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
-    v.push_back(make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
     v.push_back(
-        make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
+        RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
             Functor));
 
-    v.push_back(make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
-    v.push_back(make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
     v.push_back(
-        make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
+        RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
             Functor));
 
     v.push_back(
-        make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
+        RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
             Functor));
   }
 

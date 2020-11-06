@@ -308,10 +308,10 @@ public:
     up.res = resolution;
     up.sto_round = false;
 
-    context_container = make_unique<CudaContext>(-1, false); // blocking for timings
+    context_container = RPU::make_unique<CudaContext>(-1, false); // blocking for timings
     context = &*context_container;
 
-    blm = make_unique<BitLineMaker<num_t>>(context, x_size, d_size);
+    blm = RPU::make_unique<BitLineMaker<num_t>>(context, x_size, d_size);
 
     rx = new num_t[x_size * m_batch];
     rd = new num_t[d_size * m_batch];
@@ -339,8 +339,8 @@ public:
     transpose(rd_trans, rd, d_size, m_batch);
     transpose(rx_trans, rx, x_size, m_batch);
 
-    curx = make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx);
-    curd = make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd);
+    curx = RPU::make_unique<CudaArray<num_t>>(context, x_size * m_batch, rx);
+    curd = RPU::make_unique<CudaArray<num_t>>(context, d_size * m_batch, rd);
   }
 
   void TearDown() {

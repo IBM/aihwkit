@@ -264,7 +264,7 @@ template <typename T>
 Maximizer<T>::Maximizer(CudaContext *c, int size, bool abs_if)
     : size_{size}, context_{c}, buffer_m_batch_{0}, abs_if_{abs_if} {
   // initialize for m_batch=1
-  dev_max_values_ = make_unique<CudaArray<float>>(context_, 1);
+  dev_max_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);
   size_t temp_storage_bytes = 0;
   if (abs_if_) {
     cub::DeviceReduce::Reduce(
@@ -276,7 +276,7 @@ Maximizer<T>::Maximizer(CudaContext *c, int size, bool abs_if)
         context_->getStream());
   }
 
-  dev_v_temp_storage_ = make_unique<CudaArray<char>>(context_, temp_storage_bytes);
+  dev_v_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
 }
 
 template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
@@ -284,8 +284,8 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
   if ((m_batch > 1) && (buffer_m_batch_ != m_batch)) {
     buffer_m_batch_ = m_batch;
 
-    dev_max_values_ = make_unique<CudaArray<float>>(context_, m_batch);
-    dev_max_values0_ = make_unique<CudaArray<float>>(context_, m_batch);
+    dev_max_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
+    dev_max_values0_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
     dev_max_values0_->setConst(abs_if_ ? 0 : std::numeric_limits<T>::min());
 
     int *offsets = new int[m_batch + 1];
@@ -295,7 +295,7 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
       offsets[i] = i * size_;
     }
 
-    dev_offsets_ = make_unique<CudaArray<int>>(context_, m_batch + 1, offsets);
+    dev_offsets_ = RPU::make_unique<CudaArray<int>>(context_, m_batch + 1, offsets);
 
     size_t temp_storage_bytes = 0;
     if (abs_if_) {
@@ -308,7 +308,7 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
           nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, context_->getStream());
     }
-    dev_m_temp_storage_ = make_unique<CudaArray<char>>(context_, temp_storage_bytes);
+    dev_m_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
 
     context_->synchronize();
     delete[] offsets;

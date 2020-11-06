@@ -193,7 +193,7 @@ void WeightModifierCuda<T>::apply(
   float *amax = nullptr;
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
     if (!amaximizer_) {
-      amaximizer_ = make_unique<Maximizer<T>>(context_, size_, true);
+      amaximizer_ = RPU::make_unique<Maximizer<T>>(context_, size_, true);
     }
     amaximizer_->compute(weights, 1, false);
     amax = amaximizer_->getMaxValues();
