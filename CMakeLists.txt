@@ -82,7 +82,11 @@ if (USE_CUDA)
 
   set_target_properties(RPU_GPU PROPERTIES ${CUDA_TARGET_PROPERTIES})
   set_property(TARGET RPU_GPU PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
-  add_dependencies(RPU_GPU cub)
+
+  if(${CUDAToolkit_VERSION_MAJOR} LESS 11)
+    add_dependencies(RPU_GPU cub)
+  endif()
+
 endif(USE_CUDA)
 
 # Add aihwkit targets.
