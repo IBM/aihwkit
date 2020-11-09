@@ -10,15 +10,18 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-.PHONY: build_inplace clean clang-tidy clang-format mypy pycodestyle pylint pytest
+.PHONY: build_inplace clean clean-doc clang-format mypy pycodestyle pylint pytest
 
 build_inplace:
 	python setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace
 
 clean:
 	python setup.py clean
-	cd docs && make clean
+	rm -rf _skbuild
 	rm -f src/aihwkit/simulator/rpu_base.*.so
+
+clean-doc:
+	cd docs && make clean
 
 clang-format:
 	clang-format -i src/aihwkit/simulator/rpu_base_src/*.cpp  \
