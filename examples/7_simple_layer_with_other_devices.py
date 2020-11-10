@@ -27,10 +27,8 @@ from aihwkit.simulator.configs import UnitCellRPUConfig
 from aihwkit.simulator.configs.utils import VectorUnitCellUpdatePolicy
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
-    VectorUnitCell,
-    LinearStepDevice,
-    SoftBoundsDevice,
-    ReferenceUnitCell)
+    VectorUnitCell
+    )
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
@@ -41,13 +39,12 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 # devices per crosspoint. Each device can be arbitrarily defined
 
 rpu_config = UnitCellRPUConfig()
-# 3 arbitrary devices per cross-point.
+# 3 arbitrary single unit cell devices (of the same type) per cross-point.
 rpu_config.device = VectorUnitCell(
     unit_cell_devices=[
-        ReferenceUnitCell(unit_cell_devices=[SoftBoundsDevice(w_max=1.0)]),
-        ConstantStepDevice(),
-        LinearStepDevice(w_max_dtod=0.4),
-        SoftBoundsDevice()
+        ConstantStepDevice(w_max=0.3),
+        ConstantStepDevice(w_max_dtod=0.4),
+        ConstantStepDevice(up_down_dtod=0.1),
     ])
 
 # Only one of the devices should receive a single update.
