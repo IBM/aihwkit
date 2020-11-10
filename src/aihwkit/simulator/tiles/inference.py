@@ -39,7 +39,6 @@ class InferenceTile(AnalogTile):
         out_size: output size
         in_size: input size
         rpu_config: resistive processing unit configuration.
-        noise_model: noise model governing the expected inference noise in a statistical manner
         bias: whether to add a bias column to the tile.
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
@@ -179,6 +178,12 @@ class InferenceTile(AnalogTile):
 
         Args:
             device: CUDA device
+
+        Returns:
+            A copy of this tile in CUDA memory.
+
+        Raises:
+            CudaError: if the library has not been compiled with CUDA.
         """
         if not cuda.is_compiled():
             raise CudaError('aihwkit has not been compiled with CUDA support')

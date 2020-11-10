@@ -99,6 +99,9 @@ class NumpyMixin:
         Args:
             x_input: ``[N, in_size]`` matrix. If ``in_trans`` is set, transposed.
             d_input: ``[N, out_size]`` matrix. If ``out_trans`` is set, transposed.
+
+        Returns:
+            None.
         """
         if self.is_cuda:
             x_tensor = from_numpy(x_input.astype('float32')).cuda()

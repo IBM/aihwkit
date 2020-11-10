@@ -70,7 +70,6 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
     Args:
         g_max: In :math:`\mu S`, the maximal conductance, ie the value
             the absolute max of the weights will be mapped to.
-
         g_min: In :math:`\mu S`, the minimal conductance, ie the value
             the logical zero of the weights will be mapped to.
     """
@@ -263,13 +262,15 @@ class PCMLikeNoiseModel(BaseNoiseModel):
     Args:
         prog_coeff: programming polynomial coeffs in :math:`\mu S`, c(0) + c(1)*gt + c(2)*gt^2)
         g_converter: instantiated class of the conductance converter (defaults to single pair)
+        g_max: In :math:`\mu S`, the maximal conductance, ie the value
+            the absolute max of the weights will be mapped to.
         t_read: parameter of the 1/f fit (in seconds)
         t_0: parameter of the drift fit (first reading time)
 
-        Note:
-            The ``t_inference`` is relative to this time `t0`
-            e.g. t_inference counts from the completion of the programming
-            of a device.
+            Note:
+                The ``t_inference`` is relative to this time `t0`
+                e.g. t_inference counts from the completion of the programming
+                of a device.
     """
 
     def __init__(

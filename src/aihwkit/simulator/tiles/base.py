@@ -159,6 +159,13 @@ class BaseTile(Generic[RPUConfigGeneric]):
                 closed-loop manner.
                 A value of ``1`` means that all columns in principle receive
                 enough pulses to change from ``w_min`` to ``w_max``.
+
+        Returns:
+            None.
+
+        Raises:
+            ValueError: if the tile has bias but ``bias`` has not been
+                specified.
         """
         # Prepare the array expected by the pybind function, appending the
         # biases row if needed.
@@ -231,6 +238,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         Args:
             learning_rate: the desired learning rate.
+
+        Returns:
+            None.
         """
         return self.tile.set_learning_rate(learning_rate)
 
@@ -248,6 +258,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
            alpha: additional decay scale (such as LR). The base decay
               rate is set during tile init.
+
+        Returns:
+            None.
         """
         return self.tile.decay_weights(alpha)
 
@@ -255,6 +268,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """Diffuses the weights once.
 
         The base diffusion rate is set during tile init.
+
+        Returns:
+            None
         """
         return self.tile.diffuse_weights()
 
@@ -268,12 +284,15 @@ class BaseTile(Generic[RPUConfigGeneric]):
         .. math::
             W_{ij} = \xi*\sigma_\text{reset} + b^\text{reset}_{ij}
 
+        The reset parameters are set during tile init.
+
         Args:
             start_column_idx: a start index of columns (0..x_size-1)
             num_columns: how many consecutive columns to reset (with circular warping)
             reset_prob: individual probability of reset.
 
-        The reset parameter are set during tile init.
+        Returns:
+            None
         """
         return self.tile.reset_columns(start_column_idx, num_columns, reset_prob)
 
@@ -316,6 +335,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+
+        Returns:
+            None
         """
         return self.tile.update(x_input, d_input, self.bias,
                                 self.in_trans, self.out_trans)
@@ -392,6 +414,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             indices : torch.tensor with int indices
             image_sizes: [C_in, H_in, W_in, H_out, W_out] sizes
+
+        Raises:
+            ValueError: if ``image_sizes`` does not have valid dimensions.
+            TileError: if the tile uses transposition.
         """
         if len(image_sizes) != 5:
             raise ValueError('image_sizes expects 5 sizes [C_in, H_in, W_in, H_out, W_out]')
@@ -412,6 +438,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         Returns:
             torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+
+        Raises:
+            TileError: if the indexed tile has not been initialized.
         """
         if not self.image_sizes:
             raise TileError('self.image_sizes is not initialized. Please use '
@@ -438,6 +467,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+
+        Returns:
+            None
         """
         return self.tile.update_indexed(x_input, d_input)
 

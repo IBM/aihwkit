@@ -87,6 +87,9 @@ class AnalogSGD(SGD):
         Arguments:
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
+
+        Returns:
+            The loss, if ``closure`` has been passed as a parameter.
         """
         # pylint: disable=too-many-branches
         loss = None
