@@ -173,6 +173,8 @@ class AnalogTile(BaseTile):
             has an extra column to code the biases. Internally, the
             input :math:`\mathbf{x}` will be automatically expanded by
             an extra dimension which will be set to 1 always.
+        in_trans: Whether to assume an transposed input (batch first).
+        out_trans: Whether to assume an transposed output (batch first).
 
     .. _Gokmen & Vlasov (2016): https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
@@ -198,6 +200,12 @@ class AnalogTile(BaseTile):
 
         Args:
             device: CUDA device
+
+        Returns:
+            A copy of this tile in CUDA memory.
+
+        Raises:
+            CudaError: if the library has not been compiled with CUDA.
         """
         if not cuda.is_compiled():
             raise CudaError('aihwkit has not been compiled with CUDA support')

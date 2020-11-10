@@ -78,6 +78,9 @@ class AnalogModuleBase(Module):
             bias: whether to use a bias row on the analog tile or not.
             realistic_read_write: whether to enable realistic read/write
                for setting initial weights and read out of weights.
+
+        Returns:
+            An analog tile with the requested parameters.
         """
         # pylint: disable=attribute-defined-outside-init
         # Default to constant step device if not provided.
@@ -222,6 +225,9 @@ class AnalogModuleBase(Module):
         Arguments:
             device (int, optional): if specified, all parameters will be
                 copied to that GPU device
+
+        Returns:
+            This layer with its parameters, buffers and tiles in GPU.
         """
         # pylint: disable=attribute-defined-outside-init
         # Note: this needs to be an in-place function, not a copy
@@ -235,6 +241,9 @@ class AnalogModuleBase(Module):
 
         Args:
             t_inference: assumed time of inference (in sec)
+
+        Raises:
+            ModuleError: if the layer is not in evaluation mode.
         """
         if self.training:
             raise ModuleError('drift_analog_weights can only be applied in '
@@ -244,7 +253,11 @@ class AnalogModuleBase(Module):
             self.analog_tile.drift_weights(t_inference)
 
     def program_analog_weights(self) -> None:
-        """Program the analog weights."""
+        """Program the analog weights.
+
+        Raises:
+            ModuleError: if the layer is not in evaluation mode.
+        """
         if self.training:
             raise ModuleError('program_analog_weights can only be applied in '
                               'evaluation mode')

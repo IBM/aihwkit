@@ -43,6 +43,9 @@ class AnalogSequential(Sequential):
 
         Args:
             fn: function to be applied.
+
+        Returns:
+            This module after the function has been applied.
         """
         for module in self.modules():
             if isinstance(module, AnalogModuleBase):
@@ -64,7 +67,10 @@ class AnalogSequential(Sequential):
         """(Program) and drift all analog inference layers of a given model.
 
         Args:
-            t_inference: assumed time of inference (in sec
+            t_inference: assumed time of inference (in sec)
+
+        Raises:
+            ModuleError: if the layer is not in evaluation mode.
         """
         if self.training:
             raise ModuleError('drift_analog_weights can only be applied in '
@@ -73,7 +79,11 @@ class AnalogSequential(Sequential):
         self._apply_to_analog(lambda m: m.drift_analog_weights(t_inference))
 
     def program_analog_weights(self) -> None:
-        """Program all analog inference layers of a given model."""
+        """Program all analog inference layers of a given model.
+
+        Raises:
+            ModuleError: if the layer is not in evaluation mode.
+        """
         if self.training:
             raise ModuleError('program_analog_weights can only be applied in '
                               'evaluation mode')

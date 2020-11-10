@@ -13,17 +13,20 @@
 """Decorators for aihwkit tests."""
 
 from itertools import product
-from typing import List
+from typing import List, Callable
 
 from parameterized import parameterized_class
 
 
-def parametrize_over_tiles(tiles: List):
+def parametrize_over_tiles(tiles: List) -> Callable:
     """Parametrize a TestCase over different kind of tiles.
 
     Args:
         tiles: list of tile descriptions. The ``TestCase`` will be repeated
             for each of the entries in the list.
+
+    Returns:
+        The decorated TestCase.
     """
 
     def object_to_dict(obj):
@@ -42,7 +45,7 @@ def parametrize_over_tiles(tiles: List):
                                class_name_func=class_name)
 
 
-def parametrize_over_layers(layers: List, tiles: List, biases: List):
+def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable:
     """Parametrize a TestCase over different kind of layers.
 
     The ``TestCase`` will be repeated for each combination of
@@ -52,6 +55,9 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List):
         layers: list of layer descriptions.
         tiles: list of tile descriptions.
         biases: list of bias values.
+
+    Returns:
+        The decorated TestCase.
     """
 
     def object_to_dict(layer, tile, bias):
