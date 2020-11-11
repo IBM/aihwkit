@@ -17,15 +17,14 @@ from tempfile import TemporaryFile
 from numpy.random import rand
 from numpy.testing import assert_array_almost_equal, assert_raises
 from torch import Tensor, save, load
+from torch.nn import Sequential, Module
 from torch.nn.functional import mse_loss
 
 from aihwkit.nn import AnalogConv2d
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
-from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters
-)
+from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, Conv2d, LinearCuda, Conv2dCuda
@@ -217,3 +216,65 @@ class SerializationTest(ParametrizedTestCase):
         # Assert over the new model tile parameters.
         new_hidden_parameters = new_model.analog_tile.tile.get_hidden_parameters()
         assert_array_almost_equal(hidden_parameters, new_hidden_parameters)
+
+    def test_state_dict_children_layers_sequential(self):
+        """Test using the state_dict with children analog layers via Sequential."""
+        children_layer = self.get_layer()
+        model = Sequential(children_layer)
+
+        # Keep track of the current weights and biases for comparing.
+        (model_weights, model_biases,
+         tile_weights, tile_biases) = self.get_layer_and_tile_weights(children_layer)
+
+        self.assertIn('0.analog_tile_state', model.state_dict())
+
+        # Update the state_dict of a new model.
+        new_children_layer = self.get_layer()
+        new_model = Sequential(new_children_layer)
+        new_model.load_state_dict(model.state_dict())
+
+        # Compare the new model weights and biases.
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(
+            new_children_layer)
+
+        assert_array_almost_equal(model_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(model_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
+
+    def test_state_dict_children_layers_subclassing(self):
+        """Test using the state_dict with children analog layers via subclassing."""
+
+        class CustomModule(Module):
+            """Module that defines its children layers via custom attributes."""
+            # pylint: disable=abstract-method
+            def __init__(self, layer: Module):
+                super().__init__()
+                self.custom_child = layer
+
+        children_layer = self.get_layer()
+        model = CustomModule(children_layer)
+
+        # Keep track of the current weights and biases for comparing.
+        (model_weights, model_biases,
+         tile_weights, tile_biases) = self.get_layer_and_tile_weights(children_layer)
+
+        self.assertIn('custom_child.analog_tile_state', model.state_dict())
+
+        # Update the state_dict of a new model.
+        new_children_layer = self.get_layer()
+        new_model = CustomModule(new_children_layer)
+        new_model.load_state_dict(model.state_dict())
+
+        # Compare the new model weights and biases.
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(
+            new_children_layer)
+
+        assert_array_almost_equal(model_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(model_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
