@@ -12,7 +12,7 @@
 
 """Base class for analog Modules."""
 
-from typing import Any, Dict, NamedTuple, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from torch import Tensor
 from torch import device as torch_device
@@ -180,18 +180,27 @@ class AnalogModuleBase(Module):
         """
         self.set_weights(self.weight, self.bias, force_exact=True)
 
-    def load_state_dict(
+    def _load_from_state_dict(
             self,
             state_dict: Dict,
-            strict: bool = True
-    ) -> NamedTuple:
-        """Copy parameters and buffers into this module and descendants."""
-        current_dict = state_dict.copy()
-        analog_state = current_dict.pop('analog_tile_state')
+            prefix: str,
+            local_metadata: Dict,
+            strict: bool,
+            missing_keys: List[str],
+            unexpected_keys: List[str],
+            error_msgs: List[str]) -> None:
+        """Copies parameters and buffers from `state_dict` into only this
+        module, but not its descendants.
+
+        This method is a specialization of ``Module._load_from_state_dict``
+        that takes into account the extra `analog_tile_state` key used by
+        analog layers.
+        """
+        analog_state = state_dict.pop('{}analog_tile_state'.format(prefix))
         self.analog_tile.__setstate__(analog_state)
-        ret = super().load_state_dict(current_dict, strict)
-        self._sync_weights_to_tile()  # not needed actually
-        return ret
+        super()._load_from_state_dict(
+            state_dict, prefix, local_metadata, strict, missing_keys,
+            unexpected_keys, error_msgs)
 
     def state_dict(
             self,
@@ -209,7 +218,7 @@ class AnalogModuleBase(Module):
 
         analog_state = self.analog_tile.__getstate__()
         current_state = super().state_dict(destination, prefix, keep_vars)
-        current_state['analog_tile_state'] = analog_state
+        current_state['{}analog_tile_state'.format(prefix)] = analog_state
         return current_state
 
     def cuda(
