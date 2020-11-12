@@ -10,14 +10,14 @@
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
-# ---[ CUDA
+# CUDA
 if(USE_CUDA)
   enable_language(CUDA)
 
-  # --- [ CUDA Toolkit
+  # CUDA Toolkit
   find_package(CUDAToolkit)
 
-  # ---[ CUB (Only for CUDA v. less than 11)
+  # CUB (Only for CUDA v. less than 11)
   if(${CUDAToolkit_VERSION_MAJOR} LESS 11)
     find_package(CUB QUIET)
     if(CUB_FOUND)

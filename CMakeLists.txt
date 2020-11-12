@@ -10,7 +10,6 @@
 
 cmake_minimum_required(VERSION 3.18.0)
 project(aihwkit C CXX)
-set(ignoreMe "${SKBUILD}")
 
 # Project options.
 option(BUILD_TEST "Build C++ test binaries" OFF)
@@ -29,7 +28,7 @@ set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
                            POSITION_INDEPENDENT_CODE ON)
 
 # Append the virtualenv library path to cmake.
-if (DEFINED ENV{VIRTUAL_ENV})
+if(DEFINED ENV{VIRTUAL_ENV})
   include_directories("$ENV{VIRTUAL_ENV}/include")
   link_directories("$ENV{VIRTUAL_ENV}/lib")
   set(CMAKE_PREFIX_PATH "$ENV{VIRTUAL_ENV}")
@@ -50,7 +49,6 @@ else()
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ftree-vectorize")
 endif()
 
-
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 if (APPLE)
   string(APPEND CMAKE_CXX_FLAGS " -fvisibility=hidden")
@@ -70,7 +68,7 @@ endif()
 set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 11
                                          POSITION_INDEPENDENT_CODE ON)
 
-if (USE_CUDA)
+if(USE_CUDA)
   add_subdirectory(src/rpucuda/cuda)
   include_directories(SYSTEM src/rpucuda/cuda)
   add_library(RPU_GPU ${RPU_GPU_SRCS})
@@ -93,7 +91,7 @@ endif(USE_CUDA)
 add_subdirectory(src/aihwkit/simulator)
 
 # Add tests.
-if (BUILD_TEST)
+if(BUILD_TEST)
   enable_testing()
 
   foreach(test_src ${RPU_CPU_TEST_SRCS} ${RPU_GPU_TEST_SRCS})
@@ -102,12 +100,12 @@ if (BUILD_TEST)
     target_link_libraries(${test_name} gtest gmock)
 
     # Link to main library.
-    if (${test_src} IN_LIST RPU_CPU_TEST_SRCS)
+    if(${test_src} IN_LIST RPU_CPU_TEST_SRCS)
       target_link_libraries(${test_name} RPU_CPU ${RPU_DEPENDENCY_LIBS})
     else()
       target_link_libraries(${test_name} RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
       set_target_properties(${test_name} PROPERTIES ${CUDA_TARGET_PROPERTIES})
-      set_property(TARGET ${test_name} PROPERTY CUDA_ARCHITECTURES ${CUDA_ARCHITECTURES})
+      set_property(TARGET ${test_name} PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
     endif()
 
     add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)

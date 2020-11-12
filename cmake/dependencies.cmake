@@ -10,9 +10,14 @@
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
-# RPATH stuff
+# For informative purposes.
+if(SKBUILD)
+  message(STATUS "Invoking cmake through scikit-build")
+endif()
+
+# RPATH handling
 # see https://cmake.org/Wiki/CMake_RPATH_handling
-if (APPLE)
+if(APPLE)
   set(CMAKE_MACOSX_RPATH ON)
   set(_rpath_portable_origin "@loader_path")
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
@@ -27,24 +32,24 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH "${_rpath_portable_origin}")
 
 
-# ---[ Threads
+# Threads
 if(USE_THREADS)
   find_package(Threads REQUIRED)
   list(APPEND RPU_DEPENDENCY_LIBS ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 
-# ---[ OpenMP
+# OpenMP
 find_package(OpenMP QUIET)
-if (OPENMP_FOUND)
-  set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+if(OPENMP_FOUND)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
   include_directories(SYSTEM ${OpenMP_CXX_INCLUDE_DIR})
 else()
   message(STATUS "OpenMP could not be found. Disabling OpenMP support.")
 endif()
 
-# ---[ BLAS
+# BLAS
 message(STATUS "The BLAS backend of choice:" ${RPU_BLAS})
 
 if(RPU_BLAS STREQUAL "OpenBLAS")
@@ -60,24 +65,24 @@ elseif(RPU_BLAS STREQUAL "MKL")
     list(APPEND RPU_DEPENDENCY_LIBS ${MKL_OPENMP_LIBRARY} )
   endif()
   if(NOT MSVC) # not sure why this is not found for linux. Maybe also windows?
-    FIND_PACKAGE(AVX) # checks AVX and AVX2
+    find_package(AVX) # checks AVX and AVX2
     set(MKL_LIB_PATH "${MKL_LIBRARIES}")
     list(FILTER MKL_LIB_PATH INCLUDE REGEX ".*mkl_core.*")
     list(GET MKL_LIB_PATH 0 MKL_LIB_PATH)
     get_filename_component(MKL_LIB_PATH ${MKL_LIB_PATH} DIRECTORY)
-    IF (CXX_AVX2_FOUND)
-      MESSAGE(STATUS "AVX compiler support found")
+    if(CXX_AVX2_FOUND)
+      message(STATUS "AVX compiler support found")
       file(GLOB tmp "${MKL_LIB_PATH}/*mkl_avx2*")
       list(APPEND RPU_DEPENDENCY_LIBS "${tmp}")
-    ENDIF()
-  ENDIF()
+    endif()
+  endif()
   add_compile_definitions(RPU_USE_MKL)
   message(STATUS "MKL include for RPU is ${RPU_DEPENDENCY_LIBS}")
 else()
   message(FATAL_ERROR "Invalid BLAS backend: ${RPU_BLAS}")
 endif()
 
-# --- [ Python and pybind11
+# Python and pybind11
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS})  # order matters (before pybind)
 
@@ -86,16 +91,17 @@ execute_process(COMMAND python -c "import pybind11; print(pybind11.get_cmake_dir
     OUTPUT_VARIABLE CUSTOM_PYTHON_PYBIND11_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET)
-set (pybind11_DIR ${CUSTOM_PYTHON_PYBIND11_PATH})
+set(pybind11_DIR ${CUSTOM_PYTHON_PYBIND11_PATH})
 
 find_package(pybind11 CONFIG REQUIRED)
 include_directories(${pybind11_INCLUDE_DIR})
 
-# --- [ Pytorch
+# Pytorch
 find_package(Torch REQUIRED)
 include_directories(${TORCH_INCLUDE_DIRS})
 link_directories(${TORCH_LIB_DIR})
 
+# Set compile definitions
 if(RPU_USE_FASTRAND)
   add_compile_definitions(RPU_USE_FASTRAND)
 endif()
