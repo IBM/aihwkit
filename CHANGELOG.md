@@ -45,6 +45,14 @@ The format is based on [Keep a Changelog], and this project adheres to
   management is now automatically ignored for the backward pass. Please use the
   more general `IOParameters` instead. (\#45)
 
+### Fixed
+
+* Serialization of `Modules` that contain children analog layers is now
+  possible, both when using containers such as `Sequential` and when using
+  analog layers as custom Module attributes. (\#74)
+* The build system has been improved, with experimental Windows support and
+  supporting using CUDA 11 correctly. (\#58, \#67, \#68)
+
 ## [0.2.0] - 2020/10/20
 
 ### Added
