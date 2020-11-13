@@ -23,8 +23,9 @@ language: python
 services: docker
 
 # Setup Travis to use Ubuntu 18.04 - Bionic
-os: linux
-dist: bionic
+os:
+  - linux
+  - osx
 
 stages:
   - Test and lint
@@ -52,11 +53,13 @@ job_compile_common: &job_compile_common
 jobs:
   include:
   - name: "Compile and test. Python 3.6"
+    os: linux
     <<: *job_compile_common
     stage: Test and lint
     python: "3.6"
 
   - name: "Compile and lint. Python 3.6"
+    os: linux
     <<: *job_compile_common
     stage: Test and lint
     python: "3.6"
@@ -67,16 +70,19 @@ jobs:
       - make mypy
 
   - name: "Compile and test. Python 3.7"
+    os: linux
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.7"
 
   - name: "Compile and test. Python 3.8"
+    os: linux
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.8"
 
   - name: "Compile and test. Python 3.6, Torch 1.5"
+    os: linux
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.6"
@@ -89,6 +95,7 @@ jobs:
       - VERBOSE=1 pip install -v -e .
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
+    os: linux
     stage: Build Linux wheels
     if: tag IS present
     env:
@@ -104,5 +111,28 @@ jobs:
     script:
       # build the wheels, put them into './wheelhouse'
       - python3 -m cibuildwheel --output-dir wheelhouse
+      # The plan is to upload the wheels via twine only when the commit is tagged
+      # python3 -m twine <..>
+
+  - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
+    os: osx
+    stage: Build OSX wheels
+    if: tag IS present
+    addons:
+      homebrew:
+        packages:
+          - openblas
+        update: true
+    env:
+      - CIBW_BEFORE_ALL=""
+      - CIBW_BEFORE_BUILD="pip install ../aihwkit-wheel-helper/delocate && pip install -r requirements.txt"
+      - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
+      # - CIBW_SKIP="cp27-* cp35-* cp38-*"
+      # - CIBW_TEST_COMMAND="pytest -v -s tests/"
+    install:
+      - python3 -m pip install cibuildwheel==1.6.0
+    script:
+      # build the wheels, put them into './wheelhouse'
+      - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
       # The plan is to upload the wheels via twine only when the commit is tagged
       # python3 -m twine <..>
