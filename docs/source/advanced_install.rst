@@ -77,19 +77,20 @@ Windows (Experimental)
 """"""""""""""""""""""
 
 On a Windows-based system, we recommend to install OpenBLAS following this
-`OpenBLAS - Visual Studio`_ installation and usage guide. It will require to
-install `MS Visual Studio 2019`_ and `Miniconda`_.
+`OpenBLAS - Visual Studio`_ installation and usage guide. It requires
+installing `MS Visual Studio 2019`_ and `Miniconda`_.
 
-After compile and install OpenBLAS, in the same Miniconda terminal, the
+After compiling and installing OpenBLAS, in the same Miniconda terminal, the
 following commands can be used for installing the minimal dependencies::
 
     $ conda install pybind11 scikit-build
     $ conda install pytorch -c pytorch
 
-To compile aihwkit, it is recommended to use the x64 Native Tools Command
-Promp for VS 2019.
+For compiling ``aihwkit``, it is recommended to use the x64 Native Tools Command
+Prompt for VS 2019.
 
-Note: If you want to use Pip instead Conda, you can use following commands::
+Note: If you want to use ``pip`` instead of ``conda``, the following commands can
+be used::
 
     $ pip install cmake scikit-build pybind11
     $ pip install torch -f https://download.pytorch.org/whl/torch_stable.html
@@ -99,9 +100,7 @@ Installing and compiling
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once the dependencies are in place, the following command can be used for
-installing
-For compiling and installing the Python package, the following command can be
-used::
+compiling and installing the Python package::
 
     $ pip install -v aihwkit
 
@@ -111,6 +110,7 @@ This command will:
 * invoke ``scikit-build``
 * which in turn will invoke ``cmake`` for the compilation.
 * execute the commands in verbose mode, for helping troubleshooting issues.
+* install the Python package.
 
 If there are any issue with the dependencies or the compilation, the output
 of the command will help diagnosing the issue.
