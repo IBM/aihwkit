@@ -16,14 +16,6 @@ notifications:
 #   only:
 #     - "master"
 
-# sudo: required
-
-services: docker
-
-os:
-  - linux
-  - osx
-
 stages:
   - Test and lint
   - Test multiple python versions
@@ -93,6 +85,7 @@ jobs:
     os: linux
     dist: bionic
     language: python
+    services: docker
     stage: Build Linux and OSX wheels
     if: tag IS present
     env:
