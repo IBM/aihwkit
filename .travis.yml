@@ -25,10 +25,9 @@ os:
   - osx
 
 stages:
-  - Build OSX wheels
   - Test and lint
   - Test multiple python versions
-  - Build Linux wheels
+  - Build Linux and OSX wheels
 
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
@@ -94,7 +93,7 @@ jobs:
     os: linux
     dist: bionic
     language: python
-    stage: Build Linux wheels
+    stage: Build Linux and OSX wheels
     if: tag IS present
     env:
       - CIBW_BEFORE_ALL="yum install -y openblas-devel gtest wget"
@@ -114,7 +113,7 @@ jobs:
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
-    stage: Build OSX wheels
+    stage: Build Linux and OSX wheels
     # if: tag IS present
     addons:
       homebrew:
