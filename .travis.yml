@@ -12,9 +12,9 @@ notifications:
   email: false
 
 # Disable double triggering when issuing a PR from a branch in the main repo.
-branches:
-  only:
-    - "master"
+# branches:
+#   only:
+#     - "master"
 
 sudo: required
 
