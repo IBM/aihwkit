@@ -35,6 +35,7 @@ stages:
 
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
+  os: linux
   before_install:
     - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
     - sudo apt-get update
@@ -55,12 +56,14 @@ jobs:
   include:
   - name: "Compile and test. Python 3.6"
     os: linux
+    dist: bionic
     <<: *job_compile_common
     stage: Test and lint
     python: "3.6"
 
   - name: "Compile and lint. Python 3.6"
     os: linux
+    dist: bionic
     <<: *job_compile_common
     stage: Test and lint
     python: "3.6"
@@ -72,18 +75,21 @@ jobs:
 
   - name: "Compile and test. Python 3.7"
     os: linux
+    dist: bionic
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.7"
 
   - name: "Compile and test. Python 3.8"
     os: linux
+    dist: bionic
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.8"
 
   - name: "Compile and test. Python 3.6, Torch 1.5"
     os: linux
+    dist: bionic
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.6"
@@ -97,6 +103,7 @@ jobs:
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
     os: linux
+    dist: bionic
     stage: Build Linux wheels
     if: tag IS present
     env:
