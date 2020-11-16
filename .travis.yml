@@ -28,6 +28,7 @@ os:
   - osx
 
 stages:
+  - Build OSX wheels
   - Test and lint
   - Test multiple python versions
   - Build Linux wheels
