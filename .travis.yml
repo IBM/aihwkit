@@ -119,7 +119,7 @@ jobs:
     env:
       - CIBW_BEFORE_ALL=""
       - CIBW_BEFORE_BUILD="pip install ./delocate && pip install -r requirements.txt"
-      - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
+      - CIBW_BUILD="cp36-macosx_x86_64" # cp37-macosx_x86_64 cp38-macosx_x86_64"
       # - CIBW_SKIP="cp27-* cp35-* cp38-*"
       # - CIBW_TEST_COMMAND="pytest -v -s tests/"
     before_install:
@@ -136,4 +136,6 @@ jobs:
       bucket: "aihw-wheels"
       skip_cleanup: true
       upload-dir: wheelhouse
-      endpoint: https://$endpoint
+      endpoint: https://s3.us-south.cloud-object-storage.appdomain.cloud
+      on:
+        all_branches: true
