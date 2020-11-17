@@ -193,11 +193,16 @@ class AnalogModuleBase(Module):
         module, but not its descendants.
 
         This method is a specialization of ``Module._load_from_state_dict``
-        that takes into account the extra `analog_tile_state` key used by
+        that takes into account the extra ``analog_tile_state`` key used by
         analog layers.
         """
-        analog_state = state_dict.pop('{}analog_tile_state'.format(prefix))
-        self.analog_tile.__setstate__(analog_state)
+        key = '{}analog_tile_state'.format(prefix)
+        if key in state_dict:
+            analog_state = state_dict.pop(key)
+            self.analog_tile.__setstate__(analog_state)
+        elif strict:
+            missing_keys.append(key)
+
         super()._load_from_state_dict(
             state_dict, prefix, local_metadata, strict, missing_keys,
             unexpected_keys, error_msgs)

@@ -49,7 +49,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Serialization of `Modules` that contain children analog layers is now
   possible, both when using containers such as `Sequential` and when using
-  analog layers as custom Module attributes. (\#74)
+  analog layers as custom Module attributes. (\#74, \#80)
 * The build system has been improved, with experimental Windows support and
   supporting using CUDA 11 correctly. (\#58, \#67, \#68)
 

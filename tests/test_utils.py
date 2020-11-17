@@ -278,3 +278,19 @@ class SerializationTest(ParametrizedTestCase):
         if self.bias:
             assert_array_almost_equal(model_biases, new_model_biases)
             assert_array_almost_equal(tile_biases, new_tile_biases)
+
+    def test_state_dict_analog_strict(self):
+        """Test the `strict` flag for analog layers."""
+        model = self.get_layer()
+        state_dict = model.state_dict()
+
+        # Remove the analog key from the state dict.
+        del state_dict['analog_tile_state']
+
+        # Check that it fails when using `strict`.
+        with self.assertRaises(RuntimeError) as context:
+            model.load_state_dict(state_dict, strict=True)
+        self.assertIn('Missing key', str(context.exception))
+
+        # Check that it passes when not using `strict`.
+        model.load_state_dict(state_dict, strict=False)
