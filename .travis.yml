@@ -17,9 +17,10 @@ notifications:
 #     - "master"
 
 stages:
+  - Build Linux and OSX wheels
   - Test and lint
   - Test multiple python versions
-  - Build Linux and OSX wheels
+
 
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
@@ -109,7 +110,7 @@ jobs:
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
     stage: Build Linux and OSX wheels
-    if: tag IS present
+    # if: tag IS present
     addons:
       homebrew:
         packages:
@@ -128,3 +129,11 @@ jobs:
     script:
       # build the wheels, put them into './wheelhouse'
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
+    deploy:
+      provider: s3
+      access_key_id: $access_key_id
+      secret_access_key: $secret_access_key
+      bucket: "aihw-wheels"
+      skip_cleanup: true
+      upload-dir: wheelhouse
+      endpoint: https://$endpoint
