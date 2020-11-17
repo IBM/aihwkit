@@ -16,23 +16,16 @@ branches:
   only:
     - "master"
 
-sudo: required
-
-language: python
-
-services: docker
-
-# Setup Travis to use Ubuntu 18.04 - Bionic
-os: linux
-dist: bionic
-
 stages:
   - Test and lint
   - Test multiple python versions
-  - Build Linux wheels
+  - Build Linux and OSX wheels
 
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
+  os: linux
+  dist: bionic
+  language: python
   before_install:
     - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
     - sudo apt-get update
@@ -48,6 +41,17 @@ job_compile_common: &job_compile_common
     - pip install "parameterized==0.7.4"
     - make pytest
 
+build_deploy_common: &build_deploy_common
+  deploy:
+    provider: s3
+    access_key_id: $ACCESS_KEY_ID
+    secret_access_key: $SECRET_ACCESS_KEY
+    bucket: "aihw-wheels"
+    skip_cleanup: true
+    local_dir: wheelhouse
+    endpoint: https://$ENDPOINT
+    on:
+      all_branches: true
 
 jobs:
   include:
@@ -89,20 +93,42 @@ jobs:
       - VERBOSE=1 pip install -v -e .
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
-    stage: Build Linux wheels
+    os: linux
+    dist: bionic
+    language: python
+    services: docker
+    stage: Build Linux and OSX wheels
     if: tag IS present
     env:
-      - CIBW_BEFORE_ALL="yum install -y openblas-devel gtest wget"
-      - CIBW_BEFORE_BUILD="pip install -r requirements.txt mkl mkl-include pytest"
-      - CIBW_MANYLINUX_X86_64_IMAGE="manylinux2014"
-      - CIBW_MANYLINUX_I686_IMAGE="manylinux2014"
+      - CIBW_BEFORE_BUILD="pip install -r requirements.txt"
+      - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
-      # - CIBW_SKIP="cp27-* cp35-* cp38-*"
-      # - CIBW_TEST_COMMAND="pytest -v -s tests/"
+    before_install:
+      - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
       - python3 -m pip install cibuildwheel==1.6.0
     script:
       # build the wheels, put them into './wheelhouse'
       - python3 -m cibuildwheel --output-dir wheelhouse
-      # The plan is to upload the wheels via twine only when the commit is tagged
-      # python3 -m twine <..>
+    <<: *build_deploy_common
+
+  - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
+    os: osx
+    stage: Build Linux and OSX wheels
+    if: tag IS present
+    addons:
+      homebrew:
+        packages:
+          - openblas
+        update: true
+    env:
+      - CIBW_BEFORE_BUILD="pip install ./delocate && pip install -r requirements.txt"
+      - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
+    before_install:
+      - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
+    install:
+      - python3 -m pip install cibuildwheel==1.6.0
+    script:
+      # build the wheels, put them into './wheelhouse'
+      - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
+    <<: *build_deploy_common
