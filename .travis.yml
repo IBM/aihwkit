@@ -12,15 +12,14 @@ notifications:
   email: false
 
 # Disable double triggering when issuing a PR from a branch in the main repo.
-# branches:
-#   only:
-#     - "master"
+branches:
+  only:
+    - "master"
 
 stages:
-  - Build Linux and OSX wheels
   - Test and lint
   - Test multiple python versions
-
+  - Build Linux and OSX wheels
 
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
@@ -99,7 +98,7 @@ jobs:
     language: python
     services: docker
     stage: Build Linux and OSX wheels
-    # if: tag IS present
+    if: tag IS present
     env:
       - CIBW_BEFORE_BUILD="pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
@@ -116,7 +115,7 @@ jobs:
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
     stage: Build Linux and OSX wheels
-    # if: tag IS present
+    if: tag IS present
     addons:
       homebrew:
         packages:
