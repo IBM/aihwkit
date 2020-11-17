@@ -42,6 +42,17 @@ job_compile_common: &job_compile_common
     - pip install "parameterized==0.7.4"
     - make pytest
 
+build_deploy_common: &build_deploy_common
+  deploy:
+    provider: s3
+    access_key_id: $ACCESS_KEY_ID
+    secret_access_key: $SECRET_ACCESS_KEY
+    bucket: "aihw-wheels"
+    skip_cleanup: true
+    local_dir: wheelhouse
+    endpoint: https://$ENDPOINT
+    on:
+      all_branches: true
 
 jobs:
   include:
@@ -90,13 +101,9 @@ jobs:
     stage: Build Linux and OSX wheels
     # if: tag IS present
     env:
-      - CIBW_BEFORE_ALL=""
-      - CIBW_BEFORE_BUILD="pip install -r requirements.txt mkl mkl-include pytest"
+      - CIBW_BEFORE_BUILD="pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
-      - CIBW_MANYLINUX_I686_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
-      # - CIBW_SKIP="cp27-* cp35-* cp38-*"
-      # - CIBW_TEST_COMMAND="pytest -v -s tests/"
     before_install:
       - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
@@ -104,8 +111,7 @@ jobs:
     script:
       # build the wheels, put them into './wheelhouse'
       - python3 -m cibuildwheel --output-dir wheelhouse
-      # The plan is to upload the wheels via twine only when the commit is tagged
-      # python3 -m twine <..>
+    <<: *build_deploy_common
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
@@ -117,11 +123,8 @@ jobs:
           - openblas
         update: true
     env:
-      - CIBW_BEFORE_ALL=""
       - CIBW_BEFORE_BUILD="pip install ./delocate && pip install -r requirements.txt"
-      - CIBW_BUILD="cp36-macosx_x86_64" # cp37-macosx_x86_64 cp38-macosx_x86_64"
-      # - CIBW_SKIP="cp27-* cp35-* cp38-*"
-      # - CIBW_TEST_COMMAND="pytest -v -s tests/"
+      - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
     install:
@@ -129,13 +132,4 @@ jobs:
     script:
       # build the wheels, put them into './wheelhouse'
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
-    deploy:
-      provider: s3
-      access_key_id: $access_key_id
-      secret_access_key: $secret_access_key
-      bucket: "aihw-wheels"
-      skip_cleanup: true
-      upload-dir: wheelhouse
-      endpoint: https://s3.us-south.cloud-object-storage.appdomain.cloud
-      on:
-        all_branches: true
+    <<: *build_deploy_common
