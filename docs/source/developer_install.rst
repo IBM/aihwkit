@@ -46,6 +46,46 @@ finer control over the compilation and for easier debugging potential issues::
     build$ cmake ..
     build$ make
 
+Note that the build system uses a temporary ``_skbuild`` folder for caching
+some steps of the compilation. While this is useful when making changes to
+the source code, in some cases environment changes (such as installing a new
+version of the dependencies, or switching the compiler) are not picked up
+correctly and the output of the compilation can be different than expected
+if the folder is present.
+
+If the compilation was not successful, it is recommended to manually remove the
+folder and re-run the compilation in a clean state via::
+
+    $ make clean
+
+Using the compiled version of the library
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once the library is compiled, the shared library will be created under the
+``src/aihwkit/simulator`` directory. By default, this folder is not in the path
+that Python uses for finding modules: it needs to be added to the
+``PYTHONPATH`` accordingly by either:
+
+1. Updating the environment variable for the session::
+
+    $ export PYTHONPATH=src/
+
+2. Prepending ``PYTHONPATH=src/`` to the commands where the library needs to
+   be found::
+
+    $ PYTHONPATH=src/ python examples/1_simple_layer.py
+
+.. note::
+
+    Please be aware that, if the ``PYTHONPATH`` is not modified and there is a
+    version of ``aihkwit`` installed via ``pip``, by default Python will use
+    the installed version, as opposed to the custom-compiled version. It is
+    recommended to remove the pip-installed version via::
+
+        $ pip uninstall aihwkit
+
+    when developing the library, in order to minimize the risk of confusion.
+
 Compilation flags
 ^^^^^^^^^^^^^^^^^
 
@@ -64,21 +104,22 @@ Flag                        Description                                       De
 ==========================  ================================================  =======
 
 The options can be passed both to ``setuptools`` or to ``cmake`` directly. For
-example, for compiling with CUDA support::
+example, for compiling and installing with CUDA support::
 
-    $ python setup.py install -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="60;70"
+    $ python setup.py build_ext --inplace -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="60;70"
 
 or if using ``cmake`` directly::
 
     build$ cmake -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="60;70" ..
 
+Passing other ``cmake`` flags
+"""""""""""""""""""""""""""""
 
-.. note::
-    If you are installing the package in editable mode for development (via.
-    ``pip install -e .``), please be aware that under most circumstances the
-    actual package sources will not be appended to the Python path. You might
-    need to add the ``src/`` folder to your ``PYTHONPATH`` accordingly (for
-    example, via ``export PYTHONPATH=src/``).
+In the same way flags specific to this project can be passed to ``setup.py``,
+other generic ``cmake`` flags can be passed as well. For example, for setting
+the compiler to ``clang`` in osx systems::
+
+    $ python setup.py build_ext --inplace -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
 
 
 .. _virtual environment: https://docs.python.org/3/library/venv.html
