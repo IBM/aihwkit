@@ -17,9 +17,10 @@ notifications:
 #     - "master"
 
 stages:
+  - Build Linux and OSX wheels
   - Test and lint
   - Test multiple python versions
-  - Build Linux and OSX wheels
+
 
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
@@ -87,15 +88,17 @@ jobs:
     language: python
     services: docker
     stage: Build Linux and OSX wheels
-    if: tag IS present
+    # if: tag IS present
     env:
       - CIBW_BEFORE_ALL="yum install -y openblas-devel gtest wget"
       - CIBW_BEFORE_BUILD="pip install -r requirements.txt mkl mkl-include pytest"
-      - CIBW_MANYLINUX_X86_64_IMAGE="manylinux2014"
-      - CIBW_MANYLINUX_I686_IMAGE="manylinux2014"
+      - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
+      - CIBW_MANYLINUX_I686_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
       # - CIBW_SKIP="cp27-* cp35-* cp38-*"
       # - CIBW_TEST_COMMAND="pytest -v -s tests/"
+    before_install:
+      - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
       - python3 -m pip install cibuildwheel==1.6.0
     script:
