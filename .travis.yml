@@ -112,7 +112,6 @@ jobs:
       homebrew:
         packages:
           - openblas
-          - python
         update: true
     env:
       - CIBW_BEFORE_ALL=""
