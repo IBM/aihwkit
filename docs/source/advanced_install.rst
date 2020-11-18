@@ -69,8 +69,9 @@ miniconda
 On a miniconda-based system, the following commands can be used for installing
 the minimal dependencies [#f3]_::
 
-    $ conda install cmake openblas pybind11 scikit-build
-    $ conda install pytorch -c pytorch
+    $ conda install cmake openblas pybind11
+    $ conda install -c conda-forge scikit-build
+    $ conda install -c pytorch pytorch
 
 
 Windows (Experimental)
