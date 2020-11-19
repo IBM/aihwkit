@@ -82,7 +82,10 @@ if(USE_CUDA)
   set_property(TARGET RPU_GPU PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
 
   if(${CUDAToolkit_VERSION_MAJOR} LESS 11)
-    add_dependencies(RPU_GPU cub)
+    # The "cub" target only exists if cub was downloaded during build.
+    if(TARGET cub)
+        add_dependencies(RPU_GPU cub)
+    endif()
   endif()
 
 endif(USE_CUDA)
