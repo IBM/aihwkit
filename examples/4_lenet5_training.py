@@ -254,7 +254,7 @@ def plot_results(train_losses, valid_losses, test_error):
 
     fig = plt.plot(test_error, 'r-s')
     plt.title('aihwkit LeNet5')
-    plt.legend(fig[:1], ['Validation Accuracy'])
+    plt.legend(fig[:1], ['Validation Error'])
     plt.xlabel('Epoch number')
     plt.ylabel('Test Error [%]')
     plt.yscale('log')
