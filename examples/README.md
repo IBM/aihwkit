@@ -3,7 +3,7 @@
 We have many different examples to explore the many features of the IBM Analog Hardware
 Acceleration Kit:
 
-## Example 1: [`1_simple_layer.py`]
+## Example 1: [`01_simple_layer.py`]
 
 In this example a single fully connected analog layer is used to predict the output tensor y, based
 on the input tensor x. The `rpu_config parameter` of the `AnalogLinear` layer can be used  to
@@ -31,14 +31,14 @@ Loss error: 0.0137629760429263
 Process finished with exit code 0
 ```
 
-## Example 2: [`2_multiple_layer.py`]
+## Example 2: [`02_multiple_layer.py`]
 
 The second example uses a larger fully connected network to predict the output tensor y based on
 the input tensor x. In this network the multiple fully connected analog layer are wrapped by a
 sequential container. Similarly to the first example, the network uses a `ConstantStepDevice` and
 it is  trained for 100 epochs with the loss printed at every epoch.
 
-## Example 3: [`3_minst_training.py`]
+## Example 3: [`03_minst_training.py`]
 
 This MNIST training example is based on the paper: [Gokmen T and Vlasov Y (2016) Acceleration of
 Deep Neural Network Training with Resistive Cross-Point Devices: Design Considerations. Front.
@@ -62,7 +62,7 @@ standard MNIST dataset with a Stochastic Gradient Descent optimizer. The network
 epochs with batch size of 64 and a fixed learning rate of 0.05 and the loss is printed at every
 epoch.
 
-## Example 4: [`4_lenet5_training.py`]
+## Example 4: [`04_lenet5_training.py`]
 
 This CNN MNIST training example is based on the paper: [Gokmen T, Onen M and Haensch W (2017)
 Training Deep Convolutional Neural Networks with Resistive Cross-Point Devices. Front. Neurosci.].
@@ -125,7 +125,7 @@ executed) together with a plot that shows the training evolution over the multip
 
 ![Test Error](img/test_error.png)
 
-## Example 5: [`5_simple_layer_hardware_aware.py`]
+## Example 5: [`05_simple_layer_hardware_aware.py`]
 
 Templating from the example 1, this example use the same input/output tensors and same architecture,
 but uses the hardware aware training functionality. In hardware aware training the network training
@@ -175,7 +175,7 @@ for t_inference in [0., 1., 20., 1000., 1e5]:
 
 More details are discussed in the [Inference and PCM statistical model] documentation.
 
-## Example 6: [`6_lenet5_hardware_aware.py`]
+## Example 6: [`06_lenet5_hardware_aware.py`]
 
 This example templates from the CNN of example 4 and add noise and non-idealities typical of the
 PCM.
@@ -199,7 +199,7 @@ accuracy:
         model.drift_analog_weights(t_inference)
 ```
 
-## Example 7: [`7_simple_layer_with_other_devices.py`]
+## Example 7: [`07_simple_layer_with_other_devices.py`]
 
 This example templates from example 1. However, rather than having a single device at every
 cross-point of the RPU array it defines 3 different devices, each one with its specific parameters,
@@ -230,7 +230,7 @@ More information can be find in the [Unit Cell Device] documentation. Similarly 
 network is trained over 100 epochs with an analog Stochastic Gradient Descent optimizer and the
 loss is printed for every epoch.
 
-## Example 8: [`8_simple_layer_with_tiki_taka.py`]
+## Example 8: [`08_simple_layer_with_tiki_taka.py`]
 
 This example aims at exploring a training algorithm specifically developed for RPU and resistive
 device and discussed in [Gokmen T and Haensch W (2020) Algorithm for Training Neural Networks on
@@ -281,11 +281,11 @@ https://www.frontiersin.org/articles/10.3389/fnins.2017.00538/full
 [Gokmen T and Haensch W (2020) Algorithm for Training Neural Networks on Resistive Device Arrays.
 Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
 
-[`1_simple_layer.py`]: 1_simple_layer.py
-[`2_multiple_layer.py`]: 2_multiple_layer.py
-[`3_minst_training.py`]: 3_minst_training.py
-[`4_lenet5_training.py`]: 4_lenet5_training.py
-[`5_simple_layer_hardware_aware.py`]: 5_simple_layer_hardware_aware.py
-[`6_lenet5_hardware_aware.py`]: 6_lenet5_hardware_aware.py
-[`7_simple_layer_with_other_devices.py`]: 7_simple_layer_with_other_devices.py
-[`8_simple_layer_with_tiki_taka.py`]: 8_simple_layer_with_tiki_taka.py
+[`01_simple_layer.py`]: 01_simple_layer.py
+[`02_multiple_layer.py`]: 02_multiple_layer.py
+[`03_minst_training.py`]: 03_minst_training.py
+[`04_lenet5_training.py`]: 04_lenet5_training.py
+[`05_simple_layer_hardware_aware.py`]: 05_simple_layer_hardware_aware.py
+[`06_lenet5_hardware_aware.py`]: 06_lenet5_hardware_aware.py
+[`07_simple_layer_with_other_devices.py`]: 07_simple_layer_with_other_devices.py
+[`08_simple_layer_with_tiki_taka.py`]: 08_simple_layer_with_tiki_taka.py
