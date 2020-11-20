@@ -330,5 +330,5 @@ of this complex analog tile for testing or training from the user
 point of view is however the same as for other tiles.
 
 .. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
-.. _Example 7: https://github.com/IBM/aihwkit/blob/master/examples/7_simple_layer_with_other_devices.py
-.. _Example 8: https://github.com/IBM/aihwkit/blob/master/examples/8_simple_layer_with_tiki_taka.py
+.. _Example 7: https://github.com/IBM/aihwkit/blob/master/examples/07_simple_layer_with_other_devices.py
+.. _Example 8: https://github.com/IBM/aihwkit/blob/master/examples/08_simple_layer_with_tiki_taka.py

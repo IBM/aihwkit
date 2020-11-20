@@ -73,7 +73,7 @@ that Python uses for finding modules: it needs to be added to the
 2. Prepending ``PYTHONPATH=src/`` to the commands where the library needs to
    be found::
 
-    $ PYTHONPATH=src/ python examples/1_simple_layer.py
+    $ PYTHONPATH=src/ python examples/01_simple_layer.py
 
 .. note::
 
