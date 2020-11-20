@@ -111,9 +111,9 @@ losses, test error and accuracy are printed for every epoch:
 
 ```
 10:20:13 --- Started LeNet5 Example
-10:20:32 --- Epoch: 0	Train loss: 1.9803	Valid loss: 1.6184	Test error: 10.66%	Accuracy: 89.34%	
+10:20:32 --- Epoch: 0	Train loss: 1.9803	Valid loss: 1.6184	Test error: 10.66%	Accuracy: 89.34%
 ...
-10:29:27 --- Epoch: 29	Train loss: 1.4724	Valid loss: 1.4768	Test error: 1.32%	Accuracy: 98.68%	
+10:29:27 --- Epoch: 29	Train loss: 1.4724	Valid loss: 1.4768	Test error: 1.32%	Accuracy: 98.68%
 10:29:27 --- Completed LeNet5 Example
 ```
 
