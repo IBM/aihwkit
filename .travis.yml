@@ -110,7 +110,7 @@ jobs:
     install:
       - python3 -m pip install cibuildwheel==1.6.0
     script:
-      # build the wheels, put them into './wheelhouse'
+      # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
 
@@ -133,6 +133,6 @@ jobs:
     install:
       - python3 -m pip install cibuildwheel==1.6.0
     script:
-      # build the wheels, put them into './wheelhouse'
+      # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
     <<: *build_deploy_common
