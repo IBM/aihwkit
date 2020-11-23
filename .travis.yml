@@ -45,12 +45,12 @@ job_compile_common: &job_compile_common
 build_deploy_common: &build_deploy_common
   deploy:
     provider: s3
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $SECRET_ACCESS_KEY
-    bucket: "aihw-wheels"
+    access_key_id: $COS_ACCESS_KEY_ID
+    secret_access_key: $COS_SECRET_ACCESS_KEY
+    bucket: $COS_BUCKET
     skip_cleanup: true
     local_dir: wheelhouse
-    endpoint: https://$ENDPOINT
+    endpoint: https://$COS_ENDPOINT
     on:
       all_branches: true
 
