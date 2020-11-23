@@ -16,7 +16,7 @@ from setuptools import find_packages
 from skbuild import setup
 
 INSTALL_REQUIRES = [
-    'torch>=1.2',
+    'torch>=1.5',
     'numpy>=1.18',
     'dataclasses==0.7; python_version < "3.7"'
 ]
