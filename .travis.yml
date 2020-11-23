@@ -98,7 +98,7 @@ jobs:
     language: python
     services: docker
     stage: Build Linux and OSX wheels
-    if: tag IS present
+    if: branch =~ /^release\/.*$/
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
@@ -117,7 +117,7 @@ jobs:
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
     stage: Build Linux and OSX wheels
-    if: tag IS present
+    if: branch =~ /^release\/.*$/
     addons:
       homebrew:
         packages:
