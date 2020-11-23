@@ -16,7 +16,7 @@ from setuptools import find_packages
 from skbuild import setup
 
 INSTALL_REQUIRES = [
-    'torch>=1.5',
+    'torch{}'.format(os.getenv('TORCH_VERSION_SPECIFIER', '>=1.5')),
     'numpy>=1.18',
     'dataclasses==0.7; python_version < "3.7"'
 ]
@@ -43,7 +43,7 @@ setup(
     description='IBM Analog Hardware Acceleration Kit',
     long_description=get_long_description(),
     long_description_content_type='text/markdown',
-    url='https://github.ibm.com/ETX/ai-hardware-toolkit',
+    url='https://github.com/IBM/aihwkit',
     author='IBM Research',
     author_email='aihwkit@us.ibm.com',
     license='Apache 2.0',
