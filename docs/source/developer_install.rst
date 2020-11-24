@@ -121,5 +121,16 @@ the compiler to ``clang`` in osx systems::
 
     $ python setup.py build_ext --inplace -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
 
+Environment variables
+"""""""""""""""""""""
+
+The following environment variables are taken into account during the build
+process:
+
+============================  ================================================
+Environment variable          Description
+============================  ================================================
+``TORCH_VERSION_SPECIFIER``   If present, sets the ``pytorch`` dependency version in the built Python package
+============================  ================================================
 
 .. _virtual environment: https://docs.python.org/3/library/venv.html

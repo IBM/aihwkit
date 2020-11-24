@@ -15,6 +15,7 @@ notifications:
 branches:
   only:
     - "master"
+    - /^release\/.*$/
 
 stages:
   - Test and lint
@@ -44,12 +45,12 @@ job_compile_common: &job_compile_common
 build_deploy_common: &build_deploy_common
   deploy:
     provider: s3
-    access_key_id: $ACCESS_KEY_ID
-    secret_access_key: $SECRET_ACCESS_KEY
-    bucket: "aihw-wheels"
+    access_key_id: $COS_ACCESS_KEY_ID
+    secret_access_key: $COS_SECRET_ACCESS_KEY
+    bucket: $COS_BUCKET
     skip_cleanup: true
     local_dir: wheelhouse
-    endpoint: https://$ENDPOINT
+    endpoint: https://$COS_ENDPOINT
     on:
       all_branches: true
 
@@ -98,9 +99,11 @@ jobs:
     language: python
     services: docker
     stage: Build Linux and OSX wheels
-    if: tag IS present
+    if: branch =~ /^release\/.*$/
     env:
-      - CIBW_BEFORE_BUILD="pip install -r requirements.txt"
+      # Use a specific torch version.
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
+      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
     before_install:
@@ -108,27 +111,29 @@ jobs:
     install:
       - python3 -m pip install cibuildwheel==1.6.0
     script:
-      # build the wheels, put them into './wheelhouse'
+      # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
     stage: Build Linux and OSX wheels
-    if: tag IS present
+    if: branch =~ /^release\/.*$/
     addons:
       homebrew:
         packages:
           - openblas
         update: true
     env:
-      - CIBW_BEFORE_BUILD="pip install ./delocate && pip install -r requirements.txt"
+      # Use a specific torch version.
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
+      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install ./delocate && pip install -r requirements.txt"
       - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
     install:
       - python3 -m pip install cibuildwheel==1.6.0
     script:
-      # build the wheels, put them into './wheelhouse'
+      # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
     <<: *build_deploy_common
