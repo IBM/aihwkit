@@ -272,8 +272,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         return self.tile.diffuse_weights()
 
-    def reset_columns(self, start_column_idx: int = 0, num_columns: int = 1,
-                      reset_prob: float = 1.0) -> None:
+    def reset_columns(
+            self,
+            start_column_idx: int = 0,
+            num_columns: int = 1,
+            reset_prob: float = 1.0
+    ) -> None:
         r"""Reset (a number of) columns.
 
         Resets the weights with device-to-device and cycle-to-cycle

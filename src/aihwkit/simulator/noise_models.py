@@ -74,9 +74,11 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
             the logical zero of the weights will be mapped to.
     """
 
-    def __init__(self,
-                 g_max: Optional[float] = None,
-                 g_min: Optional[float] = None):
+    def __init__(
+            self,
+            g_max: Optional[float] = None,
+            g_min: Optional[float] = None
+    ):
         self.g_max = 25.0 if g_max is None else g_max
         self.g_min = 0.0 if g_min is None else g_min
         self.scale_ratio = None
@@ -121,8 +123,10 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
 class BaseNoiseModel:
     """Base class for phenomenological noise models for inference."""
 
-    def __init__(self,
-                 g_converter: BaseConductanceConverter = None):
+    def __init__(
+            self,
+            g_converter: BaseConductanceConverter = None
+    ):
         self.g_converter = g_converter or SinglePairConductanceConverter()
 
     @no_grad()

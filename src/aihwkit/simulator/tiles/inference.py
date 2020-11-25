@@ -44,14 +44,15 @@ class InferenceTile(AnalogTile):
 
     is_cuda = False
 
-    def __init__(self,
-                 out_size: int,
-                 in_size: int,
-                 rpu_config: Optional[InferenceRPUConfig] = None,
-                 bias: bool = False,
-                 in_trans: bool = False,
-                 out_trans: bool = False
-                 ):
+    def __init__(
+            self,
+            out_size: int,
+            in_size: int,
+            rpu_config: Optional[InferenceRPUConfig] = None,
+            bias: bool = False,
+            in_trans: bool = False,
+            out_trans: bool = False
+    ):
         rpu_config = rpu_config or InferenceRPUConfig()
 
         # Noise model.
@@ -113,8 +114,10 @@ class InferenceTile(AnalogTile):
             self.drift_baseline = self.drift_compensation.init_baseline(forward_output)
 
     @no_grad()
-    def drift_weights(self,
-                      t_inference: float = 0.0) -> None:
+    def drift_weights(
+            self,
+            t_inference: float = 0.0
+    ) -> None:
         """Programs and drifts the current reference weights.
 
         The current weight reference is either the current weights or
