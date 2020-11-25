@@ -284,7 +284,8 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
 
-        self.g_max = self.g_converter.__dict__.get('g_max', g_max)
+        self.g_max = getattr(self.g_converter, 'g_max', g_max)
+
         if self.g_max is None:
             raise ValueError('g_max cannot be established from g_converter')
 
