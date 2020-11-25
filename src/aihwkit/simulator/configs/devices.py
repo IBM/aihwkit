@@ -399,16 +399,13 @@ class LinearStepDevice(PulsedDevice):
     origin :math:`w=0`.
 
     Note:
-
        In principle one could fix :math:`\gamma=\gamma^-=\gamma^+` since
        up/down variation can be given by ``up_down_dtod``, see
        :class:`~ConstantStepResistiveDevice`.
 
     Note:
-
        The hard-bounds are still observed, so that the weight cannot
        grow beyond its bounds.
-
     """
 
     gamma_down: float = 0.0

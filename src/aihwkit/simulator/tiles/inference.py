@@ -126,7 +126,6 @@ class InferenceTile(AnalogTile):
         with the drifted ones.
 
         Args:
-
             t_inference: Time (in sec) of assumed inference
                 time. Programming ends at t=0s.  The rest is waiting time,
                 where the devices might drift and accumulate noise. See
