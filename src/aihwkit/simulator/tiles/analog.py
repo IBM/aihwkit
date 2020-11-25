@@ -20,10 +20,12 @@ from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.configs import (InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig)
+from aihwkit.simulator.configs import (
+    InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+)
 from aihwkit.simulator.configs.devices import ConstantStepDevice
-from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.rpu_base import cuda, tiles
+from aihwkit.simulator.tiles.base import BaseTile
 
 
 class AnalogTile(BaseTile):

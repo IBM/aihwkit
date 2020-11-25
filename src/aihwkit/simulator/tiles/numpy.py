@@ -15,7 +15,7 @@
 """High level analog tiles (numpy)."""
 
 from numpy import array
-from torch import Tensor, from_numpy
+from torch import from_numpy, Tensor
 
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile
 
@@ -31,7 +31,6 @@ class NumpyMixin:
         memory space as the returned array data).
 
         Caution:
-
             This is an advanced method, and assumes that the caller will be
             responsible for managing the shared weights variable manually.
             After calling this function, the tile will use the same pointer for
@@ -41,7 +40,6 @@ class NumpyMixin:
             will occur.
 
         Caution:
-
             Since the internal memory layout is transposed for CUDA the weight
             matrix is transposed as well.
 

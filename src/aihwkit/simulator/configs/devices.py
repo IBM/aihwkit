@@ -14,19 +14,18 @@
 
 # pylint: disable=too-many-instance-attributes
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import ClassVar, List, Type
-from copy import deepcopy
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.rpu_base import devices
-
 from aihwkit.simulator.configs.helpers import (
     _PrintableMixin, parameters_to_bindings
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
 )
+from aihwkit.simulator.rpu_base import devices
 
 
 @dataclass
@@ -400,16 +399,13 @@ class LinearStepDevice(PulsedDevice):
     origin :math:`w=0`.
 
     Note:
-
        In principle one could fix :math:`\gamma=\gamma^-=\gamma^+` since
        up/down variation can be given by ``up_down_dtod``, see
        :class:`~ConstantStepResistiveDevice`.
 
     Note:
-
        The hard-bounds are still observed, so that the weight cannot
        grow beyond its bounds.
-
     """
 
     gamma_down: float = 0.0

@@ -15,21 +15,19 @@
 from copy import deepcopy
 from typing import List, Optional, Union
 
-from torch import Tensor, ones
-from torch.cuda import current_stream, current_device
-from torch.cuda import device as cuda_device
 from torch import device as torch_device
+from torch import ones, Tensor
 from torch.autograd import no_grad
+from torch.cuda import current_device, current_stream
+from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.tiles.base import BaseTile
-from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    WeightClipType, WeightModifierType
-)
 from aihwkit.simulator.configs.helpers import parameters_to_bindings
-from aihwkit.simulator.rpu_base import tiles, cuda
+from aihwkit.simulator.configs.utils import WeightClipType, WeightModifierType
+from aihwkit.simulator.rpu_base import cuda, tiles
+from aihwkit.simulator.tiles.analog import AnalogTile
+from aihwkit.simulator.tiles.base import BaseTile
 
 
 class InferenceTile(AnalogTile):
@@ -46,14 +44,15 @@ class InferenceTile(AnalogTile):
 
     is_cuda = False
 
-    def __init__(self,
-                 out_size: int,
-                 in_size: int,
-                 rpu_config: Optional[InferenceRPUConfig] = None,
-                 bias: bool = False,
-                 in_trans: bool = False,
-                 out_trans: bool = False
-                 ):
+    def __init__(
+            self,
+            out_size: int,
+            in_size: int,
+            rpu_config: Optional[InferenceRPUConfig] = None,
+            bias: bool = False,
+            in_trans: bool = False,
+            out_trans: bool = False
+    ):
         rpu_config = rpu_config or InferenceRPUConfig()
 
         # Noise model.
@@ -115,8 +114,10 @@ class InferenceTile(AnalogTile):
             self.drift_baseline = self.drift_compensation.init_baseline(forward_output)
 
     @no_grad()
-    def drift_weights(self,
-                      t_inference: float = 0.0) -> None:
+    def drift_weights(
+            self,
+            t_inference: float = 0.0
+    ) -> None:
         """Programs and drifts the current reference weights.
 
         The current weight reference is either the current weights or
@@ -125,7 +126,6 @@ class InferenceTile(AnalogTile):
         with the drifted ones.
 
         Args:
-
             t_inference: Time (in sec) of assumed inference
                 time. Programming ends at t=0s.  The rest is waiting time,
                 where the devices might drift and accumulate noise. See
@@ -165,7 +165,7 @@ class InferenceTile(AnalogTile):
         """Operators that need to be called once per mini-batch."""
         super().post_update_step()
 
-        # TODO: make this a little nicer. Now each time bindings are generated..
+        # TODO: make this a little nicer. Now each time bindings are generated.
         if self.rpu_config.clip.type != WeightClipType.NONE:
             weight_clip_params = parameters_to_bindings(self.rpu_config.clip)
             self.tile.clip_weights(weight_clip_params)

@@ -12,18 +12,16 @@
 
 """High level analog tiles (base)."""
 
+from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
-from collections import OrderedDict
-
 from numpy import concatenate, expand_dims
-from torch import Tensor, stack
 from torch import device as torch_device
+from torch import stack, Tensor
 from torch.autograd import no_grad
 
-from aihwkit.simulator.rpu_base import tiles
-
 from aihwkit.exceptions import TileError
+from aihwkit.simulator.rpu_base import tiles
 
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
 
@@ -274,8 +272,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         return self.tile.diffuse_weights()
 
-    def reset_columns(self, start_column_idx: int = 0, num_columns: int = 1,
-                      reset_prob: float = 1.0) -> None:
+    def reset_columns(
+            self,
+            start_column_idx: int = 0,
+            num_columns: int = 1,
+            reset_prob: float = 1.0
+    ) -> None:
         r"""Reset (a number of) columns.
 
         Resets the weights with device-to-device and cycle-to-cycle

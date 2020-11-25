@@ -152,7 +152,7 @@ class VectorUnitCellUpdatePolicy(Enum):
     the fly."""
 
     SINGLE_SEQUENTIAL = 'SingleSequential'
-    """Each device one at a time in sequence """
+    """Each device one at a time in sequence."""
 
     SINGLE_RANDOM = 'SingleRandom'
     """A single device is selected by random choice each mini-batch."""

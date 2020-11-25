@@ -16,21 +16,21 @@ from dataclasses import dataclass, field
 from typing import ClassVar, Type
 
 from aihwkit.simulator.configs.devices import (
-    FloatingPointDevice, ConstantStepDevice, PulsedDevice,
-    UnitCell, IdealDevice
+    ConstantStepDevice, FloatingPointDevice, IdealDevice, PulsedDevice,
+    UnitCell
 )
 from aihwkit.simulator.configs.helpers import (
     _PrintableMixin, tile_parameters_to_bindings
 )
 from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters, PulseType,
-    WeightClipParameter, WeightModifierParameter
+    IOParameters, PulseType, UpdateParameters, WeightClipParameter,
+    WeightModifierParameter
+)
+from aihwkit.simulator.noise_models import (
+    BaseDriftCompensation, BaseNoiseModel, GlobalDriftCompensation,
+    PCMLikeNoiseModel
 )
 from aihwkit.simulator.rpu_base import devices
-from aihwkit.simulator.noise_models import (
-    BaseNoiseModel, PCMLikeNoiseModel,
-    BaseDriftCompensation, GlobalDriftCompensation
-)
 
 
 @dataclass

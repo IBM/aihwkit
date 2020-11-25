@@ -14,7 +14,7 @@
 
 from typing import Optional, Tuple, Union
 
-from torch import Tensor, arange, cat, float64, int32, ones
+from torch import arange, cat, float64, int32, ones, Tensor
 from torch.nn import Conv2d, Unfold
 from torch.nn.modules.utils import _pair
 

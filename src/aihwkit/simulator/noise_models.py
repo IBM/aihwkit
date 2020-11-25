@@ -13,13 +13,13 @@
 """Phenomenological noise models for inference."""
 
 from copy import deepcopy
-from typing import List, Tuple, Dict, Optional
-from torch import Tensor, randn_like, log, clamp, ones
-from torch import abs as torch_abs
-from torch.autograd import no_grad
+from typing import Dict, List, Optional, Tuple
 
-from numpy import sqrt
 from numpy import log as numpy_log
+from numpy import sqrt
+from torch import abs as torch_abs
+from torch import clamp, log, ones, randn_like, Tensor
+from torch.autograd import no_grad
 
 _ZERO_CLIP = 1e-7
 
@@ -74,9 +74,11 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
             the logical zero of the weights will be mapped to.
     """
 
-    def __init__(self,
-                 g_max: Optional[float] = None,
-                 g_min: Optional[float] = None):
+    def __init__(
+            self,
+            g_max: Optional[float] = None,
+            g_min: Optional[float] = None
+    ):
         self.g_max = 25.0 if g_max is None else g_max
         self.g_min = 0.0 if g_min is None else g_min
         self.scale_ratio = None
@@ -121,8 +123,10 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
 class BaseNoiseModel:
     """Base class for phenomenological noise models for inference."""
 
-    def __init__(self,
-                 g_converter: BaseConductanceConverter = None):
+    def __init__(
+            self,
+            g_converter: BaseConductanceConverter = None
+    ):
         self.g_converter = g_converter or SinglePairConductanceConverter()
 
     @no_grad()
@@ -284,7 +288,8 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
 
-        self.g_max = self.g_converter.__dict__.get('g_max', g_max)
+        self.g_max = getattr(self.g_converter, 'g_max', g_max)
+
         if self.g_max is None:
             raise ValueError('g_max cannot be established from g_converter')
 

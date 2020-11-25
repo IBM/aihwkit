@@ -12,10 +12,11 @@
 
 """Utilities for resistive processing units configurations."""
 
-from dataclasses import Field, is_dataclass, fields
+from dataclasses import Field, fields, is_dataclass
 from enum import Enum
 from textwrap import indent
 from typing import Any, List
+
 from aihwkit.simulator.rpu_base import devices, tiles
 
 
@@ -48,8 +49,8 @@ def tile_parameters_to_bindings(params: Any) -> Any:
     """Convert a tile dataclass parameter into a bindings class."""
     field_map = {'forward': 'forward_io',
                  'backward': 'backward_io'}
-    excuded_fields = ('device', 'noise_model', 'drift_compensation',
-                      'clip', 'modifier')
+    excluded_fields = ('device', 'noise_model', 'drift_compensation',
+                       'clip', 'modifier')
 
     result = params.bindings_class()
     for field, value in params.__dict__.items():
@@ -57,7 +58,7 @@ def tile_parameters_to_bindings(params: Any) -> Any:
         field = field_map.get(field, field)
 
         # Convert enums to the bindings enums.
-        if field in excuded_fields:
+        if field in excluded_fields:
             # Exclude special fields that are not present in the bindings.
             continue
 
