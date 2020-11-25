@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Analog Modules that contain children Modules.."""
+"""Analog Modules that contain children Modules."""
 
 from typing import Callable, Optional, Union
 

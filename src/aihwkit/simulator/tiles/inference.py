@@ -165,7 +165,7 @@ class InferenceTile(AnalogTile):
         """Operators that need to be called once per mini-batch."""
         super().post_update_step()
 
-        # TODO: make this a little nicer. Now each time bindings are generated..
+        # TODO: make this a little nicer. Now each time bindings are generated.
         if self.rpu_config.clip.type != WeightClipType.NONE:
             weight_clip_params = parameters_to_bindings(self.rpu_config.clip)
             self.tile.clip_weights(weight_clip_params)
