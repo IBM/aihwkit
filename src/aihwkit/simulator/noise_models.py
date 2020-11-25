@@ -13,13 +13,13 @@
 """Phenomenological noise models for inference."""
 
 from copy import deepcopy
-from typing import List, Tuple, Dict, Optional
-from torch import Tensor, randn_like, log, clamp, ones
-from torch import abs as torch_abs
-from torch.autograd import no_grad
+from typing import Dict, List, Optional, Tuple
 
-from numpy import sqrt
 from numpy import log as numpy_log
+from numpy import sqrt
+from torch import abs as torch_abs
+from torch import clamp, log, ones, randn_like, Tensor
+from torch.autograd import no_grad
 
 _ZERO_CLIP = 1e-7
 

@@ -14,15 +14,18 @@
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from torch import Tensor
 from torch import device as torch_device
+from torch import Tensor
 from torch.nn import Module
 
 from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
+    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
+    UnitCellRPUConfig
 )
-from aihwkit.simulator.tiles import AnalogTile, BaseTile, FloatingPointTile, InferenceTile
+from aihwkit.simulator.tiles import (
+    AnalogTile, BaseTile, FloatingPointTile, InferenceTile
+)
 
 
 class AnalogModuleBase(Module):

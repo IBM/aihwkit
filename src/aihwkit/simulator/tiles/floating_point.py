@@ -15,17 +15,14 @@
 from copy import deepcopy
 from typing import Optional, Union
 
-
 from torch import device as torch_device
 from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig
-)
-from aihwkit.simulator.tiles.base import BaseTile
+from aihwkit.simulator.configs import FloatingPointRPUConfig
 from aihwkit.simulator.rpu_base import cuda, tiles
+from aihwkit.simulator.tiles.base import BaseTile
 
 
 class FloatingPointTile(BaseTile):

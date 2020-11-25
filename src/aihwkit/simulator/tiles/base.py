@@ -12,18 +12,16 @@
 
 """High level analog tiles (base)."""
 
+from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
-from collections import OrderedDict
-
 from numpy import concatenate, expand_dims
-from torch import Tensor, stack
 from torch import device as torch_device
+from torch import stack, Tensor
 from torch.autograd import no_grad
 
-from aihwkit.simulator.rpu_base import tiles
-
 from aihwkit.exceptions import TileError
+from aihwkit.simulator.rpu_base import tiles
 
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
 

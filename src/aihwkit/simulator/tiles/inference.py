@@ -15,21 +15,19 @@
 from copy import deepcopy
 from typing import List, Optional, Union
 
-from torch import Tensor, ones
-from torch.cuda import current_stream, current_device
-from torch.cuda import device as cuda_device
 from torch import device as torch_device
+from torch import ones, Tensor
 from torch.autograd import no_grad
+from torch.cuda import current_device, current_stream
+from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.tiles.base import BaseTile
-from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    WeightClipType, WeightModifierType
-)
 from aihwkit.simulator.configs.helpers import parameters_to_bindings
-from aihwkit.simulator.rpu_base import tiles, cuda
+from aihwkit.simulator.configs.utils import WeightClipType, WeightModifierType
+from aihwkit.simulator.rpu_base import cuda, tiles
+from aihwkit.simulator.tiles.analog import AnalogTile
+from aihwkit.simulator.tiles.base import BaseTile
 
 
 class InferenceTile(AnalogTile):

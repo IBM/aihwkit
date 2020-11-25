@@ -15,7 +15,7 @@
 """High level analog tiles (numpy)."""
 
 from numpy import array
-from torch import Tensor, from_numpy
+from torch import from_numpy, Tensor
 
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile
 

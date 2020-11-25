@@ -14,19 +14,18 @@
 
 # pylint: disable=too-many-instance-attributes
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import ClassVar, List, Type
-from copy import deepcopy
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.rpu_base import devices
-
 from aihwkit.simulator.configs.helpers import (
     _PrintableMixin, parameters_to_bindings
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
 )
+from aihwkit.simulator.rpu_base import devices
 
 
 @dataclass

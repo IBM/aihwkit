@@ -20,7 +20,8 @@ from torch.nn import Linear
 from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase
 from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
+    UnitCellRPUConfig
 )
 
 

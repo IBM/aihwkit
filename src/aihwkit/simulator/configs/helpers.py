@@ -12,10 +12,11 @@
 
 """Utilities for resistive processing units configurations."""
 
-from dataclasses import Field, is_dataclass, fields
+from dataclasses import Field, fields, is_dataclass
 from enum import Enum
 from textwrap import indent
 from typing import Any, List
+
 from aihwkit.simulator.rpu_base import devices, tiles
 
 
