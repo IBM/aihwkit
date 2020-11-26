@@ -117,6 +117,7 @@ jobs:
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
+    osx_image: xcode12.2
     stage: Build Linux and OSX wheels
     if: branch =~ /^release\/.*$/
     addons:
