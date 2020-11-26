@@ -1,4 +1,3 @@
-
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -14,7 +13,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Security` in case of vulnerabilities.
 
 
-## [UNRELEASED]
+## [0.2.1] - 2020/11/26
 
 ### Added
 
@@ -33,11 +32,11 @@ The format is based on [Keep a Changelog], and this project adheres to
   their `Device` suffix, for having a more consistent naming scheme. (\#57)
 * The `Exceptions` raised by the library have been revised, making use in some
   cases of the ones introduced in a new `aihwkit.exceptions` module. (\#49)
+* Some `VectorUnitCell` properties have been renamed and extended with an update
+  policy specifying how to select the hidden devices. (\#61)
 * The `pybind11` version required has been bumped to 2.6.0, which can be
   installed from `pip` and makes system-wide installation no longer required.
   Please update your `pybind11` accordingly for compiling the library. (\#44)
-* Some `VectorUnitCell` properties have been renamed and extended with an update
-  policy specifying how to select the hidden devices. (\#61)
 
 ### Removed
 
@@ -97,7 +96,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.2.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.2.1...HEAD
+[0.2.0]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
 [0.2.0]: https://github.com/IBM/aihwkit/compare/v0.1.0..v0.2.0
 [0.1.0]: https://github.com/IBM/aihwkit/releases/tag/v0.1.0
 

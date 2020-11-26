@@ -2,7 +2,7 @@ Project roadmap
 ===============
 
 You are one of the early users of the *IBM Analog Hardware Acceleration Kit*.
-The initial releases have been focused on releasing a basic Pytorch
+The initial releases have been focused on releasing a basic PyTorch
 integration for exploring selected features of the analog devices simulator,
 and set the basis that will be extended and improved upon:
 
