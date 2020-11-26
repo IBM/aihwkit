@@ -15,11 +15,18 @@ The preferred way to install this package is by using the Python package index::
     compile the library for your environment in case you encounter errors during
     installing from pip.
 
-The packages require the following runtime libraries to be installed in your
+The package require the following runtime libraries to be installed in your
 system:
 
 * `OpenBLAS`_: 0.3.3+
 * `CUDA Toolkit`_: 9.0+ (only required for the GPU-enabled simulator [#f1]_)
+
+.. note::
+    Please note that the current pip wheels are only compatible with ``PyTorch``
+    ``1.6.0``. If you need to use a different ``PyTorch`` version, please
+    refer to the :doc:`advanced_install` section in order to compile a custom
+    version. More details about the ``Pytorch`` compatibility can be found in
+    this `issue`_.
 
 Verifying the installation
 --------------------------
@@ -34,7 +41,7 @@ creating an analog layer and predicting the output::
     model(Tensor([[0.1, 0.2], [0.3, 0.4]]))
 
 If you encounter any issues during the installation or executing the snippet,
-please refer to the :doc:`advanced_install` for more details and don't
+please refer to the :doc:`advanced_install` section for more details and don't
 hesitate on using the `issue tracker`_ for additional support.
 
 Next steps
@@ -50,3 +57,4 @@ section.
 .. _OpenBLAS: https://www.openblas.net
 .. _CUDA Toolkit: https://developer.nvidia.com/accelerated-computing-toolkit
 .. _issue tracker: https://github.com/IBM/aihwkit/issues
+.. _issue: https://github.com/IBM/aihwkit/issues/52
