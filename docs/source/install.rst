@@ -25,7 +25,7 @@ system:
     Please note that the current pip wheels are only compatible with ``PyTorch``
     ``1.6.0``. If you need to use a different ``PyTorch`` version, please
     refer to the :doc:`advanced_install` section in order to compile a custom
-    version. More details about the ``Pytorch`` compatibility can be found in
+    version. More details about the ``PyTorch`` compatibility can be found in
     this `issue`_.
 
 Verifying the installation
@@ -47,7 +47,7 @@ hesitate on using the `issue tracker`_ for additional support.
 Next steps
 ----------
 
-You can read more about the Pytorch layers in the :doc:`using_pytorch`
+You can read more about the PyTorch layers in the :doc:`using_pytorch`
 section, and about the internal analog tiles in the :doc:`using_simulator`
 section.
 

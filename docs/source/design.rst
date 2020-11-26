@@ -8,16 +8,16 @@ The architecture of the library is comprised by several layers:
 
 .. image:: ../img/architecture.png
 
-Pytorch layer
+PyTorch layer
 ~~~~~~~~~~~~~
 
-The Pytorch layer is the high-level layer that provides primitives to users for
-using the features on the library from Pytorch, in particular layers and
+The PyTorch layer is the high-level layer that provides primitives to users for
+using the features on the library from PyTorch, in particular layers and
 optimizers.
 
-Overall, the elements on this layer take advantage of Pytorch facilities
-(inheriting from existing Pytorch classes and integrating with the rest of
-Pytorch features), replacing the default functionality with calls to a ``Tiles``
+Overall, the elements on this layer take advantage of PyTorch facilities
+(inheriting from existing PyTorch classes and integrating with the rest of
+PyTorch features), replacing the default functionality with calls to a ``Tiles``
 object from the simulator abstraction layer.
 
 Relevant modules:
@@ -38,7 +38,7 @@ and performing any translations on behalf of the user.
 
 The main purpose of this layer is to abstract away the implementation-specific
 complexities of the simulator layers, and map the structures and classes into
-an interface that caters to the needs of the Pytorch layer. This also provides
+an interface that caters to the needs of the PyTorch layer. This also provides
 benefits in regards to serialization and separating concerns overall.
 
 Relevant modules:
@@ -108,7 +108,7 @@ For example, using this excerpt of code:
     * internally, the :py:class:`aihwkit.simulator.tiles.FloatingPointTile`
       constructor will create a :py:class:`aihwkit.simulator.rpu_base.tiles.FloatingPointTile`
       instance, along with other objects. These objects are not exposed to the
-      Pytorch layer, and are the ones from the Pybind bindings layer at
+      PyTorch layer, and are the ones from the Pybind bindings layer at
       :py:mod:`aihwkit.simulator.rpu_base`.
     * instantiating the bindings classes will create the C++ objects internally.
 
@@ -121,7 +121,7 @@ For example, using this excerpt of code:
 3. During the training loop (lines 6-8), the forward and backward steps will
    be performed in the analog tile:
 
-    * for the ``AnalogLinear`` layer, Pytorch will call the function defined
+    * for the ``AnalogLinear`` layer, PyTorch will call the function defined
       at :py:class:`aihwkit.nn.functions.AnalogFunction`.
     * these functions will call the ``forward()`` and ``backward()`` functions
       defined in the :py:class:`aihwkit.simulator.tiles.FloatingPointTile` of

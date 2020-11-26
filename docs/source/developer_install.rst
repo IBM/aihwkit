@@ -130,7 +130,7 @@ process:
 ============================  ================================================
 Environment variable          Description
 ============================  ================================================
-``TORCH_VERSION_SPECIFIER``   If present, sets the ``pytorch`` dependency version in the built Python package
+``TORCH_VERSION_SPECIFIER``   If present, sets the ``PyTorch`` dependency version in the built Python package
 ============================  ================================================
 
 .. _virtual environment: https://docs.python.org/3/library/venv.html

@@ -31,7 +31,7 @@ The toolkit consists of two main components:
 PyTorch integration
 ~~~~~~~~~~~~~~~~~~~
 
-A series of primitives and features that allow using the toolkit within Pytorch:
+A series of primitives and features that allow using the toolkit within PyTorch:
 
 * Analog neural network modules (fully connected layer, convolution layer).
 * Analog optimizers (SGD).
