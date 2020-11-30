@@ -682,36 +682,66 @@ class DifferenceUnitCell(UnitCell):
 @dataclass
 class TransferCompound(UnitCell):
     r"""Abstract device model that takes 2 or more devices and
-    implements a 'transfer' based learning rule.
+    implements a transfer-based learning rule.
 
     It uses a (partly) hidden weight (where the SGD update is
     accumulated), which then is transferred partly and occasionally to
-    the visible weight.
+    the visible weight. This can implement an analog friendly variant
+    of stochastic gradient descent, as described in `Gokmen & Haensch
+    (2020)`_.
+
+    The hidden weight is always the first in the list of
+    ``unit_cell_devices`` given, and the transfer is done from left to
+    right. The first of the ``unit_cell_devices`` can have different
+    HW specifications from the rest, but the others need to be of
+    identical specs. In detail, when specifying the list of devices
+    only the first two will actually be used and the rest discarded
+    and instead replaced by the second device specification. In this
+    manner, the *fast* crossbar (receiving the SGD updates) and the
+    *slow* crossbar (receiving the occasional partial transfers from the
+    fast) can have different specs, but all additional slow crossbars
+    (receiving transfers from the left neighboring crossbar in the
+    list of ``unit_cell_devices``) need to be of the same spec.
 
     The rate of transfer (e.g. learning rate and how often and how
     many columns per transfer) and the type (ie. with ADC or without,
     with noise etc.) can be adjusted.
 
+    Each transfer event that is triggered by counting the update
+    cycles (in units of either mini-batch or single mat-vecs),
+    ``n_cols_per_transfer`` columns are read from the left device
+    using the forward pass with transfer vectors as input and
+    transferred to the right (taking the order of the
+    ``unit_cell_devices`` list) using the outer-product update with
+    the read-out vectors and the transfer vectors. Currently, transfer
+    vectors are fixed to be one-hot vectors. The columns to take are
+    in sequential order and warped around at the edge of the
+    crossbar. The learning rate and forward and update specs of the
+    transfer can be user-defined.
+
     The weight that is seen in the forward and backward pass is
     governed by the :math:`\gamma` weightening setting.
 
-    In principle, a deeper chain of transferred weights can be setup,
-    however, only the device parameters of the first versus the others
-    can be different. However, all devices need to be specified in the
-    list.
 
     Note:
         Here the devices could be either transferred in analog
         (essentially within the unit cell) or on separate arrays (using
         the usual (non-ideal) forward pass and update steps. This can be
         set with ``transfer_forward`` and ``transfer_update``.
+
+    .. _Gokmen & Vlasov (2016): https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
+
     """
 
     bindings_class: ClassVar[Type] = devices.TransferResistiveDeviceParameter
 
     gamma: float = 0.0
-    """
-    Weightening factor g**(n-1) W[0] + g**(n-2) W[1] + .. + g**0 W[n-1]
+    r"""
+    Weightening factor to compute the effective SGD weight from the
+    hidden matrices. The default scheme is:
+
+    .. math:: g^{n-1} W_0 + g^{n-2} W_1 + \ldots + g^0  W_{n-1}
+
     """
 
     gamma_vec: List[float] = field(default_factory=list,
