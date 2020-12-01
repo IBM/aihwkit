@@ -687,8 +687,8 @@ class TransferCompound(UnitCell):
     It uses a (partly) hidden weight (where the SGD update is
     accumulated), which then is transferred partly and occasionally to
     the visible weight. This can implement an analog friendly variant
-    of stochastic gradient descent, as described in `Gokmen & Haensch
-    (2020)`_.
+    of stochastic gradient descent, as described in
+    `Gokmen & Haensch (2020)`_.
 
     The hidden weight is always the first in the list of
     ``unit_cell_devices`` given, and the transfer is done from left to
@@ -729,7 +729,7 @@ class TransferCompound(UnitCell):
         the usual (non-ideal) forward pass and update steps. This can be
         set with ``transfer_forward`` and ``transfer_update``.
 
-    .. _Gokmen & Vlasov (2016): https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
+    .. _Gokmen & Haensch (2020): https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
 
     """
 
