@@ -12,10 +12,10 @@ notifications:
   email: false
 
 # Disable double triggering when issuing a PR from a branch in the main repo.
-branches:
-  only:
-    - "master"
-    - /^release\/.*$/
+#branches:
+#  only:
+#    - "master"
+#    - /^release\/.*$/
 
 stages:
   - Test and lint
