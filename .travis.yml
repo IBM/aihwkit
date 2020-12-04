@@ -56,85 +56,85 @@ build_deploy_common: &build_deploy_common
 
 jobs:
   include:
-  - name: "Compile and test. Python 3.6"
-    <<: *job_compile_common
-    stage: Test and lint
-    python: "3.6"
-
-  - name: "Compile and lint. Python 3.6"
-    <<: *job_compile_common
-    stage: Test and lint
-    python: "3.6"
-    script:
-      - pip install -r requirements-dev.txt
-      - make pycodestyle
-      - make pylint
-      - make mypy
-
-  - name: "Compile and test. Python 3.7"
-    <<: *job_compile_common
-    stage: Test multiple python versions
-    python: "3.7"
-
-  - name: "Compile and test. Python 3.8"
-    <<: *job_compile_common
-    stage: Test multiple python versions
-    python: "3.8"
-
-  - name: "Compile and test. Python 3.6, Torch 1.5"
-    <<: *job_compile_common
-    stage: Test multiple python versions
-    python: "3.6"
-    install:
-      # Set the python executable, to force cmake picking the right one.
-      - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-      - pip install "torch==1.5.1"
-      - pip install -r requirements.txt pytest
-      # Install the package in editable mode.
-      - VERBOSE=1 pip install -v -e .
-
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
-    os: linux
-    dist: bionic
-    language: python
-    services: docker
-    stage: Build Linux and OSX wheels
-    if: branch =~ /^release\/.*$/
-    env:
-      # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install -r requirements.txt"
-      - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
-      - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
-    before_install:
-      - docker pull aihwkit/manylinux2014_x86_64_aihwkit
-    install:
-      - python3 -m pip install cibuildwheel==1.6.0
-    script:
-      # Build the wheels into './wheelhouse'.
-      - python3 -m cibuildwheel --output-dir wheelhouse
-    <<: *build_deploy_common
-
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
-    os: osx
-    osx_image: xcode12.2
-    stage: Build Linux and OSX wheels
-    if: branch =~ /^release\/.*$/
-    addons:
-      homebrew:
-        packages:
-          - openblas
-        update: true
-    env:
-      # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install ./delocate && pip install -r requirements.txt"
-      - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
-    before_install:
-      - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
-    install:
-      - python3 -m pip install cibuildwheel==1.6.0
-    script:
-      # Build the wheels into './wheelhouse'.
-      - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
-    <<: *build_deploy_common
+#  - name: "Compile and test. Python 3.6"
+#    <<: *job_compile_common
+#    stage: Test and lint
+#    python: "3.6"
+#
+#  - name: "Compile and lint. Python 3.6"
+#    <<: *job_compile_common
+#    stage: Test and lint
+#    python: "3.6"
+#    script:
+#      - pip install -r requirements-dev.txt
+#      - make pycodestyle
+#      - make pylint
+#      - make mypy
+#
+#  - name: "Compile and test. Python 3.7"
+#    <<: *job_compile_common
+#    stage: Test multiple python versions
+#    python: "3.7"
+#
+#  - name: "Compile and test. Python 3.8"
+#    <<: *job_compile_common
+#    stage: Test multiple python versions
+#    python: "3.8"
+#
+#  - name: "Compile and test. Python 3.6, Torch 1.5"
+#    <<: *job_compile_common
+#    stage: Test multiple python versions
+#    python: "3.6"
+#    install:
+#      # Set the python executable, to force cmake picking the right one.
+#      - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
+#      - pip install "torch==1.5.1"
+#      - pip install -r requirements.txt pytest
+#      # Install the package in editable mode.
+#      - VERBOSE=1 pip install -v -e .
+#
+#  - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
+#    os: linux
+#    dist: bionic
+#    language: python
+#    services: docker
+#    stage: Build Linux and OSX wheels
+#    if: branch =~ /^release\/.*$/
+#    env:
+#      # Use a specific torch version.
+#      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
+#      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install -r requirements.txt"
+#      - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
+#      - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64"
+#    before_install:
+#      - docker pull aihwkit/manylinux2014_x86_64_aihwkit
+#    install:
+#      - python3 -m pip install cibuildwheel==1.6.0
+#    script:
+#      # Build the wheels into './wheelhouse'.
+#      - python3 -m cibuildwheel --output-dir wheelhouse
+#    <<: *build_deploy_common
+#
+#  - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
+#    os: osx
+#    osx_image: xcode12.2
+#    stage: Build Linux and OSX wheels
+#    if: branch =~ /^release\/.*$/
+#    addons:
+#      homebrew:
+#        packages:
+#          - openblas
+#        update: true
+#    env:
+#      # Use a specific torch version.
+#      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
+#      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install ./delocate && pip install -r requirements.txt"
+#      - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64"
+#    before_install:
+#      - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
+#    install:
+#      - python3 -m pip install cibuildwheel==1.6.0
+#    script:
+#      # Build the wheels into './wheelhouse'.
+#      - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
+#    <<: *build_deploy_common
