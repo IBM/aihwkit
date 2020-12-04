@@ -145,17 +145,24 @@ jobs:
     stage: Build Linux and OSX wheels
 #    if: branch =~ /^release\/.*$/
     env:
+      - OPENBLAS_ROOT=C:\\BLAS
+      - OPENBLAS_ROOT_DIR=C:\\BLAS
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install -r requirements.txt"
-      - CIBW_BUILD="cp38-win32"
+      - CIBW_BEFORE_BUILD="pip install torch==1.6.0+cpu -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
+      - CIBW_BUILD_VERBOSITY=1
+      - CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
     before_install:
-      - choco install python --version 3.8.0
+      # Install base python, and ensure it's on the PATH.
+      - choco install python --version 3.8.6
       - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
-      # make sure it's on PATH as 'python3'
       - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+      # Download and unzip OpenBLAS.
+      - wget https://github.com/xianyi/OpenBLAS/releases/download/v0.3.12/OpenBLAS-0.3.12-x64.zip -q -O openblas.zip
+      - mkdir C:\\BLAS
+      - 7z x openblas.zip -oc:\\BLAS
     install:
-      - python3 -m pip install cibuildwheel==1.6.0
+      - python3 -m pip install cibuildwheel==1.6.4
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse

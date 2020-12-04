@@ -55,7 +55,14 @@ SET(Open_BLAS_LIB_SEARCH_PATHS
 )
 
 FIND_PATH(OpenBLAS_INCLUDE_DIR NAMES openblas_config.h PATHS ${Open_BLAS_INCLUDE_SEARCH_PATHS})
-FIND_LIBRARY(OpenBLAS_LIB NAMES openblas PATHS ${Open_BLAS_LIB_SEARCH_PATHS})
+if(WIN32)
+    # The official OpenBLAS github releases (-x64) name the library
+    # `libopenblas.*`, whereas the default `CMAKE_FIND_LIBRARY_PREFIXES` does
+    # not contain `lib`.
+    FIND_LIBRARY(OpenBLAS_LIB NAMES openblas libopenblas PATHS ${Open_BLAS_LIB_SEARCH_PATHS})
+else()
+    FIND_LIBRARY(OpenBLAS_LIB NAMES openblas PATHS ${Open_BLAS_LIB_SEARCH_PATHS})
+endif()
 # maybe add the openblasp64 if available
 
 SET(OpenBLAS_FOUND ON)
