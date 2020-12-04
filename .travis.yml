@@ -138,3 +138,25 @@ jobs:
 #      # Build the wheels into './wheelhouse'.
 #      - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
 #    <<: *build_deploy_common
+
+  - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
+    os: windows
+    language: shell
+    stage: Build Linux and OSX wheels
+#    if: branch =~ /^release\/.*$/
+    env:
+      # Use a specific torch version.
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
+      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install -r requirements.txt"
+      - CIBW_BUILD="cp38-win32"
+    before_install:
+      - choco install python --version 3.8.0
+      - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+      # make sure it's on PATH as 'python3'
+      - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+    install:
+      - python3 -m pip install cibuildwheel==1.6.0
+    script:
+      # Build the wheels into './wheelhouse'.
+      - python3 -m cibuildwheel --output-dir wheelhouse
+    # <<: *build_deploy_common
