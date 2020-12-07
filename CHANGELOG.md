@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Security` in case of vulnerabilities.
 
 
+## [UNRELEASED]
+
 ## [0.2.1] - 2020/11/26
 
 ### Added
@@ -97,7 +99,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 
 [UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.2.1...HEAD
-[0.2.0]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
+[0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
 [0.2.0]: https://github.com/IBM/aihwkit/compare/v0.1.0..v0.2.0
 [0.1.0]: https://github.com/IBM/aihwkit/releases/tag/v0.1.0
 
