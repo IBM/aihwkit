@@ -20,7 +20,7 @@ branches:
 stages:
   - Test and lint
   - Test multiple python versions
-  - Build Linux and OSX wheels
+  - Build wheels
 
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
@@ -98,7 +98,7 @@ jobs:
     dist: bionic
     language: python
     services: docker
-    stage: Build Linux and OSX wheels
+    stage: Build wheels
     if: branch =~ /^release\/.*$/
     env:
       # Use a specific torch version.
@@ -118,7 +118,7 @@ jobs:
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
     os: osx
     osx_image: xcode12.2
-    stage: Build Linux and OSX wheels
+    stage: Build wheels
     if: branch =~ /^release\/.*$/
     addons:
       homebrew:
@@ -137,4 +137,33 @@ jobs:
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
+    <<: *build_deploy_common
+
+  - name: "Build wheel for Python 3.6, 3.7, 3.8 on win64"
+    os: windows
+    language: shell
+    stage: Build wheels
+    if: branch =~ /^release\/win.*$/
+    env:
+      # Use a specific torch version.
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
+      - CIBW_BEFORE_BUILD="pip install torch==1.6.0+cpu -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
+      - CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64"
+      # Use unzipped OpenBLAS.
+      - OPENBLAS_ROOT=C:\\BLAS
+      - OPENBLAS_ROOT_DIR=C:\\BLAS
+    before_install:
+      # Install base python, and ensure it's on the PATH.
+      - choco install python --version 3.8.6
+      - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+      - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+      # Download and unzip OpenBLAS.
+      - wget https://github.com/xianyi/OpenBLAS/releases/download/v0.3.12/OpenBLAS-0.3.12-x64.zip -q -O openblas.zip
+      - mkdir C:\\BLAS
+      - 7z x openblas.zip -oc:\\BLAS
+    install:
+      - python3 -m pip install cibuildwheel==1.6.4
+    script:
+      # Build the wheels into './wheelhouse'.
+      - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
