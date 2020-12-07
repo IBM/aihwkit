@@ -166,4 +166,4 @@ jobs:
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse
-    # <<: *build_deploy_common
+    <<: *build_deploy_common
