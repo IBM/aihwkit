@@ -19,6 +19,7 @@ Uses learning rates of η = 0.01, 0.005, and 0.0025
 for epochs 0–10, 11–20, and 21–30, respectively.
 """
 
+import os
 from time import time
 
 # Imports from PyTorch.
@@ -34,7 +35,7 @@ from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 
 # Path where the datasets will be stored.
-PATH_DATASET = 'data/DATASET'
+PATH_DATASET = os.path.join('data', 'DATASET')
 
 # Network definition.
 INPUT_SIZE = 784
