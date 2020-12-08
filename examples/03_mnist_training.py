@@ -19,6 +19,7 @@ Uses learning rates of η = 0.01, 0.005, and 0.0025
 for epochs 0–10, 11–20, and 21–30, respectively.
 """
 
+import os
 from time import time
 
 # Imports from PyTorch.
@@ -34,8 +35,7 @@ from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 
 # Path where the datasets will be stored.
-TRAIN_DATASET = 'data/TRAIN_DATASET'
-TEST_DATASET = 'data/TEST_DATASET'
+PATH_DATASET = os.path.join('data', 'DATASET')
 
 # Network definition.
 INPUT_SIZE = 784
@@ -52,9 +52,9 @@ def load_images():
     transform = transforms.Compose([transforms.ToTensor()])
 
     # Load the images.
-    train_set = datasets.MNIST(TRAIN_DATASET,
+    train_set = datasets.MNIST(PATH_DATASET,
                                download=True, train=True, transform=transform)
-    val_set = datasets.MNIST(TEST_DATASET,
+    val_set = datasets.MNIST(PATH_DATASET,
                              download=True, train=False, transform=transform)
     train_data = torch.utils.data.DataLoader(
         train_set, batch_size=BATCH_SIZE, shuffle=True)

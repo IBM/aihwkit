@@ -44,8 +44,7 @@ if torch.cuda.is_available():
     USE_CUDA = 1
 
 # Path to store datasets
-TRAIN_DATASET = os.path.join('data', 'TRAIN_DATASET')
-TEST_DATASET = os.path.join('data', 'TEST_DATASET')
+PATH_DATASET = os.path.join('data', 'DATASET')
 
 # Path to store results
 RESULTS = os.path.join('results', 'LENET5')
@@ -69,8 +68,8 @@ RPU_CONFIG = SingleRPUConfig(device=ConstantStepDevice())
 def load_images():
     """Load images for train from torchvision datasets."""
     transform = transforms.Compose([transforms.ToTensor()])
-    train_set = datasets.MNIST(TRAIN_DATASET, download=True, train=True, transform=transform)
-    val_set = datasets.MNIST(TEST_DATASET, download=True, train=False, transform=transform)
+    train_set = datasets.MNIST(PATH_DATASET, download=True, train=True, transform=transform)
+    val_set = datasets.MNIST(PATH_DATASET, download=True, train=False, transform=transform)
     train_data = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
     validation_data = torch.utils.data.DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
