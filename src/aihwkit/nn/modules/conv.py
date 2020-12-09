@@ -19,10 +19,7 @@ from torch.nn import Conv2d, Unfold
 from torch.nn.modules.utils import _pair
 
 from aihwkit.nn.functions import AnalogIndexedFunction
-from aihwkit.nn.modules.base import AnalogModuleBase
-from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig
-)
+from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
 class AnalogConv2d(Conv2d, AnalogModuleBase):
@@ -82,8 +79,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             groups: int = 1,
             bias: bool = True,
             padding_mode: str = 'zeros',
-            rpu_config: Optional[
-                Union[FloatingPointRPUConfig, SingleRPUConfig, UnitCellRPUConfig]] = None,
+            rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
     ):
         # pylint: disable=too-many-arguments

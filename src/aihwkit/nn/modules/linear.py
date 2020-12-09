@@ -12,17 +12,13 @@
 
 """Analog layers."""
 
-from typing import Optional, Union
+from typing import Optional
 
 from torch import Tensor
 from torch.nn import Linear
 
 from aihwkit.nn.functions import AnalogFunction
-from aihwkit.nn.modules.base import AnalogModuleBase
-from aihwkit.simulator.configs import (
-    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
-    UnitCellRPUConfig
-)
+from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
 class AnalogLinear(Linear, AnalogModuleBase):
@@ -58,9 +54,7 @@ class AnalogLinear(Linear, AnalogModuleBase):
             in_features: int,
             out_features: int,
             bias: bool = True,
-            rpu_config: Optional[
-                Union[FloatingPointRPUConfig, SingleRPUConfig,
-                      UnitCellRPUConfig, InferenceRPUConfig]] = None,
+            rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
     ):
         # Create the tile.

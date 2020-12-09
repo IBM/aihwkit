@@ -27,6 +27,9 @@ from aihwkit.simulator.tiles import (
     AnalogTile, BaseTile, FloatingPointTile, InferenceTile
 )
 
+RPUConfigAlias = Union[FloatingPointRPUConfig, SingleRPUConfig,
+                       UnitCellRPUConfig, InferenceRPUConfig]
+
 
 class AnalogModuleBase(Module):
     """Base class for analog Modules.
@@ -55,9 +58,7 @@ class AnalogModuleBase(Module):
             in_features: int,
             out_features: int,
             bias: bool,
-            rpu_config: Optional[
-                Union[FloatingPointRPUConfig, SingleRPUConfig,
-                      UnitCellRPUConfig, InferenceRPUConfig]] = None,
+            rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False
     ) -> BaseTile:
         """Create an analog tile and setup this layer for using it.
