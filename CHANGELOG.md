@@ -19,13 +19,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-* Deterministic bitlines for analog training (\XX)
-* More noise types for hardware-aware training for inference (polynomial)
-* Additional bound management schemes (worst case, average max, shift)
-* cycle-to-cycle output referred MAC weight noise that resembles the conductance
-  dependent PCM read noise stastistics
-* C++ backend improvements (slice backward/forward/update, direct update)
-* Option to excluded bias row for hardware-aware training noise
+* Option to choose deterministic pulse trains for the rank-1 update of
+  analog devices during training (\#99)
+* More noise types for hardware-aware training for inference
+  (polynomial) (\#99)
+* Additional bound management schemes (worst case, average max, shift) (\#99)
+* Cycle-to-cycle output referred analog multipl-and-accumulate weight
+  noise that resembles the conductance dependent PCM read noise
+  stastistics (\#99)
+* C++ backend improvements (slice backward/forward/update, direct
+  update) (\#99)
+* Option to excluded bias row for hardware-aware training noise (\#99)
 * The `rpu_config` is now pretty-printed in a readable manner (excluding the
   default settings and other readability tweak). (\#60)
 * Added a new `ReferenceUnitCell` which has two devices, where one is fixed and
@@ -55,6 +59,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* Faulty backward noise management error message removed for perfect backward
+  and CUDA (\#99)
 * Serialization of `Modules` that contain children analog layers is now
   possible, both when using containers such as `Sequential` and when using
   analog layers as custom Module attributes. (\#74, \#80)
