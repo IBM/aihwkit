@@ -148,8 +148,11 @@ public:
   void diffuseWeights(T **weights, RNG<T> &rng) override;
   void clipWeights(T **weights, T clip) override;
 
+  void
+  resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
+
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
-  void setHiddenUpdateIdx(int idx) override{}; // ignored
+  void setHiddenUpdateIdx(int idx) override{};
 
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
@@ -177,6 +180,7 @@ protected:
   void populate(const TransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
   void reduceToWeights(T **weights) const override;
   T **getDeviceWeights(int device_idx) const;
+  int resetCounters(bool force = false) override;
 
   std::unique_ptr<ForwardBackwardPassIOManaged<T>> transfer_fb_pass_ = nullptr;
   std::unique_ptr<PulsedRPUWeightUpdater<T>> transfer_pwu_ = nullptr;
@@ -188,8 +192,6 @@ protected:
   T **last_weight_ = nullptr;
   std::vector<T> transfer_tmp_;
   bool fully_hidden_ = false;
-
-private:
 };
 
 } // namespace RPU

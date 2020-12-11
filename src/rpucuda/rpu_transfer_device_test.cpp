@@ -233,7 +233,6 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransfer) {
   num_t sc = reduce_weightening[0] + reduce_weightening[1];
   for (int j = 0; j < this->d_size; j++) {
     for (int i = 0; i < this->x_size; i++) {
-      // std::cout << "w(" << j << "," << i << ")=" << this->weights[j][i] << std::endl;
       if (j == rowidx && i == this->colidx) {
         ASSERT_FLOAT_EQ(this->weights[j][i], sc * dx);
       } else {

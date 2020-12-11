@@ -119,9 +119,6 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
     dev_fb_weights_->assign(*other.dev_fb_weights_);
   }
 
-  // no copy needed
-  wclipper_cuda_ = nullptr;
-
   // cannot copy external weight pointer...
   if (other.dev_delta_weights_extern_) {
     std::cout << "WARNING cannot copy external delta weight pointer..." << std::endl;
@@ -129,9 +126,13 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
   dev_delta_weights_extern_ = nullptr;
 
   if (other.fb_wmodifier_cuda_) {
-    // no copy... just new.. No parameters involved anyway
-    fb_wmodifier_cuda_ = RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
+    // no copy... just new..
+    fb_wmodifier_cuda_ =
+        RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
   }
+
+  // no copy
+  wclipper_cuda_ = nullptr;
 
   dev_x_vector_->assign(*other.dev_x_vector_);
   dev_d_vector_->assign(*other.dev_d_vector_);
@@ -139,10 +140,11 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
   dev_x_vector_bias_->assign(*other.dev_x_vector_bias_);
 
   // do not care to copy the matrix/tensor/rnd buffers (will init automatically)
+
   context_->synchronizeContext();
 
   DEBUG_CALL(this->disp(););
-  DEBUG_OUT("RPUCudaSimple copy constructed.");
+  DEBUG_OUT("RPUCuda_Simple copy constructed.");
 }
 
 // copy assignment
@@ -185,6 +187,7 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
   other.dev_x_matrix_bias_size_ = 0;
 
   dev_temp_tensor_ = std::move(other.dev_temp_tensor_);
+
   rnd_diffusion_context_ = std::move(other.rnd_diffusion_context_);
   dev_diffusion_nrnd_ = std::move(other.dev_diffusion_nrnd_);
 
@@ -230,9 +233,16 @@ template <typename T> void RPUCudaSimple<T>::setWeights(const T *host_source) {
 }
 
 template <typename T> void RPUCudaSimple<T>::setSharedWeights(T *device_source) {
-  context_->synchronizeDevice();
-  dev_weights_->copyTo(device_source);
-  dev_weights_->setShared(device_source);
+  if (!this->shared_weights_if_) {
+    context_->synchronizeDevice();
+    dev_weights_->copyTo(device_source);
+  }
+  if (device_source != dev_weights_->getData()) {
+    dev_weights_->synchronize();
+    dev_weights_->setShared(device_source);
+  }
+
+  this->shared_weights_if_ = true;
 }
 
 template <typename T>
@@ -266,7 +276,8 @@ template <typename T> void RPUCudaSimple<T>::printToStream(std::stringstream &ss
 
 template <typename T> T *RPUCudaSimple<T>::getWeightsBufferCuda() {
   if (dev_weights_buffer_ == nullptr) {
-    dev_weights_buffer_ = RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * this->d_size_);
+    dev_weights_buffer_ =
+        RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * this->d_size_);
   }
   return dev_weights_buffer_->getData();
 };
@@ -360,16 +371,35 @@ void RPUCudaSimple<T>::copyIndexedInput(
     const int size,
     const int m_batch,
     const int dim3,
-    const bool trans) {
-  if (trans) {
-    IndexReaderTransInputIterator<T> in_iter(
-        in_tensor, indices, total_input_size / dim3, m_batch, size * m_batch, m_batch * dim3);
-    RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch * size * dim3);
-  } else {
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
+  bool batch_slice = m_batch_slice > 0;
 
-    IndexReaderInputIterator<T> in_iter(
-        in_tensor, indices, total_input_size / dim3, size * m_batch);
-    RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch * size * dim3);
+  if (batch_slice) {
+    if (trans) {
+      IndexReaderSliceInputIterator<true, T> in_iter(
+          in_tensor, indices, total_input_size / dim3, size, m_batch, dim3, m_batch_slice,
+          batch_indices);
+      RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch_slice * size * dim3);
+
+    } else {
+      IndexReaderSliceInputIterator<false, T> in_iter(
+          in_tensor, indices, total_input_size / dim3, size, m_batch, dim3, m_batch_slice,
+          batch_indices);
+      RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch_slice * size * dim3);
+    }
+  } else {
+    if (trans) {
+      IndexReaderTransInputIterator<T> in_iter(
+          in_tensor, indices, total_input_size / dim3, m_batch, size * m_batch, m_batch * dim3);
+      RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch * size * dim3);
+    } else {
+
+      IndexReaderInputIterator<T> in_iter(
+          in_tensor, indices, total_input_size / dim3, size * m_batch);
+      RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch * size * dim3);
+    }
   }
 }
 
@@ -382,17 +412,85 @@ void RPUCudaSimple<T>::copyIndexedOutput(
     const int size,
     const int m_batch,
     const int dim3,
-    const bool trans) {
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
+  // CAUTION:  NO zeroying. Needs to be done from outside.
+  bool batch_slice = m_batch_slice > 0;
 
-  if (trans) {
-    IndexReaderTransOutputIterator<T> out_iter(
-        out_tensor, indices, total_output_size / dim3, m_batch, size * m_batch, m_batch * dim3);
-    RPU::math::copyWithIterator(context_, out_iter, in_tensor, size * m_batch * dim3);
+  if (batch_slice) {
+    if (trans) {
+      IndexReaderSliceOutputIterator<true, T> out_iter(
+          out_tensor, indices, total_output_size / dim3, size, m_batch, dim3, m_batch_slice,
+          batch_indices);
+      RPU::math::copyWithIterator(context_, out_iter, in_tensor, m_batch_slice * size * dim3);
+
+    } else {
+      IndexReaderSliceOutputIterator<false, T> out_iter(
+          out_tensor, indices, total_output_size / dim3, size, m_batch, dim3, m_batch_slice,
+          batch_indices);
+      RPU::math::copyWithIterator(context_, out_iter, in_tensor, m_batch_slice * size * dim3);
+    }
+
   } else {
 
-    IndexReaderOutputIterator<T> out_iter(
-        out_tensor, indices, total_output_size / dim3, size * m_batch);
-    RPU::math::copyWithIterator(context_, out_iter, in_tensor, size * m_batch * dim3);
+    if (trans) {
+      IndexReaderTransOutputIterator<T> out_iter(
+          out_tensor, indices, total_output_size / dim3, m_batch, size * m_batch, m_batch * dim3);
+      RPU::math::copyWithIterator(context_, out_iter, in_tensor, size * m_batch * dim3);
+    } else {
+
+      IndexReaderOutputIterator<T> out_iter(
+          out_tensor, indices, total_output_size / dim3, size * m_batch);
+      RPU::math::copyWithIterator(context_, out_iter, in_tensor, size * m_batch * dim3);
+    }
+  }
+}
+
+template <typename T>
+void RPUCudaSimple<T>::copySliceInput(
+    T *out_tensor,
+    const T *in_tensor,
+    const int size,
+    const int m_batch,
+    const int dim3,
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
+
+  if (trans) {
+    SliceInputIterator<true, T> in_iter(
+        in_tensor, size, m_batch, dim3, m_batch_slice, batch_indices);
+    RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch_slice * size * dim3);
+
+  } else {
+    SliceInputIterator<false, T> in_iter(
+        in_tensor, size, m_batch, dim3, m_batch_slice, batch_indices);
+
+    RPU::math::copyWithIterator(context_, out_tensor, in_iter, m_batch_slice * size * dim3);
+  }
+}
+
+template <typename T>
+void RPUCudaSimple<T>::copySliceOutput(
+    T *out_tensor,
+    const T *in_tensor,
+    const int size,
+    const int m_batch,
+    const int dim3,
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
+
+  if (trans) {
+    SliceOutputIterator<true, T> out_iter(
+        out_tensor, size, m_batch, dim3, m_batch_slice, batch_indices);
+    RPU::math::copyWithIterator(context_, out_iter, in_tensor, m_batch_slice * size * dim3);
+
+  } else {
+    SliceOutputIterator<false, T> out_iter(
+        out_tensor, size, m_batch, dim3, m_batch_slice, batch_indices);
+    RPU::math::copyWithIterator(context_, out_iter, in_tensor, m_batch_slice * size * dim3);
   }
 }
 
@@ -507,6 +605,24 @@ template <typename T> void RPUCudaSimple<T>::decayWeights(bool bias_no_decay) {
 }
 
 /*********************************************************************************/
+template <typename T> void RPUCudaSimple<T>::clipWeights(T clip) {
+
+  if (clip >= 0) {
+    RPU::math::aclip<T>(context_, dev_weights_->getData(), dev_weights_->getSize(), clip);
+  }
+}
+
+template <typename T> void RPUCudaSimple<T>::clipWeights(const WeightClipParameter &wclpar) {
+
+  if (!wclipper_cuda_) {
+    wclipper_cuda_ =
+        make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+  }
+
+  wclipper_cuda_->apply(dev_weights_->getData(), wclpar);
+}
+
+/*********************************************************************************/
 template <typename T> void RPUCudaSimple<T>::diffuseWeights() {
 
   T diffusion = this->getPar().diffusion;
@@ -539,18 +655,6 @@ template <typename T> void RPUCudaSimple<T>::diffuseWeights() {
 
 /***********************************************************************/
 
-template <typename T> void RPUCudaSimple<T>::clipWeights(const WeightClipParameter &wclpar) {
-
-  if (!wclipper_cuda_) {
-    wclipper_cuda_ =
-        RPU::make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
-  }
-
-  wclipper_cuda_->apply(dev_weights_->getData(), wclpar);
-}
-
-/***********************************************************************/
-
 template <typename T> void RPUCudaSimple<T>::setDeltaWeights(T *dw_extern) {
 
   ENFORCE_NO_DELAYED_UPDATE;
@@ -569,7 +673,8 @@ template <typename T> void RPUCudaSimple<T>::modifyFBWeights(const WeightModifie
 
   if (dev_fb_weights_ == nullptr) {
     dev_fb_weights_ = RPU::make_unique<CudaArray<T>>(context_, this->x_size_ * this->d_size_);
-    fb_wmodifier_cuda_ = RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
+    fb_wmodifier_cuda_ =
+        RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
     context_->synchronize();
   }
 

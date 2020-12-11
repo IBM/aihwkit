@@ -132,6 +132,18 @@ namespace RPU {
         GP_COUNT, ARGS);                                                                           \
   }
 
+#define RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR_IMPLICIT(                                                \
+    NUM_T, X_TRANS, D_TRANS, S, NBLOCKS, NTHREADS, SHARED_MEM, KERNEL, FUNCTOR, GP_COUNT, ARGS)    \
+  if (X_TRANS & D_TRANS) {                                                                         \
+    KERNEL<NUM_T, true, true, FUNCTOR, GP_COUNT><<<NBLOCKS, NTHREADS, SHARED_MEM, S>>> ARGS;       \
+  } else if (!X_TRANS & !D_TRANS) {                                                                \
+    KERNEL<NUM_T, false, false, FUNCTOR, GP_COUNT><<<NBLOCKS, NTHREADS, SHARED_MEM, S>>> ARGS;     \
+  } else if (!X_TRANS & D_TRANS) {                                                                 \
+    KERNEL<NUM_T, false, true, FUNCTOR, GP_COUNT><<<NBLOCKS, NTHREADS, SHARED_MEM, S>>> ARGS;      \
+  } else if (X_TRANS & !D_TRANS) {                                                                 \
+    KERNEL<NUM_T, true, false, FUNCTOR, GP_COUNT><<<NBLOCKS, NTHREADS, SHARED_MEM, S>>> ARGS;      \
+  };
+
 #define COMMA ,
 
 /********************************************************************************
@@ -173,21 +185,25 @@ DEFINE_PWU_KERNEL_PARAMETER(
     SingleFunctor,
     SingleBase,
     /*run*/
-    START_SINGLE_FUNCTOR(
-        uint32_t,
-        (dev_weights,
-         this->size,
-         x_counts_chunk ? x_counts_chunk : blm->getXCountsData(),
-         this->x_size,
-         d_counts_chunk ? d_counts_chunk : blm->getDCountsData(),
-         this->d_size,
-         rpucuda_device->get4ParamsData(),
-         rpucuda_device->get2ParamsData(),
-         rpucuda_device->get1ParamsData(),
-         rpucuda_device->getGlobalParamsData(),
-         this->nK32,
-         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar()).dw_min_std,
-         dev_states)););
+    if (this->implicit_pulses) {
+      START_SINGLE_FUNCTOR(
+          float, (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(),
+                  this->d_size, rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
+                  rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1,
+                  static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
+                      .dw_min_std,
+                  dev_states));
+    } else {
+      START_SINGLE_FUNCTOR(
+          uint32_t,
+          (dev_weights, this->size, x_counts_chunk ? x_counts_chunk : blm->getXCountsData(),
+           this->x_size, d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size,
+           rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
+           rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), this->nK32,
+           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
+               .dw_min_std,
+           dev_states));
+    });
 #undef START_SINGLE_FUNCTOR
 
 /********************************************************************************
@@ -214,7 +230,17 @@ DEFINE_PWU_KERNEL_PARAMETER(
     BatchFunctor,
     BatchBase,
     /*run*/
-    if (this->use_bo64) {
+    if (this->implicit_pulses) {
+      RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
+          T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
+          this->shared_mem, kernelUpdateWBatchFunctor, FunctorT, gp_count,
+          (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
+           rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
+           rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
+           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
+               .dw_min_std,
+           dev_states));
+    } else if (this->use_bo64) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
           T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,
           this->nthreads, this->shared_mem, kernelUpdateWBatchFunctor, FunctorT, gp_count,
@@ -244,7 +270,16 @@ DEFINE_PWU_KERNEL_PARAMETER(
  *********************************************************************************/
 
 #define RPU_PWU_START_BATCH_KERNEL(KNAME)                                                          \
-  if (this->use_bo64) {                                                                            \
+  if (this->implicit_pulses) {                                                                     \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        this->shared_mem, KNAME,                                                                   \
+        (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,    \
+         rpucuda_device->get4ParamsData(), 1, m_batch,                                             \
+         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
+             .dw_min_std,                                                                          \
+         dev_states));                                                                             \
+  } else if (this->use_bo64) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
         T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,                \
         this->nthreads, this->shared_mem, KNAME,                                                   \
@@ -291,7 +326,7 @@ DEFINE_PWU_KERNEL_BASE(
       return;
     }
 
-    int nK32_shared = nK32;
+    int nK32_shared = this->implicit_pulses ? 1 : nK32;
 
     int sz = (d_size + 31) / 32 * 32 * (x_size + 15) / 16 * 16;
     this->nthreads = MIN(RPU_THREADS_PER_BLOCK_UPDATE, sz);
@@ -324,7 +359,18 @@ DEFINE_PWU_KERNEL_PARAMETER(
     BatchSharedBase,
     /*run*/
     RPU_PWU_START_BATCH_SHARED_INIT;
-    if (this->use_bo64) {
+    if (this->implicit_pulses) {
+      RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
+          T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
+          shared_mem, kernelUpdateWBatchSharedFunctor, FunctorT, gp_count,
+          (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
+           rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
+           rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
+           batch_load_stride,
+           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
+               .dw_min_std,
+           dev_states));
+    } else if (this->use_bo64) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
           T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,
           this->nthreads, shared_mem, kernelUpdateWBatchSharedFunctor, FunctorT, gp_count,
@@ -355,7 +401,16 @@ DEFINE_PWU_KERNEL_PARAMETER(
  *********************************************************************************/
 #define RPU_PWU_START_BATCH_SHARED_KERNEL(KNAME)                                                   \
   RPU_PWU_START_BATCH_SHARED_INIT;                                                                 \
-  if (this->use_bo64) {                                                                            \
+  if (this->implicit_pulses) {                                                                     \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        shared_mem, KNAME,                                                                         \
+        (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,    \
+         rpucuda_device->get4ParamsData(), 1, m_batch, batch_load_stride,                          \
+         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
+             .dw_min_std,                                                                          \
+         dev_states));                                                                             \
+  } else if (this->use_bo64) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
         T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,                \
         this->nthreads, shared_mem, KNAME,                                                         \
@@ -392,10 +447,13 @@ DEFINE_PWU_KERNEL_PARAMETER(
 
 #undef RPU_PWU_START_BATCH_SHARED_KERNEL
 #undef RPU_PWU_START_BATCH_SHARED_INIT
+
 #undef RPU_SWITCH_TRANS_TEMPLATE
 #undef RPU_SWITCH_TRANS_TEMPLATE_OS
 #undef RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR
 #undef RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR_OS
+#undef RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR_IMPLICIT
+
 #undef DEFINE_PWU_KERNEL_PARAMETER
 #undef DEFINE_PWU_KERNEL_BASE
 } // namespace RPU

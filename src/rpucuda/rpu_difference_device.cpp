@@ -95,7 +95,7 @@ void DifferenceRPUDevice<T>::populate(
 /*********************************************************************************/
 /* update */
 
-template <typename T> inline bool DifferenceRPUDevice<T>::isInverted() const {
+template <typename T> bool DifferenceRPUDevice<T>::isInverted() const {
   return g_plus_ == 0;
 }
 
@@ -169,6 +169,8 @@ void DifferenceRPUDevice<T>::resetCols(
 template <typename T> bool DifferenceRPUDevice<T>::onSetWeights(T **weights) {
   // note: we use this to update the internal weights for each device.
   // all weights are set to *identical* values...
+
+  VectorRPUDevice<T>::resetCounters(true);
 
   T *w = weights[0];
 

@@ -37,6 +37,7 @@ PulsedWeightUpdater<T>::PulsedWeightUpdater(CudaContext *c, int x_size, int d_si
 
 {
   blm_ = RPU::make_unique<BitLineMaker<T>>(c, x_size, d_size);
+
   up_context_ = nullptr;
   is_async_update_ = false;
 };
@@ -95,7 +96,7 @@ void PulsedWeightUpdater<T>::executeUpdate(
 
   blm_->makeCounts(
       x_in, d_in, up, rpucuda_device->getDwMin(), lr, m_batch, x_trans_in, d_trans_in,
-      kpars->getOutTrans(), kpars->getUseBo64());
+      kpars->getOutTrans(), kpars->getUseBo64(), kpars->getImplicitPulses());
 
   CudaContext *c = context_;
   if (is_async_update_) {
@@ -162,12 +163,13 @@ void PulsedWeightUpdater<T>::tuneUpdate(
   is_async_update_ = is_async_update;
 
   opt_kernel_pars = v[min_i];
+
   delete tmp_device;
 
   DEBUG_OUT(
       "UpdateTuner: Using " << opt_kernel_pars->getName() << " for PWU [" << opt_kernel_pars->timing
-                            << "].\n\n");
-  DEBUG_CALL(opt_kernel_pars->print());
+                            << "].\n");
+  DEBUG_CALL(opt_kernel_pars.print());
 }
 
 template <typename T>
@@ -227,6 +229,7 @@ void PulsedWeightUpdater<T>::doFPupdate(
     const bool x_trans,
     const bool d_trans,
     const T beta) {
+
   const T *x_out = copyIterator2Buffer(x_in, dev_fpx_buffer_, x_size_ * m_batch);
   const T *d_out = copyIterator2Buffer(d_in, dev_fpd_buffer_, d_size_ * m_batch);
 
@@ -242,6 +245,45 @@ void PulsedWeightUpdater<T>::doFPupdate(
         -lr, d_out, d_trans ? m_batch : d_size_, x_out, x_trans ? m_batch : x_size_, beta,
         dev_weights, d_size_);
   }
+}
+
+template <typename T> void PulsedWeightUpdater<T>::checkBuffers(int m_batch) {
+
+  // make sure shared buffers are constructed
+  if ((dev_fpx_buffer_ == nullptr) || (dev_fpx_buffer_->getSize() < x_size_ * m_batch)) {
+    dev_fpx_buffer_ = std::make_shared<CudaArray<T>>(context_, x_size_ * m_batch);
+  }
+  if ((dev_fpd_buffer_ == nullptr) || (dev_fpd_buffer_->getSize() < d_size_ * m_batch)) {
+    dev_fpd_buffer_ = std::make_shared<CudaArray<T>>(context_, d_size_ * m_batch);
+  }
+}
+
+template <typename T>
+template <typename XInputIteratorT, typename DInputIteratorT>
+void PulsedWeightUpdater<T>::doDirectUpdate(
+    XInputIteratorT x_in,
+    DInputIteratorT d_in,
+    AbstractRPUDeviceCuda<T> *rpucuda_device,
+    T *dev_weights,
+    const T lr,
+    const int m_batch,
+    const bool x_trans,
+    const bool d_trans,
+    const T beta) {
+
+  checkBuffers(m_batch); // make sure they are created (we need them also for float * iterator)
+
+  const T *x_out = copyIterator2Buffer(x_in, dev_fpx_buffer_, x_size_ * m_batch);
+  const T *d_out = copyIterator2Buffer(d_in, dev_fpd_buffer_, d_size_ * m_batch);
+
+  if (!rpucuda_device->hasDirectUpdate()) {
+    RPU_FATAL("Device does not support a direct update");
+  }
+
+  rpucuda_device->doDirectUpdate(
+      x_out, d_out, dev_weights, lr, m_batch, x_trans, d_trans, beta,
+      dev_fpx_buffer_->getData(), // this might overrite x_out
+      dev_fpd_buffer_->getData());
 }
 
 template <typename T>
@@ -267,7 +309,11 @@ void PulsedWeightUpdater<T>::update(
     const bool x_trans,
     const bool d_trans) {
   // FP update if no device is given
-  if (checkForFPUpdate(rpucuda_device_in, up) || (up.pulse_type == PulseType::NoneWithDevice)) {
+  if (rpucuda_device_in != nullptr && rpucuda_device_in->hasDirectUpdate()) {
+    doDirectUpdate(x_in, d_in, rpucuda_device_in, dev_weights, lr, m_batch, x_trans, d_trans);
+    return;
+  } else if (
+      checkForFPUpdate(rpucuda_device_in, up) || (up.pulse_type == PulseType::NoneWithDevice)) {
 
     doFPupdate(x_in, d_in, dev_weights, lr, m_batch, x_trans, d_trans);
 
@@ -292,7 +338,6 @@ void PulsedWeightUpdater<T>::update(
     force_tuning = true;
     update_type_ = update_type;
 
-    // init buffers
     update_count_ = 0;
 
     // init kernels
@@ -353,6 +398,9 @@ void PulsedWeightUpdater<T>::update(
       const PulsedUpdateMetaParameter<NUM_T> &, const NUM_T, const int, const bool, const bool);   \
   template void PulsedWeightUpdater<NUM_T>::doFPupdate(                                            \
       XITERT, DITERT, NUM_T *, const NUM_T, const int, const bool, const bool, const NUM_T);       \
+  template void PulsedWeightUpdater<NUM_T>::doDirectUpdate(                                        \
+      XITERT, DITERT, AbstractRPUDeviceCuda<NUM_T> *, NUM_T *, const NUM_T, const int, const bool, \
+      const bool, const NUM_T);                                                                    \
   template void PulsedWeightUpdater<NUM_T>::tuneUpdate(                                            \
       pwukp_t<NUM_T> &, pwukpvec_t<NUM_T> &, XITERT, DITERT, NUM_T *,                              \
       PulsedRPUDeviceCudaBase<NUM_T> *, const PulsedUpdateMetaParameter<NUM_T> &, const NUM_T,     \
@@ -371,6 +419,16 @@ RPU_PWU_ITER_TEMPLATE(
     float, IndexReaderTransInputIterator<float>, PermuterTransInputIterator<float>);
 RPU_PWU_ITER_TEMPLATE(float, const float *, PermuterTransInputIterator<float>);
 
+RPU_PWU_ITER_TEMPLATE(
+    float, IndexReaderSliceInputIterator<TRANSFLOAT(true)>, SliceInputIterator<TRANSFLOAT(true)>);
+RPU_PWU_ITER_TEMPLATE(
+    float, IndexReaderSliceInputIterator<TRANSFLOAT(false)>, SliceInputIterator<TRANSFLOAT(false)>);
+
+RPU_PWU_ITER_TEMPLATE(float, const float *, SliceInputIterator<TRANSFLOAT(true)>);
+RPU_PWU_ITER_TEMPLATE(float, const float *, SliceInputIterator<TRANSFLOAT(false)>);
+RPU_PWU_ITER_TEMPLATE(float, IndexReaderSliceInputIterator<TRANSFLOAT(true)>, const float *);
+RPU_PWU_ITER_TEMPLATE(float, IndexReaderSliceInputIterator<TRANSFLOAT(false)>, const float *);
+
 #undef TRANSFLOAT
 
 #ifdef RPU_USE_DOUBLE
@@ -384,6 +442,20 @@ RPU_PWU_ITER_TEMPLATE(double, const double *, const double *);
 RPU_PWU_ITER_TEMPLATE(
     double, IndexReaderTransInputIterator<double>, PermuterTransInputIterator<double>);
 RPU_PWU_ITER_TEMPLATE(double, const double *, PermuterTransInputIterator<double>);
+
+RPU_PWU_ITER_TEMPLATE(
+    double,
+    IndexReaderSliceInputIterator<TRANSDOUBLE(true)>,
+    SliceInputIterator<TRANSDOUBLE(true)>);
+RPU_PWU_ITER_TEMPLATE(
+    double,
+    IndexReaderSliceInputIterator<TRANSDOUBLE(false)>,
+    SliceInputIterator<TRANSDOUBLE(false)>);
+
+RPU_PWU_ITER_TEMPLATE(double, const double *, SliceInputIterator<TRANSDOUBLE(true)>);
+RPU_PWU_ITER_TEMPLATE(double, const double *, SliceInputIterator<TRANSDOUBLE(false)>);
+RPU_PWU_ITER_TEMPLATE(double, IndexReaderSliceInputIterator<TRANSDOUBLE(true)>, const double *);
+RPU_PWU_ITER_TEMPLATE(double, IndexReaderSliceInputIterator<TRANSDOUBLE(false)>, const double *);
 
 #undef TRANSDOUBLE
 #endif

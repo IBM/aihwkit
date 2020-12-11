@@ -56,6 +56,7 @@ namespace RPU {
 
 /******************************************************************************/
 /* RPU Abstract */
+template <typename T> class RPUSimple;
 
 template <typename T> class RPUAbstract {
 
@@ -142,9 +143,9 @@ protected:
   T learning_rate_ = (T)0.0;
 };
 
-template <typename T> class RPUSimple;
-
 template <typename T> struct SimpleMetaParameter {
+
+  SimpleMetaParameter() {}
 
   T diffusion = (T)0.0;
   T lifetime = (T)0.0;
@@ -206,10 +207,11 @@ public:
     swap(a.matrix_indices_, b.matrix_indices_);
     swap(a.matrix_indices_set_, b.matrix_indices_set_);
 
+    swap(a.wclipper_, b.wclipper_);
+
     swap(a.fb_weights_, b.fb_weights_);
     swap(a.delta_weights_extern_, b.delta_weights_extern_);
 
-    swap(a.wclipper_, b.wclipper_);
     swap(a.fb_weight_modifier_, b.fb_weight_modifier_);
     swap(a.last_update_m_batch_, b.last_update_m_batch_);
 
@@ -236,6 +238,9 @@ public:
 
   void printToStream(std::stringstream &ss) const override;
 
+  /* This is to set the random seed. This is currently, however, NOT
+     causing all seeds to be set. Some seeds remain random!*/
+  virtual void setRandomSeed(unsigned int seed);
   virtual void setWeightsUniformRandom(T min_value, T max_value);
 
   /* This scales the weights by applying an (digital) output scale
@@ -253,6 +258,7 @@ public:
      pointer to handle the memory of the weights. Note that weights
      for CPU are always stored in row-major format.*/
   virtual void setSharedWeights(T *weightsptr);
+  inline bool getSharedWeightsIf() { return shared_weights_if_; };
 
   /* access to the CPU weight ptr*/
   inline T **getWeightsPtr() const { return this->weights_; };
@@ -301,6 +307,7 @@ public:
 
   /* Clip weights once. Uses the weight clipper to clip weights in
      some manner, only for HWA training.*/
+  virtual void clipWeights(const T clip);
   virtual void clipWeights(const WeightClipParameter &wclpar);
 
   /* Applying a potential reset with given probabilties to a selection of columns */
@@ -308,7 +315,7 @@ public:
     RPU_FATAL("Not supported for RPU Simple");
   };
 
-  /* Applying an Guassian drift onto the weights.*/
+  /* Applying an Gaussian diffusion onto the weights.*/
   virtual void diffuseWeights();
 
   /* Modify forward/backward weights (while keeping the update
@@ -339,6 +346,7 @@ public:
      scaling of 1/bwd_alpha */
 
   T getAlphaLearningRate() const;
+
   void setFwdAlpha(const T fwd_alpha, bool with_noise = true);
   void setBwdAlpha(const T bwd_alpha, bool with_noise = true);
   void setAlphaScale(const T alpha);
@@ -412,10 +420,40 @@ public:
       int dim3,
       bool trans,
       bool is_test);
+
   virtual void backwardIndexed(
       const T *D_input, T *X_output, int total_output_size, int m_batch, int dim3, bool trans);
   virtual void updateIndexed(
       const T *X_input, const T *D_input, int total_input_size, int m_batch, int dim3, bool trans);
+
+  virtual void forwardIndexedSlice(
+      const T *X_input,
+      T *D_output,
+      int total_input_size,
+      int m_batch,
+      int dim3,
+      bool trans,
+      int m_batch_slice,
+      const int *batch_indices,
+      bool is_test);
+  virtual void backwardIndexedSlice(
+      const T *D_input,
+      T *X_output,
+      int total_output_size,
+      int m_batch,
+      int dim3,
+      bool trans,
+      int m_batch_slice,
+      const int *batch_indices);
+  virtual void updateIndexedSlice(
+      const T *X_input,
+      const T *D_input,
+      int total_input_size,
+      int m_batch,
+      int dim3,
+      bool trans,
+      int m_batch_slice,
+      const int *batch_indices);
 
 protected:
   /* for specialized forward/backward. To be used in any forward pass
@@ -520,7 +558,9 @@ protected:
       const int size,
       const int m_batch,
       const int dim3,
-      const bool trans);
+      const bool trans,
+      const int m_batch_slice = 0,
+      const int *batch_indices = nullptr);
 
   virtual void copyIndexedOutput(
       T *out_tensor,
@@ -530,7 +570,29 @@ protected:
       const int size,
       const int m_batch,
       const int dim3,
-      const bool trans);
+      const bool trans,
+      const int m_batch_slice = 0,
+      const int *batch_indices = nullptr);
+
+  virtual void copySliceInput(
+      T *out_tensor,
+      const T *src_tensor,
+      const int size,
+      const int m_batch,
+      const int dim3,
+      const bool trans,
+      const int m_batch_slice,
+      const int *batch_indices);
+
+  virtual void copySliceOutput(
+      T *out_tensor,
+      const T *src_tensor,
+      const int size,
+      const int m_batch,
+      const int dim3,
+      const bool trans,
+      const int m_batch_slice,
+      const int *batch_indices);
 
   virtual void setZero(T *v, const int size);
 
@@ -545,10 +607,6 @@ private:
           << std::endl;
     }
   }
-  /* This is to set the random seed. This is currently, however, NOT
-     causing all seeds to be set. Some seeds remain random. Thus put
-     this into private for now*/
-  virtual void setRandomSeed(unsigned int seed);
 
 public:
   std::mutex mutex_;
@@ -572,13 +630,14 @@ private:
   SimpleMetaParameter<T> par_;
 
   T *temp_x_vector_bias_ = nullptr;
+
   T *temp_x_matrix_bias_ = nullptr;
   int temp_x_matrix_bias_size_ = 0;
   T *temp_tensor_ = nullptr;
   int temp_tensor_size_ = 0;
 
-  std::unique_ptr<WeightModifier<T>> fb_weight_modifier_ = nullptr;
   std::unique_ptr<WeightClipper<T>> wclipper_ = nullptr;
+  std::unique_ptr<WeightModifier<T>> fb_weight_modifier_ = nullptr;
 
   int *matrix_indices_ = nullptr;
   bool matrix_indices_set_ = false;

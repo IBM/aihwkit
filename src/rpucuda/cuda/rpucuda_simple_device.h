@@ -32,6 +32,20 @@ public:
   virtual std::vector<T> getHiddenWeights() const = 0;
   virtual void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) = 0;
   virtual AbstractRPUDeviceMetaParameter<T> &getPar() const = 0;
+
+  virtual void doDirectUpdate(
+      const T *x_input,
+      const T *d_input,
+      T *dev_weights,
+      const T lr,
+      const int m_batch,
+      const bool x_trans,
+      const bool d_trans,
+      const T beta,
+      T *x_buffer,
+      T *d_buffer) = 0;
+  virtual bool hasDirectUpdate() const = 0;
+
   virtual int getHiddenUpdateIdx() const { return 0; };
   virtual void setHiddenUpdateIdx(int idx){};
 
@@ -91,6 +105,19 @@ public:
   };
   DeviceUpdateType implements() const override { return this->getPar().implements(); };
   SimpleRPUDeviceCuda<T> *clone() const override { return new SimpleRPUDeviceCuda<T>(*this); }
+
+  bool hasDirectUpdate() const override { return true; };
+  void doDirectUpdate(
+      const T *x_input,
+      const T *d_input,
+      T *dev_weights,
+      const T lr,
+      const int m_batch,
+      const bool x_trans,
+      const bool d_trans,
+      const T beta,
+      T *x_buffer = nullptr,
+      T *d_buffer = nullptr) override;
 
 protected:
   int x_size_ = 0;

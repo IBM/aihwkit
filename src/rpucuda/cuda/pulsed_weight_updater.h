@@ -56,6 +56,18 @@ public:
       const bool d_trans,
       const T beta = (T)1.0);
 
+  template <typename XInputIteratorT, typename DInputIteratorT>
+  void doDirectUpdate(
+      XInputIteratorT x_in,
+      DInputIteratorT d_in,
+      AbstractRPUDeviceCuda<T> *rpucuda_device,
+      T *dev_weights,
+      const T lr,
+      const int m_batch,
+      const bool x_trans,
+      const bool d_trans,
+      const T beta = (T)1.0);
+
   void setSharedBuffer(
       int m_batch,
       std::shared_ptr<CudaArray<T>> x_buffer = nullptr,
@@ -98,6 +110,7 @@ private:
       const bool x_trans_in,
       const bool d_trans_in);
 
+  void checkBuffers(int m_batch);
   CudaContext *context_ = nullptr;
   int x_size_ = 0;
   int d_size_ = 0;

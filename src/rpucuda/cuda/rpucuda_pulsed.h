@@ -117,9 +117,43 @@ public:
       const T *X_input, const T *D_input, int total_input_size, int m_batch, int dim3, bool trans)
       override;
 
+  void forwardIndexedSlice(
+      const T *X_input,
+      T *D_output,
+      int total_input_size,
+      int m_batch,
+      int dim3,
+      bool trans,
+      int m_batch_slice,
+      const int *batch_indices,
+      bool is_test) override;
+
+  void backwardIndexedSlice(
+      const T *D_input,
+      T *X_output,
+      int total_output_size,
+      int m_batch,
+      int dim3,
+      bool trans,
+      int m_batch_slice,
+      const int *batch_indices) override;
+
+  void updateIndexedSlice(
+      const T *X_input,
+      const T *D_input,
+      int total_input_size,
+      int m_batch,
+      int dim3,
+      bool trans,
+      int m_batch_slice,
+      const int *batch_indices) override;
+
   void decayWeights(bool bias_no_decay) override;
   void decayWeights(T alpha, bool bias_no_decay) override;
   void diffuseWeights() override;
+
+  void clipWeights(T clip) override;
+  void clipWeights(const WeightClipParameter &wclpar) override;
 
   void resetCols(int start_col, int n_cols, T reset_prob) override;
 

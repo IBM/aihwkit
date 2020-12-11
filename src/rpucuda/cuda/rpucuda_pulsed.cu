@@ -123,6 +123,7 @@ RPUCudaPulsed<T>::RPUCudaPulsed(const RPUCudaPulsed<T> &other) : RPUCudaSimple<T
     rpucuda_device_ = nullptr;
     rpu_device_ = nullptr;
   }
+  par_ = other.par_;
 
   DEBUG_CALL(this->disp(););
   DEBUG_OUT("RPUCudaPulsed copy constructed.");
@@ -196,7 +197,6 @@ void RPUCudaPulsed<T>::populateParameter(
     RealWorldRNG<T> rng(dp->construction_seed);
     rpu_device_ = dp->createDeviceUnique(this->x_size_, this->d_size_, &rng);
   }
-
   rpucuda_device_ = AbstractRPUDeviceCuda<T>::createFromUnique(this->context_, *rpu_device_);
 
   this->setWeights(this->copyWeightsToHost()[0]); // set weights needs all populated
@@ -259,6 +259,22 @@ template <typename T> void RPUCudaPulsed<T>::decayWeights(bool bias_no_decay) {
 template <typename T> void RPUCudaPulsed<T>::diffuseWeights() {
   CHECK_RPU_DEVICE_INIT;
   rpucuda_device_->diffuseWeights(this->dev_weights_->getData());
+}
+
+template <typename T> void RPUCudaPulsed<T>::clipWeights(T clip) {
+  CHECK_RPU_DEVICE_INIT;
+  rpucuda_device_->clipWeights(this->dev_weights_->getData(), clip);
+}
+
+template <typename T> void RPUCudaPulsed<T>::clipWeights(const WeightClipParameter &wclpar) {
+
+  if (wclpar.type == WeightClipType::FixedValue) {
+    clipWeights(wclpar.fixed_value); // handle outside  to support devices
+  } else if (rpu_device_->implements() == DeviceUpdateType::FloatingPoint) {
+    RPUCudaSimple<T>::clipWeights(wclpar);
+  } else {
+    RPU_FATAL("Sophisticated clipping is NOT implemented for most training devices");
+  }
 }
 
 template <typename T> void RPUCudaPulsed<T>::resetCols(int start_col, int n_cols, T reset_prob) {
@@ -477,6 +493,46 @@ void RPUCudaPulsed<T>::forwardIndexed(
 }
 
 template <typename T>
+void RPUCudaPulsed<T>::forwardIndexedSlice(
+    const T *X_input,
+    T *D_output,
+    int total_input_size,
+    int m_batch,
+    int dim3,
+    bool trans,
+    int m_batch_slice,
+    const int *batch_indices,
+    bool is_test) {
+
+  const int *indices = this->getMatrixIndices();
+  int x_size = this->getXSize();
+  int d_size = this->getDSize();
+
+  if (trans && (dim3 > 1)) {
+
+    IndexReaderSliceInputIterator<true, T> in_iter(
+        X_input, indices, total_input_size / dim3, x_size, m_batch, dim3, m_batch_slice,
+        batch_indices);
+
+    SliceOutputIterator<true, T> out_iter(
+        D_output, d_size, m_batch, dim3, m_batch_slice, batch_indices);
+
+    this->forwardMatrixIterator(in_iter, out_iter, m_batch_slice * dim3, trans, trans, is_test);
+
+  } else {
+
+    IndexReaderSliceInputIterator<false, T> in_iter(
+        X_input, indices, total_input_size / dim3, x_size, m_batch, dim3, m_batch_slice,
+        batch_indices);
+
+    SliceOutputIterator<false, T> out_iter(
+        D_output, d_size, m_batch, dim3, m_batch_slice, batch_indices);
+
+    this->forwardMatrixIterator(in_iter, out_iter, m_batch_slice * dim3, trans, trans, is_test);
+  }
+}
+
+template <typename T>
 template <typename InputIteratorT, typename OutputIteratorT>
 void RPUCudaPulsed<T>::forwardMatrixIterator(
     InputIteratorT X_input,
@@ -503,7 +559,6 @@ void RPUCudaPulsed<T>::forwardVector(
   if (d_inc != 1) {
     d_output_inc1 = dev_f_d_vector_inc1_->getData();
   }
-
   if (x_inc != 1) {
     // just copy for now. Only needed for looped matrix versions anyway
     RPU::math::copy<T>(
@@ -557,6 +612,45 @@ void RPUCudaPulsed<T>::backwardIndexed(
   }
 }
 
+template <typename T>
+void RPUCudaPulsed<T>::backwardIndexedSlice(
+    const T *D_input,
+    T *X_output,
+    int total_output_size,
+    int m_batch,
+    int dim3,
+    bool trans,
+    int m_batch_slice,
+    const int *batch_indices) {
+
+  int x_size = this->getXSize();
+  int d_size = this->getDSize();
+  const int *indices = this->getMatrixIndices();
+
+  // CAUTION: need X_output to be set to zero!
+  if ((dim3 == 1) || (!trans)) {
+
+    SliceInputIterator<false, T> in_iter(
+        D_input, d_size, m_batch, dim3, m_batch_slice, batch_indices);
+
+    IndexReaderSliceOutputIterator<false, T> out_iter(
+        X_output, indices, total_output_size / dim3, x_size, m_batch, dim3, m_batch_slice,
+        batch_indices);
+
+    this->backwardMatrixIterator(in_iter, out_iter, m_batch_slice * dim3, trans, trans);
+
+  } else {
+    SliceInputIterator<true, T> in_iter(
+        D_input, d_size, m_batch, dim3, m_batch_slice, batch_indices);
+
+    IndexReaderSliceOutputIterator<true, T> out_iter(
+        X_output, indices, total_output_size / dim3, x_size, m_batch, dim3, m_batch_slice,
+        batch_indices);
+
+    this->backwardMatrixIterator(in_iter, out_iter, m_batch_slice * dim3, trans, trans);
+  }
+}
+
 template <typename T> void RPUCudaPulsed<T>::checkBatchBuffers(const int m_batch) {
   RPU_GET_CUDA_BUFFER(this->context_, T, dev_batch_buffer_x_size_, m_batch * this->x_size_);
   RPU_GET_CUDA_BUFFER(this->context_, T, dev_batch_buffer_d_size_, m_batch * this->d_size_);
@@ -589,7 +683,6 @@ void RPUCudaPulsed<T>::backwardVector(const T *d_input, T *x_output, int d_inc, 
         this->context_, this->d_size_, d_input, d_inc, dev_b_d_vector_inc1_->getData(), 1);
     d_input_inc1 = dev_b_d_vector_inc1_->getDataConst();
   }
-
   this->backwardMatrixIterator(d_input_inc1, x_output_inc1, 1, false, false);
 
   if (x_inc != 1) {
@@ -636,6 +729,45 @@ void RPUCudaPulsed<T>::updateIndexed(
     IndexReaderInputIterator<T> in_iter(
         X_input, indices, total_input_size / dim3, x_size * m_batch);
     updateMatrixIterator(in_iter, D_input, m_batch * dim3, trans, trans);
+  }
+}
+
+template <typename T>
+void RPUCudaPulsed<T>::updateIndexedSlice(
+    const T *X_input,
+    const T *D_input,
+    int total_input_size,
+    int m_batch,
+    int dim3,
+    bool trans,
+    int m_batch_slice,
+    const int *batch_indices) {
+
+  const int *indices = this->getMatrixIndices();
+  int x_size = this->getXSize();
+  int d_size = this->getDSize();
+
+  if (trans && (dim3 > 1)) {
+
+    SliceInputIterator<true, T> d_in_iter(
+        D_input, d_size, m_batch, dim3, m_batch_slice, batch_indices);
+
+    IndexReaderSliceInputIterator<true, T> x_in_iter(
+        X_input, indices, total_input_size / dim3, x_size, m_batch, dim3, m_batch_slice,
+        batch_indices);
+
+    this->updateMatrixIterator(x_in_iter, d_in_iter, m_batch_slice * dim3, trans, trans);
+
+  } else {
+
+    SliceInputIterator<false, T> d_in_iter(
+        D_input, d_size, m_batch, dim3, m_batch_slice, batch_indices);
+
+    IndexReaderSliceInputIterator<false, T> x_in_iter(
+        X_input, indices, total_input_size / dim3, x_size, m_batch, dim3, m_batch_slice,
+        batch_indices);
+
+    this->updateMatrixIterator(x_in_iter, d_in_iter, m_batch_slice * dim3, trans, trans);
   }
 }
 

@@ -26,8 +26,7 @@ public:
       LinearStepRPUDeviceCuda,
       LinearStepRPUDevice,
       /*ctor body*/
-      dev_slope_ =
-          std::unique_ptr<CudaArray<float>>(new CudaArray<float>(this->context_, 2 * this->size_));
+      dev_slope_ = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
       ,
       /*dtor body*/
       ,

@@ -230,8 +230,6 @@ void copyWithIterator(
 // to overcome compiling issues. ONLY forks for IteratorT=T * of const T * respectively. Else it
 // will cause a compilation error. To be guarded with std::is_same<>
 template <typename T, typename IteratorT> T *fakeCast(IteratorT X);
-
 template <typename T, typename IteratorT> const T *fakeCastConst(IteratorT X);
-
 } // namespace math
 } // namespace RPU

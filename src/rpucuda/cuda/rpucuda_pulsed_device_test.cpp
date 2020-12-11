@@ -95,8 +95,16 @@ public:
     p.up.update_management = true;
     p.up.update_bl_management = false;
 
-    p.up.pulse_type = PulseType::StochasticCompressed;
-    p.up._debug_kernel_index = abs(kernelidx);
+    if (kernelidx >= 0) {
+      p.up.pulse_type = PulseType::StochasticCompressed;
+      p.up._debug_kernel_index = abs(kernelidx);
+    } else {
+      p.up.pulse_type = PulseType::DeterministicImplicit;
+      p.up._debug_kernel_index = abs(kernelidx) - 1;
+      p.up.x_res_implicit = 0.01;
+      p.up.d_res_implicit = 0.01;
+      p.up.desired_BL = 5 * K;
+    }
 
     dp.print();
 
@@ -115,7 +123,7 @@ public:
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
-    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<num_t> udist(-2.0, 2.0);
     auto urnd = std::bind(udist, generator);
@@ -166,10 +174,14 @@ public:
 
       this->context->synchronizeDevice();
 
-      this->culayer_pulsed->getCountsDebug(x_counts32, d_counts32);
-      this->context->synchronizeDevice();
-      this->layer_pulsed->updateVectorWithCounts(
-          this->x_vec.data(), this->d_vec.data(), 1, 1, x_counts32, d_counts32);
+      if (kernelidx >= 0) { // other wise implicit update. No noise or pulses in that case
+        this->culayer_pulsed->getCountsDebug(x_counts32, d_counts32);
+        this->context->synchronizeDevice();
+        this->layer_pulsed->updateVectorWithCounts(
+            this->x_vec.data(), this->d_vec.data(), 1, 1, x_counts32, d_counts32);
+      } else {
+        this->layer_pulsed->update(this->x_vec.data(), this->d_vec.data(), false, 1);
+      }
 
       num_t **cuweights = this->culayer_pulsed->getWeights();
       num_t **weights = this->layer_pulsed->getWeights();
@@ -248,10 +260,9 @@ TYPED_TEST(RPUDeviceTestFixture, DeviceUpdate4) { this->runLayerTest(4); }
 TYPED_TEST(RPUDeviceTestFixture, DeviceUpdate5) { this->runLayerTest(5); }
 TYPED_TEST(RPUDeviceTestFixture, DeviceUpdate6) { this->runLayerTest(6); }
 TYPED_TEST(RPUDeviceTestFixture, DeviceUpdate7) { this->runLayerTest(7); }
-
 TYPED_TEST(RPUDeviceTestFixture, DeviceUpdate8) { this->runLayerTest(8); }
-
 TYPED_TEST(RPUDeviceTestFixture, DeviceUpdate9) { this->runLayerTest(9); }
+TYPED_TEST(RPUDeviceTestFixture, DeviceUpdate0Implicit) { this->runLayerTest(-1); }
 
 } // namespace
 

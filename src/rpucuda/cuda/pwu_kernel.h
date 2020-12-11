@@ -505,7 +505,7 @@ __global__ void kernelUpdateWBatchSum(
 
         getNfromCount<one_sided, count_t>(n, negative, mixed, xptr, dptr, nK32, xsz, dsz);
 
-        RPU_UPDATE_WITH_SUM_N_INNER();
+        RPU_UPDATE_WITH_SUM_N_INNER({});
 
       } // batch
       // last update
@@ -907,7 +907,7 @@ __global__ void kernelUpdateWBatchSharedSum(
 
         RPU_UWBS_LOAD_COUNTS_N(count_t);
 
-        RPU_UPDATE_WITH_SUM_N_INNER();
+        RPU_UPDATE_WITH_SUM_N_INNER({});
 
       } // batch
       // last update

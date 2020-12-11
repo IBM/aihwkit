@@ -115,7 +115,7 @@ public:
     simple_cuda->setWeights(refweights[0]);
     simple_cuda->setLearningRate(lr);
 
-    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);

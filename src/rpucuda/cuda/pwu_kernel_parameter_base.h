@@ -54,11 +54,28 @@ public:
     out_trans = out_trans_in;
     use_bo64 = use_bo64_in;
     valid = true;
+    implicit_pulses = up.needsImplicitPulses();
 
-    if (use_bo64 > 0) {
-      sizeof_count = sizeof(uint64_t);
+    if (implicit_pulses) {
+
+      if (sizeof(T) == sizeof(double)) {
+        RPU_FATAL("Double not supported yet.");
+      } else {
+
+        sizeof_count = sizeof(float);
+
+        if (use_bo64) {
+          valid = false;
+        }
+      }
+
     } else {
-      sizeof_count = sizeof(uint32_t);
+
+      if (use_bo64 > 0) {
+        sizeof_count = sizeof(uint64_t);
+      } else {
+        sizeof_count = sizeof(uint32_t);
+      }
     }
 
     name = update_name;
@@ -70,6 +87,9 @@ public:
     }
     if (use_bo64 > 1) {
       name += "/BO64";
+    }
+    if (implicit_pulses) {
+      name += "/Implicit";
     }
 
     if (use_bo64 > 0 && (nK32 > 1)) {
@@ -99,6 +119,7 @@ public:
   inline std::string getName() { return this->name; };
   inline bool getOutTrans() { return this->out_trans; };
   inline int getUseBo64() { return this->use_bo64; };
+  inline int getImplicitPulses() { return this->implicit_pulses; };
 
   inline void forceBo64Translate() {
     if (this->use_bo64 == 1) {
@@ -109,7 +130,7 @@ public:
   inline void force32() { this->use_bo64 = 0; };            // debug hack
 
   inline void ensureChunk() {
-    if (use_bo64 || out_trans) {
+    if (use_bo64 || out_trans || implicit_pulses) {
       valid = false;
     }
   };
@@ -127,6 +148,7 @@ public:
     std::cout << "\t nK32:\t\t " << nK32 << std::endl;
     std::cout << "\t m_batch:\t " << m_batch << std::endl;
     std::cout << "\t timing:\t " << timing << std::endl;
+    std::cout << "\t implicit:\t " << implicit_pulses << std::endl;
   };
 
 public:
@@ -141,6 +163,7 @@ protected:
   int shared_mem = 0;
   int shared_mem_per_batch = 0;
   bool out_trans = false;
+  bool implicit_pulses = false;
   int sizeof_count = 4;
   int use_bo64 = 0;
   int nK32 = 1;

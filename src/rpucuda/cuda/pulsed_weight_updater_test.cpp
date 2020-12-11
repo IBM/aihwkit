@@ -107,7 +107,7 @@ public:
     ref_w = new num_t[d_size * x_size];
     ref_w_batch = new num_t[d_size * x_size];
 
-    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_int_distribution<unsigned int> idist(0, ((uint32_t)1) << 31);
     auto irnd = std::bind(idist, generator);

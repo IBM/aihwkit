@@ -71,10 +71,13 @@ namespace RPU {
         X_TRANS, D_TRANS, OUT_TRANS, KERNEL, ARGS, COMMA true COMMA false);                        \
   }
 
-#define RPU_BLM_DEBUG_DEFINE_K                                                                     \
+#define RPU_BLM_DEBUG_DEFINE_K_NO_STOROUND                                                         \
   int Kplus1 = K + 1;                                                                              \
   int nK32 = (Kplus1 + 31) / 32;                                                                   \
-  T resolution = 0.01;                                                                             \
+  T resolution = 0.01;
+
+#define RPU_BLM_DEBUG_DEFINE_K                                                                     \
+  RPU_BLM_DEBUG_DEFINE_K_NO_STOROUND;                                                              \
   bool sto_round = false;
 
 #define RPU_BLM_DEBUG_DEFINE_K_BATCH                                                               \
@@ -1098,6 +1101,133 @@ template int debugKernelUpdateGetCounts_Loop2<double>(
 
 } // namespace test_helper
 
+// *********************************************************************************
+// kernelUpdateGetImplicitPulses
+#define GET_COUNTS_SIMPLE_LOOP_BATCH_IMPLICIT(                                                     \
+    PROB, SIZE, COUNTS, SCALEPROB, RES, TRANS, OUTTRANS, SPROPOP, TIMESK, TIDSTART, TIDEND, TIDN)  \
+  {                                                                                                \
+    if ((tid >= TIDSTART) && (tid < TIDEND)) {                                                     \
+      int sz = SIZE;                                                                               \
+      int n = m_batch * sz;                                                                        \
+                                                                                                   \
+      for (int i_stride = 0; i_stride < n; i_stride += TIDN) {                                     \
+                                                                                                   \
+        int idx = (tid - TIDSTART + i_stride);                                                     \
+        if (idx < n) {                                                                             \
+          T value = PROB[idx];                                                                     \
+          int batch_idx = getBatchIdx<TRANS>(idx, sz, m_batch);                                    \
+          int K = getK<update_bl_management>(K_values, batch_idx, Kplus1);                         \
+          T scaleprob = getScaleProb<T, update_bl_management>(SCALEPROB, K, lr_div_dwmin);         \
+          T scale = getScale<T, update_management>(scale_values, batch_idx);                       \
+          T *c = &COUNTS[getCountsIdx<TRANS, OUTTRANS, uint32_t>(idx, sz, m_batch, sz, K, 0, 1)];  \
+          T sprob = scaleprob SPROPOP scale;                                                       \
+          value *= sprob;                                                                          \
+          value = MIN(MAX(value, -1.0), 1.0);                                                      \
+          DISCRETIZE_VALUE(RES);                                                                   \
+          *c = value TIMESK;                                                                       \
+        }                                                                                          \
+      }                                                                                            \
+    }                                                                                              \
+  }
+
+template <
+    typename T,
+    bool x_trans,
+    bool d_trans,
+    bool out_trans,
+    bool update_management,
+    bool update_bl_management,
+    typename XInputIteratorT,
+    typename DInputIteratorT>
+__global__ void kernelUpdateGetCountsBatchImplicit(
+    XInputIteratorT x_prob,
+    int x_size_in,
+    T x_scaleprob_in,
+    T x_res_in,
+    T *x_counts,
+    DInputIteratorT d_prob,
+    int d_size_in,
+    T d_scaleprob_in,
+    T d_res_in,
+    T *d_counts,
+    int Kplus1_in,
+    int m_batch_in,
+    const T *scale_values = nullptr,
+    const int *K_values = nullptr,
+    const T lr_div_dwmin_in = 1.0)
+
+{
+  // same as SimpleLoop2 but implicit pulses (that is no pulses, just discretization)
+  const int tid = blockDim.x * blockIdx.x + threadIdx.x; // can be larger that x_size or d_size
+  const int x_size = x_size_in;
+  const int d_size = d_size_in;
+  const int m_batch = m_batch_in;
+  const int Kplus1 = Kplus1_in;
+
+  const T x_res = x_res_in;
+  const T d_res = d_res_in;
+  const T x_scaleprob = x_scaleprob_in;
+  const T d_scaleprob = d_scaleprob_in;
+
+  int nx_blocks = ceil(gridDim.x * ((T)x_size / (T)(x_size + d_size)));
+  int nd_blocks = gridDim.x - nx_blocks;
+  if ((nd_blocks <= 0) && (d_size > 0)) {
+    nx_blocks = gridDim.x - 1; // ASSUMES gridDim.x>1 !~
+    nd_blocks = 1;
+  }
+  const int tid_nx = nx_blocks * blockDim.x;
+  const int tid_nd = nd_blocks * blockDim.x;
+
+  if ((tid < tid_nx) && (tid > x_size * m_batch))
+    return;
+  if ((tid >= tid_nx) && (tid - tid_nx > d_size * m_batch))
+    return;
+
+  const T lr_div_dwmin = lr_div_dwmin_in;
+
+  // x input // gets the K mult
+  GET_COUNTS_SIMPLE_LOOP_BATCH_IMPLICIT(
+      x_prob, x_size, x_counts, x_scaleprob, x_res, x_trans, out_trans, /, *K, 0, tid_nx, tid_nx);
+
+  // d input
+  GET_COUNTS_SIMPLE_LOOP_BATCH_IMPLICIT(
+      d_prob, d_size, d_counts, d_scaleprob, d_res, d_trans, out_trans, *, , tid_nx,
+      tid_nx + tid_nd, tid_nd);
+}
+
+namespace test_helper {
+template <typename T>
+int debugKernelUpdateGetCountsBatchImplicit(
+    T *indata, int size, T scaleprob, T *counts, int K, T *timing, bool fake_seed) {
+  // counts should be: size allocated !
+  RPU_BLM_DEBUG_DEFINE_K_NO_STOROUND;
+  int m_batch = 1;
+
+  int nthreads = RPU_THREADS_PER_BLOCK_UPDATE;
+
+  int m = MIN(size * m_batch, nthreads * 12);
+  int nblocks = MAX((m + nthreads - 1) / nthreads, 2);
+  std::cout << "nblocks, nthreads: " << nblocks << ", " << nthreads << std::endl;
+  int n = m;
+  RPU_BLM_DEBUG_BATCH_INIT(n, T);
+
+  kernelUpdateGetCountsBatchImplicit<T, false, false, false, false, false>
+      <<<nblocks, nthreads, 0, c.getStream()>>>(
+          dev_indata.getData(), size, scaleprob, resolution, dev_counts.getData(),
+          dev_indata2.getData(), size, scaleprob, resolution, dev_counts2.getData(), Kplus1,
+          m_batch);
+
+  RPU_BLM_DEBUG_BATCH_FINISH(T);
+  return 0;
+}
+template int
+debugKernelUpdateGetCountsBatchImplicit<float>(float *, int, float, float *, int, float *, bool);
+#ifdef RPU_USE_DOUBLE
+template int debugKernelUpdateGetCountsBatchImplicit<double>(
+    double *, int, double, double *, int, double *, bool);
+#endif
+} // namespace test_helper
+
 /****************************************************************************************************************/
 /* BITLINEMAKER */
 /******************************************************************************************************************/
@@ -1197,11 +1327,12 @@ template <typename T> void BitLineMaker<T>::copyDCountsBo64ToHost(uint64_t *dest
   dev_d_counts_bo64_->copyTo(dest);
 };
 
-template <typename T> void BitLineMaker<T>::initializeBLBuffers(int m_batch, int BL, int use_bo64) {
+template <typename T>
+void BitLineMaker<T>::initializeBLBuffers(int m_batch, int BL, int use_bo64, bool implicit_pulses) {
 
   buffer_m_batch_ = m_batch;
   buffer_BL_ = BL;
-  format_ = getFormat(use_bo64);
+  format_ = getFormat(use_bo64, implicit_pulses);
 
   if (format_ == BLMOutputFormat::FP) {
     dev_d_ = RPU::make_unique<CudaArray<T>>(context_, d_size_ * m_batch);
@@ -1222,8 +1353,10 @@ template <typename T> void BitLineMaker<T>::initializeBLBuffers(int m_batch, int
       dev_x_counts_bo64_ = RPU::make_unique<CudaArray<uint64_t>>(context_, x_size_ * m_batch);
     }
   }
+
   context_->synchronize();
-  // std::cout << "BLM init BL buffers with batch " << m_batch << " and BL " << BL << ".\n";
+
+  DEBUG_OUT("BLM init BL buffers with batch " << m_batch << " and BL " << BL << ".");
 }
 
 template <typename T> void BitLineMaker<T>::getCountsDebug(uint32_t *x_counts, uint32_t *d_counts) {
@@ -1234,6 +1367,16 @@ template <typename T> void BitLineMaker<T>::getCountsDebug(uint32_t *x_counts, u
 
   dev_x_counts_->copyTo(x_counts);
   dev_d_counts_->copyTo(d_counts);
+}
+
+template <typename T> void BitLineMaker<T>::getFPCounts(T *x_counts, T *d_counts) {
+
+  if (format_ != BLMOutputFormat::FP) {
+    RPU_FATAL("Wrong format output requested!");
+  }
+
+  dev_x_->copyTo(x_counts);
+  dev_d_->copyTo(d_counts);
 }
 
 #define RPU_BLM_START_KERNEL_LINEAR(ITEM_PER_THREAD)                                               \
@@ -1261,9 +1404,17 @@ void BitLineMaker<T>::makeCounts(
     const bool x_trans,
     const bool d_trans,
     const bool out_trans,
-    const int use_bo64) {
+    const int use_bo64,
+    const bool implicit_pulses) {
   // use_bo64==1 : direct bo64
   // use_bo64==2 : translate into bo64
+
+  // just a double-check. In principle input implicit_pulses could
+  // be omitted. However, it is a safe-guard to make sure the kpars
+  // settings are correct.
+  if (up.needsImplicitPulses() != implicit_pulses) {
+    RPU_FATAL("mixed up implicit pulses settings");
+  }
 
   // update management
   T A = 0;
@@ -1278,9 +1429,9 @@ void BitLineMaker<T>::makeCounts(
 
   cudaStream_t s = this->context_->getStream();
 
-  if (format_ != getFormat(use_bo64) || (buffer_BL_ / 32 < current_BL_ / 32) ||
+  if (format_ != getFormat(use_bo64, implicit_pulses) || (buffer_BL_ / 32 < current_BL_ / 32) ||
       (buffer_m_batch_ < m_batch)) {
-    initializeBLBuffers(m_batch, current_BL_, use_bo64);
+    initializeBLBuffers(m_batch, current_BL_, use_bo64, implicit_pulses);
   }
 
   if ((use_bo64 > 0) && !out_trans) {
@@ -1308,6 +1459,41 @@ void BitLineMaker<T>::makeCounts(
   // ------- generate the requested bit lines
 
   switch (up.pulse_type) {
+
+  case PulseType::DeterministicImplicit: {
+    // we do not actually generate bitlines here but discretize and
+    // scale x and d according to the update_management
+
+    // we first scale x and d explicitely (to simulate the selection
+    // of the bit line from memory) and then multiply. Multplication
+    // is done in the update kernel directly.
+
+    // Note that we here also multiply with BL already (after the
+    // discritezation) so that counts are simply generated by
+    //
+    // x_val = blm->getXData(); d_val = blm->getDData();
+    //
+    // n = floor(x_val*d_val + 0.4999);
+    //
+    // sign is seperately taken into account so that floor does the
+    // right thing.
+
+    if (format_ != BLMOutputFormat::FP) {
+      RPU_FATAL("Expects to be in float mode!");
+    }
+
+    int m = (d_size_ + x_size_) * m_batch;
+    int nblocks = context_->getNBlocks(m, nthreads_);
+    nblocks = MAX(MIN(max_block_count_, nblocks), 2);
+
+    RPU_BLM_SWITCH_TRANS_TEMPLATE_UM(
+        x_trans, d_trans, out_trans, update_management, update_bl_management,
+        kernelUpdateGetCountsBatchImplicit,
+        (x_in, x_size_, B, up.x_res_implicit, dev_x_->getData(), d_in, d_size_, A,
+         up.d_res_implicit, dev_d_->getData(), current_BL_ + 1, m_batch, scale_values, K_values,
+         lr / dw_min));
+
+  } break;
 
   case PulseType::StochasticCompressed: {
     // here we generate stochastic bitlines. These are either in 64
@@ -1406,7 +1592,6 @@ void BitLineMaker<T>::makeCounts(
              current_BL_ + 1, m_batch, context_->getRandomStates(nthreads_ * nblocks), res, sr), );
       }
     }
-
     // translate to BO64 if necessary
     if (use_bo64 > 1) {
       umh_->translateTransToBatchOrder64(
@@ -1437,7 +1622,7 @@ template class BitLineMaker<double>;
 #define RPU_BLM_ITER_TEMPLATE(NUM_T, XITERT, DITERT)                                               \
   template void BitLineMaker<NUM_T>::makeCounts(                                                   \
       XITERT, DITERT, const PulsedUpdateMetaParameter<NUM_T> &, const NUM_T, const NUM_T,          \
-      const int, const bool, const bool, const bool, const int);
+      const int, const bool, const bool, const bool, const int, const bool);
 
 #define TRANSFLOAT(TRANS) TRANS, float
 
@@ -1445,9 +1630,19 @@ RPU_BLM_ITER_TEMPLATE(float, const float *, const float *);
 RPU_BLM_ITER_TEMPLATE(float, float *, float *);
 RPU_BLM_ITER_TEMPLATE(float, IndexReaderInputIterator<float>, const float *);
 RPU_BLM_ITER_TEMPLATE(float, IndexReaderTransInputIterator<float>, const float *);
+
 RPU_BLM_ITER_TEMPLATE(
     float, IndexReaderTransInputIterator<float>, PermuterTransInputIterator<float>);
+RPU_BLM_ITER_TEMPLATE(
+    float, IndexReaderSliceInputIterator<TRANSFLOAT(true)>, SliceInputIterator<TRANSFLOAT(true)>);
+RPU_BLM_ITER_TEMPLATE(
+    float, IndexReaderSliceInputIterator<TRANSFLOAT(false)>, SliceInputIterator<TRANSFLOAT(false)>);
+
 RPU_BLM_ITER_TEMPLATE(float, const float *, PermuterTransInputIterator<float>);
+RPU_BLM_ITER_TEMPLATE(float, const float *, SliceInputIterator<TRANSFLOAT(true)>);
+RPU_BLM_ITER_TEMPLATE(float, const float *, SliceInputIterator<TRANSFLOAT(false)>);
+RPU_BLM_ITER_TEMPLATE(float, IndexReaderSliceInputIterator<TRANSFLOAT(true)>, const float *);
+RPU_BLM_ITER_TEMPLATE(float, IndexReaderSliceInputIterator<TRANSFLOAT(false)>, const float *);
 
 #undef TRANSFLOAT
 
@@ -1460,7 +1655,20 @@ RPU_BLM_ITER_TEMPLATE(double, IndexReaderInputIterator<double>, const double *);
 RPU_BLM_ITER_TEMPLATE(double, IndexReaderTransInputIterator<double>, const double *);
 RPU_BLM_ITER_TEMPLATE(
     double, IndexReaderTransInputIterator<double>, PermuterTransInputIterator<double>);
+RPU_BLM_ITER_TEMPLATE(
+    double,
+    IndexReaderSliceInputIterator<TRANSDOUBLE(true)>,
+    SliceInputIterator<TRANSDOUBLE(true)>);
+RPU_BLM_ITER_TEMPLATE(
+    double,
+    IndexReaderSliceInputIterator<TRANSDOUBLE(false)>,
+    SliceInputIterator<TRANSDOUBLE(false)>);
+
 RPU_BLM_ITER_TEMPLATE(double, const double *, PermuterTransInputIterator<double>);
+RPU_BLM_ITER_TEMPLATE(double, const double *, SliceInputIterator<TRANSDOUBLE(true)>);
+RPU_BLM_ITER_TEMPLATE(double, const double *, SliceInputIterator<TRANSDOUBLE(false)>);
+RPU_BLM_ITER_TEMPLATE(double, IndexReaderSliceInputIterator<TRANSDOUBLE(true)>, const double *);
+RPU_BLM_ITER_TEMPLATE(double, IndexReaderSliceInputIterator<TRANSDOUBLE(false)>, const double *);
 
 #undef TRANSDOUBLE
 #endif
@@ -1488,4 +1696,7 @@ RPU_BLM_ITER_TEMPLATE(double, const double *, PermuterTransInputIterator<double>
 #undef GET_COUNTS_LOOP_BATCH
 #undef GET_COUNTS_SIMPLE_LOOP_BATCH
 #undef RPU_BLM_BLOCKS_PER_SM
+#undef RPU_BLM_DEBUG_DEFINE_K_BATCH
+#undef RPU_BLM_DEBUG_DEFINE_K_NO_STOROUND
+#undef RPU_BLM_DEBUG_DEFINE_K
 } // namespace RPU

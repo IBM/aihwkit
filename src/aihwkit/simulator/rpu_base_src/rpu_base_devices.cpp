@@ -250,12 +250,14 @@ void declare_rpu_devices(py::module &m) {
       .def(py::init<>())
       .def_readwrite("fixed_bl", &RPU::PulsedUpdateMetaParameter<T>::fixed_BL)
       .def_readwrite("desired_bl", &RPU::PulsedUpdateMetaParameter<T>::desired_BL)
+      .def_readwrite("d_res_implicit", &RPU::PulsedUpdateMetaParameter<T>::d_res_implicit)
       .def_readwrite("pulse_type", &RPU::PulsedUpdateMetaParameter<T>::pulse_type)
       .def_readwrite("res", &RPU::PulsedUpdateMetaParameter<T>::res)
       .def_readwrite("sto_round", &RPU::PulsedUpdateMetaParameter<T>::sto_round)
       .def_readwrite("update_management", &RPU::PulsedUpdateMetaParameter<T>::update_management)
       .def_readwrite(
-          "update_bl_management", &RPU::PulsedUpdateMetaParameter<T>::update_bl_management);
+          "update_bl_management", &RPU::PulsedUpdateMetaParameter<T>::update_bl_management)
+      .def_readwrite("x_res_implicit", &RPU::PulsedUpdateMetaParameter<T>::x_res_implicit);
 
   py::class_<RPU::IOMetaParameter<T>>(m, "AnalogTileInputOutputParameter")
       .def(py::init<>())
@@ -268,6 +270,8 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("is_perfect", &RPU::IOMetaParameter<T>::is_perfect)
       .def_readwrite("max_bm_factor", &RPU::IOMetaParameter<T>::max_bm_factor)
       .def_readwrite("max_bm_res", &RPU::IOMetaParameter<T>::max_bm_res)
+      .def_readwrite("nm_assumed_wmax", &RPU::IOMetaParameter<T>::nm_assumed_wmax)
+      .def_readwrite("nm_decay", &RPU::IOMetaParameter<T>::nm_decay)
       .def_readwrite("nm_thres", &RPU::IOMetaParameter<T>::nm_thres)
       .def_readwrite("noise_management", &RPU::IOMetaParameter<T>::noise_management)
       .def_readwrite("out_bound", &RPU::IOMetaParameter<T>::out_bound)
@@ -428,7 +432,9 @@ void declare_rpu_devices(py::module &m) {
    **/
   py::enum_<RPU::BoundManagementType>(m, "BoundManagementType")
       .value("None", RPU::BoundManagementType::None)
-      .value("Iterative", RPU::BoundManagementType::Iterative);
+      .value("Iterative", RPU::BoundManagementType::Iterative)
+      .value("IterativeWorstCase", RPU::BoundManagementType::IterativeWorstCase)
+      .value("Shift", RPU::BoundManagementType::Shift);
 
   py::enum_<RPU::VectorDeviceUpdatePolicy>(m, "VectorUnitCellUpdatePolicy")
       .value("All", RPU::VectorDeviceUpdatePolicy::All)
@@ -439,17 +445,21 @@ void declare_rpu_devices(py::module &m) {
   py::enum_<RPU::NoiseManagementType>(m, "NoiseManagementType")
       .value("None", RPU::NoiseManagementType::None)
       .value("AbsMax", RPU::NoiseManagementType::AbsMax)
+      .value("AbsMaxNPSum", RPU::NoiseManagementType::AbsMaxNPSum)
+      .value("Max", RPU::NoiseManagementType::Max)
       .value("Constant", RPU::NoiseManagementType::Constant)
-      .value("Max", RPU::NoiseManagementType::Max);
+      .value("AverageAbsMax", RPU::NoiseManagementType::AverageAbsMax);
 
   py::enum_<RPU::OutputWeightNoiseType>(m, "WeightNoiseType")
       .value("None", RPU::OutputWeightNoiseType::None)
-      .value("AdditiveConstant", RPU::OutputWeightNoiseType::AdditiveConstant);
+      .value("AdditiveConstant", RPU::OutputWeightNoiseType::AdditiveConstant)
+      .value("PCMRead", RPU::OutputWeightNoiseType::PCMRead);
 
   py::enum_<RPU::PulseType>(m, "PulseType")
       .value("None", RPU::PulseType::None)
       .value("StochasticCompressed", RPU::PulseType::StochasticCompressed)
       .value("Stochastic", RPU::PulseType::Stochastic)
       .value("NoneWithDevice", RPU::PulseType::NoneWithDevice)
-      .value("MeanCount", RPU::PulseType::MeanCount);
+      .value("MeanCount", RPU::PulseType::MeanCount)
+      .value("DeterministicImplicit", RPU::PulseType::DeterministicImplicit);
 }

@@ -290,6 +290,11 @@ template <typename T> void TransferRPUDevice<T>::setTransferVecs(const T *transf
   }
 }
 
+template <typename T> int TransferRPUDevice<T>::resetCounters(bool force) {
+  current_col_indices_.resize(this->n_devices_);
+  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int) 0);
+  return VectorRPUDevice<T>::resetCounters(force);
+}
 /*********************************************************************************/
 /* populate */
 
@@ -300,11 +305,13 @@ void TransferRPUDevice<T>::populate(
   VectorRPUDevice<T>::populate(p, rng);
   auto &par = getPar();
   par.initializeWithSize(this->x_size_, this->d_size_);
+
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   transfer_fb_pass_ =
       RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
+
   transfer_fb_pass_->setIOPar(par.transfer_io, par.transfer_io);
-  // NOTE: the OUT_SCALE might be different for the transfer!! How to account for that?!?
+  // TODO: the OUT_SCALE might be different for the transfer!! How to account for that?!?
 
   transfer_pwu_ =
       RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
@@ -314,17 +321,10 @@ void TransferRPUDevice<T>::populate(
   for (int k = 0; k < this->n_devices_; k++) {
     this->reduce_weightening_[k] = par.gamma_vec[k];
   }
-
+  resetCounters(); // "state" pars
   setTransferVecs();
-
   transfer_every_ = par.transfer_every_vec; // already checked for length
-
-  current_col_indices_.resize(this->n_devices_);
-  std::fill(current_col_indices_.begin(), current_col_indices_.end(), 0);
-
-  this->current_device_idx_ = 0; // only zero is updated, ignore current idx
-
-  fully_hidden_ = getPar().fullyHidden(); // save
+  fully_hidden_ = getPar().fullyHidden();   // save
 }
 
 /*********************************************************************************/
@@ -434,7 +434,6 @@ void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T cu
 /*********************************************************************************/
 /* update */
 /********************************************************************************/
-
 template <typename T>
 void TransferRPUDevice<T>::doSparseUpdate(
     T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
@@ -457,7 +456,6 @@ void TransferRPUDevice<T>::finishUpdateCycle(
 
   // we transfer the device here to cope with the sparse update below.
   for (int j = 0; j < this->n_devices_; j++) {
-
     int every = getTransferEvery(j, m_batch_info);
     if (every > 0 && this->current_update_idx_ % every == 0) {
       // last is self-update (does nothing per default, but could implement refresh in child)
@@ -470,12 +468,12 @@ void TransferRPUDevice<T>::finishUpdateCycle(
 template <typename T> bool TransferRPUDevice<T>::onSetWeights(T **weights) {
   /* all weights are set to the last weight scaled by its significance*/
 
-  // all weights are set to *identical* values...
-  // return VectorRPUDevice<T>::onSetWeights(weights);
-
   if (!this->n_devices_) {
     RPU_FATAL("First populate device then set the weights");
   }
+
+  // need to reset device index etc for consistency with CUDA
+  resetCounters();
 
   int last_idx = this->n_devices_ - 1;
 
@@ -546,6 +544,12 @@ template <typename T> void TransferRPUDevice<T>::diffuseWeights(T **weights, RNG
 
 template <typename T> void TransferRPUDevice<T>::clipWeights(T **weights, T clip) {
   LOOP_WITH_HIDDEN(clipWeights, COMMA clip);
+}
+
+template <typename T>
+void TransferRPUDevice<T>::resetCols(
+    T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) {
+  LOOP_WITH_HIDDEN(resetCols, COMMA start_col COMMA n_cols COMMA reset_prob COMMA rng);
 }
 
 #undef COMMA

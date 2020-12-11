@@ -62,6 +62,7 @@ public:
 private:
   void applyOutputWeightNoise(const bool out_trans);
   void applyOutputNonIdealities(const T *dev_weights, const bool out_trans);
+  void applyOutputPCMReadNoise(const T *dev_weights, const bool out_trans);
 
   void initializeBatchBuffer(int m_batch);
 
@@ -74,6 +75,7 @@ private:
   int in_size_ = 0;
   int out_size_ = 0;
   std::unique_ptr<NoiseManager<T>> noise_manager_ = nullptr;
+  std::unique_ptr<Maximizer<T>> output_maximizer_ = nullptr;
 
   int buffer_m_batch_ = 0;
   int temp_m_batch_ = 0;
@@ -104,13 +106,17 @@ private:
   std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_bound_exceeded_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_any_exceeded_ = nullptr;
-
+  std::unique_ptr<CudaArray<int>> dev_channel_exceeded_ = nullptr;
   std::unique_ptr<CudaArray<char>> dev_flagged_temp_storage_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_selected_bidx_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_selected_m_batch_ = nullptr;
 
   std::unique_ptr<CudaArray<T>> dev_wnoise_buffer_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_wnoise_ones_ = nullptr;
+
+  std::unique_ptr<CudaArray<T>> dev_extra_weight_buffer_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_extra_batch_buffer_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_a_buffer_ = nullptr;
 };
 
 } // namespace RPU

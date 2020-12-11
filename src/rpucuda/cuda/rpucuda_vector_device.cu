@@ -141,7 +141,7 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 
   // populate vector device
   current_update_idx_ = 0;
-  current_device_idx_ = getPar().first_update_idx;
+  current_device_idx_ = rpu_device.getCurrentDeviceIdx();
   n_devices_ = 0;
 
   dw_min_ = rpu_device.getDwMin();

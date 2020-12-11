@@ -59,12 +59,21 @@ template <typename T> struct AbstractRPUDeviceMetaParameter : SimpleMetaParamete
   virtual AbstractRPUDeviceMetaParameter<T> *clone() const = 0;
   std::unique_ptr<AbstractRPUDeviceMetaParameter<T>> cloneUnique() const {
     return std::unique_ptr<AbstractRPUDeviceMetaParameter<T>>(clone());
-  };
+  }
   virtual DeviceUpdateType implements() const = 0;
   virtual void initialize() {
     _par_initialized = true;
     _device_parameter_mode_manual = false;
-  };
+  }
+
+  friend void
+  swap(AbstractRPUDeviceMetaParameter<T> &a, AbstractRPUDeviceMetaParameter<T> &b) noexcept {
+    using std::swap;
+    swap(static_cast<SimpleMetaParameter<T> &>(a), static_cast<SimpleMetaParameter<T> &>(b));
+    swap(a._device_parameter_mode_manual, b._device_parameter_mode_manual);
+    swap(a.construction_seed, b.construction_seed);
+    swap(a._par_initialized, b._par_initialized);
+  }
 };
 
 // Simple Device parameter
@@ -73,15 +82,23 @@ template <typename T> struct SimpleRPUDeviceMetaParameter : AbstractRPUDeviceMet
   std::string getName() const override { return "SimpleRPUDevice"; };
   SimpleRPUDevice<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {
     return new SimpleRPUDevice<T>(x_size, d_size, *this, rng);
-  };
+  }
   SimpleRPUDeviceMetaParameter<T> *clone() const override {
     return new SimpleRPUDeviceMetaParameter<T>(*this);
-  };
+  }
   using SimpleMetaParameter<T>::print;
   void printToStream(std::stringstream &ss) const override {
     SimpleMetaParameter<T>::printToStream(ss);
-  };
+  }
   DeviceUpdateType implements() const override { return DeviceUpdateType::FloatingPoint; };
+
+  friend void
+  swap(SimpleRPUDeviceMetaParameter<T> &a, SimpleRPUDeviceMetaParameter<T> &b) noexcept {
+    using std::swap;
+    swap(
+        static_cast<AbstractRPUDeviceMetaParameter<T> &>(a),
+        static_cast<AbstractRPUDeviceMetaParameter<T> &>(b));
+  }
 };
 
 template <typename T> class AbstractRPUDevice {
@@ -106,17 +123,17 @@ public:
   virtual void printDP(int x_count, int d_count) const = 0;
   void dispMetaParameter() const {
     std::stringstream ss;
-    ss << "\e[0;33m";
+    ss << "\033[0;33m";
     printToStream(ss);
-    ss << "\e[0m";
+    ss << "\033[0m";
     std::cout << ss.str();
   };
   virtual void printToStream(std::stringstream &ss) const = 0;
   void dispType() const {
     std::stringstream ss;
-    ss << "\e[1m";
+    ss << "\033[1m";
     disp(ss);
-    ss << "\e[0m";
+    ss << "\033[0m";
     std::cout << ss.str();
   };
   void dispInfo() const {
@@ -129,14 +146,25 @@ public:
   virtual int getXSize() const = 0;
   virtual AbstractRPUDeviceMetaParameter<T> &getPar() const = 0;
   virtual bool isPulsedDevice() const { return false; };
+
   virtual void decayWeights(T **weights, bool bias_no_decay) = 0;
   virtual void decayWeights(T **weights, T alpha, bool bias_no_decay) = 0;
   virtual void diffuseWeights(T **weights, RNG<T> &rng) = 0;
   virtual void clipWeights(T **weights, T clip) = 0;
-  virtual bool onSetWeights(T **weights) = 0;
   virtual void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) = 0;
+
+  virtual bool onSetWeights(T **weights) = 0;
   virtual DeviceUpdateType implements() const = 0;
+  virtual bool hasDirectUpdate() const { return false; };
+  virtual void doDirectVectorUpdate(
+      T **weights,
+      const T *x_input,
+      const int x_inc,
+      const T *d_input,
+      const int d_inc,
+      const T learning_rate,
+      const int m_batch_info){RPU_NOT_IMPLEMENTED};
 };
 
 /*This re-implements the floating point weight related things to

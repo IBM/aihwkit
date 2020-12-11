@@ -55,7 +55,10 @@ public:
   void decayWeights(bool bias_no_decay) override;
   void decayWeights(T alpha, bool bias_no_decay) override;
   void diffuseWeights() override;
+  void clipWeights(T clip) override;
+  void clipWeights(const WeightClipParameter &wclpar) override;
   void resetCols(int start_col, int n_cols, T reset_prob) override;
+
   void updateVectorWithCounts(
       const T *x_input,
       const T *d_input,
@@ -121,11 +124,13 @@ template <typename T> struct PulsedMetaParameter {
     swap(a.f_io, b.f_io);
     swap(a.b_io, b.b_io);
     swap(a.up, b.up);
+
     swap(a._par_initialized, b._par_initialized);
   }
 
   IOMetaParameter<T> f_io;
   IOMetaParameter<T> b_io;
+
   PulsedUpdateMetaParameter<T> up;
 
   RPUPulsed<T> *createRPUArray(int x_size, int d_size, AbstractRPUDeviceMetaParameter<T> *dp);
@@ -134,7 +139,7 @@ template <typename T> struct PulsedMetaParameter {
   void initialize();
 
   void print() const;
-  void printToStream(std::stringstream &ss) const;
+  void printToStream(std::stringstream &ss, bool suppress_update = false) const;
 };
 
 } // namespace RPU

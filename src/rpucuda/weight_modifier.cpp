@@ -42,11 +42,22 @@ void WeightModifier<T>::apply(
     RPU::math::copy<T>(size_, weights, 1, new_weights, 1);
   }
 
+  if (wmpar.copy_last_column) {
+    saved_bias_.resize(d_size_);
+    for (int j = 0; j < d_size_; j++) {
+      saved_bias_[j] = weights[(j + 1) * x_size_ - 1];
+    }
+  }
+  enable_during_test_ = wmpar.enable_during_test;
+
   T amax = wmpar.assumed_wmax; // assumed max
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
     amax = 0.0;
     PRAGMA_SIMD
     for (int i = 0; i < size_; i++) {
+      if (wmpar.copy_last_column && (i % x_size_) == x_size_ - 1) {
+        continue;
+      }
       T a = fabs(new_weights[i]);
       amax = a > amax ? a : amax;
     }
@@ -65,8 +76,8 @@ void WeightModifier<T>::apply(
   case WeightModifierType::Discretize: {
 
     const T res = wmpar.res;
-    const bool sto_round = wmpar.sto_round;
     if (res > 0) {
+      const bool sto_round = wmpar.sto_round;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
         T w = new_weights[i];
@@ -77,51 +88,78 @@ void WeightModifier<T>::apply(
   }
   case WeightModifierType::MultNormal: {
 
-    const T std = wmpar.std_dev * amax;
-    PRAGMA_SIMD
-    for (int i = 0; i < size_; i++) {
-      T w = new_weights[i];
-      new_weights[i] += w * std * rw_rng_.sampleGauss();
+    if (wmpar.std_dev > 0) {
+      const T std = wmpar.std_dev * amax;
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        T w = new_weights[i];
+        new_weights[i] += w * std * rw_rng_.sampleGauss();
+      }
     }
-
     break;
   }
   case WeightModifierType::AddNormal: {
 
-    const T std = wmpar.std_dev * amax;
-    PRAGMA_SIMD
-    for (int i = 0; i < size_; i++) {
-      new_weights[i] += std * rw_rng_.sampleGauss();
+    if (wmpar.std_dev > 0) {
+      const T std = wmpar.std_dev * amax;
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        new_weights[i] += std * rw_rng_.sampleGauss();
+      }
     }
 
+    break;
+  }
+
+  case WeightModifierType::Poly: {
+
+    if (wmpar.std_dev > 0) {
+      const T std = wmpar.std_dev;
+      const T p0 = wmpar.coeff0;
+      const T p1 = wmpar.coeff1;
+      const T p2 = wmpar.coeff2;
+
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        T aw = fabs(new_weights[i]) / amax;
+        T sig = std * (p0 + p1 * aw + p2 * aw * aw);
+        new_weights[i] += amax * sig * rw_rng_.sampleGauss();
+      }
+    }
     break;
   }
 
   case WeightModifierType::DoReFa: {
 
     const T res = wmpar.res;
-    const bool sto_round = wmpar.sto_round;
 
-    const T scale = fabs(wmpar.dorefa_clip / tanh(amax));
+    if (res > 0) {
+      const bool sto_round = wmpar.sto_round;
+      const T scale = fabs(wmpar.dorefa_clip / tanh(amax));
 
-    PRAGMA_SIMD
-    for (int i = 0; i < size_; i++) {
-      T w = tanh(new_weights[i]) * scale;
-      new_weights[i] = getDiscretizedValueRound(w, res, sto_round, rw_rng_);
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        T w = tanh(new_weights[i]) * scale;
+        new_weights[i] = getDiscretizedValueRound(w, res, sto_round, rw_rng_);
+      }
     }
 
     break;
   }
 
   case WeightModifierType::DiscretizeAddNormal: {
+
     const T res = wmpar.res;
-    const bool sto_round = wmpar.sto_round;
     const T std = wmpar.std_dev * amax;
-    PRAGMA_SIMD
-    for (int i = 0; i < size_; i++) {
-      T w = new_weights[i];
-      w = amax * getDiscretizedValueRound(w / amax, res, sto_round, rw_rng_);
-      new_weights[i] = w + std * rw_rng_.sampleGauss();
+    if (res > 0 || std > 0) {
+      const bool sto_round = wmpar.sto_round;
+
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        T w = new_weights[i];
+        w = amax * getDiscretizedValueRound(w / amax, res, sto_round, rw_rng_);
+        new_weights[i] = w + std * rw_rng_.sampleGauss();
+      }
     }
 
     break;
@@ -133,6 +171,12 @@ void WeightModifier<T>::apply(
 
   if (wmpar.pdrop > 0.0) {
     dropConnections(new_weights, wmpar.pdrop);
+  }
+
+  if (wmpar.copy_last_column) {
+    for (int j = 0; j < d_size_; j++) {
+      new_weights[(j + 1) * x_size_ - 1] = saved_bias_[j];
+    }
   }
 }
 

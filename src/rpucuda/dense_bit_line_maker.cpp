@@ -207,6 +207,66 @@ void DenseBitLineMaker<T>::generateCoincidences(
   }
 }
 
+/**************************************************************************************/
+/* just discretize. Deterministic, could be generated according to Murat's bitlines   */
+
+template <typename T>
+inline void DenseBitLineMaker<T>::generateDetImplicit(
+    T *pcounts,
+    const T *v,
+    const int v_inc,
+    const int v_size,
+    const T p,
+    RNG<T> *rng,
+    const int BL,
+    const T res,
+    const bool sto_round,
+    const T lr) {
+  int j_v = 0;
+  for (int j = 0; j < v_size; j++) {
+
+    T v_value = lr < 0 ? -v[j_v] : v[j_v];
+    j_v += v_inc;
+
+    if (v_value == 0) {
+      pcounts[j] = 0;
+      continue;
+    }
+
+    T pp = getDiscretizedValue<T>((T)fabs(v_value) * p, res, sto_round, *rng);
+
+    pp = MAX(MIN(pp, 1), 0);
+    pcounts[j] = (v_value >= 0) ? pp : -pp;
+  }
+}
+
+template <typename T>
+void DenseBitLineMaker<T>::generateCoincidencesDetI(
+    int *coincidences,
+    const T *x_values,
+    const int x_size,
+    const T *d_values,
+    const int d_size,
+    const int BL) {
+  int idx = 0;
+  for (int i = 0; i < d_size; ++i) {
+    T dc = d_values[i];
+    if (dc != 0.0) {
+      dc *= BL;
+      PRAGMA_SIMD
+      for (int j = 0; j < x_size; ++j) {
+        coincidences[idx++] = (int)RPU_ROUNDFUN(dc * x_values[j]);
+      }
+    } else {
+      // need to set to zero
+      PRAGMA_SIMD
+      for (int j = 0; j < x_size; ++j) {
+        coincidences[idx++] = 0;
+      }
+    }
+  }
+}
+
 // makeCounts
 template <typename T>
 int *DenseBitLineMaker<T>::makeCoincidences(
@@ -218,6 +278,7 @@ int *DenseBitLineMaker<T>::makeCoincidences(
     const T lr,
     const T dw_min,
     const PulsedUpdateMetaParameter<T> &up) {
+
   T A = 0;
   T B = 0;
   int BL = 0;
@@ -246,6 +307,19 @@ int *DenseBitLineMaker<T>::makeCoincidences(
     generateCoincidences(coincidences_, x_counts_, x_size_, d_counts_, d_size_, BL);
     break;
 
+  case PulseType::DeterministicImplicit: {
+    // note that GPU version does not support stoc round / bl_thres / sparsity for this type.
+
+    // x counts
+    generateDetImplicit(
+        x_values_, x_in, x_inc, x_size_, B, rng, BL, up.x_res_implicit, up.sto_round, lr);
+
+    // d counts
+    generateDetImplicit(
+        d_values_, d_in, d_inc, d_size_, A, rng, BL, up.d_res_implicit, up.sto_round, lr);
+
+    generateCoincidencesDetI(coincidences_, x_values_, x_size_, d_values_, d_size_, BL);
+  } break;
   default:
     RPU_FATAL("PulseType not supported");
   }
@@ -254,7 +328,7 @@ int *DenseBitLineMaker<T>::makeCoincidences(
 }
 
 template <typename T> bool DenseBitLineMaker<T>::supports(RPU::PulseType pulse_type) const {
-  return PulseType::MeanCount == pulse_type;
+  return PulseType::MeanCount == pulse_type || PulseType::DeterministicImplicit == pulse_type;
 }
 
 template <typename T> void DenseBitLineMaker<T>::printCounts(int max_n) const {

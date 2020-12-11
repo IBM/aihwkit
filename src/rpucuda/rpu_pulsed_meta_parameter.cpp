@@ -72,6 +72,13 @@ template <typename T> void IOMetaParameter<T>::initializeForForward() {
     if (isinf(this->out_bound)) {
       RPU_FATAL("Forward out bound needs to be finite");
     }
+
+    if (this->bound_management == BoundManagementType::Shift) {
+      this->nm_thres = (T)0.0;
+      if (this->out_scale != 1.0) {
+        RPU_FATAL("Forward out scale should 1.0 for shift mangement");
+      }
+    }
   }
 }
 
@@ -123,6 +130,8 @@ template <typename T> void PulsedUpdateMetaParameter<T>::initialize() {
     update_management = update_management || update_bl_management;
 
     detail::checkRes(res);
+    detail::checkRes(x_res_implicit);
+    detail::checkRes(d_res_implicit);
   }
 
   if (_currently_tuning) {

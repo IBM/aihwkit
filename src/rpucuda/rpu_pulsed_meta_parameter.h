@@ -19,13 +19,28 @@
 
 namespace RPU {
 
-enum class NoiseManagementType { None, AbsMax, Max, Constant };
+enum class NoiseManagementType {
+  None,
+  AbsMax,
+  AbsMaxNPSum,
+  Max,
+  Constant,
+  AverageAbsMax,
+  AverageAbsMaxSingleValue
+};
 
-enum class BoundManagementType { None, Iterative };
+enum class BoundManagementType { None, Iterative, IterativeWorstCase, Shift, SignalChannel };
 
-enum class OutputWeightNoiseType { None, AdditiveConstant };
+enum class OutputWeightNoiseType { None, AdditiveConstant, PCMRead };
 
-enum class PulseType { None, StochasticCompressed, Stochastic, NoneWithDevice, MeanCount };
+enum class PulseType {
+  None,
+  StochasticCompressed,
+  Stochastic,
+  NoneWithDevice,
+  MeanCount,
+  DeterministicImplicit
+};
 
 template <typename T> struct IOMetaParameter {
   bool _par_initialized = false;
@@ -33,6 +48,7 @@ template <typename T> struct IOMetaParameter {
   bool is_perfect = false; // short-cut to use pure floating point (only out_scale will be applied)
 
   OutputWeightNoiseType w_noise_type = OutputWeightNoiseType::None;
+
   T inp_bound = (T)1.0;
   T inp_res = (T)1.0 / (pow((T)2.0, (T)7.0) - (T)2.0);
   T _inp_res = (T)0.0; // this is the unscaled version saved for output..
@@ -47,6 +63,8 @@ template <typename T> struct IOMetaParameter {
   T out_scale = (T)1.0;
   NoiseManagementType noise_management = NoiseManagementType::AbsMax;
   T nm_thres = (T)0.0;
+  T nm_assumed_wmax = (T)0.6;
+  T nm_decay = (T)1e-3; // minibatches for AverageAbsMax
 
   BoundManagementType bound_management = BoundManagementType::None;
   bool bm_test_negative_bound = true;
@@ -87,6 +105,10 @@ template <typename T> struct IOMetaParameter {
           ss << "\t w_noise_type:\t\t" << (int)OutputWeightNoiseType::AdditiveConstant
              << " (AdditiveConstant) " << std::endl;
         }
+        if (w_noise_type == OutputWeightNoiseType::PCMRead) {
+          ss << "\t w_noise_type:\t\t" << (int)OutputWeightNoiseType::PCMRead << " (PCMRead) "
+             << std::endl;
+        }
       }
     }
     if (out_scale != 1.0) {
@@ -95,6 +117,8 @@ template <typename T> struct IOMetaParameter {
     if (!is_perfect) {
       if (noise_management == NoiseManagementType::AbsMax && nm_thres > 0) {
         ss << "\t noise_management [nm_thres]:\t" << nm_thres << std::endl;
+      } else if (noise_management == NoiseManagementType::AbsMaxNPSum) {
+        ss << "\t noise_management [NPSum;wmax]:\t" << nm_assumed_wmax << std::endl;
       } else if (noise_management == NoiseManagementType::Constant && nm_thres > 0) {
         ss << "\t noise_management: \t" << nm_thres << " (Constant scale)" << std::endl;
       } else {
@@ -112,6 +136,12 @@ template <typename T> struct IOMetaParameter {
         break;
       case BoundManagementType::Iterative:
         ss << "Iterative";
+        break;
+      case BoundManagementType::Shift:
+        ss << "Shift";
+        break;
+      case BoundManagementType::IterativeWorstCase:
+        ss << "Iterative [2nd round with NM::AbsMaxNPSum]";
         break;
       default:
         ss << "UNKNOWN.";
@@ -138,11 +168,18 @@ template <typename T> struct PulsedUpdateMetaParameter {
   T res = (T)0; // this is taken to be in the range 0..1 as positive and negative phases are done
                 // separately
 
+  T x_res_implicit = (T)0; // in case of implicit pulsing. Assumes range 0..1
+  T d_res_implicit = (T)0;
+
   bool _par_initialized = false;
   bool _currently_tuning = false;
   int _debug_kernel_index = -1; // for PWU debugging.
 
   PulseType pulse_type = PulseType::StochasticCompressed;
+
+  virtual bool needsImplicitPulses() const {
+    return pulse_type == PulseType::DeterministicImplicit || pulse_type == PulseType::None;
+  };
 
   void initialize();
   virtual int getNK32Default() const { return desired_BL / 32 + 1; };
@@ -168,6 +205,15 @@ template <typename T> struct PulsedUpdateMetaParameter {
     } else if (pulse_type == PulseType::NoneWithDevice) {
       ss << "\t using ideal floating point (with device)." << std::endl;
     } else {
+      if (needsImplicitPulses()) {
+        ss << "\t using implicit pulsing scheme." << std::endl;
+        if (x_res_implicit > 0) {
+          ss << "\t nx (x_res):\t\t" << 1. / x_res_implicit << std::endl;
+        }
+        if (d_res_implicit > 0) {
+          ss << "\t nd (d_res):\t\t" << 1. / d_res_implicit << std::endl;
+        }
+      }
       ss << "\t desired_BL:\t\t" << desired_BL << std::endl;
       ss << "\t fixed_BL:\t\t" << std::boolalpha << fixed_BL << std::endl;
       ss << "\t update_management:\t" << std::boolalpha << update_management << std::endl;

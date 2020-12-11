@@ -125,7 +125,7 @@ public:
 
     W = new num_t[x_size * d_size];
 
-    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
@@ -215,7 +215,6 @@ TEST_P(IOManagerTestFixture, InputManagement) {
   }
   CUDA_TIMING_DESTROY;
 }
-
 TEST_P(IOManagerTestFixture, InputManagementBatch) {
 
   CUDA_TIMING_INIT;
@@ -329,7 +328,6 @@ TEST_P(IOManagerTestFixture, OutputManagementBatch) {
   for (int i = 0; i < d_size * m_batch; i++) {
     ASSERT_FLOAT_EQ(rdq[i], rd_res[i]);
   }
-
   // trans
   transpose(rdq_trans, rdq, d_size, m_batch);
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
@@ -501,7 +499,9 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   io.out_bound = 0.2;
   io.inp_sto_round = false;
 
-  auto D_buffer = CudaArray<num_t>(this->context, d_size * m_batch);
+  auto D_buffer = CudaArray<num_t>(&*this->context, d_size * m_batch);
+
+  // ASSERT_EQ(d_size==x_size,true); // otherwise simplification below will fail
 
   for (int i = 0; i < x_size * m_batch; i++) {
     rx[i] = (float)i / (x_size * m_batch) * 2.2 - 1.1;
@@ -603,6 +603,67 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   for (int i = 0; i < d_size * m_batch; i++) {
     ASSERT_NEAR(rd_trans[i], rd[i], 1e-3);
   }
+}
+
+TEST_P(IOManagerTestFixture, OutputManagementShiftBatch) {
+
+  // make reference
+  num_t scale_value = 1.0;
+  for (int i = 0; i < m_batch; i++) {
+    if (GetParam()) {
+      scale_value = Find_Absolute_Max(rx + i * x_size, x_size);
+    }
+    num_t out_max_value = Find_Max(rd + i * d_size, d_size);
+    for (int j = 0; j < d_size; j++) {
+      rd[i * d_size + j] += io.out_bound - out_max_value;
+    }
+
+    discretize(
+        rdq + i * d_size, rd + i * d_size, d_size, io.out_bound, io.out_res, false, 1.0,
+        scale_value);
+  }
+  io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
+  io.bound_management = BoundManagementType::Shift;
+
+  iom->initWithInput(curx->getDataConst(), io, m_batch, false);
+  iom->applyToInput(curx->getDataConst()); // sets the scale values
+  CUDA_TIMING_INIT;
+
+  CUDA_TIMING_START((*this->context));
+  iom->applyToOutputInPlace(curd->getData(), nullptr, false);
+  if (GetParam()) {
+    CUDA_TIMING_STOP((*this->context), "OShift Batched [NM]");
+  } else {
+    CUDA_TIMING_STOP((*this->context), "OShift Batched [no NM]");
+  }
+  context->synchronize();
+
+  curd->copyTo(rd_res);
+
+  for (int i = 0; i < d_size * m_batch; i++) {
+    ASSERT_FLOAT_EQ(rdq[i], rd_res[i]);
+  }
+
+  // trans
+  transpose(rdq_trans, rdq, d_size, m_batch);
+  iom->initWithInput(curx_trans->getDataConst(), io, m_batch, true);
+  iom->applyToInput(curx_trans->getDataConst()); // sets the scale values
+
+  CUDA_TIMING_START((*this->context));
+  iom->applyToOutputInPlace(curd_trans->getData(), nullptr, true);
+  if (GetParam()) {
+    CUDA_TIMING_STOP((*this->context), "OShift Batched Trans [NM]");
+  } else {
+    CUDA_TIMING_STOP((*this->context), "OShift Batched Trans [no NM]");
+  }
+  context->synchronize();
+  curd_trans->copyTo(rd_res);
+
+  for (int i = 0; i < d_size * m_batch; i++) {
+    ASSERT_FLOAT_EQ(rdq_trans[i], rd_res[i]);
+  }
+
+  CUDA_TIMING_DESTROY;
 }
 
 } // namespace

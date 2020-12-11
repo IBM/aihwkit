@@ -44,9 +44,9 @@ adjustable parameters. Features include:
 * Forward pass output-referred noise and device fluctuations, as well
   as adjustable ADC and DAC discretization and bounds
 * Stochastic update pulse trains for rows and columns with finite
-  weight update size per pulse coincidence 
-* Device-to-device systematic variations, cycle-to-cycle noise and 
-  adjustable asymmetry during analog update 
+  weight update size per pulse coincidence
+* Device-to-device systematic variations, cycle-to-cycle noise and
+  adjustable asymmetry during analog update
 * Adjustable device behavior for exploration of material specifications for
   training and inference
 * State-of-the-art dynamic input scaling, bound management, and update
@@ -100,7 +100,7 @@ called the [von Neumann bottleneck].
 Analog AI delivers radical performance improvements by combining compute and
 memory in a single device, eliminating the von Neumann bottleneck. By leveraging
 the physical properties of memory devices, computation happens at the same place
-where the data is stored. Such in-memory computing hardware increases the speed 
+where the data is stored. Such in-memory computing hardware increases the speed
 and energy-efficiency needed for the next generation of AI. 
 
 ## What is an in-memory computing chip?
@@ -108,7 +108,7 @@ and energy-efficiency needed for the next generation of AI. 
 An in-memory computing chip typically consists of multiple arrays of memory
 devices that communicate with each other. Many types of memory devices such as
 [phase-change memory] (PCM), [resistive random-access memory] (RRAM), and
-[Flash memory] can be used for in-memory computing. 
+[Flash memory] can be used for in-memory computing.
 
 Memory devices have the ability to store synaptic weights in their analog
 charge (Flash) or conductance (PCM, RRAM) state. When these devices are arranged
@@ -116,7 +116,7 @@ in a crossbar configuration, it allows to perform an analog matrix-vector
 multiplication in a single time step, exploiting the advantages of analog
 storage capability and [Kirchhoff’s circuits laws]. You can learn more about
 it in our [online demo].
- 
+
 In deep learning, data propagation through multiple layers of a neural network
 involves a sequence of matrix multiplications, as each layer can be represented
 as a matrix of synaptic weights. The devices are arranged in multiple crossbar

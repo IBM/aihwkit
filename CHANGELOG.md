@@ -19,6 +19,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
+* Deterministic bitlines for analog training (\XX)
+* More noise types for hardware-aware training for inference (polynomial)
+* Additional bound management schemes (worst case, average max, shift)
+* cycle-to-cycle output referred MAC weight noise that resembles the conductance
+  dependent PCM read noise stastistics
+* C++ backend improvements (slice backward/forward/update, direct update)
+* Option to excluded bias row for hardware-aware training noise
 * The `rpu_config` is now pretty-printed in a readable manner (excluding the
   default settings and other readability tweak). (\#60)
 * Added a new `ReferenceUnitCell` which has two devices, where one is fixed and

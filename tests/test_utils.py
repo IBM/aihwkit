@@ -234,9 +234,8 @@ class SerializationTest(ParametrizedTestCase):
         new_model.load_state_dict(model.state_dict())
 
         # Compare the new model weights and biases.
-        (new_model_weights, new_model_biases,
-         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(
-            new_children_layer)
+        (new_model_weights, new_model_biases, new_tile_weights, new_tile_biases) = \
+            self.get_layer_and_tile_weights(new_children_layer)
 
         assert_array_almost_equal(model_weights, new_model_weights)
         assert_array_almost_equal(tile_weights, new_tile_weights)
@@ -258,8 +257,8 @@ class SerializationTest(ParametrizedTestCase):
         model = CustomModule(children_layer)
 
         # Keep track of the current weights and biases for comparing.
-        (model_weights, model_biases,
-         tile_weights, tile_biases) = self.get_layer_and_tile_weights(children_layer)
+        (model_weights, model_biases, tile_weights, tile_biases) = \
+            self.get_layer_and_tile_weights(children_layer)
 
         self.assertIn('custom_child.analog_tile_state', model.state_dict())
 
@@ -269,9 +268,8 @@ class SerializationTest(ParametrizedTestCase):
         new_model.load_state_dict(model.state_dict())
 
         # Compare the new model weights and biases.
-        (new_model_weights, new_model_biases,
-         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(
-            new_children_layer)
+        (new_model_weights, new_model_biases, new_tile_weights, new_tile_biases) = \
+            self.get_layer_and_tile_weights(new_children_layer)
 
         assert_array_almost_equal(model_weights, new_model_weights)
         assert_array_almost_equal(tile_weights, new_tile_weights)

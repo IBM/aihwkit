@@ -413,7 +413,7 @@ void RPUSimple<T>::forward(
     } else {
       this->forwardMatrix(X_input, D_output, m_batch, x_trans, d_trans, is_test);
     }
-  };
+  }
 }
 
 template <typename T>
@@ -431,7 +431,7 @@ void RPUSimple<T>::backward(
     } else {
       this->backwardMatrix(D_input, X_output, m_batch, d_trans, x_trans);
     }
-  };
+  }
 }
 
 template <typename T>
@@ -742,7 +742,9 @@ void RPUSimple<T>::copyIndexedInput(
     const int size,
     const int m_batch,
     const int dim3,
-    const bool trans) {
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
 
   // logic: this function should be overloaded in RPUCudaSimple for
   // the Indexed to work.
@@ -751,7 +753,7 @@ void RPUSimple<T>::copyIndexedInput(
   // a forwardMatrixIterator<InputIteratorT,float *> which is
   // basically the original forwardMatrix but calling the
   // InputIteratorT type in BLM. Thus BLM will handle the conversion
-  // from indexed. The usual forwardMatrix will be just calling a
+  // from indexed. The old Forward_Matrix will be just calling a
   // standard forwardMatrixIterator<const float *,float *>
 
   // all other RPUs just use the RPU/RPUCudaSimple::copyIndexed
@@ -762,27 +764,68 @@ void RPUSimple<T>::copyIndexedInput(
   int M = m_batch * size;
   int sz_all = size * m_batch * dim3;
 
+  bool batch_slice = m_batch_slice > 0;
+
   if (trans) {
-    // here we additionally permute 132
+    // here we additioanlly permute 132
+    if (batch_slice) {
+      sz_all = size * m_batch_slice * dim3;
+      M = m_batch_slice * dim3;
 
-    int L = m_batch * dim3;
+      for (int idx = 0; idx < sz_all; idx++) {
 
-    for (int idx = 0; idx < sz_all; idx++) {
+        int i_dim3 = (idx % M) / m_batch_slice;
+        int i_batch_slice = idx % m_batch_slice;
+        int i_xd = idx / M;
+        int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+        int ind_idx = batch_idx + m_batch * i_xd;
 
-      int i = (idx % L) / m * M + (idx % m) + idx / L * m;
-      int j_shifted = indices_shifted[i % M];
-      out_tensor[idx] =
-          (j_shifted <= 1) ? (T)j_shifted : src_tensor[(j_shifted - 2) + i / M * input_matrix_size];
+        int j_shifted = indices_shifted[ind_idx];
+        out_tensor[idx] = (j_shifted <= 1)
+                              ? (T)j_shifted
+                              : src_tensor[(j_shifted - 2) + i_dim3 * input_matrix_size];
+      }
+    } else {
+
+      int L = m_batch * dim3;
+
+      for (int idx = 0; idx < sz_all; idx++) {
+
+        int i = (idx % L) / m * M + (idx % m) + idx / L * m;
+        int j_shifted = indices_shifted[i % M];
+        out_tensor[idx] = (j_shifted <= 1)
+                              ? (T)j_shifted
+                              : src_tensor[(j_shifted - 2) + i / M * input_matrix_size];
+      }
     }
-
   } else { // no trans
+    if (batch_slice) {
 
-    for (int idx = 0; idx < sz_all; idx++) {
+      sz_all = size * m_batch_slice * dim3;
+      M = m_batch_slice * size;
 
-      int j_shifted = indices_shifted[idx % M];
-      out_tensor[idx] = (j_shifted <= 1)
-                            ? (T)j_shifted
-                            : src_tensor[(j_shifted - 2) + idx / M * input_matrix_size];
+      for (int idx = 0; idx < sz_all; idx++) {
+
+        int i_dim3 = idx / M;
+        int i_batch_slice = (idx % M) / size;
+        int i_xd = idx % size;
+        int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+        int ind_idx = batch_idx * size + i_xd;
+
+        int j_shifted = indices_shifted[ind_idx];
+        out_tensor[idx] = (j_shifted <= 1)
+                              ? (T)j_shifted
+                              : src_tensor[(j_shifted - 2) + i_dim3 * input_matrix_size];
+      }
+    } else {
+
+      for (int idx = 0; idx < sz_all; idx++) {
+
+        int j_shifted = indices_shifted[idx % M];
+        out_tensor[idx] = (j_shifted <= 1)
+                              ? (T)j_shifted
+                              : src_tensor[(j_shifted - 2) + idx / M * input_matrix_size];
+      }
     }
   }
 }
@@ -796,7 +839,10 @@ void RPUSimple<T>::copyIndexedOutput(
     const int size,
     const int m_batch,
     const int dim3,
-    const bool trans) {
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
+  bool batch_slice = m_batch_slice > 0;
 
   // output iterator
   int m = m_batch;
@@ -806,22 +852,147 @@ void RPUSimple<T>::copyIndexedOutput(
 
   if (trans) {
     // here we additionally permute 132
-    int L = m_batch * dim3;
 
-    for (int idx = 0; idx < sz_all; idx++) {
-      int i = (idx % L) / m * M + (idx % m) + idx / L * m;
-      int j_shifted = indices_shifted[i % M];
-      if (j_shifted > 1) {
-        out_tensor[(j_shifted - 2) + i / M * output_matrix_size] += src_tensor[idx];
+    if (batch_slice) {
+      sz_all = size * m_batch_slice * dim3;
+      M = m_batch_slice * dim3;
+
+      for (int idx = 0; idx < sz_all; idx++) {
+
+        int i_dim3 = (idx % M) / m_batch_slice;
+        int i_batch_slice = idx % m_batch_slice;
+        int i_xd = idx / M;
+        int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+        int ind_idx = batch_idx + m_batch * i_xd;
+
+        int j_shifted = indices_shifted[ind_idx];
+        if (j_shifted > 1)
+          out_tensor[(j_shifted - 2) + i_dim3 * output_matrix_size] += src_tensor[idx];
+      }
+
+    } else {
+
+      int L = m_batch * dim3;
+
+      for (int idx = 0; idx < sz_all; idx++) {
+        int i = (idx % L) / m * M + (idx % m) + idx / L * m;
+        int j_shifted = indices_shifted[i % M];
+        if (j_shifted > 1)
+          out_tensor[(j_shifted - 2) + i / M * output_matrix_size] += src_tensor[idx];
       }
     }
   } else { // no trans
+    if (batch_slice) {
+      sz_all = size * m_batch_slice * dim3;
+      M = m_batch_slice * size;
+
+      for (int idx = 0; idx < sz_all; idx++) {
+
+        int i_dim3 = idx / M;
+        int i_batch_slice = (idx % M) / size;
+        int i_xd = idx % size;
+        int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+        int ind_idx = batch_idx * size + i_xd;
+
+        int j_shifted = indices_shifted[ind_idx];
+        if (j_shifted > 1)
+          out_tensor[(j_shifted - 2) + i_dim3 * output_matrix_size] += src_tensor[idx];
+      }
+
+    } else {
+      for (int idx = 0; idx < sz_all; idx++) {
+        int j_shifted = indices_shifted[idx % M];
+        if (j_shifted > 1)
+          out_tensor[(j_shifted - 2) + idx / M * output_matrix_size] += src_tensor[idx];
+      }
+    }
+  }
+}
+
+template <typename T>
+void RPUSimple<T>::copySliceInput(
+    T *out_tensor,
+    const T *src_tensor,
+    const int size,
+    const int m_batch,
+    const int dim3,
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
+  int input_matrix_size = m_batch * size;
+  int sz_all = size * m_batch_slice * dim3;
+
+  if (trans) {
+
+    int M = m_batch_slice * dim3;
 
     for (int idx = 0; idx < sz_all; idx++) {
-      int j_shifted = indices_shifted[idx % M];
-      if (j_shifted > 1) {
-        out_tensor[(j_shifted - 2) + idx / M * output_matrix_size] += src_tensor[idx];
-      }
+
+      int i_dim3 = (idx % M) / m_batch_slice;
+      int i_batch_slice = idx % m_batch_slice;
+      int i_xd = idx / M;
+      int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+      int ind_idx = batch_idx + m_batch * i_xd;
+
+      out_tensor[idx] = src_tensor[ind_idx + i_dim3 * input_matrix_size];
+    }
+  } else { // no trans
+
+    int M = m_batch_slice * size;
+
+    for (int idx = 0; idx < sz_all; idx++) {
+
+      int i_dim3 = idx / M;
+      int i_batch_slice = (idx % M) / size;
+      int i_xd = idx % size;
+      int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+      int ind_idx = batch_idx * size + i_xd;
+
+      out_tensor[idx] = src_tensor[ind_idx + i_dim3 * input_matrix_size];
+    }
+  }
+}
+
+template <typename T>
+void RPUSimple<T>::copySliceOutput(
+    T *out_tensor,
+    const T *src_tensor,
+    const int size,
+    const int m_batch,
+    const int dim3,
+    const bool trans,
+    const int m_batch_slice,
+    const int *batch_indices) {
+  int output_matrix_size = m_batch * size;
+  int sz_all = size * m_batch_slice * dim3;
+
+  if (trans) {
+    // here we additionally permute 132
+
+    int M = m_batch_slice * dim3;
+
+    for (int idx = 0; idx < sz_all; idx++) {
+
+      int i_dim3 = (idx % M) / m_batch_slice;
+      int i_batch_slice = idx % m_batch_slice;
+      int i_xd = idx / M;
+      int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+      int ind_idx = batch_idx + m_batch * i_xd;
+
+      out_tensor[ind_idx + i_dim3 * output_matrix_size] = src_tensor[idx];
+    }
+  } else { // no trans
+    int M = m_batch_slice * size;
+
+    for (int idx = 0; idx < sz_all; idx++) {
+
+      int i_dim3 = idx / M;
+      int i_batch_slice = (idx % M) / size;
+      int i_xd = idx % size;
+      int batch_idx = batch_indices[i_batch_slice + m_batch * i_dim3];
+      int ind_idx = batch_idx * size + i_xd;
+
+      out_tensor[ind_idx + i_dim3 * output_matrix_size] = src_tensor[idx];
     }
   }
 }
@@ -859,6 +1030,30 @@ void RPUSimple<T>::forwardIndexed(
 }
 
 template <typename T>
+void RPUSimple<T>::forwardIndexedSlice(
+    const T *X_input,
+    T *D_output,
+    int total_input_size,
+    int m_batch,
+    int dim3,
+    bool trans,
+    int m_batch_slice,
+    const int *batch_indices,
+    bool is_test) {
+  T *x_tensor, *d_tensor;
+  this->getTensorBuffer(&x_tensor, &d_tensor, m_batch_slice, dim3);
+
+  this->copyIndexedInput(
+      x_tensor, X_input, total_input_size, this->getMatrixIndices(), this->getXSize(), m_batch,
+      dim3, trans, m_batch_slice, batch_indices);
+
+  this->forwardMatrix(x_tensor, d_tensor, m_batch_slice * dim3, trans, trans, is_test);
+
+  this->copySliceOutput(
+      D_output, d_tensor, this->getDSize(), m_batch, dim3, trans, m_batch_slice, batch_indices);
+}
+
+template <typename T>
 void RPUSimple<T>::backwardIndexed(
     const T *D_input, T *X_output, int total_output_size, int m_batch, int dim3, bool trans) {
   // -- EXPECTS backward index to be set properly !!
@@ -884,6 +1079,29 @@ void RPUSimple<T>::backwardIndexed(
 }
 
 template <typename T>
+void RPUSimple<T>::backwardIndexedSlice(
+    const T *D_input,
+    T *X_output,
+    int total_output_size,
+    int m_batch,
+    int dim3,
+    bool trans,
+    int m_batch_slice,
+    const int *batch_indices) {
+  T *x_tensor, *d_tensor;
+  this->getTensorBuffer(&x_tensor, &d_tensor, m_batch_slice, dim3);
+
+  this->copySliceInput(
+      d_tensor, D_input, this->getDSize(), m_batch, dim3, trans, m_batch_slice, batch_indices);
+
+  this->backwardMatrix(d_tensor, x_tensor, m_batch_slice * dim3, trans, trans);
+
+  this->copyIndexedOutput(
+      X_output, x_tensor, total_output_size, this->getMatrixIndices(), this->getXSize(), m_batch,
+      dim3, trans, m_batch_slice, batch_indices);
+}
+
+template <typename T>
 void RPUSimple<T>::updateIndexed(
     const T *X_input, const T *D_input, int total_x_input_size, int m_batch, int dim3, bool trans) {
   T *x_tensor, *d_tensor;
@@ -898,6 +1116,30 @@ void RPUSimple<T>::updateIndexed(
   } else {
     this->update(x_tensor, D_input, false, m_batch * dim3, trans, trans);
   }
+}
+
+template <typename T>
+void RPUSimple<T>::updateIndexedSlice(
+    const T *X_input,
+    const T *D_input,
+    int total_x_input_size,
+    int m_batch,
+    int dim3,
+    bool trans,
+    int m_batch_slice,
+    const int *batch_indices) {
+
+  T *x_tensor, *d_tensor;
+  this->getTensorBuffer(&x_tensor, &d_tensor, m_batch_slice, dim3);
+
+  this->copyIndexedInput(
+      x_tensor, X_input, total_x_input_size, this->getMatrixIndices(), this->getXSize(), m_batch,
+      dim3, trans, m_batch_slice, batch_indices);
+
+  this->copySliceInput(
+      d_tensor, D_input, this->getDSize(), m_batch, dim3, trans, m_batch_slice, batch_indices);
+
+  this->update(x_tensor, d_tensor, false, m_batch_slice * dim3, trans, trans);
 }
 
 /*********************************************************************************/
@@ -1025,8 +1267,12 @@ template <typename T> void RPUSimple<T>::setSharedWeights(T *weightsptr) {
   }
   *weights_ = weightsptr;
   shared_weights_if_ = true;
-  for (int i = 0; i < this->d_size_; ++i) {
-    weights_[i] = *weights_ + this->x_size_ * i;
+  if ((this->d_size_ > 0) &&
+      (weights_[this->d_size_ - 1] != *weights_ + this->x_size_ * this->d_size_)) {
+    // only set if changed
+    for (int i = 0; i < this->d_size_; ++i) {
+      weights_[i] = *weights_ + this->x_size_ * i;
+    }
   }
 }
 
@@ -1115,6 +1361,16 @@ template <typename T> T **RPUSimple<T>::getFBWeights(bool is_test) const {
 }
 
 template <typename T> T **RPUSimple<T>::getUpWeights() {
+  // This is called from the Update routines to check which weight
+  // is used for calculation. If dw is defined, then it will use the
+  // DW mode, meaning that it will write into delta_weights the DW
+  // and keep the weights. For HW RPU models that might include
+  // first using W and then writing the difference to dW
+  //
+  // In case of delayed update is also returns the buffered weights
+  // instead of the "actual" weight. Combination of external weights
+  // and buffers are not possible
+
   if (use_delayed_update_) {
     return getWeightsBuffer();
   } else {
@@ -1201,6 +1457,18 @@ template <typename T> void RPUSimple<T>::decayWeights(bool bias_no_decay) {
   RPUSimple<T>::decayWeights(1., bias_no_decay);
 };
 
+template <typename T> void RPUSimple<T>::clipWeights(T clip) {
+
+  if (clip >= 0) {
+    int size = this->d_size_ * this->x_size_;
+    T *w = this->getWeightsPtr()[0];
+    PRAGMA_SIMD
+    for (int i = 0; i < size; ++i) {
+      w[i] = MIN(MAX(w[i], -clip), clip);
+    }
+  }
+}
+
 template <typename T> void RPUSimple<T>::clipWeights(const WeightClipParameter &wclpar) {
 
   if (wclipper_ == nullptr) {
@@ -1222,6 +1490,7 @@ template <typename T> void RPUSimple<T>::diffuseWeights() {
     }
   }
 }
+/*********************************************************************************/
 
 template <typename T> void RPUSimple<T>::modifyFBWeights(const WeightModifierParameter &wmpar) {
 

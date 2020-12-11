@@ -43,12 +43,12 @@ template <typename T> struct DifferenceRPUDeviceMetaParameter : VectorRPUDeviceM
   };
 
   void initialize() override {
-    VectorRPUDeviceMetaParameter<T>::initialize();
-
-    // different parameteter settings are not allowed because we
+    // different parameter settings are not allowed because we
     // like to be able to invert. For this we mirror copy the exact
     // DP . This does not work when the specifications of the RPU
     // arrays are different.
+
+    VectorRPUDeviceMetaParameter<T>::initialize();
 
     if (!this->vec_par.size()) {
       RPU_FATAL("Expect non-empty vec par");
@@ -132,7 +132,7 @@ protected:
   void populate(const DifferenceRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
 
 private:
-  inline bool isInverted() const;
+  bool isInverted() const;
 
   int g_plus_ = 1;
   int g_minus_ = 0;
