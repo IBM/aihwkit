@@ -47,7 +47,7 @@ if torch.cuda.is_available():
 PATH_DATASET = os.path.join('data', 'DATASET')
 
 # Path to store results
-RESULTS = os.path.join('results', 'LENET5')
+RESULTS = os.path.join(os.getcwd(), 'results', 'LENET5')
 
 # Training parameters
 SEED = 1

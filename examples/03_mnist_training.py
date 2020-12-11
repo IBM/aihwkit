@@ -29,10 +29,16 @@ from torch.optim.lr_scheduler import StepLR
 from torchvision import datasets, transforms
 
 # Imports from aihwkit.
-from aihwkit.nn import AnalogLinear
+from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
+
+# Check device
+USE_CUDA = 0
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.cuda.is_available():
+    USE_CUDA = 1
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join('data', 'DATASET')
@@ -72,7 +78,7 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         hidden_sizes (list): list of sizes of the hidden layers (2 layers).
         output_size (int): size of the Tensor at the output.
     """
-    model = nn.Sequential(
+    model = AnalogSequential(
         AnalogLinear(input_size, hidden_sizes[0], True,
                      rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
         nn.Sigmoid(),
@@ -83,6 +89,10 @@ def create_analog_network(input_size, hidden_sizes, output_size):
                      rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
         nn.LogSoftmax(dim=1)
     )
+
+    if USE_CUDA:
+        model.cuda()
+
     print(model)
     return model
 
@@ -114,6 +124,8 @@ def train(model, train_set):
     for epoch_number in range(EPOCHS):
         total_loss = 0
         for images, labels in train_set:
+            images = images.to(DEVICE)
+            labels = labels.to(DEVICE)
             # Flatten MNIST images into a 784 vector.
             images = images.view(images.shape[0], -1)
 
@@ -152,17 +164,19 @@ def test_evaluation(model, val_set):
 
     for images, labels in val_set:
         # Predict image.
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
         for i in range(len(labels)):
             image = images[i].view(1, INPUT_SIZE)
             with torch.no_grad():
                 pred = model(image)
 
         probabilities_tensor = torch.exp(pred)
-        probabilities = list(probabilities_tensor.numpy()[0])
+        probabilities = list(probabilities_tensor.cpu().numpy()[0])
 
         # Get labels.
         predicted_label = probabilities.index(max(probabilities))
-        validation_label = labels.numpy()[-1]
+        validation_label = labels.cpu().numpy()[-1]
 
         # Check if predicted image match with validation label.
         if validation_label == predicted_label:
