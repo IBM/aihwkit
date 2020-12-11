@@ -31,7 +31,7 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import WeightNoiseType
+from aihwkit.simulator.configs.utils import BoundManagementType, WeightNoiseType
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
 # Check device
@@ -44,7 +44,7 @@ if torch.cuda.is_available():
 PATH_DATASET = os.path.join('data', 'DATASET')
 
 # Path to store results
-RESULTS = os.path.join('results', 'LENET5')
+RESULTS = os.path.join(os.getcwd(), 'results', 'LENET5')
 
 # Training parameters
 SEED = 1
@@ -56,6 +56,7 @@ N_CLASSES = 10
 # Define the properties of the neural network in terms of noise simulated during
 # the inference/training pass
 RPU_CONFIG = InferenceRPUConfig()
+RPU_CONFIG.backward.bound_management = BoundManagementType.NONE
 RPU_CONFIG.forward.out_res = -1.  # Turn off (output) ADC discretization.
 RPU_CONFIG.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
 RPU_CONFIG.forward.w_noise = 0.02
