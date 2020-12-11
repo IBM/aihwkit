@@ -59,6 +59,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* Fixed small issues that resulted in warnings for windows compilation
 * Faulty backward noise management error message removed for perfect backward
   and CUDA (\#99)
 * Serialization of `Modules` that contain children analog layers is now
