@@ -83,7 +83,7 @@ class NoiseManagementType(Enum):
     ABS_MAX_NP_SUM = 'AbsMaxNPSum'
     """Takes a worst case scenario of the weight matrix to calculate the
     input scale to ensure that output is not clipping. Assumed weight
-    value is constant and given by ``nm_assumed_wmax``. """
+    value is constant and given by ``nm_assumed_wmax``."""
 
     MAX = 'Max'
     r"""Use :math:`\alpha\equiv\max{\mathbf{x}}`."""
@@ -374,7 +374,6 @@ class UpdateParameters(_PrintableMixin):
     """Resolution ie. bin width in ``0..1``) of the update probability for
     the stochastic bit line generation.  Use -1 for turning discretization
     off. Can be given as number of steps as well.
-
     """
 
     x_res_implicit: float = 0
@@ -389,7 +388,6 @@ class UpdateParameters(_PrintableMixin):
     """
 
     sto_round: bool = False
-
     """Whether to enable stochastic rounding."""
 
     update_bl_management: bool = True
