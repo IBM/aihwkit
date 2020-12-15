@@ -67,8 +67,28 @@ private:
       const int d_size,
       const int BL);
 
+  inline void generateCoincidencesDetI(
+      int *coincidences,
+      const T *x_values,
+      const int x_size,
+      const T *d_values,
+      const int d_size,
+      const int BL);
+
   inline void generateCountsMean(
       int *counts,
+      const T *v,
+      const int v_inc,
+      const int v_size,
+      const T p,
+      RNG<T> *rng,
+      const int BL,
+      const T res,
+      const bool sto_round,
+      const T lr);
+
+  inline void generateDetImplicit(
+      T *pcounts,
       const T *v,
       const int v_inc,
       const int v_size,

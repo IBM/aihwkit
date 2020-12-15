@@ -19,7 +19,10 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.utils import (
-    WeightNoiseType, WeightClipType, WeightModifierType
+    WeightNoiseType,
+    WeightClipType,
+    WeightModifierType,
+    WeightModifierParameter
 )
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel
 
@@ -94,7 +97,6 @@ class InferenceTileTest(ParametrizedTestCase):
         rpu_config = self.get_rpu_config()
         rpu_config.clip.type = WeightClipType.FIXED_VALUE
         rpu_config.clip.fixed_value = 0.3
-
         analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
 
         weights = Tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
@@ -110,17 +112,18 @@ class InferenceTileTest(ParametrizedTestCase):
         self.assertNotAlmostEqualTensor(tile_weights, weights)
         self.assertNotAlmostEqualTensor(tile_biases, biases)
 
-    def test_post_forward_modifier(self):
+    def do_post_forward_modifier_test(self, modifier):
         """Tests whether post update diffusion is performed"""
         rpu_config = self.get_rpu_config()
-        rpu_config.forward.is_perfect = True
+        rpu_config.drift_compensation = None
+        rpu_config.forward.w_noise = 0.0
+        rpu_config.forward.out_noise = 0.0
+        rpu_config.forward.inp_noise = 0.0
 
-        rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
-        rpu_config.modifier.std_dev = 1.0
-        rpu_config.modifier.enable_during_test = False
+        if modifier is not None:
+            rpu_config.modifier = modifier
 
         analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
-
         x_input = Tensor([[0.1, 0.2, 0.3]])
         weights = Tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
         biases = Tensor([-0.1, -0.2])
@@ -132,7 +135,6 @@ class InferenceTileTest(ParametrizedTestCase):
         analog_tile.set_weights(weights, biases)
 
         x_output = analog_tile.forward(x_input, is_test=True)
-        analog_tile.post_update_step()
         x_output_post = analog_tile.forward(x_input, is_test=False)
         x_output_post_true = analog_tile.forward(x_input, is_test=True)
         tile_weights, tile_biases = analog_tile.get_weights()
@@ -140,5 +142,47 @@ class InferenceTileTest(ParametrizedTestCase):
         self.assertTensorAlmostEqual(tile_weights, weights)
         self.assertTensorAlmostEqual(tile_biases, biases)
 
-        self.assertNotAlmostEqualTensor(x_output, x_output_post)
+        if modifier is None:
+            self.assertTensorAlmostEqual(x_output, x_output_post)
+        else:
+            self.assertNotAlmostEqualTensor(x_output, x_output_post)
+
         self.assertTensorAlmostEqual(x_output, x_output_post_true)
+
+    def get_modifier(self, mod_type):
+        """Returns the modifier parameter """
+        modifier = WeightModifierParameter()
+        modifier.std_dev = 1.0
+        modifier.enable_during_test = False
+        modifier.res = 0.132
+        modifier.type = mod_type
+        modifier.coeff0 = 1.0
+        modifier.coeff1 = 0.1
+        modifier.coeff2 = 0.2
+        modifier.rel_to_actual_wmax = False
+        modifier.assumed_wmax = 1.0
+        return modifier
+
+    def test_post_forward_modifier_types(self):
+        """Tests whether post update diffusion is performed"""
+
+        self.do_post_forward_modifier_test(None)
+
+        modifier = self.get_modifier(WeightModifierType.POLY)
+        self.do_post_forward_modifier_test(modifier)
+
+        modifier = self.get_modifier(WeightModifierType.DOREFA)
+        self.do_post_forward_modifier_test(modifier)
+
+        modifier = self.get_modifier(WeightModifierType.MULT_NORMAL)
+        self.do_post_forward_modifier_test(modifier)
+
+        modifier = self.get_modifier(WeightModifierType.DISCRETIZE)
+        self.do_post_forward_modifier_test(modifier)
+
+        modifier = self.get_modifier(WeightModifierType.DISCRETIZE_ADD_NORMAL)
+        self.do_post_forward_modifier_test(modifier)
+
+        modifier = self.get_modifier(WeightModifierType.COPY)
+        modifier.pdrop = 0.9999
+        self.do_post_forward_modifier_test(modifier)

@@ -65,13 +65,16 @@ template <typename T> void PulsedMetaParameter<T>::print() const {
   std::cout << ss.str();
 };
 
-template <typename T> void PulsedMetaParameter<T>::printToStream(std::stringstream &ss) const {
+template <typename T>
+void PulsedMetaParameter<T>::printToStream(std::stringstream &ss, bool suppress_update) const {
   ss << "Forward:" << std::endl;
   f_io.printToStream(ss);
   ss << "Backward:" << std::endl;
   b_io.printToStream(ss);
-  ss << "Update:" << std::endl;
-  up.printToStream(ss);
+  if (!suppress_update) {
+    ss << "Update:" << std::endl;
+    up.printToStream(ss);
+  }
 }
 
 template struct PulsedMetaParameter<float>;
@@ -159,7 +162,7 @@ template <typename T> std::unique_ptr<AbstractRPUDevice<T>> RPUPulsed<T>::cloneD
 
 /*********************************************************************************/
 template <typename T> void RPUPulsed<T>::printParametersToStream(std::stringstream &ss) const {
-  getMetaPar().printToStream(ss);
+  getMetaPar().printToStream(ss, rpu_device_->hasDirectUpdate());
   rpu_device_->printToStream(ss);
 }
 
@@ -218,6 +221,25 @@ template <typename T> void RPUPulsed<T>::resetCols(int start_col, int n_cols, T 
   if (reset_prob) {
     CHECK_RPU_DEVICE_INIT;
     rpu_device_->resetCols(this->getWeightsPtr(), start_col, n_cols, reset_prob, *this->rw_rng_);
+  }
+}
+
+template <typename T> void RPUPulsed<T>::clipWeights(T clip) {
+
+  CHECK_RPU_DEVICE_INIT;
+  rpu_device_->clipWeights(this->getWeightsPtr(), clip);
+}
+
+template <typename T> void RPUPulsed<T>::clipWeights(const WeightClipParameter &wclpar) {
+
+  CHECK_RPU_DEVICE_INIT;
+
+  if (wclpar.type == WeightClipType::FixedValue) {
+    clipWeights(wclpar.fixed_value); // handle outside  to support devices
+  } else if (rpu_device_->implements() == DeviceUpdateType::FloatingPoint) {
+    RPUSimple<T>::clipWeights(wclpar);
+  } else {
+    RPU_FATAL("Sophisticated clipping is NOT implemented for most training devices");
   }
 }
 

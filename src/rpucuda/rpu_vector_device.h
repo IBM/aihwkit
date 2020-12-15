@@ -43,11 +43,10 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   friend void
   swap(VectorRPUDeviceMetaParameter<T> &a, VectorRPUDeviceMetaParameter<T> &b) noexcept {
     using std::swap;
-    swap(static_cast<SimpleMetaParameter<T> &>(a), static_cast<SimpleMetaParameter<T> &>(b));
-    swap(a._device_parameter_mode_manual, b._device_parameter_mode_manual);
-    swap(a._par_initialized, b._par_initialized);
+    swap(
+        static_cast<PulsedRPUDeviceMetaParameterBase<T> &>(a),
+        static_cast<PulsedRPUDeviceMetaParameterBase<T> &>(b));
 
-    swap(a.construction_seed, b.construction_seed);
     swap(a.vec_par, b.vec_par);
     swap(a.same_context, b.same_context);
     swap(a.update_policy, b.update_policy);
@@ -66,7 +65,7 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     return ss.str();
   };
 
-  // appends a parameter vector to vec_par. Returns True if successful
+  /* appends a parameter vector to vec_par. Returns True if successful */
   bool appendVecPar(AbstractRPUDeviceMetaParameter<T> *par);
 
   VectorRPUDevice<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {
@@ -157,6 +156,7 @@ public:
   };
   inline T ***getWeightVec() const { return weights_vec_; };
   inline const T *getReduceWeightening() const { return reduce_weightening_.data(); };
+  inline int getCurrentDeviceIdx() const { return current_device_idx_; };
 
   VectorRPUDevice<T> *clone() const override { return new VectorRPUDevice<T>(*this); };
 
@@ -166,6 +166,7 @@ public:
   void clipWeights(T **weights, T clip) override;
   void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
+
   bool onSetWeights(T **weights) override;
   void initUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
@@ -189,6 +190,8 @@ protected:
   int current_device_idx_ = 0;
   unsigned long current_update_idx_ = 0;
   RealWorldRNG<T> rw_rng_{0};
+
+  virtual int resetCounters(bool force = false);
 
 private:
   void freeContainers();

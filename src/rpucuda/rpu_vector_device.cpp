@@ -97,7 +97,6 @@ template struct VectorRPUDeviceMetaParameter<double>;
 /* VectorRPUDevice*/
 
 template <typename T> void VectorRPUDevice<T>::allocateContainers(int n_devices) {
-
   freeContainers();
   n_devices_ = n_devices;
   weights_vec_ = Array_3D_Get<T>(n_devices_, this->d_size_, this->x_size_);
@@ -120,11 +119,7 @@ template <typename T> void VectorRPUDevice<T>::freeContainers() {
 }
 
 template <typename T>
-VectorRPUDevice<T>::VectorRPUDevice(int x_sz, int d_sz) : PulsedRPUDeviceBase<T>(x_sz, d_sz) {
-  current_device_idx_ = 0;
-  current_update_idx_ = 0;
-  n_devices_ = 0;
-}
+VectorRPUDevice<T>::VectorRPUDevice(int x_sz, int d_sz) : PulsedRPUDeviceBase<T>(x_sz, d_sz) {}
 
 template <typename T>
 VectorRPUDevice<T>::VectorRPUDevice(
@@ -355,6 +350,17 @@ template <typename T> void VectorRPUDevice<T>::printDP(int x_count, int d_count)
   }
 }
 
+template <typename T> int VectorRPUDevice<T>::resetCounters(bool force) {
+
+  current_update_idx_ = 0;
+  if (force || (getPar().update_policy != VectorDeviceUpdatePolicy::SingleFixed)) {
+    current_device_idx_ = getPar().first_update_idx;
+    return -1;
+  } else {
+    return current_device_idx_;
+  }
+}
+
 /*********************************************************************************/
 /* populate */
 
@@ -364,13 +370,12 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
   PulsedRPUDeviceBase<T>::populate(p, rng);
 
   auto &par = getPar();
-
   allocateContainers((int)par.vec_par.size()); // will set n_devices
+
+  resetCounters(true);
+
+  rpu_device_vec_.clear();
   reduce_weightening_.clear();
-
-  current_device_idx_ = par.first_update_idx;
-  current_update_idx_ = 0;
-
   dw_min_ = (T)0.0;
   for (int k = 0; k < n_devices_; k++) {
     rpu_device_vec_.push_back(std::unique_ptr<PulsedRPUDeviceBase<T>>(
@@ -464,7 +469,6 @@ template <typename T> void VectorRPUDevice<T>::decayWeights(T **weights, bool bi
 template <typename T>
 void VectorRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
 
-  // we first decay weights of all the devices and then copy the mean to weights
 #pragma omp parallel for
   for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {
     rpu_device_vec_[k]->decayWeights(weights_vec_[k], alpha, bias_no_decay);
@@ -502,21 +506,21 @@ void VectorRPUDevice<T>::resetCols(
 template <typename T> bool VectorRPUDevice<T>::onSetWeights(T **weights) {
   // note: we use this to update the internal weights for each device.
   // all weights are set to *identical* values...
+
   T *w = weights[0];
+  int fixed_index = resetCounters();
 
   // e.g. apply hard bounds
   for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {
     // only in case of SingleFixed policy set the weight chosen.
-    if (getPar().update_policy == VectorDeviceUpdatePolicy::SingleFixed) {
-      if (k != current_device_idx_) {
-        continue;
-      }
+    if (fixed_index >= 0 && fixed_index != k) {
+      continue;
     }
 
     for (int i = 0; i < this->size_; i++) {
-
       weights_vec_[k][0][i] = w[i];
     }
+
     rpu_device_vec_[k]->onSetWeights(weights_vec_[k]);
   }
   reduceToWeights(weights);

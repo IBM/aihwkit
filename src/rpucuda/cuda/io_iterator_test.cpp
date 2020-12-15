@@ -20,6 +20,7 @@
 #include <functional>
 #include <memory>
 #include <random>
+#include <numeric>
 
 #define TOLERANCE 1e-5
 
@@ -43,7 +44,7 @@ public:
     unfolded_vector = new T[unfolded_matrix_size * N];
     unfolded_vector2 = new T[unfolded_matrix_size * N];
 
-    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<T> udist(0, orig_matrix_size + 2);
     auto urnd = std::bind(udist, generator);
@@ -194,7 +195,6 @@ TYPED_TEST(IteratorTestFixture, IndexReaderTransInputIterator) {
 
   CUDA_TIMING_DESTROY;
 }
-
 TYPED_TEST(IteratorTestFixture, PermuterTransInputIterator) {
   CUDA_TIMING_INIT;
 
@@ -279,6 +279,8 @@ TYPED_TEST(IteratorTestFixture, IndexReaderTransOutputIterator) {
   for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
     this->orig_vector[i] = 0;
   }
+  // compare to reference
+  this->dev_orig_vector2->copyTo(this->orig_vector2);
 
   for (int i = 0; i < this->unfolded_matrix_size * this->N; i++) {
     int idx = this->index[i % this->unfolded_matrix_size] - 2;
@@ -321,6 +323,181 @@ TYPED_TEST(IteratorTestFixture, IndexReaderOutputIterator) {
     int idx = this->index[i % this->unfolded_matrix_size] - 2;
     if (idx >= 0) {
       int j = idx + i / this->unfolded_matrix_size * this->orig_matrix_size;
+      this->orig_vector[j] += this->unfolded_vector[i];
+    }
+  }
+  // compare to reference
+  this->dev_orig_vector2->copyTo(this->orig_vector2);
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    ASSERT_FLOAT_EQ(this->orig_vector[i], this->orig_vector2[i]);
+  }
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, IndexReaderSliceInputIterator) {
+  CUDA_TIMING_INIT;
+
+  IndexReaderSliceInputIterator<false, TypeParam> in_iter(
+      this->dev_orig_vector->getDataConst(), this->dev_index->getDataConst(),
+      this->orig_matrix_size, this->size, this->m, this->N, this->m_slice,
+      this->dev_batch_indices->getDataConst());
+
+  this->dev_unfolded_vector->setConst(0);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(*this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->size * this->m_slice * this->N);
+
+  CUDA_TIMING_STOP(*this->context, "Copy with IndexReaderSliceInputIterator");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  for (int i = 0; i < this->m_slice * this->size * this->N; i++) {
+
+    TypeParam v = this->unfolded_vector[i];
+
+    // no trans
+    int x_idx = i % this->size;
+    int mslice_idx = (i % (this->m_slice * this->size)) / this->size;
+    int N_idx = i / (this->m_slice * this->size);
+
+    int m_idx = this->batch_indices[mslice_idx + N_idx * this->m];
+
+    TypeParam v2 =
+        this->unfolded_vector2[x_idx + m_idx * this->size + this->m * this->size * N_idx];
+
+    ASSERT_FLOAT_EQ(v2, v);
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, IndexReaderSliceInputIteratorTrans) {
+  CUDA_TIMING_INIT;
+
+  IndexReaderSliceInputIterator<true, TypeParam> in_iter(
+      this->dev_orig_vector->getDataConst(), this->dev_index->getDataConst(),
+      this->orig_matrix_size, this->size, this->m, this->N, this->m_slice,
+      this->dev_batch_indices->getDataConst());
+
+  this->dev_unfolded_vector->setConst(0);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(*this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->size * this->m_slice * this->N);
+
+  CUDA_TIMING_STOP(*this->context, "Copy with IndexReaderSliceInputIterator");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  for (int i = 0; i < this->m_slice * this->size * this->N; i++) {
+
+    TypeParam v = this->unfolded_vector[i];
+
+    // trans
+    int x_idx = i / (this->m_slice * this->N);
+    int mslice_idx = i % this->m_slice;
+    int N_idx = (i % (this->m_slice * this->N)) / this->m_slice;
+
+    int m_idx = this->batch_indices[mslice_idx + N_idx * this->m];
+
+    TypeParam v2 = this->unfolded_vector2[m_idx + x_idx * this->m + this->m * this->size * N_idx];
+
+    ASSERT_FLOAT_EQ(v2, v);
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, IndexReaderSliceOutputIterator) {
+  CUDA_TIMING_INIT;
+
+  this->dev_orig_vector2->setConst(0);
+  this->context->synchronizeDevice();
+
+  IndexReaderSliceOutputIterator<false, TypeParam> out_iter(
+      this->dev_orig_vector2->getData(), this->dev_index->getDataConst(), this->orig_matrix_size,
+      this->size, this->m, this->N, this->m_slice, this->dev_batch_indices->getDataConst());
+
+  CUDA_TIMING_START(*this->context);
+  math::copyWithIterator(
+      this->context, out_iter, this->dev_unfolded_vector->getDataConst(),
+      this->size * this->m_slice * this->N);
+
+  CUDA_TIMING_STOP(*this->context, "Copy with IndexReaderSliceOutputIterator");
+
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    this->orig_vector[i] = 0;
+  }
+
+  for (int i = 0; i < this->size * this->m_slice * this->N; i++) {
+
+    // no trans
+    int x_idx = i % this->size;
+    int mslice_idx = (i % (this->m_slice * this->size)) / this->size;
+    int N_idx = i / (this->m_slice * this->size);
+
+    int m_idx = this->batch_indices[mslice_idx + N_idx * this->m];
+
+    int k = x_idx + m_idx * this->size + this->m * this->size * N_idx;
+
+    int idx = this->index[k % this->unfolded_matrix_size] - 2;
+    if (idx >= 0) {
+      int j = idx + k / this->unfolded_matrix_size * this->orig_matrix_size;
+      this->orig_vector[j] += this->unfolded_vector[i];
+    }
+  }
+  // compare to reference
+  this->dev_orig_vector2->copyTo(this->orig_vector2);
+
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    ASSERT_FLOAT_EQ(this->orig_vector[i], this->orig_vector2[i]);
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, IndexReaderSliceOutputIteratorTrans) {
+  CUDA_TIMING_INIT;
+
+  this->dev_orig_vector2->setConst(0);
+  this->context->synchronizeDevice();
+
+  IndexReaderSliceOutputIterator<true, TypeParam> out_iter(
+      this->dev_orig_vector2->getData(), this->dev_index->getDataConst(), this->orig_matrix_size,
+      this->size, this->m, this->N, this->m_slice, this->dev_batch_indices->getDataConst());
+
+  CUDA_TIMING_START(*this->context);
+  math::copyWithIterator(
+      this->context, out_iter, this->dev_unfolded_vector->getDataConst(),
+      this->size * this->m_slice * this->N);
+
+  CUDA_TIMING_STOP(*this->context, "Copy with IndexReaderSliceOutputIteratorTrans");
+
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    this->orig_vector[i] = 0;
+  }
+
+  for (int i = 0; i < this->size * this->m_slice * this->N; i++) {
+
+    // trans
+    int x_idx = i / (this->m_slice * this->N);
+    int mslice_idx = i % this->m_slice;
+    int N_idx = (i % (this->m_slice * this->N)) / this->m_slice;
+
+    int m_idx = this->batch_indices[mslice_idx + N_idx * this->m];
+
+    int k = m_idx + x_idx * this->m + this->m * this->size * N_idx;
+
+    int idx = this->index[k % this->unfolded_matrix_size] - 2;
+    if (idx >= 0) {
+      int j = idx + k / this->unfolded_matrix_size * this->orig_matrix_size;
       this->orig_vector[j] += this->unfolded_vector[i];
     }
   }

@@ -27,12 +27,12 @@
 
 #include "cublas_v2.h"
 
-#define BOLD_ON "\e[1m"
-#define BOLD_OFF "\e[0m"
-#define RED_ON "\e[0;31m"
-#define GREEN_ON "\e[0;32m"
-#define BLUE_ON "\e[0;34m"
-#define COLOR_OFF "\e[0m"
+#define BOLD_ON "\033[1m"
+#define BOLD_OFF "\033[0m"
+#define RED_ON "\033[0;31m"
+#define GREEN_ON "\033[0;32m"
+#define BLUE_ON "\033[0;34m"
+#define COLOR_OFF "\033[0m"
 
 #define CUBLAS_CALL(x)                                                                             \
   if ((x) != CUBLAS_STATUS_SUCCESS) {                                                              \
@@ -107,16 +107,24 @@
   CUDA_CALL(cudaEventDestroy(timing_start));                                                       \
   CUDA_CALL(cudaEventDestroy(timing_stop));
 
+#ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+#ifndef MAX
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
 
 #define RPU_CUDA_1D_KERNEL_LOOP(i, n)                                                              \
   for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i += blockDim.x * gridDim.x)
 
 #define RPU_GET_CUDA_BUFFER(CONTEXT, TYPE, BUFFER, SIZE)                                           \
   if (!BUFFER || BUFFER->getSize() < (SIZE)) {                                                     \
-    BUFFER = make_unique<CudaArray<TYPE>>(CONTEXT, (SIZE));                                        \
+    BUFFER = RPU::make_unique<CudaArray<TYPE>>(CONTEXT, (SIZE));                                   \
+    CONTEXT->synchronize();                                                                        \
   }
+
+#define RPU_CUDA_1D_KERNEL_LOOP(i, n)                                                              \
+  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i += blockDim.x * gridDim.x)
 
 #define RPU_THREADS_PER_BLOCK 512
 #define RPU_THREADS_PER_BLOCK_UPDATE 512
@@ -128,13 +136,21 @@
   template OUT_T FUNC(NUM_T *ARGS);                                                                \
   template OUT_T FUNC(IndexReaderInputIterator<NUM_T> ARGS);                                       \
   template OUT_T FUNC(IndexReaderTransInputIterator<NUM_T> ARGS);                                  \
-  template OUT_T FUNC(PermuterTransInputIterator<NUM_T> ARGS);
+  template OUT_T FUNC(PermuterTransInputIterator<NUM_T> ARGS);                                     \
+  template OUT_T FUNC(SliceInputIterator<true, NUM_T> ARGS);                                       \
+  template OUT_T FUNC(SliceInputIterator<false, NUM_T> ARGS);                                      \
+  template OUT_T FUNC(IndexReaderSliceInputIterator<true, NUM_T> ARGS);                            \
+  template OUT_T FUNC(IndexReaderSliceInputIterator<false, NUM_T> ARGS);
 
 #define RPU_GEN_OITER_TEMPLATES(NUM_T, OUT_T, FUNC, ARGS)                                          \
   template OUT_T FUNC(PermuterTransOutputIterator<NUM_T> ARGS);                                    \
   template OUT_T FUNC(IndexReaderTransOutputIterator<NUM_T> ARGS);                                 \
   template OUT_T FUNC(IndexReaderOutputIterator<NUM_T> ARGS);                                      \
-  template OUT_T FUNC(NUM_T *ARGS);
+  template OUT_T FUNC(NUM_T *ARGS);                                                                \
+  template OUT_T FUNC(IndexReaderSliceOutputIterator<true, NUM_T> ARGS);                           \
+  template OUT_T FUNC(IndexReaderSliceOutputIterator<false, NUM_T> ARGS);                          \
+  template OUT_T FUNC(SliceOutputIterator<false, NUM_T> ARGS);                                     \
+  template OUT_T FUNC(SliceOutputIterator<true, NUM_T> ARGS);
 
 #define TRANSPOSE_D2X(IDX, X_SIZE, D_SIZE) ((IDX % D_SIZE) * X_SIZE + (IDX / D_SIZE))
 

@@ -30,8 +30,12 @@ void declare_rpu_tiles(py::module &m) {
       .def_readwrite("dorefa_clip", &RPU::WeightModifierParameter::dorefa_clip)
       .def_readwrite("pdrop", &RPU::WeightModifierParameter::pdrop)
       .def_readwrite("enable_during_test", &RPU::WeightModifierParameter::enable_during_test)
+      .def_readwrite("copy_last_column", &RPU::WeightModifierParameter::copy_last_column)
       .def_readwrite("rel_to_actual_wmax", &RPU::WeightModifierParameter::rel_to_actual_wmax)
       .def_readwrite("assumed_wmax", &RPU::WeightModifierParameter::assumed_wmax)
+      .def_readwrite("coeff0", &RPU::WeightModifierParameter::coeff0)
+      .def_readwrite("coeff1", &RPU::WeightModifierParameter::coeff1)
+      .def_readwrite("coeff2", &RPU::WeightModifierParameter::coeff2)
       .def_readwrite("type", &RPU::WeightModifierParameter::type);
 
   py::enum_<RPU::WeightModifierType>(m, "WeightModifierType")
@@ -40,7 +44,8 @@ void declare_rpu_tiles(py::module &m) {
       .value("MultNormal", RPU::WeightModifierType::MultNormal)
       .value("AddNormal", RPU::WeightModifierType::AddNormal)
       .value("DiscretizeAddNormal", RPU::WeightModifierType::DiscretizeAddNormal)
-      .value("DoReFa", RPU::WeightModifierType::DoReFa);
+      .value("DoReFa", RPU::WeightModifierType::DoReFa)
+      .value("Poly", RPU::WeightModifierType::Poly);
 
   py::class_<RPU::WeightClipParameter>(m, "WeightClipParameter")
       .def(py::init<>())
@@ -445,7 +450,6 @@ void declare_rpu_tiles(py::module &m) {
            Args:
                weight_modifier_params: parameters of the modifications.
            )pbdoc")
-
       .def(
           "diffuse_weights", &Class::diffuseWeights,
           R"pbdoc(
@@ -461,7 +465,6 @@ void declare_rpu_tiles(py::module &m) {
                alpha: decay scale
                bias_no_decay: Whether to not decay the bias row
            )pbdoc")
-
       .def(
           "reset_columns",
           [](Class &self, int start_col, int n_cols, T reset_prob) {

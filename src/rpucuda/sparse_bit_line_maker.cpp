@@ -240,6 +240,50 @@ FORCE_INLINE void generateCounts(
   }
 }
 
+/* Other types of bitlines using a functor. BitlineFunctorT needs to
+   be of struct type and implement the function getBit, see below */
+template <typename T, typename BitlineFunctorT>
+inline void generateCountsFunctor(
+    int *counts,
+    int **indices,
+    const T *v,
+    int v_inc,
+    int v_size,
+    T P,
+    RNG<T> *rng,
+    int BL,
+    T res,
+    bool sto_round,
+    BitlineFunctorT blfun) {
+
+  PRAGMA_SIMD
+  for (int k = 0; k < BL; k++) {
+    counts[k] = 0;
+  }
+
+  int j_v = 0;
+  for (int j = 0; j < v_size; j++) {
+
+    T v_value = v[j_v];
+    j_v += v_inc;
+
+    if (v_value == 0) {
+      continue;
+    }
+
+    // this is the scaled [0..1] input value
+    T PP = getDiscretizedValue<T>(fabs(v_value) * P, res, sto_round, *rng);
+
+    int jplus1_signed = (v_value > 0) ? j + 1 : -(j + 1);
+    PRAGMA_SIMD
+    for (int k = 0; k < BL; k++) {
+      if (blfun.getBit(PP, k, BL, rng)) {
+        indices[k][counts[k]++] = jplus1_signed;
+      }
+    }
+  }
+}
+
 // makeCounts
 template <typename T>
 int SparseBitLineMaker<T>::makeCounts(

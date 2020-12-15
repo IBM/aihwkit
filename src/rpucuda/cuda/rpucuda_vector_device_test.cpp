@@ -142,7 +142,7 @@ public:
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
-    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
@@ -259,7 +259,6 @@ public:
     delete[] x_counts32;
     delete[] d_counts32;
   };
-
   void TearDown() { Array_2D_Free(refweights); }
 
   std::unique_ptr<CudaContext> context_container;

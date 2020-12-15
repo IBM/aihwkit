@@ -18,6 +18,22 @@
 
 namespace RPU {
 
+struct CustomNSum {
+  template <typename T> __device__ __forceinline__ T operator()(const T &a, const T &b) const {
+    T bval = b > (T)0.0 ? (T)0.0 : b;
+    T aval = a > (T)0.0 ? (T)0.0 : a;
+    return bval + aval;
+  }
+};
+
+struct CustomPSum {
+  template <typename T> __device__ __forceinline__ T operator()(const T &a, const T &b) const {
+    T bval = b < (T)0.0 ? (T)0.0 : b;
+    T aval = a < (T)0.0 ? (T)0.0 : a;
+    return bval + aval;
+  }
+};
+
 template <typename T> class NoiseManager {
 
 public:
@@ -41,17 +57,41 @@ public:
   void printScaleValues() const { dev_scale_values_->printValues(); };
   float *getScaleValues() const;
 
+  float getAverageAbsMax() const;
+  void setAverageAbsMax(float value);
+
 private:
+  template <typename InputIteratorT>
+  void computeNPSum(InputIteratorT dev_input, int m_batch = 1, bool trans = false);
+
   void initializeBatchBuffer(int m_batch);
 
-  std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr; // need float here
+  std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr;     // need float here
+  std::unique_ptr<CudaArray<float>> dev_ravg_scale_value_ = nullptr; // need float here
+  std::unique_ptr<CudaArray<float>> dev_avgmax_value_ = nullptr;     // need float here
   std::unique_ptr<Maximizer<T>> amaximizer_ = nullptr;
   std::unique_ptr<Maximizer<T>> maximizer_ = nullptr;
 
   NoiseManagementType nm_type_ = NoiseManagementType::None;
+  int buffer_m_batch_ = 0;
   int size_ = 0;
   CudaContext *context_ = nullptr;
   bool const_set_if_ = false;
+  bool ravg_initialized_ = false;
+
+  CustomPSum psum_op_;
+  CustomNSum nsum_op_;
+
+  std::unique_ptr<CudaArray<T>> dev_psum_values_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_psum_values0_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_nsum_values_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_nsum_values0_ = nullptr;
+
+  std::unique_ptr<CudaArray<int>> dev_offsets_ = nullptr;
+
+  std::unique_ptr<CudaArray<char>> dev_v_temp_storage_ = nullptr;
+  std::unique_ptr<CudaArray<char>> dev_m_temp_storage_ = nullptr;
+  std::unique_ptr<CudaArray<char>> dev_a_temp_storage_ = nullptr;
 };
 
 } // namespace RPU

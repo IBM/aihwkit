@@ -67,11 +67,10 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
 
-  inline void invert();
+  void invert();
 
-protected:
 private:
-  inline bool isInverted() const;
+  bool isInverted() const;
 
   int g_plus_ = 1;
   int g_minus_ = 0;

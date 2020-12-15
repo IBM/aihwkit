@@ -1,3 +1,15 @@
+/**
+ * (C) Copyright 2020 IBM. All Rights Reserved.
+ *
+ * This code is licensed under the Apache License, Version 2.0. You may
+ * obtain a copy of this license in the LICENSE.txt file in the root directory
+ * of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Any modifications or derivative works of this code must retain this
+ * copyright notice, and modified files need to carry a notice indicating
+ * that they have been altered from the originals.
+ */
+
 #include "cuda.h"
 #include "cuda_util.h"
 #include "utility_functions.h"
@@ -34,7 +46,7 @@ public:
     w = new num_t[size];
     v = new num_t[size]();
 
-    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::normal_distribution<num_t> ndist{0.0, 1.0};
     auto nrnd = std::bind(ndist, generator);

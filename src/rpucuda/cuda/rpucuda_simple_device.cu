@@ -132,7 +132,32 @@ void SimpleRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 
   initialize(context_, rpu_device.getXSize(), rpu_device.getDSize());
   par_storage_ = rpu_device_in.getPar().cloneUnique();
+
   context_->synchronize();
+}
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::doDirectUpdate(
+    const T *x_input,
+    const T *d_input,
+    T *dev_weights,
+    const T lr,
+    const int m_batch,
+    const bool x_trans,
+    const bool d_trans,
+    const T beta,
+    T *x_buffer,
+    T *d_buffer) {
+  if (m_batch == 1 && beta == 1.0) {
+    RPU::math::ger<T>(
+        context_, d_size_, x_size_, -lr, d_input, 1, x_input, 1, dev_weights, d_size_);
+  } else {
+
+    RPU::math::gemm<T>(
+        context_, d_trans, !x_trans, d_size_, x_size_, m_batch, -lr, d_input,
+        d_trans ? m_batch : d_size_, x_input, x_trans ? m_batch : x_size_, beta, dev_weights,
+        d_size_);
+  }
 }
 
 template <typename T>
@@ -158,9 +183,7 @@ template <typename T> void SimpleRPUDeviceCuda<T>::decayWeights(T *weights, bool
 }
 
 template <typename T> void SimpleRPUDeviceCuda<T>::initRndContext() {
-
-  // first time: init
-  rnd_context_ = std::unique_ptr<CudaContext>(new CudaContext(context_->getGPUId()));
+  rnd_context_ = RPU::make_unique<CudaContext>(context_->getGPUId());
   rnd_context_->setRandomSeed(0);
 }
 
@@ -169,9 +192,7 @@ template <typename T> void SimpleRPUDeviceCuda<T>::initDiffusionRnd() {
   if (rnd_context_ == nullptr) {
     initRndContext();
   }
-
-  dev_diffusion_nrnd_ = std::unique_ptr<CudaArray<float>>(
-      new CudaArray<float>(&*rnd_context_, (size_ + 31) / 32 * 32));
+  dev_diffusion_nrnd_ = RPU::make_unique<CudaArray<float>>(&*rnd_context_, (size_ + 31) / 32 * 32);
   rnd_context_->synchronize();
 }
 

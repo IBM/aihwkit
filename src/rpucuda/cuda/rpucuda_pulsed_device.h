@@ -41,8 +41,25 @@ public:
     swap(static_cast<SimpleRPUDeviceCuda<T> &>(a), static_cast<SimpleRPUDeviceCuda<T> &>(b));
   }
   bool isPulsedDevice() const override { return true; };
+  bool hasDirectUpdate() const override { return false; };
+  void doDirectUpdate(
+      const T *x_input,
+      const T *d_input,
+      T *dev_weights,
+      const T lr,
+      const int m_batch,
+      const bool x_trans,
+      const bool d_trans,
+      const T beta,
+      T *x_buffer = nullptr,
+      T *d_buffer = nullptr) override {
+    RPU_FATAL("No direct update supported with this device.");
+  }
+
   /* Resets columns of the weights matrix to 0 (with noise reset_std)*/
-  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) {RPU_FATAL("Needs implementation");};
+  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) {
+    RPU_FATAL("Needs implementation");
+  };
 
   virtual T getDwMin() const = 0;
   virtual void runUpdateKernel(
@@ -63,7 +80,7 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) = 0;
 
-  PulsedRPUDeviceCudaBase<T> *clone() const override {RPU_FATAL("Needs implementation");};
+  PulsedRPUDeviceCudaBase<T> *clone() const override { RPU_FATAL("Needs implementation"); };
 };
 
 /* Base class for all devices that do a simple pulsed update with 6 parameters*/

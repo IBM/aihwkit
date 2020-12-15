@@ -39,7 +39,31 @@ class BoundManagementType(Enum):
     """No bound management."""
 
     ITERATIVE = 'Iterative'
-    r"""Iteratively recomputes input scale set to :math:`\alpha\leftarrow\alpha/2`."""
+    r"""Iteratively recomputes input scale set to :math:`\alpha\leftarrow\alpha/2`.
+
+    It iteratively recomputes the bounds up to limit of passes (given
+    by ``max_bm_factor`` or ``max_bm_res``).
+    """
+
+    ITERATIVE_WORST_CASE = 'IterativeWorstCase'
+    """Worst case bound management.
+
+    Uses ``AbsMax`` noise management for the first pass and only when
+    output bound is hit, the ``AbsMaxNPSum`` for the second. Thus, at
+    most 2 passes are computed.
+    """
+
+    SHIFT = 'Shift'
+    """Shift bound management.
+
+    Shifts the output by adding the difference ``output_bound -
+    max_output`` to the analog output value. This is only useful to
+    increase the dynamic range before the softmax, where the max can
+    be safely.
+
+    Note:
+        Shifting needs hardware implementations.
+    """
 
 
 class NoiseManagementType(Enum):
@@ -56,11 +80,27 @@ class NoiseManagementType(Enum):
     ABS_MAX = 'AbsMax'
     r"""Use :math:`\alpha\equiv\max{|\mathbf{x}|}`."""
 
+    ABS_MAX_NP_SUM = 'AbsMaxNPSum'
+    """Takes a worst case scenario of the weight matrix to calculate the
+    input scale to ensure that output is not clipping. Assumed weight
+    value is constant and given by ``nm_assumed_wmax``. """
+
     MAX = 'Max'
     r"""Use :math:`\alpha\equiv\max{\mathbf{x}}`."""
 
     CONSTANT = 'Constant'
     r"""A constant value (given by parameter ``nm_thres``)."""
+
+    AVERAGE_ABS_MAX = 'AverageAbsMax'
+    """Moment-based scale input scale estimation. Computes the average
+    abs max over the mini-batch and applies ``nm_decay`` to update the
+    value with the history.
+
+    Note:
+        ``nm_decay`` is ``1-momentum`` and always given in
+        mini-batches. However, the CUDA implementation does not discount
+        values within mini-batches, wheras the CPU implementation does.
+    """
 
 
 class WeightNoiseType(Enum):
@@ -81,6 +121,16 @@ class WeightNoiseType(Enum):
     :math:`\sigma` is determined by ``w_noise``.
     """
 
+    PCM_READ = 'PCMRead'
+    """Output-referred PCM-like read noise that scales with the amount of
+    current generated for each output line and thus scales with both
+    conductance values and input strength.
+
+    The same general for is taken as for PCM-like statistical model of
+    the 1/f noise during inference, see
+    :class:`aihwkit.simulator.noise_models.PCMLikeNoiseModel`.
+    """
+
 
 class PulseType(Enum):
     """Pulse type."""
@@ -99,6 +149,17 @@ class PulseType(Enum):
 
     MEAN_COUNT = 'MeanCount'
     """Coincidence based in prob (:math:`p_a p_b`)."""
+
+    DETERMINISTIC_IMPLICIT = 'DeterministicImplicit'
+    r"""Coincidences are computed in deterministic manner.
+
+    Coincidences are calculated by :math:`b_l x_q d_q` where ``BL`` is
+    the desired bit length (possibly subject to dynamic adjustments
+    using ``update_bl_management``) and :math:`x_q` and :math:`d_q`
+    are the quantized input and error values, respectively, normalized
+    to the range :math:`0,\ldots,1`. It can be shown that explicit bit
+    lines exist that generate these coincidences.
+    """
 
 
 class WeightModifierType(Enum):
@@ -122,6 +183,17 @@ class WeightModifierType(Enum):
     DOREFA = 'DoReFa'
     """DoReFa discretization."""
 
+    POLY = 'Poly'
+    r"""2nd order Polynomial noise model (in terms of the weight value).
+
+    In detail, for the duration of a mini-batch, each weight will be
+    added a Gaussian random number with the standard deviation of
+    :math:`\sigma_\text{wnoise} (c_0 + c_1 w_{ij}/\omega + c_2
+    w_ij^2/\omega^2` where :math:`omega` is either the actual max
+    weight (if ``rel_to_actual_wmax`` is set) or the value
+    ``assumed_wmax``.
+    """
+
 
 class WeightClipType(Enum):
     """Weight clipper type."""
@@ -134,11 +206,13 @@ class WeightClipType(Enum):
 
     LAYER_GAUSSIAN = 'LayerGaussian'
     """Calculates the second moment of the whole weight matrix and clips
-    at ``sigma`` times the result symmetrically around zero."""
+    at ``sigma`` times the result symmetrically around zero.
+    """
 
     AVERAGE_CHANNEL_MAX = 'AverageChannelMax'
     """Calculates the abs max of each output channel (row of the weight
-    matrix) and takes the average as clipping value for all."""
+    matrix) and takes the average as clipping value for all.
+    """
 
 
 class VectorUnitCellUpdatePolicy(Enum):
@@ -294,14 +368,28 @@ class UpdateParameters(_PrintableMixin):
         Pulsing can also be turned off in which case
         the update is done as if in floating point and all
         other update related parameter are ignored.
-   """
+    """
 
     res: float = 0
-    """Number of discretization steps of the probability in ``0..1``.
-    Use -1 for turning discretization off. Can be :math:`1/n_\text{steps}` as well.
+    """Resolution ie. bin width in ``0..1``) of the update probability for
+    the stochastic bit line generation.  Use -1 for turning discretization
+    off. Can be given as number of steps as well.
+
+    """
+
+    x_res_implicit: float = 0
+    """Resolution (ie. bin width) of each quantization step for the inputs ``x`` in case
+    of ``DeterministicImplicit`` pulse trains. See :class:`PulseTypeMap` for details.
+    """
+
+    d_res_implicit: float = 0
+    """Resolution (ie. bin width) of each quantization step for the error
+    ``d`` in case of `DeterministicImplicit` pulse trains. qSee
+    :class:`PulseTypeMap` for details.
     """
 
     sto_round: bool = False
+
     """Whether to enable stochastic rounding."""
 
     update_bl_management: bool = True
@@ -395,6 +483,16 @@ class WeightModifierParameter(_PrintableMixin):
     This is typically 1.0. This parameter will be ignored if
     ``rel_to_actual_wmax`` is set.
     """
+
+    copy_last_column: bool = False
+    """Whether to not apply noise to the last column (which usually
+    contains the bias values)."""
+
+    coeff0: float = 0.26348 / 25.0
+    coeff1: float = 0.0768
+    coeff2: float = -0.001877 * 25.0
+    """Coefficients for the ``POLY`` weight modifier type. See
+    :class:`WeightModifierType` for details"""
 
     type: WeightModifierType = WeightModifierType.COPY
     """Type of the weight modification."""

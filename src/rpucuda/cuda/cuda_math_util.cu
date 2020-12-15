@@ -18,10 +18,6 @@
   cublasHandle_t handle = context->getBlasHandle();                                                \
   CUBLAS_CALL(cublasSetStream(handle, context->getStream()))
 
-#define RPU_GET_CUBLAS_HANDLE                                                                      \
-  cublasHandle_t handle = context->getBlasHandle();                                                \
-  CUBLAS_CALL(cublasSetStream(handle, context->getStream()))
-
 #define RPU_SET_CUBLAS_POINTER_MODE_DEVICE                                                         \
   cublasPointerMode_t p_mode;                                                                      \
   CUBLAS_CALL(cublasGetPointerMode(handle, &p_mode));                                              \
@@ -684,10 +680,8 @@ template void elemconst<float>(const CudaContext *, float *, const int, const fl
 #ifdef RPU_USE_DOUBLE
 template void elemconst<double>(const CudaContext *, double *, const int, const double);
 #endif
-template void
-elemconst<unsigned int>(const CudaContext *, unsigned int *, const int, const unsigned int);
-template void
-elemconst<uint64_t>(const CudaContext *, uint64_t *, const int, const uint64_t);
+template void elemconst<uint32_t>(const CudaContext *, uint32_t *, const int, const uint32_t);
+template void elemconst<uint64_t>(const CudaContext *, uint64_t *, const int, const uint64_t);
 template void elemconst<int>(const CudaContext *, int *, const int, const int);
 template void elemconst<char>(const CudaContext *, char *, const int, const char);
 
@@ -1063,9 +1057,17 @@ RPU_CMU_DEFINE_CWI(float *, float *);
 RPU_CMU_DEFINE_CWI(float *, IndexReaderInputIterator<float>);
 RPU_CMU_DEFINE_CWI(float *, IndexReaderTransInputIterator<float>);
 RPU_CMU_DEFINE_CWI(float *, PermuterTransInputIterator<float>);
+RPU_CMU_DEFINE_CWI(float *, IndexReaderSliceInputIterator<TRANS_FLOAT(true)>);
+RPU_CMU_DEFINE_CWI(float *, IndexReaderSliceInputIterator<TRANS_FLOAT(false)>);
+RPU_CMU_DEFINE_CWI(float *, SliceInputIterator<TRANS_FLOAT(true)>);
+RPU_CMU_DEFINE_CWI(float *, SliceInputIterator<TRANS_FLOAT(false)>);
 RPU_CMU_DEFINE_CWI(PermuterTransOutputIterator<float>, const float *);
 RPU_CMU_DEFINE_CWI(IndexReaderOutputIterator<float>, const float *);
 RPU_CMU_DEFINE_CWI(IndexReaderTransOutputIterator<float>, const float *);
+RPU_CMU_DEFINE_CWI(IndexReaderSliceOutputIterator<TRANS_FLOAT(true)>, const float *);
+RPU_CMU_DEFINE_CWI(IndexReaderSliceOutputIterator<TRANS_FLOAT(false)>, const float *);
+RPU_CMU_DEFINE_CWI(SliceOutputIterator<TRANS_FLOAT(true)>, const float *);
+RPU_CMU_DEFINE_CWI(SliceOutputIterator<TRANS_FLOAT(false)>, const float *);
 
 #undef TRANS_FLOAT
 
@@ -1076,9 +1078,17 @@ RPU_CMU_DEFINE_CWI(double *, double *);
 RPU_CMU_DEFINE_CWI(double *, IndexReaderInputIterator<double>);
 RPU_CMU_DEFINE_CWI(double *, IndexReaderTransInputIterator<double>);
 RPU_CMU_DEFINE_CWI(double *, PermuterTransInputIterator<double>);
+RPU_CMU_DEFINE_CWI(double *, IndexReaderSliceInputIterator<TRANS_DOUBLE(true)>);
+RPU_CMU_DEFINE_CWI(double *, IndexReaderSliceInputIterator<TRANS_DOUBLE(false)>);
+RPU_CMU_DEFINE_CWI(double *, SliceInputIterator<TRANS_DOUBLE(true)>);
+RPU_CMU_DEFINE_CWI(double *, SliceInputIterator<TRANS_DOUBLE(false)>);
 RPU_CMU_DEFINE_CWI(PermuterTransOutputIterator<double>, const double *);
 RPU_CMU_DEFINE_CWI(IndexReaderOutputIterator<double>, const double *);
 RPU_CMU_DEFINE_CWI(IndexReaderTransOutputIterator<double>, const double *);
+RPU_CMU_DEFINE_CWI(IndexReaderSliceOutputIterator<TRANS_DOUBLE(true)>, const double *);
+RPU_CMU_DEFINE_CWI(IndexReaderSliceOutputIterator<TRANS_DOUBLE(false)>, const double *);
+RPU_CMU_DEFINE_CWI(SliceOutputIterator<TRANS_DOUBLE(true)>, const double *);
+RPU_CMU_DEFINE_CWI(SliceOutputIterator<TRANS_DOUBLE(false)>, const double *);
 
 #undef TRANS_DOUBLE
 #endif

@@ -63,7 +63,7 @@ public:
     culayer_simple = RPU::make_unique<RPUCudaSimple<T>>(context, *layer_simple);
 
     // generate random numbers
-    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<T> udist(-1, 1);
     auto urnd = std::bind(udist, generator);
@@ -129,7 +129,7 @@ public:
     culayer_simple = RPU::make_unique<RPUCudaSimple<num_t>>(context, *layer_simple);
 
     // generate random numbers
-    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<num_t> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);

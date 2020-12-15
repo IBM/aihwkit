@@ -69,6 +69,9 @@ public:
     swap(a.b_io_, b.b_io_);
     swap(a.tmp_x_values_, b.tmp_x_values_);
     swap(a.tmp_d_values_, b.tmp_d_values_);
+    swap(a.aux_nm_value_, b.aux_nm_value_);
+    swap(a.rng_, b.rng_);
+    swap(a.checked_implemented_, b.checked_implemented_);
   }
 
   void forwardVector(
@@ -95,10 +98,11 @@ private:
   T *tmp_x_values_ = nullptr;
   T *tmp_d_values_ = nullptr;
 
-  bool checked_implemented_ = false;
+  T aux_nm_value_ = -1.0;
   IOMetaParameter<T> f_io_;
   IOMetaParameter<T> b_io_;
   bool containers_allocated_ = false;
+  bool checked_implemented_ = false;
   std::shared_ptr<RNG<T>> rng_ = nullptr;
 };
 

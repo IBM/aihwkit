@@ -39,7 +39,7 @@ public:
     x1 = new T[size * m_batch];
     d1 = new T[size * m_batch];
 
-    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<T> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);

@@ -54,6 +54,7 @@ inline T computeNoiseManagement(
     const int size,
     const int inc,
     const NoiseManagementType nm_type,
+    T &auxilary_variable,
     const IOMetaParameter<T> &io) {
   if (nm_type == NoiseManagementType::None) {
     return 1.0;
@@ -72,6 +73,42 @@ inline T computeNoiseManagement(
   case NoiseManagementType::Max: {
     T max_input_value = RPU::math::max<T>(size, input, inc);
     return io.nm_thres > 0 ? MIN(max_input_value, io.nm_thres) : max_input_value;
+  }
+  case NoiseManagementType::AverageAbsMax:
+  case NoiseManagementType::AverageAbsMaxSingleValue: {
+    int max_index = RPU::math::iamax<T>(size, input, inc);
+    T amax_input_value = fabs(input[max_index * inc]);
+    if (auxilary_variable < (T)0.0) {
+      auxilary_variable = amax_input_value;
+    } else {
+      auxilary_variable =
+          auxilary_variable * ((T)1.0 - io.nm_decay) + io.nm_decay * amax_input_value;
+    }
+    return auxilary_variable;
+  }
+
+  case NoiseManagementType::AbsMaxNPSum: {
+    int max_index = RPU::math::iamax<T>(size, input, inc);
+    T amax_input_value = fabs(input[max_index * inc]);
+
+    T psum = 0;
+    T nsum = 0;
+    int j_x = 0;
+    PRAGMA_SIMD
+    for (int j = 0; j < size; j++) {
+      T x = input[j_x];
+      psum += x > 0 ? x : (T)0.0;
+      nsum += x < 0 ? x : (T)0.0;
+      j_x += inc;
+    }
+    T sum = MAX(psum, -nsum);
+    amax_input_value = io.nm_thres > 0 ? MIN(amax_input_value, io.nm_thres) : amax_input_value;
+
+    T npsum_scale = sum * io.nm_assumed_wmax / io.out_bound;
+    if (io.inp_res > 0) {
+      npsum_scale = MIN(amax_input_value / io.inp_res * io.max_bm_res, npsum_scale);
+    }
+    return MAX(amax_input_value, npsum_scale);
   }
   default:
     RPU_FATAL("Noise Management type not implemented!");
@@ -102,6 +139,8 @@ template <typename T> void ForwardBackwardPassIOManaged<T>::freeContainers() {
     tmp_d_values_ = nullptr;
     tmp_x_values_ = nullptr;
 
+    rng_ = nullptr;
+
     containers_allocated_ = false;
   }
 }
@@ -110,8 +149,10 @@ template <typename T> void ForwardBackwardPassIOManaged<T>::freeContainers() {
 template <typename T>
 ForwardBackwardPassIOManaged<T>::ForwardBackwardPassIOManaged(
     int x_size, int d_size, std::shared_ptr<RNG<T>> rng)
-    : ForwardBackwardPass<T>(x_size, d_size), rng_(rng) {
+    : ForwardBackwardPass<T>(x_size, d_size) {
+  rng_ = rng;
   allocateContainers();
+  aux_nm_value_ = (T)-1.0;
 }
 
 // dtor
@@ -126,11 +167,12 @@ ForwardBackwardPassIOManaged<T>::ForwardBackwardPassIOManaged(
     : ForwardBackwardPass<T>(other) {
   f_io_ = other.f_io_;
   b_io_ = other.b_io_;
+  aux_nm_value_ = other.aux_nm_value_;
   rng_ = other.rng_;
+  checked_implemented_ = other.checked_implemented_;
 
   if (other.containers_allocated_) {
     allocateContainers();
-    // tmp not copied
   }
 }
 
@@ -173,7 +215,8 @@ ForwardBackwardPassIOManaged<T>::operator=(ForwardBackwardPassIOManaged<T> &&oth
   rng_ = std::move(other.rng_);
 
   containers_allocated_ = other.containers_allocated_;
-
+  checked_implemented_ = other.checked_implemented_;
+  aux_nm_value_ = other.aux_nm_value_;
   return *this;
 }
 
@@ -186,20 +229,23 @@ void ForwardBackwardPassIOManaged<T>::setIOPar(
   // check the parameters
   f_io_.initializeForForward();
   b_io_.initializeForBackward();
+  checked_implemented_ = false; // need to check in forward because CUDA also shares this with CPU
 }
 
 template <typename T> void ForwardBackwardPassIOManaged<T>::ensureImplemented() {
   if (b_io_.w_noise_type != OutputWeightNoiseType::AdditiveConstant &&
       b_io_.w_noise_type != OutputWeightNoiseType::None) {
-    RPU_FATAL("CPU version of NonIdealityType not yet implemented ");
+    RPU_FATAL("CPU version of OutputWeightNoiseType not yet implemented ");
   }
 
   if (f_io_.w_noise_type != OutputWeightNoiseType::AdditiveConstant &&
       f_io_.w_noise_type != OutputWeightNoiseType::None) {
-    RPU_FATAL("CPU version of NonIdealityType not yet implemented ");
+    RPU_FATAL("CPU version of OutputWeightNoiseType not yet implemented ");
   }
 
-  checked_implemented_ = true;
+  if (f_io_.bound_management == BoundManagementType::SignalChannel) {
+    RPU_FATAL("CPU version of BoundManagementType::SignalChannel not yet implemented.");
+  }
 }
 
 template <typename T>
@@ -217,12 +263,17 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
         weights, x_input, x_inc, d_output, d_inc, f_io_.out_scale * alpha, is_test);
     return;
   }
+  if (!checked_implemented_) {
+    ensureImplemented();
+    checked_implemented_ = true;
+  }
 
   T *x_value = tmp_x_values_;
-  T nm_scale_value =
-      computeNoiseManagement(x_input, this->x_size_, x_inc, f_io_.noise_management, f_io_);
+  T nm_scale_value = computeNoiseManagement(
+      x_input, this->x_size_, x_inc, f_io_.noise_management, aux_nm_value_, f_io_);
   bool nm = f_io_.noise_management != NoiseManagementType::None;
-  bool bm = f_io_.bound_management != BoundManagementType::None;
+  bool sm = f_io_.bound_management == BoundManagementType::Shift;
+  bool bm = f_io_.bound_management != BoundManagementType::None && !sm;
 
   if (nm) {
 
@@ -239,7 +290,9 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
   }
 
   T out_scale = (T)1.0;
-  out_scale = f_io_.out_scale * alpha;
+  if (!sm) { // NOT scaled for ShiftManagement (ONLY during forward...)
+    out_scale = f_io_.out_scale * alpha;
+  }
 
   bool bound_test_passed = false;
   T reduction_due_to_bound_management = 0.5;
@@ -253,11 +306,14 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
     bound_test_passed = true;
     reduction_due_to_bound_management *= 2.0;
 
-    bm_round++;
-
-    if (reduction_due_to_bound_management > 500.0) {
-      std::cout << "Bound management already at " << reduction_due_to_bound_management << "\n";
+    if (bm_round == 1 && f_io_.bound_management == BoundManagementType::IterativeWorstCase &&
+        f_io_.noise_management != NoiseManagementType::AbsMaxNPSum) {
+      nm_scale_value = computeNoiseManagement(
+          x_input, this->x_size_, x_inc, NoiseManagementType::AbsMaxNPSum, aux_nm_value_, f_io_);
+      reduction_due_to_bound_management = 1.0; // reset to 1.0
     }
+
+    bm_round++;
 
     scaling = false;
     scale = (T)1.0;
@@ -337,6 +393,22 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
       }
     }
 
+    if (sm) {
+      // this is for softmax specialization. We use the range from
+      // the max and clip below, ie shift the max to the pos range
+      // bound (out_bound (NEED TO BE SET TO FINITE VALUE FOR THIS))
+
+      int max_index = RPU::math::iamax<T>(this->d_size_, d_output, d_inc);
+      T max_output_value = fabs(d_output[max_index * d_inc]);
+      T shift_value = f_io_.out_bound - max_output_value;
+      int i_d1 = 0;
+      PRAGMA_SIMD
+      for (int i = 0; i < this->d_size_; ++i) {
+        d_output[i_d1] += shift_value; // will be clipped below
+        i_d1 += d_inc;
+      }
+    }
+
     int i_d = 0;
     PRAGMA_SIMD
     for (int i = 0; i < this->d_size_; ++i) {
@@ -357,7 +429,7 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
       i_d += d_inc;
     }
 
-    if (bm) {
+    if (bm && !sm) {
       bound_test_passed =
           bound_test_passed || ((reduction_due_to_bound_management > f_io_.max_bm_factor) ||
                                 ((f_io_.inp_res > 0) && (reduction_due_to_bound_management >
@@ -388,14 +460,10 @@ void ForwardBackwardPassIOManaged<T>::backwardVector(
     return;
   }
 
-  if (!checked_implemented_) {
-    ensureImplemented();
-  }
-
   // io managed version
   T *d_value = tmp_d_values_;
-  T nm_scale_value =
-      computeNoiseManagement(d_input, this->d_size_, d_inc, b_io_.noise_management, b_io_);
+  T nm_scale_value = computeNoiseManagement(
+      d_input, this->d_size_, d_inc, b_io_.noise_management, aux_nm_value_, b_io_);
   bool nm = b_io_.noise_management != NoiseManagementType::None;
   bool scaling = nm && nm_scale_value > 0.0;
   T out_scale = b_io_.out_scale * alpha;

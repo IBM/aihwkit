@@ -19,14 +19,14 @@
 namespace RPU {
 
 enum BLMOutputFormat {
-  NotSet,  // dummy init
-  FP,      // floating point mode for future uses
-  UI32,    // standard 32-bit word of bits per x,d value [more than one
-           // word supported]. First bit is sign
-  BO64,    // 64 word with sign bits in upper 32-bit word and data in
-           // lower. Batch major ordering. Here more than one batch
-           // value can be squeezed together in one word. Useful for
-           // small BL, will speed up loading across batches
+  NotSet, // dummy init
+  FP,     // floating point mode for implicit pulses
+  UI32,   // standard 32-bit word of bits per x,d value [more than one word supported]. First bit is
+          // sign
+  BO64,   // 64 word with sign bits in upper 32-bit word and data in
+          // lower. Batch major ordering. Here more than one batch
+          // value can be squeezed together in one word. Useful for
+          // small BL, will speed up loading across batches
   UI32BO64 // translate mode, first UI32 than compressed into BO64
 };
 
@@ -46,9 +46,10 @@ public:
       const bool x_trans = false,
       const bool d_trans = false,
       const bool out_trans = false,
-      const int use_bo64 = 0);
+      const int use_bo64 = 0,
+      const bool implicit_pulses = false);
 
-  BLMOutputFormat getFormat(int use_bo64, bool implicit_pulses = false);
+  BLMOutputFormat getFormat(int use_bo64, bool implicit_pulses);
 
   T *getXData() const;
   T *getDData() const;
@@ -72,12 +73,13 @@ public:
   }
   inline int getNK32Current() const { return current_BL_ / 32 + 1; };
   void getCountsDebug(uint32_t *x_counts, uint32_t *d_counts);
+  void getFPCounts(T *x_counts, T *d_counts);
 
   inline T getCurrentLR() const { return current_lr_; };
   // helper for debug
   UpdateManagementHelper<T> *getUmh() const { return &*umh_; };
 
-  void initializeBLBuffers(int m_batch, int BL, int use_bo64);
+  void initializeBLBuffers(int m_batch, int BL, int use_bo64, bool implicit_pulses);
 
 private:
   CudaContext *context_ = nullptr;

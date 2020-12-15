@@ -33,8 +33,8 @@ typedef int randomint_t;
 #endif
 
 // NEED TO BE 0x7FFF for FASTRAND!!!
-#define FIXED_LIST_SIZE 0x7FFF
-
+#define FIXED_LIST_SIZE 32768
+#define FIXED_LIST_SIZE_MSK 0x7FFF
 namespace RPU {
 
 static randomint_t g_seed;
@@ -116,7 +116,7 @@ public:
 #endif
 #else
 #ifdef RPU_USE_FASTMOD
-    return gauss_numbers_list_[RANDFUN() & FIXED_LIST_SIZE];
+    return gauss_numbers_list_[RANDFUN() & FIXED_LIST_SIZE_MSK];
 #else
     return gauss_numbers_list_[RANDFUN() % gauss_list_size_];
 #endif

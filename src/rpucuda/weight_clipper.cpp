@@ -1,3 +1,15 @@
+/**
+ * (C) Copyright 2020 IBM. All Rights Reserved.
+ *
+ * This code is licensed under the Apache License, Version 2.0. You may
+ * obtain a copy of this license in the LICENSE.txt file in the root directory
+ * of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Any modifications or derivative works of this code must retain this
+ * copyright notice, and modified files need to carry a notice indicating
+ * that they have been altered from the originals.
+ */
+
 #include "weight_clipper.h"
 #include "math_util.h"
 #include "utility_functions.h"
@@ -34,7 +46,7 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
     if (amax_values_.size() < (size_t)d_size_) {
       amax_values_.resize(d_size_);
     }
-    std::fill(amax_values_.begin(), amax_values_.end(), 0.0);
+    std::fill(amax_values_.begin(), amax_values_.end(), (T)0.0);
 
     // compute max per row
     PRAGMA_SIMD

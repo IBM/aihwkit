@@ -276,7 +276,8 @@ int debugKernelTranslateTransFormatToBatchOrder64Format(
   T lr = 0.01;
   BitLineMaker<T> blm(&c, size, size);
   blm.makeCounts(
-      dev_indata.getData(), dev_indata.getData(), up, dwmin, lr, m_batch, false, false, true, 2);
+      dev_indata.getData(), dev_indata.getData(), up, dwmin, lr, m_batch, false, false, true, 2,
+      false); // compute B64 to init buffer for below
 
   UpdateManagementHelper<T> *umh = blm.getUmh();
   c.synchronize();
@@ -637,7 +638,16 @@ RPU_UMH_ITER_TEMPLATE(float, IndexReaderInputIterator<float>, const float *);
 RPU_UMH_ITER_TEMPLATE(float, IndexReaderTransInputIterator<float>, const float *);
 RPU_UMH_ITER_TEMPLATE(
     float, IndexReaderTransInputIterator<float>, PermuterTransInputIterator<float>);
+RPU_UMH_ITER_TEMPLATE(
+    float, IndexReaderSliceInputIterator<TRANSFLOAT(true)>, SliceInputIterator<TRANSFLOAT(true)>);
+RPU_UMH_ITER_TEMPLATE(
+    float, IndexReaderSliceInputIterator<TRANSFLOAT(false)>, SliceInputIterator<TRANSFLOAT(false)>);
+
 RPU_UMH_ITER_TEMPLATE(float, const float *, PermuterTransInputIterator<float>);
+RPU_UMH_ITER_TEMPLATE(float, const float *, SliceInputIterator<TRANSFLOAT(true)>);
+RPU_UMH_ITER_TEMPLATE(float, const float *, SliceInputIterator<TRANSFLOAT(false)>);
+RPU_UMH_ITER_TEMPLATE(float, IndexReaderSliceInputIterator<TRANSFLOAT(true)>, const float *);
+RPU_UMH_ITER_TEMPLATE(float, IndexReaderSliceInputIterator<TRANSFLOAT(false)>, const float *);
 
 #undef TRANSFLOAT
 

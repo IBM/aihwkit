@@ -133,7 +133,10 @@ protected:
       const int size,
       const int m_batch,
       const int dim3,
-      const bool trans) override;
+      const bool trans,
+      const int m_batch_slice = 0,
+      const int *batch_indices = nullptr) override;
+
   void copyIndexedOutput(
       T *out_tensor,
       const T *src_tensor,
@@ -142,7 +145,27 @@ protected:
       const int size,
       const int m_batch,
       const int dim3,
-      const bool trans) override;
+      const bool trans,
+      const int m_batch_slice = 0,
+      const int *batch_indices = nullptr) override;
+  void copySliceInput(
+      T *out_tensor,
+      const T *src_tensor,
+      const int size,
+      const int m_batch,
+      const int dim3,
+      const bool trans,
+      const int m_batch_slice,
+      const int *batch_indices) override;
+  void copySliceOutput(
+      T *out_tensor,
+      const T *src_tensor,
+      const int size,
+      const int m_batch,
+      const int dim3,
+      const bool trans,
+      const int m_batch_slice,
+      const int *batch_indices) override;
 
   void setZero(T *v, const int size) override {
     RPU::math::elemconst<T>(context_, v, size, (T)0.0);
@@ -154,8 +177,10 @@ public:
   void decayWeights(bool bias_no_decay) override;
   void decayWeights(T alpha, bool bias_no_decay) override;
 
-  void clipWeights(const WeightClipParameter &wclpar) override;
   void diffuseWeights() override;
+
+  void clipWeights(T clip) override;
+  void clipWeights(const WeightClipParameter &wclpar) override;
 
   T **getWeights() override; // host weights. implicit copy from CUDA
 
@@ -176,7 +201,6 @@ protected:
   std::shared_ptr<CudaContext> shared_context_ = nullptr;
   std::unique_ptr<CudaContext> rnd_diffusion_context_ = nullptr;
   std::unique_ptr<CudaArray<float>> dev_diffusion_nrnd_ = nullptr;
-
   std::unique_ptr<CudaArray<T>> dev_weights_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_weights_buffer_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_fb_weights_ = nullptr;
@@ -190,12 +214,13 @@ protected:
 
   std::unique_ptr<CudaArray<T>> dev_temp_tensor_ = nullptr;
 
+  std::unique_ptr<WeightClipperCuda<T>> wclipper_cuda_ = nullptr;
+
 private:
   void
   initFrom(const RPUSimple<T> &rpu_in); // to populate from CPU->CUDA, will be called by constructor
   void initialize(CudaContext *c);
   std::unique_ptr<WeightModifierCuda<T>> fb_wmodifier_cuda_ = nullptr;
-  std::unique_ptr<WeightClipperCuda<T>> wclipper_cuda_ = nullptr;
 };
 
 } // namespace RPU

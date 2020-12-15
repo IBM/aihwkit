@@ -22,6 +22,7 @@
 #include <chrono>
 #include <memory>
 #include <random>
+#include <numeric>
 
 #define TOLERANCE 1e-5
 
@@ -127,7 +128,7 @@ public:
     w_other = new T[d_size * x_size];
     w_other_trans = new T[d_size * x_size];
 
-    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<T> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
@@ -286,7 +287,7 @@ public:
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
     culayer_pulsed->disp();
 
-    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<T> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
@@ -804,7 +805,6 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, SetWeightsReal) {
   }
   avg_dev1 /= this->d_size * this->x_size;
   avg_dev2 /= this->d_size * this->x_size;
-
   std::cout << "max_dev1 is " << max_dev1 << " idx is " << max_dev1_i << "\n";
   std::cout << "max_dev2 is " << max_dev2 << " idx is " << max_dev2_i << "\n";
 
@@ -1163,6 +1163,12 @@ TYPED_TEST(RPUCudaPulsedTestFixture, WeightDecayAlphaNoBias) {
   RPU_TEST_UPDATE(decayWeights(0.3, true), decayWeights(0.3, true), this->repeats);
 }
 
+TYPED_TEST(RPUCudaPulsedTestFixture, ClipWeights) {
+  using T = typename TestFixture::T;
+
+  RPU_TEST_UPDATE(clipWeights(0.2), clipWeights(0.2), this->repeats);
+}
+
 TYPED_TEST(RPUCudaPulsedTestFixture, ResetCols) {
   using T = typename TestFixture::T;
 
@@ -1205,7 +1211,6 @@ TYPED_TEST(RPUCudaPulsedTestFixture, PreAllReduce) {
   for (int i = 0; i < this->d_size * this->x_size; i++) {
     ASSERT_FLOAT_EQ(w1_ref[i], w2_ref[i]);
   }
-
   // check transposed assignment
   this->w_cuother->copyTo(w1); // transposed
   for (int i = 0; i < this->d_size * this->x_size; i++) {
@@ -1388,6 +1393,17 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, UpdateMatrixBatchIndexedNoNoise) {
   }
 
   this->context->synchronizeDevice();
+
+  {
+    RPU_TEST_UPDATE(
+        updateIndexedSlice(
+            cu_orig_input.getData(), this->d_cuvec_batch->getData(), input_size * this->dim3,
+            this->m, this->dim3, trans, this->m, cu_batch_indices.getDataConst()),
+        updateIndexedSlice(
+            orig_input, this->d_vec_batch.data(), input_size * this->dim3, this->m, this->dim3,
+            trans, this->m, this->batch_indices),
+        2);
+  }
 
   delete[] orig_input;
   delete[] index;

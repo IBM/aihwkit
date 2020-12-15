@@ -588,6 +588,51 @@ __global__ void kernelOutputManagementBatch(
 }
 
 /*********************************************************************************/
+/* output shift management*/
+template <typename T, typename OutputIteratorT, bool noise_management>
+__global__ void kernelOutputShiftManagementBatch(
+    OutputIteratorT output,
+    const T *input,
+    const int size_in,
+    const int m_batch_in,
+    const bool trans_in, // true if m_batch first dimensions
+    const float *nm_scale_values,
+    const float *shift_values,
+    const T bound_lower,
+    const T bound_upper,
+    const T resolution,
+    const bool sto_round,
+    curandState *random_states) {
+  const bool trans = trans_in;
+  const int size = size_in;
+  const int m_batch = m_batch_in;
+  const int total_size = size * m_batch;
+  const T res = resolution;
+  const bool sr = sto_round;
+
+  T local_nm_scale = 0.0;
+
+  STOCH_DEFINITIONS(sr, total_size);
+
+  STRIDE_LOOP(
+      total_size, value,
+
+      int bidx = trans ? (idx % m_batch) : (idx / size);
+      T local_shift = shift_values[bidx];
+
+      if (noise_management) { local_nm_scale = nm_scale_values[bidx]; }
+
+      value += bu - local_shift;
+
+      DISCRETIZE_VALUE_STOCH;
+
+      BOUND_CHECK;
+
+      if (noise_management) { APPLY_OUTPUT_NOISE_MANAGMENT(local_nm_scale); });
+  STOCH_FINALIZE(sr, total_size);
+}
+
+/*********************************************************************************/
 /* output with bound management*/
 template <typename T, typename OutputIteratorT>
 __global__ void kernelOutputBoundManagement(
@@ -830,6 +875,7 @@ template <typename T>
 InputOutputManager<T>::InputOutputManager(CudaContext *c, int in_size, int out_size)
     : context_(c), in_size_(in_size), out_size_(out_size) {
   noise_manager_ = RPU::make_unique<NoiseManager<T>>(context_, in_size_);
+  output_maximizer_ = RPU::make_unique<Maximizer<T>>(context_, out_size_, false); // MAX
 
   dev_any_exceeded_ = RPU::make_unique<CudaArray<int>>(context_, 1);
   dev_selected_m_batch_ = RPU::make_unique<CudaArray<int>>(context_, 1);
@@ -901,7 +947,8 @@ template <typename T> void InputOutputManager<T>::initializeBatchBuffer(int m_ba
         dev_selected_bidx_->getData(), dev_selected_m_batch_->getData(), m_batch,
         context_->getStream());
 
-    dev_flagged_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (byte_size + 31) / 32 * 32);
+    dev_flagged_temp_storage_ =
+        RPU::make_unique<CudaArray<char>>(context_, (byte_size + 31) / 32 * 32);
   }
 }
 
@@ -985,6 +1032,20 @@ int InputOutputManager<T>::applyToInputWithBoundManagement(InputIteratorT dev_in
   bound_management_round_++;
 
   bool reset_round = false;
+  if (bound_management_round_ == 2 &&
+      io_->bound_management == BoundManagementType::IterativeWorstCase) {
+
+    if (io_->noise_management != NoiseManagementType::AbsMaxNPSum) {
+      // recompute.
+      this->noise_manager_->compute(
+          dev_input, NoiseManagementType::AbsMaxNPSum, *io_, m_batch, temp_trans_, temp_is_test_);
+    }
+    // reset
+    reduction_due_to_bound_management_ = 1.0;
+
+    reset_round =
+        !bm_with_selecting_; // not selecting needs reset round (selecting needs NM though)
+  }
 
   if (bound_management_round_ > 20.0) {
     std::cout << "Bound management already at " << reduction_due_to_bound_management_ << "\n";
@@ -1039,6 +1100,7 @@ int InputOutputManager<T>::applyToInputWithBoundManagement(InputIteratorT dev_in
     // 2) If some batches exceeded the output bound dev_bound_exceeded will be > 0 for those batch
     // indices 3) We copy exceeded batches into d_out and recompute on those only 4) then save the
     // recomputed at the correct index position in the output
+    // std::cout << "starting IBM with "  << reduction_due_to_bound_management_ << std::endl;
 
     if (nm_scale_values == nullptr) {
       RPU_FATAL("BM selecting needs nm_scale_values to be defined.");
@@ -1081,7 +1143,7 @@ template <typename T>
 template <typename InputIteratorT>
 int InputOutputManager<T>::applyToInput(InputIteratorT dev_input) {
   if (io_->is_perfect) {
-    // short-cut (still need to copy though to get apply the iterator)
+    // short-cut (still need to copy though to apply the iterator)
     int m_batch = temp_m_batch_;
     RPU::math::copyWithIterator(context_, getInBuffer(), dev_input, m_batch * in_size_);
     return m_batch;
@@ -1133,7 +1195,6 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
   int m_batch = temp_m_batch_;
 
   // actual bound management
-
   if (m_batch == RPU_IO_USE_SINGLE_BATCH_VERSION) {
     kernelOutputBoundManagement<<<nblocks_om_, nthreads_, 0, s>>>(
         dev_output, dev_output_applied_->getData(), out_size_, io_->out_noise,
@@ -1233,12 +1294,66 @@ template <typename T> void InputOutputManager<T>::applyOutputWeightNoise(const b
 }
 
 template <typename T>
+void InputOutputManager<T>::applyOutputPCMReadNoise(const T *dev_weights, const bool out_trans) {
+  if (io_->w_noise > 0) {
+    // compute the overall noise contributions is sigma_i propto sqrt(sum_j
+    // |Wij|*xj^2) eventually we might want to use cutlass for
+    // this, but let's wait once we have more time since it seems
+    // more complicated than thought
+
+    int m_batch = temp_m_batch_;
+    int in_trans = temp_trans_;
+
+    T *in_temp = getInBuffer(); // this is in_size_ x m_batch or m_batch x in_size_ (if in_trans)
+    T *out_temp =
+        getOutBuffer(); // this is out_size_ x m_batch or m_batch x out_size_ (if out_trans)
+
+    // unfortunately needs a lot of extra buffer memory (CUTLASS will help)
+    RPU_GET_CUDA_BUFFER(context_, T, dev_extra_batch_buffer_, m_batch * out_size_);
+    RPU_GET_CUDA_BUFFER(context_, T, dev_extra_weight_buffer_, in_size_ * out_size_);
+
+    // compute thr abs weights current
+    RPU::math::elemabs(
+        context_, dev_extra_weight_buffer_->getData(), dev_weights, out_size_ * in_size_);
+
+    // COMPUTE SQR IN-PLACE thus OVERWRITES IN BUFFER!!
+    // in_temp can be overwritten since it use assumed to have been used already
+    RPU::math::elempow2(context_, in_temp, in_size_ * m_batch); // in-place
+
+    // we just use gemm also scale by the noise level
+    // assumed_wmax is set to 1. if otherwise, need to be set from outside
+    T noise_level = io_->w_noise;
+    detail::forwardMatrix(
+        context_, dev_extra_weight_buffer_->getData(), in_temp, in_size_, in_trans,
+        dev_extra_batch_buffer_->getData(), out_size_, out_trans, m_batch,
+        noise_level * noise_level);
+
+    // MIGHT WANT TO SUPPORT SCALING IT TO ACTUAL WMAX!?.
+
+    // need to do the sqrt still and add to
+
+    // generate and add the weight noise to the applied output
+    kernelElemSqrtAddNoiseBatch<<<nblocks_om_batch_, nthreads_, 0, context_->getStream()>>>(
+        out_temp,
+        out_temp, // in-place
+        dev_extra_batch_buffer_->getData(), out_size_ * m_batch,
+        context_->getRandomStates(nblocks_om_batch_ * nthreads_));
+  }
+}
+
+template <typename T>
 void InputOutputManager<T>::applyOutputNonIdealities(const T *dev_weights, const bool out_trans) {
 
   switch (io_->w_noise_type) {
   case OutputWeightNoiseType::AdditiveConstant: {
     // overwrites inBuffer
     applyOutputWeightNoise(out_trans);
+    break;
+  }
+  case OutputWeightNoiseType::PCMRead: {
+    // overwrites inBuffer
+    applyOutputPCMReadNoise(dev_weights, out_trans);
+
     break;
   }
   case OutputWeightNoiseType::None: {
@@ -1255,7 +1370,7 @@ bool InputOutputManager<T>::applyToOutput(
     OutputIteratorT dev_output, const T *dev_weights, const bool out_trans) {
 
   if (io_->is_perfect) {
-    // short-cut (still need to copy though to apply the iterator)
+    // short-cut (still need to copy though to get apply the iterator)
     int m_batch = temp_m_batch_;
     const T *tmp = getOutBuffer();
     RPU::math::copyWithIterator(context_, dev_output, tmp, m_batch * out_size_);
@@ -1266,7 +1381,8 @@ bool InputOutputManager<T>::applyToOutput(
   applyOutputNonIdealities(dev_weights, out_trans);
 
   // do the bound/ noise management (and ADC/DAC + out noise)
-  if (io_->bound_management != BoundManagementType::None) {
+  if (io_->bound_management != BoundManagementType::None &&
+      io_->bound_management != BoundManagementType::Shift) {
 
     // bound management
     return applyToOutputWithBoundManagement(dev_output, out_trans);
@@ -1278,26 +1394,59 @@ bool InputOutputManager<T>::applyToOutput(
 
     float *nm_scale_values = noise_manager_->getScaleValues();
 
-    // no bound management
+    if (io_->bound_management == BoundManagementType::Shift) {
+      // 1) just add noise (no NM scaling yet)
+      // 2) compute max
+      // 3) shift everything so that max is at out_bound
+      // 4) discritize and scale (by the NM input max)
 
-    if (m_batch == RPU_IO_USE_SINGLE_BATCH_VERSION) {
+      // just use batched version here
+      // apply noise (without the bounds)
+      if (io_->out_noise > 0) {
+        kernelOutputManagementBatch<T, T *, false><<<nblocks_om_batch_, nthreads_, 0, s>>>(
+            dev_output_applied_->getData(), dev_output_applied_->getDataConst(), out_size_, m_batch,
+            out_trans, nullptr, io_->out_noise, -std::numeric_limits<T>::max(),
+            std::numeric_limits<T>::max(), -1., false,
+            (T)1.0, // no scale
+            context_->getRandomStates(nblocks_om_batch_ * nthreads_));
+      }
+
+      // compute max // this needs to be a maximizer not absmaximizer !!
+      output_maximizer_->compute(dev_output_applied_->getDataConst(), m_batch, out_trans);
+
+      // shift and discretize
       LAUNCH_NM_KERNEL(
-          kernelOutputManagement, OutputIteratorT, nblocks_om_,
-          (dev_output, dev_output_applied_->getData(), out_size_, io_->out_noise, nm_scale_values,
-           -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round, temp_out_scale_,
-           context_->getRandomStates(nblocks_om_ * nthreads_)));
+          kernelOutputShiftManagementBatch, OutputIteratorT, nblocks_om_batch_,
+          (dev_output, dev_output_applied_->getDataConst(), out_size_, m_batch, out_trans,
+           nm_scale_values, output_maximizer_->getMaxValues(), -io_->out_bound, io_->out_bound,
+           io_->out_res, io_->out_sto_round,
+           context_->getRandomStates(nblocks_om_batch_ * nthreads_)));
+
+      return true; // shift
 
     } else {
-      // batched
-      LAUNCH_NM_KERNEL(
-          kernelOutputManagementBatch, OutputIteratorT, nblocks_om_batch_,
-          (dev_output, dev_output_applied_->getData(), out_size_, m_batch, out_trans,
-           nm_scale_values, io_->out_noise, -io_->out_bound, io_->out_bound, io_->out_res,
-           io_->out_sto_round, temp_out_scale_,
-           context_->getRandomStates(nblocks_om_batch_ * nthreads_)));
-    }
 
-    return true; // no bound managment
+      // no bound management
+
+      if (m_batch == RPU_IO_USE_SINGLE_BATCH_VERSION) {
+        LAUNCH_NM_KERNEL(
+            kernelOutputManagement, OutputIteratorT, nblocks_om_,
+            (dev_output, dev_output_applied_->getData(), out_size_, io_->out_noise, nm_scale_values,
+             -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round, temp_out_scale_,
+             context_->getRandomStates(nblocks_om_ * nthreads_)));
+
+      } else {
+        // batched
+        LAUNCH_NM_KERNEL(
+            kernelOutputManagementBatch, OutputIteratorT, nblocks_om_batch_,
+            (dev_output, dev_output_applied_->getData(), out_size_, m_batch, out_trans,
+             nm_scale_values, io_->out_noise, -io_->out_bound, io_->out_bound, io_->out_res,
+             io_->out_sto_round, temp_out_scale_,
+             context_->getRandomStates(nblocks_om_batch_ * nthreads_)));
+      }
+
+      return true; // no bound managment
+    }
   }
 }
 

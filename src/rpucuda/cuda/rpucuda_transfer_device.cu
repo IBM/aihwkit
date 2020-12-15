@@ -25,8 +25,10 @@ namespace RPU {
 */
 
 template <typename T> void TransferRPUDeviceCuda<T>::initialize() {
-  transfer_pwu_ = RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
-  transfer_iom_ = RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
+  transfer_pwu_ =
+      RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
+  transfer_iom_ =
+      RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
 }
 
 template <typename T>
@@ -120,7 +122,7 @@ void TransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
   initialize(); // pwu/iom
 
   current_col_indices_.resize(this->n_devices_ - 1);
-  std::fill(current_col_indices_.begin(), current_col_indices_.end(), 0);
+  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int) 0);
 
   this->current_update_idx_ = 0;
 

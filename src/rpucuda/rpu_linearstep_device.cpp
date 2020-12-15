@@ -12,10 +12,9 @@
 
 #include "rpu_linearstep_device.h"
 #include "utility_functions.h"
-#include <iostream>
-//#include <random>
 #include <chrono>
 #include <cmath>
+#include <iostream>
 #include <limits>
 
 namespace RPU {

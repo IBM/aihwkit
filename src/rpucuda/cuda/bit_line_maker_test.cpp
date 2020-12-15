@@ -119,7 +119,7 @@ public:
     z3 = new T[size[2] * m_batch];
     z4 = new T[size[3] * m_batch];
 
-    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<T> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
@@ -324,7 +324,7 @@ public:
     x_counts_trans = new uint32_t[x_size * m_batch * nK32];
     d_counts_trans = new uint32_t[d_size * m_batch * nK32];
 
-    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
     std::uniform_real_distribution<num_t> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);

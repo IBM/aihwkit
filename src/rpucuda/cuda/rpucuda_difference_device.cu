@@ -100,11 +100,11 @@ void DifferenceRPUDeviceCuda<T>::resetCols(
   VectorRPUDeviceCuda<T>::resetCols(dev_weights, start_col, n_cols, reset_prob);
 }
 
-template <typename T> inline bool DifferenceRPUDevice<T>::isInverted() const {
+template <typename T> bool DifferenceRPUDeviceCuda<T>::isInverted() const {
   return g_plus_ == 0;
 }
 
-template <typename T> inline void DifferenceRPUDevice<T>::invert() {
+template <typename T> void DifferenceRPUDeviceCuda<T>::invert() {
   std::swap(g_plus_, g_minus_);
   std::swap(this->dev_reduce_weightening_, this->dev_reduce_weightening_inverted_);
 }

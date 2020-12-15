@@ -19,6 +19,7 @@ namespace RPU {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;                                                 \
   int total_threads = blockDim.x * gridDim.x;                                                      \
   int size = size_in;                                                                              \
+  int size_without_bias = copy_last_column ? (size - d_size) : size;                               \
   const bool stoch_if = STOCH_IF;                                                                  \
                                                                                                    \
   curandState local_state;                                                                         \
@@ -28,10 +29,12 @@ namespace RPU {
                                                                                                    \
   for (int i_stride = 0; i_stride < size; i_stride += total_threads) {                             \
     int i = i_stride + tid;                                                                        \
-    if (i < size) {                                                                                \
+    if (i < size_without_bias) {                                                                   \
       {                                                                                            \
         BODY;                                                                                      \
       }                                                                                            \
+    } else if ((i < size) && (new_weights != weights)) {                                           \
+      new_weights[i] = weights[i];                                                                 \
     }                                                                                              \
   }                                                                                                \
                                                                                                    \
@@ -42,6 +45,8 @@ namespace RPU {
 template <typename T>
 __global__ void kernelModifyWeightsDiscretize(
     int size_in,
+    int d_size,
+    const bool copy_last_column,
     T *new_weights,
     const T *weights,
     const T res_in, // need to larger than zero!!
@@ -66,6 +71,8 @@ __global__ void kernelModifyWeightsDiscretize(
 template <typename T>
 __global__ void kernelModifyWeightsDoReFa(
     int size_in,
+    int d_size,
+    const bool copy_last_column,
     T *new_weights,
     const T *weights,
     const T res_in, // need to larger than zero!!
@@ -95,6 +102,8 @@ __global__ void kernelModifyWeightsDoReFa(
 template <typename T>
 __global__ void kernelModifyWeightsDiscretizeAddNormal(
     int size_in,
+    int d_size,
+    const bool copy_last_column,
     T *new_weights,
     const T *weights,
     const T res_in, // need to larger than zero!!
@@ -122,6 +131,8 @@ __global__ void kernelModifyWeightsDiscretizeAddNormal(
 template <typename T>
 __global__ void kernelModifyWeightsAddNormal(
     int size_in,
+    int d_size,
+    const bool copy_last_column,
     T *new_weights,
     const T *weights,
     const T stddev_in,
@@ -142,6 +153,8 @@ __global__ void kernelModifyWeightsAddNormal(
 template <typename T>
 __global__ void kernelModifyWeightsMultNormal(
     int size_in,
+    int d_size,
+    const bool copy_last_column,
     T *new_weights,
     const T *weights,
     const T stddev_in,
@@ -162,8 +175,46 @@ __global__ void kernelModifyWeightsMultNormal(
 }
 
 template <typename T>
+__global__ void kernelModifyWeightsProgNoise(
+    int size_in,
+    int d_size,
+    const bool copy_last_column,
+    T *new_weights,
+    const T *weights,
+    const T stddev_in, // additional scale:
+    const T p0_in,
+    const T p1_in,
+    const T p2_in,
+    const float assumed_wmax,
+    const float *wmax,
+    curandState_t *random_states) {
+  T amax = (wmax) ? (*wmax) : assumed_wmax;
+  amax = amax > 0.0 ? amax : (T)1.0;
+
+  const T stddev = stddev_in;
+  const T p0 = p0_in;
+  const T p1 = p1_in;
+  const T p2 = p2_in;
+
+  RPU_WM_KERNEL_LOOP(true,
+
+                     T w = weights[i];
+                     T stoch_value = curand_normal(&local_state); T aw = fabs(w) / amax;
+                     T sig = (p0 + aw * p1 + aw * aw * p2) * stddev;
+
+                     new_weights[i] = w + amax * sig * stoch_value;);
+}
+
+template <typename T>
 __global__ void kernelModifyWeightsDropConnections(
-    int size_in, T *new_weights, const T prob_in, curandState_t *random_states) {
+    int size_in,
+    int d_size,
+    const bool copy_last_column,
+    T *new_weights,
+    const T *weights,
+    const T prob_in,
+    curandState_t *random_states) {
+
   const T prob = prob_in;
 
   RPU_WM_KERNEL_LOOP(
@@ -193,7 +244,8 @@ void WeightModifierCuda<T>::apply(
   float *amax = nullptr;
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
     if (!amaximizer_) {
-      amaximizer_ = RPU::make_unique<Maximizer<T>>(context_, size_, true);
+      amaximizer_ = RPU::make_unique<Maximizer<T>>(
+          context_, wmpar.copy_last_column ? (size_ - d_size_) : size_, true);
     }
     amaximizer_->compute(weights, 1, false);
     amax = amaximizer_->getMaxValues();
@@ -215,7 +267,8 @@ void WeightModifierCuda<T>::apply(
     if (wmpar.res > 0) {
 
       kernelModifyWeightsDiscretize<T><<<nblocks, nthreads, 0, s>>>(
-          size_, new_weights, weights, wmpar.res, wmpar.sto_round, wmpar.assumed_wmax, amax,
+          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
+          wmpar.assumed_wmax, amax,
           wmpar.sto_round ? context_->getRandomStates(nblocks * nthreads) : nullptr);
       done = true;
     }
@@ -225,8 +278,8 @@ void WeightModifierCuda<T>::apply(
     if (wmpar.res > 0) {
 
       kernelModifyWeightsDoReFa<T><<<nblocks, nthreads, 0, s>>>(
-          size_, new_weights, weights, wmpar.res, wmpar.sto_round, wmpar.dorefa_clip,
-          wmpar.assumed_wmax, amax,
+          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
+          wmpar.dorefa_clip, wmpar.assumed_wmax, amax,
           wmpar.sto_round ? context_->getRandomStates(nblocks * nthreads) : nullptr);
       done = true;
     }
@@ -237,8 +290,8 @@ void WeightModifierCuda<T>::apply(
     if (wmpar.std_dev > 0) {
 
       kernelModifyWeightsMultNormal<T><<<nblocks, nthreads, 0, s>>>(
-          size_, new_weights, weights, wmpar.std_dev, wmpar.assumed_wmax, amax,
-          context_->getRandomStates(nblocks * nthreads));
+          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev,
+          wmpar.assumed_wmax, amax, context_->getRandomStates(nblocks * nthreads));
       done = true;
     }
     break;
@@ -247,18 +300,30 @@ void WeightModifierCuda<T>::apply(
     if (wmpar.std_dev > 0) {
 
       kernelModifyWeightsAddNormal<T><<<nblocks, nthreads, 0, s>>>(
-          size_, new_weights, weights, wmpar.std_dev, wmpar.assumed_wmax, amax,
+          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev,
+          wmpar.assumed_wmax, amax, context_->getRandomStates(nblocks * nthreads));
+      done = true;
+    }
+    break;
+  }
+  case WeightModifierType::Poly: {
+    if (wmpar.std_dev > 0) {
+
+      kernelModifyWeightsProgNoise<T><<<nblocks, nthreads, 0, s>>>(
+          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev, wmpar.coeff0,
+          wmpar.coeff1, wmpar.coeff2, wmpar.assumed_wmax, amax,
           context_->getRandomStates(nblocks * nthreads));
       done = true;
     }
     break;
   }
+
   case WeightModifierType::DiscretizeAddNormal: {
     if (wmpar.res > 0 || wmpar.std_dev > 0) {
 
       kernelModifyWeightsDiscretizeAddNormal<T><<<nblocks, nthreads, 0, s>>>(
-          size_, new_weights, weights, wmpar.res, wmpar.sto_round, wmpar.std_dev,
-          wmpar.assumed_wmax, amax, context_->getRandomStates(nblocks * nthreads));
+          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
+          wmpar.std_dev, wmpar.assumed_wmax, amax, context_->getRandomStates(nblocks * nthreads));
       done = true;
     }
     break;
@@ -280,7 +345,8 @@ void WeightModifierCuda<T>::apply(
     }
 
     kernelModifyWeightsDropConnections<T><<<nblocks, nthreads, 0, s>>>(
-        size_, new_weights, wmpar.pdrop, context_->getRandomStates(nblocks * nthreads));
+        size_, d_size_, wmpar.copy_last_column, new_weights, new_weights, wmpar.pdrop,
+        context_->getRandomStates(nblocks * nthreads));
   }
 }
 

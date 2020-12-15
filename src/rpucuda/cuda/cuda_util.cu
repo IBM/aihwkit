@@ -288,9 +288,6 @@ void CudaContext::init() {
   } else {
     CUDA_CALL(cudaGetDevice(&gpu_id_));
   }
-  // int gpu_count = 0;
-  // cuDeviceGetCount(&gpu_count);
-  // std::cout << "GPU devices " << gpu_count     << ", using ID " << gpu_id_ << std::endl;
 
   env_ = new CublasEnvironment(gpu_id_);
   stream_id_ = 0;
@@ -317,11 +314,11 @@ CudaContext::CudaContext(cudaStream_t shared_stream, int gpu_id) : gpu_id_(gpu_i
 
   // ignore the test for shared stream 0. Pytorch seem to like 0
   // if (!shared_stream) {
-  // RPU_FATAL("Shared stream should not be NULL!");
+  //  RPU_FATAL("Shared stream should not be NULL!");
   //} else {
   shared_ = true;
   streams_.push_back(shared_stream);
-  //}
+  // }
 }
 
 CudaContext::~CudaContext() {
