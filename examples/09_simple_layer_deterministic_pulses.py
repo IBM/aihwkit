@@ -15,7 +15,6 @@ deterministic pulse trains for update.
 
 Simple network that consist of one analog layer. The network aims to learn
 to sum all the elements from one array.
-
 """
 
 # Imports from PyTorch.
@@ -37,10 +36,10 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 # Define a single-layer network, using a constant step device type.
 rpu_config = SingleRPUConfig(device=ConstantStepDevice())
 rpu_config.update.pulse_type = PulseType.DETERMINISTIC_IMPLICIT
-rpu_config.update.desired_bl = 10 # max number in this case
-rpu_config.update.update_bl_management = True # will vary up to 10 on demand
-rpu_config.update.d_res_implicit = 0.1 # effective resolution of x bit lines
-rpu_config.update.x_res_implicit = 0.1 # effective resolution of d bit lines
+rpu_config.update.desired_bl = 10  # max number in this case
+rpu_config.update.update_bl_management = True  # will vary up to 10 on demand
+rpu_config.update.d_res_implicit = 0.1  # effective resolution of x bit lines
+rpu_config.update.x_res_implicit = 0.1  # effective resolution of d bit lines
 
 model = AnalogLinear(4, 2, bias=True,
                      rpu_config=rpu_config)
