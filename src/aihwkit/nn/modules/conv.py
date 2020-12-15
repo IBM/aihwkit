@@ -239,8 +239,8 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
             raise ValueError('Only dilation = 1 is supported')
 
         kernel_size = _triple(kernel_size)
-        self.in_features = (in_channels // groups) * kernel_size[0] * kernel_size[1] * \
-            kernel_size[2]
+        self.in_features = (in_channels // groups) * \
+            kernel_size[0] * kernel_size[1] * kernel_size[2]  # type: ignore
         self.out_features = out_channels
 
         # Create the tile and set the analog.
