@@ -265,21 +265,17 @@ rpu_config = UnitCellRPUConfig(
 Similarly to example 1 the network is trained over 100 epochs with an analog Stochastic Gradient
 Descent optimizer and the loss is printed for every epoch.
 
-## Example 8: [`09_simple_layer_deterministic_pulses.py`]
+## Example 9: [`09_simple_layer_deterministic_pulses.py`]
 
-This example shows how to select different pulsing schemes for the
-analog update. By default, we use stochastic pulses for activation
-and errors to update the devices with a step in up or down direction
-only if pulses conincide at a crosspoint. Note, that we indeed
-generate stochastic pulse trains for each input line and thus  do no
-short-cut in the simulation.
+This example shows how to select different pulsing schemes for the analog update. By default, we
+use stochastic pulses for activation and errors to update the devices with a step in up or down
+direction only if pulses coincide at a crosspoint. Note that we indeed generate stochastic pulse
+trains for each input line and thus do no short-cut in the simulation.
 
-Here, in this example, we change the updaate to be performed using
-deterministic pulse trains that yield always the same number of
-coincident pulses at a cross point, if the same inputs are
-given. Implicitely, one can design the stored pulse train structure to
-quantize the input values in a number of bins, which can be changed
-by the ``*_res_imilicit``  parameters. 
+Here, in this example, we change the update to be performed using deterministic pulse trains that
+yield always the same number of coincident pulses at a cross point, if the same inputs are
+given. Implicitly, one can design the stored pulse train structure to quantize the input values in
+a number of bins, which can be changed by the ``*_res_imilicit``  parameters. 
 
 ```
 rpu_config = SingleRPUConfig(device=ConstantStepDevice())
@@ -294,7 +290,6 @@ Similarly to example 1 the network is trained over 100 epochs with an analog Sto
 Descent optimizer and the loss is printed for every epoch.
 
 
-[Apache License 2.0]: LICENSE.txt
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
@@ -318,3 +313,4 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`06_lenet5_hardware_aware.py`]: 06_lenet5_hardware_aware.py
 [`07_simple_layer_with_other_devices.py`]: 07_simple_layer_with_other_devices.py
 [`08_simple_layer_with_tiki_taka.py`]: 08_simple_layer_with_tiki_taka.py
+[`09_simple_layer_deterministic_pulses.py`]: 09_simple_layer_deterministic_pulses.py
