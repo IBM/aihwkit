@@ -16,12 +16,13 @@ from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from numpy import concatenate, expand_dims
+from torch import Tensor, empty, stack
 from torch import device as torch_device
-from torch import stack, Tensor
 from torch.autograd import no_grad
 
 from aihwkit.exceptions import TileError
 from aihwkit.simulator.rpu_base import tiles
+
 
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
 
@@ -421,18 +422,20 @@ class BaseTile(Generic[RPUConfigGeneric]):
             ValueError: if ``image_sizes`` does not have valid dimensions.
             TileError: if the tile uses transposition.
         """
-        if len(image_sizes) != 5:
-            raise ValueError('image_sizes expects 5 sizes [C_in, H_in, W_in, H_out, W_out]')
+        if len(image_sizes) != 5 and len(image_sizes) != 7:
+            raise ValueError('image_sizes expects 5 sizes [C_in, H_in, W_in, H_out, W_out]'
+                             ' or 7 sizes [C_in, D_in, H_in, W_in, D_out, H_out, W_out]')
 
         if self.in_trans or self.out_trans:
-            raise TileError('Transposed indexed versions not supported (assumes NCHW)')
+            raise TileError('Transposed indexed versions not supported (assumes NC(D)HW)')
 
         self.image_sizes = image_sizes
         self.tile.set_matrix_indices(indices)
 
     @no_grad()
     def forward_indexed(self, x_input: Tensor, is_test: bool = False) -> Tensor:
-        """Perform the forward pass for convolutions.
+        """Perform the forward pass for convolutions. Depending on the input tensor size
+        it performs the forward pass for a 2D image or a 3D one.
 
         Args:
             x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
@@ -448,11 +451,22 @@ class BaseTile(Generic[RPUConfigGeneric]):
             raise TileError('self.image_sizes is not initialized. Please use '
                             'set_indexed()')
 
-        _, _, _, height_out, width_out = self.image_sizes
-        return self.tile.forward_indexed(x_input, height_out, width_out, is_test)
+        n_batch = x_input.size(0)
+        channel_out = self.out_size
+
+        if len(self.image_sizes) == 5:
+            _, _, _, height_out, width_out = self.image_sizes
+            d_tensor = empty(n_batch, channel_out, height_out, width_out)
+
+        if len(self.image_sizes) == 7:
+            _, _, _, _, depth_out, height_out, width_out = self.image_sizes
+            d_tensor = empty(n_batch, channel_out, depth_out, height_out, width_out)
+
+        return self.tile.forward_indexed(x_input, d_tensor, is_test)
 
     def backward_indexed(self, d_input: Tensor) -> Tensor:
-        """Perform the backward pass for convolutions.
+        """Perform the backward pass for convolutions. Depending on the input tensor size
+        it performs the backward pass for a 2D image or a 3D one.
 
         Args:
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
@@ -460,8 +474,19 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Returns:
             torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
         """
-        channel_in, height_in, width_in, _, _ = self.image_sizes
-        return self.tile.backward_indexed(d_input, channel_in, height_in, width_in)
+
+        n_batch = d_input.size(0)
+
+        if len(self.image_sizes) == 5:
+            channel_in, height_in, width_in, _, _ = self.image_sizes
+            x_tensor = empty(n_batch, channel_in, height_in, width_in)
+
+        if len(self.image_sizes) == 7:
+            channel_in, depth_in, height_in, width_in, _, _, _ \
+                = self.image_sizes
+            x_tensor = empty(n_batch, channel_in, depth_in, height_in, width_in)
+
+        return self.tile.backward_indexed(d_input, x_tensor)
 
     def update_indexed(self, x_input: Tensor, d_input: Tensor) -> None:
         """Perform the update pass for convolutions.

@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * C++ backend improvements (slice backward/forward/update, direct
   update). (\#99)
 * Option to excluded bias row for hardware-aware training noise. (\#99)
+* Added AnalogConv3d layer (\#47)
 
 #### Fixed
 
