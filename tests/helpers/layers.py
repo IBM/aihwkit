@@ -14,7 +14,7 @@
 
 """Layer helpers for aihwkit tests."""
 
-from aihwkit.nn import AnalogConv2d, AnalogConv3d, AnalogLinear
+from aihwkit.nn import AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogLinear
 
 
 class Linear:
@@ -27,6 +27,20 @@ class Linear:
         kwargs.setdefault('bias', self.bias)
 
         return AnalogLinear(in_features, out_features, **kwargs)
+
+
+class Conv1d:
+    """AnalogConv1d."""
+
+    use_cuda = False
+
+    def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
+        kwargs.setdefault('bias', self.bias)
+
+        return AnalogConv1d(in_channels, out_channels, kernel_size,
+                            padding=padding,
+                            **kwargs)
 
 
 class Conv2d:
@@ -67,6 +81,20 @@ class LinearCuda:
         kwargs.setdefault('bias', self.bias)
 
         return AnalogLinear(in_features, out_features, **kwargs).cuda()
+
+
+class Conv1dCuda:
+    """AnalogConv1d."""
+
+    use_cuda = True
+
+    def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
+        kwargs.setdefault('bias', self.bias)
+
+        return AnalogConv1d(in_channels, out_channels, kernel_size,
+                            padding=padding,
+                            **kwargs).cuda()
 
 
 class Conv2dCuda:
