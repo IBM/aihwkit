@@ -15,5 +15,5 @@
 # Convenience imports for easier access to the classes.
 
 from aihwkit.nn.modules.container import AnalogSequential
-from aihwkit.nn.modules.conv import AnalogConv2d, AnalogConv3d
+from aihwkit.nn.modules.conv import AnalogConv1d, AnalogConv2d, AnalogConv3d
 from aihwkit.nn.modules.linear import AnalogLinear

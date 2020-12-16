@@ -422,9 +422,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
             ValueError: if ``image_sizes`` does not have valid dimensions.
             TileError: if the tile uses transposition.
         """
-        if len(image_sizes) != 5 and len(image_sizes) != 7:
-            raise ValueError('image_sizes expects 5 sizes [C_in, H_in, W_in, H_out, W_out]'
-                             ' or 7 sizes [C_in, D_in, H_in, W_in, D_out, H_out, W_out]')
+        if len(image_sizes) not in (3, 5, 7):
+            raise ValueError('image_sizes expects 3, 5 or 7 sizes '
+                             '[C_in, (D_in), H_in, (W_in), (D_out), H_out, (W_out)]')
 
         if self.in_trans or self.out_trans:
             raise TileError('Transposed indexed versions not supported (assumes NC(D)HW)')
@@ -454,6 +454,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         n_batch = x_input.size(0)
         channel_out = self.out_size
 
+        if len(self.image_sizes) == 3:
+            _, _, height_out = self.image_sizes
+            d_tensor = empty(n_batch, channel_out, height_out)
+
         if len(self.image_sizes) == 5:
             _, _, _, height_out, width_out = self.image_sizes
             d_tensor = empty(n_batch, channel_out, height_out, width_out)
@@ -476,6 +480,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
 
         n_batch = d_input.size(0)
+
+        if len(self.image_sizes) == 3:
+            channel_in, height_in, _ = self.image_sizes
+            x_tensor = empty(n_batch, channel_in, height_in)
 
         if len(self.image_sizes) == 5:
             channel_in, height_in, width_in, _, _ = self.image_sizes
