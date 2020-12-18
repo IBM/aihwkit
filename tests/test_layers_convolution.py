@@ -79,7 +79,7 @@ class ConvolutionLayerTest(ParametrizedTestCase):
     biases=[True, False]
 )
 class Convolution1dLayerTest(ConvolutionLayerTest):
-    """Convolution layer abstractions tests."""
+    """Tests for AnalogConv1d layer."""
 
     digital_layer_cls = torch_Conv1d
 
@@ -178,7 +178,7 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
     biases=[True, False]
 )
 class Convolution2dLayerTest(ConvolutionLayerTest):
-    """Convolution layer abstractions tests."""
+    """Tests for AnalogConv2d layer."""
 
     digital_layer_cls = torch_Conv2d
 
@@ -277,7 +277,7 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
     biases=[True, False]
 )
 class Convolution3dLayerTest(ConvolutionLayerTest):
-    """Convolution layer abstractions tests."""
+    """Tests for AnalogConv3d layer."""
 
     digital_layer_cls = torch_Conv3d
 
