@@ -11,6 +11,7 @@
 # that they have been altered from the originals.
 
 """Tests for layer abstractions."""
+
 from torch import randn
 from torch.nn import (Conv1d as torch_Conv1d, Conv2d as torch_Conv2d,
                       Conv3d as torch_Conv3d, Sequential)
@@ -24,21 +25,18 @@ from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import FloatingPoint
 
 
-@parametrize_over_layers(
-    layers=[Conv1d, Conv1dCuda],
-    tiles=[FloatingPoint],
-    biases=[True, False]
-)
-class Convolution1dLayerTest(ParametrizedTestCase):
-    """Convolution layer abstractions tests."""
+class ConvolutionLayerTest(ParametrizedTestCase):
+    """Generic class for helping testing analog convolution layers."""
+
+    digital_layer_cls = torch_Conv1d
 
     def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
         """Return a digital layer."""
-        layer = torch_Conv1d(in_channels=in_channels,
-                             out_channels=out_channels,
-                             kernel_size=kernel_size,
-                             padding=padding,
-                             bias=self.bias)
+        layer = self.digital_layer_cls(in_channels=in_channels,
+                                       out_channels=out_channels,
+                                       kernel_size=kernel_size,
+                                       padding=padding,
+                                       bias=self.bias)
         if self.use_cuda:
             layer = layer.cuda()
 
@@ -73,6 +71,17 @@ class Convolution1dLayerTest(ParametrizedTestCase):
             loss.backward()
             opt.step()
             opt.zero_grad()
+
+
+@parametrize_over_layers(
+    layers=[Conv1d, Conv1dCuda],
+    tiles=[FloatingPoint],
+    biases=[True, False]
+)
+class Convolution1dLayerTest(ConvolutionLayerTest):
+    """Tests for AnalogConv1d layer."""
+
+    digital_layer_cls = torch_Conv1d
 
     def test_torch_original_layer(self):
         """Test a single layer, having the digital layer as reference."""
@@ -168,50 +177,10 @@ class Convolution1dLayerTest(ParametrizedTestCase):
     tiles=[FloatingPoint],
     biases=[True, False]
 )
-class Convolution2dLayerTest(ParametrizedTestCase):
-    """Convolution layer abstractions tests."""
+class Convolution2dLayerTest(ConvolutionLayerTest):
+    """Tests for AnalogConv2d layer."""
 
-    def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a digital layer."""
-        layer = torch_Conv2d(in_channels=in_channels,
-                             out_channels=out_channels,
-                             kernel_size=kernel_size,
-                             padding=padding,
-                             bias=self.bias)
-        if self.use_cuda:
-            layer = layer.cuda()
-
-        return layer
-
-    def set_weights_from_digital_model(self, analog_model, digital_model):
-        """Set the analog model weights based on the digital model."""
-        weights, biases = self.get_weights_from_digital_model(analog_model, digital_model)
-        analog_model.analog_tile.set_weights(weights, biases, realistic=False)
-
-    @staticmethod
-    def get_weights_from_digital_model(analog_model, digital_model):
-        """Set the analog model weights based on the digital model."""
-        weights = digital_model.weight.data.detach().reshape(
-            [analog_model.out_features, analog_model.in_features])
-        biases = None
-        if digital_model.bias is not None:
-            biases = digital_model.bias.data.detach()
-
-        return weights, biases
-
-    @staticmethod
-    def train_model(model, loss_func, x_b, y_b):
-        """Train the model."""
-        opt = AnalogSGD(model.parameters(), lr=0.1)
-        opt.regroup_param_groups(model)
-
-        epochs = 10
-        for _ in range(epochs):
-            pred = model(x_b)
-            loss = loss_func(pred, y_b)
-            loss.backward()
-            opt.step()
-            opt.zero_grad()
+    digital_layer_cls = torch_Conv2d
 
     def test_torch_original_layer(self):
         """Test a single layer, having the digital layer as reference."""
@@ -307,50 +276,10 @@ class Convolution2dLayerTest(ParametrizedTestCase):
     tiles=[FloatingPoint],
     biases=[True, False]
 )
-class Convolution3dLayerTest(ParametrizedTestCase):
-    """Convolution layer abstractions tests."""
+class Convolution3dLayerTest(ConvolutionLayerTest):
+    """Tests for AnalogConv3d layer."""
 
-    def get_digital_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2):
-        """Return a digital layer."""
-        layer = torch_Conv3d(in_channels=in_channels,
-                             out_channels=out_channels,
-                             kernel_size=kernel_size,
-                             padding=padding,
-                             bias=self.bias)
-        if self.use_cuda:
-            layer = layer.cuda()
-
-        return layer
-
-    def set_weights_from_digital_model(self, analog_model, digital_model):
-        """Set the analog model weights based on the digital model."""
-        weights, biases = self.get_weights_from_digital_model(analog_model, digital_model)
-        analog_model.analog_tile.set_weights(weights, biases, realistic=False)
-
-    @staticmethod
-    def get_weights_from_digital_model(analog_model, digital_model):
-        """Set the analog model weights based on the digital model."""
-        weights = digital_model.weight.data.detach().reshape(
-            [analog_model.out_features, analog_model.in_features])
-        biases = None
-        if digital_model.bias is not None:
-            biases = digital_model.bias.data.detach()
-
-        return weights, biases
-
-    @staticmethod
-    def train_model(model, loss_func, x_b, y_b):
-        """Train the model."""
-        opt = AnalogSGD(model.parameters(), lr=0.1)
-        opt.regroup_param_groups(model)
-
-        epochs = 10
-        for _ in range(epochs):
-            pred = model(x_b)
-            loss = loss_func(pred, y_b)
-            loss.backward()
-            opt.step()
-            opt.zero_grad()
+    digital_layer_cls = torch_Conv3d
 
     def test_torch_original_layer(self):
         """Test a single layer, having the digital layer as reference."""
