@@ -25,9 +25,17 @@ analog tile. The library current includes the following analog layers:
   applies a linear transformation to the input data. It is the counterpart
   of PyTorch `nn.Linear`_ layer.
 
+* :class:`~aihwkit.nn.layers.conv.AnalogConv1d`:
+  applies a 1D convolution over an input signal composed of several input
+  planes. It is the counterpart of PyTorch `nn.Conv1d`_ layer.
+
 * :class:`~aihwkit.nn.layers.conv.AnalogConv2d`:
   applies a 2D convolution over an input signal composed of several input
   planes. It is the counterpart of PyTorch `nn.Conv2d`_ layer.
+
+* :class:`~aihwkit.nn.layers.conv.AnalogConv3d`:
+  applies a 3D convolution over an input signal composed of several input
+  planes. It is the counterpart of PyTorch `nn.Conv3d`_ layer.
 
 Using analog layers
 ~~~~~~~~~~~~~~~~~~~
