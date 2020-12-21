@@ -22,8 +22,8 @@ The toolkit consists of two main components:
 A series of primitives and features that allow using the toolkit within
 [`Pytorch`]:
 
-* Analog neural network modules (fully connected layer, convolution layer,
-  sequential container).
+* Analog neural network modules (fully connected layer, 1d/2d/3d convolution
+  layers, sequential container).
 * Analog training using torch training workflow:
   * Analog torch optimizers (SGD).
   * Analog in-situ training using customizable device models and algorithms
