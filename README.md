@@ -20,7 +20,7 @@ The toolkit consists of two main components:
 ### Pytorch integration
 
 A series of primitives and features that allow using the toolkit within
-[`Pytorch`]:
+[`PyTorch`]:
 
 * Analog neural network modules (fully connected layer, 1d/2d/3d convolution
   layers, sequential container).
@@ -161,7 +161,7 @@ This project is licensed under [Apache License 2.0].
 [`CUDA Toolkit`]: https://developer.nvidia.com/accelerated-computing-toolkit
 [`OpenBLAS`]: https://www.openblas.net/
 [Python package index]: https://pypi.org/project/aihwkit
-[`Pytorch`]: https://pytorch.org/
+[`PyTorch`]: https://pytorch.org/
 
 [`examples/`]: examples/
 [documentation]: https://aihwkit.readthedocs.io/
