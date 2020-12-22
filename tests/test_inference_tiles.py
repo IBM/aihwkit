@@ -96,7 +96,7 @@ class InferenceTileTest(ParametrizedTestCase):
         self.assertNotAlmostEqualTensor(model.analog_tile.alpha, ones((1,)))
 
     def test_post_update_step_clip(self):
-        """Tests whether post update diffusion is performed"""
+        """Tests whether post update diffusion is performed."""
         rpu_config = self.get_rpu_config()
         rpu_config.clip.type = WeightClipType.FIXED_VALUE
         rpu_config.clip.fixed_value = 0.3
@@ -124,7 +124,7 @@ class InferenceTileTest(ParametrizedTestCase):
         ('copy', WeightModifierType.COPY,),
     ])
     def test_post_forward_modifier_types(self, _, modifier_type):
-        """Tests whether post update diffusion is performed"""
+        """Tests whether post update diffusion is performed."""
         rpu_config = self.get_rpu_config()
         rpu_config.drift_compensation = None
         rpu_config.forward.w_noise = 0.0
@@ -162,8 +162,10 @@ class InferenceTileTest(ParametrizedTestCase):
         self.assertTensorAlmostEqual(x_output, x_output_post_true)
 
     @staticmethod
-    def get_modifier(modifier_type: Optional[WeightModifierType]):
-        """Returns the modifier parameter """
+    def get_modifier(
+            modifier_type: Optional[WeightModifierType]
+    ) -> Optional[WeightModifierParameter]:
+        """Returns the modifier parameter."""
         if modifier_type is None:
             return None
 
