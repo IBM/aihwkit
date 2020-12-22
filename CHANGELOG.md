@@ -28,8 +28,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * C++ backend improvements (slice backward/forward/update, direct
   update). (\#99)
 * Option to excluded bias row for hardware-aware training noise. (\#99)
-* Added AnalogConv3d layer. (\#102)
-* Added AnalogConv1d layer. (\#103)
+* Two new convolution layers have been added: `AnalogConv1d` and `AnalogConv3d`,
+  mimicking their digital counterparts. (\#102, \#103).
 
 #### Fixed
 
