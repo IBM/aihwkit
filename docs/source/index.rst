@@ -36,10 +36,12 @@ A series of primitives and features that allow using the toolkit within PyTorch:
 * Analog neural network modules (fully connected layer, 1d/2d/3d convolution
   layers, sequential container).
 * Analog training using torch training workflow:
+
   * Analog torch optimizers (SGD).
   * Analog in-situ training using customizable device models and algorithms
     (Tiki-Taka).
 * Analog inference using torch inference workflow:
+
   * State-of-the-art statistical model of a phase-change memory (PCM) array
     calibrated on hardware measurements from a 1 million PCM devices chip.
   * Hardware-aware training with hardware non-idealities and noise included
