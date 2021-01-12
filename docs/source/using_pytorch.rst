@@ -224,5 +224,7 @@ Or in the case of custom classes::
 
 .. _PyTorch: https://pytorch.org
 .. _nn.Linear: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+.. _nn.Conv1d: https://pytorch.org/docs/stable/generated/torch.nn.Conv1d.html
 .. _nn.Conv2d: https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
+.. _nn.Conv3d: https://pytorch.org/docs/stable/generated/torch.nn.Conv3d.html
 .. _optim.SGD: https://pytorch.org/docs/stable/optim.html#torch.optim.SGD
