@@ -81,6 +81,11 @@ jobs:
     stage: Test multiple python versions
     python: "3.8"
 
+  - name: "Compile and test. Python 3.9"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.9"
+
   - name: "Compile and test. Python 3.6, Torch 1.5"
     <<: *job_compile_common
     stage: Test multiple python versions
