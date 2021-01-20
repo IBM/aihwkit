@@ -466,6 +466,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
             _, _, _, _, depth_out, height_out, width_out = self.image_sizes
             d_tensor = empty(n_batch, channel_out, depth_out, height_out, width_out)
 
+        if self.is_cuda:
+            d_tensor = d_tensor.to(self.device)
+
         return self.tile.forward_indexed(x_input, d_tensor, is_test)
 
     def backward_indexed(self, d_input: Tensor) -> Tensor:
@@ -493,6 +496,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
             channel_in, depth_in, height_in, width_in, _, _, _ \
                 = self.image_sizes
             x_tensor = empty(n_batch, channel_in, depth_in, height_in, width_in)
+
+        if self.is_cuda:
+            x_tensor = x_tensor.to(self.device)
 
         return self.tile.backward_indexed(d_input, x_tensor)
 
