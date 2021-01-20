@@ -458,13 +458,17 @@ class BaseTile(Generic[RPUConfigGeneric]):
             _, _, height_out = self.image_sizes
             d_tensor = empty(n_batch, channel_out, height_out)
 
-        if len(self.image_sizes) == 5:
+        elif len(self.image_sizes) == 5:
             _, _, _, height_out, width_out = self.image_sizes
             d_tensor = empty(n_batch, channel_out, height_out, width_out)
 
-        if len(self.image_sizes) == 7:
+        elif len(self.image_sizes) == 7:
             _, _, _, _, depth_out, height_out, width_out = self.image_sizes
             d_tensor = empty(n_batch, channel_out, depth_out, height_out, width_out)
+
+        # Move helper tensor to cuda if needed.
+        if self.is_cuda:
+            d_tensor = d_tensor.to(self.device)
 
         return self.tile.forward_indexed(x_input, d_tensor, is_test)
 
@@ -477,7 +481,13 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         Returns:
             torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+
+        Raises:
+            TileError: if the indexed tile has not been initialized.
         """
+        if not self.image_sizes:
+            raise TileError('self.image_sizes is not initialized. Please use '
+                            'set_indexed()')
 
         n_batch = d_input.size(0)
 
@@ -485,14 +495,18 @@ class BaseTile(Generic[RPUConfigGeneric]):
             channel_in, height_in, _ = self.image_sizes
             x_tensor = empty(n_batch, channel_in, height_in)
 
-        if len(self.image_sizes) == 5:
+        elif len(self.image_sizes) == 5:
             channel_in, height_in, width_in, _, _ = self.image_sizes
             x_tensor = empty(n_batch, channel_in, height_in, width_in)
 
-        if len(self.image_sizes) == 7:
+        elif len(self.image_sizes) == 7:
             channel_in, depth_in, height_in, width_in, _, _, _ \
                 = self.image_sizes
             x_tensor = empty(n_batch, channel_in, depth_in, height_in, width_in)
+
+        # Move helper tensor to cuda if needed.
+        if self.is_cuda:
+            x_tensor = x_tensor.to(self.device)
 
         return self.tile.backward_indexed(d_input, x_tensor)
 
