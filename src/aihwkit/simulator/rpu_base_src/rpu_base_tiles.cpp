@@ -671,7 +671,7 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "forward_indexed",
-          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_tensor_,// int d_image_size,
+          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_tensor_,
              bool is_test = false) {
             auto x_input = x_input_.contiguous();
             auto d_tensor = d_tensor_.contiguous();
