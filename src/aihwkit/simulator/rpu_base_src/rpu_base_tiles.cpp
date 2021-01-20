@@ -723,7 +723,7 @@ void declare_rpu_tiles(py::module &m) {
                 d_image_size, N, true);
             return x_tensor;
           },
-          py::arg("d_input"), py::arg("x_tensor"), //py::arg("d_image_size"),
+          py::arg("d_input"), py::arg("x_tensor"),
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
