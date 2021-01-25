@@ -103,11 +103,9 @@ class AnalogModuleBase(Module):
         elif isinstance(rpu_config, InferenceRPUConfig):
             tile_class = self.TILE_CLASS_INFERENCE
         else:
-            tile_class = self.TILE_CLASS_ANALOG  # type: ignore
+            tile_class = self.TILE_CLASS_ANALOG
 
-        return tile_class(
-            out_features, in_features, rpu_config, bias=bias  # type: ignore
-        )
+        return tile_class(out_features, in_features, rpu_config, bias=bias)
 
     def set_weights(
             self,

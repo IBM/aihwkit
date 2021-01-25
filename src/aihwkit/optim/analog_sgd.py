@@ -57,8 +57,8 @@ class AnalogSGD(SGD):
 
         # Remove the analog parameters from the main param group, and add
         # the group.
-        for param_group in new_param_groups:
-            for param in param_group['params']:  # type: ignore
+        for param_group in new_param_groups:  # type: dict
+            for param in param_group['params']:
                 # Remove the param by its id(), as removing via list.remove()
                 # seems to involve comparisons that can lead to errors.
                 index = next(
