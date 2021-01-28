@@ -248,27 +248,26 @@ void declare_rpu_tiles_cuda(py::module &m) {
            )pbdoc")
       .def(
           "forward_indexed",
-          [](Class &self, const torch::Tensor &x_input_, int d_height, int d_width,
+          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_tensor_,
              bool is_test = false) {
             auto x_input = x_input_.contiguous();
+            auto d_tensor = d_tensor_.contiguous();
             CHECK_TORCH_CUDA_INPUT(x_input);
+            CHECK_TORCH_CUDA_INPUT(d_tensor);
 
             int N = x_input.size(0); // batch
-            int C = self.getDSize(); // out_channel
-            int d_image_size = d_width * d_height;
-
-            torch::Tensor d_output = torch::empty({N, C, d_height, d_width}, x_input.options());
+            int d_image_size = ((d_tensor.numel()/d_tensor.size(0))/d_tensor.size(1));
 
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setStream(at::cuda::getCurrentCUDAStream());
             self.forwardIndexed(
-                x_input.template data_ptr<T>(), d_output.template data_ptr<T>(), x_input.numel(),
+                x_input.template data_ptr<T>(), d_tensor.template data_ptr<T>(), x_input.numel(),
                 d_image_size, N, true, is_test);
-            return d_output;
+            return d_tensor;
           },
-          py::arg("x_input"), py::arg("d_height"), py::arg("d_width"), py::arg("is_test") = false,
+           py::arg("x_input"), py::arg("d_tensor"), py::arg("is_test") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (forward pass).
 
@@ -286,25 +285,25 @@ void declare_rpu_tiles_cuda(py::module &m) {
            )pbdoc")
       .def(
           "backward_indexed",
-          [](Class &self, const torch::Tensor &d_input_, int x_channel, int x_height, int x_width) {
+          [](Class &self, const torch::Tensor &d_input_, const torch::Tensor &x_tensor_) {
             auto d_input = d_input_.contiguous();
+            auto x_tensor = x_tensor_.contiguous();
             CHECK_TORCH_CUDA_INPUT(d_input);
+            CHECK_TORCH_CUDA_INPUT(x_tensor);
 
             int N = d_input.size(0); // batch
-            int d_image_size = d_input.size(2) * d_input.size(3);
-            torch::Tensor x_output =
-                torch::empty({N, x_channel, x_height, x_width}, d_input.options());
+            int d_image_size = ((d_input.numel()/d_input.size(0))/d_input.size(1));
 
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setStream(at::cuda::getCurrentCUDAStream());
             self.backwardIndexed(
-                d_input.template data_ptr<T>(), x_output.template data_ptr<T>(), x_output.numel(),
+                d_input.template data_ptr<T>(), x_tensor.template data_ptr<T>(), x_tensor.numel(),
                 d_image_size, N, true);
-            return x_output;
+            return x_tensor;
           },
-          py::arg("d_input"), py::arg("x_channel"), py::arg("x_height"), py::arg("x_width"),
+          py::arg("d_input"), py::arg("x_tensor"),
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
@@ -329,7 +328,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
             CHECK_TORCH_CUDA_INPUT(d_input);
 
             int N = d_input.size(0); // batch
-            int d_image_size = d_input.size(2) * d_input.size(3);
+            int d_image_size = d_input.numel()/(d_input.size(0)*d_input.size(1));
 
             // Call RPU function.
             self.finishUpdateCalculations();

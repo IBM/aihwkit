@@ -37,6 +37,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Faulty backward noise management error message removed for perfect backward
   and CUDA. (\#99)
 
+#### Removed
+
+* The legacy `NumpyAnalogTile` and `NumpyFloatingPointTile` tiles have been
+  finally removed. The regular, tensor-powered `aihwkit.simulator.tiles` tiles
+  contain all their functionality and numerous additions. (\#122)
+
 ## [0.2.1] - 2020/11/26
 
 * The `rpu_config` is now pretty-printed in a readable manner (excluding the

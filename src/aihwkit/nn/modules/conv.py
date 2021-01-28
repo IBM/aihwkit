@@ -91,8 +91,8 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
         if dilation != 1:
             raise ValueError('Only dilation = 1 is supported')
 
-        kernel_size = _single(kernel_size)
-        self.in_features = (in_channels // groups) * kernel_size[0]  # type: ignore
+        kernel_size_tuple = _single(kernel_size)
+        self.in_features = (in_channels // groups) * kernel_size_tuple[0]
         self.out_features = out_channels
 
         # Create the tile and set the analog.
@@ -137,8 +137,11 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
             shape = [1] + [1] + list(x_input.shape[2:])
             fold_indices = fold_indices.reshape(*shape)
             if not all(item == 0 for item in self.padding):
-                fold_indices = pad(fold_indices, pad=(
-                    self.padding[0], self.padding[0]), mode="constant", value=0)
+                fold_indices = pad(
+                    fold_indices,
+                    pad=(self.padding[0], self.padding[0]),
+                    mode='constant',
+                    value=0)
             unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
 
             fold_indices = unfold.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
@@ -167,7 +170,7 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
 
             image_sizes = [self.in_channels, x_height, d_height]
             self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)  # type: ignore
+            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
@@ -250,8 +253,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
         if padding_mode != 'zeros':
             raise ValueError('Only "zeros" padding mode is supported')
 
-        kernel_size = _pair(kernel_size)
-        self.in_features = (in_channels // groups) * kernel_size[0] * kernel_size[1]  # type: ignore
+        kernel_size_tuple = _pair(kernel_size)
+        self.in_features = (in_channels // groups) * kernel_size_tuple[0] * kernel_size_tuple[1]
         self.out_features = out_channels
 
         # Create the tile and set the analog.
@@ -314,7 +317,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
 
             image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
             self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)  # type: ignore
+            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
@@ -399,9 +402,10 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
         if dilation != 1:
             raise ValueError('Only dilation = 1 is supported')
 
-        kernel_size = _triple(kernel_size)
-        self.in_features = (in_channels // groups) * \
-            kernel_size[0] * kernel_size[1] * kernel_size[2]  # type: ignore
+        kernel_size_tuple = _triple(kernel_size)
+        self.in_features = (in_channels // groups) * (
+            kernel_size_tuple[0] * kernel_size_tuple[1] * kernel_size_tuple[2]
+        )
         self.out_features = out_channels
 
         # Create the tile and set the analog.
@@ -487,7 +491,7 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
 
             image_sizes = [self.in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
             self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)  # type: ignore
+            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)

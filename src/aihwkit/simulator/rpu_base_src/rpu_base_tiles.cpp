@@ -671,7 +671,7 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "forward_indexed",
-          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_tensor_,// int d_image_size,
+          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_tensor_,
              bool is_test = false) {
             auto x_input = x_input_.contiguous();
             auto d_tensor = d_tensor_.contiguous();
@@ -723,7 +723,7 @@ void declare_rpu_tiles(py::module &m) {
                 d_image_size, N, true);
             return x_tensor;
           },
-          py::arg("d_input"), py::arg("x_tensor"), //py::arg("d_image_size"),
+          py::arg("d_input"), py::arg("x_tensor"),
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
