@@ -41,7 +41,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * The legacy `NumpyAnalogTile` and `NumpyFloatingPointTile` tiles have been
   finally removed. The regular, tensor-powered `aihwkit.simulator.tiles` tiles
-  contain all their functionality and numerous additions.
+  contain all their functionality and numerous additions. (\#122)
 
 ## [0.2.1] - 2020/11/26
 
