@@ -52,7 +52,7 @@ template <typename T> class PulsedRPUWeightUpdater : public RPUWeightUpdater<T> 
 public:
   explicit PulsedRPUWeightUpdater(int x_size, int d_size, std::shared_ptr<RNG<T>> rng);
   PulsedRPUWeightUpdater(){};
-  ~PulsedRPUWeightUpdater();
+  virtual ~PulsedRPUWeightUpdater();
 
   PulsedRPUWeightUpdater(const PulsedRPUWeightUpdater<T> &);
   PulsedRPUWeightUpdater<T> &operator=(const PulsedRPUWeightUpdater<T> &);
