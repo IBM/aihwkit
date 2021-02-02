@@ -53,7 +53,7 @@ template <typename T> class ForwardBackwardPassIOManaged : public ForwardBackwar
 public:
   explicit ForwardBackwardPassIOManaged(int x_size, int d_size, std::shared_ptr<RNG<T>> rng);
   ForwardBackwardPassIOManaged(){};
-  ~ForwardBackwardPassIOManaged();
+  virtual ~ForwardBackwardPassIOManaged();
 
   ForwardBackwardPassIOManaged(const ForwardBackwardPassIOManaged<T> &);
   ForwardBackwardPassIOManaged<T> &operator=(const ForwardBackwardPassIOManaged<T> &);
