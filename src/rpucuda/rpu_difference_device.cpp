@@ -95,9 +95,7 @@ void DifferenceRPUDevice<T>::populate(
 /*********************************************************************************/
 /* update */
 
-template <typename T> bool DifferenceRPUDevice<T>::isInverted() const {
-  return g_plus_ == 0;
-}
+template <typename T> bool DifferenceRPUDevice<T>::isInverted() const { return g_plus_ == 0; }
 
 template <typename T> inline void DifferenceRPUDevice<T>::invert() {
   std::swap(g_plus_, g_minus_);
@@ -108,6 +106,9 @@ template <typename T> inline void DifferenceRPUDevice<T>::invert() {
 template <typename T>
 void DifferenceRPUDevice<T>::initUpdateCycle(
     T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {
+
+  VectorRPUDevice<T>::initUpdateCycle(weights, up, current_lr, m_batch_info);
+
   if (a_indices_.size() < (size_t)up.desired_BL) {
     a_indices_.resize(up.desired_BL);
     b_indices_.resize(up.desired_BL);

@@ -85,6 +85,8 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   T reset_std = (T)0.0;
   T reset_dtod = (T)0.0;
 
+  T write_noise_std = (T)0.0;
+
   void printToStream(std::stringstream &ss) const override;
   using SimpleMetaParameter<T>::print;
   std::string getName() const override { return "PulsedRPUDeviceParameter"; };
@@ -93,6 +95,21 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   };
   PulsedRPUDeviceMetaParameter<T> *clone() const override { RPU_FATAL("Needs implementation"); };
   DeviceUpdateType implements() const override { return DeviceUpdateType::Undefined; };
+
+  virtual bool implementsWriteNoise() const { return false; }; // needs to be activated in derived
+  inline bool usesPersistentWeight() const { return write_noise_std > 0; };
+  inline T getScaledWriteNoise() const { return write_noise_std * this->dw_min; };
+  inline bool needsResetBias() const { return reset > 0 || reset_dtod > 0; };
+
+  void initialize() override {
+    PulsedRPUDeviceMetaParameterBase<T>::initialize();
+    if (!implementsWriteNoise() && usesPersistentWeight()) {
+      RPU_FATAL("Device does not support write noise");
+    }
+    reset_dtod = MAX(reset_dtod, (T)0.0);
+    reset_std = MAX(reset_std, (T)0.0);
+    reset = MAX(reset, (T)0.0);
+  };
 };
 
 template <typename T> class PulsedRPUDeviceBase : public SimpleRPUDevice<T> {
@@ -189,6 +206,7 @@ public:
     swap(a.w_min_bound_, b.w_min_bound_);
     swap(a.w_decay_scale_, b.w_decay_scale_);
     swap(a.w_diffusion_rate_, b.w_diffusion_rate_);
+    swap(a.w_persistent_, b.w_persistent_);
     swap(a.w_reset_bias_, b.w_reset_bias_);
     swap(a.sup_, b.sup_);
 
@@ -202,6 +220,7 @@ public:
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
   void printDP(int x_count, int d_count) const override;
 
+  inline T **getPersistentWeights() const { return w_persistent_; };
   inline T **getMaxBound() const { return w_max_bound_; };
   inline T **getMinBound() const { return w_min_bound_; };
   inline T **getDecayScale() const { return w_decay_scale_; };
@@ -214,19 +233,13 @@ public:
     return static_cast<PulsedRPUDeviceMetaParameter<T> &>(SimpleRPUDevice<T>::getPar());
   };
 
-  // these are turned off for concrete devices. Only for meta [derived from Base]
-  void initUpdateCycle(
-      T **weights,
-      const PulsedUpdateMetaParameter<T> &up,
-      T current_lr,
-      int m_batch_info) override final{};
-  void finishUpdateCycle(
-      T **weights,
-      const PulsedUpdateMetaParameter<T> &up,
-      T current_lr,
-      int m_batch_info) override final{};
-
   T getDwMin() const override { return this->getPar().dw_min; };
+
+  /* Note: In case of persistent data these weight methods below will
+     affect the perstistent state and ALL apparent weight elements
+     will be re-drawn with noise (even if they were not
+     e.g. clipped) */
+
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
   void diffuseWeights(T **weights, RNG<T> &rng) override;
@@ -249,6 +262,10 @@ protected:
   T **w_decay_scale_ = nullptr;
   T **w_diffusion_rate_ = nullptr;
   T **w_reset_bias_ = nullptr;
+  T **w_persistent_ = nullptr;
+
+  RealWorldRNG<T> write_noise_rng_{0};
+  virtual void applyUpdateWriteNoise(T **weights);
 
 private:
   void freeContainers();

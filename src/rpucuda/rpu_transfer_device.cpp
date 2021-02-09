@@ -292,7 +292,7 @@ template <typename T> void TransferRPUDevice<T>::setTransferVecs(const T *transf
 
 template <typename T> int TransferRPUDevice<T>::resetCounters(bool force) {
   current_col_indices_.resize(this->n_devices_);
-  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int) 0);
+  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int)0);
   return VectorRPUDevice<T>::resetCounters(force);
 }
 /*********************************************************************************/

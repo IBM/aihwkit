@@ -44,6 +44,10 @@ void PulsedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const
     ss << "\t resets to:\t\t" << reset << "\t(dtod=" << reset_dtod << ", ctoc=" << reset_std << ")"
        << std::endl;
 
+    if (this->implementsWriteNoise() && write_noise_std > (T)0.0) {
+      ss << "\t write noise std:\t" << write_noise_std << std::endl;
+    }
+
     if (this->lifetime > 0) {
       ss << "\t lifetime [decay]:\t" << this->lifetime << "\t(dtod=" << lifetime_dtod << ")"
          << std::endl;
@@ -90,6 +94,7 @@ template <typename T> void PulsedRPUDevice<T>::allocateContainers() {
   w_decay_scale_ = Array_2D_Get<T>(d_sz, x_sz);
   w_diffusion_rate_ = Array_2D_Get<T>(d_sz, x_sz);
   w_reset_bias_ = Array_2D_Get<T>(d_sz, x_sz);
+  w_persistent_ = Array_2D_Get<T>(d_sz, x_sz);
 
   // we better set everything to zero.
   for (int j = 0; j < x_sz; ++j) {
@@ -101,6 +106,7 @@ template <typename T> void PulsedRPUDevice<T>::allocateContainers() {
       w_decay_scale_[i][j] = (T)1.0; // no decay
       w_diffusion_rate_[i][j] = (T)0.0;
       w_reset_bias_[i][j] = (T)0.0;
+      w_persistent_[i][j] = (T)0.0;
 
       sup_[i][j].max_bound = std::numeric_limits<T>::max();
       sup_[i][j].min_bound = std::numeric_limits<T>::min();
@@ -127,6 +133,7 @@ template <typename T> void PulsedRPUDevice<T>::freeContainers() {
     Array_2D_Free<T>(w_decay_scale_);
     Array_2D_Free<T>(w_diffusion_rate_);
     Array_2D_Free<T>(w_reset_bias_);
+    Array_2D_Free<T>(w_persistent_);
 
     containers_allocated_ = false;
   }
@@ -209,6 +216,7 @@ PulsedRPUDevice<T> &PulsedRPUDevice<T>::operator=(PulsedRPUDevice<T> &&other) {
   w_decay_scale_ = other.w_decay_scale_;
   w_diffusion_rate_ = other.w_diffusion_rate_;
   w_reset_bias_ = other.w_reset_bias_;
+  w_persistent_ = other.w_persistent_;
 
   // set pointers to null
   other.sup_ = nullptr;
@@ -222,6 +230,7 @@ PulsedRPUDevice<T> &PulsedRPUDevice<T>::operator=(PulsedRPUDevice<T> &&other) {
   other.w_diffusion_rate_ = nullptr;
 
   other.w_reset_bias_ = nullptr;
+  other.w_persistent_ = nullptr;
 
   return *this;
 }
@@ -238,6 +247,9 @@ template <typename T> void PulsedRPUDevice<T>::getDPNames(std::vector<std::strin
   if (!getPar().legacy_params) {
     names.push_back(std::string("reset_bias"));
   }
+  if (getPar().usesPersistentWeight()) {
+    names.push_back(std::string("hidden_weigths"));
+  }
 }
 
 template <typename T>
@@ -252,14 +264,18 @@ void PulsedRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
   }
 
   for (int i = 0; i < this->size_; ++i) {
-    data_ptrs[0][i] = w_max_bound_[0][i];
-    data_ptrs[1][i] = w_min_bound_[0][i];
-    data_ptrs[2][i] = w_scale_up_[0][i];
-    data_ptrs[3][i] = w_scale_down_[0][i];
-    data_ptrs[4][i] = w_decay_scale_[0][i];
-    data_ptrs[5][i] = w_diffusion_rate_[0][i];
+    int n = 0;
+    data_ptrs[n++][i] = w_max_bound_[0][i];
+    data_ptrs[n++][i] = w_min_bound_[0][i];
+    data_ptrs[n++][i] = w_scale_up_[0][i];
+    data_ptrs[n++][i] = w_scale_down_[0][i];
+    data_ptrs[n++][i] = w_decay_scale_[0][i];
+    data_ptrs[n++][i] = w_diffusion_rate_[0][i];
     if (!getPar().legacy_params) {
-      data_ptrs[6][i] = w_reset_bias_[0][i];
+      data_ptrs[n++][i] = w_reset_bias_[0][i];
+    }
+    if (getPar().usesPersistentWeight()) {
+      data_ptrs[n++][i] = w_persistent_[0][i];
     }
   }
 };
@@ -313,8 +329,8 @@ void PulsedRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
 template <typename T> void PulsedRPUDevice<T>::decayWeights(T **weights, bool bias_no_decay) {
 
   // maybe a bit overkill to check the bounds...
+  T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
   T *wd = w_decay_scale_[0];
-  T *w = weights[0];
   T *max_bound = w_max_bound_[0];
   T *min_bound = w_min_bound_[0];
 
@@ -334,15 +350,15 @@ template <typename T> void PulsedRPUDevice<T>::decayWeights(T **weights, bool bi
       w[i] = MAX(w[i], min_bound[i]);
     }
   }
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T>
 void PulsedRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
 
   // maybe a bit overkill to check the bounds...
-
+  T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
   T *wd = w_decay_scale_[0];
-  T *w = weights[0];
   T *max_bound = w_max_bound_[0];
   T *min_bound = w_min_bound_[0];
 
@@ -362,12 +378,13 @@ void PulsedRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
       w[i] = MAX(w[i], min_bound[i]);
     }
   }
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T> void PulsedRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
 
+  T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
   T *diffusion_rate = &(w_diffusion_rate_[0][0]);
-  T *w = &(weights[0][0]);
   T *max_bound = &(w_max_bound_[0][0]);
   T *min_bound = &(w_min_bound_[0][0]);
 
@@ -377,12 +394,12 @@ template <typename T> void PulsedRPUDevice<T>::diffuseWeights(T **weights, RNG<T
     w[i] = MIN(w[i], max_bound[i]);
     w[i] = MAX(w[i], min_bound[i]);
   }
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T> void PulsedRPUDevice<T>::clipWeights(T **weights, T clip) {
   // apply hard bounds
-
-  T *w = &(weights[0][0]);
+  T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
   T *max_bound = &(w_max_bound_[0][0]);
   T *min_bound = &(w_min_bound_[0][0]);
   if (clip < 0.0) { // only apply bounds
@@ -398,11 +415,16 @@ template <typename T> void PulsedRPUDevice<T>::clipWeights(T **weights, T clip) 
       w[i] = MAX(w[i], MAX(min_bound[i], -clip));
     }
   }
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T>
 void PulsedRPUDevice<T>::resetCols(
     T **weights, int start_col, int n_col, T reset_prob, RealWorldRNG<T> &rng) {
+
+  if (getPar().usesPersistentWeight()) {
+    RPU_FATAL("ResetCols is not supported with write_noise_std>0!");
+  }
 
   T reset_std = getPar().reset_std;
   for (int j = 0; j < this->x_size_; ++j) {
@@ -459,9 +481,40 @@ void PulsedRPUDevice<T>::copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> 
 }
 
 template <typename T> bool PulsedRPUDevice<T>::onSetWeights(T **weights) {
-  // apply hard bounds
-  this->clipWeights(weights, (T)-1.0);
-  return false; // whether device was changed
+
+  // apply hard bounds to given weights
+  T *w = weights[0];
+  T *max_bound = &(w_max_bound_[0][0]);
+  T *min_bound = &(w_min_bound_[0][0]);
+  PRAGMA_SIMD
+  for (int i = 0; i < this->size_; ++i) {
+    w[i] = MIN(w[i], max_bound[i]);
+    w[i] = MAX(w[i], min_bound[i]);
+  }
+
+  if (getPar().usesPersistentWeight()) {
+    PRAGMA_SIMD
+    for (int i = 0; i < this->size_; i++) {
+      w_persistent_[0][i] = w[i];
+    }
+    applyUpdateWriteNoise(weights);
+    return true; // modified device thus true
+  } else {
+    return false; // whether device was changed
+  }
+}
+
+template <typename T> void PulsedRPUDevice<T>::applyUpdateWriteNoise(T **weights) {
+  // applies new noise to ALL weight values
+  T uw_std = getPar().getScaledWriteNoise();
+
+  if (uw_std <= 0) {
+    return; // nothing to be done, weights assumed to already updated
+  }
+
+  for (int i = 0; i < this->size_; i++) {
+    weights[0][i] = w_persistent_[0][i] + uw_std * write_noise_rng_.sampleGauss();
+  }
 }
 
 /*********************************************************************************/
@@ -545,7 +598,6 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
 
       //--------------------
       // diffusion
-      par.diffusion = MAX(par.diffusion, (T)0.0);
       {
         T t = fabs(par.diffusion * (1 + par.diffusion_dtod * rng->sampleGauss()));
         sup_[i][j].diffusion_rate = t;
@@ -553,16 +605,13 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
 
       //--------------------
       // reset
-      par.reset_dtod = MAX(par.reset_dtod, (T)0.0);
-      par.reset_std = MAX(par.reset_std, (T)0.0);
-      {
-        T t = par.reset * ((T)1.0 + par.reset_dtod * rng->sampleGauss());
+      { // additive dtod
+        T t = par.reset + par.reset_dtod * rng->sampleGauss();
         sup_[i][j].reset_bias = t;
       }
 
       //--------------------
       // decay
-      par.lifetime = MAX(par.lifetime, (T)0.0);
       {
         T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * rng->sampleGauss());
         sup_[i][j].decay_scale = t > 1.0 ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
@@ -586,21 +635,31 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
 template <typename T> void PulsedRPUDevice<T>::printDP(int x_count, int d_count) const {
   int x_count1 = x_count;
   int d_count1 = d_count;
-  if (x_count < 0 || x_count > this->x_size_)
+  if (x_count < 0 || x_count > this->x_size_) {
     x_count1 = this->x_size_;
+  }
 
-  if (d_count < 0 || d_count > this->d_size_)
+  if (d_count < 0 || d_count > this->d_size_) {
     d_count1 = this->d_size_;
+  }
+
+  bool persist_if = getPar().usesPersistentWeight();
 
   for (int i = 0; i < d_count1; ++i) {
     for (int j = 0; j < x_count1; ++j) {
-      std::cout << "[<" << sup_[i][j].max_bound << ",";
-      std::cout << sup_[i][j].min_bound << ">,<";
-      std::cout << sup_[i][j].scale_up << ",";
-      std::cout << sup_[i][j].scale_down << ">]";
+      std::cout << "[<" << sup_[i][j].max_bound << ", ";
+      std::cout << sup_[i][j].min_bound << ">, <";
+      std::cout << sup_[i][j].scale_up << ", ";
+      std::cout << sup_[i][j].scale_down << "> ";
       std::cout.precision(10);
-      std::cout << sup_[i][j].decay_scale;
+      std::cout << sup_[i][j].decay_scale << ", ";
       std::cout.precision(6);
+      std::cout << w_diffusion_rate_[i][j] << ", ";
+      std::cout << w_reset_bias_[i][j];
+      if (persist_if) {
+        std::cout << ", " << w_persistent_[i][j];
+      }
+      std::cout << "]";
     }
     std::cout << std::endl;
   }

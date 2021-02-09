@@ -679,7 +679,7 @@ void declare_rpu_tiles(py::module &m) {
             CHECK_TORCH_INPUT(d_tensor);
 
             int N = x_input.size(0); // batch
-            int d_image_size = ((d_tensor.numel()/d_tensor.size(0))/d_tensor.size(1));
+            int d_image_size = ((d_tensor.numel() / d_tensor.size(0)) / d_tensor.size(1));
 
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
@@ -714,7 +714,7 @@ void declare_rpu_tiles(py::module &m) {
             CHECK_TORCH_INPUT(x_tensor);
 
             int N = d_input.size(0); // batch
-            int d_image_size = ((d_input.numel()/d_input.size(0))/d_input.size(1));
+            int d_image_size = ((d_input.numel() / d_input.size(0)) / d_input.size(1));
 
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
@@ -748,7 +748,7 @@ void declare_rpu_tiles(py::module &m) {
             CHECK_TORCH_INPUT(d_input);
 
             int N = d_input.size(0); // batch
-            int d_image_size = d_input.numel()/(d_input.size(0)*d_input.size(1));
+            int d_image_size = d_input.numel() / (d_input.size(0) * d_input.size(1));
 
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);

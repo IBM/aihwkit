@@ -64,6 +64,8 @@ template <typename T> struct AbstractRPUDeviceMetaParameter : SimpleMetaParamete
   virtual void initialize() {
     _par_initialized = true;
     _device_parameter_mode_manual = false;
+    this->diffusion = MAX(this->diffusion, (T)0.0);
+    this->lifetime = MAX(this->lifetime, (T)0.0);
   }
 
   friend void

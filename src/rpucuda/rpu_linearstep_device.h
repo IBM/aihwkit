@@ -49,7 +49,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
        << std::endl;
     ,
     /*Add*/
-);
+    bool implementsWriteNoise() const override { return true; };);
 
 /*SoftBounds is essentially a specific LinearStep device. It will
   create one. Careful though, one could in principle  set the ls parameters
