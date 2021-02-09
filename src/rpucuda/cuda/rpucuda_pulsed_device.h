@@ -107,6 +107,7 @@ public:
     swap(a.dev_4params_, b.dev_4params_);
     swap(a.dev_reset_nrnd_, b.dev_reset_nrnd_);
     swap(a.dev_reset_flag_, b.dev_reset_flag_);
+    swap(a.dev_persistent_weights_, b.dev_persistent_weights_);
   };
 
   // implement abstract functions
@@ -144,9 +145,12 @@ public:
   virtual float *get4ParamsData() { return dev_4params_->getData(); }
 
 protected:
+  virtual void applyUpdateWriteNoise(T *dev_weights);
+
   void initResetRnd();
   std::unique_ptr<CudaArray<float>> dev_reset_nrnd_ = nullptr;
   std::unique_ptr<CudaArray<float>> dev_reset_flag_ = nullptr;
+  std::unique_ptr<CudaArray<float>> dev_persistent_weights_ = nullptr;
 
 private:
   void initialize();

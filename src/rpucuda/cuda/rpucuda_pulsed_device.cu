@@ -32,9 +32,10 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(CudaContext *c, int x_size, int d_si
 template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
 
   dev_4params_ = RPU::make_unique<CudaArray<float>>(this->context_, 4 * this->size_);
-  dev_diffusion_rate_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
-  dev_reset_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
   dev_decay_scale_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
+  dev_diffusion_rate_ = nullptr; // on the fly
+  dev_reset_bias_ = nullptr;
+  dev_persistent_weights_ = nullptr;
 
   this->context_->synchronize();
 };
@@ -45,9 +46,20 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other)
   initialize();
 
   dev_4params_->assign(*other.dev_4params_);
-  dev_diffusion_rate_->assign(*other.dev_diffusion_rate_);
-  dev_reset_bias_->assign(*other.dev_reset_bias_);
   dev_decay_scale_->assign(*other.dev_decay_scale_);
+
+  if (other.dev_diffusion_rate_ != nullptr) {
+    dev_diffusion_rate_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
+    dev_diffusion_rate_->assign(*other.dev_diffusion_rate_);
+  }
+  if (other.dev_reset_bias_ != nullptr) {
+    dev_reset_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
+    dev_reset_bias_->assign(*other.dev_reset_bias_);
+  }
+  if (other.dev_persistent_weights_ != nullptr) {
+    dev_persistent_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
+    dev_persistent_weights_->assign(*other.dev_persistent_weights_);
+  }
 
   this->context_->synchronize();
 };
@@ -73,6 +85,7 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other)
 //   dev_diffusion_rate_ = std::move(other.dev_diffusion_rate_);
 //   dev_reset_bias_ = std::move(other.dev_reset_bias_);
 //   dev_decay_scale_ = std::move(other.dev_decay_scale_);
+//   dev_persistent_weights_ = std::move(other.dev_persistent_weights_);
 
 //   return *this;
 // };
@@ -100,9 +113,12 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
   T *tmp_ds = new T[size];
   T *tmp_df = new T[size];
   T *tmp_rb = new T[size];
+  T *tmp_pw = new T[size];
+
   T *ds = rpu_device.getDecayScale()[0];
   T *df = rpu_device.getDiffusionRate()[0];
   T *rb = rpu_device.getResetBias()[0];
+  T *pw = rpu_device.getPersistentWeights()[0];
 
   for (int i = 0; i < d_size; ++i) {
     for (int j = 0; j < x_size; ++j) {
@@ -119,25 +135,45 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
       tmp_ds[l_t] = ds[l];
       tmp_df[l_t] = df[l];
       tmp_rb[l_t] = rb[l];
+      tmp_pw[l_t] = pw[l];
     }
   }
 
   dev_4params_->assign(tmp);
-  // other parameters
   dev_decay_scale_->assign(tmp_ds);
-  dev_diffusion_rate_->assign(tmp_df);
-  dev_reset_bias_->assign(tmp_rb);
+
+  // other parameters (on the fly)
+  const auto &par = getPar();
+  if (par.diffusion > 0.0) {
+    dev_diffusion_rate_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    dev_diffusion_rate_->assign(tmp_df);
+  }
+
+  if (par.needsResetBias()) {
+    dev_reset_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    dev_reset_bias_->assign(tmp_rb);
+  }
+
+  if (par.usesPersistentWeight()) {
+    dev_persistent_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    dev_persistent_weights_->assign(tmp_pw);
+  }
 
   this->context_->synchronize();
 
   delete[] tmp_ds;
   delete[] tmp_df;
   delete[] tmp_rb;
+  delete[] tmp_pw;
   delete[] tmp;
 }
 
 template <typename T>
 void PulsedRPUDeviceCuda<T>::applyWeightUpdate(T *weights, T *dw_and_current_weight_out) {
+
+  if (getPar().usesPersistentWeight()) {
+    RPU_FATAL("ResetCols is not supported with write_noise_std>0!");
+  }
   RPU::math::elemaddcopysat<T>(
       this->context_, weights, dw_and_current_weight_out, this->size_,
       dev_4params_->getDataConst());
@@ -146,19 +182,33 @@ void PulsedRPUDeviceCuda<T>::applyWeightUpdate(T *weights, T *dw_and_current_wei
 template <typename T>
 void PulsedRPUDeviceCuda<T>::decayWeights(T *weights, T alpha, bool bias_no_decay) {
 
+  T *w = getPar().usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
+
   RPU::math::elemscalealpha<T>(
-      this->context_, weights, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
+      this->context_, w, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
       dev_decay_scale_->getData(), dev_4params_->getData(), alpha);
+
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T> void PulsedRPUDeviceCuda<T>::decayWeights(T *weights, bool bias_no_decay) {
 
+  T *w = getPar().usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
+
   RPU::math::elemscale<T>(
-      this->context_, weights, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
+      this->context_, w, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
       dev_decay_scale_->getData(), dev_4params_->getData());
+
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T> void PulsedRPUDeviceCuda<T>::diffuseWeights(T *weights) {
+
+  if (dev_diffusion_rate_ == nullptr) {
+    return; // no diffusion
+  }
+
+  T *w = getPar().usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
 
   if (this->dev_diffusion_nrnd_ == nullptr) {
     this->initDiffusionRnd();
@@ -168,20 +218,28 @@ template <typename T> void PulsedRPUDeviceCuda<T>::diffuseWeights(T *weights) {
   this->rnd_context_->synchronize();
 
   RPU::math::elemasb02<T>(
-      this->context_, weights, this->size_, this->dev_diffusion_nrnd_->getData(),
+      this->context_, w, this->size_, this->dev_diffusion_nrnd_->getData(),
       dev_diffusion_rate_->getData(), dev_4params_->getData());
 
   this->rnd_context_->recordWaitEvent(this->context_->getStream());
   this->rnd_context_->randNormal(
       this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+
+  // Note: write noise will use the same rand to save memory. If
+  // diffusion + writenoise is often needed one might want to add an
+  // extra variable for the random numbers
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T> void PulsedRPUDeviceCuda<T>::clipWeights(T *weights, T clip) {
 
-  RPU::math::elemsat<T>(this->context_, weights, this->size_, dev_4params_->getData());
+  T *w = getPar().usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
+
+  RPU::math::elemsat<T>(this->context_, w, this->size_, dev_4params_->getData());
   if (clip >= 0) {
-    RPU::math::aclip<T>(this->context_, weights, this->size_, clip);
+    RPU::math::aclip<T>(this->context_, w, this->size_, clip);
   }
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T> void PulsedRPUDeviceCuda<T>::initResetRnd() {
@@ -197,9 +255,41 @@ template <typename T> void PulsedRPUDeviceCuda<T>::initResetRnd() {
   this->rnd_context_->synchronize();
 }
 
+template <typename T> void PulsedRPUDeviceCuda<T>::applyUpdateWriteNoise(T *dev_weights) {
+
+  const auto &par = getPar();
+
+  if (!par.usesPersistentWeight()) {
+    return;
+  }
+  // re-uses the diffusion rnd
+  if (this->dev_diffusion_nrnd_ == nullptr) {
+    this->initDiffusionRnd();
+    this->rnd_context_->randNormal(
+        this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+  }
+  this->rnd_context_->synchronize();
+
+  RPU::math::elemweightedsum<T>(
+      this->context_, dev_weights, this->size_, dev_persistent_weights_->getData(), (T)1.0,
+      this->dev_diffusion_nrnd_->getData(), par.write_noise_std);
+
+  this->rnd_context_->recordWaitEvent(this->context_->getStream());
+  this->rnd_context_->randNormal(
+      this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+}
+
 template <typename T>
 void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols, T reset_prob) {
   // col-major in CUDA.
+
+  if (dev_reset_bias_ == nullptr) {
+    return; // no reset
+  }
+
+  if (getPar().usesPersistentWeight()) {
+    RPU_FATAL("ResetCols is not supported with write_noise_std>0!");
+  }
 
   if (dev_reset_nrnd_ == nullptr) {
     initResetRnd();

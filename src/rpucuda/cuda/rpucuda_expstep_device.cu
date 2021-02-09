@@ -36,12 +36,12 @@ namespace RPU {
 template <typename T> struct UpdateFunctorExpStep {
 
   __device__ __forceinline__ void operator()(
-      T &w,
+      T &apparent_weight,
       uint32_t n,
       uint32_t negative,
       const float4 par_4,
       const float2 par_2,
-      T &par_1,
+      T &persistent_weight,
       const T *global_pars,
       T noise_std_dw,
       curandState &local_state)
@@ -49,9 +49,12 @@ template <typename T> struct UpdateFunctorExpStep {
   {
     // par_4 order (min_bound, scale_down, max_bound, scale_up )
     // global_pars see below
+    T uw_std = global_pars[6];
     T wmax = par_4.z; //[2];
     T wmin = par_4.x; //[0];
     T b_diff = (wmax - wmin);
+
+    T &w = uw_std > 0 ? persistent_weight : apparent_weight;
 
     if (b_diff > 0) { // only do something when bounds make sense
 
@@ -69,12 +72,17 @@ template <typename T> struct UpdateFunctorExpStep {
           UPDATE_ONCE;
         }
       }
+      // add update write noise onto apparent weight
+      if (uw_std > 0) {
+        T stoch_value = curand_normal(&local_state);
+        apparent_weight = persistent_weight + uw_std * stoch_value;
+      }
     }
   }
 };
 #undef UPDATE_ONCE
 
-RPUCUDA_DEVICE_ADD_FUNCTOR_UPDATE_KERNELS(ExpStep, UpdateFunctorExpStep<T>, 6);
+RPUCUDA_DEVICE_ADD_FUNCTOR_UPDATE_KERNELS(ExpStep, UpdateFunctorExpStep<T>, 7);
 
 template class ExpStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
