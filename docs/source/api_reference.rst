@@ -9,7 +9,6 @@ API Reference
    aihwkit.simulator
    aihwkit.simulator.configs
    aihwkit.simulator.noise_models
-   aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
    aihwkit.nn
    aihwkit.nn.functions
@@ -19,3 +18,11 @@ API Reference
    aihwkit.nn.modules.linear
    aihwkit.optim
    aihwkit.optim.analog_sgd
+
+
+.. only:: env_local
+
+   .. autosummary::
+        :recursive:
+
+        aihwkit.simulator.rpu_base
