@@ -32,7 +32,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   mimicking their digital counterparts. (\#102, \#103).
 * Option to automatically scale the digital weights into the full range of the
   simluated crossbar by applying a fixed output global factor in
-  digital (\#???).
+  digital (\##129).
 
 #### Fixed
 
@@ -40,7 +40,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Faulty backward noise management error message removed for perfect backward
   and CUDA. (\#99)
 * Fixed segfault when using diffusion or reset with vector unit cells for
-  CUDA.
+  CUDA (\##129).
 
 #### Removed
 
