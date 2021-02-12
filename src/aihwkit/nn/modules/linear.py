@@ -42,12 +42,17 @@ class AnalogLinear(Linear, AnalogModuleBase):
         bias: whether to use a bias row on the analog tile or not
         realistic_read_write: whether to enable realistic read/write
            for setting initial weights and read out of weights
+        weight_scaling_omega: the weight value where the max
+            weight will be scaled to. If zero, no weight scaling will
+            be performed
     """
     # pylint: disable=abstract-method
 
     __constants__ = ['in_features', 'out_features']
     in_features: int
     out_features: int
+    realistic_read_write: bool
+    weight_scaling_omega: float
 
     def __init__(
             self,
@@ -56,13 +61,15 @@ class AnalogLinear(Linear, AnalogModuleBase):
             bias: bool = True,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
     ):
         # Create the tile.
         self.analog_tile = self._setup_tile(in_features,
                                             out_features,
                                             bias,
                                             rpu_config,
-                                            realistic_read_write)
+                                            realistic_read_write,
+                                            weight_scaling_omega)
         # Call super() after tile creation, including ``reset_parameters``.
         super().__init__(in_features, out_features, bias=bias)
 
@@ -83,7 +90,13 @@ class AnalogLinear(Linear, AnalogModuleBase):
                                     not self.training)
 
     def extra_repr(self) -> str:
-        return '{}, is_cuda={}'.format(
-            super().extra_repr(),
-            self.analog_tile.is_cuda
-        )
+
+        output = super().extra_repr()
+        if self.realistic_read_write:
+            output += ', realistic_read_write={}'.format(self.realistic_read_write)
+        if self.weight_scaling_omega > 0:
+            alpha = self.analog_tile.tile.get_alpha_scale()
+            output += ', alpha_scale={:.3f}'.format(alpha)
+
+        return '{}, is_cuda={}'.format(output,
+                                       self.analog_tile.is_cuda)

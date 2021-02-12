@@ -16,6 +16,7 @@ from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from numpy import concatenate, expand_dims
+from numpy import abs as numpy_abs
 from torch import Tensor, empty, stack
 from torch import device as torch_device
 from torch.autograd import no_grad
@@ -38,7 +39,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
     """
-    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-instance-attributes,too-many-public-methods
 
     is_cuda = False
 
@@ -87,6 +88,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # Tensor causes issues in PyTorch 1.5.
         current_dict['analog_tile_hidden_parameters'] = \
             self.tile.get_hidden_parameters().data.numpy()
+        current_dict['analog_alpha_scale'] = self.tile.get_alpha_scale()
         current_dict.pop('tile')
         current_dict.pop('stream', None)
 
@@ -101,6 +103,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         current_dict = state.copy()
         weights = current_dict.pop('analog_tile_weights')
         hidden_parameters = current_dict.pop('analog_tile_hidden_parameters')
+        alpha_scale = current_dict.pop('analog_alpha_scale')
 
         self.__dict__.update(current_dict)
 
@@ -111,6 +114,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.tile = self._create_simulator_tile(x_size, d_size, self.rpu_config)
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
         self.tile.set_weights(weights)
+        self.tile.set_alpha_scale(alpha_scale)
 
     def _create_simulator_tile(
             self,
@@ -206,9 +210,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
               :meth:`get_weights_realistic`
 
         Returns:
-           a tuple where the first item is the ``[out_size, in_size]`` weight
-           matrix; and the second item is either the ``[out_size]`` bias vector
-           or ``None`` if the tile is set not to use bias.
+            a tuple where the first item is the ``[out_size, in_size]`` weight
+            matrix; and the second item is either the ``[out_size]`` bias vector
+            or ``None`` if the tile is set not to use bias.
         """
         # Retrieve the internal weights (and potentially biases) matrix.
         if realistic:
@@ -227,6 +231,116 @@ class BaseTile(Generic[RPUConfigGeneric]):
             biases = None
 
         return weights.to(self.device), biases.to(self.device) if self.bias else None
+
+    def set_weights_scaled(
+            self,
+            weights: Tensor,
+            biases: Optional[Tensor] = None,
+            realistic: bool = False,
+            n_loops: int = 10,
+            omega: float = 1.0
+    ) -> None:
+        r"""Set the tile weights (and biases) in a scaled fashion.
+
+        Similar to :meth:`set_weights`, however, additionally scales the weights
+        by a global scale :math:`\alpha`, that is then applied in digital at the
+        output of forward and backward pass, and the learning rate for this tile
+        is adjusted accordingly.
+
+        The weights are scaled by :math:`\omega/\max_{ij} |w_ij|` and the global
+        digital factor :math:`alpha` is set to :math:`\max_{ij} |w_ij|/\omega`.
+
+        It can be shown that such a constant factor greatly improves the SNR and
+        training accuracy as the full weight range of the analog devices are
+        used. See also `Rasch, Gokmen & Haensch (2019)`_ for more details.
+
+        Caution:
+            Using ``get_weights`` will now retrieve the true analog weights
+            *without* applying the global factor. To get the true weights, use
+            ``get_weights`` and scale it by the :math:`\alpha` of this layer
+            which can be retrieved by ``get_alpha_scale()``.
+
+        Args:
+            weights: ``[out_size, in_size]`` weight matrix.
+            biases: ``[out_size]`` bias vector. This parameter is required if
+                ``self.bias`` is ``True``, and ignored otherwise.
+            realistic: whether to use the forward and update pass to program the
+                weights iteratively, using :meth:`set_weights_realistic`.
+            n_loops: number of times the columns of the weights are set in a
+                closed-loop manner.
+                A value of ``1`` means that all columns in principle receive
+                enough pulses to change from ``w_min`` to ``w_max``.
+            omega: where the weight max should be mapped in terms of the weight
+                range. Note that for ``omega`` larger than the maximal weight of
+                the device, weights will get clipped for most devices.
+
+        Returns:
+            None.
+
+        Raises:
+            ValueError: if the tile has bias but ``bias`` has not been
+                specified.
+
+        .. _`Rasch, Gokmen & Haensch (2019)` https://arxiv.org/abs/1906.02698
+        """
+        # Prepare the array expected by the pybind function, appending the
+        # biases row if needed.
+        weights_numpy = weights.clone().detach().cpu().numpy()
+
+        if self.bias:
+            # Create a ``[out_size, in_size (+ 1)]`` matrix.
+            if biases is None:
+                raise ValueError("Analog tile has a bias, but no bias given")
+
+            biases_numpy = expand_dims(biases.clone().detach().cpu().numpy(), 1)
+            combined_weights = concatenate([weights_numpy, biases_numpy], axis=1)
+        else:
+            # Use only the ``[out_size, in_size]`` matrix.
+            combined_weights = weights_numpy
+
+        # Scale the weights.
+        weight_max = numpy_abs(combined_weights).max()
+        combined_weights = combined_weights/weight_max*omega
+        alpha = weight_max/omega
+        self.tile.set_alpha_scale(alpha)
+
+        if realistic:
+            return self.tile.set_weights_realistic(combined_weights, n_loops)
+
+        return self.tile.set_weights(combined_weights)
+
+    def get_weights_scaled(
+            self,
+            realistic: bool = False
+    ) -> Tuple[Tensor, Optional[Tensor]]:
+        """Get the tile weights (and biases) and applies the current alpha
+        scale to it.
+
+        Gets the tile weights and extracts the mathematical weight
+        matrix and biases (if present, by determined by the ``self.bias``
+        parameter).
+
+        Note:
+            By default this is **not** hardware realistic. Use set
+            ``realistic`` to True for a realistic transfer.
+
+        Args:
+            realistic: Whether to use the forward pass to read out the tile
+                weights iteratively, using :meth:`get_weights_realistic`.
+
+        Returns:
+            a tuple where the first item is the ``[out_size, in_size]`` weight
+            matrix; and the second item is either the ``[out_size]`` bias vector
+            or ``None`` if the tile is set not to use bias. Both have the alpha
+            scale applied.
+        """
+        weights, biases = self.get_weights(realistic=realistic)
+        alpha = self.tile.get_alpha_scale()
+
+        if self.bias:
+            return weights*alpha, biases*alpha
+
+        return weights*alpha, None
 
     def set_learning_rate(self, learning_rate: float) -> None:
         """Set the tile learning rate.
