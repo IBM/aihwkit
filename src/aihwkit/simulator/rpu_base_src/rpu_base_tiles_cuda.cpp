@@ -256,7 +256,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
             CHECK_TORCH_CUDA_INPUT(d_tensor);
 
             int N = x_input.size(0); // batch
-            int d_image_size = ((d_tensor.numel()/d_tensor.size(0))/d_tensor.size(1));
+            int d_image_size = ((d_tensor.numel() / d_tensor.size(0)) / d_tensor.size(1));
 
             // Call RPU function.
             self.finishUpdateCalculations();
@@ -267,7 +267,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
                 d_image_size, N, true, is_test);
             return d_tensor;
           },
-           py::arg("x_input"), py::arg("d_tensor"), py::arg("is_test") = false,
+          py::arg("x_input"), py::arg("d_tensor"), py::arg("is_test") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (forward pass).
 
@@ -292,7 +292,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
             CHECK_TORCH_CUDA_INPUT(x_tensor);
 
             int N = d_input.size(0); // batch
-            int d_image_size = ((d_input.numel()/d_input.size(0))/d_input.size(1));
+            int d_image_size = ((d_input.numel() / d_input.size(0)) / d_input.size(1));
 
             // Call RPU function.
             self.finishUpdateCalculations();
@@ -328,7 +328,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
             CHECK_TORCH_CUDA_INPUT(d_input);
 
             int N = d_input.size(0); // batch
-            int d_image_size = d_input.numel()/(d_input.size(0)*d_input.size(1));
+            int d_image_size = d_input.numel() / (d_input.size(0) * d_input.size(1));
 
             // Call RPU function.
             self.finishUpdateCalculations();

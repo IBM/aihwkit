@@ -598,14 +598,14 @@ protected:
 
 private:
   void alpha_warning() {
-    static int alpha_warning_count = 0;
-    alpha_warning_count++;
-    if (alpha_warning_count < 25) {
-      std::cout
-          << "Warning: setting weights with alpha scale. Note that alpha scale is NOT respected "
-             "when getting weights, saving or export, where thus wrong weights are obtained."
-          << std::endl;
-    }
+    DEBUG_CALL(
+        static int alpha_warning_count = 0; alpha_warning_count++; if (alpha_warning_count < 25) {
+          std::cout
+              << "Warning: setting weights with alpha scale. Note that alpha scale is NOT "
+                 "respected "
+                 "when getting weights, saving or export, where thus wrong weights are obtained."
+              << std::endl;
+        })
   }
 
 public:

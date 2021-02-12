@@ -26,7 +26,7 @@ public:
       ExpStepRPUDeviceCuda,
       ExpStepRPUDevice,
       /*ctor body*/
-      dev_es_par_ = std::unique_ptr<CudaArray<T>>(new CudaArray<T>(this->context_, 6));
+      dev_es_par_ = std::unique_ptr<CudaArray<T>>(new CudaArray<T>(this->context_, 7));
       ,
       /*dtor body*/
       ,
@@ -40,7 +40,7 @@ public:
       swap(a.dev_es_par_, b.dev_es_par_);
       ,
       /*host copy from cpu (rpu_device). Parent device params are copyied automatically*/
-      T es_par_arr[6];
+      T es_par_arr[7];
       auto &par = getPar();
       es_par_arr[0] = par.es_A_down;
       es_par_arr[1] = par.es_A_up;
@@ -48,7 +48,7 @@ public:
       es_par_arr[3] = par.es_gamma_up;
       es_par_arr[4] = par.es_a;
       es_par_arr[5] = par.es_b;
-
+      es_par_arr[6] = getPar().getScaledWriteNoise();
       dev_es_par_->assign(es_par_arr);
       this->context_->synchronize();)
 
@@ -59,6 +59,9 @@ public:
       int use_bo64,
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
+  T *get1ParamsData() override {
+    return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
+  };
 
 private:
   std::unique_ptr<CudaArray<T>> dev_es_par_ = nullptr;

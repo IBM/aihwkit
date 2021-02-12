@@ -20,17 +20,20 @@ namespace RPU {
 template <typename T> struct UpdateFunctorLinearStepMult {
 
   __device__ __forceinline__ void operator()(
-      T &w,
+      T &apparent_weight,
       uint32_t n,
       uint32_t negative,
       const float4 par_4,
       const float2 lin_slope,
-      T &par_1,
-      const T *global_par,
+      T &persistent_weight,
+      const T *write_noise_std,
       T noise_std_dw,
       curandState &local_state) {
+    T uw_std = *write_noise_std;
     T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        //[3], [1]
     T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); // [1],[0]
+
+    T &w = uw_std > 0 ? persistent_weight : apparent_weight;
 
     // n is larger 0 in any case
     if (n == 1) {
@@ -59,23 +62,32 @@ template <typename T> struct UpdateFunctorLinearStepMult {
     w = (w > wmax) ? wmax : w;
     T wmin = par_4.x; // [0]
     w = (w < wmin) ? wmin : w;
+
+    // add update write noise onto apparent weight
+    if (uw_std > 0) {
+      T stoch_value = curand_normal(&local_state);
+      apparent_weight = persistent_weight + uw_std * stoch_value;
+    }
   }
 };
 
 template <typename T> struct UpdateFunctorLinearStepAdd {
 
   __device__ __forceinline__ void operator()(
-      T &w,
+      T &apparent_weight,
       uint32_t n,
       uint32_t negative,
       const float4 par_4,
       const float2 lin_slope,
-      T &par_1,
-      const T *global_par,
+      T &persistent_weight,
+      const T *write_noise_std,
       T noise_std_dw,
       curandState &local_state) {
+    T uw_std = *write_noise_std;
     T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        // [3] [1]
     T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); //[1],[0]
+
+    T &w = uw_std > 0 ? persistent_weight : apparent_weight;
 
     // n is larger 0 in any case
     if (n == 1) {
@@ -103,6 +115,12 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
     w = (w > wmax) ? wmax : w;
     T wmin = par_4.x; // [0]
     w = (w < wmin) ? wmin : w;
+
+    // add update write noise onto apparent weight
+    if (uw_std > 0) {
+      T stoch_value = curand_normal(&local_state);
+      apparent_weight = persistent_weight + uw_std * stoch_value;
+    }
   }
 };
 

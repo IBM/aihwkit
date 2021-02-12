@@ -107,14 +107,8 @@ public:
 
   void invert();
 
-  // current_update_count not needed:
   void initUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
-  void finishUpdateCycle(
-      T **weights,
-      const PulsedUpdateMetaParameter<T> &up,
-      T current_lr,
-      int m_batch_info) override{};
 
   void setHiddenUpdateIdx(int idx) override{};
 

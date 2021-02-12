@@ -20,26 +20,28 @@ namespace RPU {
 
 template <typename T> class ExpStepRPUDevice;
 
-BUILD_PULSED_DEVICE_META_PARAMETER(ExpStep,
-                                   /*implements*/
-                                   DeviceUpdateType::ExpStep,
-                                   /*parameter def*/
-                                   T es_A_up = (T)0.00081;        /* p_000081 */
-                                   T es_A_down = (T)0.36833;      /* p_036833 */
-                                   T es_gamma_up = (T)12.44625;   /*  p_1244625 */
-                                   T es_gamma_down = (T)12.78785; /* p_1278785 */
-                                   T es_a = (T)0.244;             /* p_0244 */
-                                   T es_b = (T)0.2425;            /*p_02425 */
-                                   ,
-                                   /*print body*/
-                                   ss << "\t es_A_up:\t\t" << es_A_up << std::endl;
-                                   ss << "\t es_A_down:\t\t" << es_A_down << std::endl;
-                                   ss << "\t es_gamma_up:\t\t" << es_gamma_up << std::endl;
-                                   ss << "\t es_gamma_down:\t\t" << es_gamma_down << std::endl;
-                                   ss << "\t es_a:\t\t\t" << es_a << std::endl;
-                                   ss << "\t es_b:\t\t\t" << es_b << std::endl;
-                                   ,
-                                   /*add */
+BUILD_PULSED_DEVICE_META_PARAMETER(
+    ExpStep,
+    /*implements*/
+    DeviceUpdateType::ExpStep,
+    /*parameter def*/
+    T es_A_up = (T)0.00081;        /* p_000081 */
+    T es_A_down = (T)0.36833;      /* p_036833 */
+    T es_gamma_up = (T)12.44625;   /*  p_1244625 */
+    T es_gamma_down = (T)12.78785; /* p_1278785 */
+    T es_a = (T)0.244;             /* p_0244 */
+    T es_b = (T)0.2425;            /*p_02425 */
+    ,
+    /*print body*/
+    ss << "\t es_A_up:\t\t" << es_A_up << std::endl;
+    ss << "\t es_A_down:\t\t" << es_A_down << std::endl;
+    ss << "\t es_gamma_up:\t\t" << es_gamma_up << std::endl;
+    ss << "\t es_gamma_down:\t\t" << es_gamma_down << std::endl;
+    ss << "\t es_a:\t\t\t" << es_a << std::endl;
+    ss << "\t es_b:\t\t\t" << es_b << std::endl;
+    ,
+    /*add */
+    bool implementsWriteNoise() const override { return true; };
 
 );
 

@@ -128,13 +128,13 @@ void SimpleRPUDevice<T>::populate(const SimpleRPUDeviceMetaParameter<T> &p, Real
   par_storage_->initialize();
 }
 
-template class SimpleRPUDeviceMetaParameter<float>;
+template struct SimpleRPUDeviceMetaParameter<float>;
 template class AbstractRPUDevice<float>;
 template class SimpleRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class AbstractRPUDevice<double>;
 template class SimpleRPUDevice<double>;
-template class SimpleRPUDeviceMetaParameter<double>;
+template struct SimpleRPUDeviceMetaParameter<double>;
 #endif
 
 } // namespace RPU

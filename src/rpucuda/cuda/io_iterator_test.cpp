@@ -19,8 +19,8 @@
 #include <chrono>
 #include <functional>
 #include <memory>
-#include <random>
 #include <numeric>
+#include <random>
 
 #define TOLERANCE 1e-5
 

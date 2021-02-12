@@ -122,7 +122,7 @@ void TransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
   initialize(); // pwu/iom
 
   current_col_indices_.resize(this->n_devices_ - 1);
-  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int) 0);
+  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int)0);
 
   this->current_update_idx_ = 0;
 

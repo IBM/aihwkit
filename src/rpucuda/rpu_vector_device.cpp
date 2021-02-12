@@ -414,7 +414,15 @@ void VectorRPUDevice<T>::initUpdateCycle(
   }
   default: {
   }
-  };
+  }
+
+  if (par.singleDeviceUpdate()) {
+    rpu_device_vec_[current_device_idx_]->initUpdateCycle(weights, up, current_lr, m_batch_info);
+  } else {
+    for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+      rpu_device_vec_[k]->initUpdateCycle(weights, up, current_lr, m_batch_info);
+    }
+  }
 }
 
 template <typename T>
@@ -448,6 +456,15 @@ void VectorRPUDevice<T>::doSparseUpdate(
 template <typename T>
 void VectorRPUDevice<T>::finishUpdateCycle(
     T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {
+
+  if (getPar().singleDeviceUpdate()) {
+    rpu_device_vec_[current_device_idx_]->finishUpdateCycle(weights, up, current_lr, m_batch_info);
+  } else {
+    for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+      rpu_device_vec_[k]->finishUpdateCycle(weights, up, current_lr, m_batch_info);
+    }
+  }
+
   // count updates
   current_update_idx_++;
 }
