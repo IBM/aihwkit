@@ -73,3 +73,11 @@ html_static_path = ['_static']
 
 autodoc_typehints = 'description'
 autodoc_mock_imports = ['aihwkit.simulator.rpu_base']
+
+# -- Options specific to readthedocs -----------------------------------------
+
+on_readthedocs = os.environ.get('READTHEDOCS') == 'True'
+if on_readthedocs:
+    tags.add('env_readthedocs')
+else:
+    tags.add('env_local')
