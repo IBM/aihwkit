@@ -59,7 +59,8 @@ class AnalogModuleBase(Module):
             out_features: int,
             bias: bool,
             rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0
     ) -> BaseTile:
         """Create an analog tile and setup this layer for using it.
 
@@ -67,11 +68,17 @@ class AnalogModuleBase(Module):
         and setup additional attributes of this instance that are needed for
         using the analog tile.
 
+        If ``weight_scaling_omega`` is larger than 0, the weights are set in a
+        scaled manner (assuming a digital output scale). See
+        :meth:`~aihwkit.simulator.tiles.base.BaseTile.set_weights_scaled`
+        for details.
+
         Note:
             This method also sets the following attributes, which are assumed
             to be set by the rest of the methods:
             * ``self.use_bias``
             * ``self.realistic_read_write``
+            * ``self.weight_scaling_omega``
             * ``self.in_features``
             * ``self.out_features``
 
@@ -81,7 +88,10 @@ class AnalogModuleBase(Module):
             rpu_config: resistive processing unit configuration.
             bias: whether to use a bias row on the analog tile or not.
             realistic_read_write: whether to enable realistic read/write
-               for setting initial weights and read out of weights.
+                for setting initial weights and read out of weights.
+            weight_scaling_omega: the weight value where the max
+                weight will be scaled to. If zero, no weight scaling will
+                be performed
 
         Returns:
             An analog tile with the requested parameters.
@@ -94,6 +104,7 @@ class AnalogModuleBase(Module):
         # Setup the analog-related attributes of this instance.
         self.use_bias = bias
         self.realistic_read_write = realistic_read_write
+        self.weight_scaling_omega = weight_scaling_omega
         self.in_features = in_features
         self.out_features = out_features
 
@@ -116,7 +127,9 @@ class AnalogModuleBase(Module):
         """Sets the weight (and bias) with given Tensors.
 
         This uses an realistic write if the property ``realistic_read_write``
-        of the layer is set, unless it is overwritten by ``force_exact``.
+        of the layer is set, unless it is overwritten by ``force_exact``. It
+        uses a scaled write if ``weight_scaling_omega`` is positive (see
+        :meth:`~aihwkit.simulator.tiles.base.BaseTile.set_weights_scaled`).
 
         Note:
             This is the recommended way for setting the weight/bias matrix of
@@ -134,7 +147,12 @@ class AnalogModuleBase(Module):
         weight = weight.clone().reshape(shape)
 
         realistic = self.realistic_read_write and not force_exact
-        self.analog_tile.set_weights(weight, bias, realistic=realistic)
+
+        if self.weight_scaling_omega > 0.0:
+            self.analog_tile.set_weights_scaled(weight, bias, realistic=realistic,
+                                                omega=self.weight_scaling_omega)
+        else:
+            self.analog_tile.set_weights(weight, bias, realistic=realistic)
 
         self._sync_weights_from_tile()
 
@@ -145,7 +163,10 @@ class AnalogModuleBase(Module):
         """Get the weight (and bias) tensors.
 
         This uses an realistic read if the property ``realistic_read_write`` of
-        the layer is set, unless it is overwritten by ``force_exact``.
+        the layer is set, unless it is overwritten by ``force_exact``. It
+        scales the analog weights by the digital alpha scale if
+        ``weight_scaling_omega`` is positive (see
+        :meth:`~aihwkit.simulator.tiles.base.BaseTile.get_weights_scaled`).
 
         Note:
             This is the recommended way for setting the weight/bias matrix from
@@ -161,6 +182,10 @@ class AnalogModuleBase(Module):
             tuple: weight matrix, bias vector
         """
         realistic = self.realistic_read_write and not force_exact
+
+        if self.weight_scaling_omega > 0.0:
+            return self.analog_tile.get_weights_scaled(realistic=realistic)
+
         return self.analog_tile.get_weights(realistic=realistic)
 
     def _sync_weights_from_tile(self) -> None:

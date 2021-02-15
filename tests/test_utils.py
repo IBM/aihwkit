@@ -15,6 +15,7 @@
 from tempfile import TemporaryFile
 
 from numpy.random import rand
+from numpy import array
 from numpy.testing import assert_array_almost_equal, assert_raises
 from torch import Tensor, save, load
 from torch.nn import Sequential, Module
@@ -196,6 +197,46 @@ class SerializationTest(ParametrizedTestCase):
         # Assert over the new model tile parameters.
         new_hidden_parameters = new_model.analog_tile.tile.get_hidden_parameters()
         assert_array_almost_equal(hidden_parameters, new_hidden_parameters)
+
+    def test_save_load_alpha_scale(self):
+        """Test saving and loading a device with alpha_scale."""
+        # Create the device and the array.
+        model = self.get_layer()
+        alpha = 2.0
+        model.analog_tile.tile.set_alpha_scale(alpha)
+
+        # Save the model to a file.
+        file = TemporaryFile()
+        save(model, file)
+
+        # Load the model.
+        file.seek(0)
+        new_model = load(file)
+        file.close()
+
+        # Assert over the new model tile parameters.
+        alpha_new = new_model.analog_tile.tile.get_alpha_scale()
+        assert_array_almost_equal(array(alpha), array(alpha_new))
+
+    def test_save_load_weight_scaling_omega(self):
+        """Test saving and loading a device with weight scaling omega."""
+        model = self.get_layer(weight_scaling_omega=0.5)
+
+        alpha = model.analog_tile.tile.get_alpha_scale()
+        self.assertNotEqual(alpha, 1.0)
+
+        # Save the model to a file.
+        file = TemporaryFile()
+        save(model, file)
+
+        # Load the model.
+        file.seek(0)
+        new_model = load(file)
+        file.close()
+
+        # Assert over the new model tile parameters.
+        alpha_new = new_model.analog_tile.tile.get_alpha_scale()
+        assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_save_load_state_dict_hidden_parameters(self):
         """Test saving and loading via state_dict with hidden parameters."""

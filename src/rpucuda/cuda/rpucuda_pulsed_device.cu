@@ -283,7 +283,7 @@ template <typename T>
 void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols, T reset_prob) {
   // col-major in CUDA.
 
-  if (dev_reset_bias_ == nullptr) {
+  if (dev_reset_bias_== nullptr) {
     return; // no reset
   }
 

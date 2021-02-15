@@ -30,12 +30,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Option to excluded bias row for hardware-aware training noise. (\#99)
 * Two new convolution layers have been added: `AnalogConv1d` and `AnalogConv3d`,
   mimicking their digital counterparts. (\#102, \#103).
+* Option to automatically scale the digital weights into the full range of the
+  simluated crossbar by applying a fixed output global factor in
+  digital (\##129).
 
 #### Fixed
 
 * Fixed small issues that resulted in warnings for windows compilation. (\#99)
 * Faulty backward noise management error message removed for perfect backward
   and CUDA. (\#99)
+* Fixed segfault when using diffusion or reset with vector unit cells for
+  CUDA (\##129).
 
 #### Removed
 
