@@ -305,3 +305,17 @@ class AnalogModuleBase(Module):
 
         if isinstance(self.analog_tile, InferenceTile):
             self.analog_tile.program_weights()
+
+    def extra_repr(self) -> str:
+        """Set the extra representation of the module.
+
+        Returns:
+            A string with the extra representation.
+        """
+        output = super().extra_repr()
+        if self.realistic_read_write:
+            output += ', realistic_read_write={}'.format(self.realistic_read_write)
+        if self.weight_scaling_omega > 0:
+            output += ', weight_scaling_omega={:.3f}'.format(self.weight_scaling_omega)
+
+        return output
