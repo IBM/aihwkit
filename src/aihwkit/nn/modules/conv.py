@@ -23,7 +23,7 @@ from aihwkit.nn.functions import AnalogIndexedFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogConv1d(Conv1d, AnalogModuleBase):
+class AnalogConv1d(AnalogModuleBase, Conv1d):
     """1D convolution layer that uses an analog tile.
 
     Applies a 1D convolution over an input signal composed of several input
@@ -198,7 +198,7 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
         return output.format(**self.__dict__)
 
 
-class AnalogConv2d(Conv2d, AnalogModuleBase):
+class AnalogConv2d(AnalogModuleBase, Conv2d):
     """2D convolution layer that uses an analog tile.
 
     Applies a 2D convolution over an input signal composed of several input
@@ -356,7 +356,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
         return output.format(**self.__dict__)
 
 
-class AnalogConv3d(Conv3d, AnalogModuleBase):
+class AnalogConv3d(AnalogModuleBase, Conv3d):
     """3D convolution layer that uses an analog tile.
 
     Applies a 3D convolution over an input signal composed of several input

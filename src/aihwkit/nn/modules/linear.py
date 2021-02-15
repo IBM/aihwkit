@@ -21,7 +21,7 @@ from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogLinear(Linear, AnalogModuleBase):
+class AnalogLinear(AnalogModuleBase, Linear):
     """Linear layer that uses an analog tile.
 
     Linear layer that uses an analog tile during its forward, backward and
