@@ -23,7 +23,7 @@ from aihwkit.nn.functions import AnalogIndexedFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogConv1d(Conv1d, AnalogModuleBase):
+class AnalogConv1d(AnalogModuleBase, Conv1d):
     """1D convolution layer that uses an analog tile.
 
     Applies a 1D convolution over an input signal composed of several input
@@ -180,25 +180,8 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
 
-    def extra_repr(self) -> str:
-        output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
-                  ', stride={stride}')
-        if self.padding != (0,) * len(self.padding):
-            output += ', padding={padding}'
-        if self.dilation != (1,) * len(self.dilation):
-            output += ', dilation={dilation}'
-        if not self.use_bias:
-            output += ', bias=False'
-        if self.realistic_read_write:
-            output += ', realistic_read_write={realistic_read_write}'
-        if self.weight_scaling_omega > 0:
-            alpha = self.analog_tile.tile.get_alpha_scale()
-            output += ', alpha_scale={:.3f}'.format(alpha)
-        output += ', is_cuda={}'.format(self.analog_tile.is_cuda)
-        return output.format(**self.__dict__)
 
-
-class AnalogConv2d(Conv2d, AnalogModuleBase):
+class AnalogConv2d(AnalogModuleBase, Conv2d):
     """2D convolution layer that uses an analog tile.
 
     Applies a 2D convolution over an input signal composed of several input
@@ -338,25 +321,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
 
-    def extra_repr(self) -> str:
-        output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
-                  ', stride={stride}')
-        if self.padding != (0,) * len(self.padding):
-            output += ', padding={padding}'
-        if self.dilation != (1,) * len(self.dilation):
-            output += ', dilation={dilation}'
-        if not self.use_bias:
-            output += ', bias=False'
-        if self.realistic_read_write:
-            output += ', realistic_read_write={realistic_read_write}'
-        if self.weight_scaling_omega > 0:
-            alpha = self.analog_tile.tile.get_alpha_scale()
-            output += ', alpha_scale={:.3f}'.format(alpha)
-        output += ', is_cuda={}'.format(self.analog_tile.is_cuda)
-        return output.format(**self.__dict__)
 
-
-class AnalogConv3d(Conv3d, AnalogModuleBase):
+class AnalogConv3d(AnalogModuleBase, Conv3d):
     """3D convolution layer that uses an analog tile.
 
     Applies a 3D convolution over an input signal composed of several input
@@ -522,20 +488,3 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
 
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
-
-    def extra_repr(self) -> str:
-        output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
-                  ', stride={stride}')
-        if self.padding != (0,) * len(self.padding):
-            output += ', padding={padding}'
-        if self.dilation != (1,) * len(self.dilation):
-            output += ', dilation={dilation}'
-        if not self.use_bias:
-            output += ', bias=False'
-        if self.realistic_read_write:
-            output += ', realistic_read_write={realistic_read_write}'
-        if self.weight_scaling_omega > 0:
-            alpha = self.analog_tile.tile.get_alpha_scale()
-            output += ', alpha_scale={:.3f}'.format(alpha)
-        output += ', is_cuda={}'.format(self.analog_tile.is_cuda)
-        return output.format(**self.__dict__)

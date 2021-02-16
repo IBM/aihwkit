@@ -21,7 +21,7 @@ from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogLinear(Linear, AnalogModuleBase):
+class AnalogLinear(AnalogModuleBase, Linear):
     """Linear layer that uses an analog tile.
 
     Linear layer that uses an analog tile during its forward, backward and
@@ -88,15 +88,3 @@ class AnalogLinear(Linear, AnalogModuleBase):
         # pylint: disable=arguments-differ
         return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias,
                                     not self.training)
-
-    def extra_repr(self) -> str:
-
-        output = super().extra_repr()
-        if self.realistic_read_write:
-            output += ', realistic_read_write={}'.format(self.realistic_read_write)
-        if self.weight_scaling_omega > 0:
-            alpha = self.analog_tile.tile.get_alpha_scale()
-            output += ', alpha_scale={:.3f}'.format(alpha)
-
-        return '{}, is_cuda={}'.format(output,
-                                       self.analog_tile.is_cuda)
