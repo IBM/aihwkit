@@ -71,6 +71,7 @@ void curandSetup(
     unsigned long long rseed,
     bool same_seed) {
   int m = (n + 31) / 32 * 32;
+  c->synchronizeDevice();
   dev_states = std::unique_ptr<CudaArray<curandState_t>>(new CudaArray<curandState_t>(c, m));
   curandSetup(*dev_states, rseed, same_seed);
 }
