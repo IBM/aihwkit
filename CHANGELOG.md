@@ -29,10 +29,10 @@ The format is based on [Keep a Changelog], and this project adheres to
   update). (\#99)
 * Option to excluded bias row for hardware-aware training noise. (\#99)
 * Two new convolution layers have been added: `AnalogConv1d` and `AnalogConv3d`,
-  mimicking their digital counterparts. (\#102, \#103).
+  mimicking their digital counterparts. (\#102, \#103)
 * Option to automatically scale the digital weights into the full range of the
   simluated crossbar by applying a fixed output global factor in
-  digital (\##129).
+  digital. (\#129)
 
 #### Fixed
 
@@ -40,7 +40,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Faulty backward noise management error message removed for perfect backward
   and CUDA. (\#99)
 * Fixed segfault when using diffusion or reset with vector unit cells for
-  CUDA (\##129).
+  CUDA. (\#129)
+* Fixed random states mismatch in IoManager that could cause crashed in same
+  network size and batch size cases for CUDA, in particular for
+  `TransferCompound`. (\#132)
+* Fixed wrong update for `TransferCompound` in case of `transfer_every` smaller
+  than the batch size. (\#132)
 
 #### Removed
 
