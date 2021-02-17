@@ -25,17 +25,19 @@
 #include <cub/cub.cuh>
 
 #define STOCH_DEFINITIONS(STOCHIF, SIZE)                                                           \
+  int total_threads = blockDim.x * gridDim.x;                                                      \
+  int total_states = MIN(total_threads, SIZE);                                                     \
   int tid = blockDim.x * blockIdx.x + threadIdx.x;                                                 \
   T bu = bound_upper;                                                                              \
   T bl = bound_lower;                                                                              \
   T stoch_value;                                                                                   \
   curandState local_state;                                                                         \
-  if (STOCHIF && tid < SIZE) {                                                                     \
+  if (STOCHIF && tid < total_states) {                                                             \
     local_state = random_states[tid];                                                              \
   }
 
-#define STOCH_FINALIZE(STOCHIF, SIZE)                                                              \
-  if (STOCHIF && tid < SIZE) {                                                                     \
+#define STOCH_FINALIZE(STOCHIF)                                                                    \
+  if (STOCHIF && tid < total_states) {                                                             \
     random_states[tid] = local_state;                                                              \
   }
 
@@ -68,7 +70,6 @@
 
 #define STRIDE_LOOP(SIZE, OUTVALUE, BODY)                                                          \
   T value;                                                                                         \
-  int total_threads = blockDim.x * gridDim.x;                                                      \
   for (int i_stride = 0; i_stride < SIZE; i_stride += total_threads) {                             \
     int idx = i_stride + tid;                                                                      \
                                                                                                    \
@@ -100,6 +101,7 @@ __global__ void kernelInputManagement_noSR(
     const T bound_upper,
     const T resolution) {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  int total_threads = blockDim.x * gridDim.x;
 
   T bu = bound_upper;
   T bl = bound_lower;
@@ -158,7 +160,7 @@ __global__ void kernelInputManagement(
 
       BOUND_CHECK;);
 
-  STOCH_FINALIZE(stoch_if, size);
+  STOCH_FINALIZE(stoch_if);
 }
 
 /*********************************************************************************/
@@ -206,7 +208,7 @@ __global__ void kernelInputManagementBatch(
 
       BOUND_CHECK;);
 
-  STOCH_FINALIZE(stoch_if, total_size);
+  STOCH_FINALIZE(stoch_if);
 }
 
 /*********************************************************************************/
@@ -248,7 +250,7 @@ __global__ void kernelInputBoundManagement(
 
               DISCRETIZE_VALUE_STOCH; ADD_NOISE; BOUND_CHECK;);
 
-  STOCH_FINALIZE(stoch_if, size);
+  STOCH_FINALIZE(stoch_if);
 
   if (tid == total_threads - 1) {
     *scale_value_out = local_scale;
@@ -337,7 +339,7 @@ __global__ void kernelInputBoundManagementBatch(
 
               BOUND_CHECK;);
 
-  STOCH_FINALIZE(stoch_if, total_size);
+  STOCH_FINALIZE(stoch_if);
 }
 /*********************************************************************************/
 /* Input management with bound management for selected batch with copying*/
@@ -376,7 +378,6 @@ __global__ void kernelInputBoundManagementBatchSelected(
   // STRIDE LOOP
   T value;
   T local_scale;
-  int total_threads = blockDim.x * gridDim.x;
   for (int i_stride = 0; i_stride < total_size; i_stride += total_threads) {
     int idx_sel = i_stride + tid;
 
@@ -408,7 +409,7 @@ __global__ void kernelInputBoundManagementBatchSelected(
     }
   }
 
-  STOCH_FINALIZE(stoch_if, total_size);
+  STOCH_FINALIZE(stoch_if);
 }
 /*********************************************************************************/
 /* output add wnoise single batch*/
@@ -425,16 +426,17 @@ __global__ void kernelOutputWeightNoise(
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   T stoch_value;
   curandState local_state;
-  if (tid < size) {
+  int total_threads = blockDim.x * gridDim.x;
+  int total_states = MIN(size, total_threads);
+
+  if (tid < total_states) {
     local_state = random_states[tid];
   }
 
-  STRIDE_LOOP(size, value,
-
-              stoch_value = curand_normal(&local_state);
+  STRIDE_LOOP(size, value, stoch_value = curand_normal(&local_state);
               value += noise_std * stoch_value);
 
-  STOCH_FINALIZE(true, size);
+  STOCH_FINALIZE(true);
 }
 
 /* output add wnoise batch*/
@@ -455,17 +457,18 @@ __global__ void kernelOutputWeightNoiseBatch(
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   T stoch_value;
   curandState local_state;
-  if (tid < total_size) {
+  int total_threads = blockDim.x * gridDim.x;
+  int total_states = MIN(total_size, total_threads);
+  if (tid < total_states) {
     local_state = random_states[tid];
   }
 
   STRIDE_LOOP(total_size, value,
-
               int bidx = trans ? (idx % m_batch) : (idx / size);
               T noise_var =
                   noise_var_values[bidx]; // "if (noise_var>0)"  is actually slightly slower...
               stoch_value = curand_normal(&local_state); value += stoch_value * sqrt(noise_var););
-  STOCH_FINALIZE(true, total_size);
+  STOCH_FINALIZE(true);
 }
 
 /* output add wnoise batch*/
@@ -481,13 +484,15 @@ __global__ void kernelElemSqrtAddNoiseBatch(
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   T stoch_value;
   curandState local_state;
-  if (tid < total_size) {
+  int total_threads = blockDim.x * gridDim.x;
+  int total_states = MIN(total_size, total_threads);
+  if (tid < total_states) {
     local_state = random_states[tid];
   }
 
   STRIDE_LOOP(total_size, value, T noise_var = noise_var_values[idx];
               stoch_value = curand_normal(&local_state); value += stoch_value * sqrt(noise_var););
-  STOCH_FINALIZE(true, total_size);
+  STOCH_FINALIZE(true);
 }
 
 /*********************************************************************************/
@@ -532,7 +537,7 @@ __global__ void kernelOutputManagement(
 
       if (noise_management) { APPLY_OUTPUT_NOISE_MANAGMENT(local_nm_scale); });
 
-  STOCH_FINALIZE(stoch_if, size);
+  STOCH_FINALIZE(stoch_if);
 }
 
 /*********************************************************************************/
@@ -584,7 +589,7 @@ __global__ void kernelOutputManagementBatch(
       BOUND_CHECK;
 
       if (noise_management) { APPLY_OUTPUT_NOISE_MANAGMENT(local_nm_scale); });
-  STOCH_FINALIZE(stoch_if, total_size);
+  STOCH_FINALIZE(stoch_if);
 }
 
 /*********************************************************************************/
@@ -629,7 +634,7 @@ __global__ void kernelOutputShiftManagementBatch(
       BOUND_CHECK;
 
       if (noise_management) { APPLY_OUTPUT_NOISE_MANAGMENT(local_nm_scale); });
-  STOCH_FINALIZE(sr, total_size);
+  STOCH_FINALIZE(sr);
 }
 
 /*********************************************************************************/
@@ -684,7 +689,7 @@ __global__ void kernelOutputBoundManagement(
       APPLY_OUTPUT_NOISE_MANAGMENT(local_scale);
 
   );
-  STOCH_FINALIZE(stoch_if, size);
+  STOCH_FINALIZE(stoch_if);
 
   if (exceeded > 0) {
     atomicAdd(bound_exceeded, exceeded);
@@ -755,7 +760,7 @@ __global__ void kernelOutputBoundManagementBatch(
 
       APPLY_OUTPUT_NOISE_MANAGMENT(local_scale););
 
-  STOCH_FINALIZE(stoch_if, total_size);
+  STOCH_FINALIZE(stoch_if);
 
   if (exceeded > 0) {
     atomicAdd(any_exceeded_out, 1);
@@ -806,7 +811,6 @@ __global__ void kernelOutputBoundManagementBatchSelected(
 
   // STRIDE LOOP
   T value;
-  int total_threads = blockDim.x * gridDim.x;
   for (int i_stride = 0; i_stride < total_size; i_stride += total_threads) {
     int idx_sel = i_stride + tid;
 
@@ -850,7 +854,7 @@ __global__ void kernelOutputBoundManagementBatchSelected(
     }
   }
 
-  STOCH_FINALIZE(stoch_if, total_size);
+  STOCH_FINALIZE(stoch_if);
 
   if (exceeded > 0) {
     atomicAdd(any_exceeded_out, 1);
@@ -886,8 +890,8 @@ InputOutputManager<T>::InputOutputManager(CudaContext *c, int in_size, int out_s
   nthreads_ = RPU_IO_THREADS_PER_BLOCK;
 
   nblocks_batch_max_ = context_->getSMCount() * (context_->maxThreadsPerBlock() / nthreads_);
-  nblocks_om_ = nblocks_batch_max_; // context_->getNBlocks(out_size_,nthreads_);
-  nblocks_im_ = nblocks_batch_max_; // context_->getNBlocks(in_size_,nthreads_);
+  nblocks_om_ = MIN(context_->getNBlocks(out_size_, nthreads_), nblocks_batch_max_);
+  nblocks_im_ = MIN(context_->getNBlocks(in_size_, nthreads_), nblocks_batch_max_);
 
   bound_management_factor_ = 2.0;
   buffer_m_batch_ = 0;
@@ -902,6 +906,7 @@ void InputOutputManager<T>::setSharedBuffer(
     int m_batch,
     std::shared_ptr<CudaArray<T>> in_buffer,
     std::shared_ptr<CudaArray<T>> out_buffer) {
+
   if (in_buffer) {
     dev_input_applied_ = in_buffer;
     if (dev_input_applied_->getSize() < m_batch * in_size_) {
@@ -1060,7 +1065,8 @@ int InputOutputManager<T>::applyToInputWithBoundManagement(InputIteratorT dev_in
         (dev_input_applied_->getData(), dev_input, in_size_, nm_scale_values,
          dev_scale_values_->getData(), reduction_due_to_bound_management_, -io_->inp_bound,
          io_->inp_bound, io_->inp_res, io_->inp_sto_round, io_->inp_noise,
-         context_->getRandomStates(nblocks_im_ * nthreads_), dev_any_exceeded_->getData()));
+         context_->getRandomStates(MIN(nblocks_im_ * nthreads_, in_size_)),
+         dev_any_exceeded_->getData()));
 
   } else if (!bm_with_selecting_ || bound_management_round_ == 1 || reset_round) {
     // here we simply recompute every batch
@@ -1090,7 +1096,7 @@ int InputOutputManager<T>::applyToInputWithBoundManagement(InputIteratorT dev_in
         dev_input_applied_->getData(), dev_input, in_size_, m_batch, temp_trans_,
         dev_scale_values_->getData(), -io_->inp_bound, io_->inp_bound, io_->inp_res,
         io_->inp_sto_round, io_->inp_noise,
-        context_->getRandomStates(nblocks_im_batch_ * nthreads_));
+        context_->getRandomStates(MIN(nblocks_im_batch_ * nthreads_, m_batch * in_size_)));
 
   } else {
 
@@ -1133,7 +1139,8 @@ int InputOutputManager<T>::applyToInputWithBoundManagement(InputIteratorT dev_in
         (dev_input_applied_->getData(), dev_input, in_size_, m_batch, m_batch_selected_,
          dev_selected_bidx_->getDataConst(), temp_trans_, nm_scale_values,
          reduction_due_to_bound_management_, -io_->inp_bound, io_->inp_bound, io_->inp_res,
-         io_->inp_sto_round, io_->inp_noise, context_->getRandomStates(nblocks * nthreads_)));
+         io_->inp_sto_round, io_->inp_noise,
+         context_->getRandomStates(MIN(nblocks * nthreads_, in_size_ * m_batch))));
   }
 
   return m_batch_out;
@@ -1167,7 +1174,7 @@ int InputOutputManager<T>::applyToInput(InputIteratorT dev_input) {
             kernelInputManagement, InputIteratorT, nblocks_im_,
             (dev_input_applied_->getData(), dev_input, in_size_, nm_scale_values, -io_->inp_bound,
              io_->inp_bound, io_->inp_res, io_->inp_sto_round, io_->inp_noise,
-             context_->getRandomStates(nblocks_im_ * nthreads_)));
+             context_->getRandomStates(MIN(nblocks_im_ * nthreads_, in_size_))));
       } else {
         LAUNCH_NM_KERNEL(
             kernelInputManagement_noSR, InputIteratorT, nblocks_im_,
@@ -1180,7 +1187,8 @@ int InputOutputManager<T>::applyToInput(InputIteratorT dev_input) {
           kernelInputManagementBatch, InputIteratorT, nblocks_im_batch_,
           (dev_input_applied_->getData(), dev_input, in_size_, m_batch, temp_trans_,
            nm_scale_values, -io_->inp_bound, io_->inp_bound, io_->inp_res, io_->inp_sto_round,
-           io_->inp_noise, context_->getRandomStates(nblocks_im_batch_ * nthreads_)));
+           io_->inp_noise,
+           context_->getRandomStates(MIN(nblocks_im_batch_ * nthreads_, in_size_ * m_batch))));
     }
     return m_batch;
   }
@@ -1200,7 +1208,8 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
         dev_output, dev_output_applied_->getData(), out_size_, io_->out_noise,
         dev_scale_values_->getData(), -io_->out_bound, io_->out_bound, io_->out_res,
         io_->out_sto_round, temp_out_scale_, io_->bm_test_negative_bound,
-        context_->getRandomStates(nblocks_om_ * nthreads_), dev_any_exceeded_->getData());
+        context_->getRandomStates(MIN(nblocks_om_ * nthreads_, out_size_)),
+        dev_any_exceeded_->getData());
   } else {
 
     if (!currently_selecting_bidx_) {
@@ -1212,7 +1221,7 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
           dev_any_exceeded_->getData(),   // out
           io_->out_noise, -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round,
           temp_out_scale_, io_->bm_test_negative_bound,
-          context_->getRandomStates(nblocks_om_batch_ * nthreads_));
+          context_->getRandomStates(MIN(nblocks_om_batch_ * nthreads_, out_size_ * m_batch)));
 
     } else {
       // only add those batches to the output that exceeded in the previous round
@@ -1228,7 +1237,7 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
            reduction_due_to_bound_management_, dev_bound_exceeded_->getData(),
            dev_any_exceeded_->getData(), io_->out_noise, -io_->out_bound, io_->out_bound,
            io_->out_res, io_->out_sto_round, temp_out_scale_, io_->bm_test_negative_bound,
-           context_->getRandomStates(nblocks * nthreads_)));
+           context_->getRandomStates(MIN(nblocks * nthreads_, out_size_ * m_batch))));
     }
   }
 
@@ -1265,7 +1274,7 @@ template <typename T> void InputOutputManager<T>::applyOutputWeightNoise(const b
           out_temp, // in-place
           out_size_,
           dev_wnoise_buffer_->getDataConst(), // this is actually only the norm value, see above
-          io_->w_noise, context_->getRandomStates(nblocks_om_ * nthreads_));
+          io_->w_noise, context_->getRandomStates(MIN(nblocks_om_ * nthreads_, out_size_)));
 
     } else {
 
@@ -1288,7 +1297,7 @@ template <typename T> void InputOutputManager<T>::applyOutputWeightNoise(const b
           out_temp,
           out_temp, // in-place
           out_size_, m_batch, out_trans, dev_wnoise_buffer_->getDataConst(),
-          context_->getRandomStates(nblocks_om_batch_ * nthreads_));
+          context_->getRandomStates(MIN(nblocks_om_batch_ * nthreads_, out_size_ * m_batch)));
     }
   }
 }
@@ -1337,7 +1346,7 @@ void InputOutputManager<T>::applyOutputPCMReadNoise(const T *dev_weights, const 
         out_temp,
         out_temp, // in-place
         dev_extra_batch_buffer_->getData(), out_size_ * m_batch,
-        context_->getRandomStates(nblocks_om_batch_ * nthreads_));
+        context_->getRandomStates(MIN(nblocks_om_batch_ * nthreads_, out_size_ * m_batch)));
   }
 }
 
@@ -1408,7 +1417,7 @@ bool InputOutputManager<T>::applyToOutput(
             out_trans, nullptr, io_->out_noise, -std::numeric_limits<T>::max(),
             std::numeric_limits<T>::max(), -1., false,
             (T)1.0, // no scale
-            context_->getRandomStates(nblocks_om_batch_ * nthreads_));
+            context_->getRandomStates(MIN(nblocks_om_batch_ * nthreads_, out_size_ * m_batch)));
       }
 
       // compute max // this needs to be a maximizer not absmaximizer !!
@@ -1420,20 +1429,19 @@ bool InputOutputManager<T>::applyToOutput(
           (dev_output, dev_output_applied_->getDataConst(), out_size_, m_batch, out_trans,
            nm_scale_values, output_maximizer_->getMaxValues(), -io_->out_bound, io_->out_bound,
            io_->out_res, io_->out_sto_round,
-           context_->getRandomStates(nblocks_om_batch_ * nthreads_)));
+           context_->getRandomStates(MIN(nblocks_om_batch_ * nthreads_, out_size_ * m_batch))));
 
       return true; // shift
 
     } else {
 
       // no bound management
-
       if (m_batch == RPU_IO_USE_SINGLE_BATCH_VERSION) {
         LAUNCH_NM_KERNEL(
             kernelOutputManagement, OutputIteratorT, nblocks_om_,
             (dev_output, dev_output_applied_->getData(), out_size_, io_->out_noise, nm_scale_values,
              -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round, temp_out_scale_,
-             context_->getRandomStates(nblocks_om_ * nthreads_)));
+             context_->getRandomStates(MIN(nblocks_om_ * nthreads_, out_size_))));
 
       } else {
         // batched
@@ -1442,7 +1450,7 @@ bool InputOutputManager<T>::applyToOutput(
             (dev_output, dev_output_applied_->getData(), out_size_, m_batch, out_trans,
              nm_scale_values, io_->out_noise, -io_->out_bound, io_->out_bound, io_->out_res,
              io_->out_sto_round, temp_out_scale_,
-             context_->getRandomStates(nblocks_om_batch_ * nthreads_)));
+             context_->getRandomStates(MIN(nblocks_om_batch_ * nthreads_, out_size_ * m_batch))));
       }
 
       return true; // no bound managment

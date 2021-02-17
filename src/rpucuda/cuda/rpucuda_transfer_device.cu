@@ -147,8 +147,8 @@ void TransferRPUDeviceCuda<T>::forwardUpdate(
 
   if ((transfer_tmp_ == nullptr) || transfer_tmp_->getSize() < n_vec * this->d_size_) {
     transfer_tmp_ = RPU::make_unique<CudaArray<T>>(this->context_, this->d_size_ * n_vec);
+    this->context_->synchronize();
   }
-
   // forward with transfer vectors
   RPU::detail::forwardMatrixIteratorIOManaged(
       this->context_, this->dev_weights_ptrs_[from_device_idx], x_input, this->x_size_, trans,
@@ -225,16 +225,27 @@ template <typename T> int TransferRPUDeviceCuda<T>::getTransferEvery(int didx, i
   }
 }
 
+template <typename T> inline int getNChunks(int m_batch, T every) {
+  return MAX((int)(RPU_ROUNDFUN((T)m_batch / every)), 1); // take next integer for period
+}
+
+inline int getChunkSize(int m_batch, int nchunks) {
+  return (m_batch + nchunks - 1) / nchunks; // to ensure not to have residual
+}
+
 template <typename T>
 pwukpvec_t<T> TransferRPUDeviceCuda<T>::getUpdateKernels(
     int m_batch, int nK32, int use_bo64, bool out_trans, const PulsedUpdateMetaParameter<T> &up) {
 
   pwukpvec_t<T> v;
 
-  // use the first device as the "FAST" device that gets updates with the true gradients.
-  v = this->rpucuda_device_vec_[0]->getUpdateKernels(m_batch, nK32, use_bo64, out_trans, up);
+  int nchunks = getNChunks(m_batch, getTransferEvery(0, m_batch));
+  int chunk_size = getChunkSize(m_batch, nchunks);
 
-  if (RPU_ROUNDFUN((T)m_batch / getTransferEvery(0, m_batch)) > 1) {
+  // use the first device as the "FAST" device that gets updates with the true gradients.
+  v = this->rpucuda_device_vec_[0]->getUpdateKernels(chunk_size, nK32, use_bo64, out_trans, up);
+
+  if (nchunks > 1) {
     for (auto &kpars : v) {
       kpars->ensureChunk();
     }
@@ -271,8 +282,8 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
     RPU_FATAL("Chunking not allowed here.");
   }
 
-  int nchunks =
-      RPU_ROUNDFUN((T)m_batch / getTransferEvery(0, m_batch)); // take next integer for period
+  int nchunks = getNChunks(m_batch, getTransferEvery(0, m_batch));
+  T lr = blm->getCurrentLR();
 
   if (nchunks <= 1) {
 
@@ -294,18 +305,18 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
         // all transfer periods will be rounded up to batches.
         int period = (getTransferEvery(j, m_batch) + m_batch - 1) / m_batch; // in m_batch
         if (this->current_update_idx_ / m_batch % period == 0) {
-          transfer(j + 1, j, up, blm->getCurrentLR());
+          transfer(j + 1, j, up, lr);
         }
       }
     }
 
   } else {
     // need to do it chunkwise
-    int chunk_size = (m_batch + nchunks - 1) / nchunks; // to ensure not to have residual
+    int chunk_size = getChunkSize(m_batch, nchunks);
+    int batch_start = 0;
+    int nK32 = blm->getNK32Current();
 
     for (int i_chunk = 0; i_chunk < nchunks; i_chunk++) {
-
-      int batch_start = i_chunk * chunk_size;
 
       // note that last chunk might be smaller.
       T current_m_batch = chunk_size - MAX(batch_start + chunk_size - m_batch, 0);
@@ -313,20 +324,20 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
       this->rpucuda_device_vec_[0]->runUpdateKernel(
           kpars,
           c, // same context since sequence important
-          this->dev_weights_ptrs_[0], current_m_batch, blm, up, dev_states, one_sided,
-          blm->getXCountsData() + i_chunk * this->x_size_ * up.getNK32Default(), // always non-trans
-          blm->getDCountsData() + i_chunk * this->d_size_ * up.getNK32Default());
+          this->dev_weights_ptrs_[0], m_batch, blm, up, dev_states, one_sided,
+          blm->getXCountsData() + batch_start * this->x_size_ * nK32, // always non-trans
+          blm->getDCountsData() + batch_start * this->d_size_ * nK32);
 
       this->current_update_idx_ += current_m_batch; // first update idx
+      batch_start += current_m_batch;
 
       if (!up._currently_tuning) {
         // transfer
-
         for (int j = 0; j < this->n_devices_ - 1; j++) {
           // all transfer periods will be rounded up to chunk_sizes
           int period = (getTransferEvery(j, m_batch) + chunk_size - 1) / chunk_size;
           if (this->current_update_idx_ / chunk_size % period == 0) {
-            transfer(j + 1, j, up, blm->getCurrentLR());
+            transfer(j + 1, j, up, lr);
           }
         }
       }
