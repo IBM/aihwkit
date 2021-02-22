@@ -640,6 +640,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+
+        Returns:
+            None
         """
         return self.tile.update_indexed(x_input, d_input)
 
