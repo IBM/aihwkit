@@ -548,8 +548,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
     @no_grad()
     def forward_indexed(self, x_input: Tensor, is_test: bool = False) -> Tensor:
-        """Perform the forward pass for convolutions. Depending on the input tensor size
-        it performs the forward pass for a 2D image or a 3D one.
+        """Perform the forward pass for convolutions.
+
+        Depending on the input tensor size it performs the forward pass for a
+        2D image or a 3D one.
 
         Args:
             x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
@@ -559,7 +561,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
             torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
 
         Raises:
-            TileError: if the indexed tile has not been initialized.
+            TileError: if the indexed tile has not been initialized, or if
+                ``self.images_sizes`` does not have a valid dimennion.
         """
         if not self.image_sizes:
             raise TileError('self.image_sizes is not initialized. Please use '
@@ -579,6 +582,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
         elif len(self.image_sizes) == 7:
             _, _, _, _, depth_out, height_out, width_out = self.image_sizes
             d_tensor = empty(n_batch, channel_out, depth_out, height_out, width_out)
+        else:
+            raise TileError('self.image_sizes length is not 3, 5 or 7')
 
         # Move helper tensor to cuda if needed.
         if self.is_cuda:
@@ -587,8 +592,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return self.tile.forward_indexed(x_input, d_tensor, is_test)
 
     def backward_indexed(self, d_input: Tensor) -> Tensor:
-        """Perform the backward pass for convolutions. Depending on the input tensor size
-        it performs the backward pass for a 2D image or a 3D one.
+        """Perform the backward pass for convolutions.
+
+        Depending on the input tensor size it performs the backward pass for a
+        2D image or a 3D one.
 
         Args:
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
@@ -597,7 +604,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
             torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
 
         Raises:
-            TileError: if the indexed tile has not been initialized.
+            TileError: if the indexed tile has not been initialized, or if
+                ``self.images_sizes`` does not have a valid dimennion.
         """
         if not self.image_sizes:
             raise TileError('self.image_sizes is not initialized. Please use '
@@ -617,6 +625,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
             channel_in, depth_in, height_in, width_in, _, _, _ \
                 = self.image_sizes
             x_tensor = empty(n_batch, channel_in, depth_in, height_in, width_in)
+        else:
+            raise TileError('self.image_sizes length is not 3, 5 or 7')
 
         # Move helper tensor to cuda if needed.
         if self.is_cuda:
