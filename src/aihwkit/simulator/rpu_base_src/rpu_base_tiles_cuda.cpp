@@ -282,15 +282,15 @@ void declare_rpu_tiles_cuda(py::module &m) {
            Compute the dot product using an index matrix (forward pass).
 
            Caution:
-              Internal use for convolutions only.
+               Internal use for convolutions only.
 
            Args:
-              x_input: 4D torch::tensor in order N,C,H,W
-              d_tensor: torch:tensor with convolution dimensions
-              is_test: whether inference (true) mode or training (false)
+               x_input: 4D torch::tensor in order N,C,H,W
+               d_tensor: torch:tensor with convolution dimensions
+               is_test: whether inference (true) mode or training (false)
 
            Returns:
-              d_output: 4D torch::tensor in order N,C,d_height,d_width
+               d_output: 4D torch::tensor in order N,C,d_height,d_width
            )pbdoc")
       .def(
           "backward_indexed",
@@ -350,11 +350,11 @@ void declare_rpu_tiles_cuda(py::module &m) {
            Compute the dot product using an index matrix (backward pass).
 
            Caution:
-              Internal use for convolutions only.
+               Internal use for convolutions only.
 
            Args:
-              x_input: 4D torch::tensor input in order N,C,H,W
-              d_input: 4D torch::tensor (grad_output) in order N,C,oH,oW
+               x_input: 4D torch::tensor input in order N,C,H,W
+               d_input: 4D torch::tensor (grad_output) in order N,C,oH,oW
            )pbdoc");
 
   py::class_<ClassPulsed, RPU::RPUCudaSimple<T>>(
