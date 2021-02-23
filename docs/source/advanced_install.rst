@@ -97,7 +97,7 @@ Using this method, please make sure that the flags ``-DRPU_BLAS=MKL`` and
 commands. In particular, use the following command instead of the default one
 in the `Installing and compiling` sub-section::
 
-    $ pip install -v aihwkit --install-option="-DUSE_CUDA=ON" --install-option="-DRPU_BLAS=MKL" --install-option="-G 'Visual Studio 16 2019'"
+    $ pip install -v aihwkit --install-option="-DUSE_CUDA=ON" --install-option="-DRPU_BLAS=MKL" --install-option="-GVisual Studio 16 2019"
 
 Windows with OpenBLAS (Experimental)
 """"""""""""""""""""""""""""""""""""
