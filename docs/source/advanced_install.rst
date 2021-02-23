@@ -48,6 +48,7 @@ instructions for several operative systems:
 
 Debian-based
 """"""""""""
+
 On a Debian-based operative system, the following commands can be used for
 installing the minimal dependencies::
 
@@ -74,10 +75,35 @@ the minimal dependencies [#f3]_::
     $ conda install -c pytorch pytorch
 
 
-Windows (Experimental)
-""""""""""""""""""""""
+Windows using conda (Experimental)
+""""""""""""""""""""""""""""""""""
 
-On a Windows-based system, we recommend to install OpenBLAS following this
+On a Windows-based system, the following instructions can be used for
+installing the dependencies::
+
+1. Install (regular) `Miniconda`_, install newest `Cuda`_ driver (if available)
+   and the `MS Visual Studio 2019`_ community edition with ``Desktop development
+   with C++`` workload.
+
+2. Start ``anaconda powershell`` (miniconda) and install the following
+   packages::
+
+    $ conda install pybind11 scikit-build
+    $ conda install pytorch -c pytorch
+    $ conda install -c intel mkl mkl-devel mkl-static mkl-include
+
+Using this method, please make sure that the flags ``-DRPU_BLAS=MKL`` and
+``-G "Visual Studio 16 2019"`` are passed to the installation and compilation
+commands. In particular, use the following command instead of the default one
+in the `Installing and compiling` sub-section::
+
+    $ pip install -v aihwkit --install-option="-DUSE_CUDA=ON" --install-option="-DRPU_BLAS=MKL" --install-option="-G 'Visual Studio 16 2019'"
+
+Windows with OpenBLAS (Experimental)
+""""""""""""""""""""""""""""""""""""
+
+As an alternative on Windows-based system, compilation using OpenBLAS is also
+possible. We recommend installing OpenBLAS following this
 `OpenBLAS - Visual Studio`_ installation and usage guide. It requires
 installing `MS Visual Studio 2019`_ and `Miniconda`_.
 
@@ -90,12 +116,13 @@ following commands can be used for installing the minimal dependencies::
 For compiling ``aihwkit``, it is recommended to use the x64 Native Tools Command
 Prompt for VS 2019.
 
-Note: If you want to use ``pip`` instead of ``conda``, the following commands can
-be used::
+.. note::
+
+    If you want to use ``pip`` instead of ``conda``, the following commands can
+    be used::
 
     $ pip install cmake scikit-build pybind11
     $ pip install torch -f https://download.pytorch.org/whl/torch_stable.html
-
 
 Installing and compiling
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -155,3 +182,4 @@ of the command will help diagnosing the issue.
 .. _OpenBLAS - Visual Studio: https://github.com/xianyi/OpenBLAS/wiki/How-to-use-OpenBLAS-in-Microsoft-Visual-Studio
 .. _MS Visual Studio 2019: https://visualstudio.microsoft.com/vs/
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
+.. _Cuda: https://developer.nvidia.com/cuda-toolkit
