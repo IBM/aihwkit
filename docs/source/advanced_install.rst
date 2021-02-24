@@ -79,7 +79,7 @@ Windows using conda (Experimental)
 """"""""""""""""""""""""""""""""""
 
 On a Windows-based system, the following instructions can be used for
-installing the dependencies::
+installing the dependencies:
 
 1. Install (regular) `Miniconda`_, install newest `Cuda`_ driver (if available)
    and the `MS Visual Studio 2019`_ community edition with ``Desktop development
