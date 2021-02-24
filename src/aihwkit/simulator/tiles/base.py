@@ -281,7 +281,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             ValueError: if the tile has bias but ``bias`` has not been
                 specified.
 
-        .. _`Rasch, Gokmen & Haensch (2019)` https://arxiv.org/abs/1906.02698
+        .. _`Rasch, Gokmen & Haensch (2019)`: https://arxiv.org/abs/1906.02698
         """
         # Prepare the array expected by the pybind function, appending the
         # biases row if needed.
