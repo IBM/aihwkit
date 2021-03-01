@@ -63,6 +63,32 @@ class AnalogSequential(Sequential):
 
         return self
 
+    def to(
+            self,
+            device: Optional[Union[torch_device, str, int]] = None
+    ) -> 'AnalogSequential':
+        """Moves and/or casts the parameters, buffers and analog tiles.
+
+        Args:
+            device: the desired device of the parameters, buffers and analog
+                tiles in this module.
+
+        Returns:
+            This module in the specified device.
+
+        Raises:
+            ModuleError: if the device is not a cuda device.
+        """
+        if isinstance(device, torch_device):
+            if device.type == 'cuda':
+                raise ModuleError('Analog layer can only be moved to cuda')
+
+        super().to(device)
+
+        self._apply_to_analog(lambda m: m.cuda(device))
+
+        return self
+
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
         """(Program) and drift all analog inference layers of a given model.
 
