@@ -149,7 +149,7 @@ class AnalogLayerTest(ParametrizedTestCase):
 
         # Create a container and move to cuda.
         model = AnalogSequential(layer)
-        model = model.to(device('cuda'))
+        model.to(device('cuda'))
 
         # Assert the tile has been moved to cuda.
         self.assertIsInstance(layer.analog_tile, expected_class)

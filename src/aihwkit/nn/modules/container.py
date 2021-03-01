@@ -79,6 +79,7 @@ class AnalogSequential(Sequential):
         Raises:
             ModuleError: if the device is not a cuda device.
         """
+        # pylint: disable=arguments-differ
         if isinstance(device, torch_device):
             if device.type != 'cuda':
                 raise ModuleError('Analog layer can only be moved to cuda')
