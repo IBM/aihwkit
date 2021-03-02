@@ -59,7 +59,7 @@ class AnalogSequential(Sequential):
     ) -> 'AnalogSequential':
         super().cuda(device)
 
-        self._apply_to_analog(lambda m: m.cuda())
+        self._apply_to_analog(lambda m: m.cuda(device))
 
         return self
 
