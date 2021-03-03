@@ -38,11 +38,11 @@ The format is based on [Keep a Changelog], and this project adheres to
   `ECRamPresetDevice`, `CapacitorPresetDevice`, and device presets
   that are based on models in the literatur,
   e.g. `GokmenVlasovPresetDevice` and `IdealizedPresetDevice`. They
-  can be used defining the device field in the `RPUConfig`. (\#???)
+  can be used defining the device field in the `RPUConfig`. (\#144)
 * Added a library of config presets, such as `ReRamESPreset`,
   `Capacitor2Preset`, `TikiTakaReRamESPreset`, and many more. These can
   be used for tile configration (``rpu_config``). They specify a
-  particular device and optimizer choice. (\#???)
+  particular device and optimizer choice. (\#144)
 
 #### Fixed
 
