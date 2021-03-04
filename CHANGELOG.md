@@ -44,7 +44,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   be used for tile configration (``rpu_config``). They specify a
   particular device and optimizer choice. (\#144)
 * Utility for visualization the pulse reponse properties of a given
-  device configuration.  (\#???)
+  device configuration.  (\#146)
 
 #### Fixed
 
