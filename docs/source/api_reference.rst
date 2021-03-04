@@ -9,6 +9,7 @@ API Reference
    aihwkit.simulator
    aihwkit.simulator.configs
    aihwkit.simulator.noise_models
+   aihwkit.simulator.presets
    aihwkit.simulator.tiles
    aihwkit.nn
    aihwkit.nn.functions
