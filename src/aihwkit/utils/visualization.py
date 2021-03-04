@@ -1,0 +1,487 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+"""Visualization utilities."""
+
+from typing import Tuple, Any
+from copy import deepcopy
+
+from matplotlib.figure import Figure
+from numpy import ndarray
+
+from torch import ones, eye, from_numpy
+from torch import device as torch_device
+
+import numpy as np
+import matplotlib.ticker as ticker
+import matplotlib.pyplot as plt
+
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.tiles import (
+    AnalogTile, BaseTile
+)
+from aihwkit.simulator.rpu_base import cuda
+from aihwkit.simulator.configs.devices import PulsedDevice
+from aihwkit.simulator.configs.utils import (
+    IOParameters, WeightNoiseType, NoiseManagementType, BoundManagementType
+)
+
+
+def compute_pulse_response(
+        analog_tile: BaseTile,
+        direction: ndarray,
+        use_forward: bool = False
+) -> ndarray:
+    """Computes the pulse response of a given device configuration.
+
+    Params:
+        analog_tile: Base tile used for computing the weight traces
+        direction: numpy vector of directions to sequentially apply (-1 or 1)
+        use_forward: Whether to use the (noisy) forward pass to read out the weights
+            (otherwise returns exact weight value).
+
+    Returns:
+       An numpy array ``w_trace`` of dimensions ``len(direction) x out_size x in_size``
+    """
+    out_size = analog_tile.out_size
+    in_size = analog_tile.in_size
+
+    if analog_tile.is_cuda:
+        device = torch_device('cuda')
+    else:
+        device = torch_device('cpu')
+
+    total_iters = len(direction)
+    w_trace = np.zeros((total_iters, out_size, in_size))
+    in_vector = -ones(1, in_size, device=device)
+    out_vector = ones(1, out_size, device=device)
+    in_eye = eye(in_size, device=device)
+    dir_tensor = from_numpy(direction).float().to(device)
+
+    for i in range(total_iters):
+
+        # update the pulses
+        analog_tile.update(in_vector, out_vector * dir_tensor[i])
+
+        if use_forward:
+            # save weights by using the forward pass (to get the short-term read noise)
+            w_trace[i, :, :] = analog_tile.forward(in_eye).detach().cpu().numpy().T
+        else:
+            # noise free
+            w_trace[i, :, :] = analog_tile.get_weights()[0].detach().cpu().numpy()
+
+    return w_trace
+
+
+def plot_pulse_response(
+        analog_tile: BaseTile,
+        direction: ndarray,
+        use_forward: bool = False
+) -> ndarray:
+    """Plots the pulse response of a direction vector for each weight of
+    the analog tile.
+
+    Params:
+        analog_tile: Base tile used for computing the weight traces
+        direction: vector of directions to sequentially apply (-1 or 1)
+        use_forward: Whether to use the (noisy) forward pass to read out the weights
+            (otherwise returns exact weight value).
+
+    Returns:
+       w_trace: from :func:`compute_pulse_response`
+    """
+    w_trace = compute_pulse_response(analog_tile, direction, use_forward)
+
+    plt.plot(w_trace.reshape(w_trace.shape[0], -1))
+    if use_forward:
+        plt.title(analog_tile.rpu_config.device.__class__.__name__)
+    else:
+        plt.title('{} (without cycle/read noise)'
+                  .format(analog_tile.rpu_config.device.__class__.__name__))
+    plt.ylabel('Weight [conductance]')
+    plt.xlabel('Pulse number #')
+
+    return w_trace
+
+
+def compute_pulse_statistics(
+        w_nodes: ndarray,
+        w_trace: ndarray,
+        direction: ndarray,
+        up_direction: bool,
+        smoothness: float = 0.5
+) -> Tuple[ndarray, ndarray]:
+    """Computes the statistics of the step trace from :func:`compute_step_response`.
+
+    Params:
+        w_nodes: weight range vector to estimate the step histogram
+        w_trace: weight trace from :func:`compute_step_response`
+        direction: direction vector used to generate the weight traces
+        up_direction: whether and plot to compute the statistics for up or down direction
+        smoothness: value for smoothing the estimation of the
+            statistical step response curves
+
+    Returns:
+        Tuple of ``(dw_mean, dw_std)``.
+    """
+    # pylint: disable=too-many-locals
+
+    def calc_mean_and_std(
+            node: ndarray,
+            w_values: ndarray,
+            delta_w: ndarray,
+            lam: float
+    ) -> Tuple[ndarray, ndarray]:
+        """Calculates the mean and std of a w location (node).
+
+        Note:
+            In case there are multiple trials then it also includes
+            device-to-device variation.
+        """
+        alpha = np.exp(-0.5*(node - w_values)**2/lam**2)
+        beta = alpha.sum(axis=0)
+        alpha[:, beta < 2] = np.nan
+        alpha /= np.expand_dims(beta, axis=0)
+        mean = np.sum(alpha*delta_w, axis=0)
+        std = np.sqrt(np.sum(alpha*(delta_w - np.expand_dims(mean, axis=0))**2, axis=0))
+        return (mean, std)
+
+    # dw statistics
+    delta_w = np.diff(w_trace, axis=0)
+    w_trace_s = w_trace[:-1, :, :]
+    if up_direction:
+        msk = np.logical_and(direction[:-1] > 0, np.diff(direction) == 0)
+        w_values = w_trace_s[msk, :, :]
+        delta_w_values = delta_w[msk, :, :]
+    else:
+        msk = np.logical_and(direction[:-1] < 0, np.diff(direction) == 0)
+        w_values = w_trace_s[msk, :, :]
+        delta_w_values = delta_w[msk, :, :]
+
+    dw_mean = np.zeros((len(w_nodes), w_trace.shape[1], w_trace.shape[2]))
+    dw_std = np.zeros((len(w_nodes), w_trace.shape[1], w_trace.shape[2]))
+
+    lam = (w_nodes[1]-w_nodes[0])/2*smoothness
+    for i, node in enumerate(w_nodes):
+        dw_mean[i, :, :], dw_std[i, :, :] = calc_mean_and_std(node, w_values, delta_w_values, lam)
+
+    return dw_mean, dw_std
+
+
+def plot_pulse_statistics(
+        w_trace: ndarray,
+        direction: ndarray,
+        up_direction: bool,
+        num_nodes: int = 100,
+        smoothness: float = 0.5
+) -> Tuple[ndarray, ndarray, ndarray]:
+    """Plots the dG-G curve from a given weight trace and direction vector.
+
+    Params:
+        w_trace: weight trace from :func:`compute_pulse_response`
+        direction: direction vector used to generate ``w_trace``
+        up_direction: whether and plot to compute the statistics for up or down direction
+        num_nodes: number of nodes for estimation of the step histogram
+        smoothness: value for smoothing the estimation of the
+            statistical step response curves
+
+    Returns:
+        A tuple (w_nodes, dw_mean, dw_std) from :func:`compute_pulse_statistics`
+    """
+
+    def errorbar_patch(x: ndarray, mean: ndarray, std: ndarray) -> None:
+        """Plots a patchy error bar."""
+        axis = plt.plot(x, mean)[0]
+        plt.fill_between(x, mean - std, mean + std, edgecolor=None,
+                         facecolor=axis.get_color(), alpha=0.5)
+
+    # compute statistics
+    w_nodes = np.linspace(w_trace.min(), w_trace.max(), num_nodes)
+    dw_mean, dw_std = compute_pulse_statistics(w_nodes, w_trace, direction, up_direction,
+                                               smoothness)
+
+    n_traces = dw_mean.shape[1] * dw_mean.shape[2]
+
+    for i in range(n_traces):
+        errorbar_patch(w_nodes,
+                       dw_mean.reshape(-1, n_traces)[:, i],
+                       dw_std.reshape(-1, n_traces)[:, i])
+
+    plt.xlabel('Weight $w$')
+    plt.ylabel('Avg. step $\\Delta w$')
+    if up_direction:
+        plt.title('up-direction')
+    else:
+        plt.title('down-direction')
+
+    return w_nodes, dw_mean, dw_std
+
+
+def get_tile_for_plotting(
+        rpu_config: SingleRPUConfig,
+        n_traces: int,
+        use_cuda: bool = False,
+        noise_free: bool = False
+) -> BaseTile:
+    """Returns an analog tile for plotting the response curve.
+
+    Params:
+        rpu_config: RPU Configuration to use for plotting
+        n_traces: Number of traces to plot
+        use_cuda: Whether to use the CUDA implementation (if available)
+        noise_free: Whether to turn-off cycle-to-cycle noises
+
+    Returns:
+        Instantiated tile.
+    """
+    config = deepcopy(rpu_config)
+
+    # make sure we use single pulses for the overview
+    config.update.update_bl_management = False
+    config.update.update_management = False
+    config.update.desired_bl = 1
+
+    if noise_free:
+        config.forward.is_perfect = True
+
+        config.device.dw_min_std = 0.0  # noise free
+        if hasattr(config.device, 'write_noise_std') and \
+           getattr(config.device, 'write_noise_std') > 0.0:
+            # just make very small to avoid hidden parameter mismatch
+            setattr(config.device, 'write_noise_std', 1e-6)
+
+    analog_tile = AnalogTile(n_traces, 1, config)  # type: BaseTile
+    analog_tile.set_learning_rate(1)
+    weights = config.device.w_min*ones((n_traces, 1))
+    analog_tile.set_weights(weights)
+
+    if use_cuda and cuda.is_compiled():
+        return analog_tile.cuda()
+    return analog_tile
+
+
+def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
+    """Estimates the n_steps.
+
+    Note:
+        The estimate of the number of update pulses needed to drive
+        from smallest to largest conductance. The estimation just
+        assumes linear behavior, thus only be a rough estimate for
+        non-linear response curves.
+
+    Params:
+        rpu_config: RPU Configuration to use for plotting
+
+    Returns:
+        Guessed number of steps
+    """
+    dw_min = rpu_config.device.dw_min
+    w_min = rpu_config.device.w_min
+    w_max = rpu_config.device.w_max
+
+    n_steps = int(np.round((w_max - w_min) / dw_min))
+    return n_steps
+
+
+def plot_response_overview(
+        rpu_config: SingleRPUConfig,
+        n_loops: int = 5,
+        n_steps: int = None,
+        n_traces: int = 5,
+        use_cuda: bool = False,
+        smoothness: float = 0.1
+) -> None:
+    """Plots the step response and statistics of a given device configuration.
+
+    Params:
+        rpu_config: RPU Configuration to use for plotting
+        n_loops: How many hyper-cycles (up/down pulse sequences) to plot
+        n_steps: Number of up/down steps per cycle. If not given, will be estimated.
+        n_traces: Number of traces to plot
+        use_cuda: Whether to use the CUDA implementation (if available)
+        smoothness: value for smoothing the estimation of the
+            statistical step response curves
+        verbose: Whether to print details of the constructed tile.
+    """
+    if n_steps is None:
+        n_steps = estimate_n_steps(rpu_config)
+
+    total_iters = min(max(n_loops*2*n_steps, 1000), max(50000, 2*n_steps))
+    direction = np.sign(np.sin(np.pi*(np.arange(total_iters)+1)/n_steps))
+
+    plt.clf()
+
+    # 1. noisy tile:
+    analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
+    plt.subplot(3, 1, 1)
+    plot_pulse_response(analog_tile, direction, use_forward=True)
+
+    # 2. noise-free tile
+    analog_tile_noise_free = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=True)
+    analog_tile_noise_free.set_hidden_parameters(analog_tile.get_hidden_parameters())
+
+    plt.subplot(3, 1, 2)
+    w_trace = plot_pulse_response(analog_tile_noise_free, direction, use_forward=False)
+
+    num_nodes = min(n_steps, 100)
+    # 3. plot up statistics
+    plt.subplot(3, 2, 5)
+    plot_pulse_statistics(w_trace, direction, True, num_nodes, smoothness)
+
+    # 4. plot down statistics
+    plt.subplot(3, 2, 6)
+    plot_pulse_statistics(w_trace, direction, False, num_nodes, smoothness)
+
+    plt.tight_layout()
+
+
+def plot_device(device: PulsedDevice, w_noise: float = 0.0, **kwargs: Any) -> None:
+    """Plots the step response figure for a given device (preset).
+
+    Note:
+        It will use an amount of read weight noise ``w_noise`` for
+        reading the weights.
+
+    Params:
+        device: PulsedDevice parameters
+        w_noise: Weight noise standard deviation during read
+        kwargs: for other parameters, see :func:`plot_response_overview`
+    """
+    plt.figure(figsize=[7, 7])
+    # to simulate some weight read noise
+    io_pars = IOParameters(out_noise=0.0,    # no out noise
+                           w_noise=w_noise,  # quite low
+                           inp_res=-1.,      # turn off DAC
+                           out_bound=100.,   # not limiting
+                           out_res=-1.,      # turn off ADC
+                           bound_management=BoundManagementType.NONE,
+                           noise_management=NoiseManagementType.NONE,
+                           w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
+
+    rpu_config = SingleRPUConfig(device=device, forward=io_pars)
+
+    plot_response_overview(rpu_config, **kwargs)
+
+
+def plot_device_compact(
+        device: PulsedDevice,
+        w_noise: float = 0.0,
+        n_steps: int = None,
+        n_traces: int = 3
+) -> Figure:
+    """Plots a compact step response figure for a given device (preset).
+
+    Note:
+        It will use an amount of read weight noise ``w_noise`` for
+        reading the weights.
+
+    Params:
+        device: PulsedDevice parameters
+        w_noise: Weight noise standard deviation during read
+        n_steps: Number of steps for up/down cycle
+        n_traces: Number of traces to plot (for device-to-device variation)
+        show: if `True`, displays the figure.
+
+    Returns:
+        the compact step response figure.
+    """
+    # pylint: disable=too-many-locals,too-many-statements
+    figure = plt.figure(figsize=[12, 4])
+
+    # to simulate some weight read noise
+    io_pars = IOParameters(out_noise=0.0,    # no out noise
+                           w_noise=w_noise,  # quite low
+                           inp_res=-1.,      # turn off DAC
+                           out_bound=100.,   # not limiting
+                           out_res=-1.,      # turn off ADC
+                           bound_management=BoundManagementType.NONE,
+                           noise_management=NoiseManagementType.NONE,
+                           w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
+
+    rpu_config = SingleRPUConfig(device=device, forward=io_pars)
+
+    if n_steps is None:
+        n_steps = estimate_n_steps(rpu_config)
+
+    use_cuda = False
+
+    # noisy tile response curves
+    n_loops = 2
+    total_iters = n_loops*2*n_steps
+    direction = np.sign(np.sin(np.pi*(np.arange(total_iters)+1)/n_steps))
+
+    analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
+    w_trace = compute_pulse_response(analog_tile, direction, use_forward=True)\
+        .reshape(-1, n_traces)
+
+    axis = figure.add_subplot(1, 1, 1)
+    axis.plot(w_trace, linewidth=1)
+    axis.set_title(analog_tile.rpu_config.device.__class__.__name__)
+    axis.set_xlabel('Pulse number #')
+    limit = np.abs(w_trace).max()*1.2
+    axis.set_ylim(-limit, limit)
+    axis.set_xlim(0, total_iters-1)
+    axis.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
+
+    # noise-free tile for statistics
+    n_loops = 1
+    total_iters = min(max(n_loops*2*n_steps, 1000), max(50000, 2*n_steps))
+    direction = np.sign(np.sin(np.pi*(np.arange(total_iters)+1)/n_steps))
+
+    analog_tile_noise_free = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=True)
+    analog_tile_noise_free.set_hidden_parameters(analog_tile.get_hidden_parameters())
+
+    w_trace = compute_pulse_response(analog_tile_noise_free, direction, False)
+
+    # compute statistics
+    num_nodes = min(n_steps, 100)
+    w_nodes = np.linspace(w_trace.min(), w_trace.max(), num_nodes)
+
+    dw_mean_up = compute_pulse_statistics(w_nodes, w_trace, direction, True)[0]\
+        .reshape(-1, n_traces)
+    dw_mean_down = compute_pulse_statistics(w_nodes, w_trace, direction, False)[0]\
+        .reshape(-1, n_traces)
+
+    # plot mean up statistics
+    pos = axis.get_position().bounds
+    space = 0.1
+    gap = 0.01
+    axis.set_position([pos[0] + gap + space, pos[1], pos[2] - 2*gap - 2*space, pos[3]])
+    axis.set_yticks([])
+
+    axis_left = figure.add_axes([pos[0], pos[1], space, pos[3]])
+    dw_mean_up = dw_mean_up.reshape(-1, n_traces)
+    for i in range(n_traces):
+        axis_left.plot(dw_mean_up[:, i], w_nodes)
+
+    axis_left.set_position([pos[0], pos[1], space, pos[3]])
+    axis_left.set_xlabel('Up pulse size')
+    axis_left.set_ylabel('Weight \n [conductance]')
+    axis_left.set_ylim(-limit, limit)
+
+    # plot mean down statistics
+    axis_right = figure.add_axes([pos[0] + pos[2] - space, pos[1], space, pos[3]])
+    dw_mean_down = dw_mean_down.reshape(-1, n_traces)
+    for i in range(n_traces):
+        axis_right.plot(np.abs(dw_mean_down[:, i]), w_nodes)
+
+    axis_right.set_yticks([])
+    axis_right.set_xlabel('Down pulse size')
+    axis_right.set_ylim(-limit, limit)
+
+    # set xlim's
+    limit = np.maximum(np.nanmax(np.abs(dw_mean_down)),
+                       np.nanmax(np.abs(dw_mean_up))) * 1.2
+    axis_left.set_xlim(0.0, limit)
+    axis_right.set_xlim(0.0, limit)
+
+    return figure
