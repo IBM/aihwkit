@@ -28,7 +28,7 @@ class ReRamESPresetDevice(ExpStepDevice):
 
     Fit of the model :class:`ExpStepDevice` to  `Gong & al., Nat. Commun., 2018`_.
 
-    .. _`Gong & al., Nat. Commun., 2018` https://www.nature.com/articles/s41467-018-04485-1
+    .. _`Gong & al., Nat. Commun., 2018`: https://www.nature.com/articles/s41467-018-04485-1
     """
     # pylint: disable=invalid-name
 
@@ -69,7 +69,7 @@ class ReRamSBPresetDevice(SoftBoundsDevice):
         point by subtracting a reference device (which is in this case not
         explicitly modeled). For a more accurate fit see :class:`ReRamESPresetDevice`.
 
-    .. _`Gong & al., Nat. Commun., 2018` https://www.nature.com/articles/s41467-018-04485-1
+    .. _`Gong & al., Nat. Commun., 2018`: https://www.nature.com/articles/s41467-018-04485-1
     """
 
     dw_min: float = 0.0018
@@ -111,7 +111,7 @@ class CapacitorPresetDevice(LinearStepDevice):
 
         The parameter ``lifetime`` needs to be adjusted accordingly.
 
-    .. _`Li & al., VLSI, 2018` https://ieeexplore.ieee.org/abstract/document/8510648
+    .. _`Li & al., VLSI, 2018`: https://ieeexplore.ieee.org/abstract/document/8510648
     """
 
     dw_min: float = 0.005
@@ -155,7 +155,7 @@ class EcRamPresetDevice(LinearStepDevice):
 
     Fit of the model :class:`LinearStepDevice` to  `Tang & al., IEDM, 2018`_
 
-    .. _`Tang & al., IEDM, 2018` https://ieeexplore.ieee.org/document/8614551
+    .. _`Tang & al., IEDM, 2018`: https://ieeexplore.ieee.org/document/8614551
     """
 
     dw_min: float = 0.0021
@@ -205,9 +205,9 @@ class IdealizedPresetDevice(ConstantStepDevice):
     This is the same device used for
     `Rasch, Gokmen & Haensch, IEEE Design & Test, 2019`_.
 
-    .. _`Gokmen & Vlasov, Front. Neurosci. 2016` \
+    .. _`Gokmen & Vlasov, Front. Neurosci. 2016`: \
        https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
-    .. _`Rasch, Gokmen & Haensch, IEEE Design & Test, 2019`_ https://arxiv.org/abs/1906.02698
+    .. _`Rasch, Gokmen & Haensch, IEEE Design & Test, 2019`: https://arxiv.org/abs/1906.02698
     """
 
     dw_min: float = 0.0002  # Factor 5 smaller steps.
@@ -237,7 +237,7 @@ class GokmenVlasovPresetDevice(ConstantStepDevice):
     follow-up papers as well and here scale everything to the weight range
     ``-1..1``.
 
-    .. _`Gokmen & Vlasov, Front. Neurosci. 2016` \
+    .. _`Gokmen & Vlasov, Front. Neurosci. 2016`: \
        https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
 

@@ -61,7 +61,7 @@ class ReRamSBPreset(SingleRPUConfig):
 @dataclass
 class CapacitorPreset(SingleRPUConfig):
     """Preset configuration using a single capacitor device, see
-    class:`CapacitorPresetDevice`.
+    :class:`CapacitorPresetDevice`.
     """
 
     device: PulsedDevice = field(default_factory=CapacitorPresetDevice)
@@ -73,7 +73,7 @@ class CapacitorPreset(SingleRPUConfig):
 @dataclass
 class EcRamPreset(SingleRPUConfig):
     """Preset configuration using a single EcRAM device, see
-    class:`EcRamPresetDevice`.
+    :class:`EcRamPresetDevice`.
     """
 
     device: PulsedDevice = field(default_factory=EcRamPresetDevice)
@@ -85,7 +85,7 @@ class EcRamPreset(SingleRPUConfig):
 @dataclass
 class IdealizedPreset(SingleRPUConfig):
     """Preset configuration using a single idealized device, see
-    class:`IdealizedPresetDevice`.
+    :class:`IdealizedPresetDevice`.
     """
 
     device: PulsedDevice = field(default_factory=IdealizedPresetDevice)
@@ -111,7 +111,7 @@ class GokmenVlasovPreset(SingleRPUConfig):
 @dataclass
 class ReRamES2Preset(UnitCellRPUConfig):
     """Preset configuration using two ReRam devices per cross-point
-    (class:`ReRamESPresetDevice`), where both are updated with random
+    (:class:`ReRamESPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -127,7 +127,7 @@ class ReRamES2Preset(UnitCellRPUConfig):
 @dataclass
 class ReRamSB2Preset(UnitCellRPUConfig):
     """Preset configuration using two ReRam devices per cross-point
-    (class:`ReRamSBPresetDevice`), where both are updated with random
+    (:class:`ReRamSBPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -143,7 +143,7 @@ class ReRamSB2Preset(UnitCellRPUConfig):
 @dataclass
 class Capacitor2Preset(UnitCellRPUConfig):
     """Preset configuration using two Capacitor devices per cross-point
-    (class:`CapacitorPresetDevice`), where both are updated with random
+    (:class:`CapacitorPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -159,7 +159,7 @@ class Capacitor2Preset(UnitCellRPUConfig):
 @dataclass
 class EcRam2Preset(UnitCellRPUConfig):
     """Preset configuration using two Capacitor devices per cross-point
-    (class:`CapacitorPresetDevice`), where both are updated with random
+    (:class:`CapacitorPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -175,7 +175,7 @@ class EcRam2Preset(UnitCellRPUConfig):
 @dataclass
 class Idealized2Preset(UnitCellRPUConfig):
     """Preset configuration using two Idealized devices per cross-point
-    (class:`IdealizedPresetDevice`), where both are updated with random
+    (:class:`IdealizedPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -193,7 +193,7 @@ class Idealized2Preset(UnitCellRPUConfig):
 @dataclass
 class ReRamES4Preset(UnitCellRPUConfig):
     """Preset configuration using four ReRam devices per cross-point
-    (class:`ReRamESPresetDevice`), where both are updated with random
+    (:class:`ReRamESPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -210,7 +210,7 @@ class ReRamES4Preset(UnitCellRPUConfig):
 @dataclass
 class ReRamSB4Preset(UnitCellRPUConfig):
     """Preset configuration using four ReRam devices per cross-point
-    (class:`ReRamSBPresetDevice`), where both are updated with random
+    (:class:`ReRamSBPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -227,7 +227,7 @@ class ReRamSB4Preset(UnitCellRPUConfig):
 @dataclass
 class Capacitor4Preset(UnitCellRPUConfig):
     """Preset configuration using four Capacitor devices per cross-point
-    (class:`CapacitorPresetDevice`), where both are updated with random
+    (:class:`CapacitorPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -244,7 +244,7 @@ class Capacitor4Preset(UnitCellRPUConfig):
 @dataclass
 class EcRam4Preset(UnitCellRPUConfig):
     """Preset configuration using four Capacitor devices per cross-point
-    (class:`CapacitorPresetDevice`), where both are updated with random
+    (:class:`CapacitorPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -261,7 +261,7 @@ class EcRam4Preset(UnitCellRPUConfig):
 @dataclass
 class Idealized4Preset(UnitCellRPUConfig):
     """Preset configuration using four Idealized devices per cross-point
-    (class:`IdealizedPresetDevice`), where both are updated with random
+    (:class:`IdealizedPresetDevice`), where both are updated with random
     selection policy for update.
     """
 
@@ -280,7 +280,7 @@ class Idealized4Preset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaReRamESPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    class:`ReRamESPresetDevice` and standard ADC/DAC hardware
+    :class:`ReRamESPresetDevice` and standard ADC/DAC hardware
     etc configuration.
     """
 
@@ -300,7 +300,7 @@ class TikiTakaReRamESPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaReRamSBPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    class:`ReRamSBPresetDevice` and standard ADC/DAC hardware
+    :class:`ReRamSBPresetDevice` and standard ADC/DAC hardware
     etc configuration.
     """
 
@@ -320,7 +320,7 @@ class TikiTakaReRamSBPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaCapacitorPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    class:`CapacitorPresetDevice` and standard ADC/DAC hardware
+    :class:`CapacitorPresetDevice` and standard ADC/DAC hardware
     etc configuration.
     """
 
@@ -340,7 +340,7 @@ class TikiTakaCapacitorPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaEcRamPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    class:`EcRamPresetDevice` and standard ADC/DAC hardware
+    :class:`EcRamPresetDevice` and standard ADC/DAC hardware
     etc configuration.
     """
 
@@ -360,7 +360,7 @@ class TikiTakaEcRamPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaIdealizedPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    class:`IdealizedPresetDevice` and standard ADC/DAC hardware
+    :class:`IdealizedPresetDevice` and standard ADC/DAC hardware
     etc configuration.
     """
 
