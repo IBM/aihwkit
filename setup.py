@@ -69,5 +69,8 @@ setup(
     },
     install_requires=INSTALL_REQUIRES,
     python_requires='>=3.6',
-    zip_safe=False
+    zip_safe=False,
+    extras_require={
+        'visualization': ['matplotlib>=3.0']
+    }
 )
