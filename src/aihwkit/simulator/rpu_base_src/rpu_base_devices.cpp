@@ -345,6 +345,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("gamma_down_dtod", &LinearStepParam::ls_decrease_down_dtod)
       .def_readwrite("allow_increasing", &LinearStepParam::ls_allow_increasing_slope)
       .def_readwrite("mean_bound_reference", &LinearStepParam::ls_mean_bound_reference)
+      .def_readwrite("write_noise_std", &LinearStepParam::write_noise_std)
       .def_readwrite("mult_noise", &LinearStepParam::ls_mult_noise)
       .def("__str__", [](LinearStepParam &self) {
         std::stringstream ss;
@@ -355,6 +356,7 @@ void declare_rpu_devices(py::module &m) {
   py::class_<SoftBoundsParam, PySoftBoundsParam, PulsedParam>(
       m, "SoftBoundsResistiveDeviceParameter")
       .def_readwrite("mult_noise", &SoftBoundsParam::ls_mult_noise)
+      .def_readwrite("write_noise_std", &SoftBoundsParam::write_noise_std)
       .def(py::init<>())
       .def("__str__", [](SoftBoundsParam &self) {
         std::stringstream ss;
@@ -370,6 +372,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("gamma_down", &ExpStepParam::es_gamma_down)
       .def_readwrite("a", &ExpStepParam::es_a)
       .def_readwrite("b", &ExpStepParam::es_b)
+      .def_readwrite("write_noise_std", &ExpStepParam::write_noise_std)
       .def("__str__", [](ExpStepParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
