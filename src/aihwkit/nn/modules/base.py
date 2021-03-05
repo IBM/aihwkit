@@ -253,6 +253,22 @@ class AnalogModuleBase(Module):
         current_state['{}analog_tile_state'.format(prefix)] = analog_state
         return current_state
 
+    def cpu(self) -> 'AnalogModuleBase':
+        """Moves all model parameters, buffers and tiles to the CPU.
+
+        Note:
+            Please be aware that moving analog layers from GPU to CPU is
+            currently not supported.
+
+        Returns:
+            This layer with its parameters, buffers and tiles in CPU.
+        """
+        # pylint: disable=attribute-defined-outside-init
+        super().cpu()
+        self.analog_tile = self.analog_tile.cpu()  # type: BaseTile
+        self.set_weights(self.weight, self.bias)
+        return self
+
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
@@ -273,7 +289,7 @@ class AnalogModuleBase(Module):
         # pylint: disable=attribute-defined-outside-init
         # Note: this needs to be an in-place function, not a copy
         super().cuda(device)
-        self.analog_tile = self.analog_tile.cuda(device)  # type: BaseTile
+        self.analog_tile = self.analog_tile.cuda(device)  # type: ignore[no-redef]
         self.set_weights(self.weight, self.bias)
         return self
 

@@ -170,6 +170,10 @@ class InferenceTile(AnalogTile):
             weight_clip_params = parameters_to_bindings(self.rpu_config.clip)
             self.tile.clip_weights(weight_clip_params)
 
+    def cpu(self) -> 'BaseTile':
+        """Return a copy of this tile in CPU memory."""
+        return self
+
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
@@ -231,6 +235,10 @@ class CudaInferenceTile(InferenceTile):
         # Set the cuda properties
         self.stream = current_stream()
         self.device = torch_device(current_device())
+
+    def cpu(self) -> 'BaseTile':
+        """Return a copy of this tile in CPU memory."""
+        raise CudaError('CUDA tiles cannot be moved to CPU')
 
     def cuda(
             self,
