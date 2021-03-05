@@ -79,7 +79,8 @@ class AnalogSequential(Sequential):
         """Moves and/or casts the parameters, buffers and analog tiles.
 
         Note:
-            TODO
+            Please be aware that moving analog layers from GPU to CPU is
+            currently not supported.
 
         Args:
             device: the desired device of the parameters, buffers and analog

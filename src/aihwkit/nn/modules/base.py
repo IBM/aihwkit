@@ -256,6 +256,10 @@ class AnalogModuleBase(Module):
     def cpu(self) -> 'AnalogModuleBase':
         """Moves all model parameters, buffers and tiles to the CPU.
 
+        Note:
+            Please be aware that moving analog layers from GPU to CPU is
+            currently not supported.
+
         Returns:
             This layer with its parameters, buffers and tiles in CPU.
         """
