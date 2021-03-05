@@ -15,6 +15,7 @@
 from .configs import (
     # Single device configs.
     ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, IdealizedPreset,
+    GokmenVlasovPreset,
     # 2-device configs.
     ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, Idealized2Preset,
     # 4-device configs.

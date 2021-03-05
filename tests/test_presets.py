@@ -17,6 +17,7 @@ from torch import Tensor
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.presets import (
     ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, IdealizedPreset,
+    GokmenVlasovPreset,
     ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, Idealized2Preset,
     ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset, Idealized4Preset,
     TikiTakaReRamESPreset, TikiTakaReRamSBPreset, TikiTakaCapacitorPreset,
@@ -29,6 +30,7 @@ from .helpers.testcases import AihwkitTestCase
 @parametrize_over_presets(
     [
         ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, IdealizedPreset,
+        GokmenVlasovPreset,
         ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, Idealized2Preset,
         ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset, Idealized4Preset,
         TikiTakaReRamESPreset, TikiTakaReRamSBPreset, TikiTakaCapacitorPreset,
