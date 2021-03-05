@@ -99,8 +99,6 @@ def parametrize_over_presets(presets: List) -> Callable:
         """Return a user-friendly name for a parametrized test."""
         return '{}_{}'.format(cls.__name__, params_dict['preset_cls'])
 
-    print(presets)
-
     return parameterized_class(
         [{'preset_cls': preset} for preset in presets],
         class_name_func=class_name)
