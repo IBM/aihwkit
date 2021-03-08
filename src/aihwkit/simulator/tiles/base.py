@@ -413,6 +413,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         return self.tile.reset_columns(start_column_idx, num_columns, reset_prob)
 
+    def cpu(self) -> 'BaseTile':
+        """Return a copy of this tile in CPU memory."""
+        raise NotImplementedError
+
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
