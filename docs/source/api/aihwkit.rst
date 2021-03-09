@@ -16,3 +16,4 @@ Subpackages
    aihwkit.simulator
    aihwkit.nn
    aihwkit.optim
+   aihwkit.utils

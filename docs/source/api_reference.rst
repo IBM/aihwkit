@@ -19,6 +19,8 @@ API Reference
    aihwkit.nn.modules.linear
    aihwkit.optim
    aihwkit.optim.analog_sgd
+   aihwkit.utils
+   aihwkit.utils.visualization
 
 
 .. only:: env_local
