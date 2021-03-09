@@ -43,7 +43,7 @@ def compute_pulse_response(
 ) -> ndarray:
     """Computes the pulse response of a given device configuration.
 
-    Params:
+    Args:
         analog_tile: Base tile used for computing the weight traces
         direction: numpy vector of directions to sequentially apply (-1 or 1)
         use_forward: Whether to use the (noisy) forward pass to read out the weights
@@ -90,7 +90,7 @@ def plot_pulse_response(
     """Plots the pulse response of a direction vector for each weight of
     the analog tile.
 
-    Params:
+    Args:
         analog_tile: Base tile used for computing the weight traces
         direction: vector of directions to sequentially apply (-1 or 1)
         use_forward: Whether to use the (noisy) forward pass to read out the weights
@@ -122,7 +122,7 @@ def compute_pulse_statistics(
 ) -> Tuple[ndarray, ndarray]:
     """Computes the statistics of the step trace from :func:`compute_step_response`.
 
-    Params:
+    Args:
         w_nodes: weight range vector to estimate the step histogram
         w_trace: weight trace from :func:`compute_step_response`
         direction: direction vector used to generate the weight traces
@@ -186,7 +186,7 @@ def plot_pulse_statistics(
 ) -> Tuple[ndarray, ndarray, ndarray]:
     """Plots the dG-G curve from a given weight trace and direction vector.
 
-    Params:
+    Args:
         w_trace: weight trace from :func:`compute_pulse_response`
         direction: direction vector used to generate ``w_trace``
         up_direction: whether and plot to compute the statistics for up or down direction
@@ -234,7 +234,7 @@ def get_tile_for_plotting(
 ) -> BaseTile:
     """Returns an analog tile for plotting the response curve.
 
-    Params:
+    Args:
         rpu_config: RPU Configuration to use for plotting
         n_traces: Number of traces to plot
         use_cuda: Whether to use the CUDA implementation (if available)
@@ -278,7 +278,7 @@ def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
         assumes linear behavior, thus only be a rough estimate for
         non-linear response curves.
 
-    Params:
+    Args:
         rpu_config: RPU Configuration to use for plotting
 
     Returns:
@@ -302,7 +302,7 @@ def plot_response_overview(
 ) -> None:
     """Plots the step response and statistics of a given device configuration.
 
-    Params:
+    Args:
         rpu_config: RPU Configuration to use for plotting
         n_loops: How many hyper-cycles (up/down pulse sequences) to plot
         n_steps: Number of up/down steps per cycle. If not given, will be estimated.
@@ -351,7 +351,7 @@ def plot_device(device: PulsedDevice, w_noise: float = 0.0, **kwargs: Any) -> No
         It will use an amount of read weight noise ``w_noise`` for
         reading the weights.
 
-    Params:
+    Args:
         device: PulsedDevice parameters
         w_noise: Weight noise standard deviation during read
         kwargs: for other parameters, see :func:`plot_response_overview`
@@ -384,7 +384,7 @@ def plot_device_compact(
         It will use an amount of read weight noise ``w_noise`` for
         reading the weights.
 
-    Params:
+    Args:
         device: PulsedDevice parameters
         w_noise: Weight noise standard deviation during read
         n_steps: Number of steps for up/down cycle
