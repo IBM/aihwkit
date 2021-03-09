@@ -254,7 +254,7 @@ def get_tile_for_plotting(
 
         config.device.dw_min_std = 0.0  # Noise free.
         if (hasattr(config.device, 'write_noise_std') and
-            getattr(config.device, 'write_noise_std') > 0.0):
+                getattr(config.device, 'write_noise_std') > 0.0):
             # Just make very small to avoid hidden parameter mismatch.
             setattr(config.device, 'write_noise_std', 1e-6)
 
