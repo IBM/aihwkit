@@ -499,7 +499,7 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   io.out_bound = 0.2;
   io.inp_sto_round = false;
 
-  auto D_buffer = CudaArray<num_t>(&*this->context, d_size * m_batch);
+  auto D_buffer = CudaArray<num_t>(this->context, d_size * m_batch);
 
   // ASSERT_EQ(d_size==x_size,true); // otherwise simplification below will fail
 

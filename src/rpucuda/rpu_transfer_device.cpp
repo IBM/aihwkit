@@ -291,6 +291,7 @@ template <typename T> void TransferRPUDevice<T>::setTransferVecs(const T *transf
 }
 
 template <typename T> int TransferRPUDevice<T>::resetCounters(bool force) {
+
   current_col_indices_.resize(this->n_devices_);
   std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int)0);
   return VectorRPUDevice<T>::resetCounters(force);
@@ -544,6 +545,11 @@ template <typename T> void TransferRPUDevice<T>::diffuseWeights(T **weights, RNG
 
 template <typename T> void TransferRPUDevice<T>::clipWeights(T **weights, T clip) {
   LOOP_WITH_HIDDEN(clipWeights, COMMA clip);
+}
+
+template <typename T>
+void TransferRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
+  LOOP_WITH_HIDDEN(driftWeights, COMMA time_since_last_call COMMA rng);
 }
 
 template <typename T>

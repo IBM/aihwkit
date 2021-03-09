@@ -207,6 +207,14 @@ void VectorRPUDeviceCuda<T>::decayWeights(T *dev_weights, bool bias_no_decay) {
   reduceToWeights(this->context_, dev_weights);
 }
 
+template <typename T>
+void VectorRPUDeviceCuda<T>::driftWeights(T *dev_weights, T time_since_last_call) {
+
+  LOOP_DEVICES_WITH_CONTEXTS_K(
+      rpucuda_device_vec_[k]->driftWeights(dev_weights_ptrs_[k], time_since_last_call););
+  reduceToWeights(this->context_, dev_weights);
+}
+
 template <typename T> void VectorRPUDeviceCuda<T>::diffuseWeights(T *dev_weights) {
 
   LOOP_DEVICES_WITH_CONTEXTS_K(rpucuda_device_vec_[k]->diffuseWeights(dev_weights_ptrs_[k]););

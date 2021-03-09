@@ -44,6 +44,10 @@ template <typename T> SimpleRPUDevice<T>::SimpleRPUDevice(const SimpleRPUDevice<
   if (other.par_storage_ != nullptr) {
     par_storage_ = other.par_storage_->cloneUnique();
   }
+
+  if (other.wdrifter_) {
+    wdrifter_ = make_unique<WeightDrifter<T>>(*other.wdrifter_);
+  }
 }
 
 // copy assignment
@@ -66,6 +70,7 @@ SimpleRPUDevice<T> &SimpleRPUDevice<T>::operator=(SimpleRPUDevice<T> &&other) {
 
   initialize(other.x_size_, other.d_size_);
   par_storage_ = std::move(other.par_storage_);
+  wdrifter_ = std::move(other.wdrifter_);
   return *this;
 }
 
@@ -97,6 +102,13 @@ void SimpleRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
   }
 }
 
+template <typename T>
+void SimpleRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
+  if (hasWDrifter()) {
+    wdrifter_->apply(weights[0], time_since_last_call, rng);
+  }
+};
+
 template <typename T> void SimpleRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
 
   T diffusion = getPar().diffusion;
@@ -126,6 +138,12 @@ void SimpleRPUDevice<T>::populate(const SimpleRPUDeviceMetaParameter<T> &p, Real
 
   par_storage_ = p.cloneUnique();
   par_storage_->initialize();
+
+  if (p.drift.nu > 0) {
+    wdrifter_ = make_unique<WeightDrifter<T>>(this->size_, p.drift, rng);
+  } else {
+    wdrifter_ = nullptr;
+  }
 }
 
 template struct SimpleRPUDeviceMetaParameter<float>;

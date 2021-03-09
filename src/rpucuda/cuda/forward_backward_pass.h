@@ -181,7 +181,7 @@ void backwardMatrixIteratorIOManaged(
     // input management
     if (b_io_pars.bound_management != BoundManagementType::None) {
       RPU_FATAL("Bound management is not supported for backward pass.");
-    };
+    }
   }
 
   b_iom.setSharedBuffer(m_batch, in_buffer, out_buffer);

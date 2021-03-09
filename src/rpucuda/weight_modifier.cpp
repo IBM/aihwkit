@@ -151,6 +151,7 @@ void WeightModifier<T>::apply(
 
     const T res = wmpar.res;
     const T std = wmpar.std_dev * amax;
+
     if (res > 0 || std > 0) {
       const bool sto_round = wmpar.sto_round;
 

@@ -224,6 +224,11 @@ template <typename T> void RPUPulsed<T>::resetCols(int start_col, int n_cols, T 
   }
 }
 
+template <typename T> void RPUPulsed<T>::driftWeights(T time_since_last_call) {
+  CHECK_RPU_DEVICE_INIT;
+  rpu_device_->driftWeights(this->getWeightsPtr(), time_since_last_call, *this->rng_);
+}
+
 template <typename T> void RPUPulsed<T>::clipWeights(T clip) {
 
   CHECK_RPU_DEVICE_INIT;

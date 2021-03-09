@@ -63,6 +63,7 @@ public:
       AbstractRPUDeviceCuda<T> *rpucuda_device,
       T *dev_weights,
       const T lr,
+      const PulsedUpdateMetaParameter<T> &up,
       const int m_batch,
       const bool x_trans,
       const bool d_trans,
