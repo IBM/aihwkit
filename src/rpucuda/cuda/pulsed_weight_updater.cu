@@ -169,7 +169,7 @@ void PulsedWeightUpdater<T>::tuneUpdate(
   DEBUG_OUT(
       "UpdateTuner: Using " << opt_kernel_pars->getName() << " for PWU [" << opt_kernel_pars->timing
                             << "].\n");
-  DEBUG_CALL(opt_kernel_pars.print());
+  DEBUG_CALL(opt_kernel_pars->print());
 }
 
 template <typename T>

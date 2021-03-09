@@ -14,7 +14,7 @@
 
 from unittest import SkipTest
 
-from torch import Tensor
+from torch import Tensor, device
 
 from aihwkit.nn import AnalogSequential
 from aihwkit.simulator.tiles import AnalogTile, CudaAnalogTile
@@ -113,7 +113,7 @@ class AnalogLayerTest(ParametrizedTestCase):
             self.assertTensorAlmostEqual(gotten_biases, tile_biases)
 
     def test_sequential_move_to_cuda(self):
-        """Test sequential cuda."""
+        """Test moving AnalogSequential to cuda (from CPU)."""
         if not cuda.is_compiled():
             raise SkipTest('not compiled with CUDA support')
 
@@ -132,3 +132,55 @@ class AnalogLayerTest(ParametrizedTestCase):
 
         # Assert the tile has been moved to cuda.
         self.assertIsInstance(layer.analog_tile, expected_class)
+
+    def test_sequential_move_to_cuda_via_to(self):
+        """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
+        if not cuda.is_compiled():
+            raise SkipTest('not compiled with CUDA support')
+
+        # Map the original tile classes to the expected ones after `cuda()`.
+        tile_classes = {
+            AnalogTile: CudaAnalogTile,
+            CudaAnalogTile: CudaAnalogTile
+        }
+
+        layer = self.get_layer()
+        expected_class = tile_classes[layer.analog_tile.__class__]
+
+        # Create a container and move to cuda.
+        model = AnalogSequential(layer)
+        model.to(device('cuda'))
+
+        # Assert the tile has been moved to cuda.
+        self.assertIsInstance(layer.analog_tile, expected_class)
+
+
+@parametrize_over_layers(
+    layers=[Linear, Conv2d],
+    tiles=[ConstantStep],
+    biases=[True, False]
+)
+class CpuAnalogLayerTest(ParametrizedTestCase):
+    """Analog layers tests using CPU tiles as the source."""
+
+    def test_sequential_move_to_cpu(self):
+        """Test moving AnalogSequential to CPU (from CPU)."""
+        layer = self.get_layer()
+
+        # Create a container and move to cuda.
+        model = AnalogSequential(layer)
+        model.cpu()
+
+        # Assert the tile is still on CPU.
+        self.assertIsInstance(layer.analog_tile, AnalogTile)
+
+    def test_sequential_move_to_cpu_via_to(self):
+        """Test moving AnalogSequential to CPU (from CPU), using ``.to()``."""
+        layer = self.get_layer()
+
+        # Create a container and move to cuda.
+        model = AnalogSequential(layer)
+        model.to(device('cpu'))
+
+        # Assert the tile is still on CPU.
+        self.assertIsInstance(layer.analog_tile, AnalogTile)

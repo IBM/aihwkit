@@ -29,13 +29,35 @@ The format is based on [Keep a Changelog], and this project adheres to
   update). (\#99)
 * Option to excluded bias row for hardware-aware training noise. (\#99)
 * Two new convolution layers have been added: `AnalogConv1d` and `AnalogConv3d`,
-  mimicking their digital counterparts. (\#102, \#103).
+  mimicking their digital counterparts. (\#102, \#103)
+* Option to automatically scale the digital weights into the full range of the
+  simluated crossbar by applying a fixed output global factor in
+  digital. (\#129)
+* Added a library of device presets that are calibrated to real
+  hardware data, namely `ReRamESPresetDevice`, `ReRamSBPresetDevice`,
+  `ECRamPresetDevice`, `CapacitorPresetDevice`, and device presets
+  that are based on models in the literatur,
+  e.g. `GokmenVlasovPresetDevice` and `IdealizedPresetDevice`. They
+  can be used defining the device field in the `RPUConfig`. (\#144)
+* Added a library of config presets, such as `ReRamESPreset`,
+  `Capacitor2Preset`, `TikiTakaReRamESPreset`, and many more. These can
+  be used for tile configration (``rpu_config``). They specify a
+  particular device and optimizer choice. (\#144)
+* Utility for visualization the pulse response properties of a given
+  device configuration. (\#146)
 
 #### Fixed
 
 * Fixed small issues that resulted in warnings for windows compilation. (\#99)
 * Faulty backward noise management error message removed for perfect backward
   and CUDA. (\#99)
+* Fixed segfault when using diffusion or reset with vector unit cells for
+  CUDA. (\#129)
+* Fixed random states mismatch in IoManager that could cause crashed in same
+  network size and batch size cases for CUDA, in particular for
+  `TransferCompound`. (\#132)
+* Fixed wrong update for `TransferCompound` in case of `transfer_every` smaller
+  than the batch size. (\#132)
 
 #### Removed
 

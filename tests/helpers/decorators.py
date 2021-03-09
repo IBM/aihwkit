@@ -48,8 +48,8 @@ def parametrize_over_tiles(tiles: List) -> Callable:
 def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable:
     """Parametrize a TestCase over different kind of layers.
 
-    The ``TestCase`` will be repeated for each combination of
-    `layer`, `tile` and `bias`.
+    The ``TestCase`` will be repeated for each combination of `layer`, `tile`
+    and `bias`.
 
     Args:
         layers: list of layer descriptions.
@@ -79,4 +79,26 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable
     return parameterized_class(
         [object_to_dict(layer, tile, bias) for
          layer, tile, bias in product(layers, tiles, biases)],
+        class_name_func=class_name)
+
+
+def parametrize_over_presets(presets: List) -> Callable:
+    """Parametrize a TestCase over different kind of presets.
+
+    Note that this decorator expects a list of Presets, as opposed to a list of
+    helper objects.
+
+    Args:
+        presets: list of presets.
+
+    Returns:
+        The decorated TestCase.
+    """
+
+    def class_name(cls, _, params_dict):
+        """Return a user-friendly name for a parametrized test."""
+        return '{}_{}'.format(cls.__name__, params_dict['preset_cls'].__name__)
+
+    return parameterized_class(
+        [{'preset_cls': preset} for preset in presets],
         class_name_func=class_name)

@@ -53,13 +53,51 @@ class AnalogSequential(Sequential):
 
         return self
 
+    def cpu(
+            self
+    ) -> 'AnalogSequential':
+        super().cpu()
+
+        self._apply_to_analog(lambda m: m.cpu())
+
+        return self
+
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
     ) -> 'AnalogSequential':
         super().cuda(device)
 
-        self._apply_to_analog(lambda m: m.cuda())
+        self._apply_to_analog(lambda m: m.cuda(device))
+
+        return self
+
+    def to(
+            self,
+            device: Optional[Union[torch_device, str, int]] = None
+    ) -> 'AnalogSequential':
+        """Moves and/or casts the parameters, buffers and analog tiles.
+
+        Note:
+            Please be aware that moving analog layers from GPU to CPU is
+            currently not supported.
+
+        Args:
+            device: the desired device of the parameters, buffers and analog
+                tiles in this module.
+
+        Returns:
+            This module in the specified device.
+        """
+        # pylint: disable=arguments-differ
+        device = torch_device(device)
+
+        super().to(device)
+
+        if device.type == 'cuda':
+            self._apply_to_analog(lambda m: m.cuda(device))
+        elif device.type == 'cpu':
+            self._apply_to_analog(lambda m: m.cpu())
 
         return self
 

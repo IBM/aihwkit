@@ -21,7 +21,7 @@ from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogLinear(Linear, AnalogModuleBase):
+class AnalogLinear(AnalogModuleBase, Linear):
     """Linear layer that uses an analog tile.
 
     Linear layer that uses an analog tile during its forward, backward and
@@ -42,12 +42,17 @@ class AnalogLinear(Linear, AnalogModuleBase):
         bias: whether to use a bias row on the analog tile or not
         realistic_read_write: whether to enable realistic read/write
            for setting initial weights and read out of weights
+        weight_scaling_omega: the weight value where the max
+            weight will be scaled to. If zero, no weight scaling will
+            be performed
     """
     # pylint: disable=abstract-method
 
     __constants__ = ['in_features', 'out_features']
     in_features: int
     out_features: int
+    realistic_read_write: bool
+    weight_scaling_omega: float
 
     def __init__(
             self,
@@ -56,13 +61,15 @@ class AnalogLinear(Linear, AnalogModuleBase):
             bias: bool = True,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
     ):
         # Create the tile.
         self.analog_tile = self._setup_tile(in_features,
                                             out_features,
                                             bias,
                                             rpu_config,
-                                            realistic_read_write)
+                                            realistic_read_write,
+                                            weight_scaling_omega)
         # Call super() after tile creation, including ``reset_parameters``.
         super().__init__(in_features, out_features, bias=bias)
 
@@ -81,9 +88,3 @@ class AnalogLinear(Linear, AnalogModuleBase):
         # pylint: disable=arguments-differ
         return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias,
                                     not self.training)
-
-    def extra_repr(self) -> str:
-        return '{}, is_cuda={}'.format(
-            super().extra_repr(),
-            self.analog_tile.is_cuda
-        )

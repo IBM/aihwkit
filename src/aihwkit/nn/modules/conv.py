@@ -23,7 +23,7 @@ from aihwkit.nn.functions import AnalogIndexedFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogConv1d(Conv1d, AnalogModuleBase):
+class AnalogConv1d(AnalogModuleBase, Conv1d):
     """1D convolution layer that uses an analog tile.
 
     Applies a 1D convolution over an input signal composed of several input
@@ -41,16 +41,18 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
         in_channels: number of channels in the input image.
         out_channels: number of channels produced by the convolution.
         kernel_size: size of the convolving kernel.
-        stride: stride of the convolution-
+        stride: stride of the convolution.
         padding: zero-padding added to both sides of the input.
         dilation: spacing between kernel elements.
         groups: number of blocked connections from input channels to output
             channels.
-        bias: whether to use a bias row on the analog tile or not
+        bias: whether to use a bias row on the analog tile or not.
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
         rpu_config: resistive processing unit configuration.
-        realistic_read_write: whether to enable realistic read/write
-           for setting initial weights and read out of weights
+        realistic_read_write: whether to enable realistic read/write for
+            setting initial weights and read out of weights.
+        weight_scaling_omega: the weight value where the max weight will be
+            scaled to. If zero, no weight scaling will be performed.
     """
     # pylint: disable=abstract-method
 
@@ -64,6 +66,7 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
     padding: Tuple[int]
     dilation: Tuple[int]
     realistic_read_write: bool
+    weight_scaling_omega: float
     fold_indices: Tensor
     input_size: float
     in_features: int
@@ -81,7 +84,8 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
             bias: bool = True,
             padding_mode: str = 'zeros',
             rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0
     ):
         # pylint: disable=too-many-arguments
         if groups != 1:
@@ -100,7 +104,8 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
                                             self.out_features,
                                             bias,
                                             rpu_config,
-                                            realistic_read_write)
+                                            realistic_read_write,
+                                            weight_scaling_omega)
 
         # Call super() after tile creation, including ``reset_parameters``.
         super().__init__(in_channels, out_channels, kernel_size, stride,
@@ -175,19 +180,8 @@ class AnalogConv1d(Conv1d, AnalogModuleBase):
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
 
-    def extra_repr(self) -> str:
-        output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
-                  ', stride={stride}')
-        if self.padding != (0,) * len(self.padding):
-            output += ', padding={padding}'
-        if self.dilation != (1,) * len(self.dilation):
-            output += ', dilation={dilation}'
-        if not self.use_bias:
-            output += ', bias=False'
-        return output.format(**self.__dict__)
 
-
-class AnalogConv2d(Conv2d, AnalogModuleBase):
+class AnalogConv2d(AnalogModuleBase, Conv2d):
     """2D convolution layer that uses an analog tile.
 
     Applies a 2D convolution over an input signal composed of several input
@@ -205,16 +199,18 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
         in_channels: number of channels in the input image.
         out_channels: number of channels produced by the convolution.
         kernel_size: size of the convolving kernel.
-        stride: stride of the convolution-
+        stride: stride of the convolution.
         padding: zero-padding added to both sides of the input.
         dilation: spacing between kernel elements.
         groups: number of blocked connections from input channels to output
             channels.
-        bias: whether to use a bias row on the analog tile or not
+        bias: whether to use a bias row on the analog tile or not.
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
-           for setting initial weights and read out of weights
+            for setting initial weights and read out of weights.
+        weight_scaling_omega: the weight value where the max weight will be
+            scaled to. If zero, no weight scaling will be performed.
     """
     # pylint: disable=abstract-method
 
@@ -228,6 +224,7 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
     padding: Tuple[int, int]
     dilation: Tuple[int, int]
     realistic_read_write: bool
+    weight_scaling_omega: float
     fold_indices: Tensor
     input_size: float
     in_features: int
@@ -245,7 +242,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
             bias: bool = True,
             padding_mode: str = 'zeros',
             rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
     ):
         # pylint: disable=too-many-arguments
         if groups != 1:
@@ -262,7 +260,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
                                             self.out_features,
                                             bias,
                                             rpu_config,
-                                            realistic_read_write)
+                                            realistic_read_write,
+                                            weight_scaling_omega)
 
         # Call super() after tile creation, including ``reset_parameters``.
         super().__init__(in_channels, out_channels, kernel_size, stride,
@@ -322,19 +321,8 @@ class AnalogConv2d(Conv2d, AnalogModuleBase):
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
 
-    def extra_repr(self) -> str:
-        output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
-                  ', stride={stride}')
-        if self.padding != (0,) * len(self.padding):
-            output += ', padding={padding}'
-        if self.dilation != (1,) * len(self.dilation):
-            output += ', dilation={dilation}'
-        if not self.use_bias:
-            output += ', bias=False'
-        return output.format(**self.__dict__)
 
-
-class AnalogConv3d(Conv3d, AnalogModuleBase):
+class AnalogConv3d(AnalogModuleBase, Conv3d):
     """3D convolution layer that uses an analog tile.
 
     Applies a 3D convolution over an input signal composed of several input
@@ -352,16 +340,18 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
         in_channels: number of channels in the input image.
         out_channels: number of channels produced by the convolution.
         kernel_size: size of the convolving kernel.
-        stride: stride of the convolution-
+        stride: stride of the convolution.
         padding: zero-padding added to both sides of the input.
         dilation: spacing between kernel elements.
         groups: number of blocked connections from input channels to output
             channels.
-        bias: whether to use a bias row on the analog tile or not
+        bias: whether to use a bias row on the analog tile or not.
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
-           for setting initial weights and read out of weights
+           for setting initial weights and read out of weights.
+        weight_scaling_omega: the weight value where the max weight will be
+            scaled to. If zero, no weight scaling will be performed.
     """
     # pylint: disable=abstract-method
 
@@ -375,6 +365,7 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
     padding: Tuple[int, int, int]
     dilation: Tuple[int, int, int]
     realistic_read_write: bool
+    weight_scaling_omega: float
     fold_indices: Tensor
     input_size: float
     in_features: int
@@ -392,7 +383,8 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
             bias: bool = True,
             padding_mode: str = 'zeros',
             rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
     ):
         # pylint: disable=too-many-arguments
         if groups != 1:
@@ -413,7 +405,8 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
                                             self.out_features,
                                             bias,
                                             rpu_config,
-                                            realistic_read_write)
+                                            realistic_read_write,
+                                            weight_scaling_omega)
 
         # Call super() after tile creation, including ``reset_parameters``.
         super().__init__(in_channels, out_channels, kernel_size, stride,
@@ -495,14 +488,3 @@ class AnalogConv3d(Conv3d, AnalogModuleBase):
 
         return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
                                            self.bias, not self.training)
-
-    def extra_repr(self) -> str:
-        output = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
-                  ', stride={stride}')
-        if self.padding != (0,) * len(self.padding):
-            output += ', padding={padding}'
-        if self.dilation != (1,) * len(self.dilation):
-            output += ', dilation={dilation}'
-        if not self.use_bias:
-            output += ', bias=False'
-        return output.format(**self.__dict__)

@@ -37,7 +37,7 @@ job_compile_common: &job_compile_common
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
     - pip install -r requirements.txt pytest
     # Install the package in editable mode.
-    - VERBOSE=1 pip install -v -e .
+    - VERBOSE=1 pip install -v -e ".[visualization]"
   script:
     - pip install "parameterized==0.7.4"
     - make pytest
@@ -96,7 +96,7 @@ jobs:
       - pip install "torch==1.5.1"
       - pip install -r requirements.txt pytest
       # Install the package in editable mode.
-      - VERBOSE=1 pip install -v -e .
+      - VERBOSE=1 pip install -v -e ".[visualization]"
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
     os: linux

@@ -31,7 +31,7 @@ public:
       CudaContext *construction_context,
       int x_size_in,
       int d_size_in,
-      int m_batch,
+      int m_batch_in,
       int nK32_in,
       int use_bo64_in,
       bool out_trans_in,
@@ -50,7 +50,7 @@ public:
     d_size = d_size_in;
     nK32 = nK32_in;
     size = d_size * x_size;
-    m_batch = m_batch;
+    m_batch = m_batch_in;
     out_trans = out_trans_in;
     use_bo64 = use_bo64_in;
     valid = true;
@@ -147,6 +147,8 @@ public:
     std::cout << "\t batch_stride:\t " << batch_load_stride << std::endl;
     std::cout << "\t nK32:\t\t " << nK32 << std::endl;
     std::cout << "\t m_batch:\t " << m_batch << std::endl;
+    std::cout << "\t x_size:\t " << x_size << std::endl;
+    std::cout << "\t d_size:\t " << d_size << std::endl;
     std::cout << "\t timing:\t " << timing << std::endl;
     std::cout << "\t implicit:\t " << implicit_pulses << std::endl;
   };

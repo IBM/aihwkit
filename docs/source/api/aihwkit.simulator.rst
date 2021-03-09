@@ -13,6 +13,7 @@ Submodules
    :maxdepth: 4
 
    aihwkit.simulator.configs
+   aihwkit.simulator.noise_models
+   aihwkit.simulator.presets
    aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
-   aihwkit.simulator.noise_models

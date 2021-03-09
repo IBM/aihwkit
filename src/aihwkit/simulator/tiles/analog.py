@@ -194,6 +194,10 @@ class AnalogTile(BaseTile):
         rpu_config = rpu_config or SingleRPUConfig(device=ConstantStepDevice())
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
+    def cpu(self) -> 'BaseTile':
+        """Return a copy of this tile in CPU memory."""
+        return self
+
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
@@ -267,6 +271,10 @@ class CudaAnalogTile(AnalogTile):
         # Set the cuda properties
         self.stream = current_stream()
         self.device = torch_device(current_device())
+
+    def cpu(self) -> 'BaseTile':
+        """Return a copy of this tile in CPU memory."""
+        raise CudaError('CUDA tiles cannot be moved to CPU')
 
     def cuda(
             self,
