@@ -387,7 +387,6 @@ def plot_device_compact(
         w_noise: Weight noise standard deviation during read
         n_steps: Number of steps for up/down cycle
         n_traces: Number of traces to plot (for device-to-device variation)
-        show: if `True`, displays the figure.
 
     Returns:
         the compact step response figure.
