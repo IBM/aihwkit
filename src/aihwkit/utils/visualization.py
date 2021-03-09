@@ -68,15 +68,14 @@ def compute_pulse_response(
     dir_tensor = from_numpy(direction).float().to(device)
 
     for i in range(total_iters):
-
-        # update the pulses
+        # Update the pulses.
         analog_tile.update(in_vector, out_vector * dir_tensor[i])
 
         if use_forward:
-            # save weights by using the forward pass (to get the short-term read noise)
+            # Save weights by using the forward pass (to get the short-term read noise).
             w_trace[i, :, :] = analog_tile.forward(in_eye).detach().cpu().numpy().T
         else:
-            # noise free
+            # Noise free.
             w_trace[i, :, :] = analog_tile.get_weights()[0].detach().cpu().numpy()
 
     return w_trace
@@ -120,11 +119,11 @@ def compute_pulse_statistics(
         up_direction: bool,
         smoothness: float = 0.5
 ) -> Tuple[ndarray, ndarray]:
-    """Computes the statistics of the step trace from :func:`compute_step_response`.
+    """Computes the statistics of the step trace from :func:`compute_pulse_response`.
 
     Args:
         w_nodes: weight range vector to estimate the step histogram
-        w_trace: weight trace from :func:`compute_step_response`
+        w_trace: weight trace from :func:`compute_pulse_response`
         direction: direction vector used to generate the weight traces
         up_direction: whether and plot to compute the statistics for up or down direction
         smoothness: value for smoothing the estimation of the
@@ -155,7 +154,7 @@ def compute_pulse_statistics(
         std = np.sqrt(np.sum(alpha*(delta_w - np.expand_dims(mean, axis=0))**2, axis=0))
         return (mean, std)
 
-    # dw statistics
+    # dw statistics.
     delta_w = np.diff(w_trace, axis=0)
     w_trace_s = w_trace[:-1, :, :]
     if up_direction:
@@ -204,7 +203,7 @@ def plot_pulse_statistics(
         plt.fill_between(x, mean - std, mean + std, edgecolor=None,
                          facecolor=axis.get_color(), alpha=0.5)
 
-    # compute statistics
+    # Compute statistics.
     w_nodes = np.linspace(w_trace.min(), w_trace.max(), num_nodes)
     dw_mean, dw_std = compute_pulse_statistics(w_nodes, w_trace, direction, up_direction,
                                                smoothness)
@@ -245,7 +244,7 @@ def get_tile_for_plotting(
     """
     config = deepcopy(rpu_config)
 
-    # make sure we use single pulses for the overview
+    # Make sure we use single pulses for the overview.
     config.update.update_bl_management = False
     config.update.update_management = False
     config.update.desired_bl = 1
@@ -253,10 +252,10 @@ def get_tile_for_plotting(
     if noise_free:
         config.forward.is_perfect = True
 
-        config.device.dw_min_std = 0.0  # noise free
-        if hasattr(config.device, 'write_noise_std') and \
-           getattr(config.device, 'write_noise_std') > 0.0:
-            # just make very small to avoid hidden parameter mismatch
+        config.device.dw_min_std = 0.0  # Noise free.
+        if (hasattr(config.device, 'write_noise_std') and
+            getattr(config.device, 'write_noise_std') > 0.0):
+            # Just make very small to avoid hidden parameter mismatch.
             setattr(config.device, 'write_noise_std', 1e-6)
 
     analog_tile = AnalogTile(n_traces, 1, config)  # type: BaseTile
@@ -310,7 +309,6 @@ def plot_response_overview(
         use_cuda: Whether to use the CUDA implementation (if available)
         smoothness: value for smoothing the estimation of the
             statistical step response curves
-        verbose: Whether to print details of the constructed tile.
     """
     if n_steps is None:
         n_steps = estimate_n_steps(rpu_config)
@@ -320,12 +318,12 @@ def plot_response_overview(
 
     plt.clf()
 
-    # 1. noisy tile:
+    # 1. Noisy tile.
     analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
     plt.subplot(3, 1, 1)
     plot_pulse_response(analog_tile, direction, use_forward=True)
 
-    # 2. noise-free tile
+    # 2. Noise-free tile.
     analog_tile_noise_free = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=True)
     analog_tile_noise_free.set_hidden_parameters(analog_tile.get_hidden_parameters())
 
@@ -333,11 +331,11 @@ def plot_response_overview(
     w_trace = plot_pulse_response(analog_tile_noise_free, direction, use_forward=False)
 
     num_nodes = min(n_steps, 100)
-    # 3. plot up statistics
+    # 3. Plot up statistics.
     plt.subplot(3, 2, 5)
     plot_pulse_statistics(w_trace, direction, True, num_nodes, smoothness)
 
-    # 4. plot down statistics
+    # 4. Plot down statistics.
     plt.subplot(3, 2, 6)
     plot_pulse_statistics(w_trace, direction, False, num_nodes, smoothness)
 
@@ -357,7 +355,7 @@ def plot_device(device: PulsedDevice, w_noise: float = 0.0, **kwargs: Any) -> No
         kwargs: for other parameters, see :func:`plot_response_overview`
     """
     plt.figure(figsize=[7, 7])
-    # to simulate some weight read noise
+    # To simulate some weight read noise.
     io_pars = IOParameters(out_noise=0.0,    # no out noise
                            w_noise=w_noise,  # quite low
                            inp_res=-1.,      # turn off DAC
@@ -397,7 +395,7 @@ def plot_device_compact(
     # pylint: disable=too-many-locals,too-many-statements
     figure = plt.figure(figsize=[12, 4])
 
-    # to simulate some weight read noise
+    # To simulate some weight read noise.
     io_pars = IOParameters(out_noise=0.0,    # no out noise
                            w_noise=w_noise,  # quite low
                            inp_res=-1.,      # turn off DAC
@@ -414,7 +412,7 @@ def plot_device_compact(
 
     use_cuda = False
 
-    # noisy tile response curves
+    # Noisy tile response curves.
     n_loops = 2
     total_iters = n_loops*2*n_steps
     direction = np.sign(np.sin(np.pi*(np.arange(total_iters)+1)/n_steps))
@@ -432,7 +430,7 @@ def plot_device_compact(
     axis.set_xlim(0, total_iters-1)
     axis.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
 
-    # noise-free tile for statistics
+    # Noise-free tile for statistics.
     n_loops = 1
     total_iters = min(max(n_loops*2*n_steps, 1000), max(50000, 2*n_steps))
     direction = np.sign(np.sin(np.pi*(np.arange(total_iters)+1)/n_steps))
@@ -442,7 +440,7 @@ def plot_device_compact(
 
     w_trace = compute_pulse_response(analog_tile_noise_free, direction, False)
 
-    # compute statistics
+    # Compute statistics.
     num_nodes = min(n_steps, 100)
     w_nodes = np.linspace(w_trace.min(), w_trace.max(), num_nodes)
 
@@ -451,7 +449,7 @@ def plot_device_compact(
     dw_mean_down = compute_pulse_statistics(w_nodes, w_trace, direction, False)[0]\
         .reshape(-1, n_traces)
 
-    # plot mean up statistics
+    # Plot mean up statistics.
     pos = axis.get_position().bounds
     space = 0.1
     gap = 0.01
@@ -468,7 +466,7 @@ def plot_device_compact(
     axis_left.set_ylabel('Weight \n [conductance]')
     axis_left.set_ylim(-limit, limit)
 
-    # plot mean down statistics
+    # Plot mean down statistics.
     axis_right = figure.add_axes([pos[0] + pos[2] - space, pos[1], space, pos[3]])
     dw_mean_down = dw_mean_down.reshape(-1, n_traces)
     for i in range(n_traces):
@@ -478,7 +476,7 @@ def plot_device_compact(
     axis_right.set_xlabel('Down pulse size')
     axis_right.set_ylim(-limit, limit)
 
-    # set xlim's
+    # Set xlim's.
     limit = np.maximum(np.nanmax(np.abs(dw_mean_down)),
                        np.nanmax(np.abs(dw_mean_up))) * 1.2
     axis_left.set_xlim(0.0, limit)
