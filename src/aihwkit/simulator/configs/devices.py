@@ -12,7 +12,7 @@
 
 """Configuration for Analog (Resistive Device) tiles."""
 
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-lines
 
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -905,3 +905,118 @@ class TransferCompound(UnitCell):
                 raise ConfigError("Could not add unit cell device parameter")
 
         return transfer_parameters
+
+
+###############################################################################
+# Specific compound-devices with digital rank update
+###############################################################################
+
+@dataclass
+class DigitalRankUpdateCell(_PrintableMixin):
+    """Parameters that modify the behavior of the digital rank update cell.
+
+    This is the base class for devices that compute the rank update in
+    digital and then (occasionally) transfer the information to the
+    (analog) crossbar array that is used during forward and backward.
+    """
+
+    bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
+
+    device: PulsedDevice = field(default_factory=ConstantStepDevice)
+    """(Analog) device that are used for forward and backward."""
+
+    def as_bindings(self) -> devices.AbstractResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+        raise NotImplementedError
+
+    def requires_diffusion(self) -> bool:
+        """Return whether device has diffusion enabled."""
+        return self.device.requires_diffusion()
+
+    def requires_decay(self) -> bool:
+        """Return whether device has decay enabled."""
+        return self.device.requires_decay()
+
+
+@dataclass
+class MixedPrecisionCompound(DigitalRankUpdateCell):
+    r"""Abstract device model that takes 1 (analog) device and
+    implements a transfer-based learning rule, where the outer product
+    is computed in digital.
+
+    Here, the outer product of the activations and error is done on a
+    full-precision floating-point :math:`\chi` matrix. Then, with a
+    threshold given by the ``granularity``, pulses will be applied to
+    transfer the information row-by-row to the analog matrix.
+
+    For details, see `Nandakumar et al. Front. in Neurosci. (2020)`_.
+
+    Note:
+        This version of update is different from a parallel update in
+        analog other devices are implementing with stochastic pulsing,
+        as here :math:`{\cal O}(n^2)` digital computations are needed
+        to compute the outer product (rank update). This need for
+        digital compute in potentially high precision might result in
+        inferior run time and power estimates in real-world
+        applications, although sparse integer products can potentially
+        be employed to speed up to improve run time estimates. For
+        details, see discussion in `Nandakumar et al. Front. in
+        Neurosci. (2020)`_.
+
+    .. _`Nandakumar et al. Front. in Neurosci. (2020)`_: https://doi.org/10.3389/fnins.2020.00406
+    """
+
+    bindings_class: ClassVar[Type] = devices.MixedPrecResistiveDeviceParameter
+
+    transfer_every: int = 1
+    """Transfers every :math:`n` mat-vec operations (rounded to
+    multiples/ratios of m_batch).
+
+    Standard setting is 1.0 for mixed precision, but it could potentially be
+    reduced to get better run time estimates.
+    """
+
+    n_rows_per_transfer: int = -1
+    r"""How many consecutive rows to write to the tile from the
+    :math:`\chi` matrix. -1 means full matrix read each transfer event.
+    """
+
+    random_row: bool = False
+    """Whether to select a random starting row for each transfer
+    event and not take the next row that was previously not
+    transferred as a starting row (the default).
+    """
+
+    granularity: float = 0.0
+    r"""Granularity of the device that is used to calculate the number of
+    pulses transferred from :math:`\chi` to analog.
+
+    If 0, it will take ``dw_min`` from the analog device used.
+    """
+
+    n_x_bins: int = 0
+    """The number of bins to discretize (symmetrically around zero) the
+    activation before computing the outer product.
+
+    Dynamic quantization is used by computing the absolute max value of each
+    input. Quantization can be turned off by setting this to 0.
+    """
+
+    n_d_bins: int = 0
+    """The number of bins to discretize (symmetrically around zero) the
+    error before computing the outer product.
+
+    Dynamic quantization is used by computing the absolute max value of each
+    error vector. Quantization can be turned off by setting this to 0.
+    """
+
+    def as_bindings(self) -> devices.MixedPrecResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+
+        mixed_prec_parameter = parameters_to_bindings(self)
+        param_device = self.device.as_bindings()
+
+        if not mixed_prec_parameter.set_device_parameter(param_device):
+            raise ConfigError("Could not add device parameter")
+
+        return mixed_prec_parameter

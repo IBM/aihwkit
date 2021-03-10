@@ -20,9 +20,9 @@ from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
     FloatingPoint, Ideal, ConstantStep, LinearStep,
-    ExpStep, Vector, Difference, Transfer,
+    ExpStep, Vector, Difference, Transfer, MixedPrecision,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda
+    ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda, MixedPrecisionCuda,
 )
 
 
@@ -64,6 +64,7 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
     Vector,
     Difference,
     Transfer,
+    MixedPrecision,
     IdealCuda,
     ConstantStepCuda,
     LinearStepCuda,
@@ -71,6 +72,7 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
     VectorCuda,
     DifferenceCuda,
     TransferCuda,
+    MixedPrecisionCuda,
 ])
 class RPUConfigurationsTest(ParametrizedTestCase):
     """Tests related to resistive processing unit configurations."""
