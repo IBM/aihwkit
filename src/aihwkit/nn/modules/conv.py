@@ -15,7 +15,7 @@
 from typing import Optional, Tuple, Union
 
 from torch import Tensor, arange, cat, float64, int32, ones
-from torch.nn import Conv1d, Conv2d, Conv3d, Unfold
+from torch.nn import Conv1d, Conv2d, Conv3d, Module, Unfold
 from torch.nn.functional import pad
 from torch.nn.modules.utils import _single, _pair, _triple
 
@@ -23,7 +23,27 @@ from aihwkit.nn.functions import AnalogIndexedFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogConv1d(AnalogModuleBase, Conv1d):
+class _AnalogConvNd(AnalogModuleBase):
+    """Base class for convolution layers."""
+
+    __constants__ = ['stride', 'padding', 'dilation', 'groups',
+                     'padding_mode', 'output_padding', 'in_channels',
+                     'out_channels', 'kernel_size']
+    in_channels: int
+    out_channels: int
+    kernel_size: Tuple[int, ...]
+    stride: Tuple[int, ...]
+    padding: Tuple[int, ...]
+    dilation: Tuple[int, ...]
+    realistic_read_write: bool
+    weight_scaling_omega: float
+    fold_indices: Tensor
+    input_size: float
+    in_features: int
+    out_features: int
+
+
+class AnalogConv1d(_AnalogConvNd, Conv1d):
     """1D convolution layer that uses an analog tile.
 
     Applies a 1D convolution over an input signal composed of several input
@@ -55,22 +75,6 @@ class AnalogConv1d(AnalogModuleBase, Conv1d):
             scaled to. If zero, no weight scaling will be performed.
     """
     # pylint: disable=abstract-method
-
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size']
-    in_channels: int
-    out_channels: int
-    kernel_size: Tuple[int]
-    stride: Tuple[int]
-    padding: Tuple[int]
-    dilation: Tuple[int]
-    realistic_read_write: bool
-    weight_scaling_omega: float
-    fold_indices: Tensor
-    input_size: float
-    in_features: int
-    out_features: int
 
     def __init__(
             self,
@@ -181,7 +185,7 @@ class AnalogConv1d(AnalogModuleBase, Conv1d):
                                            self.bias, not self.training)
 
 
-class AnalogConv2d(AnalogModuleBase, Conv2d):
+class AnalogConv2d(_AnalogConvNd, Conv2d):
     """2D convolution layer that uses an analog tile.
 
     Applies a 2D convolution over an input signal composed of several input
@@ -213,22 +217,6 @@ class AnalogConv2d(AnalogModuleBase, Conv2d):
             scaled to. If zero, no weight scaling will be performed.
     """
     # pylint: disable=abstract-method
-
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size']
-    in_channels: int
-    out_channels: int
-    kernel_size: Tuple[int, int]
-    stride: Tuple[int, int]
-    padding: Tuple[int, int]
-    dilation: Tuple[int, int]
-    realistic_read_write: bool
-    weight_scaling_omega: float
-    fold_indices: Tensor
-    input_size: float
-    in_features: int
-    out_features: int
 
     def __init__(
             self,
@@ -322,7 +310,7 @@ class AnalogConv2d(AnalogModuleBase, Conv2d):
                                            self.bias, not self.training)
 
 
-class AnalogConv3d(AnalogModuleBase, Conv3d):
+class AnalogConv3d(_AnalogConvNd, Conv3d):
     """3D convolution layer that uses an analog tile.
 
     Applies a 3D convolution over an input signal composed of several input
@@ -354,22 +342,6 @@ class AnalogConv3d(AnalogModuleBase, Conv3d):
             scaled to. If zero, no weight scaling will be performed.
     """
     # pylint: disable=abstract-method
-
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size']
-    in_channels: int
-    out_channels: int
-    kernel_size: Tuple[int, int, int]
-    stride: Tuple[int, int, int]
-    padding: Tuple[int, int, int]
-    dilation: Tuple[int, int, int]
-    realistic_read_write: bool
-    weight_scaling_omega: float
-    fold_indices: Tensor
-    input_size: float
-    in_features: int
-    out_features: int
 
     def __init__(
             self,
