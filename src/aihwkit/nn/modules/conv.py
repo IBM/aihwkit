@@ -15,7 +15,7 @@
 from typing import Optional, Tuple, Union
 
 from torch import Tensor, arange, cat, float64, int32, ones
-from torch.nn import Conv1d, Conv2d, Conv3d, Module, Unfold
+from torch.nn import Conv1d, Conv2d, Conv3d, Unfold
 from torch.nn.functional import pad
 from torch.nn.modules.utils import _single, _pair, _triple
 
@@ -46,6 +46,17 @@ class _AnalogConvNd(AnalogModuleBase):
         """Calculate the output image sizes"""
         nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
         return nom // self.stride[i] + 1
+
+    def reset_parameters(self) -> None:
+        """Reset the parameters (weight and bias)."""
+        # TODO: this disable can be removed once inherits from _ConvNd.
+        # pylint: disable=no-member
+        super().reset_parameters()
+        self.set_weights(self.weight, self.bias)
+
+    def forward(self, x_input: Tensor) -> Tensor:
+        """Computes the forward pass."""
+        raise NotImplementedError
 
 
 class AnalogConv1d(_AnalogConvNd, Conv1d):
@@ -128,11 +139,6 @@ class AnalogConv1d(_AnalogConvNd, Conv1d):
         # Set the index matrices.
         self.fold_indices = Tensor().detach()
         self.input_size = 0
-
-    def reset_parameters(self) -> None:
-        """Reset the parameters (weight and bias)."""
-        super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
 
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
@@ -263,11 +269,6 @@ class AnalogConv2d(_AnalogConvNd, Conv2d):
         self.fold_indices = Tensor().detach()
         self.input_size = 0
 
-    def reset_parameters(self) -> None:
-        """Reset the parameters (weight and bias)."""
-        super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
-
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
         # pylint: disable=arguments-differ
@@ -385,11 +386,6 @@ class AnalogConv3d(_AnalogConvNd, Conv3d):
         # Set the index matrices.
         self.fold_indices = Tensor().detach()
         self.input_size = 0
-
-    def reset_parameters(self) -> None:
-        """Reset the parameters (weight and bias)."""
-        super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
 
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
