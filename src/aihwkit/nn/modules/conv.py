@@ -42,6 +42,11 @@ class _AnalogConvNd(AnalogModuleBase):
     in_features: int
     out_features: int
 
+    def get_size(self, size: int, i: int) -> int:
+        """Calculate the output image sizes"""
+        nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
+        return nom // self.stride[i] + 1
+
 
 class AnalogConv1d(_AnalogConvNd, Conv1d):
     """1D convolution layer that uses an analog tile.
@@ -132,12 +137,6 @@ class AnalogConv1d(_AnalogConvNd, Conv1d):
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
         # pylint: disable=arguments-differ
-
-        def get_size(size: int, i: int) -> int:
-            """Calculate the output image sizes"""
-            nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
-            return nom // self.stride[i] + 1
-
         input_size = x_input.numel()/x_input.size(0)
         if not self.fold_indices.numel() or self.input_size != input_size:
             # pytorch just always uses NCHW order?
@@ -148,7 +147,7 @@ class AnalogConv1d(_AnalogConvNd, Conv1d):
             if not all(item == 0 for item in self.padding):
                 fold_indices = pad(
                     fold_indices,
-                    pad=(self.padding[0], self.padding[0]),
+                    pad=[self.padding[0], self.padding[0]],
                     mode='constant',
                     value=0)
             unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
@@ -175,7 +174,7 @@ class AnalogConv1d(_AnalogConvNd, Conv1d):
 
             x_height = x_input.size(2)
 
-            d_height = get_size(x_height, 0)
+            d_height = self.get_size(x_height, 0)
 
             image_sizes = [self.in_channels, x_height, d_height]
             self.input_size = input_size
@@ -272,12 +271,6 @@ class AnalogConv2d(_AnalogConvNd, Conv2d):
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
         # pylint: disable=arguments-differ
-
-        def get_size(size: int, i: int) -> int:
-            """Calculate the output image sizes"""
-            nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
-            return nom // self.stride[i] + 1
-
         input_size = x_input.numel()/x_input.size(0)
         if not self.fold_indices.numel() or self.input_size != input_size:
             # pytorch just always uses NCHW order?
@@ -299,8 +292,8 @@ class AnalogConv2d(_AnalogConvNd, Conv2d):
             x_height = x_input.size(2)
             x_width = x_input.size(3)
 
-            d_height = get_size(x_height, 0)
-            d_width = get_size(x_width, 1)
+            d_height = self.get_size(x_height, 0)
+            d_width = self.get_size(x_width, 1)
 
             image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
             self.input_size = input_size
@@ -401,12 +394,6 @@ class AnalogConv3d(_AnalogConvNd, Conv3d):
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
         # pylint: disable=arguments-differ,too-many-locals
-
-        def get_size(size: int, i: int) -> int:
-            """Calculate the output image sizes"""
-            nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
-            return nom // self.stride[i] + 1
-
         input_size = x_input.numel()/x_input.size(0)
         if not self.fold_indices.numel() or self.input_size != input_size:
             # pytorch just always uses NCDHW order?
@@ -415,10 +402,10 @@ class AnalogConv3d(_AnalogConvNd, Conv3d):
             shape = [1] + [1] + list(x_input.shape[2:])
             fold_indices = fold_indices.reshape(*shape)
             if not all(item == 0 for item in self.padding):
-                fold_indices = pad(fold_indices, pad=(
+                fold_indices = pad(fold_indices, pad=[
                     self.padding[2], self.padding[2],
                     self.padding[1], self.padding[1],
-                    self.padding[0], self.padding[0]), mode="constant", value=0)
+                    self.padding[0], self.padding[0]], mode="constant", value=0)
             unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).\
                 unfold(3, self.kernel_size[1], self.stride[1]).\
                 unfold(4, self.kernel_size[2], self.stride[2]).clone()
@@ -450,9 +437,9 @@ class AnalogConv3d(_AnalogConvNd, Conv3d):
             x_height = x_input.size(3)
             x_width = x_input.size(4)
 
-            d_depth = get_size(x_depth, 0)
-            d_height = get_size(x_height, 1)
-            d_width = get_size(x_width, 2)
+            d_depth = self.get_size(x_depth, 0)
+            d_height = self.get_size(x_height, 1)
+            d_width = self.get_size(x_width, 2)
 
             image_sizes = [self.in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
             self.input_size = input_size
