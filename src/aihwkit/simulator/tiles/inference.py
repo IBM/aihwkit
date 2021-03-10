@@ -131,6 +131,7 @@ class InferenceTile(AnalogTile):
                 where the devices might drift and accumulate noise. See
                 noise model used for details.
         """
+        # pylint: disable=arguments-differ
         if self.programmed_weights is None:
             self.program_weights()
 

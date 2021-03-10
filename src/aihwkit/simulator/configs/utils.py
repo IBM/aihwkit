@@ -510,3 +510,121 @@ class WeightClipParameter(_PrintableMixin):
 
     type: WeightClipType = WeightClipType.NONE
     """Type of clipping."""
+
+
+@dataclass
+class SimpleDriftParameter(_PrintableMixin):
+    r"""Parameter for a simple power law drift.
+
+    The drift as a simple power law drift without device-to-device
+    variation or conductance dependence.
+
+    It computes:
+    .. math::
+        w_{ij}*\left(\frac{t + \Delta t}{t_0}\right)^(-\nu)
+    """
+
+    bindings_class: ClassVar[Type] = devices.DriftParameter
+
+    nu: float = 0.0
+    r"""Average drift :math:`\nu` value. Need to non-zero to actually use the drift."""
+
+    t_0: float = 1.0
+    """Time between write and first read.
+
+    Usually assumed in milliseconds, however, it really determines the time
+    units of ``time_since_last_call`` when calling the drift.
+    """
+
+    reset_tol: float = 1e-7
+    """Reset tolerance.
+
+    This should a number smaller than the expected weight change as it
+    is used to detect any changes in the weight from the last drift
+    call. Every change to the weight above this tolerance will reset
+    the drift time.
+
+    Caution:
+       Any write noise or diffusion on the weight might thus
+       interfere with the drift.
+   """
+
+
+@dataclass
+class DriftParameter(SimpleDriftParameter):
+    r"""Parameter for a power law drift.
+
+    The drift is based on the model described by `Oh et al (2019)`_
+
+    It computes:
+    .. math::
+        w_{ij}*\left(\frac{t + \Delta t}{t_0}\right)^(-\nu^\text{actual}_{ij})
+
+    where the drift coefficient is drawn once at the beginning and
+    might depend on device. It also can depend on the actual weight
+    value.
+
+    The actual drift coefficient is computed as:
+    .. math::
+
+        \nu_{ij}^\text{actual} =  \nu_{ij} - \nu_k \log \frac{(w_{ij} - w_\text{off}) / r_\text{wg}
+        + g_\text{off}}{G_0}  + \nu\sigma_\nu\xi
+
+    here :math:`w_{ij}` is the actual weight and `\nu_{ij}` fixed for
+    each device given by the mean :math:`\nu` and the device-to-device
+    variation: :math:`\nu_{ij} = \nu + \nu_dtod\nu\xi` and are only
+    drawn once at the beginning (tile instantiation).  `\xi` is
+    Gaussian noise.
+
+    Note:
+       If the weight has changed from the last drift call (determined
+       by the ``reset_tol`` parameter), for instance due to update,
+       decay or noise, then the drift time :math:`t` will be reset and start
+       from new, however, the drift coefficients :math:`\nu_{ij}` are
+       *not* changed. On the other hand, if the weights has not
+       changed since last call, :math:`t` will accumulate the time.
+
+    Caution:
+       Note that the drift coefficient does *not* depend on the initially
+       programmed weight value at :math:`t=0` in the current
+       implementation (ie G0 is a constant for all devices), but
+       instead on the actual weight. In some materials (e.g. phase
+       changed materials), that might be not accurate.
+
+    .. _`Oh et al (2019)`: https://ieeexplore.ieee.org/document/8753712
+    """
+
+    bindings_class: ClassVar[Type] = devices.DriftParameter
+
+    nu_dtod: float = 0.0
+    r"""Device-to-device variation of the :math:`\nu` values."""
+
+    nu_std: float = 0.0
+    r"""Cycle-to-cycle variation of :math:`\nu`.
+
+    A more realistic way to add noise of the drift might be using
+    ``w_noise_std``.
+    """
+
+    wg_ratio: float = 1.0
+    """``(w_max-w_min)/(g_max-g_min)`` to convert to physical units."""
+
+    g_offset: float = 0.0
+    """``g_min`` to convert to physical units."""
+
+    w_offset: float = 0.0
+    """``w(g_min)``, i.e. to what value ``g_min`` is mapped to in w-space."""
+
+    nu_k: float = 0.0
+    r"""Variation of "math:`nu` with :math:`W`.
+
+    ie. :math:`\nu(R) = nu_0 - k \log(G/G_0)`.
+    See Oh et al.
+    """
+
+    log_g0: float = 0.0
+    """Log g0."""
+
+    w_noise_std: float = 0.0
+    """Additional weight noise (Gaussian diffusion) added to the weights
+    after the drift is applied."""

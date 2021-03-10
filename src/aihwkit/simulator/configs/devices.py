@@ -23,7 +23,8 @@ from aihwkit.simulator.configs.helpers import (
     _PrintableMixin, parameters_to_bindings
 )
 from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
+    IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy,
+    DriftParameter, SimpleDriftParameter
 )
 from aihwkit.simulator.rpu_base import devices
 
@@ -42,6 +43,9 @@ class FloatingPointDevice(_PrintableMixin):
 
     lifetime: float = 0.0
     r"""One over `decay_rate`, ie :math:`1/r_\text{decay}`."""
+
+    drift: SimpleDriftParameter = field(default_factory=SimpleDriftParameter)
+    """Parameter governing a power-law drift."""
 
     def as_bindings(self) -> devices.FloatingPointTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
@@ -73,25 +77,32 @@ class PulsedDevice(_PrintableMixin):
     Resets the weight in cross points to (around) zero with
     cycle-to-cycle and systematic spread around a mean.
 
+    Important:
+        Reset with given parameters is only activated when
+        :meth:`~aihwkit.simulator.tiles.base.Base.reset_weights` is
+        called explicitly by the user.
 
     **Decay**:
 
     .. math:: w_{ij} \leftarrow w_{ij}\,(1-\alpha_\text{decay}\delta_{ij})
 
-    Weight decay is generally off and has to be activated explicitly
-    by using :meth:`decay` on an analog tile. Note that the device
-    ``decay_lifetime`` parameters (1 over decay rates
-    :math:`\delta_{ij}`) are analog tile specific and are thus set and
-    fixed during RPU initialization. :math:`\alpha_\text{decay}` is a
-    scaling factor that can be given during run-time.
-
+    Weight decay is only activated by inserting a specific call to
+    :meth:`~aihwkit.simulator.tiles.base.Base.decay_weights`, which is
+    done automatically for a tile each mini-batch is decay is
+    present. Note that the device ``decay_lifetime`` parameters (1
+    over decay rates :math:`\delta_{ij}`) are analog tile specific and
+    are thus set and fixed during RPU
+    initialization. :math:`\alpha_\text{decay}` is a scaling factor
+    that can be given during run-time.
 
     **Diffusion**:
 
-    Similar to the decay, diffusion is only activated by inserting a specific
-    operator. However, the parameters of the diffusion
-    process are set during RPU initialization and are fixed for the
-    remainder.
+    Similar to the decay, diffusion is only activated by inserting a
+    specific call to
+    :meth:`~aihwkit.simulator.tiles.base.Base.diffuse_weights`, which is
+    done automatically for a tile each mini-batch is diffusion is
+    present. The parameters of the diffusion process are set during
+    RPU initialization and are fixed for the remainder.
 
     .. math:: w_{ij} \leftarrow w_{ij} + \rho_{ij} \, \xi;
 
@@ -101,13 +112,24 @@ class PulsedDevice(_PrintableMixin):
     Note:
        If diffusion happens to move the weight beyond the hard bounds of the
        weight it is ensured to be clipped appropriately.
+
+    ** Drift **:
+
+    Optional power-law drift setting, as described in
+    :class:`~aihwkit.similar.configs.utils.DriftParameter`.
+
+    Important:
+        Similar to reset, drift is *not* applied automatically each
+        mini-batch but requires an explicit call to
+        :meth:`~aihwkit.simulator.tiles.base.Base.drift_weights` each
+        time the drift should be applied.
     """
 
     bindings_class: ClassVar[Type] = devices.PulsedResistiveDeviceParameter
 
     construction_seed: int = 0
     """If not equal 0, will set a unique seed for hidden parameters
-    during construction"""
+    during construction."""
 
     corrupt_devices_prob: float = 0.0
     """Probability for devices to be corrupt (weights fixed to random value
@@ -121,6 +143,9 @@ class PulsedDevice(_PrintableMixin):
 
     diffusion_dtod: float = 0.0
     """Device-to device variation of diffusion rate in relative units."""
+
+    drift: DriftParameter = field(default_factory=DriftParameter)
+    """Parameter governing a power-law drift."""
 
     dw_min: float = 0.001
     """Mean of the minimal update step sizes across devices and directions."""
@@ -269,7 +294,7 @@ class IdealDevice(_PrintableMixin):
 
     construction_seed: int = 0
     """If not equal 0, will set a unique seed for hidden parameters
-    during construction"""
+    during construction."""
 
     diffusion: float = 0.0
     """Standard deviation of diffusion process."""
@@ -353,7 +378,6 @@ class LinearStepDevice(PulsedDevice):
        w_{ij}  &\leftarrow& \text{clip}(w_{ij},b^\text{min}_{ij},b^\text{max}_{ij})
        \end{eqnarray*}
 
-
     in case of additive noise.  Optionally, multiplicative noise can
     be chosen in which case the first equation becomes:
 
@@ -424,7 +448,7 @@ class LinearStepDevice(PulsedDevice):
 
     allow_increasing: bool = False
     """Whether to allow the situation where update sizes increase
-    towards the bound instead of saturating (and thus becoming smaller)
+    towards the bound instead of saturating (and thus becoming smaller).
     """
 
     mean_bound_reference: bool = True
@@ -443,7 +467,7 @@ class LinearStepDevice(PulsedDevice):
 
     mult_noise: bool = True
     """Whether to use multiplicative noise instead of additive
-    cycle-to-cycle noise"""
+    cycle-to-cycle noise."""
 
     write_noise_std: float = 0.0
     r"""Whether to use update write noise that is added to the updated
@@ -477,7 +501,7 @@ class SoftBoundsDevice(PulsedDevice):
 
     mult_noise: bool = True
     """Whether to use multiplicative noise instead of additive
-    cycle-to-cycle noise"""
+    cycle-to-cycle noise."""
 
 
 @dataclass
@@ -752,7 +776,6 @@ class TransferCompound(UnitCell):
     The weight that is seen in the forward and backward pass is
     governed by the :math:`\gamma` weightening setting.
 
-
     Note:
         Here the devices could be either transferred in analog
         (essentially within the unit cell) or on separate arrays (using
@@ -760,24 +783,20 @@ class TransferCompound(UnitCell):
         set with ``transfer_forward`` and ``transfer_update``.
 
     .. _Gokmen & Haensch (2020): https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
-
     """
 
     bindings_class: ClassVar[Type] = devices.TransferResistiveDeviceParameter
 
     gamma: float = 0.0
-    r"""
-    Weightening factor to compute the effective SGD weight from the
+    r"""Weighting factor to compute the effective SGD weight from the
     hidden matrices. The default scheme is:
 
     .. math:: g^{n-1} W_0 + g^{n-2} W_1 + \ldots + g^0  W_{n-1}
-
     """
 
     gamma_vec: List[float] = field(default_factory=list,
                                    metadata={'hide_if': []})
-    """
-    User-defined weightening can be given as a list if weights in
+    """User-defined weightening can be given as a list if weights in
     which case the default weightening scheme with ``gamma`` is not
     used.
     """

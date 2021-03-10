@@ -228,7 +228,8 @@ void declare_rpu_devices(py::module &m) {
           })
       // Properties from this class.
       .def_readwrite("diffusion", &RPU::SimpleMetaParameter<T>::diffusion)
-      .def_readwrite("lifetime", &RPU::SimpleMetaParameter<T>::lifetime);
+      .def_readwrite("lifetime", &RPU::SimpleMetaParameter<T>::lifetime)
+      .def_readwrite("drift", &RPU::SimpleMetaParameter<T>::drift);
 
   py::class_<RPU::PulsedMetaParameter<T>>(m, "AnalogTileParameter")
       .def(py::init<>())
@@ -281,6 +282,20 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("out_sto_round", &RPU::IOMetaParameter<T>::out_sto_round)
       .def_readwrite("w_noise", &RPU::IOMetaParameter<T>::w_noise)
       .def_readwrite("w_noise_type", &RPU::IOMetaParameter<T>::w_noise_type);
+
+  py::class_<RPU::DriftParameter<T>>(m, "DriftParameter")
+      .def(py::init<>())
+      .def_readwrite("nu", &RPU::DriftParameter<T>::nu)
+      .def_readwrite("nu_dtod", &RPU::DriftParameter<T>::nu_dtod)
+      .def_readwrite("nu_std", &RPU::DriftParameter<T>::nu_std)
+      .def_readwrite("wg_ratio", &RPU::DriftParameter<T>::wg_ratio)
+      .def_readwrite("g_offset", &RPU::DriftParameter<T>::g_offset)
+      .def_readwrite("w_offset", &RPU::DriftParameter<T>::w_offset)
+      .def_readwrite("nu_k", &RPU::DriftParameter<T>::nu_k)
+      .def_readwrite("log_g0", &RPU::DriftParameter<T>::logG0)
+      .def_readwrite("t_0", &RPU::DriftParameter<T>::t0)
+      .def_readwrite("reset_tol", &RPU::DriftParameter<T>::reset_tol)
+      .def_readwrite("w_noise_std", &RPU::DriftParameter<T>::w_read_std);
 
   // device params
   py::class_<AbstractParam, PyAbstractParam, RPU::SimpleMetaParameter<T>>(

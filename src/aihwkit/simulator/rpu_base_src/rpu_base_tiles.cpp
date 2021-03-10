@@ -248,6 +248,24 @@ void declare_rpu_tiles(py::module &m) {
                alpha: decay scale
            )pbdoc")
       .def(
+          "drift_weights", [](Class &self, float time_since_last_call) { self.driftWeights(time_since_last_call); },
+      py::arg("time_since_last_call"),
+          R"pbdoc(
+           Drift weights according to a power law::
+
+              W = W0*(delta_t/t0)^(-nu_actual)
+
+           Applies the weight drift to all unchanged weight elements
+           (judged by ``reset_tol``) and resets the drift for those
+           that have changed (nu is not re-drawn, however). Each
+           device might have a different version of this drift.
+
+           Args:
+               time_since_last_call: This is the time between the calls (``delta_t``),
+                   typically the time to process a mini-batch for the
+                   network.
+           )pbdoc")
+      .def(
           "clip_weights",
           [](Class &self, ::RPU::WeightClipParameter &wclip_par) { self.clipWeights(wclip_par); },
           py::arg("weight_clipper_params"),
