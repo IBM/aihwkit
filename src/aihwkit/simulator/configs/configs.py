@@ -80,7 +80,7 @@ class UnitCellRPUConfig(_PrintableMixin):
     """Input-output parameter setting for the backward direction."""
 
     update: UpdateParameters = field(default_factory=UpdateParameters)
-    """Parameter for the update behavior."""
+    """Parameter for the parallel analog update behavior."""
 
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""

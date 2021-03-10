@@ -25,7 +25,7 @@ from aihwkit.simulator.rpu_base import tiles, cuda
 
 from aihwkit.simulator.configs import FloatingPointRPUConfig, SingleRPUConfig
 from aihwkit.simulator.configs.devices import FloatingPointDevice, ConstantStepDevice, IdealDevice
-from aihwkit.simulator.configs.utils import IOParameters
+from aihwkit.simulator.configs.utils import IOParameters, DriftParameter
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -124,6 +124,21 @@ class BindingsTilesTest(ParametrizedTestCase):
         deviation_std = std((weights - init_weights).flatten())
         self.assertLess(deviation_std, 1.1*diffusion_rate)
         self.assertGreater(deviation_std, 0.9*diffusion_rate)
+
+    def test_drift_weights(self):
+        """Check drifting the weights."""
+        nu = 0.1
+        drift_params = DriftParameter(nu=nu, t_0=1.0, nu_dtod=0.0, nu_std=0.0, w_noise_std=0.0)
+        delta_t = 2.0
+        # Use custom parameters for the tile.
+        python_tile = self.get_custom_tile(100, 122, drift=drift_params)
+        cpp_tile = python_tile.tile
+
+        init_weights = cpp_tile.get_weights().copy()
+        cpp_tile.drift_weights(delta_t)
+        weights = cpp_tile.get_weights()
+
+        assert_array_almost_equal(weights, init_weights*(delta_t)**(-nu))
 
     def test_mimic_rpu_mac(self):
         """Check using the update, forward and backward functions."""
