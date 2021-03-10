@@ -51,6 +51,7 @@ public:
       const bool x_trans,
       const bool d_trans,
       const T beta,
+      const RPU::PulsedUpdateMetaParameter<T> &up,
       T *x_buffer = nullptr,
       T *d_buffer = nullptr) override {
     RPU_FATAL("No direct update supported with this device.");
@@ -113,6 +114,7 @@ public:
   // implement abstract functions
   void decayWeights(T *dev_weights, bool bias_no_decay) override;
   void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override;
+  void driftWeights(T *dev_weights, T time_since_epoch) override;
   void diffuseWeights(T *dev_weights) override;
   void clipWeights(T *dev_weights, T clip) override;
   void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override;

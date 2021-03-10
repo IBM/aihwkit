@@ -15,6 +15,7 @@
 #include "cuda_math_util.h"
 #include "cuda_util.h"
 #include "rpu_simple_device.h"
+#include "weight_drifter_cuda.h"
 
 namespace RPU {
 
@@ -25,6 +26,7 @@ public:
 
   virtual void decayWeights(T *dev_weights, bool bias_no_decay) = 0;
   virtual void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) = 0;
+  virtual void driftWeights(T *dev_weights, T time_since_epoch) = 0;
   virtual void diffuseWeights(T *dev_weights) = 0;
   virtual void clipWeights(T *dev_weights, T clip) = 0;
   virtual void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) = 0;
@@ -42,6 +44,7 @@ public:
       const bool x_trans,
       const bool d_trans,
       const T beta,
+      const PulsedUpdateMetaParameter<T> &up,
       T *x_buffer,
       T *d_buffer) = 0;
   virtual bool hasDirectUpdate() const = 0;
@@ -83,6 +86,7 @@ public:
     swap(a.x_size_, b.x_size_);
     swap(a.d_size_, b.d_size_);
     swap(a.par_storage_, b.par_storage_);
+    swap(a.wdrifter_cuda_, b.wdrifter_cuda_);
   };
 
   // implement abstract functions
@@ -92,6 +96,7 @@ public:
   };
   void decayWeights(T *dev_weights, bool bias_no_decay) override;
   void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override;
+  void driftWeights(T *dev_weights, T time_since_epoch) override;
   void diffuseWeights(T *dev_weights) override;
   void clipWeights(T *dev_weights, T clip) override;
   void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override {
@@ -116,6 +121,7 @@ public:
       const bool x_trans,
       const bool d_trans,
       const T beta,
+      const PulsedUpdateMetaParameter<T> &up,
       T *x_buffer = nullptr,
       T *d_buffer = nullptr) override;
 
@@ -125,6 +131,7 @@ protected:
   int size_ = 0;
   CudaContext *context_;
 
+  std::unique_ptr<WeightDrifterCuda<T>> wdrifter_cuda_ = nullptr;
   // these are helpers and not copied
   void initDiffusionRnd();
   void initRndContext();

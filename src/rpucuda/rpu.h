@@ -14,6 +14,7 @@
 
 #include "rng.h"
 #include "weight_clipper.h"
+#include "weight_drifter.h"
 #include "weight_modifier.h"
 #include <cfenv>
 #include <iostream>
@@ -145,12 +146,14 @@ protected:
 
 template <typename T> struct SimpleMetaParameter {
 
-  SimpleMetaParameter() {}
+  SimpleMetaParameter() { drift.setSimpleDrift(); }
 
   T diffusion = (T)0.0;
   T lifetime = (T)0.0;
   T alpha_std = (T)0.0; // one-time relative error when setting alpha scale
   bool use_delayed_update = false;
+
+  DriftParameter<T> drift;
 
   virtual void printToStream(std::stringstream &ss) const;
   void print() const {
@@ -207,6 +210,7 @@ public:
     swap(a.matrix_indices_, b.matrix_indices_);
     swap(a.matrix_indices_set_, b.matrix_indices_set_);
 
+    swap(a.wdrifter_, b.wdrifter_);
     swap(a.wclipper_, b.wclipper_);
 
     swap(a.fb_weights_, b.fb_weights_);
@@ -317,6 +321,9 @@ public:
 
   /* Applying an Gaussian diffusion onto the weights.*/
   virtual void diffuseWeights();
+
+  /* conductance drift */
+  virtual void driftWeights(T time_since_last_call);
 
   /* Modify forward/backward weights (while keeping the update
      weights to a reference). This essentially copies the weight
@@ -636,6 +643,7 @@ private:
   T *temp_tensor_ = nullptr;
   int temp_tensor_size_ = 0;
 
+  std::unique_ptr<WeightDrifter<T>> wdrifter_ = nullptr;
   std::unique_ptr<WeightClipper<T>> wclipper_ = nullptr;
   std::unique_ptr<WeightModifier<T>> fb_weight_modifier_ = nullptr;
 

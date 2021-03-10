@@ -131,6 +131,10 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
         RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
   }
 
+  if (other.wdrifter_cuda_) {
+    wdrifter_cuda_ = RPU::make_unique<WeightDrifterCuda<T>>(*other.wdrifter_cuda_);
+  }
+
   // no copy
   wclipper_cuda_ = nullptr;
 
@@ -190,6 +194,8 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
 
   rnd_diffusion_context_ = std::move(other.rnd_diffusion_context_);
   dev_diffusion_nrnd_ = std::move(other.dev_diffusion_nrnd_);
+
+  wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
 
   return *this;
 }
@@ -602,6 +608,19 @@ template <typename T> void RPUCudaSimple<T>::decayWeights(T alpha, bool bias_no_
 
 template <typename T> void RPUCudaSimple<T>::decayWeights(bool bias_no_decay) {
   RPUCudaSimple<T>::decayWeights(1.0, bias_no_decay);
+}
+
+/*********************************************************************************/
+template <typename T> void RPUCudaSimple<T>::driftWeights(T time_since_last_call) {
+
+  if (wdrifter_cuda_ == nullptr) {
+    auto wd =
+        WeightDrifter<T>(this->x_size_ * this->d_size_, this->getPar().drift); // forces simple
+    wdrifter_cuda_ =
+        RPU::make_unique<WeightDrifterCuda<T>>(this->context_, wd, this->x_size_, this->d_size_);
+    context_->synchronize();
+  }
+  wdrifter_cuda_->apply(dev_weights_->getData(), time_since_last_call);
 }
 
 /*********************************************************************************/

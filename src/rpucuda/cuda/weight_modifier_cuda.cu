@@ -296,6 +296,7 @@ void WeightModifierCuda<T>::apply(
     }
     break;
   }
+
   case WeightModifierType::AddNormal: {
     if (wmpar.std_dev > 0) {
 
@@ -306,6 +307,7 @@ void WeightModifierCuda<T>::apply(
     }
     break;
   }
+
   case WeightModifierType::Poly: {
     if (wmpar.std_dev > 0) {
 

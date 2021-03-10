@@ -256,6 +256,11 @@ template <typename T> void RPUCudaPulsed<T>::decayWeights(bool bias_no_decay) {
   rpucuda_device_->decayWeights(this->dev_weights_->getData(), bias_no_decay);
 }
 
+template <typename T> void RPUCudaPulsed<T>::driftWeights(T time_since_last_call) {
+  CHECK_RPU_DEVICE_INIT;
+  rpucuda_device_->driftWeights(this->dev_weights_->getData(), time_since_last_call);
+}
+
 template <typename T> void RPUCudaPulsed<T>::diffuseWeights() {
   CHECK_RPU_DEVICE_INIT;
   rpucuda_device_->diffuseWeights(this->dev_weights_->getData());

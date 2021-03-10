@@ -49,12 +49,14 @@ public:
       bool trans = false,
       bool is_test = false);
 
+  // debugging functions
+  inline void copyScaleValuesToHost(float *dest) const { dev_scale_values_->copyTo(dest); };
+  void printScaleValues() const { dev_scale_values_->printValues(); };
+  void printAvgAbsMax() const { dev_ravg_scale_value_->printValues(); };
+  void printAbsMaxValues() const { amaximizer_->printMaxValues(); };
+
   /* sets the computed max values to zero below thres. Caution: This
      is in-place. does not check whether compute was called. */
-
-  inline void copyScaleValuesToHost(float *dest) const { dev_scale_values_->copyTo(dest); };
-
-  void printScaleValues() const { dev_scale_values_->printValues(); };
   float *getScaleValues() const;
 
   float getAverageAbsMax() const;

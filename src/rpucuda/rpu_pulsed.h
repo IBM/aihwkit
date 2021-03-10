@@ -54,6 +54,7 @@ public:
   // overloaded methods
   void decayWeights(bool bias_no_decay) override;
   void decayWeights(T alpha, bool bias_no_decay) override;
+  void driftWeights(T time_since_last_call) override;
   void diffuseWeights() override;
   void clipWeights(T clip) override;
   void clipWeights(const WeightClipParameter &wclpar) override;

@@ -41,12 +41,12 @@ namespace RPU {
 #ifdef RPU_USE_DOUBLE
 template <> void RPUAbstract<double>::printToStream(std::stringstream &ss) const {
   ss << "RPUAbstract<double>(" << d_size_ << "," << x_size_ << ")\n";
-};
+}
 #endif
 
 template <> void RPUAbstract<float>::printToStream(std::stringstream &ss) const {
   ss << "RPUAbstract<float>(" << d_size_ << "," << x_size_ << ")\n";
-};
+}
 
 /********************************************************************************/
 template <typename T>
@@ -64,7 +64,7 @@ void RPUAbstract<T>::forwardMatrix(
   for (int i = 0; i < m_batch; i++) {
     this->forwardVector(x_input + i * x_offset, d_output + i * d_offset, x_inc, d_inc, is_test);
   }
-};
+}
 
 template <typename T>
 void RPUAbstract<T>::backwardMatrix(
@@ -80,7 +80,7 @@ void RPUAbstract<T>::backwardMatrix(
   for (int i = 0; i < m_batch; i++) {
     this->backwardVector(d_input + i * d_offset, x_output + i * x_offset, d_inc, x_inc);
   }
-};
+}
 
 template <typename T>
 void RPUAbstract<T>::updateMatrix(
@@ -96,7 +96,7 @@ void RPUAbstract<T>::updateMatrix(
   for (int i = 0; i < m_batch; i++) {
     this->updateVector(x_input + i * x_offset, d_input + i * d_offset, x_inc, d_inc);
   }
-};
+}
 
 template <typename T>
 void RPUAbstract<T>::forwardMatrixBias(
@@ -118,7 +118,7 @@ void RPUAbstract<T>::forwardMatrixBias(
     this->forwardVectorBias(
         x_input_without_bias + i * x_offset, d_output + i * d_offset, x_inc, d_inc, is_test);
   }
-};
+}
 
 template <typename T>
 void RPUAbstract<T>::backwardMatrixBias(
@@ -135,7 +135,7 @@ void RPUAbstract<T>::backwardMatrixBias(
     this->backwardVectorBias(
         d_input + i * d_offset, x_output_without_bias + i * x_offset, d_inc, x_inc);
   }
-};
+}
 
 template <typename T>
 void RPUAbstract<T>::updateMatrixBias(
@@ -172,16 +172,22 @@ template <typename T> void SimpleMetaParameter<T>::printToStream(std::stringstre
   if (lifetime > 0) {
     ss << "\t lifetime [decay]:\t" << lifetime << std::endl;
   }
+  if (drift.nu > 0) {
+    ss << "Drift:" << std::endl;
+    drift.printToStream(ss);
+  }
   if (diffusion > 0) {
     ss << "Diffusion:" << std::endl;
     ss << "\t diffusion:\t\t" << diffusion << std::endl;
   }
-};
+}
 
 #ifdef RPU_USE_DOUBLE
 template struct SimpleMetaParameter<double>;
+template struct DriftParameter<double>;
 #endif
 template struct SimpleMetaParameter<float>;
+template struct DriftParameter<float>;
 
 /********************************************************************************
  * RPUSimple<T>
@@ -284,6 +290,10 @@ template <typename T> RPUSimple<T>::RPUSimple(const RPUSimple<T> &other) : RPUAb
   if (other.shared_weights_if_) {
     this->setSharedWeights(*other.weights_);
   }
+  if (other.wdrifter_) {
+    // call copy constructor
+    wdrifter_ = make_unique<WeightDrifter<T>>(*other.wdrifter_);
+  }
 
   // no copy needed
   wclipper_ = nullptr;
@@ -379,6 +389,8 @@ template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(RPUSimple<T> &&other
 
   matrix_indices_set_ = other.matrix_indices_set_;
   other.matrix_indices_set_ = false;
+
+  wdrifter_ = std::move(other.wdrifter_);
 
   last_update_m_batch_ = other.last_update_m_batch_;
 
@@ -479,7 +491,7 @@ void RPUSimple<T>::forwardMatrix(
         this->fwd_alpha_, X_input, x_trans ? m_batch : this->x_size_, getFBWeights(is_test)[0],
         this->x_size_, (float)0.0, D_output, this->d_size_);
   }
-};
+}
 
 template <typename T>
 void RPUSimple<T>::backwardMatrix(
@@ -499,7 +511,7 @@ void RPUSimple<T>::backwardMatrix(
         this->bwd_alpha_, D_input, d_trans ? m_batch : this->d_size_, getFBWeights(false)[0],
         this->x_size_, (T)0.0, X_output, this->x_size_);
   }
-};
+}
 
 template <typename T>
 void RPUSimple<T>::updateMatrix(
@@ -511,7 +523,7 @@ void RPUSimple<T>::updateMatrix(
       m_batch,       // K
       -this->getAlphaLearningRate(), D_input, d_trans ? m_batch : this->d_size_, X_input,
       x_trans ? m_batch : this->x_size_, this->getUpBeta(), this->getUpWeights()[0], this->x_size_);
-};
+}
 
 template <typename T>
 void RPUSimple<T>::forwardMatrixBias(
@@ -553,7 +565,7 @@ template <typename T> T *RPUSimple<T>::getMatrixBiasBuffer(int m_batch) {
     temp_x_matrix_bias_size_ = m_batch;
   }
   return temp_x_matrix_bias_;
-};
+}
 
 template <typename T>
 T *RPUSimple<T>::copyToMatrixBiasBuffer(const T *X_input_without_bias, int m_batch, bool x_trans) {
@@ -582,14 +594,14 @@ void RPUSimple<T>::forwardVector(
   RPU::math::gemv<T>(
       CblasRowMajor, CblasNoTrans, this->d_size_, this->x_size_, this->fwd_alpha_,
       getFBWeights(is_test)[0], this->x_size_, x_input, x_inc, (T)0.0, d_output, d_inc);
-};
+}
 
 template <typename T>
 void RPUSimple<T>::backwardVector(const T *d_input, T *x_output, int d_inc, int x_inc) {
   RPU::math::gemv<T>(
       CblasRowMajor, CblasTrans, this->d_size_, this->x_size_, this->bwd_alpha_,
       getFBWeights(false)[0], this->x_size_, d_input, d_inc, (T)0.0, x_output, x_inc);
-};
+}
 
 template <typename T>
 void RPUSimple<T>::updateVector(const T *x_input, const T *d_input, int x_inc, int d_inc) {
@@ -1000,8 +1012,8 @@ void RPUSimple<T>::copySliceOutput(
 template <typename T> void RPUSimple<T>::setZero(T *v, const int size) {
   for (int i = 0; i < size; i++) {
     v[i] = (T)0.0;
-  };
-};
+  }
+}
 
 template <typename T>
 void RPUSimple<T>::forwardIndexed(
@@ -1279,7 +1291,7 @@ template <typename T> void RPUSimple<T>::setSharedWeights(T *weightsptr) {
 template <typename T> T RPUSimple<T>::getAlphaLearningRate() const {
   return (getDeltaWeights()) ? -(T)1.0 / this->bwd_alpha_
                              : this->getLearningRate() / this->bwd_alpha_;
-};
+}
 
 template <typename T> void RPUSimple<T>::setFwdAlpha(const T fwd_alpha, bool with_noise) {
   if (with_noise) {
@@ -1289,7 +1301,7 @@ template <typename T> void RPUSimple<T>::setFwdAlpha(const T fwd_alpha, bool wit
   } else {
     fwd_alpha_ = fwd_alpha;
   }
-};
+}
 
 template <typename T> void RPUSimple<T>::setBwdAlpha(const T bwd_alpha, bool with_noise) {
   if (with_noise) {
@@ -1299,12 +1311,12 @@ template <typename T> void RPUSimple<T>::setBwdAlpha(const T bwd_alpha, bool wit
   } else {
     bwd_alpha_ = bwd_alpha;
   }
-};
+}
 
 template <typename T> void RPUSimple<T>::setAlphaScale(const T alpha) {
   setFwdAlpha(alpha);
   setBwdAlpha(alpha);
-};
+}
 
 template <typename T>
 void RPUSimple<T>::getAndResetWeightUpdate(T *prev_weight_and_dw_out, T scale) {
@@ -1411,17 +1423,17 @@ template <typename T> void RPUSimple<T>::printWeights(int x_count, int d_count) 
 
 template <> void RPUSimple<float>::printToStream(std::stringstream &ss) const {
   ss << "RPUSimple<float>(" << this->d_size_ << "," << this->x_size_ << ")\n";
-};
+}
 
 #ifdef RPU_USE_DOUBLE
 template <> void RPUSimple<double>::printToStream(std::stringstream &ss) const {
   ss << "RPUSimple<double>(" << this->d_size_ << "," << this->x_size_ << ")\n";
-};
+}
 #endif
 
 template <typename T> void RPUSimple<T>::printParametersToStream(std::stringstream &ss) const {
   getPar().printToStream(ss);
-};
+}
 
 template <typename T> void RPUSimple<T>::setLearningRate(T lr) {
   if (lr != this->getLearningRate()) {
@@ -1451,11 +1463,19 @@ template <typename T> void RPUSimple<T>::decayWeights(T alpha, bool bias_no_deca
       }
     }
   }
-};
+}
 
 template <typename T> void RPUSimple<T>::decayWeights(bool bias_no_decay) {
   RPUSimple<T>::decayWeights(1., bias_no_decay);
-};
+}
+
+template <typename T> void RPUSimple<T>::driftWeights(T time_since_last_call) {
+  if (!wdrifter_) {
+    wdrifter_ =
+        make_unique<WeightDrifter<T>>(this->x_size_ * this->d_size_, getPar().drift); // simpleDrift
+  }
+  wdrifter_->apply(this->getWeightsPtr()[0], time_since_last_call, *rng_);
+}
 
 template <typename T> void RPUSimple<T>::clipWeights(T clip) {
 
@@ -1490,6 +1510,7 @@ template <typename T> void RPUSimple<T>::diffuseWeights() {
     }
   }
 }
+
 /*********************************************************************************/
 
 template <typename T> void RPUSimple<T>::modifyFBWeights(const WeightModifierParameter &wmpar) {

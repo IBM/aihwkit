@@ -155,7 +155,7 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
   // handle cases with no device or FP device
   if (rpu_device_in != nullptr && rpu_device_in->hasDirectUpdate()) {
     rpu_device_in->doDirectVectorUpdate(
-        weights, x_input, x_inc, d_input, d_inc, learning_rate, m_batch_info);
+        weights, x_input, x_inc, d_input, d_inc, learning_rate, m_batch_info, up_);
     return;
   } else if (up_.pulse_type == PulseType::NoneWithDevice || checkForFPUpdate(rpu_device_in)) {
 

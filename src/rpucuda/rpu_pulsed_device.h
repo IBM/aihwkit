@@ -32,7 +32,7 @@ template <typename T> class PulsedRPUDevice;
 
 template <typename T> struct PulsedRPUDeviceMetaParameterBase : SimpleRPUDeviceMetaParameter<T> {
 
-  PulsedRPUDeviceMetaParameterBase() {}
+  PulsedRPUDeviceMetaParameterBase() { this->drift.unsetSimpleDrift(); }
 
   std::string getName() const override { return "PulsedRPUDeviceParameterBase"; };
   PulsedRPUDeviceBase<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {
@@ -242,6 +242,7 @@ public:
 
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
+  void driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) override;
   void diffuseWeights(T **weights, RNG<T> &rng) override;
   void clipWeights(T **weights, T add_clip) override;
   bool onSetWeights(T **weights) override;

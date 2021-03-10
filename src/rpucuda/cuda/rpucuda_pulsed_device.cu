@@ -202,6 +202,17 @@ template <typename T> void PulsedRPUDeviceCuda<T>::decayWeights(T *weights, bool
   applyUpdateWriteNoise(weights);
 }
 
+template <typename T>
+void PulsedRPUDeviceCuda<T>::driftWeights(T *weights, T time_since_last_call) {
+
+  T *w = getPar().usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
+
+  PulsedRPUDeviceCudaBase<T>::driftWeights(w, time_since_last_call);
+  this->wdrifter_cuda_->saturate(w, dev_4params_->getData());
+
+  applyUpdateWriteNoise(weights);
+}
+
 template <typename T> void PulsedRPUDeviceCuda<T>::diffuseWeights(T *weights) {
 
   if (dev_diffusion_rate_ == nullptr) {
@@ -283,7 +294,7 @@ template <typename T>
 void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols, T reset_prob) {
   // col-major in CUDA.
 
-  if (dev_reset_bias_== nullptr) {
+  if (dev_reset_bias_ == nullptr) {
     return; // no reset
   }
 
