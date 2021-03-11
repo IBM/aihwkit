@@ -521,6 +521,7 @@ class SimpleDriftParameter(_PrintableMixin):
 
     It computes:
     .. math::
+
         w_{ij}*\left(\frac{t + \Delta t}{t_0}\right)^(-\nu)
     """
 
@@ -554,10 +555,11 @@ class SimpleDriftParameter(_PrintableMixin):
 class DriftParameter(SimpleDriftParameter):
     r"""Parameter for a power law drift.
 
-    The drift is based on the model described by `Oh et al (2019)`_
+    The drift is based on the model described by `Oh et al (2019)`_.
 
     It computes:
     .. math::
+
         w_{ij}*\left(\frac{t + \Delta t}{t_0}\right)^(-\nu^\text{actual}_{ij})
 
     where the drift coefficient is drawn once at the beginning and
@@ -577,19 +579,19 @@ class DriftParameter(SimpleDriftParameter):
     Gaussian noise.
 
     Note:
-       If the weight has changed from the last drift call (determined
-       by the ``reset_tol`` parameter), for instance due to update,
-       decay or noise, then the drift time :math:`t` will be reset and start
-       from new, however, the drift coefficients :math:`\nu_{ij}` are
-       *not* changed. On the other hand, if the weights has not
-       changed since last call, :math:`t` will accumulate the time.
+        If the weight has changed from the last drift call (determined
+        by the ``reset_tol`` parameter), for instance due to update,
+        decay or noise, then the drift time :math:`t` will be reset and start
+        from new, however, the drift coefficients :math:`\nu_{ij}` are
+        *not* changed. On the other hand, if the weights has not
+        changed since last call, :math:`t` will accumulate the time.
 
     Caution:
-       Note that the drift coefficient does *not* depend on the initially
-       programmed weight value at :math:`t=0` in the current
-       implementation (ie G0 is a constant for all devices), but
-       instead on the actual weight. In some materials (e.g. phase
-       changed materials), that might be not accurate.
+        Note that the drift coefficient does *not* depend on the initially
+        programmed weight value at :math:`t=0` in the current
+        implementation (ie G0 is a constant for all devices), but
+        instead on the actual weight. In some materials (e.g. phase
+        changed materials), that might be not accurate.
 
     .. _`Oh et al (2019)`: https://ieeexplore.ieee.org/document/8753712
     """

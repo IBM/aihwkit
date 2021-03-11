@@ -107,13 +107,13 @@ class PulsedDevice(_PrintableMixin):
     .. math:: w_{ij} \leftarrow w_{ij} + \rho_{ij} \, \xi;
 
     where :math:`xi` is a standard Gaussian variable and :math:`\rho_{ij}` the
-    diffusion rate for a cross-point `ij`
+    diffusion rate for a cross-point `ij`.
 
     Note:
        If diffusion happens to move the weight beyond the hard bounds of the
        weight it is ensured to be clipped appropriately.
 
-    ** Drift **:
+    **Drift**:
 
     Optional power-law drift setting, as described in
     :class:`~aihwkit.similar.configs.utils.DriftParameter`.
@@ -963,7 +963,7 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
         details, see discussion in `Nandakumar et al. Front. in
         Neurosci. (2020)`_.
 
-    .. _`Nandakumar et al. Front. in Neurosci. (2020)`_: https://doi.org/10.3389/fnins.2020.00406
+    .. _`Nandakumar et al. Front. in Neurosci. (2020)`: https://doi.org/10.3389/fnins.2020.00406
     """
 
     bindings_class: ClassVar[Type] = devices.MixedPrecResistiveDeviceParameter
