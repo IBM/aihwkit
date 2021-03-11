@@ -31,7 +31,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Two new convolution layers have been added: `AnalogConv1d` and `AnalogConv3d`,
   mimicking their digital counterparts. (\#102, \#103)
 * Option to automatically scale the digital weights into the full range of the
-  simluated crossbar by applying a fixed output global factor in
+  simulated crossbar by applying a fixed output global factor in
   digital. (\#129)
 * Added a library of device presets that are calibrated to real
   hardware data, namely `ReRamESPresetDevice`, `ReRamSBPresetDevice`,
@@ -45,11 +45,11 @@ The format is based on [Keep a Changelog], and this project adheres to
   particular device and optimizer choice. (\#144)
 * Utility for visualization the pulse response properties of a given
   device configuration. (\#146)
-* Optional power-law drift during analog training (\#158)
+* Optional power-law drift during analog training. (\#158)
 * A new abstract device (`MixedPrecisionCompound`) implementing an SGD 
   optimizer that computes the rank update in digital (assuming digital 
-  high precision storage) and then transfers the matrix sequentually to 
-  the anlog device, instead of using the default fully parallel pulsed 
+  high precision storage) and then transfers the matrix sequentially to 
+  the analog device, instead of using the default fully parallel pulsed 
   update. (#159)  
 
 #### Fixed
