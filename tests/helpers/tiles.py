@@ -25,13 +25,15 @@ from aihwkit.simulator.configs.devices import (
     DifferenceUnitCell,
     VectorUnitCell,
     TransferCompound,
-    ReferenceUnitCell
+    ReferenceUnitCell,
+    MixedPrecisionCompound,
 )
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
     InferenceRPUConfig,
     SingleRPUConfig,
     UnitCellRPUConfig,
+    DigitalRankUpdateRPUConfig,
 )
 
 from aihwkit.simulator.rpu_base import tiles
@@ -201,6 +203,25 @@ class Transfer:
             gamma=0.1
 
         ))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
+class MixedPrecision:
+    """AnalogTile with MixedPrecisionCompound."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return DigitalRankUpdateRPUConfig(
+            device=MixedPrecisionCompound(
+                device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                transfer_every=1),
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -385,6 +406,25 @@ class TransferCuda:
             transfer_every=1,
             gamma=0.1
         ))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class MixedPrecisionCuda:
+    """AnalogTile with MixedPrecisionCompound."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return DigitalRankUpdateRPUConfig(
+            device=MixedPrecisionCompound(
+                device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                transfer_every=1),
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()

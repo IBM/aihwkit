@@ -249,7 +249,7 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "drift_weights", [](Class &self, float time_since_last_call) { self.driftWeights(time_since_last_call); },
-      py::arg("time_since_last_call"),
+          py::arg("time_since_last_call"),
           R"pbdoc(
            Drift weights according to a power law::
 

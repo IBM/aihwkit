@@ -25,9 +25,8 @@ def parameters_to_bindings(params: Any) -> Any:
     result = params.bindings_class()
     for field, value in params.__dict__.items():
         # Convert enums to the bindings enums.
-        if field == 'unit_cell_devices':
-            # Exclude `unit_cell_devices`, as it is a special field that is not
-            # present in the bindings.
+        if field in ('unit_cell_devices', 'device'):
+            # Exclude special fields that are not present in the bindings.
             continue
 
         if isinstance(value, Enum):

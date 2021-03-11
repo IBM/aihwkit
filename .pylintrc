@@ -285,7 +285,8 @@ good-names=i,
            z,
            d,
            t,
-           fn
+           fn,
+           nu,
 
 # Good variable names regexes, separated by a comma. If names match any regex,
 # they will always be accepted
