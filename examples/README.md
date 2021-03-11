@@ -275,7 +275,7 @@ trains for each input line and thus do no short-cut in the simulation.
 Here, in this example, we change the update to be performed using deterministic pulse trains that
 yield always the same number of coincident pulses at a cross point, if the same inputs are
 given. Implicitly, one can design the stored pulse train structure to quantize the input values in
-a number of bins, which can be changed by the ``*_res_imilicit``  parameters. 
+a number of bins, which can be changed by the ``*_res_imilicit``  parameters.
 
 ```
 rpu_config = SingleRPUConfig(device=ConstantStepDevice())
@@ -289,12 +289,34 @@ rpu_config.update.x_res_implicit = 0.1 # effective resolution of d bit lines
 Similarly to example 1 the network is trained over 100 epochs with an analog Stochastic Gradient
 Descent optimizer and the loss is printed for every epoch.
 
+## Example 10: [`10_plot_presets.py`]
+
+This examples print 5 of the different [`preset devices`] and [`preset configs`] available.
+Using this presets makes easy testing the different memory element that can be used to train a
+neural network. The presets (except for the "Idealized analog device") are calibrated on the
+measured characteristics of real hardware devices that have been fabricated at IBM. Device non-ideal
+characteristics, noise, and variability are accurately simulated in all presets.
+
+## Example 11: [`11_vgg8_training.py`]
+
+This example train a VGG8 network on the Street View House Number (SVHN) dataset.
+The device used in the `rpu_config` is the `GokmenVlasovPreset` config. In addition, it uses
+weight scaling in the analog layers in order to improve the accuracy.
+
+There are many built-in [`preset devices`] and corresponding [`preset configs`] which makes
+convenient to explore the different memory element that can be used to train a neural network.
+The presets (except for the "Idealized analog device") are calibrated on the measured
+characteristics of real hardware devices that have been fabricated at IBM. Device non-ideal
+characteristics, noise, and variability are accurately simulated in all presets.
+
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
 [Compound Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#transfer-compound-device
 [weight drift]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html#drift
+[`preset devices`]: https://aihwkit.readthedocs.io/en/latest/api/aihwkit.simulator.presets.devices.html
+[`preset configs`]: https://aihwkit.readthedocs.io/en/latest/api/aihwkit.simulator.presets.configs.html
 
 [Gokmen T and Vlasov Y (2016) Acceleration of Deep Neural Network Training with Resistive
 Cross-Point Devices: Design Considerations. Front. Neurosci.]:
@@ -314,3 +336,5 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`07_simple_layer_with_other_devices.py`]: 07_simple_layer_with_other_devices.py
 [`08_simple_layer_with_tiki_taka.py`]: 08_simple_layer_with_tiki_taka.py
 [`09_simple_layer_deterministic_pulses.py`]: 09_simple_layer_deterministic_pulses.py
+[`10_plot_presets.py`]: 10_plot_presets.py
+[`11_vgg8_training.py`]: 11_vgg8_training.py
