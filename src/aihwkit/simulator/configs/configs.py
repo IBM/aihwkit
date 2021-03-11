@@ -17,7 +17,7 @@ from typing import ClassVar, Type
 
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice, FloatingPointDevice, IdealDevice, PulsedDevice,
-    UnitCell
+    UnitCell, DigitalRankUpdateCell
 )
 from aihwkit.simulator.configs.helpers import (
     _PrintableMixin, tile_parameters_to_bindings
@@ -135,6 +135,37 @@ class InferenceRPUConfig(_PrintableMixin):
         init=False
     )
     """Parameter for the update behavior: ``NONE`` pulse type."""
+
+    def as_bindings(self) -> devices.AnalogTileParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+        return tile_parameters_to_bindings(self)
+
+
+@dataclass
+class DigitalRankUpdateRPUConfig(_PrintableMixin):
+    """Configuration for an analog (unit cell) resistive processing unit
+    where the rank update is done in digital.
+
+    Note that for forward and backward, an analog crossbar is still
+    used, and during update the digitally computed rank update is
+    transferred to the analog crossbar using pulses.
+    """
+
+    bindings_class: ClassVar[Type] = devices.AnalogTileParameter
+
+    device: DigitalRankUpdateCell = field(default_factory=DigitalRankUpdateCell)
+    """Parameters that modify the behavior of the pulsed device."""
+
+    forward: IOParameters = field(default_factory=IOParameters)
+    """Input-output parameter setting for the forward direction."""
+
+    backward: IOParameters = field(default_factory=IOParameters)
+    """Input-output parameter setting for the backward direction."""
+
+    update: UpdateParameters = field(default_factory=UpdateParameters)
+    """Parameter for the analog part of the update, that is the transfer
+    from the digital buffer to the devices.
+    """
 
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""

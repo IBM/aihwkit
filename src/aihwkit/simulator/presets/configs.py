@@ -15,10 +15,11 @@
 from dataclasses import dataclass, field
 
 from aihwkit.simulator.configs.configs import (
-    SingleRPUConfig, UnitCellRPUConfig
+    SingleRPUConfig, UnitCellRPUConfig, DigitalRankUpdateRPUConfig
 )
 from aihwkit.simulator.configs.devices import (
-    PulsedDevice, TransferCompound, UnitCell, VectorUnitCell
+    PulsedDevice, TransferCompound, UnitCell, VectorUnitCell,
+    DigitalRankUpdateCell, MixedPrecisionCompound
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
@@ -372,6 +373,98 @@ class TikiTakaIdealizedPreset(UnitCellRPUConfig):
             transfer_every=1.0,
             units_in_mbatch=True,
             ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+# Mixed precision presets
+
+@dataclass
+class MixedPrecisionReRamESPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`ReRamESPresetDevice` and standard ADC/DAC hardware
+    etc configuration."""
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=ReRamESPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionReRamSBPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`ReRamSBPresetDevice` and standard ADC/DAC hardware
+    etc configuration."""
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=ReRamSBPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionCapacitorPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`CapacitorPresetDevice` and standard ADC/DAC hardware
+    etc configuration."""
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=CapacitorPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionEcRamPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`EcRamPresetDevice` and standard ADC/DAC hardware
+    etc configuration."""
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=EcRamPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionIdealizedPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`IdealizedPresetDevice` and standard ADC/DAC hardware
+    etc configuration."""
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=IdealizedPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionGokmenVlasovPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`GokmenVlasovPresetDevice` and standard ADC/DAC hardware
+    etc configuration."""
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=GokmenVlasovPresetDevice(),
+        ))
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)

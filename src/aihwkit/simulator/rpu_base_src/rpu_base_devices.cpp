@@ -25,6 +25,7 @@ void declare_rpu_devices(py::module &m) {
   using VectorParam = RPU::VectorRPUDeviceMetaParameter<T>;
   using DifferenceParam = RPU::DifferenceRPUDeviceMetaParameter<T>;
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
+  using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -208,6 +209,24 @@ void declare_rpu_devices(py::module &m) {
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(
           RPU::TransferRPUDevice<T> *, TransferParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  class PyMixedPrecParam : public MixedPrecParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, MixedPrecParam, getName, );
+    }
+    MixedPrecParam *clone() const override {
+      PYBIND11_OVERLOAD(MixedPrecParam *, MixedPrecParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, MixedPrecParam, implements, );
+    }
+    RPU::MixedPrecRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::MixedPrecRPUDevice<T> *, MixedPrecParam, createDevice, x_size, d_size, rng);
     }
   };
 
@@ -440,6 +459,30 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("transfer_forward", &TransferParam::transfer_io)
       .def_readwrite("transfer_update", &TransferParam::transfer_up)
       .def("__str__", [](TransferParam &self) {
+        std::stringstream ss;
+        self.printToStream(ss);
+        return ss.str();
+      });
+
+  py::class_<MixedPrecParam, PyMixedPrecParam, SimpleParam>(m, "MixedPrecResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("transfer_every", &MixedPrecParam::transfer_every)
+      .def_readwrite("n_rows_per_transfer", &MixedPrecParam::n_rows_per_transfer)
+      .def_readwrite("random_row", &MixedPrecParam::random_row)
+      .def_readwrite("granularity", &MixedPrecParam::granularity)
+      .def_readwrite("compute_sparsity", &MixedPrecParam::compute_sparsity)
+      .def_readwrite("n_x_bins", &MixedPrecParam::n_x_bins)
+      .def_readwrite("n_d_bins", &MixedPrecParam::n_d_bins)
+      .def(
+          "set_device_parameter",
+          [](MixedPrecParam &self, const RPU::AbstractRPUDeviceMetaParameter<T> &dp) {
+            return self.setDevicePar(dp);
+          },
+          py::arg("parameter"),
+          R"pbdoc(
+           Set a pulsed base device parameter of a mixed precision device.
+           )pbdoc")
+      .def("__str__", [](MixedPrecParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
         return ss.str();
