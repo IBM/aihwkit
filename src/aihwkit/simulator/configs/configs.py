@@ -164,8 +164,7 @@ class DigitalRankUpdateRPUConfig(_PrintableMixin):
 
     update: UpdateParameters = field(default_factory=UpdateParameters)
     """Parameter for the analog part of the update, that is the transfer
-    from the digital buffer to the devices.
-    """
+    from the digital buffer to the devices."""
 
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""

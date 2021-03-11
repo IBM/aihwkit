@@ -128,8 +128,8 @@ class PulsedDevice(_PrintableMixin):
     bindings_class: ClassVar[Type] = devices.PulsedResistiveDeviceParameter
 
     construction_seed: int = 0
-    """If not equal 0, will set a unique seed for hidden parameters
-    during construction."""
+    """If not equal 0, will set a unique seed for hidden parameters during
+    construction."""
 
     corrupt_devices_prob: float = 0.0
     """Probability for devices to be corrupt (weights fixed to random value
@@ -151,26 +151,27 @@ class PulsedDevice(_PrintableMixin):
     """Mean of the minimal update step sizes across devices and directions."""
 
     dw_min_dtod: float = 0.3
-    """Device-to-device std deviation of dw_min (in relative units to ``dw_min``)."""
+    """Device-to-device std deviation of dw_min (in relative units to
+    ``dw_min``)."""
 
     dw_min_std: float = 0.3
     r"""Cycle-to-cycle variation size of the update step (related to
     :math:`\sigma_\text{c-to-c}` above) in relative units to ``dw_min``.
 
     Note:
-        Many spread (device-to-device variation) parameters are
-        given in relative units. For instance e.g. a setting of
-        ``dw_min_std`` of 0.1 would mean 10% spread around the
-        mean and thus a resulting standard deviation
-        (:math:`\sigma_\text{c-to-c}`) of ``dw_min`` *
-        ``dw_min_std``.
+        Many spread (device-to-device variation) parameters are given in
+        relative units. For instance e.g. a setting of ``dw_min_std`` of 0.1
+        would mean 10% spread around the mean and thus a resulting standard
+        deviation (:math:`\sigma_\text{c-to-c}`) of ``dw_min`` * ``dw_min_std``.
     """
 
     enforce_consistency: bool = True
-    """Whether to enforce during initialization that max weight bounds cannot
-    be smaller than min weight bounds, and up direction step size is positive
-    and down negative. Switches the opposite values if encountered during
-    init."""
+    """Whether to enforce weight bounds consistency during initialization.
+
+    Whether to enforce that max weight bounds cannot be smaller than min
+    weight bounds, and up direction step size is positive and down negative.
+    Switches the opposite values if encountered during init.
+    """
 
     lifetime: float = 0.0
     r"""One over `decay_rate`, ie :math:`1/r_\text{decay}`."""
@@ -183,8 +184,8 @@ class PulsedDevice(_PrintableMixin):
     for the devices in the bias row."""
 
     reset: float = 0.01
-    """The reset values and spread per cross-point ``ij`` when using reset functionality
-    of the device."""
+    """The reset values and spread per cross-point ``ij`` when using reset
+    functionality of the device."""
 
     reset_dtod: float = 0.0
     """See ``reset``."""
@@ -193,18 +194,20 @@ class PulsedDevice(_PrintableMixin):
     """See ``reset``."""
 
     up_down: float = 0.0
-    r"""Up and down direction step sizes can be systematically different and also
-    vary across devices.
-    :math:`\Delta w_{ij}^d` is set during RPU initialization (for each cross-point `ij`):
+    r"""Up and down direction step sizes can be systematically different and
+    also vary across devices.
+
+    :math:`\Delta w_{ij}^d` is set during RPU initialization (for each
+    cross-point `ij`):
 
     .. math::
 
         \Delta w_{ij}^d = d\; \Delta w_\text{min}\, \left(
         1 + d \beta_{ij} + \sigma_\text{d-to-d}\xi\right)
 
-    where \xi is again a standard Gaussian. :math:`\beta_{ij}`
-    is the directional up `versus` down bias.  At initialization
-    ``up_down_dtod`` and ``up_down`` defines this bias term:
+    where \xi is again a standard Gaussian. :math:`\beta_{ij}` is the
+    directional up `versus` down bias.  At initialization ``up_down_dtod`` and
+    ``up_down`` defines this bias term:
 
     .. math::
 
@@ -212,9 +215,8 @@ class PulsedDevice(_PrintableMixin):
         \sigma_\text{up-down-dtod}
 
     where \xi is again a standard Gaussian number and
-    :math:`\beta_\text{up-down}` corresponds to
-    ``up_down``. Note that ``up_down_dtod`` is again given in
-    relative units to ``dw_min``.
+    :math:`\beta_\text{up-down}` corresponds to ``up_down``. Note that
+    ``up_down_dtod`` is again given in relative units to ``dw_min``.
     """
 
     up_down_dtod: float = 0.01
@@ -227,8 +229,10 @@ class PulsedDevice(_PrintableMixin):
     """See ``w_min_dtod``."""
 
     w_min: float = -0.6
-    """Mean of hard bounds across device cross-point `ij`. The parameters
-    ``w_min`` and ``w_max`` are used to set the min/max bounds independently.
+    """Mean of hard bounds across device cross-point `ij`.
+
+    The parameters ``w_min`` and ``w_max`` are used to set the min/max bounds
+    independently.
 
     Note:
         For this abstract device, we assume that weights can have
@@ -238,9 +242,12 @@ class PulsedDevice(_PrintableMixin):
     """
 
     w_min_dtod: float = 0.3
-    """Device-to-device variation of the hard bounds, of min and max value,
+    """Device-to-device variation of the hard bounds.
+
+    Device-to-device variation of the hard bounds, of min and max value,
     respectively. All are given in relative units to ``w_min``, or ``w_max``,
-    respectively."""
+    respectively.
+    """
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
@@ -293,8 +300,8 @@ class IdealDevice(_PrintableMixin):
     bindings_class: ClassVar[Type] = devices.IdealResistiveDeviceParameter
 
     construction_seed: int = 0
-    """If not equal 0, will set a unique seed for hidden parameters
-    during construction."""
+    """If not ``0``, set a unique seed for hidden parameters during
+    construction."""
 
     diffusion: float = 0.0
     """Standard deviation of diffusion process."""
@@ -418,37 +425,35 @@ class LinearStepDevice(PulsedDevice):
     gamma_up: float = 0.0
     r"""The value of :math:`\gamma^+`.
 
-    Intuitively, a value of 0.1 means that the update step size in up
-    direction at the weight bounds is 10% decreased relative to that
-    origin :math:`w=0`.
+    Intuitively, a value of 0.1 means that the update step size in up direction
+    at the weight bounds is 10% decreased relative to that origin :math:`w=0`.
 
     Note:
-       In principle one could fix :math:`\gamma=\gamma^-=\gamma^+` since
-       up/down variation can be given by ``up_down_dtod``, see
-       :class:`~ConstantStepResistiveDevice`.
+        In principle one could fix :math:`\gamma=\gamma^-=\gamma^+` since
+        up/down variation can be given by ``up_down_dtod``, see
+        :class:`~ConstantStepResistiveDevice`.
 
     Note:
-       The hard-bounds are still observed, so that the weight cannot
-       grow beyond its bounds.
+        The hard-bounds are still observed, so that the weight cannot
+        grow beyond its bounds.
     """
 
     gamma_down: float = 0.0
-    r"""The value of :math:`\gamma^-`.
-    """
+    r"""The value of :math:`\gamma^-`."""
 
     gamma_up_dtod: float = 0.05
-    r"""Device-to-device variation for :math:`\gamma^+`, i.e. the
-    value of :math:`\gamma_\text{d-to-d}^+`.
-    """
+    r"""Device-to-device variation for :math:`\gamma^+`, i.e. the value of
+    :math:`\gamma_\text{d-to-d}^+`."""
 
     gamma_down_dtod: float = 0.05
-    r"""Device-to-device variation for :math:`\gamma^-`, i.e. the
-    value of :math:`\gamma_\text{d-to-d}^-`.
-    """
+    r"""Device-to-device variation for :math:`\gamma^-`, i.e. the value of
+    :math:`\gamma_\text{d-to-d}^-`."""
 
     allow_increasing: bool = False
-    """Whether to allow the situation where update sizes increase
-    towards the bound instead of saturating (and thus becoming smaller).
+    """Whether to allow increasing of update sizes.
+
+    Whether to allow the situation where update sizes increase towards the
+    bound instead of saturating (and thus becoming smaller).
     """
 
     mean_bound_reference: bool = True
@@ -460,17 +465,18 @@ class LinearStepDevice(PulsedDevice):
 
         \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}
 
-    where :math:`b^\text{max}` and :math:`b^\text{max}` are the
-    values given by ``w_max`` and ``w_min``, see
-    :class:`~ConstantStepResistiveDevice`.
+    where :math:`b^\text{max}` and :math:`b^\text{max}` are the values given by
+    ``w_max`` and ``w_min``, see :class:`~ConstantStepResistiveDevice`.
     """
 
     mult_noise: bool = True
-    """Whether to use multiplicative noise instead of additive
-    cycle-to-cycle noise."""
+    """Whether to use multiplicative noise instead of additive cycle-to-cycle
+    noise."""
 
     write_noise_std: float = 0.0
-    r"""Whether to use update write noise that is added to the updated
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
     devices weight, while the update is done on a hidden persistent weight. The
     update write noise is then sampled a new when the device is touched
     again.
@@ -500,8 +506,8 @@ class SoftBoundsDevice(PulsedDevice):
     bindings_class: ClassVar[Type] = devices.SoftBoundsResistiveDeviceParameter
 
     mult_noise: bool = True
-    """Whether to use multiplicative noise instead of additive
-    cycle-to-cycle noise."""
+    """Whether to use multiplicative noise instead of additive cycle-to-cycle
+    noise."""
 
 
 @dataclass
@@ -559,7 +565,9 @@ class ExpStepDevice(PulsedDevice):
     """Global offset parameter"""
 
     write_noise_std: float = 0.0
-    r"""Whether to use update write noise that is added to the updated
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
     devices weight, while the update is done on a hidden persistent weight. The
     update write noise is then sampled a new when the device is touched
     again.
@@ -591,8 +599,8 @@ class VectorUnitCell(UnitCell):
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
 
     update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.ALL
-    """The update policy of which if the devices will be receiving the
-    update of a mini-batch."""
+    """The update policy of which if the devices will be receiving the update
+    of a mini-batch."""
 
     first_update_idx: int = 0
     """Device that receives the first mini-batch.
@@ -601,7 +609,6 @@ class VectorUnitCell(UnitCell):
     """
 
     gamma_vec: List[float] = field(default_factory=list, metadata={'hide_if': []})
-
     """Weighting of the unit cell devices to reduce to final weight.
 
     User-defined weightening can be given as a list if factors. If not
@@ -665,9 +672,8 @@ class ReferenceUnitCell(UnitCell):
     """Weighting of the unit cell devices to reduce to final weight.
 
     Note:
-        While user-defined weighting can be given it is suggested to
-        keep it to the default ``[1, -1]`` to implement the reference
-        device subtraction.
+        While user-defined weighting can be given it is suggested to keep it to
+        the default ``[1, -1]`` to implement the reference device subtraction.
     """
 
     def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
@@ -788,72 +794,82 @@ class TransferCompound(UnitCell):
     bindings_class: ClassVar[Type] = devices.TransferResistiveDeviceParameter
 
     gamma: float = 0.0
-    r"""Weighting factor to compute the effective SGD weight from the
-    hidden matrices. The default scheme is:
+    r"""Weighting factor to compute the effective SGD weight from the hidden
+    matrices.
+
+    The default scheme is:
 
     .. math:: g^{n-1} W_0 + g^{n-2} W_1 + \ldots + g^0  W_{n-1}
     """
 
     gamma_vec: List[float] = field(default_factory=list,
                                    metadata={'hide_if': []})
-    """User-defined weightening can be given as a list if weights in
-    which case the default weightening scheme with ``gamma`` is not
-    used.
+    """User-defined weightening.
+
+    User-defined weightening can be given as a list if weights in which case
+    the default weightening scheme with ``gamma`` is not used.
     """
 
     transfer_every: float = 0.0
-    """Transfers every :math:`n` mat-vec operations (rounded to
-    multiples/ratios of m_batch for CUDA). If ``units_in_mbatch`` is
-    set, then the units are in ``m_batch`` instead of mat-vecs, which
-    is equal to the overall the weight re-use during a while
-    mini-batch.
+    """Transfers every :math:`n` mat-vec operations.
+
+    Transfers every :math:`n` mat-vec operations (rounded to multiples/ratios
+    of ``m_batch`` for CUDA). If ``units_in_mbatch`` is set, then the units are
+    in ``m_batch`` instead of mat-vecs, which is equal to the overall the
+    weight re-use during a while mini-batch.
 
     If 0 it is set to ``x_size / n_cols_per_transfer``.
 
-    The higher transfer cycles are geometrically scaled, the first is
-    set to transfer_every. Each next transfer cycle is multiplied by
-    by ``x_size / n_cols_per_transfer``.
+    The higher transfer cycles are geometrically scaled, the first is set to
+    transfer_every. Each next transfer cycle is multiplied by
+    ``x_size / n_cols_per_transfer``.
     """
 
     no_self_transfer: bool = True
-    """Whether to set the transfer rate of the last device (which is
-    applied to itself) to zero.
-    """
+    """Whether to set the transfer rate of the last device (which is applied to
+    itself) to zero."""
 
     transfer_every_vec: List[float] = field(default_factory=list,
                                             metadata={'hide_if': []})
-    """A list of :math:`n` entries, to explicitly set the transfer
-    cycles lengths. In this case, the above defaults are ignored.
+    """Transfer cycles lengths.
+
+    A list of :math:`n` entries, to explicitly set the transfer cycles lengths.
+    In this case, the above defaults are ignored.
     """
 
     units_in_mbatch: bool = True
-    """If set, then the cycle length units of ``transfer_every`` are
-    in ``m_batch`` instead of mat-vecs, which is equal to the overall
-    the weight re-use during a while mini-batch.
+    """Units for ``transfer_every``.
+
+    If set, then the cycle length units of ``transfer_every`` are in
+    ``m_batch`` instead of mat-vecs, which is equal to the overall of the
+    weight re-use during a while mini-batch.
     """
 
     n_cols_per_transfer: int = 1
-    """How many consecutive columns to read (from one tile) and write
-    (to the next tile) every transfer event. For read, the input is a
-    1-hot vector. Once the final column is reached, reading starts
-    again from the first.
+    """Number of consecutive columns to use during transfer events.
+
+    How many consecutive columns to read (from one tile) and write (to the next
+    tile) every transfer event. For read, the input is a 1-hot vector. Once the
+    final column is reached, reading starts again from the first.
     """
 
     with_reset_prob: float = 0.0
-    """Whether to apply reset of the columns that were transferred
-    with a given probability."""
+    """Whether to apply reset of the columns that were transferred with a given
+    probability."""
 
     random_column: bool = False
-    """Whether to select a random starting column for each transfer
-    event and not take the next column that was previously not
-    transferred as a starting column (the default).
+    """Whether to select a random starting column.
+
+    Whether to select a random starting column for each transfer event and not
+    take the next column that was previously not transferred as a starting
+    column (the default).
     """
 
     transfer_lr: float = 1.0
-    """Learning rate (LR) for the update step of the transfer
-    event. Per default all learning rates are identical. If
-    ``scale_transfer_lr`` is set, the transfer LR is scaled by current
-    learning rate of the SGD.
+    """Learning rate (LR) for the update step of the transfer event.
+
+    Per default all learning rates are identical. If ``scale_transfer_lr`` is
+    set, the transfer LR is scaled by current learning rate of the SGD.
 
     Note:
         LR is always a positive number, sign will be correctly
@@ -862,25 +878,30 @@ class TransferCompound(UnitCell):
 
     transfer_lr_vec: List[float] = field(default_factory=list,
                                          metadata={'hide_if': []})
-    """Transfer LR for each individual transfer in the device chain
-    can be given.
-    """
+    """Transfer LR for each individual transfer in the device chain can be
+    given."""
 
     scale_transfer_lr: bool = True
-    """Whether to give the transfer_lr in relative units, ie whether
-    to scale the transfer LR with the current LR of the SGD.
+    """Whether to give the transfer_lr in relative units.
+
+    ie. whether to scale the transfer LR with the current LR of the SGD.
     """
 
     transfer_forward: IOParameters = field(
         default_factory=IOParameters)
-    """Input-output parameters
+    """Input-output parameters that define the read of a transfer event.
+
     :class:`~AnalogTileInputOutputParameters` that define the read
     (forward) of an transfer event. For instance the amount of noise
-    or whether transfer is done using a ADC/DAC etc."""
+    or whether transfer is done using a ADC/DAC etc.
+    """
 
     transfer_update: UpdateParameters = field(
         default_factory=UpdateParameters)
-    """Update parameters :class:`~AnalogTileUpdateParameters` that
+    """Update parameters that define the type of update used for each transfer
+    event.
+
+    Update parameters :class:`~AnalogTileUpdateParameters` that
     define the type of update used for each transfer event.
     """
 
@@ -969,27 +990,34 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
     bindings_class: ClassVar[Type] = devices.MixedPrecResistiveDeviceParameter
 
     transfer_every: int = 1
-    """Transfers every :math:`n` mat-vec operations (rounded to
-    multiples/ratios of m_batch).
+    """Transfers every :math:`n` mat-vec operations.
+    Transfers every :math:`n` mat-vec operations (rounded to multiples/ratios
+    of ``m_batch``).
 
     Standard setting is 1.0 for mixed precision, but it could potentially be
     reduced to get better run time estimates.
     """
 
     n_rows_per_transfer: int = -1
-    r"""How many consecutive rows to write to the tile from the
-    :math:`\chi` matrix. -1 means full matrix read each transfer event.
+    r"""How many consecutive rows to write to the tile from the :math:`\chi`
+    matrix.
+
+    ``-1`` means full matrix read each transfer event.
     """
 
     random_row: bool = False
-    """Whether to select a random starting row for each transfer
-    event and not take the next row that was previously not
-    transferred as a starting row (the default).
+    """Whether to select a random starting row.
+
+    Whether to select a random starting row for each transfer event and not
+    take the next row that was previously not transferred as a starting row
+    (the default).
     """
 
     granularity: float = 0.0
-    r"""Granularity of the device that is used to calculate the number of
-    pulses transferred from :math:`\chi` to analog.
+    r"""Granularity of the device.
+
+    Granularity of the device that is used to calculate the number of pulses
+    transferred from :math:`\chi` to analog.
 
     If 0, it will take ``dw_min`` from the analog device used.
     """
