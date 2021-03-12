@@ -64,6 +64,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0
     ):
+        # pylint: disable=too-many-arguments
         # Create the tile and set the analog.
         self.in_features = self.get_tile_size(in_channels, groups, kernel_size)
         self.out_features = out_channels
@@ -108,9 +109,22 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         super().reset_parameters()
         self.set_weights(self.weight, self.bias)
 
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile.
+
+        Args:
+            x_input: the input tensor.
+        """
+        raise NotImplementedError
+
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
-        raise NotImplementedError
+        input_size = x_input.numel() / x_input.size(0)
+        if not self.fold_indices.numel() or self.input_size != input_size:
+            self.recalculate_indexes(x_input)
+
+        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
+                                           self.bias, not self.training)
 
 
 class AnalogConv1d(_AnalogConvNd):
@@ -161,13 +175,14 @@ class AnalogConv1d(_AnalogConvNd):
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0
     ):
+        # pylint: disable=too-many-arguments
         kernel_size = _single(kernel_size)
         stride = _single(stride)
         padding = _single(padding)
         dilation = _single(dilation)
 
         super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding, dilation,
+            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _single(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
@@ -181,54 +196,45 @@ class AnalogConv1d(_AnalogConvNd):
         """Calculate the tile size."""
         return (in_channels // groups) * kernel_size[0]
 
-    def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
-        # pylint: disable=arguments-differ
-        input_size = x_input.numel()/x_input.size(0)
-        if not self.fold_indices.numel() or self.input_size != input_size:
-            # pytorch just always uses NCHW order?
-            fold_indices = arange(2, x_input.size(2) + 2,
-                                  dtype=float64).detach()
-            shape = [1] + [1] + list(x_input.shape[2:])
-            fold_indices = fold_indices.reshape(*shape)
-            if not all(item == 0 for item in self.padding):
-                fold_indices = pad(
-                    fold_indices,
-                    pad=[self.padding[0], self.padding[0]],
-                    mode='constant',
-                    value=0)
-            unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile."""
+        input_size = x_input.numel() / x_input.size(0)
 
-            fold_indices = unfold.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
+        # pytorch just always uses NCHW order?
+        fold_indices = arange(2, x_input.size(2) + 2, dtype=float64).detach()
+        shape = [1] + [1] + list(x_input.shape[2:])
+        fold_indices = fold_indices.reshape(*shape)
+        if not all(item == 0 for item in self.padding):
+            fold_indices = pad(fold_indices, pad=[self.padding[0], self.padding[0]],
+                               mode='constant', value=0)
+        unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
 
-            # concatenate the matrix index for different channels
-            fold_indices_orig = fold_indices.clone()
-            for i in range(self.in_channels - 1):
-                fold_indices_tmp = fold_indices_orig.clone()
-                for j in range(fold_indices_orig.size(0)):
-                    if fold_indices_orig[j] != 0:
-                        fold_indices_tmp[j] += (input_size / self.in_channels) * (i + 1)
+        fold_indices = unfold.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
 
-                fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
+        # concatenate the matrix index for different channels
+        fold_indices_orig = fold_indices.clone()
+        for i in range(self.in_channels - 1):
+            fold_indices_tmp = fold_indices_orig.clone()
+            for j in range(fold_indices_orig.size(0)):
+                if fold_indices_orig[j] != 0:
+                    fold_indices_tmp[j] += (input_size / self.in_channels) * (i + 1)
 
-            fold_indices = fold_indices.to(dtype=int32)
+            fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
 
-            if self.use_bias:
-                out_image_size = fold_indices.numel() // (self.kernel_size[0])
-                fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
+        fold_indices = fold_indices.to(dtype=int32)
 
-            self.fold_indices = fold_indices.to(x_input.device)
+        if self.use_bias:
+            out_image_size = fold_indices.numel() // (self.kernel_size[0])
+            fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
-            x_height = x_input.size(2)
+        self.fold_indices = fold_indices.to(x_input.device)
 
-            d_height = self.get_image_size(x_height, 0)
+        x_height = x_input.size(2)
+        d_height = self.get_image_size(x_height, 0)
 
-            image_sizes = [self.in_channels, x_height, d_height]
-            self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
-
-        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
-                                           self.bias, not self.training)
+        image_sizes = [self.in_channels, x_height, d_height]
+        self.input_size = input_size
+        self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
 
 class AnalogConv2d(_AnalogConvNd):
@@ -286,7 +292,7 @@ class AnalogConv2d(_AnalogConvNd):
         dilation = _pair(dilation)
 
         super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding, dilation,
+            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _pair(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
@@ -300,39 +306,35 @@ class AnalogConv2d(_AnalogConvNd):
         """Calculate the tile size."""
         return (in_channels // groups) * kernel_size[0] * kernel_size[1]
 
-    def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
-        # pylint: disable=arguments-differ
-        input_size = x_input.numel()/x_input.size(0)
-        if not self.fold_indices.numel() or self.input_size != input_size:
-            # pytorch just always uses NCHW order?
-            fold_indices = arange(2, input_size+2, dtype=float64).detach()
-            shape = [1] + list(x_input.shape[1:])
-            fold_indices = fold_indices.reshape(*shape)
-            unfold = Unfold(kernel_size=self.kernel_size,
-                            stride=self.stride,
-                            padding=self.padding,
-                            dilation=self.dilation)
-            fold_indices = unfold(fold_indices).flatten().round().to(dtype=int32)
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile."""
+        input_size = x_input.numel() / x_input.size(0)
 
-            if self.use_bias:
-                out_image_size = fold_indices.numel() // (self.kernel_size[0]*self.kernel_size[1])
-                fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
+        # pytorch just always uses NCHW order?
+        fold_indices = arange(2, input_size + 2, dtype=float64).detach()
+        shape = [1] + list(x_input.shape[1:])
+        fold_indices = fold_indices.reshape(*shape)
+        unfold = Unfold(kernel_size=self.kernel_size,
+                        stride=self.stride,
+                        padding=self.padding,
+                        dilation=self.dilation)
+        fold_indices = unfold(fold_indices).flatten().round().to(dtype=int32)
 
-            self.fold_indices = fold_indices.to(x_input.device)
+        if self.use_bias:
+            out_image_size = fold_indices.numel() // (self.kernel_size[0] * self.kernel_size[1])
+            fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
-            x_height = x_input.size(2)
-            x_width = x_input.size(3)
+        self.fold_indices = fold_indices.to(x_input.device)
 
-            d_height = self.get_image_size(x_height, 0)
-            d_width = self.get_image_size(x_width, 1)
+        x_height = x_input.size(2)
+        x_width = x_input.size(3)
 
-            image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
-            self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
+        d_height = self.get_image_size(x_height, 0)
+        d_width = self.get_image_size(x_width, 1)
 
-        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
-                                           self.bias, not self.training)
+        image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
+        self.input_size = input_size
+        self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
 
 class AnalogConv3d(_AnalogConvNd):
@@ -390,7 +392,7 @@ class AnalogConv3d(_AnalogConvNd):
         dilation = _triple(dilation)
 
         super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding, dilation,
+            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _triple(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
@@ -405,59 +407,56 @@ class AnalogConv3d(_AnalogConvNd):
         return (in_channels // groups) * (
                 kernel_size[0] * kernel_size[1] * kernel_size[2])
 
-    def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
-        # pylint: disable=arguments-differ,too-many-locals
-        input_size = x_input.numel()/x_input.size(0)
-        if not self.fold_indices.numel() or self.input_size != input_size:
-            # pytorch just always uses NCDHW order?
-            fold_indices = arange(2, x_input.size(2)*x_input.size(3)*x_input.size(4)+2,
-                                  dtype=float64).detach()
-            shape = [1] + [1] + list(x_input.shape[2:])
-            fold_indices = fold_indices.reshape(*shape)
-            if not all(item == 0 for item in self.padding):
-                fold_indices = pad(fold_indices, pad=[
-                    self.padding[2], self.padding[2],
-                    self.padding[1], self.padding[1],
-                    self.padding[0], self.padding[0]], mode="constant", value=0)
-            unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).\
-                unfold(3, self.kernel_size[1], self.stride[1]).\
-                unfold(4, self.kernel_size[2], self.stride[2]).clone()
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile."""
+        # pylint: disable=too-many-locals
+        input_size = x_input.numel() / x_input.size(0)
 
-            fold_indices = unfold.reshape(-1, self.kernel_size[0] * self.kernel_size[1] *
-                                          self.kernel_size[2]).transpose(0, 1).flatten().round()
+        # pytorch just always uses NCDHW order?
+        fold_indices = arange(2, x_input.size(2) * x_input.size(3) * x_input.size(4) + 2,
+                              dtype=float64).detach()
+        shape = [1] + [1] + list(x_input.shape[2:])
+        fold_indices = fold_indices.reshape(*shape)
+        if not all(item == 0 for item in self.padding):
+            fold_indices = pad(fold_indices, pad=[
+                self.padding[2], self.padding[2],
+                self.padding[1], self.padding[1],
+                self.padding[0], self.padding[0]], mode="constant", value=0)
+        unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]). \
+            unfold(3, self.kernel_size[1], self.stride[1]). \
+            unfold(4, self.kernel_size[2], self.stride[2]).clone()
 
-            # concatenate the matrix index for different channels
-            fold_indices_orig = fold_indices.clone()
-            for i in range(self.in_channels-1):
-                fold_indices_tmp = fold_indices_orig.clone()
-                for j in range(fold_indices_orig.size(0)):
-                    if fold_indices_orig[j] != 0:
-                        fold_indices_tmp[j] += (input_size/self.in_channels)*(i+1)
+        fold_indices = unfold.reshape(-1, self.kernel_size[0] * self.kernel_size[1] *
+                                      self.kernel_size[2]).transpose(0, 1).flatten().round()
 
-                fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
+        # concatenate the matrix index for different channels
+        fold_indices_orig = fold_indices.clone()
+        for i in range(self.in_channels - 1):
+            fold_indices_tmp = fold_indices_orig.clone()
+            for j in range(fold_indices_orig.size(0)):
+                if fold_indices_orig[j] != 0:
+                    fold_indices_tmp[j] += (input_size / self.in_channels) * (i + 1)
 
-            fold_indices = fold_indices.to(dtype=int32)
+            fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
 
-            if self.use_bias:
-                out_image_size = fold_indices.numel() // (self.kernel_size[0] *
-                                                          self.kernel_size[1] *
-                                                          self.kernel_size[2])
-                fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
+        fold_indices = fold_indices.to(dtype=int32)
 
-            self.fold_indices = fold_indices.to(x_input.device)
+        if self.use_bias:
+            out_image_size = fold_indices.numel() // (self.kernel_size[0] *
+                                                      self.kernel_size[1] *
+                                                      self.kernel_size[2])
+            fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
-            x_depth = x_input.size(2)
-            x_height = x_input.size(3)
-            x_width = x_input.size(4)
+        self.fold_indices = fold_indices.to(x_input.device)
 
-            d_depth = self.get_image_size(x_depth, 0)
-            d_height = self.get_image_size(x_height, 1)
-            d_width = self.get_image_size(x_width, 2)
+        x_depth = x_input.size(2)
+        x_height = x_input.size(3)
+        x_width = x_input.size(4)
 
-            image_sizes = [self.in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
-            self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
+        d_depth = self.get_image_size(x_depth, 0)
+        d_height = self.get_image_size(x_height, 1)
+        d_width = self.get_image_size(x_width, 2)
 
-        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
-                                           self.bias, not self.training)
+        image_sizes = [self.in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
+        self.input_size = input_size
+        self.analog_tile.set_indexed(self.fold_indices, image_sizes)
