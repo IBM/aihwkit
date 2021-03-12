@@ -65,6 +65,11 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             weight_scaling_omega: float = 0.0
     ):
         # pylint: disable=too-many-arguments
+        if groups != 1:
+            raise ValueError('Only one group is supported')
+        if padding_mode != 'zeros':
+            raise ValueError('Only "zeros" padding mode is supported')
+
         # Create the tile and set the analog.
         self.in_features = self.get_tile_size(in_channels, groups, kernel_size)
         self.out_features = out_channels
@@ -180,6 +185,9 @@ class AnalogConv1d(_AnalogConvNd):
         stride = _single(stride)
         padding = _single(padding)
         dilation = _single(dilation)
+
+        if dilation != _single(1):
+            raise ValueError('Only dilation = 1 is supported')
 
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
@@ -390,6 +398,9 @@ class AnalogConv3d(_AnalogConvNd):
         stride = _triple(stride)
         padding = _triple(padding)
         dilation = _triple(dilation)
+
+        if dilation != _triple(1):
+            raise ValueError('Only dilation = 1 is supported')
 
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
