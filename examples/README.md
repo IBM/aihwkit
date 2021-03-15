@@ -309,6 +309,13 @@ The presets (except for the "Idealized analog device") are calibrated on the mea
 characteristics of real hardware devices that have been fabricated at IBM. Device non-ideal
 characteristics, noise, and variability are accurately simulated in all presets.
 
+## Example 12: [`12_simple_layer_with_mixed_precision.py`]
+
+This example uses a single fully connected analog layer to predict the output tensor `y` based
+on the input tensor `x` (using the same values and network structure as the example `01.`).
+However, this example uses a custom RPU config for using a digital rank update and transfer to
+analog device (as in mixed precision), set to a mixed precision compound which in turn uses
+a `ConstantStep` analog device.
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
@@ -338,3 +345,4 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`09_simple_layer_deterministic_pulses.py`]: 09_simple_layer_deterministic_pulses.py
 [`10_plot_presets.py`]: 10_plot_presets.py
 [`11_vgg8_training.py`]: 11_vgg8_training.py
+[`12_simple_layer_with_mixed_precision.py`]: 12_simple_layer_with_mixed_precision.py
