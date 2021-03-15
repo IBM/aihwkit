@@ -14,7 +14,6 @@
 
 Mixed precision is based on the paper Nandakumar et al (2020) (see
 https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full).
-
 """
 
 # Imports from PyTorch.
@@ -44,8 +43,8 @@ rpu_config = DigitalRankUpdateRPUConfig(
     device=MixedPrecisionCompound(
         device=SoftBoundsDevice(),
         # adjust quantization level (0 means FP)
-        n_x_bins=5, # quantization bins of the digital rank update (activation)
-        n_d_bins=3  # quantization bins of the digital rank update (error)
+        n_x_bins=5,  # quantization bins of the digital rank update (activation)
+        n_d_bins=3   # quantization bins of the digital rank update (error)
     )
 )
 
