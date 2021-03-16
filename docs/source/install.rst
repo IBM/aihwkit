@@ -28,6 +28,15 @@ system:
     version. More details about the ``PyTorch`` compatibility can be found in
     this `issue`_.
 
+Optional features
+-----------------
+
+The package contains optional functionality that is not installed as part of
+the default installed. In order to install the extra dependencies, the
+recommended way is by specifying the extra ``visualization`` dependencies::
+
+    pip install aihwkit[visualization]
+
 Verifying the installation
 --------------------------
 

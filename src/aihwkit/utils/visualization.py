@@ -10,7 +10,14 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Visualization utilities."""
+"""Visualization utilities.
+
+This module includes plotting and visualization utilities for ``aihwkit``.
+Using this module has extra dependencies that can be installed via the
+extras mechanism::
+
+    pip install aihwkit[visualization]
+"""
 
 from typing import Tuple, Any
 from copy import deepcopy
