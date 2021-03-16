@@ -46,11 +46,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Utility for visualization the pulse response properties of a given
   device configuration. (\#146)
 * Optional power-law drift during analog training. (\#158)
-* A new abstract device (`MixedPrecisionCompound`) implementing an SGD 
-  optimizer that computes the rank update in digital (assuming digital 
-  high precision storage) and then transfers the matrix sequentially to 
-  the analog device, instead of using the default fully parallel pulsed 
-  update. (#159)  
+* A new abstract device (`MixedPrecisionCompound`) implementing an SGD
+  optimizer that computes the rank update in digital (assuming digital
+  high precision storage) and then transfers the matrix sequentially to
+  the analog device, instead of using the default fully parallel pulsed
+  update. (#159)
 
 #### Fixed
 
