@@ -15,6 +15,7 @@ API Reference
    aihwkit.nn.functions
    aihwkit.nn.modules
    aihwkit.nn.modules.base
+   aihwkit.nn.modules.container
    aihwkit.nn.modules.conv
    aihwkit.nn.modules.linear
    aihwkit.optim

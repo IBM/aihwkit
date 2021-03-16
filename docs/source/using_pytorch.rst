@@ -21,19 +21,19 @@ Analog layers
 An **analog layer** is a neural network module that stores its weights in an
 analog tile. The library current includes the following analog layers:
 
-* :class:`~aihwkit.nn.layers.linear.AnalogLinear`:
+* :class:`~aihwkit.nn.modules.linear.AnalogLinear`:
   applies a linear transformation to the input data. It is the counterpart
   of PyTorch `nn.Linear`_ layer.
 
-* :class:`~aihwkit.nn.layers.conv.AnalogConv1d`:
+* :class:`~aihwkit.nn.modules.conv.AnalogConv1d`:
   applies a 1D convolution over an input signal composed of several input
   planes. It is the counterpart of PyTorch `nn.Conv1d`_ layer.
 
-* :class:`~aihwkit.nn.layers.conv.AnalogConv2d`:
+* :class:`~aihwkit.nn.modules.conv.AnalogConv2d`:
   applies a 2D convolution over an input signal composed of several input
   planes. It is the counterpart of PyTorch `nn.Conv2d`_ layer.
 
-* :class:`~aihwkit.nn.layers.conv.AnalogConv3d`:
+* :class:`~aihwkit.nn.modules.conv.AnalogConv3d`:
   applies a 3D convolution over an input signal composed of several input
   planes. It is the counterpart of PyTorch `nn.Conv3d`_ layer.
 
@@ -115,7 +115,7 @@ tile.
     some of the features require manually performing them on the analog layers
     directly (instead of only on the parent module).
     Please check the rest of the document for more information about using
-    :class:`~aihwkit.nn.layers.container.AnalogSequential` as the parent class
+    :class:`~aihwkit.nn.modules.container.AnalogSequential` as the parent class
     instead of ``nn.Sequential``, for convenience.
 
 Optimizers
@@ -194,7 +194,7 @@ directly to the analog layers themselves (as opposed to applying the parent
 container).
 
 In order to bypass the need of applying the functions to the analog layers,
-you can use the :class:`~aihwkit.nn.layers.container.AnalogSequential` as both
+you can use the :class:`~aihwkit.nn.modules.container.AnalogSequential` as both
 a compatible replacement for ``nn.Sequential``, and as the superclass in case
 of custom analog modules. By using this convenience module, the operations are
 guaranteed to be applied correctly to its children. For example::
