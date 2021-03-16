@@ -1,7 +1,7 @@
 Installation
 ============
 
-The preferred way to install this package is by using the Python package index::
+The preferred way to install this package is by using the `Python package index`_::
 
     pip install aihwkit
 
@@ -58,3 +58,4 @@ section.
 .. _CUDA Toolkit: https://developer.nvidia.com/accelerated-computing-toolkit
 .. _issue tracker: https://github.com/IBM/aihwkit/issues
 .. _issue: https://github.com/IBM/aihwkit/issues/52
+.. _Python package index: https://pypi.org/project/aihwkit/
