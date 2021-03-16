@@ -26,6 +26,7 @@ class AnalogSequential(Sequential):
 
     Specialization of torch ``nn.Sequential`` with extra functionality for
     handling analog layers:
+
     * correct handling of ``.cuda()`` for children modules.
     * apply analog-specific functions to all its children (drift and program
       weights).
