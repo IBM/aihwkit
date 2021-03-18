@@ -17,7 +17,7 @@
 from typing import Any
 
 from torch.nn import (
-    BatchNorm2d, Flatten, LogSoftmax, MaxPool2d, Module, ReLU, Sigmoid, Tanh
+    Flatten, LogSoftmax, MaxPool2d, Module, Sigmoid, Tanh
 )
 from torchvision.datasets import FashionMNIST, SVHN
 
@@ -25,7 +25,7 @@ from aihwkit.experiments import BasicTraining
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.simulator.presets import (
     CapacitorPreset, ReRamSBPreset, TikiTakaReRamSBPreset,
-    EcRamPreset, IdealizedPreset
+    EcRamPreset
 )
 
 
