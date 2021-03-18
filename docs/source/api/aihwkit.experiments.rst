@@ -13,3 +13,4 @@ Submodules
    :maxdepth: 4
 
    aihwkit.experiments.experiments
+   aihwkit.experiments.runners

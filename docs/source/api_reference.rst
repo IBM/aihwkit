@@ -6,6 +6,9 @@ API Reference
 
    aihwkit
    aihwkit.exceptions
+   aihwkit.experiments
+   aihwkit.experiments.experiments
+   aihwkit.experiments.runners
    aihwkit.simulator
    aihwkit.simulator.configs
    aihwkit.simulator.noise_models
