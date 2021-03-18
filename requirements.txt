@@ -4,5 +4,7 @@ scikit-build>=0.11.1
 pybind11>=2.6.2
 # Runtime dependencies.
 torch>=1.5
+torchvision
+scipy
 numpy>=1.18
 dataclasses==0.7; python_version < '3.7'
