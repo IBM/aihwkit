@@ -102,3 +102,30 @@ def parametrize_over_presets(presets: List) -> Callable:
     return parameterized_class(
         [{'preset_cls': preset} for preset in presets],
         class_name_func=class_name)
+
+
+def parametrize_over_models(models: List) -> Callable:
+    """Parametrize a TestCase over different kind of experiments.
+
+    Args:
+        models: list of model descriptions. The ``TestCase`` will be
+            repeated for each of the entries in the list.
+
+    Returns:
+        The decorated TestCase.
+    """
+
+    def object_to_dict(obj):
+        """Convert the public members of an object to a dictionary."""
+        ret = {key: value for key, value in vars(obj).items()
+               if not key.startswith('_')}
+        ret['parameter'] = obj.__name__
+
+        return ret
+
+    def class_name(cls, _, params_dict):
+        """Return a user-friendly name for a parametrized test."""
+        return '{}_{}'.format(cls.__name__, params_dict['parameter'])
+
+    return parameterized_class([object_to_dict(model) for model in models],
+                               class_name_func=class_name)
