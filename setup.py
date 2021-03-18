@@ -19,6 +19,7 @@ INSTALL_REQUIRES = [
     'torch{}'.format(os.getenv('TORCH_VERSION_SPECIFIER', '>=1.5')),
     'torchvision',
     'scipy',
+    'requests>=2.25,<3',
     'numpy>=1.18',
     'dataclasses==0.7; python_version < "3.7"'
 ]
