@@ -50,7 +50,10 @@ The format is based on [Keep a Changelog], and this project adheres to
   optimizer that computes the rank update in digital (assuming digital
   high precision storage) and then transfers the matrix sequentially to
   the analog device, instead of using the default fully parallel pulsed
-  update. (#159)
+  update. (\#159)
+* A new `aihwkit.experiments` module has been added that allows creating and
+  running specific high-level use cases (for example, neural network training)
+  conveniently. (\#171, \#172) 
 
 #### Fixed
 
