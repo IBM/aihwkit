@@ -122,7 +122,7 @@ class CapacitorPresetDevice(LinearStepDevice):
 
     mult_noise: bool = False
 
-    # gamma_up = slope*w_max/dw_min + 1
+    # gamma_up = -slope*w_max/dw_min
     gamma_up: float = 0.05
     gamma_down: float = 0.05
 
@@ -158,22 +158,22 @@ class EcRamPresetDevice(LinearStepDevice):
     .. _`Tang & al., IEDM, 2018`: https://ieeexplore.ieee.org/document/8614551
     """
 
-    dw_min: float = 0.0021
-    up_down: float = -0.0588
+    dw_min: float = 0.002
+    up_down: float = 0.0  # mean shifted onto range
 
-    w_min: float = -1.0
-    w_max: float = 1.0
+    w_min: float = -1.1724
+    w_max: float = 0.8276
 
     mult_noise: bool = False
 
-    # gamma_up = slope*w_max/dw_min + 1
-    gamma_up: float = 0.0941
-    gamma_down: float = 0.5882
+    # gamma_up = -slope*w_max/dw_min
+    gamma_up: float = 0.0814
+    gamma_down: float = 0.7203
 
     # Device-to-device var.
     dw_min_dtod: float = 0.3
-    w_min_dtod: float = 0.3
-    w_max_dtod: float = 0.3
+    w_min_dtod: float = 0.1
+    w_max_dtod: float = 0.1
     up_down_dtod: float = 0.01
 
     gamma_up_dtod: float = 0.05
