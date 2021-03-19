@@ -810,19 +810,21 @@ class TransferCompound(UnitCell):
     the default weightening scheme with ``gamma`` is not used.
     """
 
-    transfer_every: float = 0.0
-    """Transfers every :math:`n` mat-vec operations.
+    transfer_every: float = 1.0
+    """Transfers every :math:`n` mat-vec operations or :math:`n` batches.
 
     Transfers every :math:`n` mat-vec operations (rounded to multiples/ratios
     of ``m_batch`` for CUDA). If ``units_in_mbatch`` is set, then the units are
     in ``m_batch`` instead of mat-vecs, which is equal to the overall the
     weight re-use during a while mini-batch.
 
-    If 0 it is set to ``x_size / n_cols_per_transfer``.
+    Note:
+        If ``transfer_every`` is 0.0 *no transfer* will be made.
 
-    The higher transfer cycles are geometrically scaled, the first is set to
-    transfer_every. Each next transfer cycle is multiplied by
-    ``x_size / n_cols_per_transfer``.
+    If not given explicitely with ``transfer_every_vec``, then the higher
+    transfer cycles are geometrically scaled, the first is set to
+    transfer_every. Each next transfer cycle is multiplied by ``x_size
+    / n_cols_per_transfer``.
     """
 
     no_self_transfer: bool = True
