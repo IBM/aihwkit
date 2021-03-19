@@ -12,6 +12,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
    using_pytorch
    using_simulator
    pcm_inference
+   using_experiments
    design
    developer_install
    development_conventions

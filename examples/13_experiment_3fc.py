@@ -1,0 +1,85 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+"""aihwkit example 13: Experiment training (3 fully connected layers).
+
+Creation and execution of a Basic Training experiment, where the model uses
+3 fully connected analog layers.
+"""
+
+import os
+
+# Imports from PyTorch.
+import torch
+from torch.nn import Flatten, Sigmoid, LogSoftmax
+
+# Imports from aihwkit.
+from torchvision.datasets import FashionMNIST
+
+from aihwkit.experiments import BasicTraining
+from aihwkit.experiments.runners import LocalRunner
+from aihwkit.nn import AnalogLinear, AnalogSequential
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.devices import ConstantStepDevice
+
+# Check device
+USE_CUDA = 0
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.cuda.is_available():
+    USE_CUDA = 1
+
+# Path where the datasets will be stored.
+PATH_DATASET = os.path.join('data', 'DATASET')
+
+# Network definition.
+INPUT_SIZE = 784
+HIDDEN_SIZES = [256, 128]
+OUTPUT_SIZE = 10
+
+# Training parameters.
+EPOCHS = 30
+BATCH_SIZE = 64
+LEARNING_RATE = 0.05
+
+
+def main():
+    """Create and execute an experiment."""
+    model = AnalogSequential(
+        Flatten(),
+        AnalogLinear(INPUT_SIZE, HIDDEN_SIZES[0], True,
+                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
+        Sigmoid(),
+        AnalogLinear(HIDDEN_SIZES[0], HIDDEN_SIZES[1], True,
+                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
+        Sigmoid(),
+        AnalogLinear(HIDDEN_SIZES[1], OUTPUT_SIZE, True,
+                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
+        LogSoftmax(dim=1)
+    )
+
+    # Create the training Experiment.
+    experiment = BasicTraining(
+        dataset=FashionMNIST,
+        model=model,
+        epochs=EPOCHS,
+        batch_size=BATCH_SIZE
+    )
+
+    # Create the runner and execute the experiment.
+    runner = LocalRunner(device=DEVICE)
+    results = runner.run(experiment, dataset_root=PATH_DATASET)
+    print(results)
+
+
+if __name__ == '__main__':
+    # Execute only if run as the entry point into the program.
+    main()

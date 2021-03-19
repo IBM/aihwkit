@@ -317,6 +317,26 @@ However, this example uses a custom RPU config for using a digital rank update a
 analog device (as in mixed precision), set to a mixed precision compound which in turn uses
 a `ConstantStep` analog device.
 
+## Example 13: [`13_experiment_3fc.py`]
+
+In this example the usage of the `Experiments` module is shown. A `BasicTraining` experiment
+using three fully connected analog layers (based on the example `03`) is created, and executed
+locally using the `LocalRunner`.
+
+The `Experiments` module provides a convenient interface for running different types of experiments
+by encapsulating the experiments in single classes.
+
+## Example 14: [`14_experiment_custom_scheduler.py`]
+
+This example illustrate how to customize the Experiments for adding new features. By subclassing
+the base `BasicTraining` experiment used in example `13`, the training algorithm is modified in
+order to support the use of a scheduler.
+
+In particular, the new class specializes the `training()` function in order to create the
+scheduler when the training is started, and the `training_step()` function in order to step the
+scheduler every time an epoch is completed.
+
+
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
@@ -346,3 +366,5 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`10_plot_presets.py`]: 10_plot_presets.py
 [`11_vgg8_training.py`]: 11_vgg8_training.py
 [`12_simple_layer_with_mixed_precision.py`]: 12_simple_layer_with_mixed_precision.py
+[`13_experiment_3fc.py`]: 13_experiment_3fc.py
+[`14_experiment_custom_scheduler.py`]: 14_experiment_custom_scheduler.py
