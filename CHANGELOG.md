@@ -66,13 +66,17 @@ The format is based on [Keep a Changelog], and this project adheres to
   network size and batch size cases for CUDA, in particular for
   `TransferCompound`. (\#132)
 * Fixed wrong update for `TransferCompound` in case of `transfer_every` smaller
-  than the batch size. (\#132)
-
+  than the batch size. (\#132, \#174)
+* Period in the modulus of `TransferCompound` could become zero which
+  caused a floating point exception. (\174)
+* Ceil instead of round for very small transfers in `TransferCompound`
+  (to avoid zero transfer for extreme settings). (\#174)
+  
 #### Removed
-
 * The legacy `NumpyAnalogTile` and `NumpyFloatingPointTile` tiles have been
   finally removed. The regular, tensor-powered `aihwkit.simulator.tiles` tiles
   contain all their functionality and numerous additions. (\#122)
+* Default value for TransferCompound for `transfer_every=0` (\#174).
 
 ## [0.2.1] - 2020/11/26
 

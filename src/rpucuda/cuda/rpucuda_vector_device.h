@@ -101,7 +101,7 @@ protected:
   std::vector<std::unique_ptr<CudaContext>> context_vec_;
   std::vector<std::unique_ptr<PulsedRPUDeviceCudaBase<T>>> rpucuda_device_vec_;
   int current_device_idx_ = 0;
-  unsigned long int current_update_idx_ = 0;
+  uint64_t current_update_idx_ = 0;
   std::unique_ptr<CudaArray<T>> dev_reduce_weightening_ = nullptr;
 
 private:
