@@ -53,7 +53,12 @@ The format is based on [Keep a Changelog], and this project adheres to
   update. (\#159)
 * A new `aihwkit.experiments` module has been added that allows creating and
   running specific high-level use cases (for example, neural network training)
-  conveniently. (\#171, \#172) 
+  conveniently. (\#171, \#172)
+
+#### Changed
+
+* The minimal PyTorch version has been bumped to `1.7+`. Please recompile your
+  library and update the dependencies accordingly. (\#176)
 
 #### Fixed
 
@@ -71,8 +76,9 @@ The format is based on [Keep a Changelog], and this project adheres to
   caused a floating point exception. (\174)
 * Ceil instead of round for very small transfers in `TransferCompound`
   (to avoid zero transfer for extreme settings). (\#174)
-  
+
 #### Removed
+
 * The legacy `NumpyAnalogTile` and `NumpyFloatingPointTile` tiles have been
   finally removed. The regular, tensor-powered `aihwkit.simulator.tiles` tiles
   contain all their functionality and numerous additions. (\#122)
