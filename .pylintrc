@@ -10,7 +10,7 @@ fail-under=10
 
 # Add files or directories to the blacklist. They should be base names, not
 # paths.
-ignore=CVS
+ignore=CVS,definitions
 
 # Add files or directories matching the regex patterns to the blacklist. The
 # regex matches against base names, not paths.
@@ -376,7 +376,8 @@ ignored-classes=optparse.Values,thread._local,_thread._local
 # supports qualified module names, as well as Unix pattern matching.
 ignored-modules=torch,torch.optim,aihwkit.simulator.rpu_base,
                 aihwkit.simulator.rpu_base.tiles,
-                aihwkit.simulator.rpu_base.devices
+                aihwkit.simulator.rpu_base.devices,
+                aihwkit.cloud.converter.definitions
 
 # Show a hint with possible names when a member name was not found. The aspect
 # of finding the hint is based on edit distance.
