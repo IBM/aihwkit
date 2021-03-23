@@ -5,6 +5,8 @@ API Reference
    :recursive:
 
    aihwkit
+   aihwkit.cloud
+   aihwkit.cloud.converter
    aihwkit.exceptions
    aihwkit.experiments
    aihwkit.experiments.experiments
