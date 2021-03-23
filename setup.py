@@ -21,7 +21,8 @@ INSTALL_REQUIRES = [
     'scipy',
     'requests>=2.25,<3',
     'numpy>=1.18',
-    'dataclasses==0.7; python_version < "3.7"'
+    'dataclasses==0.7; python_version < "3.7"',
+    'protobuf>=3.13.0,<4'
 ]
 
 

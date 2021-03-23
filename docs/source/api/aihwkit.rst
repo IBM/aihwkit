@@ -12,6 +12,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   aihwkit.cloud
    aihwkit.exceptions
    aihwkit.experiments
    aihwkit.simulator
