@@ -17,15 +17,16 @@
 from typing import Any
 
 from torch.nn import (
-    Flatten, LogSoftmax, MaxPool2d, Module, Sigmoid, Tanh
+    BatchNorm2d, Conv2d, Flatten, Linear, LogSoftmax, MaxPool2d, Module,
+    ReLU, Sigmoid, Tanh
 )
 from torchvision.datasets import FashionMNIST, SVHN
 
 from aihwkit.experiments import BasicTraining
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.simulator.presets import (
-    CapacitorPreset, ReRamSBPreset, TikiTakaReRamSBPreset,
-    EcRamPreset
+    CapacitorPreset, ReRamSBPreset, TikiTakaEcRamPreset, TikiTakaReRamSBPreset,
+    EcRamPreset, IdealizedPreset
 )
 
 
@@ -183,5 +184,129 @@ class LeNet5SVHN:
             Tanh(),
             AnalogLinear(in_features=128, out_features=10, rpu_config=rpu_config(),
                          weight_scaling_omega=0.6),
+            LogSoftmax(dim=1)
+        )
+
+
+class Vgg8SVHN:
+    """Vgg8; with SVHN."""
+
+    def get_experiment(
+            self,
+            real: bool = False,
+            rpu_config: Any = IdealizedPreset
+    ):
+        """Return a BasicTraining experiment."""
+        argv = {
+            'dataset': SVHN,
+            'model': self.get_model(rpu_config),
+            'epochs': 20,
+            'batch_size': 10,
+            'learning_rate': 0.01
+        }
+
+        if not real:
+            argv['epochs'] = 1
+
+        return BasicTraining(**argv)
+
+    def get_model(self, rpu_config: Any = IdealizedPreset) -> Module:
+        return AnalogSequential(
+            Conv2d(in_channels=3, out_channels=48,
+                   kernel_size=3, stride=1, padding=1),
+            ReLU(),
+            AnalogConv2d(in_channels=48, out_channels=48,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            BatchNorm2d(48),
+            ReLU(),
+            MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
+            AnalogConv2d(in_channels=48, out_channels=96,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            ReLU(),
+            AnalogConv2d(in_channels=96, out_channels=96,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            BatchNorm2d(96),
+            ReLU(),
+            MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
+            AnalogConv2d(in_channels=96, out_channels=144,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            ReLU(),
+            AnalogConv2d(in_channels=144, out_channels=144,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            BatchNorm2d(144),
+            ReLU(),
+            MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
+            Flatten(),
+            AnalogLinear(in_features=16 * 144, out_features=384,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            ReLU(),
+            Linear(in_features=384, out_features=10),
+            LogSoftmax(dim=1)
+        )
+
+
+class Vgg8SVHNScaling:
+    """Vgg8; with SVHN (and weight scaling)."""
+
+    def get_experiment(
+            self,
+            real: bool = False,
+            rpu_config: Any = TikiTakaEcRamPreset
+    ):
+        """Return a BasicTraining experiment."""
+        argv = {
+            'dataset': SVHN,
+            'model': self.get_model(rpu_config),
+            'epochs': 20,
+            'batch_size': 10,
+            'learning_rate': 0.01
+        }
+
+        if not real:
+            argv['epochs'] = 1
+
+        return BasicTraining(**argv)
+
+    def get_model(self, rpu_config: Any = TikiTakaEcRamPreset) -> Module:
+        return AnalogSequential(
+            Conv2d(in_channels=3, out_channels=48,
+                   kernel_size=3, stride=1, padding=1),
+            ReLU(),
+            AnalogConv2d(in_channels=48, out_channels=48,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            BatchNorm2d(48),
+            ReLU(),
+            MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
+            AnalogConv2d(in_channels=48, out_channels=96,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            ReLU(),
+            AnalogConv2d(in_channels=96, out_channels=96,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            BatchNorm2d(96),
+            ReLU(),
+            MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
+            AnalogConv2d(in_channels=96, out_channels=144,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            ReLU(),
+            AnalogConv2d(in_channels=144, out_channels=144,
+                         kernel_size=3, stride=1, padding=1,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            BatchNorm2d(144),
+            ReLU(),
+            MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
+            Flatten(),
+            AnalogLinear(in_features=16 * 144, out_features=384,
+                         rpu_config=rpu_config(), weight_scaling_omega=0.8),
+            ReLU(),
+            Linear(in_features=384, out_features=10),
             LogSoftmax(dim=1)
         )

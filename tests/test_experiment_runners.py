@@ -24,6 +24,7 @@ from .helpers.decorators import parametrize_over_models
 from .helpers.experiments import (
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
     LeNet5FashionMNIST,
+    Vgg8SVHN, Vgg8SVHNScaling
 )
 from .helpers.testcases import AihwkitTestCase
 
@@ -31,6 +32,7 @@ from .helpers.testcases import AihwkitTestCase
 @parametrize_over_models([
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
     LeNet5FashionMNIST,
+    Vgg8SVHN, Vgg8SVHNScaling
 ])
 class TestLocalRunner(AihwkitTestCase):
     """Test LocalRunner."""

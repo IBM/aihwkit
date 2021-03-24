@@ -18,14 +18,16 @@ from aihwkit.nn.modules.base import AnalogModuleBase
 from .helpers.decorators import parametrize_over_models
 from .helpers.experiments import (
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
-    LeNet5FashionMNIST
+    LeNet5FashionMNIST,
+    Vgg8SVHN, Vgg8SVHNScaling
 )
 from .helpers.testcases import AihwkitTestCase
 
 
 @parametrize_over_models([
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
-    LeNet5FashionMNIST
+    LeNet5FashionMNIST,
+    Vgg8SVHN, Vgg8SVHNScaling
 ])
 class TestBasicTraining(AihwkitTestCase):
     """Test BasicTraining Experiment."""
