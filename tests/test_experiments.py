@@ -19,7 +19,7 @@ from .helpers.decorators import parametrize_over_experiments
 from .helpers.experiments import (
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
     LeNet5FashionMNIST,
-    Vgg8SVHN, Vgg8SVHNScaling
+    Vgg8SVHN, Vgg8SVHNTikiTaka
 )
 from .helpers.testcases import AihwkitTestCase
 
@@ -27,7 +27,7 @@ from .helpers.testcases import AihwkitTestCase
 @parametrize_over_experiments([
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
     LeNet5FashionMNIST,
-    Vgg8SVHN, Vgg8SVHNScaling
+    Vgg8SVHN, Vgg8SVHNTikiTaka
 ])
 class TestBasicTraining(AihwkitTestCase):
     """Test BasicTraining Experiment."""
