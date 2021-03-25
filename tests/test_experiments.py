@@ -15,19 +15,19 @@
 from aihwkit.cloud.converter.v1.training import BasicTrainingConverter
 from aihwkit.nn.modules.base import AnalogModuleBase
 
-from .helpers.decorators import parametrize_over_models
+from .helpers.decorators import parametrize_over_experiments
 from .helpers.experiments import (
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
     LeNet5FashionMNIST,
-    Vgg8SVHN, Vgg8SVHNScaling
+    Vgg8SVHN, Vgg8SVHNTikiTaka
 )
 from .helpers.testcases import AihwkitTestCase
 
 
-@parametrize_over_models([
+@parametrize_over_experiments([
     FullyConnectedFashionMNIST, FullyConnectedFashionMNISTTikiTaka,
     LeNet5FashionMNIST,
-    Vgg8SVHN, Vgg8SVHNScaling
+    Vgg8SVHN, Vgg8SVHNTikiTaka
 ])
 class TestBasicTraining(AihwkitTestCase):
     """Test BasicTraining Experiment."""

@@ -250,8 +250,8 @@ class Vgg8SVHN:
         )
 
 
-class Vgg8SVHNScaling:
-    """Vgg8; with SVHN (and weight scaling)."""
+class Vgg8SVHNTikiTaka:
+    """Vgg8; with SVHN (and Tiki-Taka)."""
 
     def get_experiment(
             self,

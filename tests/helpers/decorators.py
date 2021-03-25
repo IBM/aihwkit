@@ -104,7 +104,7 @@ def parametrize_over_presets(presets: List) -> Callable:
         class_name_func=class_name)
 
 
-def parametrize_over_models(models: List) -> Callable:
+def parametrize_over_experiments(models: List) -> Callable:
     """Parametrize a TestCase over different kind of experiments.
 
     Args:
