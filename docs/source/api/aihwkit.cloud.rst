@@ -12,4 +12,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   aihwkit.cloud.client
    aihwkit.cloud.converter
