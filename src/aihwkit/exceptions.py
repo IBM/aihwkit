@@ -30,4 +30,8 @@ class CudaError(AihwkitException):
 
 
 class ConfigError(AihwkitException):
-    """Exception related to tile configuration. """
+    """Exceptions related to tile configuration."""
+
+
+class CloudError(AihwkitException):
+    """Exceptions related to the cloud functionality."""
