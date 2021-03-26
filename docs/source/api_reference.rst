@@ -6,6 +6,7 @@ API Reference
 
    aihwkit
    aihwkit.cloud
+   aihwkit.cloud.client
    aihwkit.cloud.converter
    aihwkit.exceptions
    aihwkit.experiments
