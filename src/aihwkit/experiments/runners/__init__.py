@@ -14,4 +14,5 @@
 
 # Convenience imports for easier access to the classes.
 
+from aihwkit.experiments.runners.cloud import CloudRunner
 from aihwkit.experiments.runners.local import LocalRunner

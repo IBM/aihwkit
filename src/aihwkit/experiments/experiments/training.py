@@ -39,6 +39,12 @@ class BasicTraining(Experiment):
       items have getters that are used by the ``Workers`` that execute the
       experiments and by the training loop.
     * the training algorithm, with the main entry point being ``train()``.
+
+    Note:
+        When executing a ``BasicTraining`` in the cloud, additional constraints
+        are applied to the data. For example, the model is restricted to
+        sequential layers of specific types; the dataset choices are limited,
+        etc. Please check the ``CloudRunner`` documentation.
     """
 
     def __init__(
