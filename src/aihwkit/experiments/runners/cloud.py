@@ -87,6 +87,7 @@ class CloudRunner(Runner):
             self,
             experiment: BasicTraining,
             name: str = '',
+            device: str = 'gpu',
             **_: Any
     ) -> CloudExperiment:
         """Run a single Experiment.
@@ -102,6 +103,7 @@ class CloudRunner(Runner):
         Args:
             experiment: the experiment to be executed.
             name: an optional name for the experiment.
+            device: the desired device.
             _: extra arguments for the runner.
 
         Returns:
@@ -115,4 +117,4 @@ class CloudRunner(Runner):
                 len(experiment.model)
             )
 
-        return self.api_client.experiment_create(experiment, name=name)
+        return self.api_client.experiment_create(experiment, name, device)

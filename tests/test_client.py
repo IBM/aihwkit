@@ -100,7 +100,9 @@ class ApiClientCreateTest(AihwkitTestCase):
         """Test creating a new experiment."""
         experiment = self.get_experiment()
         api_experiment = self.api_client.experiment_create(
-            experiment, name='test_create_experiment')
+            experiment, name='test_create_experiment',
+            device='cpu'
+        )
         self.assertIsInstance(api_experiment, CloudExperiment)
 
         # Assert the experiment shows in the list.

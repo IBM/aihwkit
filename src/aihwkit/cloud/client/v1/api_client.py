@@ -91,13 +91,15 @@ class ApiClient:
     def experiment_create(
             self,
             input_: BasicTraining,
-            name: str
+            name: str,
+            device: str = 'gpu'
     ) -> CloudExperiment:
         """Create a new experiment, queuing its execution.
 
         Args:
             input_: the experiment to be executed.
             name: the name of the experiment.
+            device: the desired device.
 
         Returns:
             A ``CloudExperiment``.
@@ -111,7 +113,8 @@ class ApiClient:
         experiment = ExperimentParser.parse_experiment(response, self)
 
         # Create the input.
-        response = self.inputs.post({'experiment': experiment.id_})
+        response = self.inputs.post({'experiment': experiment.id_,
+                                     'device': device})
         object_storage_url = response['url']
         _ = self.object_storage_session.put(url=object_storage_url, data=payload)
 

@@ -106,7 +106,8 @@ class CloudRunnerCreateTest(AihwkitTestCase):
         cloud_runner = CloudRunner(self.api_url, self.api_token)
         cloud_experiment = self.get_experiment()
 
-        api_experiment = cloud_runner.run(cloud_experiment)
+        api_experiment = cloud_runner.run(cloud_experiment,
+                                          device='cpu')
         self.assertIsInstance(api_experiment, CloudExperiment)
 
         # Assert the experiment shows in the list.
