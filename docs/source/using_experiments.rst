@@ -64,6 +64,7 @@ The following types of Runners are available:
 Tile class                                                Description
 ========================================================  ========
 :class:`~aihwkit.experiments.runners.local.LocalRunner`   Runner for executing experiments locally
+:class:`~aihwkit.experiments.runners.cloud.CloudRunner`   Runner for executing experiments in the cloud
 ========================================================  ========
 
 Running an Experiment Locally
@@ -132,4 +133,95 @@ session, as a way of tracking progress). This can be turned off by the
     ``dataset_root`` argument to indicate the location of the data files::
 
         result = my_runner.run(my_experiment, dataset_root='/some/path')
+
+Cloud Runner
+------------
+
+Experiments can also be run in the cloud at our companion ``AIHW Composer``
+application, that allows for executing the experiments remotely using hardware
+acceleration and inspect the experiments and their results visually, along
+other features.
+
+Setting up your account
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The integration is provided by a Python client included in ``aihwkit`` that
+allows connecting to the ``AIHW Composer`` platform. In order to be able to
+run experiments in the cloud:
+
+1. Register in the platform and generate an ``API token`` in your user page.
+   This token acts as the credentials for connecting with the application.
+
+2. Store your credentials by creating a ``~/.config/aihwkit.conf`` file with
+   the following contents, replacing ``YOUR_API_TOKEN`` with the string
+   from the previous step::
+
+    [cloud]
+    api_token = YOUR_API_TOKEN
+
+
+Running an Experiment in the cloud
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once your credentials are configured, running experiments in the cloud can
+be performed by using the ``CloudRunner``, in an analogous way as running
+experiments locally::
+
+    from aihwkit.experiments.runners import CloudRunner
+
+    my_cloud_runner = CloudRunner()
+    cloud_experiment = my_cloud_runner.run(my_experiment)
+
+Instead of waiting for the experiment to be completed, the ``run()`` method
+returns an object that represents a job in the cloud. As such, it has several
+convenience methods:
+
+Checking the status of a cloud experiment
+"""""""""""""""""""""""""""""""""""""""""
+
+The status of a cloud experiment can be retrieved via::
+
+    cloud_experiment.status()
+
+The response will provide information about the cloud experiment:
+    * ``WAITING``: if the experiment is waiting to be processed.
+    * ``RUNNING``: when the experiment is being executed in the cloud.
+    * ``COMPLETED``: if the experiment was executed successfully.
+    * ``FAILED``: if there was an error during the execution of the experiment.
+
+.. note::
+
+    Some actions are only possible if the cloud experiment has finished
+    successfully, for example, retrieving its results. Please also be mindful
+    that some experiments can take a sizeable amount of time to be executed,
+    specially during the initial versions of the platform.
+
+Retrieving the results of a cloud experiment
+""""""""""""""""""""""""""""""""""""""""""""
+
+Once the cloud experiment completes its execution, its results can be retrieved
+using::
+
+    result = cloud_experiment.get_result()
+
+This will display the result of executing the experiment, in a similar form as
+the output of running an Experiment locally.
+
+Retrieving the content of the experiment
+""""""""""""""""""""""""""""""""""""""""
+
+The Experiment can be retrieved using::
+
+    experiment = cloud_experiment.get_experiment()
+
+This will return a local Experiment (for example, a ``BasicTraining``) that
+can be used locally and their properties inspected. In particular, the weights
+of the model will reflect the results of the experiment.
+
+Retrieving a previous cloud experiment
+""""""""""""""""""""""""""""""""""""""
+
+The list of experiments previously executed in the cloud can be retrieved via::
+
+    cloud_experiments = my_cloud_runner.list_experiments()
 
