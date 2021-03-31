@@ -6,6 +6,14 @@ aihwkit.nn package
    :undoc-members:
    :show-inheritance:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   aihwkit.nn.modules
+
 Submodules
 ----------
 
@@ -13,4 +21,3 @@ Submodules
    :maxdepth: 4
 
    aihwkit.nn.functions
-   aihwkit.nn.modules

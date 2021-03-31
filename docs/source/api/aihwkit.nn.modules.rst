@@ -1,5 +1,5 @@
-aihwkit.nn.modules module
-=========================
+aihwkit.nn.modules package
+==========================
 
 .. automodule:: aihwkit.nn.modules
    :members:
