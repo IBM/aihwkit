@@ -13,9 +13,16 @@ Subpackages
    :maxdepth: 4
 
    aihwkit.cloud
-   aihwkit.exceptions
    aihwkit.experiments
-   aihwkit.simulator
    aihwkit.nn
    aihwkit.optim
+   aihwkit.simulator
    aihwkit.utils
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   aihwkit.exceptions

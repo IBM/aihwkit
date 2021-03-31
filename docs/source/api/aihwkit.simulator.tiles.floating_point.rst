@@ -1,5 +1,5 @@
-aihwkit.simulator.tiles.floating_point module
-=============================================
+aihwkit.simulator.tiles.floating\_point module
+==============================================
 
 .. automodule:: aihwkit.simulator.tiles.floating_point
    :members:

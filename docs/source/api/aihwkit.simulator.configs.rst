@@ -14,4 +14,5 @@ Submodules
 
    aihwkit.simulator.configs.configs
    aihwkit.simulator.configs.devices
+   aihwkit.simulator.configs.helpers
    aihwkit.simulator.configs.utils
