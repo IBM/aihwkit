@@ -13,52 +13,61 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Security` in case of vulnerabilities.
 
 
-## [UNRELEASED]
+## [0.3.0]
 
 ### Added
 
-* Option to choose deterministic pulse trains for the rank-1 update of
-  analog devices during training. (\#99)
-* More noise types for hardware-aware training for inference
-  (polynomial). (\#99)
-* Additional bound management schemes (worst case, average max, shift). (\#99)
-* Cycle-to-cycle output referred analog multiply-and-accumulate weight
-  noise that resembles the conductance dependent PCM read noise
-  statistics. (\#99)
-* C++ backend improvements (slice backward/forward/update, direct
-  update). (\#99)
-* Option to excluded bias row for hardware-aware training noise. (\#99)
-* Two new convolution layers have been added: `AnalogConv1d` and `AnalogConv3d`,
-  mimicking their digital counterparts. (\#102, \#103)
-* Option to automatically scale the digital weights into the full range of the
-  simulated crossbar by applying a fixed output global factor in
-  digital. (\#129)
-* Added a library of device presets that are calibrated to real
-  hardware data, namely `ReRamESPresetDevice`, `ReRamSBPresetDevice`,
-  `ECRamPresetDevice`, `CapacitorPresetDevice`, and device presets
-  that are based on models in the literatur,
-  e.g. `GokmenVlasovPresetDevice` and `IdealizedPresetDevice`. They
-  can be used defining the device field in the `RPUConfig`. (\#144)
-* Added a library of config presets, such as `ReRamESPreset`,
-  `Capacitor2Preset`, `TikiTakaReRamESPreset`, and many more. These can
-  be used for tile configration (``rpu_config``). They specify a
-  particular device and optimizer choice. (\#144)
-* Utility for visualization the pulse response properties of a given
-  device configuration. (\#146)
-* Optional power-law drift during analog training. (\#158)
-* A new abstract device (`MixedPrecisionCompound`) implementing an SGD
-  optimizer that computes the rank update in digital (assuming digital
-  high precision storage) and then transfers the matrix sequentially to
-  the analog device, instead of using the default fully parallel pulsed
-  update. (\#159)
-* A new `aihwkit.experiments` module has been added that allows creating and
-  running specific high-level use cases (for example, neural network training)
-  conveniently. (\#171, \#172)
+* Analog devices and tiles improvements:
+    * A new abstract device (`MixedPrecisionCompound`) implementing an SGD
+      optimizer that computes the rank update in digital (assuming digital
+      high precision storage) and then transfers the matrix sequentially to
+      the analog device, instead of using the default fully parallel pulsed
+      update. (\#159)
+    * Option to choose deterministic pulse trains for the rank-1 update of
+      analog devices during training. (\#99)
+    * More noise types for hardware-aware training for inference
+      (polynomial). (\#99)
+    * Additional bound management schemes (worst case, average max, shift).
+      (\#99)
+    * Cycle-to-cycle output referred analog multiply-and-accumulate weight
+      noise that resembles the conductance dependent PCM read noise
+      statistics. (\#99)
+    * C++ backend improvements (slice backward/forward/update, direct
+      update). (\#99)
+    * Option to excluded bias row for hardware-aware training noise. (\#99)
+    * Option to automatically scale the digital weights into the full range of
+      the simulated crossbar by applying a fixed output global factor in
+      digital. (\#129)
+    * Optional power-law drift during analog training. (\#158)
+* PyTorch interface improvements:
+    * Two new convolution layers have been added: `AnalogConv1d` and
+      `AnalogConv3d`, mimicking their digital counterparts. (\#102, \#103)
+    * The `.to()` method can now be used in `AnalogSequential`, along with
+      `.cpu()` methods in analog layers (albeit GPU to CPU is still not
+      possible). (\#142, \#149)
+* New modules added:
+  * A library of device presets that are calibrated to real hardware data,
+    namely `ReRamESPresetDevice`, `ReRamSBPresetDevice`, `ECRamPresetDevice`,
+    `CapacitorPresetDevice`, and device presets that are based on models in the
+    literature, e.g. `GokmenVlasovPresetDevice` and `IdealizedPresetDevice`.
+    They can be used defining the device field in the `RPUConfig`. (\#144)
+  * A library of config presets, such as `ReRamESPreset`, `Capacitor2Preset`,
+    `TikiTakaReRamESPreset`, and many more. These can be used for tile
+    configuration (`rpu_config`). They specify a particular device and optimizer
+    choice. (\#144)
+  * Utilities for visualization the pulse response properties of a given
+    device configuration. (\#146)
+  * A new `aihwkit.experiments` module has been added that allows creating and
+    running specific high-level use cases (for example, neural network training)
+    conveniently. (\#171, \#172)
+  * A `CloudRunner` class has been added that allows executing experiments in
+    the cloud. (\#184)
 
 #### Changed
 
 * The minimal PyTorch version has been bumped to `1.7+`. Please recompile your
   library and update the dependencies accordingly. (\#176)
+* Default value for TransferCompound for `transfer_every=0` (\#174).
 
 #### Fixed
 
@@ -82,7 +91,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The legacy `NumpyAnalogTile` and `NumpyFloatingPointTile` tiles have been
   finally removed. The regular, tensor-powered `aihwkit.simulator.tiles` tiles
   contain all their functionality and numerous additions. (\#122)
-* Default value for TransferCompound for `transfer_every=0` (\#174).
 
 ## [0.2.1] - 2020/11/26
 
@@ -165,7 +173,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.2.1...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/IBM/aihwkit/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
 [0.2.0]: https://github.com/IBM/aihwkit/compare/v0.1.0..v0.2.0
 [0.1.0]: https://github.com/IBM/aihwkit/releases/tag/v0.1.0
