@@ -747,7 +747,7 @@ class TransferCompound(UnitCell):
     It uses a (partly) hidden weight (where the SGD update is
     accumulated), which then is transferred partly and occasionally to
     the visible weight. This can implement an analog friendly variant
-    of stochastic gradient descent, as described in
+    of stochastic gradient descent (Tiki-taka), as described in
     `Gokmen & Haensch (2020)`_.
 
     The hidden weight is always the first in the list of
@@ -758,10 +758,10 @@ class TransferCompound(UnitCell):
     only the first two will actually be used and the rest discarded
     and instead replaced by the second device specification. In this
     manner, the *fast* crossbar (receiving the SGD updates) and the
-    *slow* crossbar (receiving the occasional partial transfers from the
-    fast) can have different specs, but all additional slow crossbars
-    (receiving transfers from the left neighboring crossbar in the
-    list of ``unit_cell_devices``) need to be of the same spec.
+    *slow* crossbar (receiving the occasional partial transfers from
+    the fast) can have different specs, but all additional slow
+    crossbars (receiving transfers from the left neighboring crossbar
+    in the list of ``unit_cell_devices``) need to be of the same spec.
 
     The rate of transfer (e.g. learning rate and how often and how
     many columns per transfer) and the type (ie. with ADC or without,
