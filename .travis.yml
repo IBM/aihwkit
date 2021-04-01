@@ -60,6 +60,8 @@ jobs:
     <<: *job_compile_common
     stage: Test and lint
     python: "3.6"
+    env:
+      - TEST_DATASET=true
 
   - name: "Compile and lint. Python 3.6"
     <<: *job_compile_common
