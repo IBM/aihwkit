@@ -49,6 +49,17 @@ We rely on the result of those checks to help reviewing pull requests: when
 contributing, please make sure of reviewing the result of the continuous
 integration in order to help fixing potential issues.
 
+Testing
+-------
+
+The following environment variables can be used for selecting the subset of
+tests to be performed:
+
+* ``TEST_DATASET``: if set, the tests that involve using datasets will be
+  executed (involves downloading the datasets).
+* ``TEST_CREATE``: if set, the tests that involve remote experiment creation
+  will be executed.
+
 Branches and releases
 ---------------------
 
