@@ -24,7 +24,31 @@ from aihwkit.simulator.configs.utils import (
 
 @dataclass
 class PresetIOParameters(IOParameters):
-    """Preset for the forward and backward pass parameters."""
+    r"""Preset for the forward and backward pass parameters.
+
+    This defines the default (peripheral) hardware configurations
+    used for most presets.
+
+    Currently, we assume 7 bit DAC (without stochastic rounding) and 9
+    bit ADC (including the sign) and a fixed dynamic range ratio. The
+    dynamic range ratio is defined by how many fully-on inputs would
+    saturate the output ADC when all weights are set maximal
+    conductances. This value is set to 20 here, as the weight range is
+    normalized to :math:`-1,\ldots 1`.
+
+    Moreover, the output noise (additive Gaussian) is set to 0.1,
+    which is on the order of 1 LSB of the ADC.
+
+    By default, we turned additional weight noise off, however, some
+    presets might turn it on as required by the device specification.
+
+    Finally, we assume by default that the device is run with bound
+    management (see
+    :class:`~aihwkit.simulator.config.utils.BoundManagementType`) and
+    noise management (see
+    :class:`~aihwkit.simulator.config.utils.NoiseManagementType`)
+    turned on to `ITERATIVE` and `ABS_MAX`, respectively.
+    """
 
     bound_management: BoundManagementType = BoundManagementType.ITERATIVE
     noise_management: NoiseManagementType = NoiseManagementType.ABS_MAX
@@ -45,7 +69,19 @@ class PresetIOParameters(IOParameters):
 class PresetUpdateParameters(UpdateParameters):
     """Preset for the general update behavior.
 
-    Stochastic pulse trains with parallel update by default.
+    This defines the default update configurations used for most
+    presets. Presets might override this default behavior to implement
+    other analog SGD optimizers.
+
+    Parallel analog update is the default. We assume stochastic pulse
+    to do the parallel update in analog, as described in `Gokmen &
+    Vlasov, Front. Neurosci. 2016`_.
+
+    Moreover, we assume that the pulse length is dynamically adjusted
+    with a maximal pulse length of 31 pulses.
+
+    .. _`Gokmen & Vlasov, Front. Neurosci. 2016`: \
+       https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
 
     desired_bl: int = 31  # Less than 32 preferable (faster implementation).
