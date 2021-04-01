@@ -12,6 +12,9 @@
 
 """Tests for Experiments."""
 
+import os
+from unittest import SkipTest
+
 from aihwkit.cloud.converter.v1.training import BasicTrainingConverter
 from aihwkit.nn.modules.base import AnalogModuleBase
 
@@ -31,6 +34,10 @@ from .helpers.testcases import AihwkitTestCase
 ])
 class TestBasicTraining(AihwkitTestCase):
     """Test BasicTraining Experiment."""
+
+    def setUp(self) -> None:
+        if not os.getenv('TEST_DATASET'):
+            raise SkipTest('TEST_DATASET not set')
 
     def test_conversion_roundtrip(self):
         """Test roundtrip conversion of examples."""

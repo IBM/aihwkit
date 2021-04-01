@@ -12,8 +12,9 @@
 
 """Tests for Experiment Runners."""
 
+import os
 from io import StringIO
-from unittest import skipIf
+from unittest import SkipTest, skipIf
 from unittest.mock import patch
 
 from torch import device as torch_device
@@ -36,6 +37,10 @@ from .helpers.testcases import AihwkitTestCase
 ])
 class TestLocalRunner(AihwkitTestCase):
     """Test LocalRunner."""
+
+    def setUp(self) -> None:
+        if not os.getenv('TEST_DATASET'):
+            raise SkipTest('TEST_DATASET not set')
 
     def test_run_example_cpu(self):
         """Test running the example using a local runner."""
