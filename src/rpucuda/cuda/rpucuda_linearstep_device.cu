@@ -32,6 +32,8 @@ template <typename T> struct UpdateFunctorLinearStepMult {
     T uw_std = *write_noise_std;
     T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        //[3], [1]
     T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); // [1],[0]
+    T wmax = par_4.z;                                          // [2]
+    T wmin = par_4.x;                                          // [0]
 
     T &w = uw_std > 0 ? persistent_weight : apparent_weight;
 
@@ -44,24 +46,27 @@ template <typename T> struct UpdateFunctorLinearStepMult {
       } else {
         w += lin_a * w + lin_dw;
       }
+      w = (w > wmax) ? wmax : w;
+      w = (w < wmin) ? wmin : w;
     } else {
       if (noise_std_dw > 0) {
         for (int i_updates = 0; i_updates < n; i_updates++) {
           T stoch_value = curand_normal(&local_state);
           stoch_value *= noise_std_dw;
           w += (lin_a * w + lin_dw) * (1.0 + stoch_value);
+          // better always check both bounds
+          w = (w > wmax) ? wmax : w;
+          w = (w < wmin) ? wmin : w;
         }
       } else {
         for (int i_updates = 0; i_updates < n; i_updates++) {
           w += lin_a * w + lin_dw;
+          // better always check both bounds
+          w = (w > wmax) ? wmax : w;
+          w = (w < wmin) ? wmin : w;
         }
       }
     }
-    // better always check both bounds
-    T wmax = par_4.z; // [2]
-    w = (w > wmax) ? wmax : w;
-    T wmin = par_4.x; // [0]
-    w = (w < wmin) ? wmin : w;
 
     // add update write noise onto apparent weight
     if (uw_std > 0) {
@@ -86,8 +91,9 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
     T uw_std = *write_noise_std;
     T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        // [3] [1]
     T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); //[1],[0]
-
     T &w = uw_std > 0 ? persistent_weight : apparent_weight;
+    T wmax = par_4.z; // [2]
+    T wmin = par_4.x; // [0]
 
     // n is larger 0 in any case
     if (n == 1) {
@@ -98,24 +104,25 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
       } else {
         w += lin_a * w + lin_dw;
       }
+      w = (w > wmax) ? wmax : w;
+      w = (w < wmin) ? wmin : w;
     } else {
       if (noise_std_dw > 0) {
         for (int i_updates = 0; i_updates < n; i_updates++) {
           T stoch_value = curand_normal(&local_state);
           stoch_value *= noise_std_dw;
           w += lin_a * w + lin_dw * (1.0 + stoch_value);
+          w = (w > wmax) ? wmax : w;
+          w = (w < wmin) ? wmin : w;
         }
       } else {
         for (int i_updates = 0; i_updates < n; i_updates++) {
           w += lin_a * w + lin_dw;
+          w = (w > wmax) ? wmax : w;
+          w = (w < wmin) ? wmin : w;
         }
       }
     }
-    T wmax = par_4.z; // [2]
-    w = (w > wmax) ? wmax : w;
-    T wmin = par_4.x; // [0]
-    w = (w < wmin) ? wmin : w;
-
     // add update write noise onto apparent weight
     if (uw_std > 0) {
       T stoch_value = curand_normal(&local_state);

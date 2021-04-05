@@ -26,6 +26,7 @@ void declare_rpu_devices(py::module &m) {
   using DifferenceParam = RPU::DifferenceRPUDeviceMetaParameter<T>;
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
   using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
+  using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -227,6 +228,24 @@ void declare_rpu_devices(py::module &m) {
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(
           RPU::MixedPrecRPUDevice<T> *, MixedPrecParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  class PyPowStepParam : public PowStepParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, PowStepParam, getName, );
+    }
+    PowStepParam *clone() const override {
+      PYBIND11_OVERLOAD(PowStepParam *, PowStepParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, PowStepParam, implements, );
+    }
+    RPU::PowStepRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::PowStepRPUDevice<T> *, PowStepParam, createDevice, x_size, d_size, rng);
     }
   };
 
@@ -483,6 +502,19 @@ void declare_rpu_devices(py::module &m) {
            Set a pulsed base device parameter of a mixed precision device.
            )pbdoc")
       .def("__str__", [](MixedPrecParam &self) {
+        std::stringstream ss;
+        self.printToStream(ss);
+        return ss.str();
+      });
+
+  py::class_<PowStepParam, PyPowStepParam, PulsedParam>(m, "PowStepResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("pow_gamma", &PowStepParam::ps_gamma)
+      .def_readwrite("pow_gamma_dtod", &PowStepParam::ps_gamma_dtod)
+      .def_readwrite("pow_up_down", &PowStepParam::ps_gamma_up_down)
+      .def_readwrite("pow_up_down_dtod", &PowStepParam::ps_gamma_up_down_dtod)
+      .def_readwrite("write_noise_std", &PowStepParam::write_noise_std)
+      .def("__str__", [](PowStepParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
         return ss.str();

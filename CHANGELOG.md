@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog], and this project adheres to
       high precision storage) and then transfers the matrix sequentially to
       the analog device, instead of using the default fully parallel pulsed
       update. (\#159)
+    * A new devicen model class `PowStepDevice` that implements a
+      power-exponent type of non-linearity. (\#???)
     * Option to choose deterministic pulse trains for the rank-1 update of
       analog devices during training. (\#99)
     * More noise types for hardware-aware training for inference

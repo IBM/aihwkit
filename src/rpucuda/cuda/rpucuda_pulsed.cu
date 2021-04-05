@@ -340,7 +340,7 @@ template <typename T> void RPUCudaPulsed<T>::setWeightsReal(const T *weightsptr,
   if (dpar != nullptr) {
     w_min = dpar->w_min;
     w_max = dpar->w_max;
-    static_cast<PulsedRPUDeviceCudaBase<T> &>(*rpucuda_device_).getDwMin();
+    dw_min = static_cast<PulsedRPUDeviceCudaBase<T> &>(*rpucuda_device_).getDwMin();
   }
   T A = 0;
   T B = 0;
