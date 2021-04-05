@@ -17,6 +17,7 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import ClassVar, List, Type
+from numpy import exp
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.configs.helpers import (
@@ -144,7 +145,8 @@ class PulsedDevice(_PrintableMixin):
     diffusion_dtod: float = 0.0
     """Device-to device variation of diffusion rate in relative units."""
 
-    drift: DriftParameter = field(default_factory=DriftParameter)
+    drift: DriftParameter = field(default_factory=DriftParameter,
+                                  metadata={'hide_if': DriftParameter()})
     """Parameter governing a power-law drift."""
 
     dw_min: float = 0.001
@@ -352,7 +354,7 @@ class ConstantStepDevice(PulsedDevice):
     device-to-device can be given as parameters, see below.
 
     For parameters regarding the devices settings, see e.g.
-    :class:`~aihwkit.simulator.parameters.ConstantStepResistiveDeviceParameters`.
+    :class:`~PulsedDevice`.
     """
 
     bindings_class: ClassVar[Type] = devices.ConstantStepResistiveDeviceParameter
@@ -366,7 +368,7 @@ class LinearStepDevice(PulsedDevice):
     size of the material is linearly dependent with resistance (up to
     hard bounds).
 
-    This model is very similar to :class:`~ConstantStepResistiveDevice` and thus
+    This model is based on :class:`~PulsedDevice` and thus
     shares all parameters and functionality. In addition, it only
     implements a more general `update once` function, where the update
     step size can depend linearly on the weight itself.
@@ -374,7 +376,7 @@ class LinearStepDevice(PulsedDevice):
     For each coincidence the weights is updated once. Here, the
     positive (negative) update step size decreases linearly in the
     following manner (compare to the `update once` for
-    :class:`~ConstantStepResistiveDevice`):
+    :class:`~ConstantStepDevice`):
 
     .. math::
        :nowrap:
@@ -407,7 +409,7 @@ class LinearStepDevice(PulsedDevice):
     where the :math:`\xi` are standard Gaussian random variables and
     :math:`b^\text{min}_{ij}` and :math:`b^\text{max}_{ij}` the
     cross-point `ij` specific minimal and maximal weight bounds,
-    respectively (see description for :class:`~ConstantStepResistiveDevice`).
+    respectively (see description for :class:`~PulsedDevice`).
 
     Note:
        If :math:`\gamma=1` and :math:`\gamma_\text{d-to-d}=0` this
@@ -416,8 +418,8 @@ class LinearStepDevice(PulsedDevice):
 
     Note:
        If :math:`\gamma=0` and :math:`\gamma_\text{d-to-d}=0` and
-       additive noise, this update is identical to
-       :class:`~ConstantStepResistiveDevice`.
+       additive noise, this update is identical to those described in
+       :class:`~PulsedDevice`.
     """
 
     bindings_class: ClassVar[Type] = devices.LinearStepResistiveDeviceParameter
@@ -431,7 +433,7 @@ class LinearStepDevice(PulsedDevice):
     Note:
         In principle one could fix :math:`\gamma=\gamma^-=\gamma^+` since
         up/down variation can be given by ``up_down_dtod``, see
-        :class:`~ConstantStepResistiveDevice`.
+        :class:`~PulsedDevice`.
 
     Note:
         The hard-bounds are still observed, so that the weight cannot
@@ -466,7 +468,7 @@ class LinearStepDevice(PulsedDevice):
         \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}
 
     where :math:`b^\text{max}` and :math:`b^\text{max}` are the values given by
-    ``w_max`` and ``w_min``, see :class:`~ConstantStepResistiveDevice`.
+    ``w_max`` and ``w_min``, see :class:`~PulsedDevice`.
     """
 
     mult_noise: bool = True
@@ -499,7 +501,7 @@ class SoftBoundsDevice(PulsedDevice):
     of the material is linearly dependent and it goes to zero at the
     bound.
 
-    This model is based on :class:`~LinearStepResistiveDevice` with
+    This model is based on :class:`~LinearStepDevice` with
     parameters set to model soft bounds.
     """
 
@@ -511,11 +513,97 @@ class SoftBoundsDevice(PulsedDevice):
 
 
 @dataclass
+class SoftBoundsPmaxDevice(SoftBoundsDevice):
+    r"""Pulsed update behavioral model: soft bounds, with a different
+    parameterization for easier device fitting to experimental data.
+
+    Under the hood, the same  device behavior as :class:`~SoftboundsDevice`
+    This model is based on :class:`~LinearStepDevice` with
+    parameters set to model soft bounds.
+
+    It implements pulse response function of the form:
+
+    .. math::
+
+        w(p_\text{up}) = B\left(1 -e^{-\alpha p_\text{up}} \right) + r_\text{min}
+
+        w(p_\text{down}) = - B\left(1 - e^{-\alpha (p_\text{max}
+        - p_\text{down})}\right) + r_\text{max}
+
+    where $B=\frac{r_\text{max} - r_\text{min}}{1 - e^{-\alpha p_\text{max}}}$.
+
+    Here $p_max$ is the number of pulses that were applied to get the
+    device from the minimum conductance (minimum of range,
+    $r_\text{min}$) to the maximum (maximum of range, $r_\text{max}$).
+
+    Internally the following transformation is used to get the
+    original parameter of :class:`SoftboundsDevice`::
+
+        b_factor = (range_max - range_min)/(1 - exp(-p_max * alpha))
+        w_min = range_min
+        w_max = range_min + b_factor
+        dw_min = b_factor * alpha
+        up_down = 1 + 2 * range_min / b_factor
+
+    Note:
+        Device-to-device and cycle-to-cycle variation are defined as
+        before (see :class:`SoftBoundsDevice`, see also
+        :class:`PulsedDevice`). That is, for instance `dw_min_dtod`
+        will effectively change the slope (in units of ``dw_min`` which
+        is ``b_factor * alpha``, see above). Range offset fluctuations
+        can be achieved by using ``w_min_dtod`` and ``w_max_dtod``
+        which will vary ``w_min`` and ``w_max`` across devices,
+        respectively.
+    """
+
+    p_max: int = 1000
+    """Number of pulses to drive the synapse from ``range_min`` to ``range_max``."""
+
+    alpha: float = 0.001/2
+    r"""The slope of the soft bounds model :math:`dw \propto \alpha w` for both
+    up and down direction."""
+
+    range_min: float = -1.0
+    """Setting of the weight when starting the :math:`P_max` up pulse
+    experiment."""
+
+    range_max: float = 1.0
+    """Value of the weight for :math:`P_max` number of up pulses."""
+
+    w_min_dtod: float = 0.0
+    w_max_dtod: float = 0.0
+    up_down_dtod: float = 0.0
+    dw_min_std: float = 0.3
+    dw_min_dtod: float = 0.0
+
+    #  these values will be set from the above, so we hide it.
+    w_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
+    w_max: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
+    dw_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
+    up_down: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
+
+    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+        params = SoftBoundsDevice()
+        for key, value in self.__dict__.items():
+            if key not in ['range_min', 'range_max', 'alpha', 'p_max']:
+                setattr(params, key, value)
+
+        b_factor = (self.range_max - self.range_min)/(1 - exp(-self.p_max * self.alpha))
+        params.w_min = self.range_min
+        params.w_max = self.range_min + b_factor
+        params.dw_min = b_factor * self.alpha
+        params.up_down = 1 + 2 * self.range_min / b_factor
+
+        return parameters_to_bindings(params)
+
+
+@dataclass
 class ExpStepDevice(PulsedDevice):
     r"""Exponential update step or CMOS-like update behavior.
 
-    This model is derived from ``PulsedResistiveDevice`` and uses all its
-    parameters. ``ExpStepResistiveDevice`` only implements a new 'update once'
+    This model is derived from ``PulsedDevice`` and uses all its
+    parameters. ``ExpStepDevice`` only implements a new 'update once'
     functionality, where the minimal weight step change with weight is
     fitted by an exponential function as detailed below.
 
@@ -533,14 +621,14 @@ class ExpStepDevice(PulsedDevice):
         y_{ij} = 1 - A^{(d)} e^{d \gamma^{(d)} z_{ij}}
 
     where :math:`d` is the direction of the update (+ or -), see also
-    :class:`~ConstantStepResistiveDevice` for details.
+    :class:`~PulsedDevice` for details.
 
     All additional parameter (:math:`a_\text{es}`,
     :math:`b_\text{es}`, :math:`\gamma^{(d)}`, :math:`A^{(d)}` ) are
     tile-wise fitting parameters (ie. no device-to-device variation in
     these parameters).  Note that the other parameter involved can be
     still defined with device-to-device variation and (additional)
-    up-down bias (see :class:`~ConstantStepResistiveDevice`).
+    up-down bias (see :class:`~PulsedDevice`).
     """
     # pylint: disable=invalid-name
 

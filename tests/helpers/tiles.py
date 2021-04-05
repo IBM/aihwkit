@@ -21,6 +21,7 @@ from aihwkit.simulator.configs.devices import (
     LinearStepDevice,
     ExpStepDevice,
     SoftBoundsDevice,
+    SoftBoundsPmaxDevice,
     IOParameters,
     DifferenceUnitCell,
     VectorUnitCell,
@@ -108,6 +109,21 @@ class SoftBounds:
 
     def get_rpu_config(self):
         return SingleRPUConfig(device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
+class SoftBoundsPmax:
+    """AnalogTile with SoftBoundsPmaxDevice."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=SoftBoundsPmaxDevice(w_max_dtod=0, w_min_dtod=0))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -312,6 +328,21 @@ class SoftBoundsCuda:
 
     def get_rpu_config(self):
         return SingleRPUConfig(device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class SoftBoundsPmaxCuda:
+    """AnalogTile with SoftBoundsPmaxDevice."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=SoftBoundsPmaxDevice(w_max_dtod=0, w_min_dtod=0))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
