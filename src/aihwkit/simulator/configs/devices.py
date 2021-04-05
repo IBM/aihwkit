@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 
 # (C) Copyright 2020, 2021 IBM. All Rights Reserved.
@@ -569,12 +570,6 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
 
     range_max: float = 1.0
     """Value of the weight for :math:`P_max` number of up pulses."""
-
-    w_min_dtod: float = 0.0
-    w_max_dtod: float = 0.0
-    up_down_dtod: float = 0.0
-    dw_min_std: float = 0.3
-    dw_min_dtod: float = 0.0
 
     #  these values will be set from the above, so we hide it.
     w_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
