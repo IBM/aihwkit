@@ -14,6 +14,7 @@ Module                                  Notes
 ======================================  ========
 :py:mod:`aihwkit.simulator.tiles`       Entry point for instantiating analog tiles
 :py:mod:`aihwkit.simulator.configs`     Configurations and parameters for analog tiles
+:py:mod:`aihwkit.simulator.presets`     Presets for analog tiles
 :py:mod:`aihwkit.simulator.rpu_base`    Low-level bindings of the C++ simulator members
 ======================================  ========
 
@@ -324,10 +325,31 @@ use the following tile configuration for that (see also `Example 8`_)::
     print(model.analog_tile.tile)
 
 
-Note that this analog tile now will perfom tiki-taka as the learning
+Note that this analog tile now will perform tiki-taka as the learning
 rule instead of plain SGD. Once the configuration is done, the usage
 of this complex analog tile for testing or training from the user
 point of view is however the same as for other tiles.
+
+Analog presets
+--------------
+
+Other than the building blocks for analog tiles described in the sections
+above, the toolkit includes:
+
+* a library of device presets that are calibrated to real hardware data and/or
+  are based on models in the literature.
+* a library of configuration presets that specify a particular device and
+  optimizer choice.
+
+The current list of device and configuration presets can be found in the
+:py:mod:`aihwkit.simulator.presets` module. These presets can be used directly
+instead of manually specifying a ``RPU Configuration``::
+
+    from aihwkit.simulator.tiles import AnalogTile
+    from aihwkit.simulator.presets import TikiTakaEcRamPreset
+
+    tile = AnalogTile(10, 20, rpu_config=TikiTakaEcRamPreset())
+
 
 .. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
 .. _Example 7: https://github.com/IBM/aihwkit/blob/master/examples/07_simple_layer_with_other_devices.py
