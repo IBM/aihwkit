@@ -108,7 +108,9 @@ Resistive device class                                            Description
 :class:`~aihwkit.simulator.configs.devices.ConstantStepDevice`    pulsed update behavioral model: constant step, where the update step of material is constant throughout the resistive range (up to hard bounds).
 :class:`~aihwkit.simulator.configs.devices.LinearStepDevice`      pulsed update behavioral model: linear step, where the update step response size of the material is linearly dependent with resistance (up to hard bounds).
 :class:`~aihwkit.simulator.configs.devices.SoftBoundsDevice`      pulsed update behavioral model: soft bounds, where the update step response size of the material is linearly dependent and it goes to zero at the bound.
+:class:`~aihwkit.simulator.configs.devices.SoftBoundsPmaxDevice`  same model as in :class:`~aihwkit.simulator.configs.devices.SoftBoundsDevice` but using a more convinient parameterization for easier fits to experimentally measured update response curves.
 :class:`~aihwkit.simulator.configs.devices.ExpStepDevice`         exponential update step or CMOS-like update behavior.
+:class:`~aihwkit.simulator.configs.devices.PowStepDevice`         update step using a power exponent non-linearity.
 ================================================================  ========
 
 Unit cell devices
@@ -118,7 +120,7 @@ Unit cell devices
 Resistive device class                                                Description
 ====================================================================  ========
 :class:`~aihwkit.simulator.configs.devices.VectorUnitCell`            abstract resistive device that combines multiple pulsed resistive devices in a single 'unit cell'.
-:class:`~aihwkit.simulator.configs.devices.DifferenceUnitCell`        abstract device model takes an arbitrary device per crosspoint and implements an explicit plus-minus device pair.
+:class:`~aihwkit.simulator.configs.devices.DifferenceUnitCell`        abstract device model that takes an arbitrary device per crosspoint and implements an one-sided plus-minus device pair, where both devices only receive only positive updates and a refresh or reset needs to be added to avoid saturation.
 :class:`~aihwkit.simulator.configs.devices.ReferenceUnitCell`         abstract device model takes two arbitrary device per cross-point and implements an device with reference pair.
 ====================================================================  ========
 
@@ -129,6 +131,7 @@ Compound devices
 Resistive device class                                                Description
 ====================================================================  ========
 :class:`~aihwkit.simulator.configs.devices.TransferCompound`          abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
+:class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`    abstract device model that takes one devices per crosspoint and implements a 'mixed-precision' based learning rule where the rank-updata is done in digital instead of using a fully analog parallel write (see `Nandakumar et al. 2020`_).
 ====================================================================  ========
 
 RPU Configurations
@@ -330,6 +333,43 @@ rule instead of plain SGD. Once the configuration is done, the usage
 of this complex analog tile for testing or training from the user
 point of view is however the same as for other tiles.
 
+Mixed Precisionn Compound
+-------------------------
+
+This abstract device implements an analog SGD optimizer suggested by
+`Nandakumar et al. 2020`_ where the update is not done in analog
+directly, but in digital. Thus is uses a digital rank-update of an
+intermediately stored floating point matrix, which will be used to
+transfer the information to the analog tile that is used in forward
+and backward pass.  This optimizer strategy is in contrast with the
+default mode in the simulator, that uses stochastic pulse trains to
+update in parallel onto the analog tile directly. This will have
+impact on the hardware design as well as expected runtime, as more
+digital computation is needed to be done. For details, see `Nandakumar
+et al. 2020`_.
+
+To enable mixed-precision one defines for example the following ``rpu_config``::
+
+    # Imports from aihwkit.
+    from aihwkit.simulator.configs import DigitalRankUpdateRPUConfig
+    from aihwkit.simulator.configs.devices import SoftBoundsDevice
+
+    rpu_config = DigitalRankUpdateRPUConfig(
+        device=SoftBoundsDevice(),
+
+	# make some adjustments of mixed-precion hyper parameter
+        granularity=0.001,
+	n_x_bins=15,
+	n_d_bins=31,
+    )
+
+    # use tile configuration in model
+    model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
+
+Now this analog tile will use the mixed-precision optimizer with a
+soft bounds device model. 
+
+
 Analog presets
 --------------
 
@@ -354,3 +394,4 @@ instead of manually specifying a ``RPU Configuration``::
 .. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
 .. _Example 7: https://github.com/IBM/aihwkit/blob/master/examples/07_simple_layer_with_other_devices.py
 .. _Example 8: https://github.com/IBM/aihwkit/blob/master/examples/08_simple_layer_with_tiki_taka.py
+.. _Nandakumar et al. 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full
