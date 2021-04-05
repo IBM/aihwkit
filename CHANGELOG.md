@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog], and this project adheres to
       the analog device, instead of using the default fully parallel pulsed
       update. (\#159)
     * A new devicen model class `PowStepDevice` that implements a
-      power-exponent type of non-linearity. (\#???)
+      power-exponent type of non-linearity. (\#192)
     * Option to choose deterministic pulse trains for the rank-1 update of
       analog devices during training. (\#99)
     * More noise types for hardware-aware training for inference
@@ -73,6 +73,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 #### Fixed
 
+* Issue of numnber og loop estimations for realistics read (\#192)
 * Fixed small issues that resulted in warnings for windows compilation. (\#99)
 * Faulty backward noise management error message removed for perfect backward
   and CUDA. (\#99)
