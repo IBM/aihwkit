@@ -108,7 +108,7 @@ Resistive device class                                            Description
 :class:`~aihwkit.simulator.configs.devices.ConstantStepDevice`    pulsed update behavioral model: constant step, where the update step of material is constant throughout the resistive range (up to hard bounds).
 :class:`~aihwkit.simulator.configs.devices.LinearStepDevice`      pulsed update behavioral model: linear step, where the update step response size of the material is linearly dependent with resistance (up to hard bounds).
 :class:`~aihwkit.simulator.configs.devices.SoftBoundsDevice`      pulsed update behavioral model: soft bounds, where the update step response size of the material is linearly dependent and it goes to zero at the bound.
-:class:`~aihwkit.simulator.configs.devices.SoftBoundsPmaxDevice`  same model as in :class:`~aihwkit.simulator.configs.devices.SoftBoundsDevice` but using a more convinient parameterization for easier fits to experimentally measured update response curves.
+:class:`~aihwkit.simulator.configs.devices.SoftBoundsPmaxDevice`  same model as in :class:`~aihwkit.simulator.configs.devices.SoftBoundsDevice` but using a more convenient parameterization for easier fits to experimentally measured update response curves.
 :class:`~aihwkit.simulator.configs.devices.ExpStepDevice`         exponential update step or CMOS-like update behavior.
 :class:`~aihwkit.simulator.configs.devices.PowStepDevice`         update step using a power exponent non-linearity.
 ================================================================  ========
@@ -131,7 +131,7 @@ Compound devices
 Resistive device class                                                Description
 ====================================================================  ========
 :class:`~aihwkit.simulator.configs.devices.TransferCompound`          abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
-:class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`    abstract device model that takes one devices per crosspoint and implements a 'mixed-precision' based learning rule where the rank-updata is done in digital instead of using a fully analog parallel write (see `Nandakumar et al. 2020`_).
+:class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`    abstract device model that takes one devices per crosspoint and implements a 'mixed-precision' based learning rule where the rank-update is done in digital instead of using a fully analog parallel write (see `Nandakumar et al. 2020`_).
 ====================================================================  ========
 
 RPU Configurations
@@ -333,7 +333,7 @@ rule instead of plain SGD. Once the configuration is done, the usage
 of this complex analog tile for testing or training from the user
 point of view is however the same as for other tiles.
 
-Mixed Precisionn Compound
+Mixed Precision Compound
 -------------------------
 
 This abstract device implements an analog SGD optimizer suggested by
@@ -357,7 +357,7 @@ To enable mixed-precision one defines for example the following ``rpu_config``::
     rpu_config = DigitalRankUpdateRPUConfig(
         device=SoftBoundsDevice(),
 
-	# make some adjustments of mixed-precion hyper parameter
+	# make some adjustments of mixed-precision hyper parameter
         granularity=0.001,
 	n_x_bins=15,
 	n_d_bins=31,
