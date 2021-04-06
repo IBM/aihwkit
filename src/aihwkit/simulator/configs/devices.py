@@ -111,8 +111,8 @@ class PulsedDevice(_PrintableMixin):
     diffusion rate for a cross-point `ij`.
 
     Note:
-       If diffusion happens to move the weight beyond the hard bounds of the
-       weight it is ensured to be clipped appropriately.
+        If diffusion happens to move the weight beyond the hard bounds of the
+        weight it is ensured to be clipped appropriately.
 
     **Drift**:
 
@@ -530,11 +530,13 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
         w(p_\text{down}) = - B\left(1 - e^{-\alpha (p_\text{max}
         - p_\text{down})}\right) + r_\text{max}
 
-    where $B=\frac{r_\text{max} - r_\text{min}}{1 - e^{-\alpha p_\text{max}}}$.
+    where :math:`B=\frac{r_\text{max} -
+    r_\text{min}}{1 - e^{-\alpha p_\text{max}}}`.
 
-    Here $p_max$ is the number of pulses that were applied to get the
+    Here :math:`p_max` is the number of pulses that were applied to get the
     device from the minimum conductance (minimum of range,
-    $r_\text{min}$) to the maximum (maximum of range, $r_\text{max}$).
+    :math:`r_\text{min}`) to the maximum (maximum of range,
+    :math:`r_\text{max}`).
 
     Internally the following transformation is used to get the
     original parameter of :class:`SoftboundsDevice`::
