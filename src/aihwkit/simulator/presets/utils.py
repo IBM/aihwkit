@@ -81,7 +81,7 @@ class PresetUpdateParameters(UpdateParameters):
     with a maximal pulse length of 31 pulses.
 
     .. _`Gokmen & Vlasov, Front. Neurosci. 2016`: \
-       https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
+        https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
 
     desired_bl: int = 31  # Less than 32 preferable (faster implementation).

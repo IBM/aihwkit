@@ -57,7 +57,7 @@ def compute_pulse_response(
             (otherwise returns exact weight value).
 
     Returns:
-       An numpy array ``w_trace`` of dimensions ``len(direction) x out_size x in_size``
+        An numpy array ``w_trace`` of dimensions ``len(direction) x out_size x in_size``
     """
     out_size = analog_tile.out_size
     in_size = analog_tile.in_size
@@ -103,7 +103,7 @@ def plot_pulse_response(
             (otherwise returns exact weight value).
 
     Returns:
-       w_trace: from :func:`compute_pulse_response`
+        w_trace: from :func:`compute_pulse_response`
     """
     w_trace = compute_pulse_response(analog_tile, direction, use_forward)
 

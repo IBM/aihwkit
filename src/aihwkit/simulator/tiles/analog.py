@@ -56,11 +56,11 @@ class AnalogTile(BaseTile):
 
     .. math::
 
-       \mathbf{y} = f_\text{ADC}((W + \sigma_\text{w}\Xi) \otimes
-       (f_\text{DAC}( x/\alpha ) +
-       \sigma_\text{inp}\,\boldsymbol{\xi}_1 ) +
-       \sigma_\text{out}\,\boldsymbol{\xi}_2)\,s_\alpha\,
-       s_\text{out}\,\alpha
+        \mathbf{y} = f_\text{ADC}((W + \sigma_\text{w}\Xi) \otimes
+        (f_\text{DAC}( x/\alpha ) +
+        \sigma_\text{inp}\,\boldsymbol{\xi}_1 ) +
+        \sigma_\text{out}\,\boldsymbol{\xi}_2)\,s_\alpha\,
+        s_\text{out}\,\alpha
 
     where :math:`W` is the weight matrix, :math:`\mathbf{x}` the input
     vector and the :math:`\Xi,\boldsymbol{\xi}_1,\boldsymbol{\xi}_2`
@@ -77,9 +77,9 @@ class AnalogTile(BaseTile):
 
     .. math::
 
-       f_\text{Z}(x) = \text{round}(x\,
-       \frac{r_\text{Z}}{2\,b_\text{Z}} +
-       \zeta)\frac{2b_\text{Z}}{r_\text{Z}}
+        f_\text{Z}(x) = \text{round}(x\,
+        \frac{r_\text{Z}}{2\,b_\text{Z}} +
+        \zeta)\frac{2b_\text{Z}}{r_\text{Z}}
 
     If SR is enabled :math:`\zeta` is an uniform random :math:`\in
     [-0.5,0.5)`. Otherwise :math:`\zeta=0`.  Inputs are clipped below
@@ -89,10 +89,10 @@ class AnalogTile(BaseTile):
     bit, it would be :math:`1/256`
 
     Note:
-       Typically the resolution is reduced by 2 level, eg. in case of
-       8 bits it is set to :math:`1/254` to account for a
-       discretization mirror symmetric around zero, including the zero
-       and discarding one value.
+        Typically the resolution is reduced by 2 level, eg. in case of
+        8 bits it is set to :math:`1/254` to account for a
+        discretization mirror symmetric around zero, including the zero
+        and discarding one value.
 
     The scalar scale :math:`s_\text{out}` can be set by
     ``out_scale``. The scalar scale :math:`s_\alpha` is an additional

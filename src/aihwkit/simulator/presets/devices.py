@@ -206,7 +206,7 @@ class IdealizedPresetDevice(ConstantStepDevice):
     `Rasch, Gokmen & Haensch, IEEE Design & Test, 2019`_.
 
     .. _`Gokmen & Vlasov, Front. Neurosci. 2016`: \
-       https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
+        https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     .. _`Rasch, Gokmen & Haensch, IEEE Design & Test, 2019`: https://arxiv.org/abs/1906.02698
     """
 
@@ -238,7 +238,7 @@ class GokmenVlasovPresetDevice(ConstantStepDevice):
     ``-1..1``.
 
     .. _`Gokmen & Vlasov, Front. Neurosci. 2016`: \
-       https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
+        https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
 
     dw_min: float = 0.0016  # to keep 1200 states

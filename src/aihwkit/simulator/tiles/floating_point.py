@@ -69,9 +69,9 @@ class FloatingPointTile(BaseTile):
     Weight decay can be called by calling the analog tile decay.
 
     Note:
-       ``life_time`` parameter is set during
-       initialization. alpha is a scaling factor that can be given
-       during run-time.
+        ``life_time`` parameter is set during
+        initialization. alpha is a scaling factor that can be given
+        during run-time.
 
 
     **Diffusion**:
