@@ -267,7 +267,7 @@ def get_tile_for_plotting(
 
     analog_tile = AnalogTile(n_traces, 1, config)  # type: BaseTile
     analog_tile.set_learning_rate(1)
-    weights = config.device.w_min*ones((n_traces, 1))
+    weights = config.device.as_bindings().w_min * ones((n_traces, 1))
     analog_tile.set_weights(weights)
 
     if use_cuda and cuda.is_compiled():
@@ -290,9 +290,10 @@ def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
     Returns:
         Guessed number of steps
     """
-    dw_min = rpu_config.device.dw_min
-    w_min = rpu_config.device.w_min
-    w_max = rpu_config.device.w_max
+    device_binding = rpu_config.device.as_bindings()
+    dw_min = device_binding.dw_min
+    w_min = device_binding.w_min
+    w_max = device_binding.w_max
 
     n_steps = int(np.round((w_max - w_min) / dw_min))
     return n_steps
