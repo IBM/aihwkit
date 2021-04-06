@@ -99,6 +99,8 @@ jobs:
       - pip install "torch==1.7.1"
       # Install the package in editable mode.
       - VERBOSE=1 pip install -v -e ".[visualization]"
+    env:
+      - TORCH_VERSION_SPECIFIER=1.7.1
 
   - name: "Compile and test. Python 3.9, Torch 1.7.1"
     <<: *job_compile_common
@@ -111,6 +113,8 @@ jobs:
       - pip install "torch==1.7.1"
       # Install the package in editable mode.
       - VERBOSE=1 pip install -v -e ".[visualization]"
+    env:
+      - TORCH_VERSION_SPECIFIER=1.7.1
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
     os: linux
