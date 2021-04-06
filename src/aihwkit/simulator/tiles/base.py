@@ -205,9 +205,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
             ``realistic`` to True for a realistic transfer.
 
         Args:
-            realistic: Whether to use the forward pass to
-              read out the tile weights iteratively, using
-              :meth:`get_weights_realistic`
+            realistic: Whether to use the forward pass to read out the tile
+                weights iteratively, using :meth:`get_weights_realistic`.
 
         Returns:
             a tuple where the first item is the ``[out_size, in_size]`` weight
@@ -370,8 +369,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """Decays the weights once according to the decay parameters of the tile.
 
         Args:
-           alpha: additional decay scale (such as LR). The base decay
-              rate is set during tile init.
+            alpha: additional decay scale (such as LR). The base decay
+                rate is set during tile init.
 
         Returns:
             None.

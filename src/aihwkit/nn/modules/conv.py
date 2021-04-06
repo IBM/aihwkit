@@ -372,7 +372,7 @@ class AnalogConv3d(_AnalogConvNd):
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
-           for setting initial weights and read out of weights.
+            for setting initial weights and read out of weights.
         weight_scaling_omega: the weight value where the max weight will be
             scaled to. If zero, no weight scaling will be performed.
     """

@@ -337,9 +337,9 @@ class ConstantStepDevice(PulsedDevice):
 
     .. math::
 
-       w_{ij}  &\leftarrow&  w_{ij} - \Delta w_{ij}^d(1 + \sigma_\text{c-to-c}\,\xi)
+        w_{ij}  &\leftarrow&  w_{ij} - \Delta w_{ij}^d(1 + \sigma_\text{c-to-c}\,\xi)
 
-       w_{ij}  &\leftarrow& \text{clip}(w_{ij},b^\text{min}_{ij},b^\text{max}_{ij})
+        w_{ij}  &\leftarrow& \text{clip}(w_{ij},b^\text{min}_{ij},b^\text{max}_{ij})
 
     where :math:`d` is the direction of the update (product of signs
     of input and error). :math:`\Delta w_{ij}^d` is the update step
@@ -379,32 +379,32 @@ class LinearStepDevice(PulsedDevice):
     :class:`~ConstantStepDevice`):
 
     .. math::
-       :nowrap:
+        :nowrap:
 
-       \begin{eqnarray*}
-       w_{ij}  &\leftarrow&  w_{ij} - \Delta w_{ij}^d(\gamma_{ij}^d\;w_{ij}
-       + 1 + \sigma_\text{c-to-c}\,\xi)\\
-       w_{ij}  &\leftarrow& \text{clip}(w_{ij},b^\text{min}_{ij},b^\text{max}_{ij})
-       \end{eqnarray*}
+        \begin{eqnarray*}
+        w_{ij}  &\leftarrow&  w_{ij} - \Delta w_{ij}^d(\gamma_{ij}^d\;w_{ij}
+        + 1 + \sigma_\text{c-to-c}\,\xi)\\
+        w_{ij}  &\leftarrow& \text{clip}(w_{ij},b^\text{min}_{ij},b^\text{max}_{ij})
+        \end{eqnarray*}
 
     in case of additive noise.  Optionally, multiplicative noise can
     be chosen in which case the first equation becomes:
 
     .. math::
 
-       w_{ij}  \leftarrow  w_{ij} - \Delta w_{ij}^d (\gamma_{ij}^d \;w_{ij} + 1)
-       (1 + \sigma_\text{c-to-c}\,\xi)
+        w_{ij}  \leftarrow  w_{ij} - \Delta w_{ij}^d (\gamma_{ij}^d \;w_{ij} + 1)
+        (1 + \sigma_\text{c-to-c}\,\xi)
 
     The cross-point `ij` dependent slope parameter
     :math:`\gamma_{ij}^d` are given during initialization by
 
     .. math::
-       :nowrap:
+        :nowrap:
 
-       \begin{eqnarray*}
-       \gamma_{ij}^+ &=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}_{ij}\\
-       \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}_{ij}
-       \end{eqnarray*}
+        \begin{eqnarray*}
+        \gamma_{ij}^+ &=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}_{ij}\\
+        \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}_{ij}
+        \end{eqnarray*}
 
     where the :math:`\xi` are standard Gaussian random variables and
     :math:`b^\text{min}_{ij}` and :math:`b^\text{max}_{ij}` the
@@ -412,14 +412,14 @@ class LinearStepDevice(PulsedDevice):
     respectively (see description for :class:`~PulsedDevice`).
 
     Note:
-       If :math:`\gamma=1` and :math:`\gamma_\text{d-to-d}=0` this
-       update implements `soft bounds`, since the updates step becomes
-       equal to :math:`1/b`.
+        If :math:`\gamma=1` and :math:`\gamma_\text{d-to-d}=0` this
+        update implements `soft bounds`, since the updates step becomes
+        equal to :math:`1/b`.
 
     Note:
-       If :math:`\gamma=0` and :math:`\gamma_\text{d-to-d}=0` and
-       additive noise, this update is identical to those described in
-       :class:`~PulsedDevice`.
+        If :math:`\gamma=0` and :math:`\gamma_\text{d-to-d}=0` and
+        additive noise, this update is identical to those described in
+        :class:`~PulsedDevice`.
     """
 
     bindings_class: ClassVar[Type] = devices.LinearStepResistiveDeviceParameter
@@ -486,7 +486,7 @@ class LinearStepDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-       w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
+        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
 
     and the update is done on :math:`w_ij` but the forward sees the
     :math:`w_\text{apparent}`.
@@ -659,7 +659,7 @@ class ExpStepDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-       w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
+        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
 
     and the update is done on :math:`w_ij` but the forward sees the
     :math:`w_\text{apparent}`.
@@ -684,14 +684,14 @@ class PowStepDevice(PulsedDevice):
     the upper bound, then the update per pulse is for the upwards direction:
 
     .. math::
-       w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^+\,(\omega_{ij})^{\gamma_{ij}^+}
-       \left(1 + \sigma_\text{c-to-c}\,\xi\right)
+        w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^+\,(\omega_{ij})^{\gamma_{ij}^+}
+        \left(1 + \sigma_\text{c-to-c}\,\xi\right)
 
     and in downwards direction:
 
     .. math::
-       w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^-\,(1 - \omega_{ij})^{\gamma_{ij}^-}
-       \left(1 + \sigma_\text{c-to-c}\,\xi\right)
+        w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^-\,(1 - \omega_{ij})^{\gamma_{ij}^-}
+        \left(1 + \sigma_\text{c-to-c}\,\xi\right)
 
     Similar to :math:`\Delta w_{ij}^d` the exponent :math:`\gamma_{ij}` can be
     defined with device-to-device variation and bias in up and down
@@ -773,7 +773,7 @@ class PowStepDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-       w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
+        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
 
     and the update is done on :math:`w_ij` but the forward sees the
     :math:`w_\text{apparent}`.
