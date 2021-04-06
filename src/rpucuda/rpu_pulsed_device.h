@@ -323,7 +323,7 @@ public:                                                                         
     PulsedRPUDevice<T>::copyInvertDeviceParameter(rpu_device);                                     \
     const auto *rpu = dynamic_cast<const CLASSNAME<T> *>(rpu_device);                              \
     if (rpu == nullptr) {                                                                          \
-      RPU_FATAL("Expect RPU Pulsed device");                                                       \
+      RPU_FATAL("Wrong device class");                                                             \
     };                                                                                             \
     INVERT_COPY_BODY;                                                                              \
   };                                                                                               \

@@ -40,7 +40,8 @@ enum DeviceUpdateType {
   Vector,
   Difference,
   Transfer,
-  MixedPrec
+  MixedPrec,
+  PowStep,
 };
 
 // inherit from Simple

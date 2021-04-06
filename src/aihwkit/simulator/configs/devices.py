@@ -201,14 +201,14 @@ class PulsedDevice(_PrintableMixin):
     also vary across devices.
 
     :math:`\Delta w_{ij}^d` is set during RPU initialization (for each
-    cross-point `ij`):
+    cross-point :math:`ij`):
 
     .. math::
 
         \Delta w_{ij}^d = d\; \Delta w_\text{min}\, \left(
         1 + d \beta_{ij} + \sigma_\text{d-to-d}\xi\right)
 
-    where \xi is again a standard Gaussian. :math:`\beta_{ij}` is the
+    where :math:`\xi` is again a standard Gaussian. :math:`\beta_{ij}` is the
     directional up `versus` down bias.  At initialization ``up_down_dtod`` and
     ``up_down`` defines this bias term:
 
@@ -217,7 +217,7 @@ class PulsedDevice(_PrintableMixin):
         \beta_{ij} = \beta_\text{up-down} + \xi
         \sigma_\text{up-down-dtod}
 
-    where \xi is again a standard Gaussian number and
+    where :math:`\xi` is again a standard Gaussian number and
     :math:`\beta_\text{up-down}` corresponds to ``up_down``. Note that
     ``up_down_dtod`` is again given in relative units to ``dw_min``.
     """
@@ -646,6 +646,120 @@ class ExpStepDevice(PulsedDevice):
 
     b: float = 0.2425
     """Global offset parameter"""
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled a new when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+       w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
+
+    and the update is done on :math:`w_ij` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
+
+@dataclass
+class PowStepDevice(PulsedDevice):
+    r"""Pulsed update behavioral model: power-dependent step.
+
+    Pulsed update behavioral model, where the update step response
+    size of the material has a power-dependent with resistance. This
+    device model implements (a shifted from of) the `Fusi & Abott
+    (2007)`_ synapse model (see also `Frascaroli et al. (2108)`_).
+
+    The model based on :class:`~PulsedDevice` and thus shares most
+    parameters and functionality. However, it implements new `update
+    once` function, where the update step size depends in the
+    following way. If we set :math:`\omega_{ij} =
+    \frac{b_{ij}^\text{max} - w_{ij}}{b_{ij}^\text{max} -
+    b_{ij}^\text{min}}` the relative distance of the current weight to
+    the upper bound, then the update per pulse is for the upwards direction:
+
+    .. math::
+       w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^+\,(\omega_{ij})^{\gamma_{ij}^+}
+       \left(1 + \sigma_\text{c-to-c}\,\xi\right)
+
+    and in downwards direction:
+
+    .. math::
+       w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^-\,(1 - \omega_{ij})^{\gamma_{ij}^-}
+       \left(1 + \sigma_\text{c-to-c}\,\xi\right)
+
+    Similar to :math:`\Delta w_{ij}^d` the exponent :math:`\gamma_{ij}` can be
+    defined with device-to-device variation and bias in up and down
+    direction:
+
+    .. math::
+
+        \gamma_{ij}^d = d\; \gamma\, \left(1 + d\, \beta_{ij}
+        + \sigma_\text{pow-gamma-d-to-d}\xi\right)
+
+    where :math:`\xi` is again a standard Gaussian. :math:`\beta_{ij}`
+    is the directional up `versus` down bias.  At initialization
+    ``pow_up_down_dtod`` and ``pow_up_down`` defines this bias term:
+
+    .. math::
+
+        \beta_{ij} = \beta_\text{pow-up-down} + \xi\sigma_\text{pow-up-down-dtod}
+
+    where :math:`\xi` is again a standard Gaussian number and
+    :math:`\beta_\text{pow-up-down}` corresponds to ``pow_up_down``.
+
+    Note:
+        The ``pow_gamma_dtod`` and ``pow_up_down_dtod``
+        device-to-device variation parameters are given in relative
+        units to ``pow_gamma``.
+
+    Note:
+        :math:`\Delta w_{ij}^d` is defined as for the
+        :class:`~PulsedDevice`, however, for this device, the update step
+        size will *not* be given by :math:`\Delta w_{ij}` at
+        :math:`w_{ij}=0` as for most other devices models
+
+    ..  _Fusi & Abott (2007): https://www.nature.com/articles/nn1859
+    ..  _Frascaroli et al. (2108): https://www.nature.com/articles/s41598-018-25376-x
+    """
+
+    bindings_class: ClassVar[Type] = devices.PowStepResistiveDeviceParameter
+
+    pow_gamma: float = 1.0
+    r"""The value of :math:`\gamma` as explained above.
+
+    Note:
+        :math:`\gamma` reduces essentially to the
+        :class:`SoftBoundsDevice` (if no device-to-device variation of
+        gamma is used additionally). However, the
+        :class:`SoftBoundsDevice` will be much faster, as it does not
+        need to compute the slow `pow` function.
+    """
+
+    pow_gamma_dtod: float = 0.1
+    r"""Device-to-device variation for ``pow_gamma``.
+
+    i.e. the value of :math:`\gamma_\text{pow-gamma-d-to-d}` given in relative
+    units to ``pow_gamma``.
+    """
+
+    pow_up_down: float = 0.0
+    r"""The up versus down bias of the :math:`\gamma` as described above.
+
+    It is :math:`\gamma^+ = \gamma (1 + \beta_\text{pow-up-down})` and
+    :math:`\gamma^- = \gamma (1 - \beta_\text{pow-up-down})` .
+    """
+
+    pow_up_down_dtod: float = 0.0
+    r"""Device-to-device variation in the up versus down bias of
+    :math:`\gamma` as descibed above.
+
+    In units of ``pow_gamma``.
+    """
 
     write_noise_std: float = 0.0
     r"""Whether to use update write noise.

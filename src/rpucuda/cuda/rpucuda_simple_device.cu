@@ -20,6 +20,7 @@
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_mixedprec_device.h"
+#include "rpucuda_powstep_device.h"
 #include "rpucuda_transfer_device.h"
 #include "rpucuda_vector_device.h"
 
@@ -53,6 +54,8 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> 
     return new SimpleRPUDeviceCuda<T>(c, static_cast<const SimpleRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::MixedPrec:
     return new MixedPrecRPUDeviceCuda<T>(c, static_cast<const MixedPrecRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::PowStep:
+    return new PowStepRPUDeviceCuda<T>(c, static_cast<const PowStepRPUDevice<T> &>(rpu_device));
   default:
     RPU_FATAL("Pulsed device type not implemented in CUDA. Maybe not added to createFrom in "
               "rpucuda_simple_device.cu?");

@@ -306,8 +306,8 @@ template <typename T> void RPUPulsed<T>::setWeightsReal(const T *weightsptr, int
   if (dpar != nullptr) {
     w_min = dpar->w_min;
     w_max = dpar->w_max;
-    dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)
-        ->getDwMin(); // this should be safe since we checked the params
+    dw_min = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)
+                 ->getDwMin(); // this should be safe since we checked the params
   }
   int BL = 0;
   T A = (T)0.0;
