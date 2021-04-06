@@ -42,6 +42,9 @@ The format is based on [Keep a Changelog], and this project adheres to
       the simulated crossbar by applying a fixed output global factor in
       digital. (\#129)
     * Optional power-law drift during analog training. (\#158)
+	* New parameterization of the ``SoftBoundsDevice`` called
+      ``SoftBoundsPmaxDevice`` (\#???)
+	  
 * PyTorch interface improvements:
     * Two new convolution layers have been added: `AnalogConv1d` and
       `AnalogConv3d`, mimicking their digital counterparts. (\#102, \#103)
