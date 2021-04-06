@@ -17,40 +17,39 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
+* New analog devices:
+  * A new abstract device (`MixedPrecisionCompound`) implementing an SGD
+    optimizer that computes the rank update in digital (assuming digital
+    high precision storage) and then transfers the matrix sequentially to
+    the analog device, instead of using the default fully parallel pulsed
+    update. (\#159)
+  * A new device model class `PowStepDevice` that implements a power-exponent
+    type of non-linearity based on the Fusi & Abott synapse model. (\#192)
+  * New parameterization of the `SoftBoundsDevice`, called
+    `SoftBoundsPmaxDevice`. (\#191)
 * Analog devices and tiles improvements:
-    * A new abstract device (`MixedPrecisionCompound`) implementing an SGD
-      optimizer that computes the rank update in digital (assuming digital
-      high precision storage) and then transfers the matrix sequentially to
-      the analog device, instead of using the default fully parallel pulsed
-      update. (\#159)
-    * A new devicen model class `PowStepDevice` that implements a
-      power-exponent type of non-linearity based on the Fusi & Abott
-      synapse model. (\#192)
-    * Option to choose deterministic pulse trains for the rank-1 update of
-      analog devices during training. (\#99)
-    * More noise types for hardware-aware training for inference
-      (polynomial). (\#99)
-    * Additional bound management schemes (worst case, average max, shift).
-      (\#99)
-    * Cycle-to-cycle output referred analog multiply-and-accumulate weight
-      noise that resembles the conductance dependent PCM read noise
-      statistics. (\#99)
-    * C++ backend improvements (slice backward/forward/update, direct
-      update). (\#99)
-    * Option to excluded bias row for hardware-aware training noise. (\#99)
-    * Option to automatically scale the digital weights into the full range of
-      the simulated crossbar by applying a fixed output global factor in
-      digital. (\#129)
-    * Optional power-law drift during analog training. (\#158)
-	* New parameterization of the ``SoftBoundsDevice`` called
-      ``SoftBoundsPmaxDevice`` (\#???)
-	  
+  * Option to choose deterministic pulse trains for the rank-1 update of
+    analog devices during training. (\#99)
+  * More noise types for hardware-aware training for inference
+    (polynomial). (\#99)
+  * Additional bound management schemes (worst case, average max, shift).
+    (\#99)
+  * Cycle-to-cycle output referred analog multiply-and-accumulate weight
+    noise that resembles the conductance dependent PCM read noise
+    statistics. (\#99)
+  * C++ backend improvements (slice backward/forward/update, direct
+    update). (\#99)
+  * Option to excluded bias row for hardware-aware training noise. (\#99)
+  * Option to automatically scale the digital weights into the full range of
+    the simulated crossbar by applying a fixed output global factor in
+    digital. (\#129)
+  * Optional power-law drift during analog training. (\#158)
 * PyTorch interface improvements:
-    * Two new convolution layers have been added: `AnalogConv1d` and
-      `AnalogConv3d`, mimicking their digital counterparts. (\#102, \#103)
-    * The `.to()` method can now be used in `AnalogSequential`, along with
-      `.cpu()` methods in analog layers (albeit GPU to CPU is still not
-      possible). (\#142, \#149)
+  * Two new convolution layers have been added: `AnalogConv1d` and
+    `AnalogConv3d`, mimicking their digital counterparts. (\#102, \#103)
+  * The `.to()` method can now be used in `AnalogSequential`, along with
+    `.cpu()` methods in analog layers (albeit GPU to CPU is still not
+    possible). (\#142, \#149)
 * New modules added:
   * A library of device presets that are calibrated to real hardware data,
     namely `ReRamESPresetDevice`, `ReRamSBPresetDevice`, `ECRamPresetDevice`,
@@ -77,7 +76,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 #### Fixed
 
-* Issue of numnber og loop estimations for realistics read (\#192)
+* Issue of number of loop estimations for realistic reads. (\#192)
 * Fixed small issues that resulted in warnings for windows compilation. (\#99)
 * Faulty backward noise management error message removed for perfect backward
   and CUDA. (\#99)
@@ -89,7 +88,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fixed wrong update for `TransferCompound` in case of `transfer_every` smaller
   than the batch size. (\#132, \#174)
 * Period in the modulus of `TransferCompound` could become zero which
-  caused a floating point exception. (\174)
+  caused a floating point exception. (\#174)
 * Ceil instead of round for very small transfers in `TransferCompound`
   (to avoid zero transfer for extreme settings). (\#174)
 
