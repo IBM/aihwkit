@@ -19,6 +19,8 @@
 #include "rpucuda_difference_device.h"
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_linearstep_device.h"
+#include "rpucuda_mixedprec_device.h"
+#include "rpucuda_powstep_device.h"
 #include "rpucuda_transfer_device.h"
 #include "rpucuda_vector_device.h"
 
@@ -50,6 +52,10 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> 
     return new TransferRPUDeviceCuda<T>(c, static_cast<const TransferRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::FloatingPoint:
     return new SimpleRPUDeviceCuda<T>(c, static_cast<const SimpleRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::MixedPrec:
+    return new MixedPrecRPUDeviceCuda<T>(c, static_cast<const MixedPrecRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::PowStep:
+    return new PowStepRPUDeviceCuda<T>(c, static_cast<const PowStepRPUDevice<T> &>(rpu_device));
   default:
     RPU_FATAL("Pulsed device type not implemented in CUDA. Maybe not added to createFrom in "
               "rpucuda_simple_device.cu?");
@@ -101,6 +107,9 @@ SimpleRPUDeviceCuda<T>::SimpleRPUDeviceCuda(const SimpleRPUDeviceCuda<T> &other)
   if (other.par_storage_ != nullptr) {
     par_storage_ = other.par_storage_->cloneUnique();
   }
+  if (other.wdrifter_cuda_) {
+    wdrifter_cuda_ = RPU::make_unique<WeightDrifterCuda<T>>(*other.wdrifter_cuda_);
+  }
 };
 
 template <typename T>
@@ -119,6 +128,7 @@ SimpleRPUDeviceCuda<T> &SimpleRPUDeviceCuda<T>::operator=(SimpleRPUDeviceCuda<T>
 
   initialize(other.context_, other.x_size_, other.d_size_);
   par_storage_ = std::move(other.par_storage_);
+  wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
   return *this;
 };
 
@@ -132,6 +142,12 @@ void SimpleRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 
   initialize(context_, rpu_device.getXSize(), rpu_device.getDSize());
   par_storage_ = rpu_device_in.getPar().cloneUnique();
+  wdrifter_cuda_ = nullptr;
+
+  if (rpu_device.hasWDrifter()) {
+    wdrifter_cuda_ = RPU::make_unique<WeightDrifterCuda<T>>(
+        this->context_, *rpu_device.getWDrifter(), x_size_, d_size_);
+  }
 
   context_->synchronize();
 }
@@ -146,6 +162,7 @@ void SimpleRPUDeviceCuda<T>::doDirectUpdate(
     const bool x_trans,
     const bool d_trans,
     const T beta,
+    const RPU::PulsedUpdateMetaParameter<T> &up,
     T *x_buffer,
     T *d_buffer) {
   if (m_batch == 1 && beta == 1.0) {
@@ -180,6 +197,14 @@ void SimpleRPUDeviceCuda<T>::decayWeights(T *weights, T alpha, bool bias_no_deca
 
 template <typename T> void SimpleRPUDeviceCuda<T>::decayWeights(T *weights, bool bias_no_decay) {
   decayWeights(weights, 1.0, bias_no_decay);
+}
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::driftWeights(T *weights, T time_since_last_call) {
+  if (!wdrifter_cuda_) {
+    RPU_FATAL("Seems that populateFrom was no called.");
+  }
+  wdrifter_cuda_->apply(weights, time_since_last_call);
 }
 
 template <typename T> void SimpleRPUDeviceCuda<T>::initRndContext() {

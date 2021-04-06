@@ -58,6 +58,11 @@ void PulsedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const
       ss << "\t corrupt_devices_range:\t" << corrupt_devices_range << std::endl;
     }
 
+    if (this->drift.nu > 0) {
+      ss << "   Drift:" << std::endl;
+      this->drift.printToStream(ss);
+    }
+
     if (this->diffusion > 0) {
       ss << "   Diffusion:" << std::endl;
       ss << "\t diffusion:\t\t" << this->diffusion << "\t(dtod=" << diffusion_dtod << ")"
@@ -246,6 +251,8 @@ template <typename T> void PulsedRPUDevice<T>::getDPNames(std::vector<std::strin
   names.push_back(std::string("diffusion_rates"));
   if (!getPar().legacy_params) {
     names.push_back(std::string("reset_bias"));
+    names.push_back(std::string(
+        "drift_nu")); // we only save the nu, not the t/w0 etc. drift will thus reset at zero
   }
   if (getPar().usesPersistentWeight()) {
     names.push_back(std::string("hidden_weigths"));
@@ -262,7 +269,7 @@ void PulsedRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
   if (data_ptrs.size() < names.size()) {
     RPU_FATAL("More data pointers expected");
   }
-
+  int n_drift = 0;
   for (int i = 0; i < this->size_; ++i) {
     int n = 0;
     data_ptrs[n++][i] = w_max_bound_[0][i];
@@ -273,10 +280,15 @@ void PulsedRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
     data_ptrs[n++][i] = w_diffusion_rate_[0][i];
     if (!getPar().legacy_params) {
       data_ptrs[n++][i] = w_reset_bias_[0][i];
+      data_ptrs[n][i] = (T)0.0;
+      n_drift = n++;
     }
     if (getPar().usesPersistentWeight()) {
       data_ptrs[n++][i] = w_persistent_[0][i];
     }
+  }
+  if (!getPar().legacy_params && this->hasWDrifter()) {
+    this->wdrifter_->getNu(data_ptrs[n_drift]);
   }
 };
 
@@ -291,18 +303,25 @@ void PulsedRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
   }
 
   T dw_min = (T)0.0;
+  int n_drift = 0;
   for (int i = 0; i < this->size_; ++i) {
-    w_max_bound_[0][i] = data_ptrs[0][i];
-    w_min_bound_[0][i] = data_ptrs[1][i];
-    w_scale_up_[0][i] = data_ptrs[2][i];   // assumed to be positive
-    w_scale_down_[0][i] = data_ptrs[3][i]; // assumed to be positive
-    w_decay_scale_[0][i] = data_ptrs[4][i];
-    w_diffusion_rate_[0][i] = data_ptrs[5][i];
+    int n = 0;
+    w_max_bound_[0][i] = data_ptrs[n++][i];
+    w_min_bound_[0][i] = data_ptrs[n++][i];
+    w_scale_up_[0][i] = data_ptrs[n++][i];   // assumed to be positive
+    w_scale_down_[0][i] = data_ptrs[n++][i]; // assumed to be positive
+    w_decay_scale_[0][i] = data_ptrs[n++][i];
+    w_diffusion_rate_[0][i] = data_ptrs[n++][i];
     if (!getPar().legacy_params) {
-      w_reset_bias_[0][i] = data_ptrs[6][i];
+      w_reset_bias_[0][i] = data_ptrs[n++][i];
+      n_drift = n++;
     } else {
       w_reset_bias_[0][i] = (T)0.0;
     }
+    if (getPar().usesPersistentWeight()) {
+      w_persistent_[0][i] = data_ptrs[n++][i];
+    }
+
     dw_min += (fabs(w_scale_up_[0][i]) + fabs(w_scale_down_[0][i])) / (T)2.0;
 
     // copy to sup
@@ -314,6 +333,10 @@ void PulsedRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
     sup_[0][i].decay_scale = w_decay_scale_[0][i];
     sup_[0][i].diffusion_rate = w_diffusion_rate_[0][i];
     sup_[0][i].reset_bias = w_reset_bias_[0][i];
+  }
+
+  if (!getPar().legacy_params && this->hasWDrifter()) {
+    this->wdrifter_->setNu(data_ptrs[n_drift]);
   }
 
   dw_min /= this->size_;
@@ -379,6 +402,16 @@ void PulsedRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
     }
   }
   applyUpdateWriteNoise(weights);
+}
+
+template <typename T>
+void PulsedRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
+  if (this->hasWDrifter()) {
+    T **w = getPar().usesPersistentWeight() ? w_persistent_ : weights;
+    PulsedRPUDeviceBase<T>::driftWeights(w, time_since_last_call, rng);
+    this->wdrifter_->saturate(w[0], w_min_bound_[0], w_max_bound_[0]);
+    applyUpdateWriteNoise(weights);
+  }
 }
 
 template <typename T> void PulsedRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {

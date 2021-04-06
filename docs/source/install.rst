@@ -1,7 +1,7 @@
 Installation
 ============
 
-The preferred way to install this package is by using the Python package index::
+The preferred way to install this package is by using the `Python package index`_::
 
     pip install aihwkit
 
@@ -27,6 +27,15 @@ system:
     refer to the :doc:`advanced_install` section in order to compile a custom
     version. More details about the ``PyTorch`` compatibility can be found in
     this `issue`_.
+
+Optional features
+-----------------
+
+The package contains optional functionality that is not installed as part of
+the default installed. In order to install the extra dependencies, the
+recommended way is by specifying the extra ``visualization`` dependencies::
+
+    pip install aihwkit[visualization]
 
 Verifying the installation
 --------------------------
@@ -58,3 +67,4 @@ section.
 .. _CUDA Toolkit: https://developer.nvidia.com/accelerated-computing-toolkit
 .. _issue tracker: https://github.com/IBM/aihwkit/issues
 .. _issue: https://github.com/IBM/aihwkit/issues/52
+.. _Python package index: https://pypi.org/project/aihwkit/

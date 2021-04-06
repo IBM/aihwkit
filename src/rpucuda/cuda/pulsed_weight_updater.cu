@@ -266,6 +266,7 @@ void PulsedWeightUpdater<T>::doDirectUpdate(
     AbstractRPUDeviceCuda<T> *rpucuda_device,
     T *dev_weights,
     const T lr,
+    const PulsedUpdateMetaParameter<T> &up,
     const int m_batch,
     const bool x_trans,
     const bool d_trans,
@@ -281,7 +282,7 @@ void PulsedWeightUpdater<T>::doDirectUpdate(
   }
 
   rpucuda_device->doDirectUpdate(
-      x_out, d_out, dev_weights, lr, m_batch, x_trans, d_trans, beta,
+      x_out, d_out, dev_weights, lr, m_batch, x_trans, d_trans, beta, up,
       dev_fpx_buffer_->getData(), // this might overrite x_out
       dev_fpd_buffer_->getData());
 }
@@ -310,7 +311,7 @@ void PulsedWeightUpdater<T>::update(
     const bool d_trans) {
   // FP update if no device is given
   if (rpucuda_device_in != nullptr && rpucuda_device_in->hasDirectUpdate()) {
-    doDirectUpdate(x_in, d_in, rpucuda_device_in, dev_weights, lr, m_batch, x_trans, d_trans);
+    doDirectUpdate(x_in, d_in, rpucuda_device_in, dev_weights, lr, up, m_batch, x_trans, d_trans);
     return;
   } else if (
       checkForFPUpdate(rpucuda_device_in, up) || (up.pulse_type == PulseType::NoneWithDevice)) {
@@ -399,8 +400,8 @@ void PulsedWeightUpdater<T>::update(
   template void PulsedWeightUpdater<NUM_T>::doFPupdate(                                            \
       XITERT, DITERT, NUM_T *, const NUM_T, const int, const bool, const bool, const NUM_T);       \
   template void PulsedWeightUpdater<NUM_T>::doDirectUpdate(                                        \
-      XITERT, DITERT, AbstractRPUDeviceCuda<NUM_T> *, NUM_T *, const NUM_T, const int, const bool, \
-      const bool, const NUM_T);                                                                    \
+      XITERT, DITERT, AbstractRPUDeviceCuda<NUM_T> *, NUM_T *, const NUM_T,                        \
+      const PulsedUpdateMetaParameter<NUM_T> &, const int, const bool, const bool, const NUM_T);   \
   template void PulsedWeightUpdater<NUM_T>::tuneUpdate(                                            \
       pwukp_t<NUM_T> &, pwukpvec_t<NUM_T> &, XITERT, DITERT, NUM_T *,                              \
       PulsedRPUDeviceCudaBase<NUM_T> *, const PulsedUpdateMetaParameter<NUM_T> &, const NUM_T,     \

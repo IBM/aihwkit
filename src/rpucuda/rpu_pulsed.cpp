@@ -224,6 +224,11 @@ template <typename T> void RPUPulsed<T>::resetCols(int start_col, int n_cols, T 
   }
 }
 
+template <typename T> void RPUPulsed<T>::driftWeights(T time_since_last_call) {
+  CHECK_RPU_DEVICE_INIT;
+  rpu_device_->driftWeights(this->getWeightsPtr(), time_since_last_call, *this->rng_);
+}
+
 template <typename T> void RPUPulsed<T>::clipWeights(T clip) {
 
   CHECK_RPU_DEVICE_INIT;
@@ -301,8 +306,8 @@ template <typename T> void RPUPulsed<T>::setWeightsReal(const T *weightsptr, int
   if (dpar != nullptr) {
     w_min = dpar->w_min;
     w_max = dpar->w_max;
-    dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)
-        ->getDwMin(); // this should be safe since we checked the params
+    dw_min = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)
+                 ->getDwMin(); // this should be safe since we checked the params
   }
   int BL = 0;
   T A = (T)0.0;

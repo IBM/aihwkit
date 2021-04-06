@@ -87,8 +87,8 @@ struct SoftBoundsRPUDeviceMetaParameter : LinearStepRPUDeviceMetaParameter<T> {
   void printToStream(std::stringstream &ss) const override {
     checkSoftBounds();
     PulsedRPUDeviceMetaParameter<T>::printToStream(ss);
-    ss << "   ";
-    ss << "SoftBounds parameter:" << std::endl;
+    // ss << "   ";
+    // ss << getName() << " parameter:" << std::endl;
     ss << "\t ls_mult_noise:\t\t\t" << std::boolalpha << this->ls_mult_noise << std::endl;
   };
 };

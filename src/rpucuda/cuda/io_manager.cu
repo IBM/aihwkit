@@ -1379,7 +1379,7 @@ bool InputOutputManager<T>::applyToOutput(
     OutputIteratorT dev_output, const T *dev_weights, const bool out_trans) {
 
   if (io_->is_perfect) {
-    // short-cut (still need to copy though to get apply the iterator)
+    // short-cut (still need to copy though to apply the iterator)
     int m_batch = temp_m_batch_;
     const T *tmp = getOutBuffer();
     RPU::math::copyWithIterator(context_, dev_output, tmp, m_batch * out_size_);

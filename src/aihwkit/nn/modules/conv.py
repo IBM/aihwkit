@@ -15,15 +15,124 @@
 from typing import Optional, Tuple, Union
 
 from torch import Tensor, arange, cat, float64, int32, ones
-from torch.nn import Conv1d, Conv2d, Conv3d, Unfold
+from torch.nn import Unfold
 from torch.nn.functional import pad
+from torch.nn.modules.conv import _ConvNd
 from torch.nn.modules.utils import _single, _pair, _triple
 
 from aihwkit.nn.functions import AnalogIndexedFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 
-class AnalogConv1d(AnalogModuleBase, Conv1d):
+class _AnalogConvNd(AnalogModuleBase, _ConvNd):
+    """Base class for convolution layers."""
+
+    __constants__ = ['stride', 'padding', 'dilation', 'groups',
+                     'padding_mode', 'output_padding', 'in_channels',
+                     'out_channels', 'kernel_size']
+    in_channels: int
+    out_channels: int
+    kernel_size: Tuple[int, ...]
+    stride: Tuple[int, ...]
+    padding: Tuple[int, ...]
+    dilation: Tuple[int, ...]
+    realistic_read_write: bool
+    weight_scaling_omega: float
+    transposed: bool
+    output_padding: Tuple[int, ...]
+    groups: int
+    padding_mode: str
+    fold_indices: Tensor
+    input_size: float
+    in_features: int
+    out_features: int
+
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: Tuple[int, ...],
+            stride: Tuple[int, ...],
+            padding: Tuple[int, ...],
+            dilation: Tuple[int, ...],
+            transposed: bool,
+            output_padding: Tuple[int, ...],
+            groups: int,
+            bias: bool,
+            padding_mode: str,
+            rpu_config: Optional[RPUConfigAlias] = None,
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0
+    ):
+        # pylint: disable=too-many-arguments
+        if groups != 1:
+            raise ValueError('Only one group is supported')
+        if padding_mode != 'zeros':
+            raise ValueError('Only "zeros" padding mode is supported')
+
+        # Create the tile and set the analog.
+        self.in_features = self.get_tile_size(in_channels, groups, kernel_size)
+        self.out_features = out_channels
+        self.analog_tile = self._setup_tile(self.in_features,
+                                            self.out_features,
+                                            bias,
+                                            rpu_config,
+                                            realistic_read_write,
+                                            weight_scaling_omega)
+
+        # Call super() after tile creation, including ``reset_parameters``.
+        super().__init__(
+            in_channels, out_channels, kernel_size, stride, padding, dilation,
+            transposed, output_padding, groups, bias, padding_mode
+        )
+
+        # Setup the Parameter custom attributes needed by the optimizer.
+        self.weight.is_weight = True
+        if bias:
+            self.bias.is_bias = True
+
+        # Set the index matrices.
+        self.fold_indices = Tensor().detach()
+        self.input_size = 0
+
+    def get_tile_size(
+            self,
+            in_channels: int,
+            groups: int,
+            kernel_size: Tuple[int, ...]
+    ) -> int:
+        """Calculate the tile size."""
+        raise NotImplementedError
+
+    def get_image_size(self, size: int, i: int) -> int:
+        """Calculate the output image sizes."""
+        nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
+        return nom // self.stride[i] + 1
+
+    def reset_parameters(self) -> None:
+        """Reset the parameters (weight and bias)."""
+        super().reset_parameters()
+        self.set_weights(self.weight, self.bias)
+
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile.
+
+        Args:
+            x_input: the input tensor.
+        """
+        raise NotImplementedError
+
+    def forward(self, x_input: Tensor) -> Tensor:
+        """Computes the forward pass."""
+        input_size = x_input.numel() / x_input.size(0)
+        if not self.fold_indices.numel() or self.input_size != input_size:
+            self.recalculate_indexes(x_input)
+
+        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
+                                           self.bias, not self.training)
+
+
+class AnalogConv1d(_AnalogConvNd):
     """1D convolution layer that uses an analog tile.
 
     Applies a 1D convolution over an input signal composed of several input
@@ -56,22 +165,6 @@ class AnalogConv1d(AnalogModuleBase, Conv1d):
     """
     # pylint: disable=abstract-method
 
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size']
-    in_channels: int
-    out_channels: int
-    kernel_size: Tuple[int]
-    stride: Tuple[int]
-    padding: Tuple[int]
-    dilation: Tuple[int]
-    realistic_read_write: bool
-    weight_scaling_omega: float
-    fold_indices: Tensor
-    input_size: float
-    in_features: int
-    out_features: int
-
     def __init__(
             self,
             in_channels: int,
@@ -88,100 +181,71 @@ class AnalogConv1d(AnalogModuleBase, Conv1d):
             weight_scaling_omega: float = 0.0
     ):
         # pylint: disable=too-many-arguments
-        if groups != 1:
-            raise ValueError('Only one group is supported')
-        if padding_mode != 'zeros':
-            raise ValueError('Only "zeros" padding mode is supported')
-        if dilation != 1:
+        kernel_size = _single(kernel_size)
+        stride = _single(stride)
+        padding = _single(padding)
+        dilation = _single(dilation)
+
+        if dilation != _single(1):
             raise ValueError('Only dilation = 1 is supported')
 
-        kernel_size_tuple = _single(kernel_size)
-        self.in_features = (in_channels // groups) * kernel_size_tuple[0]
-        self.out_features = out_channels
+        super().__init__(
+            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
+            False, _single(0), groups, bias, padding_mode,
+            rpu_config, realistic_read_write, weight_scaling_omega
+        )
 
-        # Create the tile and set the analog.
-        self.analog_tile = self._setup_tile(self.in_features,
-                                            self.out_features,
-                                            bias,
-                                            rpu_config,
-                                            realistic_read_write,
-                                            weight_scaling_omega)
+    def get_tile_size(
+            self,
+            in_channels: int,
+            groups: int,
+            kernel_size: Tuple[int, ...]
+    ) -> int:
+        """Calculate the tile size."""
+        return (in_channels // groups) * kernel_size[0]
 
-        # Call super() after tile creation, including ``reset_parameters``.
-        super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, dilation, groups, bias, padding_mode)
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile."""
+        input_size = x_input.numel() / x_input.size(0)
 
-        # Setup the Parameter custom attributes needed by the optimizer.
-        self.weight.is_weight = True
-        if bias:
-            self.bias.is_bias = True
+        # pytorch just always uses NCHW order?
+        fold_indices = arange(2, x_input.size(2) + 2, dtype=float64).detach()
+        shape = [1] + [1] + list(x_input.shape[2:])
+        fold_indices = fold_indices.reshape(*shape)
+        if not all(item == 0 for item in self.padding):
+            fold_indices = pad(fold_indices, pad=[self.padding[0], self.padding[0]],
+                               mode='constant', value=0)
+        unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
 
-        # Set the index matrices.
-        self.fold_indices = Tensor().detach()
-        self.input_size = 0
+        fold_indices = unfold.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
 
-    def reset_parameters(self) -> None:
-        """Reset the parameters (weight and bias)."""
-        super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
+        # concatenate the matrix index for different channels
+        fold_indices_orig = fold_indices.clone()
+        for i in range(self.in_channels - 1):
+            fold_indices_tmp = fold_indices_orig.clone()
+            for j in range(fold_indices_orig.size(0)):
+                if fold_indices_orig[j] != 0:
+                    fold_indices_tmp[j] += (input_size / self.in_channels) * (i + 1)
 
-    def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
-        # pylint: disable=arguments-differ
+            fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
 
-        def get_size(size: int, i: int) -> int:
-            """Calculate the output image sizes"""
-            nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
-            return nom // self.stride[i] + 1
+        fold_indices = fold_indices.to(dtype=int32)
 
-        input_size = x_input.numel()/x_input.size(0)
-        if not self.fold_indices.numel() or self.input_size != input_size:
-            # pytorch just always uses NCHW order?
-            fold_indices = arange(2, x_input.size(2) + 2,
-                                  dtype=float64).detach()
-            shape = [1] + [1] + list(x_input.shape[2:])
-            fold_indices = fold_indices.reshape(*shape)
-            if not all(item == 0 for item in self.padding):
-                fold_indices = pad(
-                    fold_indices,
-                    pad=(self.padding[0], self.padding[0]),
-                    mode='constant',
-                    value=0)
-            unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
+        if self.use_bias:
+            out_image_size = fold_indices.numel() // (self.kernel_size[0])
+            fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
-            fold_indices = unfold.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
+        self.fold_indices = fold_indices.to(x_input.device)
 
-            # concatenate the matrix index for different channels
-            fold_indices_orig = fold_indices.clone()
-            for i in range(self.in_channels - 1):
-                fold_indices_tmp = fold_indices_orig.clone()
-                for j in range(fold_indices_orig.size(0)):
-                    if fold_indices_orig[j] != 0:
-                        fold_indices_tmp[j] += (input_size / self.in_channels) * (i + 1)
+        x_height = x_input.size(2)
+        d_height = self.get_image_size(x_height, 0)
 
-                fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
-
-            fold_indices = fold_indices.to(dtype=int32)
-
-            if self.use_bias:
-                out_image_size = fold_indices.numel() // (self.kernel_size[0])
-                fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
-
-            self.fold_indices = fold_indices.to(x_input.device)
-
-            x_height = x_input.size(2)
-
-            d_height = get_size(x_height, 0)
-
-            image_sizes = [self.in_channels, x_height, d_height]
-            self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
-
-        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
-                                           self.bias, not self.training)
+        image_sizes = [self.in_channels, x_height, d_height]
+        self.input_size = input_size
+        self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
 
-class AnalogConv2d(AnalogModuleBase, Conv2d):
+class AnalogConv2d(_AnalogConvNd):
     """2D convolution layer that uses an analog tile.
 
     Applies a 2D convolution over an input signal composed of several input
@@ -214,22 +278,6 @@ class AnalogConv2d(AnalogModuleBase, Conv2d):
     """
     # pylint: disable=abstract-method
 
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size']
-    in_channels: int
-    out_channels: int
-    kernel_size: Tuple[int, int]
-    stride: Tuple[int, int]
-    padding: Tuple[int, int]
-    dilation: Tuple[int, int]
-    realistic_read_write: bool
-    weight_scaling_omega: float
-    fold_indices: Tensor
-    input_size: float
-    in_features: int
-    out_features: int
-
     def __init__(
             self,
             in_channels: int,
@@ -246,83 +294,58 @@ class AnalogConv2d(AnalogModuleBase, Conv2d):
             weight_scaling_omega: float = 0.0,
     ):
         # pylint: disable=too-many-arguments
-        if groups != 1:
-            raise ValueError('Only one group is supported')
-        if padding_mode != 'zeros':
-            raise ValueError('Only "zeros" padding mode is supported')
+        kernel_size = _pair(kernel_size)
+        stride = _pair(stride)
+        padding = _pair(padding)
+        dilation = _pair(dilation)
 
-        kernel_size_tuple = _pair(kernel_size)
-        self.in_features = (in_channels // groups) * kernel_size_tuple[0] * kernel_size_tuple[1]
-        self.out_features = out_channels
+        super().__init__(
+            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
+            False, _pair(0), groups, bias, padding_mode,
+            rpu_config, realistic_read_write, weight_scaling_omega
+        )
 
-        # Create the tile and set the analog.
-        self.analog_tile = self._setup_tile(self.in_features,
-                                            self.out_features,
-                                            bias,
-                                            rpu_config,
-                                            realistic_read_write,
-                                            weight_scaling_omega)
+    def get_tile_size(
+            self,
+            in_channels: int,
+            groups: int,
+            kernel_size: Tuple[int, ...]
+    ) -> int:
+        """Calculate the tile size."""
+        return (in_channels // groups) * kernel_size[0] * kernel_size[1]
 
-        # Call super() after tile creation, including ``reset_parameters``.
-        super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, dilation, groups, bias, padding_mode)
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile."""
+        input_size = x_input.numel() / x_input.size(0)
 
-        # Setup the Parameter custom attributes needed by the optimizer.
-        self.weight.is_weight = True
-        if bias:
-            self.bias.is_bias = True
+        # pytorch just always uses NCHW order?
+        fold_indices = arange(2, input_size + 2, dtype=float64).detach()
+        shape = [1] + list(x_input.shape[1:])
+        fold_indices = fold_indices.reshape(*shape)
+        unfold = Unfold(kernel_size=self.kernel_size,
+                        stride=self.stride,
+                        padding=self.padding,
+                        dilation=self.dilation)
+        fold_indices = unfold(fold_indices).flatten().round().to(dtype=int32)
 
-        # Set the index matrices.
-        self.fold_indices = Tensor().detach()
-        self.input_size = 0
+        if self.use_bias:
+            out_image_size = fold_indices.numel() // (self.kernel_size[0] * self.kernel_size[1])
+            fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
-    def reset_parameters(self) -> None:
-        """Reset the parameters (weight and bias)."""
-        super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
+        self.fold_indices = fold_indices.to(x_input.device)
 
-    def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
-        # pylint: disable=arguments-differ
+        x_height = x_input.size(2)
+        x_width = x_input.size(3)
 
-        def get_size(size: int, i: int) -> int:
-            """Calculate the output image sizes"""
-            nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
-            return nom // self.stride[i] + 1
+        d_height = self.get_image_size(x_height, 0)
+        d_width = self.get_image_size(x_width, 1)
 
-        input_size = x_input.numel()/x_input.size(0)
-        if not self.fold_indices.numel() or self.input_size != input_size:
-            # pytorch just always uses NCHW order?
-            fold_indices = arange(2, input_size+2, dtype=float64).detach()
-            shape = [1] + list(x_input.shape[1:])
-            fold_indices = fold_indices.reshape(*shape)
-            unfold = Unfold(kernel_size=self.kernel_size,
-                            stride=self.stride,
-                            padding=self.padding,
-                            dilation=self.dilation)
-            fold_indices = unfold(fold_indices).flatten().round().to(dtype=int32)
-
-            if self.use_bias:
-                out_image_size = fold_indices.numel() // (self.kernel_size[0]*self.kernel_size[1])
-                fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
-
-            self.fold_indices = fold_indices.to(x_input.device)
-
-            x_height = x_input.size(2)
-            x_width = x_input.size(3)
-
-            d_height = get_size(x_height, 0)
-            d_width = get_size(x_width, 1)
-
-            image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
-            self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
-
-        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
-                                           self.bias, not self.training)
+        image_sizes = [self.in_channels, x_height, x_width, d_height, d_width]
+        self.input_size = input_size
+        self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
 
-class AnalogConv3d(AnalogModuleBase, Conv3d):
+class AnalogConv3d(_AnalogConvNd):
     """3D convolution layer that uses an analog tile.
 
     Applies a 3D convolution over an input signal composed of several input
@@ -349,27 +372,11 @@ class AnalogConv3d(AnalogModuleBase, Conv3d):
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
-           for setting initial weights and read out of weights.
+            for setting initial weights and read out of weights.
         weight_scaling_omega: the weight value where the max weight will be
             scaled to. If zero, no weight scaling will be performed.
     """
     # pylint: disable=abstract-method
-
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size']
-    in_channels: int
-    out_channels: int
-    kernel_size: Tuple[int, int, int]
-    stride: Tuple[int, int, int]
-    padding: Tuple[int, int, int]
-    dilation: Tuple[int, int, int]
-    realistic_read_write: bool
-    weight_scaling_omega: float
-    fold_indices: Tensor
-    input_size: float
-    in_features: int
-    out_features: int
 
     def __init__(
             self,
@@ -387,104 +394,80 @@ class AnalogConv3d(AnalogModuleBase, Conv3d):
             weight_scaling_omega: float = 0.0,
     ):
         # pylint: disable=too-many-arguments
-        if groups != 1:
-            raise ValueError('Only one group is supported')
-        if padding_mode != 'zeros':
-            raise ValueError('Only "zeros" padding mode is supported')
-        if dilation != 1:
+        kernel_size = _triple(kernel_size)
+        stride = _triple(stride)
+        padding = _triple(padding)
+        dilation = _triple(dilation)
+
+        if dilation != _triple(1):
             raise ValueError('Only dilation = 1 is supported')
 
-        kernel_size_tuple = _triple(kernel_size)
-        self.in_features = (in_channels // groups) * (
-            kernel_size_tuple[0] * kernel_size_tuple[1] * kernel_size_tuple[2]
+        super().__init__(
+            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
+            False, _triple(0), groups, bias, padding_mode,
+            rpu_config, realistic_read_write, weight_scaling_omega
         )
-        self.out_features = out_channels
 
-        # Create the tile and set the analog.
-        self.analog_tile = self._setup_tile(self.in_features,
-                                            self.out_features,
-                                            bias,
-                                            rpu_config,
-                                            realistic_read_write,
-                                            weight_scaling_omega)
+    def get_tile_size(
+            self,
+            in_channels: int,
+            groups: int,
+            kernel_size: Tuple[int, ...]
+    ) -> int:
+        """Calculate the tile size."""
+        return (in_channels // groups) * (
+                kernel_size[0] * kernel_size[1] * kernel_size[2])
 
-        # Call super() after tile creation, including ``reset_parameters``.
-        super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, dilation, groups, bias, padding_mode)
+    def recalculate_indexes(self, x_input: Tensor) -> None:
+        """Calculate and set the indexes of the analog tile."""
+        # pylint: disable=too-many-locals
+        input_size = x_input.numel() / x_input.size(0)
 
-        # Setup the Parameter custom attributes needed by the optimizer.
-        self.weight.is_weight = True
-        if bias:
-            self.bias.is_bias = True
+        # pytorch just always uses NCDHW order?
+        fold_indices = arange(2, x_input.size(2) * x_input.size(3) * x_input.size(4) + 2,
+                              dtype=float64).detach()
+        shape = [1] + [1] + list(x_input.shape[2:])
+        fold_indices = fold_indices.reshape(*shape)
+        if not all(item == 0 for item in self.padding):
+            fold_indices = pad(fold_indices, pad=[
+                self.padding[2], self.padding[2],
+                self.padding[1], self.padding[1],
+                self.padding[0], self.padding[0]], mode="constant", value=0)
+        unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]). \
+            unfold(3, self.kernel_size[1], self.stride[1]). \
+            unfold(4, self.kernel_size[2], self.stride[2]).clone()
 
-        # Set the index matrices.
-        self.fold_indices = Tensor().detach()
-        self.input_size = 0
+        fold_indices = unfold.reshape(-1, self.kernel_size[0] * self.kernel_size[1] *
+                                      self.kernel_size[2]).transpose(0, 1).flatten().round()
 
-    def reset_parameters(self) -> None:
-        """Reset the parameters (weight and bias)."""
-        super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
+        # concatenate the matrix index for different channels
+        fold_indices_orig = fold_indices.clone()
+        for i in range(self.in_channels - 1):
+            fold_indices_tmp = fold_indices_orig.clone()
+            for j in range(fold_indices_orig.size(0)):
+                if fold_indices_orig[j] != 0:
+                    fold_indices_tmp[j] += (input_size / self.in_channels) * (i + 1)
 
-    def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
-        # pylint: disable=arguments-differ,too-many-locals
+            fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
 
-        def get_size(size: int, i: int) -> int:
-            """Calculate the output image sizes"""
-            nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
-            return nom // self.stride[i] + 1
+        fold_indices = fold_indices.to(dtype=int32)
 
-        input_size = x_input.numel()/x_input.size(0)
-        if not self.fold_indices.numel() or self.input_size != input_size:
-            # pytorch just always uses NCDHW order?
-            fold_indices = arange(2, x_input.size(2)*x_input.size(3)*x_input.size(4)+2,
-                                  dtype=float64).detach()
-            shape = [1] + [1] + list(x_input.shape[2:])
-            fold_indices = fold_indices.reshape(*shape)
-            if not all(item == 0 for item in self.padding):
-                fold_indices = pad(fold_indices, pad=(
-                    self.padding[2], self.padding[2],
-                    self.padding[1], self.padding[1],
-                    self.padding[0], self.padding[0]), mode="constant", value=0)
-            unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).\
-                unfold(3, self.kernel_size[1], self.stride[1]).\
-                unfold(4, self.kernel_size[2], self.stride[2]).clone()
+        if self.use_bias:
+            out_image_size = fold_indices.numel() // (self.kernel_size[0] *
+                                                      self.kernel_size[1] *
+                                                      self.kernel_size[2])
+            fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
-            fold_indices = unfold.reshape(-1, self.kernel_size[0] * self.kernel_size[1] *
-                                          self.kernel_size[2]).transpose(0, 1).flatten().round()
+        self.fold_indices = fold_indices.to(x_input.device)
 
-            # concatenate the matrix index for different channels
-            fold_indices_orig = fold_indices.clone()
-            for i in range(self.in_channels-1):
-                fold_indices_tmp = fold_indices_orig.clone()
-                for j in range(fold_indices_orig.size(0)):
-                    if fold_indices_orig[j] != 0:
-                        fold_indices_tmp[j] += (input_size/self.in_channels)*(i+1)
+        x_depth = x_input.size(2)
+        x_height = x_input.size(3)
+        x_width = x_input.size(4)
 
-                fold_indices = cat([fold_indices, fold_indices_tmp], dim=0).clone()
+        d_depth = self.get_image_size(x_depth, 0)
+        d_height = self.get_image_size(x_height, 1)
+        d_width = self.get_image_size(x_width, 2)
 
-            fold_indices = fold_indices.to(dtype=int32)
-
-            if self.use_bias:
-                out_image_size = fold_indices.numel() // (self.kernel_size[0] *
-                                                          self.kernel_size[1] *
-                                                          self.kernel_size[2])
-                fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
-
-            self.fold_indices = fold_indices.to(x_input.device)
-
-            x_depth = x_input.size(2)
-            x_height = x_input.size(3)
-            x_width = x_input.size(4)
-
-            d_depth = get_size(x_depth, 0)
-            d_height = get_size(x_height, 1)
-            d_width = get_size(x_width, 2)
-
-            image_sizes = [self.in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
-            self.input_size = input_size
-            self.analog_tile.set_indexed(self.fold_indices, image_sizes)
-
-        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
-                                           self.bias, not self.training)
+        image_sizes = [self.in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
+        self.input_size = input_size
+        self.analog_tile.set_indexed(self.fold_indices, image_sizes)

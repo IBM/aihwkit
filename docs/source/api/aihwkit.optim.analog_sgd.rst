@@ -1,5 +1,5 @@
-aihwkit.optim.analog_sgd module
-===============================
+aihwkit.optim.analog\_sgd module
+================================
 
 .. automodule:: aihwkit.optim.analog_sgd
    :members:

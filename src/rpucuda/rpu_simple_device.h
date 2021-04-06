@@ -15,6 +15,7 @@
 #include "math_util.h"
 #include "rng.h"
 #include "rpu.h"
+#include "rpu_pulsed_meta_parameter.h"
 #include "utility_functions.h"
 #include <iostream>
 #include <limits>
@@ -38,7 +39,9 @@ enum DeviceUpdateType {
   ExpStep,
   Vector,
   Difference,
-  Transfer
+  Transfer,
+  MixedPrec,
+  PowStep,
 };
 
 // inherit from Simple
@@ -151,6 +154,7 @@ public:
 
   virtual void decayWeights(T **weights, bool bias_no_decay) = 0;
   virtual void decayWeights(T **weights, T alpha, bool bias_no_decay) = 0;
+  virtual void driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) = 0;
   virtual void diffuseWeights(T **weights, RNG<T> &rng) = 0;
   virtual void clipWeights(T **weights, T clip) = 0;
   virtual void
@@ -166,7 +170,10 @@ public:
       const T *d_input,
       const int d_inc,
       const T learning_rate,
-      const int m_batch_info){RPU_NOT_IMPLEMENTED};
+      const int m_batch_info,
+      const PulsedUpdateMetaParameter<T> &up) {
+    RPU_NOT_IMPLEMENTED;
+  };
 };
 
 /*This re-implements the floating point weight related things to
@@ -192,6 +199,7 @@ public:
     swap(a.size_, b.size_);
     swap(a.x_size_, b.x_size_);
     swap(a.d_size_, b.d_size_);
+    swap(a.wdrifter_, b.wdrifter_);
   }
 
   SimpleRPUDevice<T> *clone() const override { return new SimpleRPUDevice<T>(*this); }
@@ -217,6 +225,7 @@ public:
 
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
+  void driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) override;
   void diffuseWeights(T **weights, RNG<T> &rng) override;
   void clipWeights(T **weights, T clip) override;
   bool onSetWeights(T **weights) override { return false; };
@@ -227,11 +236,21 @@ public:
 
   DeviceUpdateType implements() const override { return this->getPar().implements(); };
 
+  inline const WeightDrifter<T> *getWDrifter() const {
+    if (hasWDrifter()) {
+      return &*wdrifter_;
+    } else {
+      return nullptr;
+    }
+  };
+  inline bool hasWDrifter() const { return wdrifter_ != nullptr; };
+
 protected:
   void populate(const SimpleRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng);
   int x_size_ = 0;
   int d_size_ = 0;
   int size_ = 0;
+  std::unique_ptr<WeightDrifter<T>> wdrifter_ = nullptr;
 
 private:
   void initialize(int x_sz, int d_sz);

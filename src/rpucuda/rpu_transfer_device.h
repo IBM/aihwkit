@@ -148,6 +148,7 @@ public:
   void diffuseWeights(T **weights, RNG<T> &rng) override;
   void clipWeights(T **weights, T clip) override;
 
+  void driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) override;
   void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
 

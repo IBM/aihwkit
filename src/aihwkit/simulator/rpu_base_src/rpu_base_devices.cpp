@@ -25,6 +25,8 @@ void declare_rpu_devices(py::module &m) {
   using VectorParam = RPU::VectorRPUDeviceMetaParameter<T>;
   using DifferenceParam = RPU::DifferenceRPUDeviceMetaParameter<T>;
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
+  using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
+  using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -211,6 +213,42 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
+  class PyMixedPrecParam : public MixedPrecParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, MixedPrecParam, getName, );
+    }
+    MixedPrecParam *clone() const override {
+      PYBIND11_OVERLOAD(MixedPrecParam *, MixedPrecParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, MixedPrecParam, implements, );
+    }
+    RPU::MixedPrecRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::MixedPrecRPUDevice<T> *, MixedPrecParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
+  class PyPowStepParam : public PowStepParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, PowStepParam, getName, );
+    }
+    PowStepParam *clone() const override {
+      PYBIND11_OVERLOAD(PowStepParam *, PowStepParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, PowStepParam, implements, );
+    }
+    RPU::PowStepRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::PowStepRPUDevice<T> *, PowStepParam, createDevice, x_size, d_size, rng);
+    }
+  };
+
   /*
    * Python class definitions.
    */
@@ -228,7 +266,8 @@ void declare_rpu_devices(py::module &m) {
           })
       // Properties from this class.
       .def_readwrite("diffusion", &RPU::SimpleMetaParameter<T>::diffusion)
-      .def_readwrite("lifetime", &RPU::SimpleMetaParameter<T>::lifetime);
+      .def_readwrite("lifetime", &RPU::SimpleMetaParameter<T>::lifetime)
+      .def_readwrite("drift", &RPU::SimpleMetaParameter<T>::drift);
 
   py::class_<RPU::PulsedMetaParameter<T>>(m, "AnalogTileParameter")
       .def(py::init<>())
@@ -281,6 +320,20 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("out_sto_round", &RPU::IOMetaParameter<T>::out_sto_round)
       .def_readwrite("w_noise", &RPU::IOMetaParameter<T>::w_noise)
       .def_readwrite("w_noise_type", &RPU::IOMetaParameter<T>::w_noise_type);
+
+  py::class_<RPU::DriftParameter<T>>(m, "DriftParameter")
+      .def(py::init<>())
+      .def_readwrite("nu", &RPU::DriftParameter<T>::nu)
+      .def_readwrite("nu_dtod", &RPU::DriftParameter<T>::nu_dtod)
+      .def_readwrite("nu_std", &RPU::DriftParameter<T>::nu_std)
+      .def_readwrite("wg_ratio", &RPU::DriftParameter<T>::wg_ratio)
+      .def_readwrite("g_offset", &RPU::DriftParameter<T>::g_offset)
+      .def_readwrite("w_offset", &RPU::DriftParameter<T>::w_offset)
+      .def_readwrite("nu_k", &RPU::DriftParameter<T>::nu_k)
+      .def_readwrite("log_g0", &RPU::DriftParameter<T>::logG0)
+      .def_readwrite("t_0", &RPU::DriftParameter<T>::t0)
+      .def_readwrite("reset_tol", &RPU::DriftParameter<T>::reset_tol)
+      .def_readwrite("w_noise_std", &RPU::DriftParameter<T>::w_read_std);
 
   // device params
   py::class_<AbstractParam, PyAbstractParam, RPU::SimpleMetaParameter<T>>(
@@ -425,6 +478,43 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("transfer_forward", &TransferParam::transfer_io)
       .def_readwrite("transfer_update", &TransferParam::transfer_up)
       .def("__str__", [](TransferParam &self) {
+        std::stringstream ss;
+        self.printToStream(ss);
+        return ss.str();
+      });
+
+  py::class_<MixedPrecParam, PyMixedPrecParam, SimpleParam>(m, "MixedPrecResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("transfer_every", &MixedPrecParam::transfer_every)
+      .def_readwrite("n_rows_per_transfer", &MixedPrecParam::n_rows_per_transfer)
+      .def_readwrite("random_row", &MixedPrecParam::random_row)
+      .def_readwrite("granularity", &MixedPrecParam::granularity)
+      .def_readwrite("compute_sparsity", &MixedPrecParam::compute_sparsity)
+      .def_readwrite("n_x_bins", &MixedPrecParam::n_x_bins)
+      .def_readwrite("n_d_bins", &MixedPrecParam::n_d_bins)
+      .def(
+          "set_device_parameter",
+          [](MixedPrecParam &self, const RPU::AbstractRPUDeviceMetaParameter<T> &dp) {
+            return self.setDevicePar(dp);
+          },
+          py::arg("parameter"),
+          R"pbdoc(
+           Set a pulsed base device parameter of a mixed precision device.
+           )pbdoc")
+      .def("__str__", [](MixedPrecParam &self) {
+        std::stringstream ss;
+        self.printToStream(ss);
+        return ss.str();
+      });
+
+  py::class_<PowStepParam, PyPowStepParam, PulsedParam>(m, "PowStepResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("pow_gamma", &PowStepParam::ps_gamma)
+      .def_readwrite("pow_gamma_dtod", &PowStepParam::ps_gamma_dtod)
+      .def_readwrite("pow_up_down", &PowStepParam::ps_gamma_up_down)
+      .def_readwrite("pow_up_down_dtod", &PowStepParam::ps_gamma_up_down_dtod)
+      .def_readwrite("write_noise_std", &PowStepParam::write_noise_std)
+      .def("__str__", [](PowStepParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
         return ss.str();

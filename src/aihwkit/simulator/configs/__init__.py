@@ -14,5 +14,5 @@
 
 from .configs import (
     FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
-    UnitCellRPUConfig
+    UnitCellRPUConfig, DigitalRankUpdateRPUConfig
 )

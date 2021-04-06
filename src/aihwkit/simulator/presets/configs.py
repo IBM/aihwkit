@@ -15,10 +15,11 @@
 from dataclasses import dataclass, field
 
 from aihwkit.simulator.configs.configs import (
-    SingleRPUConfig, UnitCellRPUConfig
+    SingleRPUConfig, UnitCellRPUConfig, DigitalRankUpdateRPUConfig
 )
 from aihwkit.simulator.configs.devices import (
-    PulsedDevice, TransferCompound, UnitCell, VectorUnitCell
+    PulsedDevice, TransferCompound, UnitCell, VectorUnitCell,
+    DigitalRankUpdateCell, MixedPrecisionCompound
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
@@ -37,7 +38,16 @@ from aihwkit.simulator.presets.utils import (
 @dataclass
 class ReRamESPreset(SingleRPUConfig):
     """Preset configuration using a single ReRam device (based on ExpStep
-    model, see :class:`ReRamESPresetDevice`).
+    model, see :class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`).
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: PulsedDevice = field(default_factory=ReRamESPresetDevice)
@@ -49,7 +59,17 @@ class ReRamESPreset(SingleRPUConfig):
 @dataclass
 class ReRamSBPreset(SingleRPUConfig):
     """Preset configuration using a single ReRam device (based on
-    SoftBounds model, see :class:`ReRamSBPresetDevice`).
+    SoftBounds model, see
+    :class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`).
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: PulsedDevice = field(default_factory=ReRamSBPresetDevice)
@@ -61,7 +81,16 @@ class ReRamSBPreset(SingleRPUConfig):
 @dataclass
 class CapacitorPreset(SingleRPUConfig):
     """Preset configuration using a single capacitor device, see
-    :class:`CapacitorPresetDevice`.
+    :class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`.
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: PulsedDevice = field(default_factory=CapacitorPresetDevice)
@@ -73,7 +102,16 @@ class CapacitorPreset(SingleRPUConfig):
 @dataclass
 class EcRamPreset(SingleRPUConfig):
     """Preset configuration using a single EcRAM device, see
-    :class:`EcRamPresetDevice`.
+    :class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: PulsedDevice = field(default_factory=EcRamPresetDevice)
@@ -85,7 +123,16 @@ class EcRamPreset(SingleRPUConfig):
 @dataclass
 class IdealizedPreset(SingleRPUConfig):
     """Preset configuration using a single idealized device, see
-    :class:`IdealizedPresetDevice`.
+    :class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: PulsedDevice = field(default_factory=IdealizedPresetDevice)
@@ -96,8 +143,18 @@ class IdealizedPreset(SingleRPUConfig):
 
 @dataclass
 class GokmenVlasovPreset(SingleRPUConfig):
-    """Preset configuration using a single device with constant update step size, see
-    :class:`GokmenVlasovPresetDevice`.
+    """Preset configuration using a single device with constant update
+    step size, see
+    :class:`~aihwkit.simulator.presets.devices.GokmenVlasovPresetDevice`.
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: PulsedDevice = field(default_factory=GokmenVlasovPresetDevice)
@@ -111,8 +168,17 @@ class GokmenVlasovPreset(SingleRPUConfig):
 @dataclass
 class ReRamES2Preset(UnitCellRPUConfig):
     """Preset configuration using two ReRam devices per cross-point
-    (:class:`ReRamESPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -127,8 +193,17 @@ class ReRamES2Preset(UnitCellRPUConfig):
 @dataclass
 class ReRamSB2Preset(UnitCellRPUConfig):
     """Preset configuration using two ReRam devices per cross-point
-    (:class:`ReRamSBPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -143,8 +218,17 @@ class ReRamSB2Preset(UnitCellRPUConfig):
 @dataclass
 class Capacitor2Preset(UnitCellRPUConfig):
     """Preset configuration using two Capacitor devices per cross-point
-    (:class:`CapacitorPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -159,8 +243,17 @@ class Capacitor2Preset(UnitCellRPUConfig):
 @dataclass
 class EcRam2Preset(UnitCellRPUConfig):
     """Preset configuration using two Capacitor devices per cross-point
-    (:class:`CapacitorPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -175,8 +268,17 @@ class EcRam2Preset(UnitCellRPUConfig):
 @dataclass
 class Idealized2Preset(UnitCellRPUConfig):
     """Preset configuration using two Idealized devices per cross-point
-    (:class:`IdealizedPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -193,8 +295,17 @@ class Idealized2Preset(UnitCellRPUConfig):
 @dataclass
 class ReRamES4Preset(UnitCellRPUConfig):
     """Preset configuration using four ReRam devices per cross-point
-    (:class:`ReRamESPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -210,8 +321,17 @@ class ReRamES4Preset(UnitCellRPUConfig):
 @dataclass
 class ReRamSB4Preset(UnitCellRPUConfig):
     """Preset configuration using four ReRam devices per cross-point
-    (:class:`ReRamSBPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -227,8 +347,17 @@ class ReRamSB4Preset(UnitCellRPUConfig):
 @dataclass
 class Capacitor4Preset(UnitCellRPUConfig):
     """Preset configuration using four Capacitor devices per cross-point
-    (:class:`CapacitorPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -244,8 +373,17 @@ class Capacitor4Preset(UnitCellRPUConfig):
 @dataclass
 class EcRam4Preset(UnitCellRPUConfig):
     """Preset configuration using four Capacitor devices per cross-point
-    (:class:`CapacitorPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -261,8 +399,17 @@ class EcRam4Preset(UnitCellRPUConfig):
 @dataclass
 class Idealized4Preset(UnitCellRPUConfig):
     """Preset configuration using four Idealized devices per cross-point
-    (:class:`IdealizedPresetDevice`), where both are updated with random
-    selection policy for update.
+    (:class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
@@ -280,8 +427,16 @@ class Idealized4Preset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaReRamESPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    :class:`ReRamESPresetDevice` and standard ADC/DAC hardware
-    etc configuration.
+    :class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.TransferCompound`
+    for details on Tiki-taka-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(
@@ -300,8 +455,16 @@ class TikiTakaReRamESPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaReRamSBPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    :class:`ReRamSBPresetDevice` and standard ADC/DAC hardware
-    etc configuration.
+    :class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.TransferCompound`
+    for details on Tiki-taka-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(
@@ -320,8 +483,16 @@ class TikiTakaReRamSBPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaCapacitorPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    :class:`CapacitorPresetDevice` and standard ADC/DAC hardware
-    etc configuration.
+    :class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.TransferCompound`
+    for details on Tiki-taka-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(
@@ -340,8 +511,16 @@ class TikiTakaCapacitorPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaEcRamPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    :class:`EcRamPresetDevice` and standard ADC/DAC hardware
-    etc configuration.
+    :class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.TransferCompound`
+    for details on Tiki-taka-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(
@@ -360,8 +539,16 @@ class TikiTakaEcRamPreset(UnitCellRPUConfig):
 @dataclass
 class TikiTakaIdealizedPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
-    :class:`IdealizedPresetDevice` and standard ADC/DAC hardware
-    etc configuration.
+    :class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.TransferCompound`
+    for details on Tiki-taka-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
     """
 
     device: UnitCell = field(
@@ -372,6 +559,153 @@ class TikiTakaIdealizedPreset(UnitCellRPUConfig):
             transfer_every=1.0,
             units_in_mbatch=True,
             ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+# Mixed precision presets
+
+@dataclass
+class MixedPrecisionReRamESPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`
+
+    See
+    class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=ReRamESPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionReRamSBPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`.
+
+    See class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=ReRamSBPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionCapacitorPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`.
+
+    See class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=CapacitorPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionEcRamPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
+
+    See class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=EcRamPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionIdealizedPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
+
+    See class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=IdealizedPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionGokmenVlasovPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.GokmenVlasovPresetDevice`.
+
+    See class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=GokmenVlasovPresetDevice(),
+        ))
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)

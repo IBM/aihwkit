@@ -1,5 +1,5 @@
-aihwkit.nn.modules module
-=========================
+aihwkit.nn.modules package
+==========================
 
 .. automodule:: aihwkit.nn.modules
    :members:
@@ -14,5 +14,6 @@ Submodules
    :maxdepth: 4
 
    aihwkit.nn.modules.base
+   aihwkit.nn.modules.container
    aihwkit.nn.modules.conv
    aihwkit.nn.modules.linear

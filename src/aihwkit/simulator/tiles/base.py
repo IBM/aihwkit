@@ -205,9 +205,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
             ``realistic`` to True for a realistic transfer.
 
         Args:
-            realistic: Whether to use the forward pass to
-              read out the tile weights iteratively, using
-              :meth:`get_weights_realistic`
+            realistic: Whether to use the forward pass to read out the tile
+                weights iteratively, using :meth:`get_weights_realistic`.
 
         Returns:
             a tuple where the first item is the ``[out_size, in_size]`` weight
@@ -365,20 +364,38 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         return self.tile.get_learning_rate()
 
+    @no_grad()
     def decay_weights(self, alpha: float = 1.0) -> None:
-        """Decays the weights once.
+        """Decays the weights once according to the decay parameters of the tile.
 
         Args:
-           alpha: additional decay scale (such as LR). The base decay
-              rate is set during tile init.
+            alpha: additional decay scale (such as LR). The base decay
+                rate is set during tile init.
 
         Returns:
             None.
         """
         return self.tile.decay_weights(alpha)
 
+    @no_grad()
+    def drift_weights(self, delta_t: float = 1.0) -> None:
+        """Drifts the weights once according to the drift parameters of the
+        tile.
+
+        See also :class:`~aihwkit.simulator.configs.utils.DriftParameter`.
+
+        Args:
+            delta_t: Time since last drift call.
+
+        Returns:
+            None.
+        """
+        return self.tile.drift_weights(delta_t)
+
+    @no_grad()
     def diffuse_weights(self) -> None:
-        """Diffuses the weights once.
+        """Diffuses the weights once according to the diffusion parameters of
+        the tile.
 
         The base diffusion rate is set during tile init.
 
@@ -387,13 +404,14 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         return self.tile.diffuse_weights()
 
+    @no_grad()
     def reset_columns(
             self,
             start_column_idx: int = 0,
             num_columns: int = 1,
             reset_prob: float = 1.0
     ) -> None:
-        r"""Reset (a number of) columns.
+        r"""Reset (a number of) columns according to the reset parameters of the tile.
 
         Resets the weights with device-to-device and cycle-to-cycle
         variability (depending on device type), typically:

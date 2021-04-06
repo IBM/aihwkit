@@ -493,6 +493,16 @@ void VectorRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
   reduceToWeights(weights);
 }
 
+template <typename T>
+void VectorRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
+
+#pragma omp parallel for
+  for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {
+    rpu_device_vec_[k]->driftWeights(weights_vec_[k], time_since_last_call, rng);
+  }
+  reduceToWeights(weights);
+}
+
 template <typename T> void VectorRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
 #pragma omp parallel for
   for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {

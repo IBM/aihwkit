@@ -161,9 +161,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     RPU_WARNING("too many transfers in one shot. Use x_size instead.");
   }
 
-  if (!transfer_every) {
-    transfer_every = (T)x_size / n_cols_per_transfer;
-  }
+  // TODO: make an default value, where the value of the transfer depends on  x_size
 
   if (transfer_every_vec.size() == 0) {
     T n = transfer_every;
@@ -291,6 +289,7 @@ template <typename T> void TransferRPUDevice<T>::setTransferVecs(const T *transf
 }
 
 template <typename T> int TransferRPUDevice<T>::resetCounters(bool force) {
+
   current_col_indices_.resize(this->n_devices_);
   std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int)0);
   return VectorRPUDevice<T>::resetCounters(force);
@@ -342,9 +341,9 @@ template <typename T>
 int TransferRPUDevice<T>::getTransferEvery(int from_device_idx, int m_batch) const {
 
   if (getPar().units_in_mbatch) {
-    return MAX(RPU_ROUNDFUN(transfer_every_[from_device_idx] * m_batch), 0);
+    return MAX(ceil(transfer_every_[from_device_idx] * m_batch), 0);
   } else {
-    return MAX(RPU_ROUNDFUN(transfer_every_[from_device_idx]), 0);
+    return MAX(round(transfer_every_[from_device_idx]), 0);
   }
 }
 
@@ -544,6 +543,11 @@ template <typename T> void TransferRPUDevice<T>::diffuseWeights(T **weights, RNG
 
 template <typename T> void TransferRPUDevice<T>::clipWeights(T **weights, T clip) {
   LOOP_WITH_HIDDEN(clipWeights, COMMA clip);
+}
+
+template <typename T>
+void TransferRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
+  LOOP_WITH_HIDDEN(driftWeights, COMMA time_since_last_call COMMA rng);
 }
 
 template <typename T>

@@ -41,25 +41,24 @@ class BoundManagementType(Enum):
     ITERATIVE = 'Iterative'
     r"""Iteratively recomputes input scale set to :math:`\alpha\leftarrow\alpha/2`.
 
-    It iteratively recomputes the bounds up to limit of passes (given
-    by ``max_bm_factor`` or ``max_bm_res``).
+    It iteratively recomputes the bounds up to limit of passes (given by
+    ``max_bm_factor`` or ``max_bm_res``).
     """
 
     ITERATIVE_WORST_CASE = 'IterativeWorstCase'
     """Worst case bound management.
 
-    Uses ``AbsMax`` noise management for the first pass and only when
-    output bound is hit, the ``AbsMaxNPSum`` for the second. Thus, at
-    most 2 passes are computed.
+    Uses ``AbsMax`` noise management for the first pass and only when output
+    bound is hit, the ``AbsMaxNPSum`` for the second. Thus, at most 2 passes
+    are computed.
     """
 
     SHIFT = 'Shift'
     """Shift bound management.
 
-    Shifts the output by adding the difference ``output_bound -
-    max_output`` to the analog output value. This is only useful to
-    increase the dynamic range before the softmax, where the max can
-    be safely.
+    Shifts the output by adding the difference ``output_bound - max_output`` to
+    the analog output value. This is only useful to increase the dynamic range
+    before the softmax, where the max can be safely.
 
     Note:
         Shifting needs hardware implementations.
@@ -81,9 +80,12 @@ class NoiseManagementType(Enum):
     r"""Use :math:`\alpha\equiv\max{|\mathbf{x}|}`."""
 
     ABS_MAX_NP_SUM = 'AbsMaxNPSum'
-    """Takes a worst case scenario of the weight matrix to calculate the
-    input scale to ensure that output is not clipping. Assumed weight
-    value is constant and given by ``nm_assumed_wmax``."""
+    """Assume weight value is constant and given by ``nm_assumed_wmax``.
+
+    Takes a worst case scenario of the weight matrix to calculate the input
+    scale to ensure that output is not clipping. Assumed weight value is
+    constant and given by ``nm_assumed_wmax``.
+    """
 
     MAX = 'Max'
     r"""Use :math:`\alpha\equiv\max{\mathbf{x}}`."""
@@ -92,14 +94,15 @@ class NoiseManagementType(Enum):
     r"""A constant value (given by parameter ``nm_thres``)."""
 
     AVERAGE_ABS_MAX = 'AverageAbsMax'
-    """Moment-based scale input scale estimation. Computes the average
-    abs max over the mini-batch and applies ``nm_decay`` to update the
-    value with the history.
+    """Moment-based scale input scale estimation.
+
+    Computes the average abs max over the mini-batch and applies ``nm_decay``
+    to update the value with the history.
 
     Note:
-        ``nm_decay`` is ``1-momentum`` and always given in
-        mini-batches. However, the CUDA implementation does not discount
-        values within mini-batches, wheras the CPU implementation does.
+        ``nm_decay`` is ``1-momentum`` and always given in mini-batches.
+        However, the CUDA implementation does not discount values within
+        mini-batches, whereas the CPU implementation does.
     """
 
 
@@ -116,18 +119,20 @@ class WeightNoiseType(Enum):
     """No weight noise."""
 
     ADDITIVE_CONSTANT = 'AdditiveConstant'
-    r"""
-    The :math:`\xi\sim{\cal N}(0,\sigma)` thus all are Gaussian distributed.
+    r"""The :math:`\xi\sim{\cal N}(0,\sigma)` thus all are Gaussian distributed.
+
     :math:`\sigma` is determined by ``w_noise``.
     """
 
     PCM_READ = 'PCMRead'
-    """Output-referred PCM-like read noise that scales with the amount of
-    current generated for each output line and thus scales with both
-    conductance values and input strength.
+    """Output-referred PCM-like read noise.
 
-    The same general for is taken as for PCM-like statistical model of
-    the 1/f noise during inference, see
+    Output-referred PCM-like read noise that scales with the amount of current
+    generated for each output line and thus scales with both conductance values
+    and input strength.
+
+    The same general for is taken as for PCM-like statistical model of the 1/f
+    noise during inference, see
     :class:`aihwkit.simulator.noise_models.PCMLikeNoiseModel`.
     """
 
@@ -139,13 +144,17 @@ class PulseType(Enum):
     """Floating point update instead of pulses."""
 
     STOCHASTIC_COMPRESSED = 'StochasticCompressed'
-    """Generates actual stochastic bit lines. Plus and minus pulses are taken in the same pass."""
+    """Generates actual stochastic bit lines.
+
+    Plus and minus pulses are taken in the same pass.
+    """
 
     STOCHASTIC = 'Stochastic'
     """Two passes for plus and minus (only CPU)."""
 
     NONE_WITH_DEVICE = 'NoneWithDevice'
-    """Floating point like ``None``, but with analog devices (e.g. weight clipping)."""
+    """Floating point like ``None``, but with analog devices (e.g. weight
+    clipping)."""
 
     MEAN_COUNT = 'MeanCount'
     """Coincidence based in prob (:math:`p_a p_b`)."""
@@ -153,12 +162,12 @@ class PulseType(Enum):
     DETERMINISTIC_IMPLICIT = 'DeterministicImplicit'
     r"""Coincidences are computed in deterministic manner.
 
-    Coincidences are calculated by :math:`b_l x_q d_q` where ``BL`` is
-    the desired bit length (possibly subject to dynamic adjustments
-    using ``update_bl_management``) and :math:`x_q` and :math:`d_q`
-    are the quantized input and error values, respectively, normalized
-    to the range :math:`0,\ldots,1`. It can be shown that explicit bit
-    lines exist that generate these coincidences.
+    Coincidences are calculated by :math:`b_l x_q d_q` where ``BL`` is the
+    desired bit length (possibly subject to dynamic adjustments using
+    ``update_bl_management``) and :math:`x_q` and :math:`d_q` are the quantized
+    input and error values, respectively, normalized to the range
+    :math:`0,\ldots,1`. It can be shown that explicit bit lines exist that
+    generate these coincidences.
     """
 
 
@@ -172,7 +181,7 @@ class WeightModifierType(Enum):
     """Quantize the weights."""
 
     MULT_NORMAL = 'MultNormal'
-    """Mutiplicative Gaussian noise."""
+    """Multiplicative Gaussian noise."""
 
     ADD_NORMAL = 'AddNormal'
     """Additive Gaussian noise."""
@@ -206,13 +215,11 @@ class WeightClipType(Enum):
 
     LAYER_GAUSSIAN = 'LayerGaussian'
     """Calculates the second moment of the whole weight matrix and clips
-    at ``sigma`` times the result symmetrically around zero.
-    """
+    at ``sigma`` times the result symmetrically around zero."""
 
     AVERAGE_CHANNEL_MAX = 'AverageChannelMax'
     """Calculates the abs max of each output channel (row of the weight
-    matrix) and takes the average as clipping value for all.
-    """
+    matrix) and takes the average as clipping value for all."""
 
 
 class VectorUnitCellUpdatePolicy(Enum):
@@ -254,9 +261,11 @@ class IOParameters(_PrintableMixin):
     """Input bound and ranges for the digital-to-analog converter (DAC)."""
 
     inp_noise: float = 0.0
-    r"""Std deviation of Gaussian input noise (:math:`\sigma_\text{inp}`),
+    r"""Std deviation of Gaussian input noise (:math:`\sigma_\text{inp}`).
+
     i.e. noisiness of the analog input (at the stage after DAC and
-    before the multiplication)."""
+    before the multiplication).
+    """
 
     inp_res: float = 1 / (2**7 - 2)
     r"""Number of discretization steps for DAC (:math:`\le0` means infinite steps)
@@ -266,25 +275,31 @@ class IOParameters(_PrintableMixin):
     """Whether to enable stochastic rounding of DAC."""
 
     is_perfect: bool = False
-    """Short-cut to compute a perfect forward pass. If ``True``, it assumes an
-    ideal forward pass (e.g. no bound, ADC etc...). Will disregard all other
-    settings in this case."""
+    """Short-cut to compute a perfect forward pass.
+
+    If ``True``, it assumes an ideal forward pass (e.g. no bound, ADC etc...).
+    Will disregard all other settings in this case.
+    """
 
     max_bm_factor: int = 1000
-    """Maximal bound management factor. If this factor is reached then the
-    iterative process is stopped."""
+    """Maximal bound management factor.
+
+    If this factor is reached then the iterative process is stopped.
+    """
 
     max_bm_res: float = 0.25
-    """Another way to limit the maximal number of iterations of the bound
-    management. The max effective resolution number of the inputs, e.g.
-    use :math:`1/4` for 2 bits."""
+    """Limit the maximal number of iterations of the bound management.
+
+    Another way to limit the maximal number of iterations of the bound
+    management. The max effective resolution number of the inputs, e.g. use
+    :math:`1/4` for 2 bits.
+    """
 
     nm_thres: float = 0.0
     r"""Constant noise management value for ``type`` ``Constant``.
 
-    In other cases, this is a upper threshold :math:`\theta` above
-    which the noise management factor is saturated. E.g. for
-    `AbsMax`:
+    In other cases, this is a upper threshold :math:`\theta` above which the
+    noise management factor is saturated. E.g. for `AbsMax`:
 
     .. math::
         :nowrap:
@@ -294,9 +309,9 @@ class IOParameters(_PrintableMixin):
         \text{otherwise}\end{cases} \end{equation*}
 
     Caution:
-        If ``nm_thres`` is set (and type is not ``Constant``), the
-        noise management will clip some large input values, in
-        favor of having a better SNR for smaller input values.
+        If ``nm_thres`` is set (and type is not ``Constant``), the noise
+        management will clip some large input values, in favor of having a
+        better SNR for smaller input values.
     """
 
     noise_management: NoiseManagementType = NoiseManagementType.ABS_MAX
@@ -306,12 +321,17 @@ class IOParameters(_PrintableMixin):
     """Output bound and ranges for analog-to-digital converter (ADC)."""
 
     out_noise: float = 0.06
-    r"""Std deviation of Gaussian output noise (:math:`\sigma_\text{out}`),
-    i.e. noisiness of device summation at the output."""
+    r"""Std deviation of Gaussian output noise (:math:`\sigma_\text{out}`).
+
+    i.e. noisiness of device summation at the output.
+    """
 
     out_res: float = 1 / (2**9 - 2)
-    """Number of discretization steps for ADC (:math:`<=0` means infinite steps)
-    or resolution (1/steps)."""
+    """Number of discretization steps for ADC or resolution.
+
+    Number of discretization steps for ADC (:math:`<=0` means infinite steps)
+    or resolution (1/steps).
+    """
 
     out_scale: float = 1.0
     """Additional fixed scalar factor."""
@@ -341,13 +361,18 @@ class UpdateParameters(_PrintableMixin):
     bindings_class: ClassVar[Type] = devices.AnalogTileUpdateParameter
 
     desired_bl: int = 31
-    """Desired length of the pulse trains. For update BL management, it is the
-    maximal pulse train length."""
+    """Desired length of the pulse trains.
+
+    For update BL management, it is the maximal pulse train length.
+    """
 
     fixed_bl: bool = True
-    """Whether to fix the length of the pulse trains (however, see ``update_bl_management``).
+    """Whether to fix the length of the pulse trains.
 
-    In case of ``True`` (where ``dw_min`` is the mean minimal weight change step size) it is::
+    See also ``update_bl_management``.
+
+    In case of ``True`` (where ``dw_min`` is the mean minimal weight change
+    step size) it is::
 
         BL = desired_BL
         A = B =  sqrt(learning_rate / (dw_min * BL));
@@ -362,28 +387,37 @@ class UpdateParameters(_PrintableMixin):
     """
 
     pulse_type: PulseType = PulseType.STOCHASTIC_COMPRESSED
-    """Switching between different pulse types. See :class:`PulseTypeMap` for details.
+    """Switching between different pulse types.
+
+    See also :class:`PulseTypeMap` for details.
 
     Important:
-        Pulsing can also be turned off in which case
-        the update is done as if in floating point and all
-        other update related parameter are ignored.
+        Pulsing can also be turned off in which case the update is done as if
+        in floating point and all other update related parameter are ignored.
     """
 
     res: float = 0
-    """Resolution ie. bin width in ``0..1``) of the update probability for
-    the stochastic bit line generation.  Use -1 for turning discretization
-    off. Can be given as number of steps as well.
+    """Resolution of the update probability for the stochastic bit line
+    generation.
+
+    Resolution ie. bin width in ``0..1``) of the update probability for the
+    stochastic bit line generation. Use -1 for turning discretization off. Can
+    be given as number of steps as well.
     """
 
     x_res_implicit: float = 0
-    """Resolution (ie. bin width) of each quantization step for the inputs ``x`` in case
-    of ``DeterministicImplicit`` pulse trains. See :class:`PulseTypeMap` for details.
+    """Resolution of each quantization step for the inputs ``x``.
+
+    Resolution (ie. bin width) of each quantization step for the inputs ``x``
+    in case of ``DeterministicImplicit`` pulse trains. See
+    :class:`PulseTypeMap` for details.
     """
 
     d_res_implicit: float = 0
-    """Resolution (ie. bin width) of each quantization step for the error
-    ``d`` in case of `DeterministicImplicit` pulse trains. qSee
+    """Resolution of each quantization step for the error ``d``.
+
+    Resolution (ie. bin width) of each quantization step for the error ``d``
+    in case of `DeterministicImplicit` pulse trains. See
     :class:`PulseTypeMap` for details.
     """
 
@@ -399,15 +433,17 @@ class UpdateParameters(_PrintableMixin):
     """
 
     update_management: bool = True
-    r"""After the above setting an additional scaling (always on when using
-    `update_bl_management``) is applied to account for the different input strengths.
+    r"""Whether to apply additional scaling.
+
+    After the above setting an additional scaling (always on when using
+    `update_bl_management``) is applied to account for the different input
+    strengths.
     If
 
     .. math:: \gamma \equiv \max_i |x_i| / \max_j |d_j|
 
-    is the ratio between the two maximal inputs, then ``A`` is
-    additionally scaled by :math:`\gamma` and ``B`` is scaled by
-    :math:`1/\gamma`.
+    is the ratio between the two maximal inputs, then ``A`` is additionally
+    scaled by :math:`\gamma` and ``B`` is scaled by :math:`1/\gamma`.
     """
 
 
@@ -420,14 +456,14 @@ class WeightModifierParameter(_PrintableMixin):
     std_dev: float = 0.0
     """Standard deviation of the added noise to the weight matrix.
 
-    This parameter affects the modifier types ``AddNormal``,
-    ``MultNormal`` and ``DiscretizeAddNormal``.
+    This parameter affects the modifier types ``AddNormal``, ``MultNormal`` and
+    ``DiscretizeAddNormal``.
 
     Note:
-        If the parameter ``rel_to_actual_wmax`` is set then the
-        ``std_dev`` is computed in relative terms to the abs max of the
-        given weight matrix, otherwise it in relative terms to the
-        assumed max, which is set by ``assumed_wmax``.
+        If the parameter ``rel_to_actual_wmax`` is set then the ``std_dev`` is
+        computed in relative terms to the abs max of the given weight matrix,
+        otherwise it in relative terms to the assumed max, which is set by
+        ``assumed_wmax``.
     """
 
     res: float = 0.0
@@ -438,8 +474,8 @@ class WeightModifierParameter(_PrintableMixin):
     :math:`a_\text{max}` is either given by the abs max (if
     ``rel_to_actual_wmax`` is set) or ``assumed_wmax`` otherwise.
 
-    ``res`` is only used in the modifier types ``DoReFa``,
-    ``Discretize``, and ``DiscretizeAddNormal``.
+    ``res`` is only used in the modifier types ``DoReFa``, ``Discretize``, and
+    ``DiscretizeAddNormal``.
     """
 
     sto_round: bool = False
@@ -455,7 +491,8 @@ class WeightModifierParameter(_PrintableMixin):
     pdrop: float = 0.0
     """Drop connect probability.
 
-    Drop connect sets weights to zero with the given probability. This implements drop connect.
+    Drop connect sets weights to zero with the given probability. This
+    implements drop connect.
 
     Important:
         Drop connect can be used with any other modifier type in combination.
@@ -470,7 +507,8 @@ class WeightModifierParameter(_PrintableMixin):
     """
 
     rel_to_actual_wmax: bool = True
-    """Whether to calculate the abs max of the weight and apply noise relative to this number.
+    """Whether to calculate the abs max of the weight and apply noise relative
+    to this number.
 
     If set to False, ``assumed_wmax`` is taken as relative units.
     """
@@ -483,14 +521,16 @@ class WeightModifierParameter(_PrintableMixin):
     """
 
     copy_last_column: bool = False
-    """Whether to not apply noise to the last column (which usually
-    contains the bias values)."""
+    """Whether to not apply noise to the last column (which usually contains
+    the bias values)."""
 
     coeff0: float = 0.26348 / 25.0
     coeff1: float = 0.0768
     coeff2: float = -0.001877 * 25.0
-    """Coefficients for the ``POLY`` weight modifier type. See
-    :class:`WeightModifierType` for details"""
+    """Coefficients for the ``POLY`` weight modifier type.
+
+    See :class:`WeightModifierType` for details.
+    """
 
     type: WeightModifierType = WeightModifierType.COPY
     """Type of the weight modification."""
@@ -510,3 +550,125 @@ class WeightClipParameter(_PrintableMixin):
 
     type: WeightClipType = WeightClipType.NONE
     """Type of clipping."""
+
+
+@dataclass
+class SimpleDriftParameter(_PrintableMixin):
+    r"""Parameter for a simple power law drift.
+
+    The drift as a simple power law drift without device-to-device
+    variation or conductance dependence.
+
+    It computes:
+    .. math::
+
+        w_{ij}*\left(\frac{t + \Delta t}{t_0}\right)^(-\nu)
+    """
+
+    bindings_class: ClassVar[Type] = devices.DriftParameter
+
+    nu: float = 0.0
+    r"""Average drift :math:`\nu` value.
+
+    Need to non-zero to actually use the drift.
+    """
+
+    t_0: float = 1.0
+    """Time between write and first read.
+
+    Usually assumed in milliseconds, however, it really determines the time
+    units of ``time_since_last_call`` when calling the drift.
+    """
+
+    reset_tol: float = 1e-7
+    """Reset tolerance.
+
+    This should a number smaller than the expected weight change as it is used
+    to detect any changes in the weight from the last drift call. Every change
+    to the weight above this tolerance will reset the drift time.
+
+    Caution:
+        Any write noise or diffusion on the weight might thus
+        interfere with the drift.
+   """
+
+
+@dataclass
+class DriftParameter(SimpleDriftParameter):
+    r"""Parameter for a power law drift.
+
+    The drift is based on the model described by `Oh et al (2019)`_.
+
+    It computes:
+    .. math::
+
+        w_{ij}*\left(\frac{t + \Delta t}{t_0}\right)^(-\nu^\text{actual}_{ij})
+
+    where the drift coefficient is drawn once at the beginning and
+    might depend on device. It also can depend on the actual weight
+    value.
+
+    The actual drift coefficient is computed as:
+    .. math::
+
+        \nu_{ij}^\text{actual} =  \nu_{ij} - \nu_k \log \frac{(w_{ij} - w_\text{off}) / r_\text{wg}
+        + g_\text{off}}{G_0}  + \nu\sigma_\nu\xi
+
+    here :math:`w_{ij}` is the actual weight and `\nu_{ij}` fixed for
+    each device given by the mean :math:`\nu` and the device-to-device
+    variation: :math:`\nu_{ij} = \nu + \nu_dtod\nu\xi` and are only
+    drawn once at the beginning (tile instantiation).  `\xi` is
+    Gaussian noise.
+
+    Note:
+        If the weight has changed from the last drift call (determined
+        by the ``reset_tol`` parameter), for instance due to update,
+        decay or noise, then the drift time :math:`t` will be reset and start
+        from new, however, the drift coefficients :math:`\nu_{ij}` are
+        *not* changed. On the other hand, if the weights has not
+        changed since last call, :math:`t` will accumulate the time.
+
+    Caution:
+        Note that the drift coefficient does *not* depend on the initially
+        programmed weight value at :math:`t=0` in the current
+        implementation (ie G0 is a constant for all devices), but
+        instead on the actual weight. In some materials (e.g. phase
+        changed materials), that might be not accurate.
+
+    .. _`Oh et al (2019)`: https://ieeexplore.ieee.org/document/8753712
+    """
+
+    bindings_class: ClassVar[Type] = devices.DriftParameter
+
+    nu_dtod: float = 0.0
+    r"""Device-to-device variation of the :math:`\nu` values."""
+
+    nu_std: float = 0.0
+    r"""Cycle-to-cycle variation of :math:`\nu`.
+
+    A more realistic way to add noise of the drift might be using
+    ``w_noise_std``.
+    """
+
+    wg_ratio: float = 1.0
+    """``(w_max-w_min)/(g_max-g_min)`` to convert to physical units."""
+
+    g_offset: float = 0.0
+    """``g_min`` to convert to physical units."""
+
+    w_offset: float = 0.0
+    """``w(g_min)``, i.e. to what value ``g_min`` is mapped to in w-space."""
+
+    nu_k: float = 0.0
+    r"""Variation of "math:`nu` with :math:`W`.
+
+    ie. :math:`\nu(R) = nu_0 - k \log(G/G_0)`.
+    See Oh et al.
+    """
+
+    log_g0: float = 0.0
+    """Log g0."""
+
+    w_noise_std: float = 0.0
+    """Additional weight noise (Gaussian diffusion) added to the weights
+    after the drift is applied."""

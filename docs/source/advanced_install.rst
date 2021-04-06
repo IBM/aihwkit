@@ -35,7 +35,7 @@ C++11 compatible compiler
 `scikit-build`_                  0.11.0+
 `Python 3 development headers`_  3.6+
 BLAS implementation                        `OpenBLAS`_ or `Intel MKL`_
-`PyTorch`_                       1.5+      The libtorch library and headers are needed [#f1]_
+`PyTorch`_                       1.7+      The libtorch library and headers are needed [#f1]_
 `OpenMP`_                        11.0.0+   Optional, OpenMP library and headers [#f2]_
 CUDA                             9.0+      Optional, for GPU-enabled simulator
 `Nvidia CUB`_                    1.8.0     Optional, for GPU-enabled simulator [#f4]_

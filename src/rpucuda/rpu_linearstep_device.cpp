@@ -98,6 +98,7 @@ template <typename T> void LinearStepRPUDevice<T>::printDP(int x_count, int d_co
   }
 }
 
+namespace {
 template <typename T>
 inline void update_once_mult(
     T &w,
@@ -151,6 +152,7 @@ inline void update_once_add(
     w_apparent = w + write_noise_std * rng->sampleGauss();
   }
 }
+} // namespace
 
 template <typename T>
 void LinearStepRPUDevice<T>::doSparseUpdate(
