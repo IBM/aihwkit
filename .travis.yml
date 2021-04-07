@@ -83,6 +83,11 @@ jobs:
     stage: Test multiple python versions
     python: "3.8"
 
+  - name: "Compile and test. Python 3.9"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.9"
+
   - name: "Compile and test. Python 3.6, Torch 1.7.1"
     <<: *job_compile_common
     stage: Test multiple python versions
@@ -90,10 +95,12 @@ jobs:
     install:
       # Set the python executable, to force cmake picking the right one.
       - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-      - pip install "torch==1.7.1"
       - pip install -r requirements.txt pytest
+      - pip install "torch==1.7.1"
       # Install the package in editable mode.
       - VERBOSE=1 pip install -v -e ".[visualization]"
+    env:
+      - TORCH_VERSION_SPECIFIER="==1.7.1"
 
   - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
     os: linux
