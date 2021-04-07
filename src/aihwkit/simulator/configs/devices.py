@@ -533,8 +533,8 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     where :math:`B=\frac{r_\text{max} -
     r_\text{min}}{1 - e^{-\alpha p_\text{max}}}`.
 
-    Here :math:`p_max` is the number of pulses that were applied to get the
-    device from the minimum conductance (minimum of range,
+    Here :math:`p_\text{max}` is the number of pulses that were applied to get
+    the device from the minimum conductance (minimum of range,
     :math:`r_\text{min}`) to the maximum (maximum of range,
     :math:`r_\text{max}`).
 
