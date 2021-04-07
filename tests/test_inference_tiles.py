@@ -127,7 +127,7 @@ class InferenceTileTest(ParametrizedTestCase):
         """Tests whether post update diffusion is performed."""
         rpu_config = self.get_rpu_config()
         rpu_config.drift_compensation = None
-        rpu_config.forward.w_noise = 0.0
+        rpu_config.forward.is_perfect = True
         rpu_config.forward.out_noise = 0.0
         rpu_config.forward.inp_noise = 0.0
 
