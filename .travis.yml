@@ -111,8 +111,8 @@ jobs:
     if: branch =~ /^release\/.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install -r requirements.txt"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp39-manylinux_x86_64"
     before_install:
@@ -136,8 +136,8 @@ jobs:
         update: true
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.6.0 && pip install ./delocate && pip install -r requirements.txt"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 && pip install ./delocate && pip install -r requirements.txt"
       - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64 cp39-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
@@ -155,8 +155,8 @@ jobs:
     if: branch =~ /^release\/win.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.6.0'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.6.0+cpu -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1+cpu -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
       - CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64 cp39-win_amd64"
       # Use unzipped OpenBLAS.
       - OPENBLAS_ROOT=C:\\BLAS
