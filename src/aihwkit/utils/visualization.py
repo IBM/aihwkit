@@ -25,7 +25,7 @@ from copy import deepcopy
 from matplotlib.figure import Figure
 from numpy import ndarray
 
-from torch import ones, eye, from_numpy
+from torch import ones, eye, from_numpy, zeros
 from torch import device as torch_device
 
 import numpy as np
@@ -490,3 +490,50 @@ def plot_device_compact(
     axis_right.set_xlim(0.0, limit)
 
     return figure
+
+
+def plot_device_symmetry(
+        device: PulsedDevice,
+        w_noise: float = 0.0,
+        n_pulses: int = 10000,
+        n_traces: int = 3,
+        use_cuda: bool = False
+) -> None:
+    """Plots the response figure for a given device (preset).
+
+    It will show the response to alternating up down pulses.
+
+    Note:
+        It will use an amount of read weight noise ``w_noise`` for
+        reading the weights.
+
+    Args:
+        device: PulsedDevice parameters
+        n_pulses: total number of pulses
+        w_noise: Weight noise standard deviation during read
+        n_traces: Number of device traces
+        use_cuda: Whether to use CUDA
+    """
+    plt.figure(figsize=[10, 5])
+
+    io_pars = IOParameters(out_noise=0.0,    # no out noise
+                           w_noise=w_noise,  # quite low
+                           inp_res=-1.,      # turn off DAC
+                           out_bound=100.,   # not limiting
+                           out_res=-1.,      # turn off ADC
+                           bound_management=BoundManagementType.NONE,
+                           noise_management=NoiseManagementType.NONE,
+                           w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
+
+    rpu_config = SingleRPUConfig(device=device, forward=io_pars)
+
+    direction = np.sign(np.cos(np.pi*np.arange(n_pulses)))
+    plt.clf()
+
+    analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
+    weights = zeros((n_traces, 1))
+    analog_tile.set_weights(weights)
+
+    plot_pulse_response(analog_tile, direction, use_forward=False)
+    plt.ylim([-1, 1])
+    plt.grid(True)
