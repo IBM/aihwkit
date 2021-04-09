@@ -35,8 +35,8 @@ class ReRamESPresetDevice(ExpStepDevice):
     dw_min: float = 0.00135
     up_down: float = 0.259359
 
-    w_min: float = -1.
     w_max: float = 1.
+    w_min: float = -1.
 
     a: float = -0.5
     b: float = -0.5
@@ -47,13 +47,13 @@ class ReRamESPresetDevice(ExpStepDevice):
 
     # Device-to-device var.
     dw_min_dtod: float = 0.2  # a little reduced compared to SB because of non-linearity
-    w_min_dtod: float = 0.1
-    w_max_dtod: float = 0.1
     up_down_dtod: float = 0.05
+
+    w_max_dtod: float = 0.3
+    w_min_dtod: float = 0.3
 
     # Cycle-to_cycle.
     dw_min_std: float = 5.0
-
     write_noise_std: float = 75.0
 
 
@@ -72,23 +72,23 @@ class ReRamSBPresetDevice(SoftBoundsDevice):
     .. _`Gong & al., Nat. Commun., 2018`: https://www.nature.com/articles/s41467-018-04485-1
     """
 
-    dw_min: float = 0.0018
+    dw_min: float = 0.002
     up_down: float = 0.0
 
-    w_min: float = -1
-    w_max: float = 1
+    w_max: float = 1.25
+    w_min: float = -0.75
 
     mult_noise: bool = False
 
     # Device-to-device var.
     dw_min_dtod: float = 0.3
-    w_min_dtod: float = 0.3
-    w_max_dtod: float = 0.3
     up_down_dtod: float = 0.01  # assumes symmetry point corrected.
+
+    w_max_dtod: float = 0.3/1.25
+    w_min_dtod: float = 0.3/0.75
 
     # Cycle-to_cycle.
     dw_min_std: float = 3.75
-
     write_noise_std: float = 56
 
 
@@ -117,26 +117,27 @@ class CapacitorPresetDevice(LinearStepDevice):
     dw_min: float = 0.005
     up_down: float = 0.0
 
-    w_min: float = -1.0
     w_max: float = 1.0
+    w_min: float = -1.0
 
     mult_noise: bool = False
 
-    # gamma_up = -slope*w_max/dw_min
-    gamma_up: float = 0.05
+    gamma_up: float = 0.05  # gamma_up = -slope_up * w_max / dw_min_up
     gamma_down: float = 0.05
 
     # Device-to-device var.
     dw_min_dtod: float = 0.1
-    w_min_dtod: float = 0.07
-    w_max_dtod: float = 0.07
     up_down_dtod: float = 0.06
+
+    w_max_dtod: float = 0.07
+    w_min_dtod: float = 0.07
 
     gamma_up_dtod: float = 0.01
     gamma_down_dtod: float = 0.01
 
     # Cycle-to_cycle.
     dw_min_std: float = 0.3
+    write_noise_std: float = 0.0
 
     # Slope does not depend on bound.
     mean_bound_reference: bool = True
@@ -145,12 +146,10 @@ class CapacitorPresetDevice(LinearStepDevice):
     lifetime: float = 1.0e6
     lifetime_dtod: float = 0.3
 
-    write_noise_std: float = 0.0
-
 
 @dataclass
 class EcRamPresetDevice(LinearStepDevice):
-    """Preset configuration for a single ECRAM resistive processing
+    """Preset configuration for a single Lithium-based ECRAM resistive processing
     unit based on linear step device.
 
     Fit of the model :class:`LinearStepDevice` to  `Tang & al., IEDM, 2018`_
@@ -159,30 +158,31 @@ class EcRamPresetDevice(LinearStepDevice):
     """
 
     dw_min: float = 0.002
-    up_down: float = 0.0  # mean shifted onto range
+    up_down: float = 0.0  # assumed shifted onto range
 
-    w_min: float = -1.1724
-    w_max: float = 0.8276
+    w_max: float = 1.1724
+    w_min: float = -0.8276
 
-    mult_noise: bool = False
+    mult_noise: bool = True
 
-    # gamma_up = -slope*w_max/dw_min
-    gamma_up: float = 0.0814
-    gamma_down: float = 0.7203
+    gamma_up: float = 0.1153
+    gamma_down: float = 0.5085
 
     # Device-to-device var.
-    dw_min_dtod: float = 0.3
-    w_min_dtod: float = 0.1
-    w_max_dtod: float = 0.1
+    dw_min_dtod: float = 0.1
     up_down_dtod: float = 0.01
+
+    w_max_dtod: float = 0.05
+    w_min_dtod: float = 0.05
 
     gamma_up_dtod: float = 0.05
     gamma_down_dtod: float = 0.05
 
     # Cycle-to_cycle.
     dw_min_std: float = 0.3
+    write_noise_std: float = 0.0
 
-    # Slope does not depend on bound.
+    # Slope does not depend on the actual bound.
     mean_bound_reference: bool = True
 
     write_noise_std: float = 0.0
@@ -215,7 +215,7 @@ class IdealizedPresetDevice(ConstantStepDevice):
     dw_min_std: float = 0.3
 
     up_down: float = 0.0
-    up_down_dtod: float = 0.0  # Set to zero.
+    up_down_dtod: float = 0.0  # set to zero, since idealized
 
     w_max: float = 1.0  # Increased range.
     w_min: float = -1.0
@@ -251,6 +251,6 @@ class GokmenVlasovPresetDevice(ConstantStepDevice):
     w_max: float = 1.0  # Increased range, parameter adjusted
     w_min: float = -1.0
 
-    # Device-to-device of range.
+    # Device-to-device variation of range
     w_max_dtod: float = 0.3
     w_min_dtod: float = 0.3
