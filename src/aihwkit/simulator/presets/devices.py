@@ -185,7 +185,44 @@ class EcRamPresetDevice(LinearStepDevice):
     # Slope does not depend on the actual bound.
     mean_bound_reference: bool = True
 
+
+@dataclass
+class EcRamMOPresetDevice(LinearStepDevice):
+    """Preset configuration for a single metal-oxide ECRAM resistive processing
+    unit based on linear step device.
+
+    Based on data from `Kim et al. IEDM, 2019`_
+
+    .. _`Kim et al. IEDM, 2019`:  https://ieeexplore.ieee.org/document/8993463
+    """
+
+    dw_min: float = 2.8214e-4
+    up_down: float = 0.0  # assumed shifted onto range
+
+    w_max: float = 1.1714
+    w_min: float = -0.8286
+
+    mult_noise: bool = True
+
+    gamma_up: float = 0.4152
+    gamma_down: float = 0.7342
+
+    # Device-to-device var.
+    dw_min_dtod: float = 0.1
+    up_down_dtod: float = 0.01
+
+    w_max_dtod: float = 0.05
+    w_min_dtod: float = 0.05
+
+    gamma_up_dtod: float = 0.05
+    gamma_down_dtod: float = 0.05
+
+    # Cycle-to_cycle.
+    dw_min_std: float = 2.0
     write_noise_std: float = 0.0
+
+    # Slope does not depend on the actual bound.
+    mean_bound_reference: bool = True
 
 
 @dataclass
