@@ -32,7 +32,8 @@ class CloudRunner(Runner):
 
     def __init__(self,
                  api_url: Optional[str] = None,
-                 api_token: Optional[str] = None):
+                 api_token: Optional[str] = None,
+                 verify: bool = True):
         """CloudRunner constructor.
 
         Note:
@@ -44,6 +45,7 @@ class CloudRunner(Runner):
         Args:
             api_url: the URL of the AIHW Composer API.
             api_token: the API token for authentication.
+            verify: if ``False``, disable the remote server TLS verification.
 
         Raises:
             CredentialsError: if no credentials could be found.
@@ -61,7 +63,7 @@ class CloudRunner(Runner):
         self.api_token = api_token
 
         # Authenticate.
-        self.session = ApiSession(self.api_url, self.api_token)
+        self.session = ApiSession(self.api_url, self.api_token, verify)
         self.api_client = ApiClient(self.session)
 
     def get_cloud_experiment(self, id_: str) -> CloudExperiment:
