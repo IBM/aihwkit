@@ -15,6 +15,8 @@
 from typing import Any, Optional, Text, Union
 
 from requests import HTTPError, Session
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
 
 from aihwkit.version import __version__
 from aihwkit.cloud.client.exceptions import ApiResponseError, ResponseError
@@ -70,12 +72,17 @@ class ApiSession(Session):
     def __init__(
             self,
             api_url: str,
-            api_token: str
+            api_token: str,
+            verify: bool = True
     ):
         super().__init__()
 
         self.api_url = api_url
         self.api_token = api_token
+        self.verify = verify
+        if not verify:
+            urllib3.disable_warnings(InsecureRequestWarning)
+
         self.jwt_token = None  # type: Optional[str]
 
         self.headers.update({'User-Agent': 'aihwkit/{}'.format(__version__)})
