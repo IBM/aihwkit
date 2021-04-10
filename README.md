@@ -4,6 +4,7 @@
 [![Documentation Status](https://readthedocs.org/projects/aihwkit/badge/?version=latest)](https://aihwkit.readthedocs.io/en/latest/?badge=latest)
 [![Build Status](https://travis-ci.com/IBM/aihwkit.svg?branch=master)](https://travis-ci.com/IBM/aihwkit)
 ![PyPI - License](https://img.shields.io/pypi/l/aihwkit)
+[![arXiv](https://img.shields.io/badge/arXiv-2104.02184-green.svg)](https://arxiv.org/abs/2104.02184)
 
 ## Description
 
@@ -123,6 +124,18 @@ as a matrix of synaptic weights. The devices are arranged in multiple crossbar
 arrays, creating an artificial neural network where all matrix multiplications
 are performed in-place in an analog manner. This structure allows to run deep
 learning models at reduced energy consumption. 
+
+## How to cite?
+
+In case you are using the _IBM Analog Hardware Acceleration Kit_ for
+your research, please cite the arXiv paper that describes the toolkit:
+
+> Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
+> Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
+> "A flexible and fast PyTorch toolkit for simulating training and inference on
+> analog crossbar arrays" (2021)
+>
+> https://arxiv.org/abs/2104.02184
 
 ## Installation
 
