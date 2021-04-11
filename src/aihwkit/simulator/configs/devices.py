@@ -480,13 +480,13 @@ class LinearStepDevice(PulsedDevice):
 
     Whether to use update write noise that is added to the updated
     devices weight, while the update is done on a hidden persistent weight. The
-    update write noise is then sampled a new when the device is touched
+    update write noise is then sampled anew when the device is touched
     again.
 
     Thus it is:
 
     .. math::
-        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
+        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise} \Delta w_\text{min}\xi
 
     and the update is done on :math:`w_ij` but the forward sees the
     :math:`w_\text{apparent}`.

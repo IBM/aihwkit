@@ -154,6 +154,8 @@ class EcRamPresetDevice(LinearStepDevice):
 
     Fit of the model :class:`LinearStepDevice` to  `Tang & al., IEDM, 2018`_
 
+    The range is shifted, so that the symmetry point is at zero.
+
     .. _`Tang & al., IEDM, 2018`: https://ieeexplore.ieee.org/document/8614551
     """
 
