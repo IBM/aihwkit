@@ -215,7 +215,7 @@ class Mappings:
         LeakyReLU: Function('LeakyReLU', {
             'negative_slope': float
         }),
-        LogSigmoid: Function('LogSimoid', {}),
+        LogSigmoid: Function('LogSigmoid', {}),
         LogSoftmax: Function('LogSoftmax', {
             'dim': int
         }),

@@ -224,4 +224,3 @@ Retrieving a previous cloud experiment
 The list of experiments previously executed in the cloud can be retrieved via::
 
     cloud_experiments = my_cloud_runner.list_experiments()
-
