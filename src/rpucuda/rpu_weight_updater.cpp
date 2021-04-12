@@ -170,7 +170,7 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
   auto *rpu_device = static_cast<PulsedRPUDeviceBase<T> *>(rpu_device_in);
 
   // check learning rate and update management
-  T dw_min = rpu_device->getDwMin();
+  T weight_granularity = rpu_device->getWeightGranularity();
 
   // pulsed device update
   rpu_device->initUpdateCycle(weights, up_, learning_rate, m_batch_info);
@@ -179,7 +179,7 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
     // envoke sparse bit line maker to get the counts and indices
     int BL = sblm_->makeCounts(
         x_input, x_inc, d_input, d_inc, &*rng_, learning_rate < 0 ? -learning_rate : learning_rate,
-        dw_min, up_);
+        weight_granularity, up_);
     // positive LR actually means that positive signs *decrease* the weight (as in SGD).
     int lr_sign = learning_rate < 0 ? -1 : 1;
 
@@ -219,8 +219,8 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
     }
   } else {
     // use dense update
-    int *coincidences =
-        dblm_->makeCoincidences(x_input, x_inc, d_input, d_inc, &*rng_, learning_rate, dw_min, up_);
+    int *coincidences = dblm_->makeCoincidences(
+        x_input, x_inc, d_input, d_inc, &*rng_, learning_rate, weight_granularity, up_);
     rpu_device->doDenseUpdate(weights, coincidences, &*rng_);
   }
 
@@ -278,7 +278,8 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDeviceAndCounts(
   }
 
   int BL = sblm_->makeCounts(
-      x_input, x_inc, d_input, d_inc, &*rng_, fabs(learning_rate), rpu_device->getDwMin(), up_);
+      x_input, x_inc, d_input, d_inc, &*rng_, fabs(learning_rate),
+      rpu_device->getWeightGranularity(), up_);
 
   // translate to sparse format
   int *x_counts_p;

@@ -40,6 +40,19 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t es_a:\t\t\t" << es_a << std::endl;
     ss << "\t es_b:\t\t\t" << es_b << std::endl;
     ,
+    /* calc weight granularity body */
+    T up_down = this->up_down;
+    T up_bias = up_down > 0 ? (T)0.0 : up_down;
+    T down_bias = up_down > 0 ? -up_down : (T)0.0;
+    T scale_up = (up_bias + 1.0) * this->dw_min;
+    T scale_down = (down_bias + 1.0) * this->dw_min;
+    T w = 0.0; // just take at zero
+    T z = (T)2.0 * w / (this->w_max - this->w_min) * es_a + es_b;
+    T dw_down = scale_down * MAX((T)1 - es_A_down * expf(es_gamma_down * (-z)), (T)0);
+    T dw_up = scale_up * MAX(1 - es_A_up * expf(es_gamma_up * z), (T)0);
+    T weight_granularity = MAX((dw_down + dw_down) / (T)2.0, (T)0);
+    return weight_granularity > (T)0 ? weight_granularity : this->dw_min;
+    ,
     /*add */
     bool implementsWriteNoise() const override { return true; };
 

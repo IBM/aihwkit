@@ -35,6 +35,9 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t ps_gamma_up_down:\t" << ps_gamma_up_down << "\t(dtod=" << ps_gamma_up_down_dtod << ")"
        << std::endl;
     ,
+    /* calc weight granularity body */
+    return this->dw_min * pow(0.5, ps_gamma);
+    ,
     /*Add*/
     bool implementsWriteNoise() const override { return true; };);
 
@@ -110,8 +113,6 @@ template <typename T> class PowStepRPUDevice : public PulsedRPUDevice<T> {
   );
 
   void printDP(int x_count, int d_count) const override;
-
-  T getDwMin() const override;
 
   inline T **getGammaUp() const { return w_gamma_up_; };
   inline T **getGammaDown() const { return w_gamma_down_; };

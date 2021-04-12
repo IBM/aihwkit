@@ -48,6 +48,9 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t ls_allow_increasing_slope:\t" << std::boolalpha << ls_allow_increasing_slope
        << std::endl;
     ,
+    /* calc weight granularity body */
+    return this->dw_min;
+    ,
     /*Add*/
     bool implementsWriteNoise() const override { return true; };);
 

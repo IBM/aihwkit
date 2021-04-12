@@ -26,9 +26,9 @@ template <typename T>
 void MixedPrecRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const {
   ss << "Update using digital outer product + transfer to analog: " << std::endl;
 
-  ss << "\t n_x_bins: \t";
+  ss << "\t n_x_bins: \t\t";
   ss << n_x_bins << std::endl;
-  ss << "\t n_d_bins: \t";
+  ss << "\t n_d_bins: \t\t";
   ss << n_d_bins << std::endl;
 
   MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(ss);
@@ -159,6 +159,10 @@ void MixedPrecRPUDevice<T>::forwardUpdate(
     this->transfer_tmp_.resize(this->x_size_);
   }
 
+  if (this->granularity_ <= 0 )  {
+    RPU_FATAL("Granularity cannot be zero!");
+  }
+  
   // forward / update
   for (int j = 0; j < n_vec; j++) {
     T *chi_row = chi_[j_row_start + j];

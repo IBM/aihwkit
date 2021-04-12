@@ -35,7 +35,6 @@ public:
     swap(
         static_cast<PulsedRPUDeviceCudaBase<T> &>(a), static_cast<PulsedRPUDeviceCudaBase<T> &>(b));
     swap(a.n_devices_, b.n_devices_);
-    swap(a.dw_min_, b.dw_min_);
     swap(a.dev_weights_vec_, b.dev_weights_vec_);
     swap(a.rpucuda_device_vec_, b.rpucuda_device_vec_);
     swap(a.dev_weights_ptrs_, b.dev_weights_ptrs_);
@@ -62,7 +61,6 @@ public:
   };
 
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
-  T getDwMin() const override { return dw_min_; };
 
   VectorRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<VectorRPUDeviceMetaParameter<T> &>(SimpleRPUDeviceCuda<T>::getPar());
@@ -91,7 +89,6 @@ public:
   std::vector<T> getReduceWeightening() const;
 
 protected:
-  T dw_min_ = 0;
   int n_devices_ = 0;
 
   virtual void reduceToWeights(CudaContext *c, T *dev_weights);

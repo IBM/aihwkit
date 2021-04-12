@@ -75,7 +75,6 @@ VectorRPUDeviceCuda<T>::VectorRPUDeviceCuda(const VectorRPUDeviceCuda<T> &other)
     : PulsedRPUDeviceCudaBase<T>(other) {
   current_update_idx_ = other.current_update_idx_;
   current_device_idx_ = other.current_device_idx_;
-  dw_min_ = other.dw_min_;
   n_devices_ = other.n_devices_;
 
   allocateContainers();
@@ -110,7 +109,6 @@ VectorRPUDeviceCuda<T> &VectorRPUDeviceCuda<T>::operator=(VectorRPUDeviceCuda<T>
 
   PulsedRPUDeviceCudaBase<T>::operator=(std::move(other));
 
-  dw_min_ = other.dw_min_;
   n_devices_ = other.n_devices_;
   current_update_idx_ = other.current_update_idx_;
   current_device_idx_ = other.current_device_idx_;
@@ -143,8 +141,6 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
   current_update_idx_ = 0;
   current_device_idx_ = rpu_device.getCurrentDeviceIdx();
   n_devices_ = 0;
-
-  dw_min_ = rpu_device.getDwMin();
 
   const auto &rpu_device_vec = rpu_device.getRpuVec();
   T ***weights_vec = rpu_device.getWeightVec();

@@ -90,9 +90,34 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     return dp;
   }
 
+  T calcWeightGranularity() const override {
+    T weight_granularity = 0.0;
+    for (size_t k = 0; k < vec_par.size(); k++) {
+      weight_granularity += vec_par[k]->calcWeightGranularity() / vec_par.size();
+    }
+    return weight_granularity;
+  }
+
   void printToStream(std::stringstream &ss) const override {
     ss << this->getName();
-    ss << " [update policy " << (int)update_policy << " (" << first_update_idx << ")]" << std::endl;
+    ss << " [update policy ";
+    switch (update_policy) {
+    case VectorDeviceUpdatePolicy::All:
+      ss << "All";
+      break;
+    case VectorDeviceUpdatePolicy::SingleFixed:
+      ss << "SingleFixed";
+      break;
+    case VectorDeviceUpdatePolicy::SingleSequential:
+      ss << "SingleSequential";
+      break;
+    case VectorDeviceUpdatePolicy::SingleRandom:
+      ss << "SingleRandom";
+      break;
+    default:
+      ss << "UNDEFINED";
+    }
+    ss << " (" << first_update_idx << ")]" << std::endl;
     ss << std::endl;
     for (size_t k = 0; k < vec_par.size(); k++) {
       ss << "Device Parameter " << k << ": " << vec_par[k]->getName() << std::endl;
@@ -127,7 +152,6 @@ public:
     swap(a.current_device_idx_, b.current_device_idx_);
     swap(a.current_update_idx_, b.current_update_idx_);
     swap(a.n_devices_, b.n_devices_);
-    swap(a.dw_min_, b.dw_min_);
   }
 
   void getDPNames(std::vector<std::string> &names) const override;
@@ -144,8 +168,6 @@ public:
     ss << "Device " << this->getPar().getName() << " [" << this->x_size_ << "," << this->d_size_
        << "]\n";
   };
-
-  T getDwMin() const override { return dw_min_; };
 
   VectorRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<VectorRPUDeviceMetaParameter<T> &>(SimpleRPUDevice<T>::getPar());
@@ -182,7 +204,6 @@ protected:
   void populate(const VectorRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
   virtual void reduceToWeights(T **weights) const;
 
-  T dw_min_ = 0;
   int n_devices_ = 0;
 
   std::vector<std::unique_ptr<PulsedRPUDeviceBase<T>>> rpu_device_vec_;

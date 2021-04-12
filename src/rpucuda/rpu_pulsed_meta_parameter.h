@@ -184,7 +184,7 @@ template <typename T> struct PulsedUpdateMetaParameter {
   void initialize();
   virtual int getNK32Default() const { return desired_BL / 32 + 1; };
 
-  virtual void calculateBlAB(int &BL, T &A, T &B, T lr, T dw_min) const;
+  virtual void calculateBlAB(int &BL, T &A, T &B, T lr, T weight_granularity) const;
   virtual void performUpdateManagement(
       int &BL,
       T &A,
@@ -193,7 +193,7 @@ template <typename T> struct PulsedUpdateMetaParameter {
       const T x_abs_max,
       const T d_abs_max,
       const T lr,
-      const T dw_min) const;
+      const T weight_granularity) const;
   void print() const {
     std::stringstream ss;
     printToStream(ss);

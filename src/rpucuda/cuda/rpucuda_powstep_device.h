@@ -74,8 +74,6 @@ public:
     return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
   };
 
-  T getDwMin() const override;
-
 private:
   std::unique_ptr<CudaArray<float>> dev_gamma_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_write_noise_std_ = nullptr;
