@@ -162,7 +162,7 @@ void MixedPrecRPUDevice<T>::forwardUpdate(
   if (this->granularity_ <= 0 )  {
     RPU_FATAL("Granularity cannot be zero!");
   }
-  
+
   // forward / update
   for (int j = 0; j < n_vec; j++) {
     T *chi_row = chi_[j_row_start + j];
