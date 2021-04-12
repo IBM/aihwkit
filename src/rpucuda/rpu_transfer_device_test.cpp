@@ -155,7 +155,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdate) {
   rpu_device->initUpdateCycle(this->weights, this->up, 1, 1);
 
   // last row update, net 1 (n_pos-n_neg)
-  float dx = rpu_device->getDwMin() * (n_pos - n_neg);
+  float dx = rpu_device->getWeightGranularity() * (n_pos - n_neg);
   int rowidx = this->d_size - 1;
   rpu_device->doSparseUpdate(
       this->weights, rowidx, this->x_indices, this->n_neg + this->n_pos, (num_t)-1.0, this->rng);
@@ -195,7 +195,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransfer) {
   rpu_device->initUpdateCycle(this->weights, this->up, 1, 1);
 
   // last row update, net 1 (n_pos-n_neg)
-  float dx = rpu_device->getDwMin() * (n_pos - n_neg);
+  float dx = rpu_device->getWeightGranularity() * (n_pos - n_neg);
   int rowidx = this->d_size - 1;
   rpu_device->doSparseUpdate(
       this->weights, rowidx, this->x_indices, this->n_neg + this->n_pos, (num_t)-1.0, this->rng);

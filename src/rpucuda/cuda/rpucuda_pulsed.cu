@@ -218,7 +218,8 @@ template <typename T> void RPUCudaPulsed<T>::setLearningRate(T lr) {
       T A = 0;
       T B = 0;
       getMetaPar().up.calculateBlAB(
-          BL, A, B, lr, static_cast<PulsedRPUDeviceCudaBase<T> &>(*rpucuda_device_).getDwMin());
+          BL, A, B, lr,
+          static_cast<PulsedRPUDeviceCudaBase<T> &>(*rpucuda_device_).getWeightGranularity());
       DEBUG_OUT("\t BL = " << BL << ", A = " << A << ", B = " << B);
     }
   }
@@ -331,7 +332,7 @@ template <typename T> void RPUCudaPulsed<T>::setWeightsReal(const T *weightsptr,
   int d_sz = this->getDSize();
 
   /*==== slight hack to get the range right */
-  T dw_min = 0.001;
+  T weight_granularity = 0.001;
   const auto *dpar =
       dynamic_cast<const PulsedRPUDeviceMetaParameter<T> *>(&rpucuda_device_->getPar());
   T w_min = -1;
@@ -340,13 +341,14 @@ template <typename T> void RPUCudaPulsed<T>::setWeightsReal(const T *weightsptr,
   if (dpar != nullptr) {
     w_min = dpar->w_min;
     w_max = dpar->w_max;
-    dw_min = static_cast<PulsedRPUDeviceCudaBase<T> &>(*rpucuda_device_).getDwMin();
+    weight_granularity =
+        static_cast<PulsedRPUDeviceCudaBase<T> &>(*rpucuda_device_).getWeightGranularity();
   }
   T A = 0;
   T B = 0;
   int BL = 0;
-  getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), dw_min);
-  T mx_change = BL * dw_min;
+  getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), weight_granularity);
+  T mx_change = BL * weight_granularity;
   T range = fabs(w_max - w_min);
   int iter = n_loops * range / mx_change;
 
@@ -410,7 +412,7 @@ template <typename T> void RPUCudaPulsed<T>::setDeviceParameter(const std::vecto
   CHECK_RPU_DEVICE_INIT;
 
   // Note: for now setting the device just keeps the old meta parameter.
-  // however dw_min is at least estimated.
+  // however weight_granularity is at least estimated.
   rpu_device_->setDeviceParameter(data_ptrs);
 
   rpucuda_device_->populateFrom(*rpu_device_);

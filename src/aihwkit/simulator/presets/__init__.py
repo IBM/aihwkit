@@ -22,5 +22,8 @@ from .configs import (
     ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset, Idealized4Preset,
     # Tiki-taka configs.
     TikiTakaReRamESPreset, TikiTakaReRamSBPreset, TikiTakaCapacitorPreset,
-    TikiTakaEcRamPreset, TikiTakaIdealizedPreset
+    TikiTakaEcRamPreset, TikiTakaIdealizedPreset,
+    # MixedPrecision configs.
+    MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
+    MixedPrecisionEcRamPreset, MixedPrecisionIdealizedPreset, MixedPrecisionGokmenVlasovPreset
 )

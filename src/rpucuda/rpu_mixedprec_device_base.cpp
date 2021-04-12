@@ -219,24 +219,27 @@ void MixedPrecRPUDeviceBase<T>::populate(
   avg_sparsity_ = 0;
   up_ptr_ = nullptr;
 
+  if (par.device_par == nullptr) {
+    RPU_FATAL("Expect device parameter in device_par!");
+  }
+
   rpu_device_ = par.device_par->createDeviceUnique(this->x_size_, this->d_size_, rng);
 
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   transfer_pwu_ =
       RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
 
-  T dw_min = 0.0;
+  granularity_ = 0.0;
   if (dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_) != nullptr) {
-    dw_min = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)->getDwMin();
+    granularity_ = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)->getWeightGranularity();
   }
-  if (getPar().granularity > 0) {
+  if (par.granularity > 0) {
     // overwrites
-    dw_min = getPar().granularity;
+    granularity_ = par.granularity;
   }
-  if (dw_min <= 0) {
-    RPU_FATAL("Cannot establish granularity from device. Need explicit settiing >=0.");
+  if (granularity_ <= 0) {
+    RPU_FATAL("Cannot establish granularity from device. Need explicit setting >=0.");
   }
-  granularity_ = dw_min;
 }
 
 /*********************************************************************************/

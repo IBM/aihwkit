@@ -27,6 +27,7 @@ void PulsedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const
     ss << "\n\t Device parameters set manually\n";
   } else {
     ss << "Pulsed device parameter:" << std::endl;
+    ss << "\t granularity (calc.):\t" << this->calcWeightGranularity() << std::endl;
     if (this->construction_seed != 0) {
       ss << "\t construction_seed:\t" << this->construction_seed << std::endl;
     }
@@ -341,9 +342,12 @@ void PulsedRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
 
   dw_min /= this->size_;
   // need dw_min for update management
-  this->checkDwMin(dw_min);
-
-  getPar().dw_min = dw_min; //!! update par. Should be possible since unique
+  if (fabs(dw_min - getPar().dw_min) / getPar().dw_min > 2 * getPar().dw_min_dtod) {
+    RPU_WARNING("DW min seems to have changed during hidden parameter set. Will update parameter "
+                "with estimated value.");
+    getPar().dw_min = dw_min; //!! update par. Should be possible since unique
+    this->setWeightGranularity(getPar().calcWeightGranularity());
+  }
 };
 
 /********************************************************************************/

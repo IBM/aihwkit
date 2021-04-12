@@ -499,6 +499,22 @@ class BaseTile(Generic[RPUConfigGeneric]):
     def set_hidden_parameters(self, ordered_parameters: OrderedDict) -> None:
         """Set the hidden parameters of the tile.
 
+        Caution:
+            Usually the hidden parameters are drawn according to the
+            parameter definitions (those given in the RPU config). If
+            the hidden parameters are arbitrary set by the user, then
+            this correspondence might be broken. This might cause problems
+            in the learning, in particular, the `weight granularity`
+            (usually ``dw_min``, depending on the device) is needed for
+            the dynamic adjustment of the bit length
+            (``update_bl_management``, see
+            :class:`~aihwkit.simulator.configs.utils.UpdateParameters`).
+
+            Currently, the new ``dw_min`` parameter is tried to be
+            estimated from the average of hidden parameters if the
+            discrepancy with the ``dw_min`` from the definition is too
+            large.
+
         Args:
             ordered_parameters: Ordered dictionary of hidden parameter tensors.
         """

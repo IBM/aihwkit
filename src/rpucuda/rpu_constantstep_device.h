@@ -28,6 +28,9 @@ BUILD_PULSED_DEVICE_META_PARAMETER(ConstantStep,
                                    /*print body*/
                                    ss << "\tNone additional.\n";
                                    ,
+                                   /* calc weight granularity body */
+                                   return this->dw_min;
+                                   ,
                                    /*add*/
 );
 

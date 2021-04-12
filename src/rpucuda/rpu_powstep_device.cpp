@@ -126,12 +126,6 @@ inline void update_once(
 
 } // namespace
 
-template <typename T> T PowStepRPUDevice<T>::getDwMin() const {
-  const auto &par = getPar();
-  // just approximately at zero (used for update management)
-  return par.dw_min * pow(0.5, par.ps_gamma);
-};
-
 template <typename T>
 void PowStepRPUDevice<T>::doSparseUpdate(
     T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {

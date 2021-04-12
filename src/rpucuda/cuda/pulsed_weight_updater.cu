@@ -95,7 +95,7 @@ void PulsedWeightUpdater<T>::executeUpdate(
     const bool d_trans_in) {
 
   blm_->makeCounts(
-      x_in, d_in, up, rpucuda_device->getDwMin(), lr, m_batch, x_trans_in, d_trans_in,
+      x_in, d_in, up, rpucuda_device->getWeightGranularity(), lr, m_batch, x_trans_in, d_trans_in,
       kpars->getOutTrans(), kpars->getUseBo64(), kpars->getImplicitPulses());
 
   CudaContext *c = context_;

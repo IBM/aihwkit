@@ -561,11 +561,7 @@ void TransferRPUDevice<T>::resetCols(
 
 template <typename T>
 void TransferRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
-
   VectorRPUDevice<T>::setDeviceParameter(data_ptrs);
-
-  // take dwmin only from the first
-  this->dw_min_ = this->rpu_device_vec_[0]->getDwMin();
 }
 
 template class TransferRPUDevice<float>;

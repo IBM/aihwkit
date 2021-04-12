@@ -196,7 +196,8 @@ template <typename T> void RPUPulsed<T>::setLearningRate(T lr) {
       T A = 0;
       T B = 0;
       getMetaPar().up.calculateBlAB(
-          BL, A, B, lr, static_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)->getDwMin());
+          BL, A, B, lr,
+          static_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)->getWeightGranularity());
       DEBUG_OUT("\t BL = " << BL << ", A = " << A << ", B = " << B);
     }
   }
@@ -299,22 +300,23 @@ template <typename T> void RPUPulsed<T>::setWeightsReal(const T *weightsptr, int
 
   /*==== this is a slight hack to get the number of iteration appproximately right*/
   // does not matter exactly anyway
-  T dw_min = (T)0.001;
+  T weight_granularity = (T)0.001;
   T w_min = (T)-1.0;
   T w_max = (T)1.0;
   auto *dpar = dynamic_cast<const PulsedRPUDeviceMetaParameter<T> *>(&rpu_device_->getPar());
   if (dpar != nullptr) {
     w_min = dpar->w_min;
     w_max = dpar->w_max;
-    dw_min = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)
-                 ->getDwMin(); // this should be safe since we checked the params
+    weight_granularity =
+        dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)
+            ->getWeightGranularity(); // this should be safe since we checked the params
   }
   int BL = 0;
   T A = (T)0.0;
   T B = (T)0.0;
-  getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), dw_min);
+  getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), weight_granularity);
 
-  T mx_change = BL * dw_min;
+  T mx_change = BL * weight_granularity;
   T range = w_max - w_min;
   int iter = (int)round(n_loops * range / mx_change);
 

@@ -111,14 +111,6 @@ pwukpvec_t<T> PowStepRPUDeviceCuda<T>::getUpdateKernels(
 
 #undef ARGS
 
-template <typename T> T PowStepRPUDeviceCuda<T>::getDwMin() const {
-
-  // TODO: this should actually be just be a property from rpu_device. Need to do this in Base.
-  const auto &par = getPar();
-  // just approximately at zero (used for update management)
-  return par.dw_min * pow(0.5, par.ps_gamma);
-};
-
 template class PowStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class PowStepRPUDeviceCuda<double>;

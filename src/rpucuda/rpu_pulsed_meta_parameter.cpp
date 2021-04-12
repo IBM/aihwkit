@@ -140,7 +140,8 @@ template <typename T> void PulsedUpdateMetaParameter<T>::initialize() {
 }
 
 template <typename T>
-void PulsedUpdateMetaParameter<T>::calculateBlAB(int &BL, T &A, T &B, T lr, T dw_min) const {
+void PulsedUpdateMetaParameter<T>::calculateBlAB(
+    int &BL, T &A, T &B, T lr, T weight_granularity) const {
   if (lr < 0.0) {
     RPU_FATAL("lr should be positive !");
   } else if (lr == 0.0) {
@@ -151,16 +152,16 @@ void PulsedUpdateMetaParameter<T>::calculateBlAB(int &BL, T &A, T &B, T lr, T dw
 
   if (fixed_BL || update_bl_management) {
     BL = desired_BL; // actually max for UBLM
-    A = sqrt(lr / (dw_min * BL));
+    A = sqrt(lr / (weight_granularity * BL));
     B = A;
   } else {
-    if ((dw_min * desired_BL) < lr) {
+    if ((weight_granularity * desired_BL) < lr) {
       A = (T)1.0;
       B = (T)1.0;
-      BL = (int)ceil(lr / dw_min);
+      BL = (int)ceil(lr / weight_granularity);
     } else {
       BL = desired_BL;
-      A = sqrt(lr / (dw_min * BL));
+      A = sqrt(lr / (weight_granularity * BL));
       B = A;
     }
   }
@@ -175,23 +176,23 @@ void PulsedUpdateMetaParameter<T>::performUpdateManagement(
     const T x_abs_max,
     const T d_abs_max,
     const T lr,
-    const T dw_min) const {
+    const T weight_granularity) const {
 
-  this->calculateBlAB(BL, A, B, lr, dw_min);
+  this->calculateBlAB(BL, A, B, lr, weight_granularity);
   if (lr > 0.0) {
     if (this->update_bl_management || this->update_management) {
 
-      T reg = dw_min * dw_min;
+      T reg = weight_granularity * weight_granularity;
       T x_abs_max_value = (x_abs_max < reg) ? reg : x_abs_max;
       T d_abs_max_value = (d_abs_max < reg) ? reg : d_abs_max;
 
       if (this->update_bl_management) {
 
-        BL = (int)ceil(lr * x_abs_max_value * d_abs_max_value / dw_min);
+        BL = (int)ceil(lr * x_abs_max_value * d_abs_max_value / weight_granularity);
         if (BL > max_BL) {
           BL = max_BL; // the set BL is the *max BL* in case of update_bl_management  !
         }
-        A = sqrt(lr / (dw_min * BL));
+        A = sqrt(lr / (weight_granularity * BL));
         B = A;
       }
       if (this->update_management) {
@@ -214,7 +215,8 @@ template struct PulsedUpdateMetaParameter<double>;
  * DebugPulsedUpdateMetaParameter<T>
  *********************************************************************************/
 template <typename T>
-void DebugPulsedUpdateMetaParameter<T>::calculateBlAB(int &BL, T &A, T &B, T lr, T dw_min) const {
+void DebugPulsedUpdateMetaParameter<T>::calculateBlAB(
+    int &BL, T &A, T &B, T lr, T weight_granularity) const {
   BL = this->desired_BL;
   A = scaleprob;
   B = scaleprob;

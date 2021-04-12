@@ -82,6 +82,9 @@ void declare_rpu_devices(py::module &m) {
       PYBIND11_OVERLOAD_PURE(
           RPU::PulsedRPUDeviceBase<T> *, PulsedBaseParam, createDevice, x_size, d_size, rng);
     }
+    T calcWeightGranularity() const {
+      PYBIND11_OVERLOAD(T, PulsedBaseParam, calcWeightGranularity, );
+    }
   };
 
   class PyPulsedParam : public PulsedParam {
@@ -97,6 +100,9 @@ void declare_rpu_devices(py::module &m) {
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD_PURE(
           RPU::PulsedRPUDevice<T> *, PulsedParam, createDevice, x_size, d_size, rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, PulsedParam, calcWeightGranularity, );
     }
   };
 
@@ -116,6 +122,9 @@ void declare_rpu_devices(py::module &m) {
       PYBIND11_OVERLOAD(
           RPU::ConstantStepRPUDevice<T> *, ConstantStepParam, createDevice, x_size, d_size, rng);
     }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, ConstantStepParam, calcWeightGranularity, );
+    }
   };
 
   class PyLinearStepParam : public LinearStepParam {
@@ -134,6 +143,9 @@ void declare_rpu_devices(py::module &m) {
       PYBIND11_OVERLOAD(
           RPU::LinearStepRPUDevice<T> *, LinearStepParam, createDevice, x_size, d_size, rng);
     }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, LinearStepParam, calcWeightGranularity, );
+    }
   };
 
   class PySoftBoundsParam : public SoftBoundsParam {
@@ -143,6 +155,9 @@ void declare_rpu_devices(py::module &m) {
     }
     SoftBoundsParam *clone() const override {
       PYBIND11_OVERLOAD(SoftBoundsParam *, SoftBoundsParam, clone, );
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, SoftBoundsParam, calcWeightGranularity, );
     }
   };
 
@@ -162,6 +177,9 @@ void declare_rpu_devices(py::module &m) {
       PYBIND11_OVERLOAD(
           RPU::ExpStepRPUDevice<T> *, ExpStepParam, createDevice, x_size, d_size, rng);
     }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, ExpStepParam, calcWeightGranularity, );
+    }
   };
 
   class PyVectorParam : public VectorParam {
@@ -174,6 +192,9 @@ void declare_rpu_devices(py::module &m) {
     RPU::VectorRPUDevice<T> *
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(RPU::VectorRPUDevice<T> *, VectorParam, createDevice, x_size, d_size, rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, VectorParam, calcWeightGranularity, );
     }
   };
 
@@ -193,6 +214,9 @@ void declare_rpu_devices(py::module &m) {
       PYBIND11_OVERLOAD(
           RPU::DifferenceRPUDevice<T> *, DifferenceParam, createDevice, x_size, d_size, rng);
     }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, DifferenceParam, calcWeightGranularity, );
+    }
   };
 
   class PyTransferParam : public TransferParam {
@@ -210,6 +234,9 @@ void declare_rpu_devices(py::module &m) {
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(
           RPU::TransferRPUDevice<T> *, TransferParam, createDevice, x_size, d_size, rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, TransferParam, calcWeightGranularity, );
     }
   };
 
@@ -246,6 +273,9 @@ void declare_rpu_devices(py::module &m) {
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(
           RPU::PowStepRPUDevice<T> *, PowStepParam, createDevice, x_size, d_size, rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, PowStepParam, calcWeightGranularity, );
     }
   };
 
@@ -383,11 +413,21 @@ void declare_rpu_devices(py::module &m) {
   py::class_<ConstantStepParam, PyConstantStepParam, PulsedParam>(
       m, "ConstantStepResistiveDeviceParameter")
       .def(py::init<>())
-      .def("__str__", [](ConstantStepParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](ConstantStepParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &ConstantStepParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   py::class_<LinearStepParam, PyLinearStepParam, PulsedParam>(
       m, "LinearStepResistiveDeviceParameter")
@@ -400,22 +440,42 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("mean_bound_reference", &LinearStepParam::ls_mean_bound_reference)
       .def_readwrite("write_noise_std", &LinearStepParam::write_noise_std)
       .def_readwrite("mult_noise", &LinearStepParam::ls_mult_noise)
-      .def("__str__", [](LinearStepParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](LinearStepParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &LinearStepParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   py::class_<SoftBoundsParam, PySoftBoundsParam, PulsedParam>(
       m, "SoftBoundsResistiveDeviceParameter")
       .def_readwrite("mult_noise", &SoftBoundsParam::ls_mult_noise)
       .def_readwrite("write_noise_std", &SoftBoundsParam::write_noise_std)
       .def(py::init<>())
-      .def("__str__", [](SoftBoundsParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](SoftBoundsParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &SoftBoundsParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   py::class_<ExpStepParam, PyExpStepParam, PulsedParam>(m, "ExpStepResistiveDeviceParameter")
       .def(py::init<>())
@@ -426,11 +486,21 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("a", &ExpStepParam::es_a)
       .def_readwrite("b", &ExpStepParam::es_b)
       .def_readwrite("write_noise_std", &ExpStepParam::write_noise_std)
-      .def("__str__", [](ExpStepParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](ExpStepParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &ExpStepParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   py::class_<VectorParam, PyVectorParam, PulsedBaseParam>(m, "VectorResistiveDeviceParameter")
       .def(py::init<>())
@@ -446,20 +516,40 @@ void declare_rpu_devices(py::module &m) {
           R"pbdoc(
            Adds a pulsed base device parameter to the vector device.
            )pbdoc")
-      .def("__str__", [](VectorParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](VectorParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &VectorParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   py::class_<DifferenceParam, PyDifferenceParam, VectorParam>(
       m, "DifferenceResistiveDeviceParameter")
       .def(py::init<>())
-      .def("__str__", [](DifferenceParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](DifferenceParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &DifferenceParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   py::class_<TransferParam, PyTransferParam, VectorParam>(m, "TransferResistiveDeviceParameter")
       .def(py::init<>())
@@ -477,11 +567,21 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("scale_transfer_lr", &TransferParam::scale_transfer_lr)
       .def_readwrite("transfer_forward", &TransferParam::transfer_io)
       .def_readwrite("transfer_update", &TransferParam::transfer_up)
-      .def("__str__", [](TransferParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](TransferParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &TransferParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   py::class_<MixedPrecParam, PyMixedPrecParam, SimpleParam>(m, "MixedPrecResistiveDeviceParameter")
       .def(py::init<>())
@@ -514,11 +614,21 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("pow_up_down", &PowStepParam::ps_gamma_up_down)
       .def_readwrite("pow_up_down_dtod", &PowStepParam::ps_gamma_up_down_dtod)
       .def_readwrite("write_noise_std", &PowStepParam::write_noise_std)
-      .def("__str__", [](PowStepParam &self) {
-        std::stringstream ss;
-        self.printToStream(ss);
-        return ss.str();
-      });
+      .def(
+          "__str__",
+          [](PowStepParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &PowStepParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
 
   /**
    * Helper enums.

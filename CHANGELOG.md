@@ -44,6 +44,7 @@ The format is based on [Keep a Changelog], and this project adheres to
     the simulated crossbar by applying a fixed output global factor in
     digital. (\#129)
   * Optional power-law drift during analog training. (\#158)
+  * Cleaner setting of `dw_min` using device granularity. (\#200)
 * PyTorch interface improvements:
   * Two new convolution layers have been added: `AnalogConv1d` and
     `AnalogConv3d`, mimicking their digital counterparts. (\#102, \#103)

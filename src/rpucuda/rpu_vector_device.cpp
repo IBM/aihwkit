@@ -136,7 +136,6 @@ template <typename T>
 VectorRPUDevice<T>::VectorRPUDevice(const VectorRPUDevice<T> &other)
     : PulsedRPUDeviceBase<T>(other) {
 
-  dw_min_ = other.dw_min_;
   reduce_weightening_ = other.reduce_weightening_;
   current_device_idx_ = other.current_device_idx_;
   current_update_idx_ = other.current_update_idx_;
@@ -177,7 +176,6 @@ VectorRPUDevice<T> &VectorRPUDevice<T>::operator=(VectorRPUDevice<T> &&other) {
   PulsedRPUDeviceBase<T>::operator=(std::move(other));
 
   n_devices_ = other.n_devices_;
-  dw_min_ = other.dw_min_;
   current_device_idx_ = other.current_device_idx_;
   current_update_idx_ = other.current_update_idx_;
 
@@ -297,7 +295,7 @@ void VectorRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
     RPU_FATAL("Expected " << names.size() << " data pointers!");
   }
 
-  T dw_min = (T)0.0;
+  T weight_granularity = (T)0.0;
   size_t m = 0;
   for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
     std::vector<std::string> n;
@@ -308,7 +306,7 @@ void VectorRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
       v.push_back(data_ptrs[m + i]);
     }
     rpu_device_vec_[k]->setDeviceParameter(v);
-    T dw_min_device = rpu_device_vec_[k]->getDwMin();
+    T weight_granularity_device = rpu_device_vec_[k]->getWeightGranularity();
     m += n.size();
 
     // "hidden weights"
@@ -317,13 +315,11 @@ void VectorRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
     }
     m++;
 
-    dw_min += dw_min_device;
+    weight_granularity += weight_granularity_device;
   }
-  dw_min /= rpu_device_vec_.size();
 
-  this->checkDwMin(dw_min);
-
-  dw_min_ = dw_min;
+  weight_granularity /= rpu_device_vec_.size();
+  this->setWeightGranularity(weight_granularity);
 };
 
 template <typename T> void VectorRPUDevice<T>::printDP(int x_count, int d_count) const {
@@ -371,20 +367,22 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
 
   auto &par = getPar();
   allocateContainers((int)par.vec_par.size()); // will set n_devices
-
   resetCounters(true);
 
+  // construct the sub devices and set the weight granularity as the
+  // average of all
   rpu_device_vec_.clear();
   reduce_weightening_.clear();
-  dw_min_ = (T)0.0;
+  T weight_granularity = (T)0.0;
   for (int k = 0; k < n_devices_; k++) {
     rpu_device_vec_.push_back(std::unique_ptr<PulsedRPUDeviceBase<T>>(
         par.vec_par[k]->createDevice(this->x_size_, this->d_size_, rng)));
-    dw_min_ += rpu_device_vec_.back()->getDwMin();
+    weight_granularity += rpu_device_vec_.back()->getWeightGranularity();
 
     reduce_weightening_.push_back((T)1.0 / n_devices_); // average per default
   }
-  dw_min_ = dw_min_ / n_devices_;
+  weight_granularity = weight_granularity / n_devices_;
+  this->setWeightGranularity(weight_granularity);
 
   // default weightening can be overwritten by given gamma_vec
   if (par.gamma_vec.size()) {

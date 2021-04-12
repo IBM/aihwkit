@@ -106,6 +106,15 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   DeviceUpdateType implements() const override { return DeviceUpdateType::Transfer; };
   void printToStream(std::stringstream &ss) const override;
 
+  T calcWeightGranularity() const override {
+    T weight_granularity = 0.0;
+    if (this->vec_par.size() > 0) {
+      // only take that from first (fast) device
+      weight_granularity = this->vec_par[0]->calcWeightGranularity();
+    }
+    return weight_granularity;
+  }
+
   virtual T getTransferLR(int to_device_idx, int from_device_idx, T current_lr) const;
 };
 
@@ -171,7 +180,6 @@ public:
       const T reset_prob,
       const int i_col);
   virtual const T *getTransferVecs() const { return &transfer_vecs_[0]; };
-  T getDwMin() const override { return this->rpu_device_vec_[0]->getDwMin(); };
 
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)

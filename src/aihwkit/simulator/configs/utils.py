@@ -427,9 +427,11 @@ class UpdateParameters(_PrintableMixin):
     update_bl_management: bool = True
     """Whether to enable dynamical adjustment of ``A``,``B``,and ``BL``::
 
-        BL = ceil(learning_rate * abs(x_j) * abs(d_i) / dw_min);
+        BL = ceil(learning_rate * abs(x_j) * abs(d_i) / weight_granularity);
         BL  = min(BL,desired_BL);
-        A = B = sqrt(learning_rate / (dw_min * BL));
+        A = B = sqrt(learning_rate / (weight_granularity * BL));
+
+    The ``weight_granularity`` is usually equal to ``dw_min``.
     """
 
     update_management: bool = True

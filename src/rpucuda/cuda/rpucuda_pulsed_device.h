@@ -39,7 +39,18 @@ public:
   friend void swap(PulsedRPUDeviceCudaBase<T> &a, PulsedRPUDeviceCudaBase<T> &b) noexcept {
     using std::swap;
     swap(static_cast<SimpleRPUDeviceCuda<T> &>(a), static_cast<SimpleRPUDeviceCuda<T> &>(b));
+    swap(a.weight_granularity_, b.weight_granularity_);
   }
+  void populateFrom(const AbstractRPUDevice<T> &rpu_device_in) override {
+    SimpleRPUDeviceCuda<T>::populateFrom(rpu_device_in);
+
+    const auto &rpu_device = dynamic_cast<const PulsedRPUDeviceBase<T> &>(rpu_device_in);
+    if (&rpu_device == nullptr) {
+      RPU_FATAL("populateFrom expects PulsedRPUDeviceBase.");
+    }
+    setWeightGranularity(rpu_device.getWeightGranularity());
+  };
+
   bool isPulsedDevice() const override { return true; };
   bool hasDirectUpdate() const override { return false; };
   void doDirectUpdate(
@@ -62,7 +73,6 @@ public:
     RPU_FATAL("Needs implementation");
   };
 
-  virtual T getDwMin() const = 0;
   virtual void runUpdateKernel(
       pwukp_t<T> kpars,
       CudaContext *c,
@@ -82,6 +92,16 @@ public:
       const PulsedUpdateMetaParameter<T> &up) = 0;
 
   PulsedRPUDeviceCudaBase<T> *clone() const override { RPU_FATAL("Needs implementation"); };
+
+  inline T getWeightGranularity() const { return weight_granularity_; };
+
+protected:
+  inline void setWeightGranularity(T weight_granularity) {
+    weight_granularity_ = weight_granularity;
+  };
+
+private:
+  T weight_granularity_ = 0.0;
 };
 
 /* Base class for all devices that do a simple pulsed update with 6 parameters*/
@@ -121,7 +141,6 @@ public:
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override;
   void
   populateFrom(const AbstractRPUDevice<T> &rpu_device) override; // need to be called by derived
-  T getDwMin() const override { return this->getPar().dw_min; };
   PulsedRPUDeviceCuda<T> *clone() const override { RPU_FATAL("Needs implementations"); };
 
   PulsedRPUDeviceMetaParameter<T> &getPar() const override {
