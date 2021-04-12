@@ -290,10 +290,10 @@ def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
     Returns:
         Guessed number of steps
     """
-    device_binding = rpu_config.device.as_bindings()
-    dw_min = device_binding.dw_min
-    w_min = device_binding.w_min
-    w_max = device_binding.w_max
+    device_bindings = rpu_config.device.as_bindings()
+    dw_min = device_bindings.calc_weight_granularity()
+    w_min = device_bindings.w_min
+    w_max = device_bindings.w_max
 
     n_steps = int(np.round((w_max - w_min) / dw_min))
     return n_steps
