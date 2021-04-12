@@ -356,19 +356,17 @@ To enable mixed-precision one defines for example the following ``rpu_config``::
 
     rpu_config = DigitalRankUpdateRPUConfig(
         device=SoftBoundsDevice(),
-
-	# make some adjustments of mixed-precision hyper parameter
+        # make some adjustments of mixed-precision hyper parameter
         granularity=0.001,
-	n_x_bins=15,
-	n_d_bins=31,
+        n_x_bins=15,
+        n_d_bins=31,
     )
 
     # use tile configuration in model
     model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
 Now this analog tile will use the mixed-precision optimizer with a
-soft bounds device model. 
-
+soft bounds device model.
 
 Analog presets
 --------------

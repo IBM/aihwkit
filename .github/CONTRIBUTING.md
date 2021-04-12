@@ -48,7 +48,7 @@ from the core team and contributions:
    > After the pull request is submitted, the maintainers will review your
    > contribution. This is a two-way conversation as well, with mutual feedback
    > and help in the hopes of getting the contribution ready to
-   > be merged. 
+   > be merged.
 
 6. Merging your contribution into the project.
 
