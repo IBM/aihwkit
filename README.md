@@ -199,4 +199,4 @@ This project is licensed under [Apache License 2.0].
 [Flash memory]: https://en.wikipedia.org/wiki/Flash_memory
 [Kirchhoff’s circuits laws]: https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws
 [online demo]: https://analog-ai-demo.mybluemix.net/
-[AIHW Composer]: TODO
+[AIHW Composer]: https://aihw-composer.draco.res.ibm.com
