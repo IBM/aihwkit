@@ -1,12 +1,15 @@
 ``aihwkit`` design
 ==================
 
-``aihwkit`` layers
-------------------
+``aihwkit`` architecture
+------------------------
 
-The architecture of the library is comprised by several layers:
+The library is comprised by several layers:
 
 .. image:: ../img/architecture.png
+   :scale: 50%
+   :alt: aihwkit architecture
+   :align: center
 
 PyTorch layer
 ~~~~~~~~~~~~~
@@ -45,7 +48,8 @@ Relevant modules:
 
 * :py:mod:`aihwkit.simulator.tiles`
 * :py:mod:`aihwkit.simulator.devices`
-* :py:mod:`aihwkit.simulator.parameters`
+* :py:mod:`aihwkit.simulator.configs`
+* :py:mod:`aihwkit.simulator.presets`
 
 
 Pybind Python layer
@@ -69,8 +73,8 @@ managed by the upper classes.
 * :py:mod:`aihwkit.simulator.rpu_base.parameters`
 
 
-C++ layer
-~~~~~~~~~
+C++ layer (``rpucuda``)
+~~~~~~~~~~~~~~~~~~~~~~~
 
 Ultimately, this is the layer where the real operations over ``Tiles`` take
 place, and the one that implements the actual simulation and most of the
