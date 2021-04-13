@@ -67,6 +67,19 @@ adjustable parameters. Feature include:
 * State-of-the-art dynamic input scaling, bound management, and update
   management schemes
 
+Other features
+~~~~~~~~~~~~~~
+
+Along with the two main components, the toolkit includes other functionality:
+
+* A library of device presets that are calibrated to real hardware data and
+  device presets that are based on models in the literature, along with config
+  preset that specify a particular device and optimizer choice.
+* A module for executing high-level use cases ("experiments"), such as neural
+  network training with minimal code overhead.
+* Integration with the `AIHW Composer`_ platform that allows executing
+  experiments in the cloud.
+
 .. warning::
     This library is currently in beta and under active development.
     Please be mindful of potential issues and keep an eye for improvements,
@@ -102,8 +115,26 @@ Example
         opt.step()
         print('Loss error: {:.16f}'.format(loss))
 
+How to cite
+-----------
+
+In case you are using the *IBM Analog Hardware Acceleration Kit* for
+your research, please cite the `arXiv paper`_ that describes the toolkit:
+
+.. note::
+
+    Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
+    Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
+    "A flexible and fast PyTorch toolkit for simulating training and inference on
+    analog crossbar arrays" (2021)
+
+    https://arxiv.org/abs/2104.02184
+
 
 Reference
 =========
 
 :ref:`genindex` | :ref:`modindex` | :ref:`search`
+
+.. _AIHW Composer: TODO
+.. _arXiv paper: https://arxiv.org/abs/2104.02184
