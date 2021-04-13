@@ -53,6 +53,18 @@ adjustable parameters. Features include:
 * State-of-the-art dynamic input scaling, bound management, and update
   management schemes
 
+### Other features
+
+Along with the two main components, the toolkit includes other functionality:
+
+* A library of device presets that are calibrated to real hardware data and
+  device presets that are based on models in the literature, along with config
+  preset that specify a particular device and optimizer choice.
+* A module for executing high-level use cases ("experiments"), such as neural
+  network training with minimal code overhead.
+* Integration with the [AIHW Composer] platform that allows executing
+  experiments in the cloud.
+
 ## Example
 
 ### Training example
@@ -187,3 +199,4 @@ This project is licensed under [Apache License 2.0].
 [Flash memory]: https://en.wikipedia.org/wiki/Flash_memory
 [Kirchhoff’s circuits laws]: https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws
 [online demo]: https://analog-ai-demo.mybluemix.net/
+[AIHW Composer]: TODO
