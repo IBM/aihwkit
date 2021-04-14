@@ -136,5 +136,5 @@ Reference
 
 :ref:`genindex` | :ref:`modindex` | :ref:`search`
 
-.. _AIHW Composer: TODO
+.. _AIHW Composer: https://aihw-composer.draco.res.ibm.com
 .. _arXiv paper: https://arxiv.org/abs/2104.02184

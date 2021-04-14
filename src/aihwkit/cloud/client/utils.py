@@ -16,7 +16,7 @@ from os import getenv, path
 from typing import Dict
 from configparser import ConfigParser
 
-DEFAULT_URL = ''
+DEFAULT_URL = 'https://api-aihw-composer.draco.res.ibm.com'
 
 
 class ClientConfiguration:

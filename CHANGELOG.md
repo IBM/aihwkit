@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Security` in case of vulnerabilities.
 
 
-## [0.3.0]
+## [0.3.0] - 2021/04/14
 
 ### Added
 

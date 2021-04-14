@@ -137,7 +137,7 @@ session, as a way of tracking progress). This can be turned off by the
 Cloud Runner
 ------------
 
-Experiments can also be run in the cloud at our companion ``AIHW Composer``
+Experiments can also be run in the cloud at our companion `AIHW Composer`_
 application, that allows for executing the experiments remotely using hardware
 acceleration and inspect the experiments and their results visually, along
 other features.
@@ -146,10 +146,10 @@ Setting up your account
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 The integration is provided by a Python client included in ``aihwkit`` that
-allows connecting to the ``AIHW Composer`` platform. In order to be able to
+allows connecting to the `AIHW Composer`_ platform. In order to be able to
 run experiments in the cloud:
 
-1. Register in the platform and generate an ``API token`` in your user page.
+1. Register in the platform and generate an `API token`_ in your user page.
    This token acts as the credentials for connecting with the application.
 
 2. Store your credentials by creating a ``~/.config/aihwkit.conf`` file with
@@ -224,3 +224,7 @@ Retrieving a previous cloud experiment
 The list of experiments previously executed in the cloud can be retrieved via::
 
     cloud_experiments = my_cloud_runner.list_experiments()
+
+
+.. _AIHW Composer: https://aihw-composer.draco.res.ibm.com/
+.. _API token: https://aihw-composer.draco.res.ibm.com/account
