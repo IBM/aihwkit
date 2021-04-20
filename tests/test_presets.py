@@ -16,12 +16,15 @@ from torch import Tensor
 
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.presets import (
-    ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, IdealizedPreset,
+    ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, EcRamMOPreset, IdealizedPreset,
     GokmenVlasovPreset,
-    ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, Idealized2Preset,
-    ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset, Idealized4Preset,
-    TikiTakaReRamESPreset, TikiTakaReRamSBPreset, TikiTakaCapacitorPreset,
-    TikiTakaEcRamPreset, TikiTakaIdealizedPreset
+    ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, EcRamMO2Preset,
+    Idealized2Preset, ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset,
+    EcRamMO4Preset, Idealized4Preset, TikiTakaReRamESPreset, TikiTakaReRamSBPreset,
+    TikiTakaCapacitorPreset, TikiTakaEcRamPreset, TikiTakaEcRamMOPreset, TikiTakaIdealizedPreset,
+    MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
+    MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
+    MixedPrecisionGokmenVlasovPreset,
 )
 from .helpers.decorators import parametrize_over_presets
 from .helpers.testcases import AihwkitTestCase
@@ -29,12 +32,16 @@ from .helpers.testcases import AihwkitTestCase
 
 @parametrize_over_presets(
     [
-        ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, IdealizedPreset,
+        ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, EcRamMOPreset, IdealizedPreset,
         GokmenVlasovPreset,
-        ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, Idealized2Preset,
-        ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset, Idealized4Preset,
-        TikiTakaReRamESPreset, TikiTakaReRamSBPreset, TikiTakaCapacitorPreset,
-        TikiTakaEcRamPreset, TikiTakaIdealizedPreset
+        ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, EcRamMO2Preset,
+        Idealized2Preset, ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset,
+        EcRamMO4Preset, Idealized4Preset, TikiTakaReRamESPreset, TikiTakaReRamSBPreset,
+        TikiTakaCapacitorPreset, TikiTakaEcRamPreset, TikiTakaEcRamMOPreset,
+        TikiTakaIdealizedPreset,
+        MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
+        MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
+        MixedPrecisionGokmenVlasovPreset,
     ]
 )
 class PresetTest(AihwkitTestCase):

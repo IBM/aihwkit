@@ -25,7 +25,7 @@ from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
 )
 from aihwkit.simulator.presets.devices import (
-    CapacitorPresetDevice, EcRamPresetDevice, IdealizedPresetDevice,
+    CapacitorPresetDevice, EcRamPresetDevice, EcRamMOPresetDevice, IdealizedPresetDevice,
     ReRamESPresetDevice, ReRamSBPresetDevice, GokmenVlasovPresetDevice
 )
 from aihwkit.simulator.presets.utils import (
@@ -101,7 +101,7 @@ class CapacitorPreset(SingleRPUConfig):
 
 @dataclass
 class EcRamPreset(SingleRPUConfig):
-    """Preset configuration using a single EcRAM device, see
+    """Preset configuration using a single Lithium-based EcRAM device, see
     :class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
 
     This preset uses standard SGD with fully parallel update on analog
@@ -115,6 +115,27 @@ class EcRamPreset(SingleRPUConfig):
     """
 
     device: PulsedDevice = field(default_factory=EcRamPresetDevice)
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class EcRamMOPreset(SingleRPUConfig):
+    """Preset configuration using a single metal-oxide EcRAM device, see
+    :class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`.
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: PulsedDevice = field(default_factory=EcRamMOPresetDevice)
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -242,8 +263,8 @@ class Capacitor2Preset(UnitCellRPUConfig):
 
 @dataclass
 class EcRam2Preset(UnitCellRPUConfig):
-    """Preset configuration using two Capacitor devices per cross-point
-    (:class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`),
+    """Preset configuration using two Lithium-based EcRam devices per cross-point
+    (:class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`),
     where both are updated with random selection policy for update.
 
     See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
@@ -258,6 +279,31 @@ class EcRam2Preset(UnitCellRPUConfig):
 
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
         unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
+        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
+    ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class EcRamMO2Preset(UnitCellRPUConfig):
+    """Preset configuration using two metal-oxide EcRam devices per cross-point
+    (:class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
+        unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
         update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
     ))
     forward: IOParameters = field(default_factory=PresetIOParameters)
@@ -372,8 +418,8 @@ class Capacitor4Preset(UnitCellRPUConfig):
 
 @dataclass
 class EcRam4Preset(UnitCellRPUConfig):
-    """Preset configuration using four Capacitor devices per cross-point
-    (:class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`),
+    """Preset configuration using four Lithium-based EcRam devices per cross-point
+    (:class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`),
     where both are updated with random selection policy for update.
 
     See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
@@ -389,6 +435,32 @@ class EcRam4Preset(UnitCellRPUConfig):
     device: UnitCell = field(default_factory=lambda: VectorUnitCell(
         unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice(),
                            EcRamPresetDevice(), EcRamPresetDevice()],
+        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
+    ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class EcRamMO4Preset(UnitCellRPUConfig):
+    """Preset configuration using four metal-oxide EcRam devices per cross-point
+    (:class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`),
+    where both are updated with random selection policy for update.
+
+    See :class:`~aihwkit.simulator.configs.devices.VectorUnitCell` for
+    more details on multiple devices per cross-points.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
+        unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice(),
+                           EcRamMOPresetDevice(), EcRamMOPresetDevice()],
         update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
     ))
     forward: IOParameters = field(default_factory=PresetIOParameters)
@@ -537,6 +609,34 @@ class TikiTakaEcRamPreset(UnitCellRPUConfig):
 
 
 @dataclass
+class TikiTakaEcRamMOPreset(UnitCellRPUConfig):
+    """Configuration using Tiki-taka with
+    :class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.TransferCompound`
+    for details on Tiki-taka-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: TransferCompound(
+            unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
+            transfer_forward=PresetIOParameters(),
+            transfer_update=PresetUpdateParameters(),
+            transfer_every=1.0,
+            units_in_mbatch=True,
+            ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
 class TikiTakaIdealizedPreset(UnitCellRPUConfig):
     """Configuration using Tiki-taka with
     :class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
@@ -657,6 +757,30 @@ class MixedPrecisionEcRamPreset(DigitalRankUpdateRPUConfig):
     device: DigitalRankUpdateCell = field(
         default_factory=lambda: MixedPrecisionCompound(
             device=EcRamPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionEcRamMOPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`.
+
+    See class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=EcRamMOPresetDevice(),
         ))
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
