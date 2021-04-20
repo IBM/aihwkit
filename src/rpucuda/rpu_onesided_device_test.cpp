@@ -12,7 +12,7 @@
 
 #include "rng.h"
 #include "rpu_constantstep_device.h"
-#include "rpu_difference_device.h"
+#include "rpu_onesided_device.h"
 #include "utility_functions.h"
 #include "gtest/gtest.h"
 #include <chrono>
@@ -35,8 +35,8 @@ using namespace RPU;
 class RPUDeviceTestFixture : public ::testing::TestWithParam<int> {
 public:
   void SetUp() {
-    x_size = 2;
-    d_size = 3;
+    x_size = 6;
+    d_size = 7;
 
     n_pos = GetParam() + 4;
     n_neg = GetParam();
@@ -73,7 +73,7 @@ public:
     dp_cs.w_min_dtod = 0;
     dp_cs.lifetime = lifetime;
 
-    dp = new DifferenceRPUDeviceMetaParameter<num_t>(dp_cs);
+    dp = new OneSidedRPUDeviceMetaParameter<num_t>(dp_cs);
     // note: meta parameters for g+ and g- need to be the same (to support inversion)
     reference_update = dw_min * n_pos - dw_min * n_neg;
     reference_update_inv = -dw_min * n_neg + dw_min * n_pos;
@@ -96,11 +96,11 @@ public:
   num_t **w_ref;
   num_t reference_update_inv, reference_update;
   PulsedUpdateMetaParameter<num_t> up;
-  DifferenceRPUDeviceMetaParameter<num_t> *dp;
+  OneSidedRPUDeviceMetaParameter<num_t> *dp;
   ConstantStepRPUDeviceMetaParameter<num_t> dp_cs;
   RNG<num_t> *rng;
   RealWorldRNG<num_t> rw_rng;
-  DifferenceRPUDevice<num_t> *rpu_device;
+  OneSidedRPUDevice<num_t> *rpu_device;
 };
 
 // define the tests
@@ -137,6 +137,60 @@ TEST_P(RPUDeviceTestFixture, onSetWeights) {
       ASSERT_FLOAT_EQ(w_vec[1][0][i], 0);
     }
   }
+  delete rpu_device;
+}
+
+TEST_P(RPUDeviceTestFixture, refreshWeights) {
+  dp->vec_par.clear();
+  dp_cs.w_max = 1.0f;
+  dp_cs.w_min = -1.0f;
+  dp_cs.reset_std = 0.0f;
+  dp_cs.reset = 0.0f;
+
+  dp->appendVecPar(dp_cs);
+  dp->refresh_every = 1;
+  dp->refresh_up.pulse_type = PulseType::None;
+  dp->refresh_io.is_perfect = true;
+  dp->refresh_upper_thres = 0.75;
+  dp->refresh_lower_thres = 0.25;
+
+  rpu_device = dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
+  rpu_device->onSetWeights(this->weights);
+  rpu_device->dispInfo();
+
+  num_t **wp = rpu_device->getPosWeights();
+  num_t **wn = rpu_device->getNegWeights();
+  for (int i = 0; i < this->d_size * this->x_size; i++) {
+    if (i < this->x_size) {
+      wp[0][i] = 0.8;
+      wn[0][i] = 0.4;
+    } else if (i < 2 * this->x_size) {
+      wp[0][i] = 0.6;
+      wn[0][i] = 0.3;
+    } else {
+      wp[0][i] = 0.3;
+      wn[0][i] = 0.8;
+    }
+  }
+  // advance update counter and refresh
+  rpu_device->finishUpdateCycle(this->weights, this->up, 1.0, 1);
+
+  for (int i = 0; i < this->d_size * this->x_size; i++) {
+    if (i < this->x_size) {
+      ASSERT_FLOAT_EQ(wp[0][i], 0.4);
+      ASSERT_FLOAT_EQ(wn[0][i], 0.0);
+      ASSERT_FLOAT_EQ(this->weights[0][i], 0.4);
+    } else if (i < 2 * this->x_size) {
+      ASSERT_FLOAT_EQ(wp[0][i], 0.6);
+      ASSERT_FLOAT_EQ(wn[0][i], 0.3);
+      ASSERT_FLOAT_EQ(this->weights[0][i], 0.3);
+    } else {
+      ASSERT_FLOAT_EQ(wp[0][i], 0.0);
+      ASSERT_FLOAT_EQ(wn[0][i], 0.5);
+      ASSERT_FLOAT_EQ(this->weights[0][i], -0.5);
+    }
+  }
+
   delete rpu_device;
 }
 

@@ -26,7 +26,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(ConstantStep,
                                    /*parameter def*/
                                    ,
                                    /*print body*/
-                                   ss << "\tNone additional.\n";
+                                   ss << "\t None additional." << std::endl;
                                    ,
                                    /* calc weight granularity body */
                                    return this->dw_min;

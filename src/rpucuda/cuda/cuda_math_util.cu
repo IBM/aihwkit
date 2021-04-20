@@ -637,6 +637,78 @@ template void elemresetsat<double>(
     const float *);
 #endif
 
+// MSK != 0
+// W(MSK) = sat(reset_bias(MSK) + std*randn())
+#define RESET_TOLERANCE 1e-6
+template <typename T>
+__global__ void kernelElemResetSatMsk(
+    T *weights,
+    const int size_in,
+    const char *msk,
+    const T *reset_bias,
+    const T reset_std_in,
+    const float *dev_4params,
+    curandState_t *random_states) {
+
+  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  T reset_std = reset_std_in;
+  int size = size_in;
+  int total_threads = blockDim.x * gridDim.x;
+  curandState_t local_state;
+  bool with_bias = reset_bias != nullptr;
+
+  if (reset_std) {
+    local_state = random_states[tid];
+  }
+
+  for (int idx = tid; idx < size; idx += total_threads) {
+
+    bool reset_if = msk[idx] != 0;
+
+    if (reset_if) {
+      // assume very sparse reset thus only read if reset
+      T bias = with_bias ? reset_bias[idx] : (T)0.0;
+      T w;
+      const float4 parij = reinterpret_cast<const float4 *>(dev_4params)[tid];
+      if (reset_std) {
+        w = bias + reset_std * curand_normal(&local_state);
+      } else {
+        w = bias;
+      }
+      w = (w > parij.z) ? parij.z : w;
+      w = (w < parij.x) ? parij.x : w;
+      weights[idx] = w;
+    }
+  }
+  if (reset_std) {
+    random_states[tid] = local_state;
+  }
+}
+#undef RESET_TOLERANCE
+template <typename T>
+void elemresetsatmsk(
+    CudaContext *context,
+    T *W,
+    const int size,
+    const char *msk,
+    const T *reset_bias,
+    const T reset_std,
+    const float *dev_4params) {
+
+  int nthreads = context->getNThreads();
+  int nblocks_batch_max = context->getSMCount() * (context->maxThreadsPerBlock() / nthreads);
+  int nblocks = MIN(context->getNBlocks(size, nthreads), nblocks_batch_max);
+  kernelElemResetSatMsk<T><<<nblocks, nthreads, 0, context->getStream()>>>(
+      W, size, msk, reset_bias, reset_std, dev_4params,
+      context->getRandomStates(nblocks * nthreads));
+}
+template void elemresetsatmsk<float>(
+    CudaContext *, float *, const int, const char *, const float *, const float, const float *x);
+#ifdef RPU_USE_DOUBLE
+template void elemresetsatmsk<double>(
+    CudaContext *, double *, const int, const char *, const double *, const double, const float *);
+#endif
+
 // A = W - A_in; W = A_in;
 template <typename T>
 __global__ void kernelElemSubCopy(T *dev_W, T *dev_A, const int size, const T scale) {

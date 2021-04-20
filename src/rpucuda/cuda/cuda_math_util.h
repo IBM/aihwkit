@@ -164,6 +164,18 @@ void elemresetsat(
     T thres,
     const float *dev_4params);
 
+// MSK != 0
+// W(MSK) = sat(reset_bias(MSK) + std*randn())
+template <typename T>
+void elemresetsatmsk(
+    CudaContext *context, // non const because might use random states
+    T *W,
+    const int size,
+    const char *msk,
+    const T *reset_bias, // can be nullptr
+    const T reset_std,
+    const float *dev_4params);
+
 // set all elements to a
 template <typename T>
 void elemconst(const CudaContext *context, T *X, const int size, const T alpha);

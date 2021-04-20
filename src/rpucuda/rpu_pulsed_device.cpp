@@ -482,6 +482,26 @@ void PulsedRPUDevice<T>::resetCols(
 }
 
 template <typename T>
+void PulsedRPUDevice<T>::resetAtIndices(
+    T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng) {
+
+  if (getPar().usesPersistentWeight()) {
+    RPU_FATAL("ResetIndices is not supported with write_noise_std>0!");
+  }
+
+  T reset_std = getPar().reset_std;
+
+  for (const auto &index : x_major_indices) {
+    int i = index / this->x_size_;
+    int j = index % this->x_size_;
+
+    weights[i][j] = w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+    weights[i][j] = MIN(weights[i][j], w_max_bound_[i][j]);
+    weights[i][j] = MAX(weights[i][j], w_min_bound_[i][j]);
+  }
+}
+
+template <typename T>
 void PulsedRPUDevice<T>::copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> *rpu_device) {
   if (!containers_allocated_) {
     RPU_FATAL("Containers empty");

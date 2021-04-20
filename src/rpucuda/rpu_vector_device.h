@@ -66,7 +66,7 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   };
 
   /* appends a parameter vector to vec_par. Returns True if successful */
-  bool appendVecPar(AbstractRPUDeviceMetaParameter<T> *par);
+  virtual bool appendVecPar(const AbstractRPUDeviceMetaParameter<T> &par);
 
   VectorRPUDevice<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {
     return new VectorRPUDevice<T>(x_size, d_size, *this, rng);

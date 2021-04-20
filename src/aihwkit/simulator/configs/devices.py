@@ -17,7 +17,9 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import ClassVar, List, Type
+from warnings import warn
 from numpy import exp
+
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.configs.helpers import (
@@ -898,43 +900,110 @@ class ReferenceUnitCell(UnitCell):
 
 
 @dataclass
-class DifferenceUnitCell(UnitCell):
+class OneSidedUnitCell(UnitCell):
     """Abstract device model takes an arbitrary device per crosspoint and
-    implements an explicit plus-minus device pair.
+    implements an explicit plus-minus device pair with one sided update.
 
-    A plus minus pair is implemented by using only one-sided updated
-    of the given devices. Note that reset might need to be called
-    otherwise the one-sided device quickly saturates during learning.
+    One device will receive all positive updated and the other all
+    negative updates. Since the devices will quickly saturate, the
+    device implements a refresh strategy.
 
-    The output current is the difference of both devices.
+    With fixed frequency per update call (``refresh_every``, in units
+    of single vector updates) a refresh is performed. During the
+    refresh, each column will be read using a forward pass (parameters
+    are specified with ``refresh_forward``) to read out the positive and
+    negative device weights.
 
-    Meta parameter setting of the pairs are assumed to be identical
-    (however, device-to-device variation is still present).
+    Whether a weight needs refreshing is determined by the following
+    criterion: The larger weight (normalized by the tile-wise fixed
+    w_max setting) is tested against the upper threshold. If larger
+    than the upper threshold, and the normalized lower weight is
+    larger than the lower threshold, then a reset and rewriting will
+    be performed.
 
-    Caution:
-        Reset needs to be added `manually` by calling the
-        reset_columns method of a tile.
+    Note that this abstract device needs single devices that are
+    derived from :class:`~PulsedDevice`. The reset properties (bias
+    and cycle-to-cycle noise) can be thus adjusted (see
+    :class:`~PulsedDevice`).
+
+    The rewriting of the computed difference is only done onto one of
+    the two devices using the update properties defined in
+    ``refresh_update``.
+
+    Note:
+        This device will take only the first ``unit_cell_device`` to
+        generate two devices. Both positive and negative device will
+        thus have the same (reversed) parameters, e.g. the specified
+        ``w_min``, will become the w_max of the negative device.
     """
 
-    bindings_class: ClassVar[Type] = devices.DifferenceResistiveDeviceParameter
+    bindings_class: ClassVar[Type] = devices.OneSidedResistiveDeviceParameter
 
-    def as_bindings(self) -> devices.DifferenceResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
+    refresh_every: int = 0
+    """How often a refresh is performed (in units of the number of vector
+    updates).
 
+    Note:
+        If a refresh is done, full reads of both positive and negative
+        devices are performed. Additionally, if single devices deemed
+        to be refreshed, an (open-loop) re-write is done (once per
+        column). Thus, refresh might have considerable runtime
+        impacts.
+    """
+
+    refresh_upper_thres: float = 0.75
+    """Upper threshold for determining the refresh, see above."""
+
+    refresh_lower_thres: float = 0.25
+    """Lower threshold for determining the refresh, see above."""
+
+    refresh_forward: IOParameters = field(
+        default_factory=IOParameters)
+
+    """Input-output parameters that define the read during a refresh event.
+
+    :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters`
+    that define the read (forward) of an refresh event. For instance
+    the amount of noise or whether refresh is done using a ADC/DAC
+    etc.
+    """
+
+    refresh_update: UpdateParameters = field(default_factory=UpdateParameters)
+    """Update parameters that define the type of update used for each refresh
+    event.
+
+    Update parameters
+    :class:`~aihwkit.simulator.config.utils.AnalogTileUpdateParameters`
+    that define the type of update used for each refresh event.
+    """
+
+    def as_bindings(self) -> devices.OneSidedResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator
+        bindings object."""
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
 
-        difference_parameters = parameters_to_bindings(self)
+        onesided_parameters = parameters_to_bindings(self)
         device_parameters = self.unit_cell_devices[0].as_bindings()
 
         # need to be exactly 2 and same parameters
-        if not difference_parameters.append_parameter(device_parameters):
+        if not onesided_parameters.append_parameter(device_parameters):
             raise ConfigError("Could not add unit cell device parameter")
 
-        if not difference_parameters.append_parameter(device_parameters):
+        if not onesided_parameters.append_parameter(device_parameters):
             raise ConfigError("Could not add unit cell device parameter")
 
-        return difference_parameters
+        return onesided_parameters
+
+
+@dataclass
+class DifferenceUnitCell(OneSidedUnitCell):
+    """Deprecated alias to ``OneSidedUnitCell``."""
+
+    def __post__init__(self) -> None:
+        warn('The DifferenceUnitCell class is deprecated. Please use '
+             'OneSidedUnitCell instead.',
+             DeprecationWarning)
 
 
 @dataclass
@@ -1091,7 +1160,7 @@ class TransferCompound(UnitCell):
         default_factory=IOParameters)
     """Input-output parameters that define the read of a transfer event.
 
-    :class:`~AnalogTileInputOutputParameters` that define the read
+    :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters` that define the read
     (forward) of an transfer event. For instance the amount of noise
     or whether transfer is done using a ADC/DAC etc.
     """
@@ -1101,7 +1170,7 @@ class TransferCompound(UnitCell):
     """Update parameters that define the type of update used for each transfer
     event.
 
-    Update parameters :class:`~AnalogTileUpdateParameters` that
+    Update parameters :class:`~aihwkit.simulator.config.utils.AnalogTileUpdateParameters` that
     define the type of update used for each transfer event.
     """
 

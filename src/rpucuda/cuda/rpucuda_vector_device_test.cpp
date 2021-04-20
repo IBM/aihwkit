@@ -16,9 +16,9 @@
 #include "rng.h"
 #include "rpu_pulsed.h"
 #include "rpucuda_constantstep_device.h"
-#include "rpucuda_difference_device.h"
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_linearstep_device.h"
+#include "rpucuda_onesided_device.h"
 #include "rpucuda_pulsed.h"
 #include "rpucuda_pulsed_device.h"
 #include "rpucuda_transfer_device.h"
@@ -45,7 +45,7 @@ template <typename VectorDeviceParT> void setAdditionalValues(VectorDeviceParT *
 
 template <> void setAdditionalValues(VectorRPUDeviceMetaParameter<num_t> *vp, num_t value) {}
 
-template <> void setAdditionalValues(DifferenceRPUDeviceMetaParameter<num_t> *vp, num_t value) {}
+template <> void setAdditionalValues(OneSidedRPUDeviceMetaParameter<num_t> *vp, num_t value) {}
 
 template <> void setAdditionalValues(TransferRPUDeviceMetaParameter<num_t> *vp, num_t value) {
   vp->transfer_up.pulse_type = PulseType::None;
@@ -282,7 +282,7 @@ public:
 // types
 typedef ::testing::Types<
     VectorRPUDeviceMetaParameter<num_t>,
-    DifferenceRPUDeviceMetaParameter<num_t>,
+    OneSidedRPUDeviceMetaParameter<num_t>,
     TransferRPUDeviceMetaParameter<num_t>>
     MetaPar;
 

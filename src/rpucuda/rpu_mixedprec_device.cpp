@@ -159,7 +159,7 @@ void MixedPrecRPUDevice<T>::forwardUpdate(
     this->transfer_tmp_.resize(this->x_size_);
   }
 
-  if (this->granularity_ <= 0 )  {
+  if (this->granularity_ <= 0) {
     RPU_FATAL("Granularity cannot be zero!");
   }
 

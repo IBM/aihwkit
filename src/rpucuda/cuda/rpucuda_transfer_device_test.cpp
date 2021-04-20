@@ -113,15 +113,14 @@ public:
   ConstantStepRPUDeviceMetaParameter<num_t> dp_cs;
   std::unique_ptr<PulsedWeightUpdater<num_t>> up_pwu;
   std::unique_ptr<CudaArray<num_t>> dev_weights;
+  RealWorldRNG<num_t> rw_rng;
+  std::unique_ptr<AbstractRPUDevice<num_t>> rpu_device;
+  std::unique_ptr<AbstractRPUDeviceCuda<num_t>> rpucuda_device;
 
   RNG<num_t> *rng;
 
   std::unique_ptr<CudaContext> context_container;
   CudaContext *context;
-
-  RealWorldRNG<num_t> rw_rng;
-  std::unique_ptr<AbstractRPUDevice<num_t>> rpu_device;
-  std::unique_ptr<AbstractRPUDeviceCuda<num_t>> rpucuda_device;
 };
 
 // define the tests

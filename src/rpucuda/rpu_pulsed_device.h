@@ -252,7 +252,7 @@ public:
   bool onSetWeights(T **weights) override;
   void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
-
+  virtual void resetAtIndices(T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng);
   void copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> *rpu_device) override;
 
 protected:
@@ -420,7 +420,8 @@ public:                                                                         
   }
 
 #define PULSED_UPDATE_W_LOOP_DENSE(BODY)                                                           \
-  for (int j = 0; j < this->x_size_ * this->d_size_; j++) {                                        \
+  int _total_size = this->x_size_ * this->d_size_;                                                 \
+  for (int j = 0; j < _total_size; j++) {                                                          \
     int c_signed = coincidences[j];                                                                \
     if (c_signed == 0) {                                                                           \
       continue;                                                                                    \
