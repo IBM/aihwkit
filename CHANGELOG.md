@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 
 * Weight refresh mechanism for ``OneSidedUnitCell`` to counteract
-  saturation, by differential read, reset, and re-write. (\#???)
+  saturation, by differential read, reset, and re-write. (\#209)
   
 * A number of new config presets added to the library, namely `EcRamMOPreset`,
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 * Renamed the `DifferenceUnitCell` to `OneSidedUnitCell` which more
-  properly reflects its function. (\#???)
+  properly reflects its function. (\#209)
 
 ## [0.3.0] - 2021/04/14
 
