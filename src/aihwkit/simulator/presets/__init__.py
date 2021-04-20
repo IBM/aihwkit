@@ -14,16 +14,19 @@
 
 from .configs import (
     # Single device configs.
-    ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, IdealizedPreset,
+    ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, EcRamMOPreset, IdealizedPreset,
     GokmenVlasovPreset,
     # 2-device configs.
-    ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, Idealized2Preset,
+    ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, EcRamMO2Preset,
+    Idealized2Preset,
     # 4-device configs.
-    ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset, Idealized4Preset,
+    ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset, EcRamMO4Preset,
+    Idealized4Preset,
     # Tiki-taka configs.
     TikiTakaReRamESPreset, TikiTakaReRamSBPreset, TikiTakaCapacitorPreset,
-    TikiTakaEcRamPreset, TikiTakaIdealizedPreset,
+    TikiTakaEcRamPreset, TikiTakaEcRamMOPreset, TikiTakaIdealizedPreset,
     # MixedPrecision configs.
     MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
-    MixedPrecisionEcRamPreset, MixedPrecisionIdealizedPreset, MixedPrecisionGokmenVlasovPreset
+    MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
+    MixedPrecisionGokmenVlasovPreset,
 )
