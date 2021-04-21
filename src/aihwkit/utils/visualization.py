@@ -33,6 +33,7 @@ import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
 
 from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.tiles import (
     AnalogTile, BaseTile
 )
@@ -244,7 +245,7 @@ def get_tile_for_plotting(
         rpu_config: RPU Configuration to use for plotting
         n_traces: Number of traces to plot
         use_cuda: Whether to use the CUDA implementation (if available)
-        noise_free: Whether to turn-off cycle-to-cycle noises
+        noise_free: Whether to turn-off cycle-to-cycle noises (if possible)
 
     Returns:
         Instantiated tile.
@@ -259,7 +260,9 @@ def get_tile_for_plotting(
     if noise_free:
         config.forward.is_perfect = True
 
-        config.device.dw_min_std = 0.0  # Noise free.
+        if hasattr(config.device, 'dw_min_std'):
+            config.device.dw_min_std = 0.0  # Noise free.
+
         if (hasattr(config.device, 'write_noise_std') and
                 getattr(config.device, 'write_noise_std') > 0.0):
             # Just make very small to avoid hidden parameter mismatch.
@@ -267,7 +270,8 @@ def get_tile_for_plotting(
 
     analog_tile = AnalogTile(n_traces, 1, config)  # type: BaseTile
     analog_tile.set_learning_rate(1)
-    weights = config.device.as_bindings().w_min * ones((n_traces, 1))
+    w_min = getattr(config.device.as_bindings(), 'w_min', -1.0)
+    weights = w_min * ones((n_traces, 1))
     analog_tile.set_weights(weights)
 
     if use_cuda and cuda.is_compiled():
@@ -289,13 +293,25 @@ def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
 
     Returns:
         Guessed number of steps
-    """
-    device_bindings = rpu_config.device.as_bindings()
-    dw_min = device_bindings.calc_weight_granularity()
-    w_min = device_bindings.w_min
-    w_max = device_bindings.w_max
 
-    n_steps = int(np.round((w_max - w_min) / dw_min))
+    Raises:
+
+        ConfigError: If rpu_config.device does not have the w_min
+            attribute (which is only ensured for
+            :class:`~aihwkit.simulator.configs.configs.SingleRPUConfig`)
+
+    """
+
+    device_binding = rpu_config.device.as_bindings()
+
+    if not hasattr(device_binding, 'w_min'):
+        raise ConfigError("Expect SingleRPUConfig for step estimation.")
+
+    weight_granularity = device_binding.calc_weight_granularity()
+    w_min = device_binding.w_min
+    w_max = device_binding.w_max
+
+    n_steps = int(np.round((w_max - w_min) / weight_granularity))
     return n_steps
 
 

@@ -25,7 +25,7 @@ VectorRPUDeviceMetaParameter<T>::VectorRPUDeviceMetaParameter(
     const PulsedRPUDeviceMetaParameterBase<T> &dp, int n_devices) {
   vec_par.clear();
   for (int i = 0; i < n_devices; i++) {
-    appendVecPar(dp.clone());
+    appendVecPar(dp);
   }
 }
 
@@ -36,7 +36,7 @@ VectorRPUDeviceMetaParameter<T>::VectorRPUDeviceMetaParameter(
     : PulsedRPUDeviceMetaParameterBase<T>(other) {
   // deep copy
   for (size_t i = 0; i < other.vec_par.size(); i++) {
-    appendVecPar(other.vec_par[i]->clone());
+    appendVecPar(*other.vec_par[i]);
   }
   same_context = other.same_context;
   update_policy = other.update_policy;
@@ -78,8 +78,8 @@ VectorRPUDeviceMetaParameter<T>::operator=(VectorRPUDeviceMetaParameter<T> &&oth
 }
 
 template <typename T>
-bool VectorRPUDeviceMetaParameter<T>::appendVecPar(AbstractRPUDeviceMetaParameter<T> *par) {
-  auto *dp = dynamic_cast<PulsedRPUDeviceMetaParameterBase<T> *>(par);
+bool VectorRPUDeviceMetaParameter<T>::appendVecPar(const AbstractRPUDeviceMetaParameter<T> &par) {
+  auto *dp = dynamic_cast<PulsedRPUDeviceMetaParameterBase<T> *>(par.clone());
   if (dp == nullptr) {
     return false;
   } else {
@@ -510,7 +510,6 @@ template <typename T> void VectorRPUDevice<T>::diffuseWeights(T **weights, RNG<T
 }
 
 template <typename T> void VectorRPUDevice<T>::clipWeights(T **weights, T clip) {
-
 #pragma omp parallel for
   for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {
     rpu_device_vec_[k]->clipWeights(weights_vec_[k], clip);

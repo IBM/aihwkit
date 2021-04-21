@@ -327,7 +327,7 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
   }
 
   reduceToWeights(up_context, dev_weights);
-  current_update_idx_++;
+  current_update_idx_ += m_batch;
 }
 
 template <typename T> void VectorRPUDeviceCuda<T>::setHiddenUpdateIdx(int idx) {

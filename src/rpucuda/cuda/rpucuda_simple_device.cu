@@ -16,10 +16,10 @@
 #include <memory>
 
 #include "rpucuda_constantstep_device.h"
-#include "rpucuda_difference_device.h"
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_mixedprec_device.h"
+#include "rpucuda_onesided_device.h"
 #include "rpucuda_powstep_device.h"
 #include "rpucuda_transfer_device.h"
 #include "rpucuda_vector_device.h"
@@ -45,9 +45,8 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> 
     return new ExpStepRPUDeviceCuda<T>(c, static_cast<const ExpStepRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::Vector:
     return new VectorRPUDeviceCuda<T>(c, static_cast<const VectorRPUDevice<T> &>(rpu_device));
-  case DeviceUpdateType::Difference:
-    return new DifferenceRPUDeviceCuda<T>(
-        c, static_cast<const DifferenceRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::OneSided:
+    return new OneSidedRPUDeviceCuda<T>(c, static_cast<const OneSidedRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::Transfer:
     return new TransferRPUDeviceCuda<T>(c, static_cast<const TransferRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::FloatingPoint:

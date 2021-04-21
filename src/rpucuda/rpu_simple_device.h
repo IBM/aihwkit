@@ -38,7 +38,7 @@ enum DeviceUpdateType {
   SoftBounds,
   ExpStep,
   Vector,
-  Difference,
+  OneSided,
   Transfer,
   MixedPrec,
   PowStep,
@@ -159,7 +159,6 @@ public:
   virtual void clipWeights(T **weights, T clip) = 0;
   virtual void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) = 0;
-
   virtual bool onSetWeights(T **weights) = 0;
   virtual DeviceUpdateType implements() const = 0;
   virtual bool hasDirectUpdate() const { return false; };

@@ -23,7 +23,7 @@ void declare_rpu_devices(py::module &m) {
   using SoftBoundsParam = RPU::SoftBoundsRPUDeviceMetaParameter<T>;
   using ExpStepParam = RPU::ExpStepRPUDeviceMetaParameter<T>;
   using VectorParam = RPU::VectorRPUDeviceMetaParameter<T>;
-  using DifferenceParam = RPU::DifferenceRPUDeviceMetaParameter<T>;
+  using OneSidedParam = RPU::OneSidedRPUDeviceMetaParameter<T>;
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
   using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
   using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
@@ -198,24 +198,24 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
-  class PyDifferenceParam : public DifferenceParam {
+  class PyOneSidedParam : public OneSidedParam {
   public:
     std::string getName() const override {
-      PYBIND11_OVERLOAD(std::string, DifferenceParam, getName, );
+      PYBIND11_OVERLOAD(std::string, OneSidedParam, getName, );
     }
-    DifferenceParam *clone() const override {
-      PYBIND11_OVERLOAD(DifferenceParam *, DifferenceParam, clone, );
+    OneSidedParam *clone() const override {
+      PYBIND11_OVERLOAD(OneSidedParam *, OneSidedParam, clone, );
     }
     RPU::DeviceUpdateType implements() const override {
-      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, DifferenceParam, implements, );
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, OneSidedParam, implements, );
     }
-    RPU::DifferenceRPUDevice<T> *
+    RPU::OneSidedRPUDevice<T> *
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(
-          RPU::DifferenceRPUDevice<T> *, DifferenceParam, createDevice, x_size, d_size, rng);
+          RPU::OneSidedRPUDevice<T> *, OneSidedParam, createDevice, x_size, d_size, rng);
     }
     T calcWeightGranularity() const override {
-      PYBIND11_OVERLOAD(T, DifferenceParam, calcWeightGranularity, );
+      PYBIND11_OVERLOAD(T, OneSidedParam, calcWeightGranularity, );
     }
   };
 
@@ -510,7 +510,7 @@ void declare_rpu_devices(py::module &m) {
       .def(
           "append_parameter",
           [](VectorParam &self, RPU::AbstractRPUDeviceMetaParameter<T> &dp) {
-            return self.appendVecPar(dp.clone());
+            return self.appendVecPar(dp);
           },
           py::arg("parameter"),
           R"pbdoc(
@@ -532,18 +532,22 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<DifferenceParam, PyDifferenceParam, VectorParam>(
-      m, "DifferenceResistiveDeviceParameter")
+  py::class_<OneSidedParam, PyOneSidedParam, VectorParam>(m, "OneSidedResistiveDeviceParameter")
       .def(py::init<>())
+      .def_readwrite("refresh_every", &OneSidedParam::refresh_every)
+      .def_readwrite("refresh_forward", &OneSidedParam::refresh_io)
+      .def_readwrite("refresh_update", &OneSidedParam::refresh_up)
+      .def_readwrite("refresh_upper_thres", &OneSidedParam::refresh_upper_thres)
+      .def_readwrite("refresh_lower_thres", &OneSidedParam::refresh_lower_thres)
       .def(
           "__str__",
-          [](DifferenceParam &self) {
+          [](OneSidedParam &self) {
             std::stringstream ss;
             self.printToStream(ss);
             return ss.str();
           })
       .def(
-          "calc_weight_granularity", &DifferenceParam::calcWeightGranularity,
+          "calc_weight_granularity", &OneSidedParam::calcWeightGranularity,
           R"pbdoc(
         Calculates the granularity of the weights (typically ``dw_min``)
 

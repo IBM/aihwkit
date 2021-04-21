@@ -30,9 +30,9 @@ TransferRPUDeviceMetaParameter<T>::TransferRPUDeviceMetaParameter(
   if (n_total_devices < 2) {
     RPU_FATAL("More or equal than 2 devices expected.");
   }
-  this->appendVecPar(dp_fast.clone());
+  this->appendVecPar(dp_fast);
   for (int i = 1; i < n_total_devices; i++) {
-    this->appendVecPar(dp_rest.clone());
+    this->appendVecPar(dp_rest);
   }
 };
 
@@ -116,12 +116,12 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
   this->first_update_idx = 0; // only first is updated
   this->same_context = true;
 
-  // Only the first device might be difference from the rest,
+  // Only the first device might be different from the rest,
   // because we use only 2 pulsed weight updater
   auto impl = this->vec_par[1]->implements();
   for (size_t i = 2; i < n_devices; i++) {
     if (impl != this->vec_par[i]->implements()) {
-      RPU_FATAL("Only the first device can be a difference RPU device. ");
+      RPU_FATAL("Only the first device can be a different RPU device. ");
     }
   }
 
@@ -255,15 +255,9 @@ template <typename T>
 TransferRPUDevice<T> &TransferRPUDevice<T>::operator=(TransferRPUDevice<T> &&other) {
   VectorRPUDevice<T>::operator=(std::move(other));
 
-  current_col_indices_ = other.current_col_indices_;
-  other.current_col_indices_.clear();
-
-  transfer_vecs_ = other.transfer_vecs_;
-  other.transfer_vecs_.clear();
-
-  transfer_every_ = other.transfer_every_;
-  other.transfer_every_.clear();
-
+  current_col_indices_ = std::move(other.current_col_indices_);
+  transfer_vecs_ = std::move(other.transfer_vecs_);
+  transfer_every_ = std::move(other.transfer_every_);
   transfer_fb_pass_ = std::move(other.transfer_fb_pass_);
   transfer_pwu_ = std::move(other.transfer_pwu_);
 

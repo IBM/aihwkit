@@ -289,7 +289,7 @@ void CudaContext::init() {
   } else {
     CUDA_CALL(cudaGetDevice(&gpu_id_));
   }
-
+  DEBUG_OUT("Create context on GPU " << gpu_id_);
   env_ = new CublasEnvironment(gpu_id_);
   stream_id_ = 0;
   rng_created_ = false;
@@ -304,7 +304,6 @@ void CudaContext::init() {
 
 CudaContext::CudaContext(int gpu_id, bool non_blocking)
     : gpu_id_(gpu_id), non_blocking_(non_blocking) {
-  DEBUG_OUT("Create context on GPU " << gpu_id);
   this->init();
   this->getStream(0);
 }
@@ -324,8 +323,8 @@ CudaContext::CudaContext(cudaStream_t shared_stream, int gpu_id) : gpu_id_(gpu_i
 
 CudaContext::~CudaContext() {
   DEBUG_OUT("Destroy Cuda Context...");
-  enforceDeviceId();
   if (env_ != nullptr) {
+    enforceDeviceId();
     int i_start = shared_ ? 1 : 0;
     for (int i = i_start; i < streams_.size(); i++) {
       cudaStreamSynchronize(streams_[i]);
@@ -343,6 +342,7 @@ CudaContext::~CudaContext() {
   }
   if (rng_created_) {
     curandDestroyGenerator(rng_);
+    rng_created_ = false;
   }
 
   if (prop_ != nullptr) {
@@ -442,7 +442,8 @@ void CudaContext::enforceDeviceId() const {
   int gpu_id;
   CUDA_CALL(cudaGetDevice(&gpu_id));
   if (gpu_id != gpu_id_) {
-    std::cout << "WARNING wrong device detected!" << std::endl;
+    std::cout << "WARNING wrong device detected " << gpu_id << " versus " << gpu_id_ << "!"
+              << std::endl;
     CUDA_CALL(cudaSetDevice(gpu_id_));
   }
 #endif
@@ -656,7 +657,6 @@ template <typename T> CudaArray<T>::~CudaArray() {
 
   // no sync because no ownership of context !! (might be already destructed)
   if ((size_ > 0) && (values_ != nullptr) && (!shared_if_)) {
-    context_->enforceDeviceId();
     cudaFree(values_);
     values_ = nullptr;
   }

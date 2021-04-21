@@ -24,7 +24,7 @@ from aihwkit.simulator.configs.devices import (
     SoftBoundsPmaxDevice,
     PowStepDevice,
     IOParameters,
-    DifferenceUnitCell,
+    OneSidedUnitCell,
     VectorUnitCell,
     TransferCompound,
     ReferenceUnitCell,
@@ -199,15 +199,15 @@ class Reference:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs)
 
 
-class Difference:
-    """AnalogTile with DifferenceUnitCell."""
+class OneSided:
+    """AnalogTile with OneSidedUnitCell."""
 
     simulator_tile_class = tiles.AnalogTile
     first_hidden_field = 'max_bound_0'
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=DifferenceUnitCell(
+        return UnitCellRPUConfig(device=OneSidedUnitCell(
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
             ]))
@@ -433,15 +433,15 @@ class ReferenceCuda:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
-class DifferenceCuda:
-    """AnalogTile with DifferenceUnitCell."""
+class OneSidedCuda:
+    """AnalogTile with OneSidedUnitCell."""
 
     simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
     first_hidden_field = 'max_bound_0'
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=DifferenceUnitCell(
+        return UnitCellRPUConfig(device=OneSidedUnitCell(
             unit_cell_devices=[
                 ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
             ]))

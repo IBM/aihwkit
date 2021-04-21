@@ -148,7 +148,7 @@ template <typename T> struct IOMetaParameter {
         break; // should never happen
       };
     } else {
-      ss << "\t using ideal floating point." << std::endl;
+      ss << "\t using ideal floating point.";
     }
 
     ss << std::endl;

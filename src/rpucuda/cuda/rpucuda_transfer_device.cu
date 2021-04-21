@@ -29,6 +29,7 @@ template <typename T> void TransferRPUDeviceCuda<T>::initialize() {
       RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
   transfer_iom_ =
       RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
+  this->context_->synchronize();
 }
 
 template <typename T>
@@ -384,6 +385,16 @@ void TransferRPUDeviceCuda<T>::decayWeights(T *dev_weights, bool bias_no_decay) 
   VectorRPUDeviceCuda<T>::decayWeights(dev_weights, bias_no_decay);
 }
 
+template <typename T>
+void TransferRPUDeviceCuda<T>::driftWeights(T *dev_weights, T time_since_last_call) {
+
+  if (fully_hidden_) {
+    this->dev_weights_ptrs_[this->n_devices_ - 1] = dev_weights;
+  }
+
+  VectorRPUDeviceCuda<T>::driftWeights(dev_weights, time_since_last_call);
+}
+
 template <typename T> void TransferRPUDeviceCuda<T>::diffuseWeights(T *dev_weights) {
 
   if (fully_hidden_) {
@@ -400,6 +411,16 @@ template <typename T> void TransferRPUDeviceCuda<T>::clipWeights(T *dev_weights,
   }
 
   VectorRPUDeviceCuda<T>::clipWeights(dev_weights, clip);
+}
+
+template <typename T>
+void TransferRPUDeviceCuda<T>::resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) {
+
+  if (fully_hidden_) {
+    this->dev_weights_ptrs_[this->n_devices_ - 1] = dev_weights;
+  }
+
+  VectorRPUDeviceCuda<T>::resetCols(dev_weights, start_col, n_cols, reset_prob);
 }
 
 template class TransferRPUDeviceCuda<float>;

@@ -26,9 +26,9 @@ from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
     FloatingPoint, Ideal, ConstantStep, LinearStep, SoftBounds,
-    ExpStep, Vector, Difference, Transfer, MixedPrecision, Inference, Reference,
+    ExpStep, Vector, OneSided, Transfer, MixedPrecision, Inference, Reference,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    SoftBoundsCuda, ExpStepCuda, VectorCuda, DifferenceCuda, TransferCuda,
+    SoftBoundsCuda, ExpStepCuda, VectorCuda, OneSidedCuda, TransferCuda,
     InferenceCuda, ReferenceCuda, MixedPrecisionCuda
 )
 
@@ -41,7 +41,7 @@ from .helpers.tiles import (
     ExpStep,
     SoftBounds,
     Vector,
-    Difference,
+    OneSided,
     Transfer,
     MixedPrecision,
     Inference,
@@ -53,7 +53,7 @@ from .helpers.tiles import (
     ExpStepCuda,
     SoftBoundsCuda,
     VectorCuda,
-    DifferenceCuda,
+    OneSidedCuda,
     TransferCuda,
     MixedPrecisionCuda,
     InferenceCuda,

@@ -172,7 +172,7 @@ template <typename T>
 void PulsedRPUDeviceCuda<T>::applyWeightUpdate(T *weights, T *dw_and_current_weight_out) {
 
   if (getPar().usesPersistentWeight()) {
-    RPU_FATAL("ResetCols is not supported with write_noise_std>0!");
+    RPU_FATAL("ApplyWeightUpdate is not supported with write_noise_std>0!");
   }
   RPU::math::elemaddcopysat<T>(
       this->context_, weights, dw_and_current_weight_out, this->size_,
@@ -288,6 +288,21 @@ template <typename T> void PulsedRPUDeviceCuda<T>::applyUpdateWriteNoise(T *dev_
   this->rnd_context_->recordWaitEvent(this->context_->getStream());
   this->rnd_context_->randNormal(
       this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+}
+
+template <typename T>
+void PulsedRPUDeviceCuda<T>::resetAt(T *dev_weights, const char *dev_non_zero_msk) {
+
+  const auto &par = getPar();
+
+  if (par.usesPersistentWeight()) {
+    RPU_FATAL("ResetAt is not supported with write_noise_std>0!");
+  }
+
+  RPU::math::elemresetsatmsk<T>(
+      this->context_, dev_weights, this->size_, dev_non_zero_msk,
+      dev_reset_bias_ == nullptr ? nullptr : dev_reset_bias_->getDataConst(), par.reset_std,
+      dev_4params_->getData());
 }
 
 template <typename T>
