@@ -120,7 +120,7 @@ Unit cell devices
 Resistive device class                                                Description
 ====================================================================  ========
 :class:`~aihwkit.simulator.configs.devices.VectorUnitCell`            abstract resistive device that combines multiple pulsed resistive devices in a single 'unit cell'.
-:class:`~aihwkit.simulator.configs.devices.DifferenceUnitCell`        abstract device model that takes an arbitrary device per crosspoint and implements an one-sided plus-minus device pair, where both devices only receive only positive updates and a refresh or reset needs to be added to avoid saturation.
+:class:`~aihwkit.simulator.configs.devices.OneSidedUnitCell`          abstract device model that takes an arbitrary device per crosspoint and implements an explicit plus-minus device pair with one sided update.
 :class:`~aihwkit.simulator.configs.devices.ReferenceUnitCell`         abstract device model takes two arbitrary device per cross-point and implements an device with reference pair.
 ====================================================================  ========
 
