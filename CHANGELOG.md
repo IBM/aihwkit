@@ -18,13 +18,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Weight refresh mechanism for ``OneSidedUnitCell`` to counteract
   saturation, by differential read, reset, and re-write. (\#209)
-  
 * A number of new config presets added to the library, namely `EcRamMOPreset`,
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
   `MixedPrecisionEcRamMOPreset`. These can be used for tile configuration
   (`rpu_config`). They specify a particular device and optimizer choice. (\#207)
 
 ### Changed
+
 * Renamed the `DifferenceUnitCell` to `OneSidedUnitCell` which more
   properly reflects its function. (\#209)
 
