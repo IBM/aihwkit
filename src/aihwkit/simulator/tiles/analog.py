@@ -13,19 +13,21 @@
 """High level analog tiles (analog)."""
 
 from copy import deepcopy
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 from torch import device as torch_device
 from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.configs import (
-    InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
-)
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda, tiles
 from aihwkit.simulator.tiles.base import BaseTile
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.configs import (
+        InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
+    )
 
 
 class AnalogTile(BaseTile):
@@ -185,8 +187,8 @@ class AnalogTile(BaseTile):
             self,
             out_size: int,
             in_size: int,
-            rpu_config: Optional[Union[SingleRPUConfig, UnitCellRPUConfig,
-                                       InferenceRPUConfig]] = None,
+            rpu_config: Optional[Union['SingleRPUConfig', 'UnitCellRPUConfig',
+                                       'InferenceRPUConfig']] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False,
@@ -230,7 +232,7 @@ class AnalogTile(BaseTile):
             self,
             x_size: int,
             d_size: int,
-            rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig]
+            rpu_config: Union['SingleRPUConfig', 'UnitCellRPUConfig', 'InferenceRPUConfig']
     ) -> tiles.AnalogTile:
         """Create a simulator tile.
 
