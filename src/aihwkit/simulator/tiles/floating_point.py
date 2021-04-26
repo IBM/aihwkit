@@ -109,7 +109,11 @@ class FloatingPointTile(BaseTile):
             in_trans: bool = False,
             out_trans: bool = False,
     ):
-        rpu_config = rpu_config or FloatingPointRPUConfig()
+        if not rpu_config:
+            # Import `FloatingPointRPUConfig` dynamically to avoid import cycles.
+            # pylint: disable=import-outside-toplevel
+            from aihwkit.simulator.configs import FloatingPointRPUConfig
+            rpu_config = FloatingPointRPUConfig()
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
     def cpu(self) -> 'BaseTile':

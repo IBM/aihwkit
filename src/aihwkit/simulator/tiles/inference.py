@@ -53,7 +53,11 @@ class InferenceTile(AnalogTile):
             in_trans: bool = False,
             out_trans: bool = False
     ):
-        rpu_config = rpu_config or InferenceRPUConfig()
+        if not rpu_config:
+            # Import `InferenceRPUConfig` dynamically to avoid import cycles.
+            # pylint: disable=import-outside-toplevel
+            from aihwkit.simulator.configs import InferenceRPUConfig
+            rpu_config = InferenceRPUConfig()
 
         # Noise model.
         self.noise_model = deepcopy(rpu_config.noise_model)

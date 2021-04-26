@@ -191,7 +191,12 @@ class AnalogTile(BaseTile):
             in_trans: bool = False,
             out_trans: bool = False,
     ):
-        rpu_config = rpu_config or SingleRPUConfig(device=ConstantStepDevice())
+        if not rpu_config:
+            # Import `SingleRPUConfig` dynamically to avoid import cycles.
+            # pylint: disable=import-outside-toplevel
+            from aihwkit.simulator.configs import SingleRPUConfig
+            rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
     def cpu(self) -> 'BaseTile':
