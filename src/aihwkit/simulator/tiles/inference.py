@@ -13,7 +13,7 @@
 """High level analog tiles (inference)."""
 
 from copy import deepcopy
-from typing import List, Optional, Union
+from typing import List, Optional, Union, TYPE_CHECKING
 
 from torch import device as torch_device
 from torch import ones, Tensor
@@ -22,12 +22,14 @@ from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.helpers import parameters_to_bindings
 from aihwkit.simulator.configs.utils import WeightClipType, WeightModifierType
 from aihwkit.simulator.rpu_base import cuda, tiles
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.tiles.base import BaseTile
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.configs import InferenceRPUConfig
 
 
 class InferenceTile(AnalogTile):
@@ -48,12 +50,16 @@ class InferenceTile(AnalogTile):
             self,
             out_size: int,
             in_size: int,
-            rpu_config: Optional[InferenceRPUConfig] = None,
+            rpu_config: Optional['InferenceRPUConfig'] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False
     ):
-        rpu_config = rpu_config or InferenceRPUConfig()
+        if not rpu_config:
+            # Import `InferenceRPUConfig` dynamically to avoid import cycles.
+            # pylint: disable=import-outside-toplevel
+            from aihwkit.simulator.configs import InferenceRPUConfig
+            rpu_config = InferenceRPUConfig()
 
         # Noise model.
         self.noise_model = deepcopy(rpu_config.noise_model)

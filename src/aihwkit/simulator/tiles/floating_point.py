@@ -13,16 +13,18 @@
 """High level analog tiles (floating point)."""
 
 from copy import deepcopy
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 from torch import device as torch_device
 from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.configs import FloatingPointRPUConfig
 from aihwkit.simulator.rpu_base import cuda, tiles
 from aihwkit.simulator.tiles.base import BaseTile
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.configs import FloatingPointRPUConfig
 
 
 class FloatingPointTile(BaseTile):
@@ -104,12 +106,16 @@ class FloatingPointTile(BaseTile):
             self,
             out_size: int,
             in_size: int,
-            rpu_config: Optional[FloatingPointRPUConfig] = None,
+            rpu_config: Optional['FloatingPointRPUConfig'] = None,
             bias: bool = False,
             in_trans: bool = False,
             out_trans: bool = False,
     ):
-        rpu_config = rpu_config or FloatingPointRPUConfig()
+        if not rpu_config:
+            # Import `FloatingPointRPUConfig` dynamically to avoid import cycles.
+            # pylint: disable=import-outside-toplevel
+            from aihwkit.simulator.configs import FloatingPointRPUConfig
+            rpu_config = FloatingPointRPUConfig()
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
     def cpu(self) -> 'BaseTile':
@@ -143,7 +149,7 @@ class FloatingPointTile(BaseTile):
             self,
             x_size: int,
             d_size: int,
-            rpu_config: FloatingPointRPUConfig
+            rpu_config: 'FloatingPointRPUConfig'
     ) -> tiles.FloatingPointTile:
         """Create a simulator tile.
 
