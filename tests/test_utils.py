@@ -103,14 +103,12 @@ class SerializationTest(ParametrizedTestCase):
             assert_raises(AssertionError, assert_array_almost_equal, model_biases, tile_biases)
 
         # Save the model to a file.
-        file = TemporaryFile()
-        save(model.state_dict(), file)
-
-        # Create a new model and load its state dict.
-        file.seek(0)
-        new_model = self.get_layer()
-        new_model.load_state_dict(load(file))
-        file.close()
+        with TemporaryFile() as file:
+            save(model.state_dict(), file)
+            # Create a new model and load its state dict.
+            file.seek(0)
+            new_model = self.get_layer()
+            new_model.load_state_dict(load(file))
 
         # Compare the new model weights and biases. they should now be in sync
         (new_model_weights, new_model_biases,
@@ -134,13 +132,11 @@ class SerializationTest(ParametrizedTestCase):
             assert_array_almost_equal(model_biases, tile_biases)
 
         # Save the model to a file.
-        file = TemporaryFile()
-        save(model, file)
-
-        # Load the model.
-        file.seek(0)
-        new_model = load(file)
-        file.close()
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file)
 
         # Compare the new model weights and biases.
         (new_model_weights, new_model_biases,
@@ -165,13 +161,11 @@ class SerializationTest(ParametrizedTestCase):
         model = self.get_layer(rpu_config=rpu_config)
 
         # Save the model to a file.
-        file = TemporaryFile()
-        save(model, file)
-
-        # Load the model.
-        file.seek(0)
-        new_model = load(file)
-        file.close()
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file)
 
         # Assert over the new model tile parameters.
         parameters = new_model.analog_tile.tile.get_parameters()
@@ -186,13 +180,11 @@ class SerializationTest(ParametrizedTestCase):
         hidden_parameters = model.analog_tile.tile.get_hidden_parameters()
 
         # Save the model to a file.
-        file = TemporaryFile()
-        save(model, file)
-
-        # Load the model.
-        file.seek(0)
-        new_model = load(file)
-        file.close()
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file)
 
         # Assert over the new model tile parameters.
         new_hidden_parameters = new_model.analog_tile.tile.get_hidden_parameters()
@@ -206,13 +198,11 @@ class SerializationTest(ParametrizedTestCase):
         model.analog_tile.tile.set_alpha_scale(alpha)
 
         # Save the model to a file.
-        file = TemporaryFile()
-        save(model, file)
-
-        # Load the model.
-        file.seek(0)
-        new_model = load(file)
-        file.close()
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file)
 
         # Assert over the new model tile parameters.
         alpha_new = new_model.analog_tile.tile.get_alpha_scale()
@@ -226,13 +216,11 @@ class SerializationTest(ParametrizedTestCase):
         self.assertNotEqual(alpha, 1.0)
 
         # Save the model to a file.
-        file = TemporaryFile()
-        save(model, file)
-
-        # Load the model.
-        file.seek(0)
-        new_model = load(file)
-        file.close()
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file)
 
         # Assert over the new model tile parameters.
         alpha_new = new_model.analog_tile.tile.get_alpha_scale()
@@ -245,14 +233,12 @@ class SerializationTest(ParametrizedTestCase):
         hidden_parameters = model.analog_tile.tile.get_hidden_parameters()
 
         # Save the model to a file.
-        file = TemporaryFile()
-        save(model.state_dict(), file)
-
-        # Load the model.
-        file.seek(0)
-        new_model = self.get_layer()
-        new_model.load_state_dict(load(file))
-        file.close()
+        with TemporaryFile() as file:
+            save(model.state_dict(), file)
+            # Load the model.
+            file.seek(0)
+            new_model = self.get_layer()
+            new_model.load_state_dict(load(file))
 
         # Assert over the new model tile parameters.
         new_hidden_parameters = new_model.analog_tile.tile.get_hidden_parameters()

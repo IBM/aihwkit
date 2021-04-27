@@ -1,5 +1,5 @@
 mypy==0.812
 pycodestyle==2.7.0
-pylint==2.6.0
+pylint==2.8.2
 pytest==6.2.3
 parameterized==0.8.1
