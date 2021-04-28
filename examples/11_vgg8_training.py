@@ -78,42 +78,47 @@ def load_images():
     return train_data, validation_data
 
 
-def VGG8():
-    """VGG8 inspired analog model."""
+def create_analog_network():
+    """Returns a Vgg8 inspired analog model.""""
+    channel_base = 48
+    channel = [channel_base, 2 * channel_base, 3 * channel_base]
+    fc_size = 8 * channel_base
     model = AnalogSequential(
-        AnalogConv2d(in_channels=3, out_channels=128, kernel_size=3, stride=1, padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+        nn.Conv2d(in_channels=3, out_channels=channel[0], kernel_size=3, stride=1, padding=1),
         nn.ReLU(),
-        AnalogConv2d(in_channels=128, out_channels=128, kernel_size=3, stride=1, padding=1,
+        AnalogConv2d(in_channels=channel[0], out_channels=channel[0], kernel_size=3, stride=1,
+                     padding=1,
                      rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
-        nn.BatchNorm2d(128),
-        nn.ReLU(),
-        nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
-        AnalogConv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
-        nn.ReLU(),
-        AnalogConv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
-        nn.BatchNorm2d(256),
+        nn.BatchNorm2d(channel[0]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
-        AnalogConv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1, padding=1,
+        AnalogConv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=3, stride=1,
+                     padding=1,
                      rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
         nn.ReLU(),
-        AnalogConv2d(in_channels=512, out_channels=512, kernel_size=3, stride=1, padding=1,
+        AnalogConv2d(in_channels=channel[1], out_channels=channel[1], kernel_size=3, stride=1,
+                     padding=1,
                      rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
-        nn.BatchNorm2d(512),
+        nn.BatchNorm2d(channel[1]),
+        nn.ReLU(),
+        nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
+        AnalogConv2d(in_channels=channel[1], out_channels=channel[2], kernel_size=3, stride=1,
+                     padding=1,
+                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+        nn.ReLU(),
+        AnalogConv2d(in_channels=channel[2], out_channels=channel[2], kernel_size=3, stride=1,
+                     padding=1,
+                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+        nn.BatchNorm2d(channel[2]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
         nn.Flatten(),
-        AnalogLinear(in_features=8192, out_features=1024,
+        AnalogLinear(in_features=16 * channel[2], out_features=fc_size,
                      rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
         nn.ReLU(),
-        AnalogLinear(in_features=1024, out_features=N_CLASSES,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+        nn.Linear(in_features=fc_size, out_features=N_CLASSES),
         nn.LogSoftmax(dim=1)
     )
-
     return model
 
 
@@ -282,7 +287,7 @@ def main():
     train_data, validation_data = load_images()
 
     # Prepare the model.
-    model = VGG8()
+    model = create_analog_network()
     if USE_CUDA:
         model.cuda()
     print(model)

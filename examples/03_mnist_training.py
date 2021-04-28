@@ -162,26 +162,19 @@ def test_evaluation(model, val_set):
     predicted_ok = 0
     total_images = 0
 
+    model.eval()
+
     for images, labels in val_set:
         # Predict image.
         images = images.to(DEVICE)
         labels = labels.to(DEVICE)
-        for i in range(len(labels)):
-            image = images[i].view(1, INPUT_SIZE)
-            with torch.no_grad():
-                pred = model(image)
 
-        probabilities_tensor = torch.exp(pred)
-        probabilities = list(probabilities_tensor.cpu().numpy()[0])
+        images = images.view(images.shape[0], -1)
+        pred = model(images)
 
-        # Get labels.
-        predicted_label = probabilities.index(max(probabilities))
-        validation_label = labels.cpu().numpy()[-1]
-
-        # Check if predicted image match with validation label.
-        if validation_label == predicted_label:
-            predicted_ok += 1
-        total_images += 1
+        _, predicted = torch.max(pred.data, 1)
+        total_images += labels.size(0)
+        predicted_ok += (predicted == labels).sum().item()
 
     print('\nNumber Of Images Tested = {}'.format(total_images))
     print('Model Accuracy = {}'.format(predicted_ok/total_images))

@@ -76,37 +76,27 @@ def load_images():
     return train_data, validation_data
 
 
-class LeNet5(AnalogSequential):
-    """LeNet5 inspired analog model."""
+def create_analog_network():
+    """Returns a LeNet5 inspired analog model.""""
+    channel = [16, 32, 512, 128]
+    model = AnalogSequential(
+        AnalogConv2d(in_channels=1, out_channels=channel[0], kernel_size=5, stride=1,
+                     rpu_config=RPU_CONFIG),
+        nn.Tanh(),
+        nn.MaxPool2d(kernel_size=2),
+        AnalogConv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=5, stride=1,
+                     rpu_config=RPU_CONFIG),
+        nn.Tanh(),
+        nn.MaxPool2d(kernel_size=2),
+        nn.Tanh(),
+        nn.Flatten(),
+        AnalogLinear(in_features=channel[2], out_features=channel[3], rpu_config=RPU_CONFIG),
+        nn.Tanh(),
+        AnalogLinear(in_features=channel[3], out_features=N_CLASSES, rpu_config=RPU_CONFIG),
+        nn.LogSoftmax(dim=1)
+    )
 
-    def __init__(self):
-        super().__init__()
-
-        self.feature_extractor = nn.Sequential(
-            AnalogConv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1,
-                         rpu_config=RPU_CONFIG),
-            nn.Tanh(),
-            nn.MaxPool2d(kernel_size=2),
-            AnalogConv2d(in_channels=16, out_channels=32, kernel_size=5, stride=1,
-                         rpu_config=RPU_CONFIG),
-            nn.Tanh(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Tanh()
-        )
-
-        self.classifier = nn.Sequential(
-            AnalogLinear(in_features=512, out_features=128, rpu_config=RPU_CONFIG),
-            nn.Tanh(),
-            AnalogLinear(in_features=128, out_features=N_CLASSES, rpu_config=RPU_CONFIG),
-        )
-
-    def forward(self, x):
-        x = self.feature_extractor(x)
-        x = torch.flatten(x, 1)
-        logits = self.classifier(x)
-        probs = F.softmax(logits, dim=1)
-
-        return probs
+    return model
 
 
 def create_sgd_optimizer(model, learning_rate):
@@ -274,9 +264,10 @@ def main():
     train_data, validation_data = load_images()
 
     # Prepare the model.
-    model = LeNet5()
+    model = create_analog_network()
     if USE_CUDA:
         model.cuda()
+
     print(model)
 
     print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
