@@ -40,6 +40,7 @@ class FloatingPointRPUConfig(_PrintableMixin):
     """Configuration for a floating point resistive processing unit."""
 
     tile_class: ClassVar[Type] = FloatingPointTile
+    """Tile class that correspond to this RPUConfig."""
 
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
     """Parameters that modify the behavior of the pulsed device."""
@@ -50,6 +51,7 @@ class SingleRPUConfig(_PrintableMixin):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
+    """Tile class that correspond to this RPUConfig."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -75,6 +77,7 @@ class UnitCellRPUConfig(_PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
+    """Tile class that correspond to this RPUConfig."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -109,6 +112,7 @@ class InferenceRPUConfig(_PrintableMixin):
     # pylint: disable=too-many-instance-attributes
 
     tile_class: ClassVar[Type] = InferenceTile
+    """Tile class that correspond to this RPUConfig."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -162,6 +166,7 @@ class DigitalRankUpdateRPUConfig(_PrintableMixin):
     """
 
     tile_class: ClassVar[Type] = AnalogTile
+    """Tile class that correspond to this RPUConfig."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 

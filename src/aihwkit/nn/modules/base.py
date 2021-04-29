@@ -48,6 +48,8 @@ class AnalogModuleBase(Module):
       for performance reasons. The canonical way of reading and writing
       weights is via the ``set_weights()`` and ``get_weights()`` as opposed
       to using the attributes directly.
+    * the ``BaseTile`` subclass that is created is retrieved from the
+      ``rpu_config.tile_class`` attribute.
     """
     # pylint: disable=abstract-method
 
