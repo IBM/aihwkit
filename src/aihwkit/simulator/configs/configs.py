@@ -32,10 +32,14 @@ from aihwkit.simulator.noise_models import (
 )
 from aihwkit.simulator.rpu_base import devices
 
+from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
+
 
 @dataclass
 class FloatingPointRPUConfig(_PrintableMixin):
     """Configuration for a floating point resistive processing unit."""
+
+    tile_class: ClassVar[Type] = FloatingPointTile
 
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
     """Parameters that modify the behavior of the pulsed device."""
@@ -44,6 +48,8 @@ class FloatingPointRPUConfig(_PrintableMixin):
 @dataclass
 class SingleRPUConfig(_PrintableMixin):
     """Configuration for an analog (pulsed device) resistive processing unit."""
+
+    tile_class: ClassVar[Type] = AnalogTile
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -67,6 +73,8 @@ class SingleRPUConfig(_PrintableMixin):
 @dataclass
 class UnitCellRPUConfig(_PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit."""
+
+    tile_class: ClassVar[Type] = AnalogTile
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -99,6 +107,8 @@ class InferenceRPUConfig(_PrintableMixin):
     and read noise can be used.
     """
     # pylint: disable=too-many-instance-attributes
+
+    tile_class: ClassVar[Type] = InferenceTile
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -150,6 +160,8 @@ class DigitalRankUpdateRPUConfig(_PrintableMixin):
     used, and during update the digitally computed rank update is
     transferred to the analog crossbar using pulses.
     """
+
+    tile_class: ClassVar[Type] = AnalogTile
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
