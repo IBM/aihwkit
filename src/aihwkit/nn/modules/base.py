@@ -12,7 +12,7 @@
 
 """Base class for analog Modules."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from torch import device as torch_device
 from torch import Tensor
@@ -23,9 +23,11 @@ from aihwkit.simulator.configs import (
     FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
     UnitCellRPUConfig
 )
-from aihwkit.simulator.tiles import (
-    AnalogTile, BaseTile, FloatingPointTile, InferenceTile
-)
+from aihwkit.simulator.tiles import InferenceTile
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.tiles import BaseTile
+
 
 RPUConfigAlias = Union[FloatingPointRPUConfig, SingleRPUConfig,
                        UnitCellRPUConfig, InferenceRPUConfig]
@@ -46,12 +48,10 @@ class AnalogModuleBase(Module):
       for performance reasons. The canonical way of reading and writing
       weights is via the ``set_weights()`` and ``get_weights()`` as opposed
       to using the attributes directly.
+    * the ``BaseTile`` subclass that is created is retrieved from the
+      ``rpu_config.tile_class`` attribute.
     """
     # pylint: disable=abstract-method
-
-    TILE_CLASS_FLOATING_POINT: Any = FloatingPointTile
-    TILE_CLASS_ANALOG: Any = AnalogTile
-    TILE_CLASS_INFERENCE: Any = InferenceTile
 
     def _setup_tile(
             self,
@@ -61,7 +61,7 @@ class AnalogModuleBase(Module):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0
-    ) -> BaseTile:
+    ) -> 'BaseTile':
         """Create an analog tile and setup this layer for using it.
 
         Create an analog tile to be used for the basis of this layer operations,
@@ -109,14 +109,7 @@ class AnalogModuleBase(Module):
         self.out_features = out_features
 
         # Create the tile.
-        if isinstance(rpu_config, FloatingPointRPUConfig):
-            tile_class = self.TILE_CLASS_FLOATING_POINT
-        elif isinstance(rpu_config, InferenceRPUConfig):
-            tile_class = self.TILE_CLASS_INFERENCE
-        else:
-            tile_class = self.TILE_CLASS_ANALOG
-
-        return tile_class(out_features, in_features, rpu_config, bias=bias)
+        return rpu_config.tile_class(out_features, in_features, rpu_config, bias=bias)
 
     def set_weights(
             self,

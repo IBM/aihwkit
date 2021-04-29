@@ -27,6 +27,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Renamed the `DifferenceUnitCell` to `OneSidedUnitCell` which more
   properly reflects its function. (\#209)
+* The `BaseTile` subclass that is instantiated in the analog layers is now
+  retrieved from the new `RPUConfig.tile_class` attribute, facilitating the
+  use of custom tiles. (\#218)
 
 ## [0.3.0] - 2021/04/14
 

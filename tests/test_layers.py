@@ -12,11 +12,14 @@
 
 """Tests for general functionality of layers."""
 
+# pylint: disable=too-few-public-methods
+
 from unittest import SkipTest
 
 from torch import Tensor, device
 
 from aihwkit.nn import AnalogSequential
+from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.tiles import AnalogTile, CudaAnalogTile
 from aihwkit.simulator.rpu_base import cuda
 
@@ -184,3 +187,37 @@ class CpuAnalogLayerTest(ParametrizedTestCase):
 
         # Assert the tile is still on CPU.
         self.assertIsInstance(layer.analog_tile, AnalogTile)
+
+
+class CustomAnalogTile(AnalogTile):
+    """Helper tile for ``CustomTileTest``."""
+
+
+class CustomRPUConfig(SingleRPUConfig):
+    """Helper rpu config for ``CustomTileTest``."""
+    tile_class = CustomAnalogTile
+
+
+class CustomTileTestHelper:
+    """Helper tile for parametrizing during ``CustomTileTest``."""
+
+    def get_rpu_config(self):
+        """Return a RPU Config."""
+        return CustomRPUConfig()
+
+
+@parametrize_over_layers(
+    layers=[Linear, Conv2d],
+    tiles=[CustomTileTestHelper],
+    biases=[True, False]
+)
+class CustomTileTest(ParametrizedTestCase):
+    """Test for analog layers using custom tiles."""
+
+    def test_custom_tile(self):
+        """Test using a custom tile with analog layers."""
+        # Create the layer, which uses `CustomRPUConfig`.
+        layer = self.get_layer()
+
+        # Assert that the internal analog tile is `CustomAnalogTile`.
+        self.assertIsInstance(layer.analog_tile, CustomAnalogTile)
