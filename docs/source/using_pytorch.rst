@@ -60,10 +60,10 @@ in the underlying tile.
 Overall, the layer can be combined and used as if it was a standard torch
 layer. As an example, it can be mixed with existing layers::
 
-        from aihwkit.nn import AnalogLinear
-        from torch.nn import Linear, Sequential
+        from aihwkit.nn import AnalogLinear, AnalogSequential
+        from torch.nn import Linear
 
-        model = Sequential(
+        model = AnalogSequential(
             AnalogLinear(2, 3),
             Linear(3, 3),
             AnalogLinear(3, 1)
@@ -214,12 +214,12 @@ Or in the case of custom classes::
 
     class Example(AnalogSequential):
 
-    def __init__(self):
-        super().__init__()
+        def __init__(self):
+            super().__init__()
 
-        self.feature_extractor = AnalogConv2d(
-            in_channels=1, out_channels=16, kernel_size=5, stride=1
-        )
+            self.feature_extractor = AnalogConv2d(
+                in_channels=1, out_channels=16, kernel_size=5, stride=1
+            )
 
 
 .. _PyTorch: https://pytorch.org
