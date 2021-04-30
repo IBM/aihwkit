@@ -151,9 +151,9 @@ on the particularities of the tile.
 For example, for creating a floating point configuration that has the default
 values for its parameters::
 
-    from aihwkit.simulator.configs import FloatingPointResistiveDevice
+    from aihwkit.simulator.configs import FloatingPointRPUConfig
 
-    config = FloatingPointResistiveDevice()
+    config = FloatingPointRPUConfig()
 
 Among those parameters is the resistive device that will be used for creating
 the tile. For example, for creating a single resistive device configuration
@@ -188,10 +188,11 @@ the tile::
 
     from aihwkit.simulator.configs import SingleRPUConfig
     from aihwkit.simulator.configs.devices import LinearStepDevice
+    from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 
     rpu_config = SingleRPUConfig(
         forward=IOParameters(out_noise=0.1),
-        backward=BackwardIOParameters(out_noise=0.2),
+        backward=IOParameters(out_noise=0.2),
         update=UpdateParameters(desired_bl=20),
         device=LinearStepDevice(w_min=-0.4, w_max=0.6)
     )
