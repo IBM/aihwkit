@@ -12,7 +12,7 @@
 
 """Basic training Experiment."""
 
-from typing import Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type
 
 from torch import device as torch_device, max as torch_max, Tensor
 from torch.nn import Module, NLLLoss
@@ -75,6 +75,28 @@ class BasicTraining(Experiment):
 
         super().__init__()
 
+    def get_dataset_arguments(self, dataset: type) -> Tuple[Dict, Dict]:
+        """Return the dataset constructor arguments for specifying subset."""
+        if dataset in (SVHN, ):
+            return {'split': 'train'}, {'split': 'test'}
+        return {'train': True}, {'train': False}
+
+    def get_dataset_transform(self, dataset: type) -> Any:
+        """Return the dataset transform."""
+        # Normalize supported datasets.
+        if dataset == FashionMNIST:
+            mean = Tensor([0.2860])
+            std = Tensor([0.3205])
+            transform = Compose([ToTensor(), Normalize(mean, std)])
+        elif dataset == SVHN:
+            mean = Tensor([0.4377, 0.4438, 0.4728])
+            std = Tensor([0.1980, 0.2010, 0.1970])
+            transform = Compose([ToTensor(), Normalize(mean, std)])
+        else:
+            transform = Compose([ToTensor()])
+
+        return transform
+
     def get_data_loaders(
             self,
             dataset: type,
@@ -96,21 +118,8 @@ class BasicTraining(Experiment):
             A tuple with the training and validation loaders.
         """
         # Create the sets and the loaders.
-        train_args = {'split': 'train'}  # type: Dict
-        test_args = {'split': 'test'}  # type: Dict
-        transform = Compose([ToTensor()])
-
-        # Normalize datasets.
-        if dataset == FashionMNIST:
-            mean = Tensor([0.2860])
-            std = Tensor([0.3205])
-            transform = Compose([ToTensor(), Normalize(mean, std)])
-            train_args = {'train': True}
-            test_args = {'train': False}
-        elif dataset == SVHN:
-            mean = Tensor([0.4377, 0.4438, 0.4728])
-            std = Tensor([0.1980, 0.2010, 0.1970])
-            transform = Compose([ToTensor(), Normalize(mean, std)])
+        train_args, test_args = self.get_dataset_arguments(dataset)
+        transform = self.get_dataset_transform(dataset)
 
         # Create the datasets.
         training_set = dataset(dataset_root, transform=transform, **train_args)

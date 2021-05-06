@@ -30,6 +30,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The `BaseTile` subclass that is instantiated in the analog layers is now
   retrieved from the new `RPUConfig.tile_class` attribute, facilitating the
   use of custom tiles. (\#218)
+* The default parameter for the `dataset` constructor used by `BasicTraining`
+  is now the `train=bool` argument. If using a dataset that requires other
+  arguments or transforms, they can now be specified via overriding
+  `get_dataset_arguments()` and `get_dataset_transform()`. (\#225)
 
 ## [0.3.0] - 2021/04/14
 
