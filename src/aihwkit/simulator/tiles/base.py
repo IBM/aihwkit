@@ -246,8 +246,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
         output of forward and backward pass, and the learning rate for this tile
         is adjusted accordingly.
 
-        The weights are scaled by :math:`\omega/\max_{ij} |w_ij|` and the global
-        digital factor :math:`alpha` is set to :math:`\max_{ij} |w_ij|/\omega`.
+        The weights are scaled by :math:`\omega/\max_{ij} |w_{ij}|` and the global
+        digital factor :math:`alpha` is set to :math:`\max_{ij} |w_{ij}|/\omega`.
 
         It can be shown that such a constant factor greatly improves the SNR and
         training accuracy as the full weight range of the analog devices are

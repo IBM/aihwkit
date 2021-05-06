@@ -26,7 +26,7 @@ public:
       ExpStepRPUDeviceCuda,
       ExpStepRPUDevice,
       /*ctor body*/
-      dev_es_par_ = std::unique_ptr<CudaArray<T>>(new CudaArray<T>(this->context_, 7));
+      dev_es_par_ = std::unique_ptr<CudaArray<T>>(new CudaArray<T>(this->context_, 9));
       ,
       /*dtor body*/
       ,
@@ -40,7 +40,7 @@ public:
       swap(a.dev_es_par_, b.dev_es_par_);
       ,
       /*host copy from cpu (rpu_device). Parent device params are copyied automatically*/
-      T es_par_arr[7];
+      T es_par_arr[9];
       auto &par = getPar();
       es_par_arr[0] = par.es_A_down;
       es_par_arr[1] = par.es_A_up;
@@ -48,7 +48,9 @@ public:
       es_par_arr[3] = par.es_gamma_up;
       es_par_arr[4] = par.es_a;
       es_par_arr[5] = par.es_b;
-      es_par_arr[6] = getPar().getScaledWriteNoise();
+      es_par_arr[6] = par.getScaledWriteNoise();
+      es_par_arr[7] = par.dw_min_std_add;
+      es_par_arr[8] = par.dw_min_std_slope;
       dev_es_par_->assign(es_par_arr);
       this->context_->synchronize();)
 

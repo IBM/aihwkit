@@ -147,7 +147,7 @@ class AnalogTile(BaseTile):
 
         for t in range(BL):
             if (pulse_train_x[t]==1) and (pulse_train_d[t]==1)
-                update_once(w_ij, direction = sign)
+                update_once(w_{ij}, direction = sign)
 
     The probabilities are generated using scaling factors ``A`` and ``B`` that
     are determined by the learning rate and pulse train length ``BL`` (see

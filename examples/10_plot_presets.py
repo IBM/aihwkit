@@ -21,30 +21,35 @@ from aihwkit.utils.visualization import plot_device, plot_device_compact
 
 from aihwkit.simulator.presets.devices import (
     ReRamSBPresetDevice, ReRamESPresetDevice, CapacitorPresetDevice,
-    EcRamPresetDevice, IdealizedPresetDevice
+    EcRamPresetDevice, IdealizedPresetDevice, EcRamMOPresetDevice,
+    PCMPresetUnitCell,
 )
 
 
 plt.ion()
 
-# ReRam based on ExpStep
-plot_device(ReRamESPresetDevice(), n_steps=1000)
-plot_device_compact(ReRamESPresetDevice(), n_steps=1000)
-
-# ReRam based on SoftBounds
-plot_device(ReRamSBPresetDevice(), n_steps=1000)
-plot_device_compact(ReRamSBPresetDevice(), n_steps=1000)
-
-# Capacitor
-plot_device(CapacitorPresetDevice(), n_steps=400)
-plot_device_compact(CapacitorPresetDevice(), n_steps=400)
-
-# ECRAM
-plot_device(EcRamPresetDevice(), n_steps=1000)
-plot_device_compact(EcRamPresetDevice(), n_steps=1000)
+# Note alternatively one can use plot_device_compact for a more compact
+# plot.
 
 # Idealized
 plot_device(IdealizedPresetDevice(), n_steps=10000)
-plot_device_compact(IdealizedPresetDevice(), n_steps=10000)
+
+# ReRam based on ExpStep
+plot_device(ReRamESPresetDevice(), n_steps=1000)
+
+# ReRam based on SoftBounds
+plot_device(ReRamSBPresetDevice(), n_steps=1000)
+
+# Capacitor
+plot_device(CapacitorPresetDevice(), n_steps=400)
+
+# ECRAM
+plot_device(EcRamPresetDevice(), n_steps=1000)
+
+# Mo-ECRAM
+plot_device(EcRamMOPresetDevice(), n_steps=8000)
+
+# PCM
+plot_device(PCMPresetUnitCell(), n_steps=80)
 
 plt.show()

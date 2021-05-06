@@ -30,6 +30,7 @@ template <typename T> struct OneSidedRPUDeviceMetaParameter : VectorRPUDeviceMet
   PulsedUpdateMetaParameter<T> refresh_up; // UP parameters for refresh
   T refresh_upper_thres = 0.75;
   T refresh_lower_thres = 0.25;
+  bool copy_inverted = false; // whether to use copy inverted for second device
 
   OneSidedRPUDeviceMetaParameter(){};
   OneSidedRPUDeviceMetaParameter(const PulsedRPUDeviceMetaParameterBase<T> &dp, int n_devices = 2)

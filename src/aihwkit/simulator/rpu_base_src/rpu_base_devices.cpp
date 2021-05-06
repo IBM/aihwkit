@@ -486,6 +486,8 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("a", &ExpStepParam::es_a)
       .def_readwrite("b", &ExpStepParam::es_b)
       .def_readwrite("write_noise_std", &ExpStepParam::write_noise_std)
+      .def_readwrite("dw_min_std_add", &ExpStepParam::dw_min_std_add)
+      .def_readwrite("dw_min_std_slope", &ExpStepParam::dw_min_std_slope)
       .def(
           "__str__",
           [](ExpStepParam &self) {
@@ -539,6 +541,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("refresh_update", &OneSidedParam::refresh_up)
       .def_readwrite("refresh_upper_thres", &OneSidedParam::refresh_upper_thres)
       .def_readwrite("refresh_lower_thres", &OneSidedParam::refresh_lower_thres)
+      .def_readwrite("copy_inverted", &OneSidedParam::copy_inverted)
       .def(
           "__str__",
           [](OneSidedParam &self) {

@@ -16,7 +16,7 @@
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import ClassVar, List, Type
+from typing import ClassVar, List, Type, Union
 from warnings import warn
 from numpy import exp
 
@@ -488,9 +488,9 @@ class LinearStepDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise} \Delta w_\text{min}\xi
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise} \Delta w_\text{min}\xi
 
-    and the update is done on :math:`w_ij` but the forward sees the
+    and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
     """
 
@@ -627,6 +627,24 @@ class ExpStepDevice(PulsedDevice):
     these parameters).  Note that the other parameter involved can be
     still defined with device-to-device variation and (additional)
     up-down bias (see :class:`~PulsedDevice`).
+
+
+    Note:
+
+        This device also features a more complex cycle-to-cycle noise
+        model of the update step, when specifying ``dw_min_std_add``
+        and ``dw_min_std_slope``. By default,    The Gaussian noise added to the
+        calculated update step size :math:`\Delta q_\text{act}` is
+        proportional to
+
+        .. math::
+           \sigma_{\text{final}} = \sigma \left( \sigma_\text{add} +
+           |\Delta w_\text{actual}| + \sigma_\text{slope} |w_\text{current}|\right)
+
+        where the :math:`\sigma` is given by ``dw_min_std``,
+        :math:`\sigma_\text{add}` is given by ``dw_min_std_add``, and
+        :math:`\sigma_\text{slope}` is given by ``dw_min_std_slope``.
+
     """
     # pylint: disable=invalid-name
 
@@ -650,6 +668,13 @@ class ExpStepDevice(PulsedDevice):
     b: float = 0.2425
     """Global offset parameter"""
 
+    dw_min_std_add: float = 0.0
+    """additive cycle-to-cycle noise of the update size (in units of
+    ``dw_min_std``, see above)"""
+
+    dw_min_std_slope: float = 0.0
+    """ cycle-to-cycle noise of the update size (in units of ``dw_min_std``, see above)"""
+
     write_noise_std: float = 0.0
     r"""Whether to use update write noise.
 
@@ -661,9 +686,9 @@ class ExpStepDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise}\xi
 
-    and the update is done on :math:`w_ij` but the forward sees the
+    and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
     """
 
@@ -775,9 +800,9 @@ class PowStepDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        w_\text{apparent}{ij} = w_ij + \sigma_\text{write_noise}\xi
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise}\xi
 
-    and the update is done on :math:`w_ij` but the forward sees the
+    and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
     """
 
@@ -977,6 +1002,11 @@ class OneSidedUnitCell(UnitCell):
     that define the type of update used for each refresh event.
     """
 
+    copy_inverted: bool = False
+    """Whether the use the "down" update behavior of the first device for
+    the negative updates instead of the positive half of the second
+    device."""
+
     def as_bindings(self) -> devices.OneSidedResistiveDeviceParameter:
         """Return a representation of this instance as a simulator
         bindings object."""
@@ -984,14 +1014,23 @@ class OneSidedUnitCell(UnitCell):
             raise ConfigError("unit_cell_devices should be a list of devices")
 
         onesided_parameters = parameters_to_bindings(self)
-        device_parameters = self.unit_cell_devices[0].as_bindings()
+        device_parameter0 = self.unit_cell_devices[0].as_bindings()
+
+        if len(self.unit_cell_devices) == 0 or len(self.unit_cell_devices) > 2:
+            raise ConfigError("Need 1 or 2 unit_cell_devices")
+
+        if len(self.unit_cell_devices) == 1:
+            device_parameter1 = device_parameter0
+        else:
+            device_parameter1 = self.unit_cell_devices[1].as_bindings()
 
         # need to be exactly 2 and same parameters
-        if not onesided_parameters.append_parameter(device_parameters):
+        if not onesided_parameters.append_parameter(device_parameter0):
             raise ConfigError("Could not add unit cell device parameter")
 
-        if not onesided_parameters.append_parameter(device_parameters):
-            raise ConfigError("Could not add unit cell device parameter")
+        if not onesided_parameters.append_parameter(device_parameter1):
+            raise ConfigError("Could not add unit cell device parameter" +
+                              "(both devices need to be of the same type)")
 
         return onesided_parameters
 
@@ -1212,7 +1251,10 @@ class DigitalRankUpdateCell(_PrintableMixin):
 
     bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
 
-    device: PulsedDevice = field(default_factory=ConstantStepDevice)
+    device: Union[PulsedDevice,
+                  OneSidedUnitCell,
+                  VectorUnitCell,
+                  ReferenceUnitCell] = field(default_factory=ConstantStepDevice)
     """(Analog) device that are used for forward and backward."""
 
     def as_bindings(self) -> devices.AbstractResistiveDeviceParameter:
@@ -1288,7 +1330,7 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
     Granularity of the device that is used to calculate the number of pulses
     transferred from :math:`\chi` to analog.
 
-    If 0, it will take ``dw_min`` from the analog device used.
+    If 0, it will take granularity from the analog device used.
     """
 
     n_x_bins: int = 0

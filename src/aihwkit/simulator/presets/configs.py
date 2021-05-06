@@ -26,7 +26,8 @@ from aihwkit.simulator.configs.utils import (
 )
 from aihwkit.simulator.presets.devices import (
     CapacitorPresetDevice, EcRamPresetDevice, EcRamMOPresetDevice, IdealizedPresetDevice,
-    ReRamESPresetDevice, ReRamSBPresetDevice, GokmenVlasovPresetDevice
+    ReRamESPresetDevice, ReRamSBPresetDevice, GokmenVlasovPresetDevice,
+    PCMPresetUnitCell
 )
 from aihwkit.simulator.presets.utils import (
     PresetIOParameters, PresetUpdateParameters
@@ -179,6 +180,27 @@ class GokmenVlasovPreset(SingleRPUConfig):
     """
 
     device: PulsedDevice = field(default_factory=GokmenVlasovPresetDevice)
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class PCMPreset(UnitCellRPUConfig):
+    """Preset configuration using a single pair of PCM devicec with refresh, see
+    :class:`~aihwkit.simulator.presets.devices.PCMPresetUnitCell`.
+
+    This preset uses standard SGD with fully parallel update on analog
+    with stochastic pulses.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(default_factory=PCMPresetUnitCell)
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -829,6 +851,30 @@ class MixedPrecisionGokmenVlasovPreset(DigitalRankUpdateRPUConfig):
     device: DigitalRankUpdateCell = field(
         default_factory=lambda: MixedPrecisionCompound(
             device=GokmenVlasovPresetDevice(),
+        ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class MixedPrecisionPCMPreset(DigitalRankUpdateRPUConfig):
+    """Configuration using Mixed-precision with
+    class:`~aihwkit.simulator.presets.devices.PCMPresetDevice`.
+
+    See class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`
+    for details on the mixed precision optimizer.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: DigitalRankUpdateCell = field(
+        default_factory=lambda: MixedPrecisionCompound(
+            device=PCMPresetUnitCell(),
         ))
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)

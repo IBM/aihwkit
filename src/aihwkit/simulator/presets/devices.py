@@ -14,10 +14,14 @@
 
 # pylint: disable=too-many-instance-attributes
 
-from dataclasses import dataclass
-
+from typing import List
+from dataclasses import dataclass, field
+from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 from aihwkit.simulator.configs.devices import (
-    ConstantStepDevice, ExpStepDevice, LinearStepDevice, SoftBoundsDevice
+    ConstantStepDevice, ExpStepDevice, LinearStepDevice, SoftBoundsDevice, OneSidedUnitCell
+)
+from aihwkit.simulator.presets.utils import (
+    PresetIOParameters, PresetUpdateParameters
 )
 
 
@@ -35,8 +39,8 @@ class ReRamESPresetDevice(ExpStepDevice):
     dw_min: float = 0.00135
     up_down: float = 0.259359
 
-    w_max: float = 1.
-    w_min: float = -1.
+    w_max: float = 1.0
+    w_min: float = -1.0
 
     a: float = -0.5
     b: float = -0.5
@@ -293,3 +297,81 @@ class GokmenVlasovPresetDevice(ConstantStepDevice):
     # Device-to-device variation of range
     w_max_dtod: float = 0.3
     w_min_dtod: float = 0.3
+
+
+@dataclass
+class PCMPresetDevice(ExpStepDevice):
+    """Preset configuration for a single Phase change memory (PCM) analog
+    resistive processing unit based on exponential step device model.
+
+    A PCM device based on :math:`Ge_2Sb_2Te_5` described in
+    `Nandakumar et al., Front. Neurosci. 2020`_ by using the
+    exponential device model with complex cycle-to-cycle noise (see
+    :class:`~aihwkit.simulator.configs.device.ExpStepDevice`)
+
+    Note:
+
+        This is an uni-directional device and thus can only be used as
+        a plus-minus pair with refresh (see
+        :class:`~PCMPresetUnitCell` which is using this device
+        combined as a pair based on
+        :class:`~aihwkit.simulator.configs.device.OneSidedUnitCell`).
+
+        When the device is reset, device-to-device and cycle-to-cycle
+        variation is assumed.
+
+    .. _`Nandakumar et al., Front. Neurosci. 2020`: \
+        https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full
+    """
+    # pylint: disable=invalid-name
+
+    dw_min: float = 0.01
+    up_down: float = 0.0
+
+    w_max: float = 2.
+    w_min: float = 0.
+
+    a: float = -1.0  # scales with w_max
+    b: float = 0.0
+    gamma_up: float = 2.5
+    gamma_down: float = 2.5
+    A_up: float = -27.235
+    A_down: float = -2.235
+
+    # Device-to-device var.
+    dw_min_dtod: float = 0.2
+    up_down_dtod: float = 0.05
+
+    w_max_dtod: float = 0.1
+    w_min_dtod: float = 0.0
+
+    # Cycle-to_cycle.
+    dw_min_std: float = 0.6
+    dw_min_std_add: float = 0.042  # dw_min_std/0.6*0.5/20
+    dw_min_std_slope: float = 0.108  # dw_min_std/0.6*1.3/20
+
+    write_noise_std: float = 0.0
+
+    # reset behavior
+    reset: float = 0.01
+    reset_dtod: float = 0.02
+
+
+@dataclass
+class PCMPresetUnitCell(OneSidedUnitCell):
+    """A unit cell that is comprised of two uni-directional PCM devices of
+    opposite sign (see :class:`~PCMPresetDevice`).
+
+    Check for refresh is performed after each mini-batch update. See
+    :class:`~aihwkit.simulator.configs.device.OneSidedUnitCell` for
+    details on the refresh implementation.
+
+    """
+
+    unit_cell_devices: List = field(
+        default_factory=lambda: [PCMPresetDevice(), PCMPresetDevice()])
+
+    refresh_every: int = 1
+    refresh_forward: IOParameters = field(default_factory=PresetIOParameters)
+    refresh_update: UpdateParameters = field(
+        default_factory=lambda: PresetUpdateParameters(desired_bl=31))

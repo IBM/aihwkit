@@ -31,6 +31,8 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T es_gamma_down = (T)12.78785; /* p_1278785 */
     T es_a = (T)0.244;             /* p_0244 */
     T es_b = (T)0.2425;            /*p_02425 */
+    T dw_min_std_add = (T)0.0;     // additive part of dw noise
+    T dw_min_std_slope = (T)0.0;   // multiplicative part of noise with abs(w)
     ,
     /*print body*/
     ss << "\t es_A_up:\t\t" << es_A_up << std::endl;
@@ -39,7 +41,11 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t es_gamma_down:\t\t" << es_gamma_down << std::endl;
     ss << "\t es_a:\t\t\t" << es_a << std::endl;
     ss << "\t es_b:\t\t\t" << es_b << std::endl;
-    ,
+    if (dw_min_std_add != 0.0) {
+      ss << "\t dw_min_std_add:\t " << dw_min_std_add << std::endl;
+    } if (dw_min_std_slope != 0.0) {
+      ss << "\t dw_min_std_slope:\t " << dw_min_std_slope << std::endl;
+    },
     /* calc weight granularity body */
     T up_down = this->up_down;
     T up_bias = up_down > 0 ? (T)0.0 : up_down;
@@ -55,8 +61,9 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ,
     /*add */
     bool implementsWriteNoise() const override { return true; };
-
-);
+    inline bool hasComplexNoise() const {
+      return ((this->dw_min_std > 0) && (dw_min_std_slope != 0.0f || dw_min_std_add != 0.0f));
+    };);
 
 template <typename T> class ExpStepRPUDevice : public PulsedRPUDevice<T> {
 
