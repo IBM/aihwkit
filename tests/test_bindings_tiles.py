@@ -14,7 +14,7 @@
 
 from unittest import SkipTest
 
-from numpy import array, std, dot
+from numpy import array, std, dot, reshape
 from numpy import abs as numpy_abs
 from numpy.random import uniform
 from numpy.testing import assert_array_equal, assert_array_almost_equal
@@ -306,6 +306,80 @@ class FloatingPointTileTest(ParametrizedTestCase):
         input_weights = array([[6, 5, 4], [3, 2, 1]])
         cpp_tile.set_weights_realistic(input_weights, 10)
         assert_array_equal(cpp_tile.get_weights_realistic(), input_weights)
+
+    def test_n_dim_forward(self):
+        """Tests whether forward n-dim inputs work as expected"""
+        in_size = 6
+        out_size = 5
+        add_shape = [2, 3, 4]
+
+        python_tile = self.get_tile(out_size, in_size)
+        init_weights = python_tile.get_weights()[0]
+        x_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [in_size]).astype('float32'))
+
+        if python_tile.is_cuda:
+            x_t = x_t.cuda()
+
+        y_t = python_tile.forward(x_t).detach().cpu().numpy()
+        x_t = x_t.detach().cpu().numpy()
+        self.assertEqual(x_t.ndim, y_t.ndim)
+        self.assertEqual(out_size, y_t.shape[-1])
+
+        x_t = reshape(x_t, [-1, in_size])
+        y_t = reshape(y_t, [-1, out_size])
+        assert_array_almost_equal(dot(x_t, init_weights.T), y_t)
+
+    def test_n_dim_backward(self):
+        """Tests whether backward n-dim inputs work as expected"""
+        in_size = 6
+        out_size = 5
+        add_shape = [4, 2]
+
+        python_tile = self.get_tile(out_size, in_size)
+        init_weights = python_tile.get_weights()[0]
+        d_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [out_size]).astype('float32'))
+
+        if python_tile.is_cuda:
+            d_t = d_t.cuda()
+
+        y_t = python_tile.backward(d_t).detach().cpu().numpy()
+        d_t = d_t.detach().cpu().numpy()
+        self.assertEqual(d_t.ndim, y_t.ndim)
+        self.assertEqual(in_size, y_t.shape[-1])
+
+        d_t = reshape(d_t, [-1, out_size])
+        y_t = reshape(y_t, [-1, in_size])
+        assert_array_almost_equal(dot(d_t, init_weights), y_t)
+
+    def test_n_dim_update(self):
+        """Tests whether update n-dim inputs work as expected"""
+        in_size = 6
+        out_size = 5
+        lr = 0.3
+        add_shape = []
+
+        python_tile = self.get_tile(out_size, in_size)
+        init_weights = python_tile.get_weights()[0]
+        python_tile.set_learning_rate(lr)
+
+        x_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [in_size]).astype('float32'))
+        d_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [out_size]).astype('float32'))
+
+        if python_tile.is_cuda:
+            x_t = x_t.cuda()
+            d_t = d_t.cuda()
+
+        python_tile.update(x_t, d_t)
+        updated_weights = python_tile.get_weights()[0]
+
+        x_t = x_t.detach().cpu().numpy()
+        x_t = reshape(x_t, [-1, in_size])
+
+        d_t = d_t.detach().cpu().numpy()
+        d_t = reshape(d_t, [-1, out_size])
+
+        ref_weights = init_weights - lr*dot(d_t.T, x_t)
+        assert_array_almost_equal(updated_weights, ref_weights)
 
 
 @parametrize_over_tiles([

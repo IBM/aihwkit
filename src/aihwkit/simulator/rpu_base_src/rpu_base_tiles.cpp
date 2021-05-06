@@ -326,27 +326,31 @@ void declare_rpu_tiles(py::module &m) {
             CHECK_TORCH_INPUT(x_input);
 
             // at::cuda::getCurrentCUDAStream() for CUDA
-            if (x_input.dim() != 2) {
-              throw std::runtime_error("Invalid x_input dimensions: expected 2 dimensional array");
+            if (x_input.dim() < 1) {
+              throw std::runtime_error(
+                  "Invalid x_input dimensions: expected at least 1 dimensional array");
             }
-
-            int in_size = x_trans ? x_input.size(0) : x_input.size(1);
+            int in_size = x_trans ? x_input.size(0) : x_input.size(-1);
             int expected_in_size = self.getXSize() - (bias ? 1 : 0);
-            int m_batch = x_trans ? x_input.size(1) : x_input.size(0);
+            int m_batch = x_input.numel() / in_size;
             int out_size = self.getDSize();
 
             // Validate the x_input dimensions.
             if (in_size != expected_in_size) {
-              std::string shape_str = x_trans ? ("[_, " + std::to_string(expected_in_size) + "]")
-                                              : ("[" + std::to_string(expected_in_size) + ",_]");
+              std::string shape_str = x_trans ? ("[*, " + std::to_string(expected_in_size) + "]")
+                                              : ("[" + std::to_string(expected_in_size) + ",*]");
               throw std::runtime_error(
                   "Invalid x_input dimensions: expected " + shape_str + " array");
             }
 
             // Build the buffers.
-            int dim0 = d_trans ? out_size : m_batch;
-            int dim1 = d_trans ? m_batch : out_size;
-            torch::Tensor d_output = torch::empty({dim0, dim1}, x_input.options());
+            std::vector<int64_t> dims(x_input.sizes().begin(), x_input.sizes().end());
+            if (d_trans) {
+              dims[0] = out_size;
+            } else {
+              dims[dims.size() - 1] = out_size;
+            }
+            torch::Tensor d_output = torch::empty(dims, x_input.options());
 
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
@@ -360,27 +364,28 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Compute the dot product (forward pass).
 
-           Compute the dot product::
+           Compute the dot product:
+           .. math:
 
-               Y = X * W (+ b)
+               \mathbf{y} = W\mathbf{x} [+ \mathbf{b}]
 
-           where ``X`` is the input and ``W`` is the ``[d_size, x_size]``
+           where :math:`\mathbf{x}` is the input and :math:`W` is the ``[d_size, x_size]``
            current weight matrix. If ``bias`` is True, then it is assumes that a
-           bias row is added to the analog tile weights.  The input ``X`` is
+           bias row is added to the analog tile weights.  The input :math:`\mathbf{x}` is
            then  expected to be of size ``x_size -1`` , as internally it will be
            expanded by a 1, to match the bias row in the tile weights.
 
            An analog tile will have a possible non-ideal version of this forward pass.
 
            Args:
-               x_input: ``[N, x_size (- 1)]`` matrix.
+               x_input: ``[N,*, x_size (- 1)]`` input :math:`\mathbf{x}` torch::Tensor.
                bias: whether to use bias.
-               x_trans: whether the ``x_input`` matrix is transposed.
+               x_trans: whether the ``x_input`` matrix is transposed. That is of size ``[x_size (- 1), *, N]``
                d_trans: whether the ``d`` matrix is transposed.
                is_test: whether inference (true) mode or training (false)
 
            Returns:
-               torch::tensor: ``[N, d_size]`` matrix.
+               torch::tensor: ``[N, *, d_size]`` or ``[d_size, *, N]`` matrix.
            )pbdoc")
 
       .def(
@@ -390,27 +395,31 @@ void declare_rpu_tiles(py::module &m) {
             auto d_input = d_input_.contiguous();
             CHECK_TORCH_INPUT(d_input);
 
-            if (d_input.dim() != 2) {
-              throw std::runtime_error("Invalid d_input dimensions: expected 2 dimensional array");
+            if (d_input.dim() < 1) {
+              throw std::runtime_error(
+                  "Invalid d_input dimensions: expected at least 1 dimensional array");
             }
-
-            int in_size = d_trans ? d_input.size(0) : d_input.size(1);
+            int in_size = d_trans ? d_input.size(0) : d_input.size(-1);
             int expected_in_size = self.getDSize();
-            int m_batch = d_trans ? d_input.size(1) : d_input.size(0);
+            int m_batch = d_input.numel() / in_size;
             int out_size = self.getXSize() - (bias ? 1 : 0);
 
             // Validate the d_input dimensions.
             if (in_size != expected_in_size) {
-              std::string shape_str = d_trans ? ("[_, " + std::to_string(expected_in_size) + "]")
-                                              : ("[" + std::to_string(expected_in_size) + ",_]");
+              std::string shape_str = d_trans ? ("[*, " + std::to_string(expected_in_size) + "]")
+                                              : ("[" + std::to_string(expected_in_size) + ", *]");
               throw std::runtime_error(
                   "Invalid d_input dimensions: expected " + shape_str + " array");
             }
 
             // Build the buffers.
-            int dim0 = x_trans ? out_size : m_batch;
-            int dim1 = x_trans ? m_batch : out_size;
-            torch::Tensor x_output = torch::empty({dim0, dim1}, d_input.options());
+            std::vector<int64_t> dims(d_input.sizes().begin(), d_input.sizes().end());
+            if (x_trans) {
+              dims[0] = out_size;
+            } else {
+              dims[dims.size() - 1] = out_size;
+            }
+            torch::Tensor x_output = torch::empty(dims, d_input.options());
 
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
@@ -424,23 +433,24 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Compute the transposed dot product (backward pass).
 
-           Compute the transposed dot product::
+           Compute the transposed dot product:
+           .. math:
 
-               Y = D * W'
+               \mathbf{y} = W\mathbf{d}
 
-           where ``D`` is the input and ``W'`` is the ``[d_size, x_size]`` transposed current
-           weight matrix.
+           where :math:`\mathbf{d}` is the input and :math:`W` is the  current
+           weight matrix (of size ``[d_size, x_size]``).
 
            An analog tile will have a possible non-ideal version of this backward pass.
 
            Args:
-               d_input: ``[N, d_size]`` torch::Tensor.
+               d_input: ``[N, *,  d_size]`` input :math:`\mathbf{d}` torch::Tensor.
                bias: whether to use bias.
-               x_trans: whether the ``x_input`` matrix is transposed.
-               d_trans: whether the ``d`` matrix is transposed.
+               d_trans: whether the ``d_input`` matrix is transposed. That is of size ``[d_size, *, N]``
+               x_trans: whether the ``x`` output matrix is transposed.
 
            Returns:
-               torch::Tensor: ``[N, x_size (-1)]`` torch::Tensor.
+               torch::Tensor: ``[N, *, x_size (-1)]`` or ``[x_size (-1), *, N]`` torch::Tensor.
            )pbdoc")
 
       .def(
@@ -453,30 +463,30 @@ void declare_rpu_tiles(py::module &m) {
             CHECK_TORCH_INPUT(d_input);
             CHECK_TORCH_INPUT(x_input);
 
-            if ((x_input.dim() != 2) || (d_input.dim() != 2)) {
+            if ((x_input.dim() < 1) || (d_input.dim() < 1)) {
               throw std::runtime_error(
-                  "Invalid x_input/d_input dimensions: expected 2 dimensional array");
+                  "Invalid x_input/d_input dimensions: expected at least 1 dimensional array");
             }
 
-            int in_size = x_trans ? x_input.size(0) : x_input.size(1);
+            int in_size = x_trans ? x_input.size(0) : x_input.size(-1);
             int expected_in_size = self.getXSize() - (bias ? 1 : 0);
-            int m_batch = x_trans ? x_input.size(1) : x_input.size(0);
+            int m_batch = x_input.numel() / in_size;
 
-            int out_size = d_trans ? d_input.size(0) : d_input.size(1);
+            int out_size = d_trans ? d_input.size(0) : d_input.size(-1);
             int expected_out_size = self.getDSize();
-            int m_batch_from_d = d_trans ? d_input.size(1) : d_input.size(0);
+            int m_batch_from_d = d_input.numel() / out_size;
 
             // Validate the x_input dimensions.
             if (in_size != expected_in_size) {
-              std::string shape_str = x_trans ? ("[_, " + std::to_string(expected_in_size) + "]")
-                                              : ("[" + std::to_string(expected_in_size) + ",_]");
+              std::string shape_str = x_trans ? ("[*, " + std::to_string(expected_in_size) + "]")
+                                              : ("[" + std::to_string(expected_in_size) + ", *]");
               throw std::runtime_error(
                   "Invalid x_input dimensions: expected " + shape_str + " array");
             }
             // Validate the d_input dimensions.
             if (out_size != expected_out_size) {
-              std::string shape_str = d_trans ? ("[_, " + std::to_string(expected_out_size) + "]")
-                                              : ("[" + std::to_string(expected_out_size) + ",_]");
+              std::string shape_str = d_trans ? ("[*, " + std::to_string(expected_out_size) + "]")
+                                              : ("[" + std::to_string(expected_out_size) + ", *]");
               throw std::runtime_error(
                   "Invalid d_input dimensions: expected " + shape_str + " array");
             }
@@ -497,11 +507,12 @@ void declare_rpu_tiles(py::module &m) {
           R"pbdoc(
            Compute an n-rank update.
 
-           Compute an n-rank update::
+           Compute an n-rank update:
+           .. math:
 
-               W += -LR * D * X'
+               W \leftarrow W - \lambda \mathbf{x}\mathbf{d}^T
 
-           where ``LR`` is the learning rate.
+           where :math:`\lambda` is the learning rate.
 
            An analog tile will have a possible non-ideal version of this update pass.
 
@@ -509,11 +520,11 @@ void declare_rpu_tiles(py::module &m) {
                The learning rate is always positive, and thus scaling is negative.
 
            Args:
-               x_input: ``[N, x_size (-1)]`` torch::Tensor.
-               d_input: ``[N, d_size]`` torch::Tensor.
+               x_input: ``[N, *, x_size (-1)]`` input :math:`\mathbf{x}` torch::Tensor.
+               d_input: ``[N, *, d_size]`` input :math:`\mathbf{d}` torch::Tensor.
                bias: whether to use bias.
-               x_trans: whether the ``x_input`` matrix is transposed.
-               d_trans: whether the ``d`` matrix is transposed.
+               x_trans: whether the ``x_input`` matrix is transposed, ie. ``[x_size (-1), *, N]``
+               d_trans: whether the ``d`` matrix is transposed, ie. ``[d_size, *, N]``
            )pbdoc")
       .def(
           "forward_indexed",

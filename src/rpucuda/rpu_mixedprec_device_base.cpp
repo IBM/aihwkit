@@ -137,9 +137,9 @@ bool MixedPrecRPUDeviceBaseMetaParameter<T>::setDevicePar(
   }
 }
 
-template class MixedPrecRPUDeviceBaseMetaParameter<float>;
+template struct MixedPrecRPUDeviceBaseMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
-template class MixedPrecRPUDeviceBaseMetaParameter<double>;
+template struct MixedPrecRPUDeviceBaseMetaParameter<double>;
 #endif
 
 /******************************************************************************************/
