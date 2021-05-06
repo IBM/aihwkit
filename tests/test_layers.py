@@ -24,13 +24,17 @@ from aihwkit.simulator.tiles import AnalogTile, CudaAnalogTile
 from aihwkit.simulator.rpu_base import cuda
 
 from .helpers.decorators import parametrize_over_layers
-from .helpers.layers import Linear, Conv2d, LinearCuda, Conv2dCuda
+from .helpers.layers import (
+    Linear, Conv1d, Conv2d, Conv3d,
+    LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda
+)
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import ConstantStep
 
 
 @parametrize_over_layers(
-    layers=[Linear, Conv2d, LinearCuda, Conv2dCuda],
+    layers=[Linear, Conv1d, Conv2d, Conv3d,
+            LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda],
     tiles=[ConstantStep],
     biases=[True, False]
 )
@@ -159,7 +163,7 @@ class AnalogLayerTest(ParametrizedTestCase):
 
 
 @parametrize_over_layers(
-    layers=[Linear, Conv2d],
+    layers=[Linear, Conv1d, Conv2d, Conv3d],
     tiles=[ConstantStep],
     biases=[True, False]
 )
@@ -207,7 +211,7 @@ class CustomTileTestHelper:
 
 
 @parametrize_over_layers(
-    layers=[Linear, Conv2d],
+    layers=[Linear, Conv1d, Conv2d, Conv3d],
     tiles=[CustomTileTestHelper],
     biases=[True, False]
 )
