@@ -92,7 +92,7 @@ public:
 
   friend void swap(MixedPrecRPUDevice<T> &a, MixedPrecRPUDevice<T> &b) noexcept {
     using std::swap;
-    swap(static_cast<MixedPrecRPUDevice<T> &>(a), static_cast<MixedPrecRPUDevice<T> &>(b));
+    swap(static_cast<MixedPrecRPUDeviceBase<T> &>(a), static_cast<MixedPrecRPUDeviceBase<T> &>(b));
 
     swap(a.chi_, b.chi_);
     swap(a.qx_, b.qx_);

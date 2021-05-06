@@ -82,7 +82,7 @@ void declare_rpu_devices(py::module &m) {
       PYBIND11_OVERLOAD_PURE(
           RPU::PulsedRPUDeviceBase<T> *, PulsedBaseParam, createDevice, x_size, d_size, rng);
     }
-    T calcWeightGranularity() const {
+    T calcWeightGranularity() const override {
       PYBIND11_OVERLOAD(T, PulsedBaseParam, calcWeightGranularity, );
     }
   };
