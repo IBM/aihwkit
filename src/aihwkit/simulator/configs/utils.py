@@ -198,7 +198,7 @@ class WeightModifierType(Enum):
     In detail, for the duration of a mini-batch, each weight will be
     added a Gaussian random number with the standard deviation of
     :math:`\sigma_\text{wnoise} (c_0 + c_1 w_{ij}/\omega + c_2
-    w_ij^2/\omega^2` where :math:`omega` is either the actual max
+    w_{ij}^2/\omega^2` where :math:`omega` is either the actual max
     weight (if ``rel_to_actual_wmax`` is set) or the value
     ``assumed_wmax``.
     """

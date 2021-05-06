@@ -26,7 +26,7 @@ template <typename T>
 void MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(std::stringstream &ss) const {
 
   if (granularity > 0) {
-    ss << "\t granularity: \t";
+    ss << "\t granularity: \t\t";
     ss << granularity << std::endl;
   }
 

@@ -16,12 +16,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-* Weight refresh mechanism for ``OneSidedUnitCell`` to counteract
-  saturation, by differential read, reset, and re-write. (\#209)
 * A number of new config presets added to the library, namely `EcRamMOPreset`,
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
   `MixedPrecisionEcRamMOPreset`. These can be used for tile configuration
   (`rpu_config`). They specify a particular device and optimizer choice. (\#207)
+* Weight refresh mechanism for ``OneSidedUnitCell`` to counteract
+  saturation, by differential read, reset, and re-write. (\#209)
+* Complex cycle-to-cycle noise for ``ExpStepDevice`` (\#226)
+* Added the following presets: ``PCMPresetDevice`` (uni-directional),
+  ``PCMPresetUnitCell`` (a pair of uni-directional devices with
+  periodical refresh) and a ``MixedPrecisionPCMPreset`` for using the
+  mixed precision optimizer with a PCM pair. (\#226)
 
 ### Changed
 

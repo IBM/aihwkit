@@ -15,7 +15,7 @@
 from .configs import (
     # Single device configs.
     ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, EcRamMOPreset, IdealizedPreset,
-    GokmenVlasovPreset,
+    GokmenVlasovPreset, PCMPreset,
     # 2-device configs.
     ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, EcRamMO2Preset,
     Idealized2Preset,
@@ -28,5 +28,5 @@ from .configs import (
     # MixedPrecision configs.
     MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
     MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
-    MixedPrecisionGokmenVlasovPreset,
+    MixedPrecisionGokmenVlasovPreset, MixedPrecisionPCMPreset
 )

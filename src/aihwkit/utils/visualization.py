@@ -19,7 +19,7 @@ extras mechanism::
     pip install aihwkit[visualization]
 """
 
-from typing import Tuple, Any
+from typing import Tuple, Any, Union
 from copy import deepcopy
 
 from matplotlib.figure import Figure
@@ -32,15 +32,16 @@ import numpy as np
 import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
 
-from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.tiles import (
     AnalogTile, BaseTile
 )
 from aihwkit.simulator.rpu_base import cuda
-from aihwkit.simulator.configs.devices import PulsedDevice
+from aihwkit.simulator.configs.devices import PulsedDevice, UnitCell
 from aihwkit.simulator.configs.utils import (
-    IOParameters, WeightNoiseType, NoiseManagementType, BoundManagementType
+    IOParameters, WeightNoiseType, NoiseManagementType, BoundManagementType,
+    PulseType, UpdateParameters
 )
 
 
@@ -156,7 +157,7 @@ def compute_pulse_statistics(
         """
         alpha = np.exp(-0.5*(node - w_values)**2/lam**2)
         beta = alpha.sum(axis=0)
-        alpha[:, beta < 2] = np.nan
+        alpha[:, beta < 0.1] = np.nan
         alpha /= np.expand_dims(beta, axis=0)
         mean = np.sum(alpha*delta_w, axis=0)
         std = np.sqrt(np.sum(alpha*(delta_w - np.expand_dims(mean, axis=0))**2, axis=0))
@@ -234,7 +235,7 @@ def plot_pulse_statistics(
 
 
 def get_tile_for_plotting(
-        rpu_config: SingleRPUConfig,
+        rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig],
         n_traces: int,
         use_cuda: bool = False,
         noise_free: bool = False
@@ -250,6 +251,28 @@ def get_tile_for_plotting(
     Returns:
         Instantiated tile.
     """
+
+    def set_noise_free(dev: Any) -> Any:
+        if hasattr(dev, 'dw_min_std'):
+            dev.dw_min_std = 0.0  # Noise free.
+
+        if hasattr(dev, 'refresh_forward'):
+            setattr(dev, 'refresh_forward', IOParameters(is_perfect=True))
+
+        if hasattr(dev, 'refresh_update'):
+            setattr(dev, 'refresh_update', UpdateParameters(pulse_type=PulseType.NONE))
+
+        if hasattr(dev, 'transfer_forward'):
+            setattr(dev, 'refresh_forward', IOParameters(is_perfect=True))
+
+        if hasattr(dev, 'transfer_update'):
+            setattr(dev, 'transfer_update', UpdateParameters(pulse_type=PulseType.NONE))
+
+        if (hasattr(dev, 'write_noise_std') and
+           getattr(dev, 'write_noise_std') > 0.0):
+            # Just make very small to avoid hidden parameter mismatch.
+            setattr(dev, 'write_noise_std', 1e-6)
+
     config = deepcopy(rpu_config)
 
     # Make sure we use single pulses for the overview.
@@ -260,17 +283,17 @@ def get_tile_for_plotting(
     if noise_free:
         config.forward.is_perfect = True
 
-        if hasattr(config.device, 'dw_min_std'):
-            config.device.dw_min_std = 0.0  # Noise free.
-
-        if (hasattr(config.device, 'write_noise_std') and
-                getattr(config.device, 'write_noise_std') > 0.0):
-            # Just make very small to avoid hidden parameter mismatch.
-            setattr(config.device, 'write_noise_std', 1e-6)
+        set_noise_free(config.device)
+        if hasattr(config.device, 'unit_cell_devices'):
+            for dev in getattr(config.device, 'unit_cell_devices'):
+                set_noise_free(dev)
+        if hasattr(config.device, 'device'):
+            set_noise_free(getattr(config.device, 'device'))
 
     analog_tile = AnalogTile(n_traces, 1, config)  # type: BaseTile
     analog_tile.set_learning_rate(1)
     w_min = getattr(config.device.as_bindings(), 'w_min', -1.0)
+
     weights = w_min * ones((n_traces, 1))
     analog_tile.set_weights(weights)
 
@@ -279,7 +302,7 @@ def get_tile_for_plotting(
     return analog_tile
 
 
-def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
+def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> int:
     """Estimates the n_steps.
 
     Note:
@@ -298,14 +321,17 @@ def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
 
         ConfigError: If rpu_config.device does not have the w_min
             attribute (which is only ensured for
-            :class:`~aihwkit.simulator.configs.configs.SingleRPUConfig`)
+            :class:`~aihwkit.simulator.configs.devices.PulseDevice`)
 
     """
+    if not isinstance(rpu_config, SingleRPUConfig):
+        return 1000
 
     device_binding = rpu_config.device.as_bindings()
 
     if not hasattr(device_binding, 'w_min'):
-        raise ConfigError("Expect SingleRPUConfig for step estimation.")
+        raise ConfigError("n_step estimation only for PulsedDevice." +
+                          " Provide n_step explicitly.")
 
     weight_granularity = device_binding.calc_weight_granularity()
     w_min = device_binding.w_min
@@ -316,7 +342,7 @@ def estimate_n_steps(rpu_config: SingleRPUConfig) -> int:
 
 
 def plot_response_overview(
-        rpu_config: SingleRPUConfig,
+        rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig],
         n_loops: int = 5,
         n_steps: int = None,
         n_traces: int = 5,
@@ -328,7 +354,11 @@ def plot_response_overview(
     Args:
         rpu_config: RPU Configuration to use for plotting
         n_loops: How many hyper-cycles (up/down pulse sequences) to plot
-        n_steps: Number of up/down steps per cycle. If not given, will be estimated.
+
+        n_steps: Number of up/down steps per cycle. If not given, will
+            be tried to be estimated (only for ``PulsedDevice``
+            possible otherwise defaults to 1000 if ``n_steps=None``).
+
         n_traces: Number of traces to plot
         use_cuda: Whether to use the CUDA implementation (if available)
         smoothness: value for smoothing the estimation of the
@@ -366,7 +396,7 @@ def plot_response_overview(
     plt.tight_layout()
 
 
-def plot_device(device: PulsedDevice, w_noise: float = 0.0, **kwargs: Any) -> None:
+def plot_device(device: Union[PulsedDevice, UnitCell], w_noise: float = 0.0, **kwargs: Any) -> None:
     """Plots the step response figure for a given device (preset).
 
     Note:
@@ -389,16 +419,18 @@ def plot_device(device: PulsedDevice, w_noise: float = 0.0, **kwargs: Any) -> No
                            noise_management=NoiseManagementType.NONE,
                            w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
 
-    rpu_config = SingleRPUConfig(device=device, forward=io_pars)
-
-    plot_response_overview(rpu_config, **kwargs)
+    if isinstance(device, PulsedDevice):
+        plot_response_overview(SingleRPUConfig(device=device, forward=io_pars), **kwargs)
+    else:
+        plot_response_overview(UnitCellRPUConfig(device=device, forward=io_pars), **kwargs)
 
 
 def plot_device_compact(
-        device: PulsedDevice,
+        device: Union[PulsedDevice, UnitCell],
         w_noise: float = 0.0,
         n_steps: int = None,
-        n_traces: int = 3
+        n_traces: int = 3,
+        use_cuda: bool = False,
 ) -> Figure:
     """Plots a compact step response figure for a given device (preset).
 
@@ -407,15 +439,24 @@ def plot_device_compact(
         reading the weights.
 
     Args:
-        device: PulsedDevice parameters
+        device: ``PulsedDevice`` or ``UnitCell`` parameters
         w_noise: Weight noise standard deviation during read
-        n_steps: Number of steps for up/down cycle
+        n_steps: Number of up/down steps per cycle. If not given, will
+            be tried to be estimated (only for ``PulsedDevice``
+            possible otherwise defaults to 1000 if ``n_steps=None``).
         n_traces: Number of traces to plot (for device-to-device variation)
+        use_cuda: Whether to use CUDA for the computation
 
     Returns:
         the compact step response figure.
     """
     # pylint: disable=too-many-locals,too-many-statements
+    def get_rpu_config(device: Union[PulsedDevice, UnitCell], io_pars: IOParameters) \
+            -> Union[SingleRPUConfig, UnitCellRPUConfig]:
+        if isinstance(device, PulsedDevice):
+            return SingleRPUConfig(device=device, forward=io_pars)
+        return UnitCellRPUConfig(device=device, forward=io_pars)
+
     figure = plt.figure(figsize=[12, 4])
 
     # To simulate some weight read noise.
@@ -428,12 +469,10 @@ def plot_device_compact(
                            noise_management=NoiseManagementType.NONE,
                            w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
 
-    rpu_config = SingleRPUConfig(device=device, forward=io_pars)
+    rpu_config = get_rpu_config(device, io_pars)
 
     if n_steps is None:
         n_steps = estimate_n_steps(rpu_config)
-
-    use_cuda = False
 
     # Noisy tile response curves.
     n_loops = 2
@@ -443,7 +482,6 @@ def plot_device_compact(
     analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
     w_trace = compute_pulse_response(analog_tile, direction, use_forward=True)\
         .reshape(-1, n_traces)
-
     axis = figure.add_subplot(1, 1, 1)
     axis.plot(w_trace, linewidth=1)
     axis.set_title(analog_tile.rpu_config.device.__class__.__name__)

@@ -62,10 +62,16 @@ bool OneSidedRPUDeviceMetaParameter<T>::appendVecPar(const AbstractRPUDeviceMeta
   auto *dp = dynamic_cast<PulsedRPUDeviceMetaParameter<T> *>(par.clone());
   if (dp == nullptr) {
     return false;
-  } else {
-    this->vec_par.push_back(std::unique_ptr<PulsedRPUDeviceMetaParameter<T>>(dp));
-    return true;
   }
+  if (this->vec_par.size() > 1) {
+    return false;
+  }
+  if (this->vec_par.size() == 1 && (typeid(*this->vec_par[0]) != typeid(*dp))) {
+    return false;
+  }
+
+  this->vec_par.push_back(std::unique_ptr<PulsedRPUDeviceMetaParameter<T>>(dp));
+  return true;
 };
 
 template struct OneSidedRPUDeviceMetaParameter<float>;
@@ -162,8 +168,11 @@ void OneSidedRPUDevice<T>::populate(
     RPU_FATAL("Expect exactly 2 devices.");
   }
 
-  this->rpu_device_vec_[1]->copyInvertDeviceParameter(&*this->rpu_device_vec_[0]);
+  const auto &par = getPar();
 
+  if (par.copy_inverted) {
+    this->rpu_device_vec_[1]->copyInvertDeviceParameter(&*this->rpu_device_vec_[0]);
+  }
   g_plus_ = 1;
   g_minus_ = 0;
 
@@ -172,7 +181,7 @@ void OneSidedRPUDevice<T>::populate(
   this->reduce_weightening_[g_minus_] = -1;
 
   // init refresh
-  const auto &par = getPar();
+
   this->setRefreshVecs();
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   refresh_fb_pass_ =
@@ -392,8 +401,6 @@ void OneSidedRPUDevice<T>::resetCols(
 }
 
 template <typename T> bool OneSidedRPUDevice<T>::onSetWeights(T **weights) {
-  // note: we use this to update the internal weights for each device.
-  // all weights are set to *identical* values...
 
   resetCounters(true);
 
@@ -403,7 +410,6 @@ template <typename T> bool OneSidedRPUDevice<T>::onSetWeights(T **weights) {
   for (int i = 0; i < this->size_; i++) {
     this->weights_vec_[g_plus_][0][i] = w[i] > 0 ? w[i] : (T)0.0;
     this->weights_vec_[g_minus_][0][i] = w[i] < 0 ? -w[i] : (T)0.0;
-    ;
   }
 
   this->rpu_device_vec_[g_plus_]->onSetWeights(this->weights_vec_[g_plus_]);
