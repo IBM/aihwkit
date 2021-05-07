@@ -204,6 +204,6 @@ class CudaFloatingPointTile(FloatingPointTile):
             device: Optional[Union[torch_device, str, int]] = None
     ) -> 'CudaFloatingPointTile':
         if self.stream != current_stream(device):
-            raise CudaError("Cannot switch streams of existing Cuda tiles")
+            raise CudaError('Cannot switch streams of existing Cuda tiles')
 
         return self

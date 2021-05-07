@@ -432,7 +432,7 @@ class AnalogConv3d(_AnalogConvNd):
             fold_indices = pad(fold_indices, pad=[
                 self.padding[2], self.padding[2],
                 self.padding[1], self.padding[1],
-                self.padding[0], self.padding[0]], mode="constant", value=0)
+                self.padding[0], self.padding[0]], mode='constant', value=0)
         unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]). \
             unfold(3, self.kernel_size[1], self.stride[1]). \
             unfold(4, self.kernel_size[2], self.stride[2]).clone()

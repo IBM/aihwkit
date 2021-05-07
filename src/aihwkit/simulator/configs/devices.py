@@ -1026,8 +1026,8 @@ class OneSidedUnitCell(UnitCell):
             raise ConfigError('Could not add unit cell device parameter')
 
         if not onesided_parameters.append_parameter(device_parameter1):
-            raise ConfigError('Could not add unit cell device parameter' +
-                              "(both devices need to be of the same type)")
+            raise ConfigError('Could not add unit cell device parameter ' +
+                              '(both devices need to be of the same type)')
 
         return onesided_parameters
 

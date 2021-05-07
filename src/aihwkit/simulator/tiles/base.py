@@ -177,7 +177,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         if self.bias:
             # Create a ``[out_size, in_size (+ 1)]`` matrix.
             if biases is None:
-                raise ValueError("Analog tile has a bias, but no bias given")
+                raise ValueError('Analog tile has a bias, but no bias given')
 
             biases_numpy = expand_dims(biases.clone().detach().cpu().numpy(), 1)
             combined_weights = concatenate([weights_numpy, biases_numpy], axis=1)
@@ -289,7 +289,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         if self.bias:
             # Create a ``[out_size, in_size (+ 1)]`` matrix.
             if biases is None:
-                raise ValueError("Analog tile has a bias, but no bias given")
+                raise ValueError('Analog tile has a bias, but no bias given')
 
             biases_numpy = expand_dims(biases.clone().detach().cpu().numpy(), 1)
             combined_weights = concatenate([weights_numpy, biases_numpy], axis=1)

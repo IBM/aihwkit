@@ -330,8 +330,8 @@ def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> i
     device_binding = rpu_config.device.as_bindings()
 
     if not hasattr(device_binding, 'w_min'):
-        raise ConfigError("n_step estimation only for PulsedDevice." +
-                          " Provide n_step explicitly.")
+        raise ConfigError('n_step estimation only for PulsedDevice. ' +
+                          'Provide n_step explicitly.')
 
     weight_granularity = device_binding.calc_weight_granularity()
     w_min = device_binding.w_min
