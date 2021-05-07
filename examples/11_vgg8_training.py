@@ -79,7 +79,7 @@ def load_images():
 
 
 def create_analog_network():
-    """Returns a Vgg8 inspired analog model.""""
+    """Returns a Vgg8 inspired analog model."""
     channel_base = 48
     channel = [channel_base, 2 * channel_base, 3 * channel_base]
     fc_size = 8 * channel_base

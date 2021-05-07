@@ -288,6 +288,6 @@ class CudaAnalogTile(AnalogTile):
             device: Optional[Union[torch_device, str, int]] = None
     ) -> 'CudaAnalogTile':
         if self.stream != current_stream(device):
-            raise CudaError("Cannot switch CUDA devices of existing Cuda tiles")
+            raise CudaError('Cannot switch CUDA devices of existing Cuda tiles')
 
         return self

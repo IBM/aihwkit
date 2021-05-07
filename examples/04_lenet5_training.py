@@ -77,7 +77,7 @@ def load_images():
 
 
 def create_analog_network():
-    """Returns a LeNet5 inspired analog model.""""
+    """Returns a LeNet5 inspired analog model."""
     channel = [16, 32, 512, 128]
     model = AnalogSequential(
         AnalogConv2d(in_channels=1, out_channels=channel[0], kernel_size=5, stride=1,

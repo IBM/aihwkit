@@ -310,7 +310,6 @@ class PCMPresetDevice(ExpStepDevice):
     :class:`~aihwkit.simulator.configs.device.ExpStepDevice`)
 
     Note:
-
         This is an uni-directional device and thus can only be used as
         a plus-minus pair with refresh (see
         :class:`~PCMPresetUnitCell` which is using this device
@@ -365,7 +364,6 @@ class PCMPresetUnitCell(OneSidedUnitCell):
     Check for refresh is performed after each mini-batch update. See
     :class:`~aihwkit.simulator.configs.device.OneSidedUnitCell` for
     details on the refresh implementation.
-
     """
 
     unit_cell_devices: List = field(

@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   ``PCMPresetUnitCell`` (a pair of uni-directional devices with
   periodical refresh) and a ``MixedPrecisionPCMPreset`` for using the
   mixed precision optimizer with a PCM pair. (\#226)
-* ``AnalogLinear`` layer now accpets multi-dimensional inputs in the same
+* ``AnalogLinear`` layer now accepts multi-dimensional inputs in the same
   way as PyTorch's ``Linear`` layer does. (\#227)
 
 ### Changed

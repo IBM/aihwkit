@@ -330,8 +330,8 @@ def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> i
     device_binding = rpu_config.device.as_bindings()
 
     if not hasattr(device_binding, 'w_min'):
-        raise ConfigError("n_step estimation only for PulsedDevice." +
-                          " Provide n_step explicitly.")
+        raise ConfigError('n_step estimation only for PulsedDevice. ' +
+                          'Provide n_step explicitly.')
 
     weight_granularity = device_binding.calc_weight_granularity()
     w_min = device_binding.w_min
@@ -354,11 +354,9 @@ def plot_response_overview(
     Args:
         rpu_config: RPU Configuration to use for plotting
         n_loops: How many hyper-cycles (up/down pulse sequences) to plot
-
         n_steps: Number of up/down steps per cycle. If not given, will
             be tried to be estimated (only for ``PulsedDevice``
             possible otherwise defaults to 1000 if ``n_steps=None``).
-
         n_traces: Number of traces to plot
         use_cuda: Whether to use the CUDA implementation (if available)
         smoothness: value for smoothing the estimation of the
