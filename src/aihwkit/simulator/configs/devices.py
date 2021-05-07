@@ -628,9 +628,7 @@ class ExpStepDevice(PulsedDevice):
     still defined with device-to-device variation and (additional)
     up-down bias (see :class:`~PulsedDevice`).
 
-
     Note:
-
         This device also features a more complex cycle-to-cycle noise
         model of the update step, when specifying ``dw_min_std_add``
         and ``dw_min_std_slope``. By default,    The Gaussian noise added to the
@@ -644,17 +642,16 @@ class ExpStepDevice(PulsedDevice):
         where the :math:`\sigma` is given by ``dw_min_std``,
         :math:`\sigma_\text{add}` is given by ``dw_min_std_add``, and
         :math:`\sigma_\text{slope}` is given by ``dw_min_std_slope``.
-
     """
     # pylint: disable=invalid-name
 
     bindings_class: ClassVar[Type] = devices.ExpStepResistiveDeviceParameter
 
     A_up: float = 0.00081
-    """Factor ``A`` for the up direction"""
+    """Factor ``A`` for the up direction."""
 
     A_down: float = 0.36833
-    """Factor ``A`` for the down direction"""
+    """Factor ``A`` for the down direction."""
 
     gamma_up: float = 12.44625
     """Exponent for the up direction."""
@@ -663,17 +660,17 @@ class ExpStepDevice(PulsedDevice):
     """Exponent for the down direction."""
 
     a: float = 0.244
-    """Global slope parameter"""
+    """Global slope parameter."""
 
     b: float = 0.2425
-    """Global offset parameter"""
+    """Global offset parameter."""
 
     dw_min_std_add: float = 0.0
     """additive cycle-to-cycle noise of the update size (in units of
-    ``dw_min_std``, see above)"""
+    ``dw_min_std``, see above)."""
 
     dw_min_std_slope: float = 0.0
-    """ cycle-to-cycle noise of the update size (in units of ``dw_min_std``, see above)"""
+    """ cycle-to-cycle noise of the update size (in units of ``dw_min_std``, see above)."""
 
     write_noise_std: float = 0.0
     r"""Whether to use update write noise.
@@ -846,12 +843,12 @@ class VectorUnitCell(UnitCell):
         vector_parameters = parameters_to_bindings(self)
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError("unit_cell_devices should be a list of devices")
+            raise ConfigError('unit_cell_devices should be a list of devices')
 
         for param in self.unit_cell_devices:
             device_parameters = param.as_bindings()
             if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError("Could not add unit cell device parameter")
+                raise ConfigError('Could not add unit cell device parameter')
 
         return vector_parameters
 
@@ -906,7 +903,7 @@ class ReferenceUnitCell(UnitCell):
         vector_parameters = parameters_to_bindings(self)
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError("unit_cell_devices should be a list of devices")
+            raise ConfigError('unit_cell_devices should be a list of devices')
 
         if len(self.unit_cell_devices) > 2:
             self.unit_cell_devices = self.unit_cell_devices[:2]
@@ -914,12 +911,12 @@ class ReferenceUnitCell(UnitCell):
             self.unit_cell_devices = [self.unit_cell_devices[0],
                                       deepcopy(self.unit_cell_devices[0])]
         elif len(self.unit_cell_devices) != 2:
-            raise ConfigError("ReferenceUnitCell expects two unit_cell_devices")
+            raise ConfigError('ReferenceUnitCell expects two unit_cell_devices')
 
         for param in self.unit_cell_devices:
             device_parameters = param.as_bindings()
             if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError("Could not add unit cell device parameter")
+                raise ConfigError('Could not add unit cell device parameter')
 
         return vector_parameters
 
@@ -1011,13 +1008,13 @@ class OneSidedUnitCell(UnitCell):
         """Return a representation of this instance as a simulator
         bindings object."""
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError("unit_cell_devices should be a list of devices")
+            raise ConfigError('unit_cell_devices should be a list of devices')
 
         onesided_parameters = parameters_to_bindings(self)
         device_parameter0 = self.unit_cell_devices[0].as_bindings()
 
         if len(self.unit_cell_devices) == 0 or len(self.unit_cell_devices) > 2:
-            raise ConfigError("Need 1 or 2 unit_cell_devices")
+            raise ConfigError('Need 1 or 2 unit_cell_devices')
 
         if len(self.unit_cell_devices) == 1:
             device_parameter1 = device_parameter0
@@ -1026,10 +1023,10 @@ class OneSidedUnitCell(UnitCell):
 
         # need to be exactly 2 and same parameters
         if not onesided_parameters.append_parameter(device_parameter0):
-            raise ConfigError("Could not add unit cell device parameter")
+            raise ConfigError('Could not add unit cell device parameter')
 
         if not onesided_parameters.append_parameter(device_parameter1):
-            raise ConfigError("Could not add unit cell device parameter" +
+            raise ConfigError('Could not add unit cell device parameter' +
                               "(both devices need to be of the same type)")
 
         return onesided_parameters
@@ -1217,7 +1214,7 @@ class TransferCompound(UnitCell):
         """Return a representation of this instance as a simulator bindings object."""
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError("unit_cell_devices should be a list of devices")
+            raise ConfigError('unit_cell_devices should be a list of devices')
 
         n_devices = len(self.unit_cell_devices)
 
@@ -1227,11 +1224,11 @@ class TransferCompound(UnitCell):
         param_slow = self.unit_cell_devices[1].as_bindings()
 
         if not transfer_parameters.append_parameter(param_fast):
-            raise ConfigError("Could not add unit cell device parameter")
+            raise ConfigError('Could not add unit cell device parameter')
 
         for _ in range(n_devices - 1):
             if not transfer_parameters.append_parameter(param_slow):
-                raise ConfigError("Could not add unit cell device parameter")
+                raise ConfigError('Could not add unit cell device parameter')
 
         return transfer_parameters
 
@@ -1356,6 +1353,6 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
         param_device = self.device.as_bindings()
 
         if not mixed_prec_parameter.set_device_parameter(param_device):
-            raise ConfigError("Could not add device parameter")
+            raise ConfigError('Could not add device parameter')
 
         return mixed_prec_parameter
