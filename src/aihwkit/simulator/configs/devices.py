@@ -723,7 +723,7 @@ class PowStepDevice(PulsedDevice):
 
     .. math::
 
-        \gamma_{ij}^d = d\; \gamma\, \left(1 + d\, \beta_{ij}
+        \gamma_{ij}^d = \gamma\, \left(1 + d\, \beta_{ij}
         + \sigma_\text{pow-gamma-d-to-d}\xi\right)
 
     where :math:`\xi` is again a standard Gaussian. :math:`\beta_{ij}`
