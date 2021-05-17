@@ -28,6 +28,10 @@ from aihwkit.nn import AnalogConv2d, AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.presets import (
     CapacitorPreset, EcRamPreset, IdealizedPreset, ReRamESPreset, ReRamSBPreset,
+    PCMPreset,
+    MixedPrecisionCapacitorPreset, MixedPrecisionEcRamPreset,
+    MixedPrecisionIdealizedPreset, MixedPrecisionPCMPreset,
+    MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset,
     TikiTakaCapacitorPreset, TikiTakaEcRamPreset, TikiTakaIdealizedPreset,
     TikiTakaReRamESPreset, TikiTakaReRamSBPreset
 )
@@ -246,6 +250,13 @@ class Mappings:
         CapacitorPreset: 'CapacitorPreset',
         EcRamPreset: 'EcRamPreset',
         IdealizedPreset: 'IdealizedPreset',
+        PCMPreset: 'PCMPreset',
+        MixedPrecisionReRamESPreset: 'MixedPrecisionReRamESPreset',
+        MixedPrecisionReRamSBPreset: 'MixedPrecisionReRamSBPreset',
+        MixedPrecisionCapacitorPreset: 'MixedPrecisionCapacitorPreset',
+        MixedPrecisionEcRamPreset: 'MixedPrecisionEcRamPreset',
+        MixedPrecisionIdealizedPreset: 'MixedPrecisionIdealizedPreset',
+        MixedPrecisionPCMPreset: 'MixedPrecisionPCMPreset',
         TikiTakaReRamESPreset: 'TikiTakaReRamESPreset',
         TikiTakaReRamSBPreset: 'TikiTakaReRamSBPreset',
         TikiTakaCapacitorPreset: 'TikiTakaCapacitorPreset',
