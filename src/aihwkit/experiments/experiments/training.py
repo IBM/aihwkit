@@ -181,6 +181,7 @@ class BasicTraining(Experiment):
             optimizer.zero_grad()
             output = model(images)
             loss = loss_function(output, labels)
+            batch_image_count = labels.size(0)
 
             # Run training (backward propagation).
             loss.backward()
@@ -188,7 +189,9 @@ class BasicTraining(Experiment):
             # Optimize weights.
             optimizer.step()
 
-            self._call_hook(Signals.TRAIN_EPOCH_BATCH_END, loss.item())
+            self._call_hook(Signals.TRAIN_EPOCH_BATCH_END,
+                            batch_image_count,
+                            loss.item()*batch_image_count)
 
     def validation_step(
             self,
@@ -224,7 +227,7 @@ class BasicTraining(Experiment):
             self._call_hook(Signals.VALIDATION_EPOCH_BATCH_END,
                             batch_image_count,
                             batch_correct_count,
-                            loss.item())
+                            loss.item()*batch_image_count)
 
     def train(
             self,
