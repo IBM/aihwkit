@@ -34,16 +34,19 @@ class LocalMetric:
             'number': epoch,
             'start_time': datetime.utcnow(),
             'total_loss': 0,
-            'batches': 0,
-            'validation_batches': 0,
+            'training_images': 0,
             'validation_images': 0,
             'validation_correct': 0,
             'validation_loss': 0
         }
 
-    def receive_train_epoch_batch_end(self, train_loss: float) -> None:
+    def receive_train_epoch_batch_end(
+            self,
+            total: int,
+            train_loss: float
+    ) -> None:
         """Hook for `TRAIN_EPOCH_START`."""
-        self.current_epoch['batches'] += 1
+        self.current_epoch['training_images'] += total
         self.current_epoch['total_loss'] += train_loss
 
     def receive_validation_epoch_batch_end(
@@ -55,8 +58,6 @@ class LocalMetric:
         """Hook for `VALIDATION_EPOCH_BATCH_END`."""
         self.current_epoch['validation_images'] += total
         self.current_epoch['validation_correct'] += int(correct)
-
-        self.current_epoch['validation_batches'] += 1
         self.current_epoch['validation_loss'] += validation_loss
 
     def receive_train_epoch_end(self) -> None:
@@ -66,7 +67,7 @@ class LocalMetric:
 
         print('Epoch: {}, loss: {:.8f}'.format(
                 self.current_epoch['number'],
-                self.current_epoch['total_loss'] / self.current_epoch['batches'],
+                self.current_epoch['total_loss'] / self.current_epoch['training_images'],
               ))
 
     def receive_validation_epoch_end(self) -> None:
@@ -77,7 +78,7 @@ class LocalMetric:
         print('Number of images: {}, accuracy: {:.6%}, validation loss: {:.8f}'.format(
             self.current_epoch['validation_images'],
             self.current_epoch['validation_correct'] / self.current_epoch['validation_images'],
-            self.current_epoch['validation_loss'] / self.current_epoch['batches'],
+            self.current_epoch['validation_loss'] / self.current_epoch['validation_images'],
         ))
 
     def receive_epoch_end(self) -> Dict:
@@ -95,7 +96,7 @@ class LocalMetric:
             'accuracy': (self.current_epoch['validation_correct'] /
                          self.current_epoch['validation_images']),
             'train_loss': (self.current_epoch['total_loss'] /
-                           self.current_epoch['batches']),
+                           self.current_epoch['training_images']),
             'valid_loss': (self.current_epoch['validation_loss'] /
-                           self.current_epoch['batches'])
+                           self.current_epoch['validation_images'])
         }
