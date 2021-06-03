@@ -114,7 +114,7 @@ Analog AI delivers radical performance improvements by combining compute and
 memory in a single device, eliminating the von Neumann bottleneck. By leveraging
 the physical properties of memory devices, computation happens at the same place
 where the data is stored. Such in-memory computing hardware increases the speed
-and energy-efficiency needed for the next generation of AI. 
+and energy-efficiency needed for the next generation of AI.
 
 ## What is an in-memory computing chip?
 
@@ -135,7 +135,7 @@ involves a sequence of matrix multiplications, as each layer can be represented
 as a matrix of synaptic weights. The devices are arranged in multiple crossbar
 arrays, creating an artificial neural network where all matrix multiplications
 are performed in-place in an analog manner. This structure allows to run deep
-learning models at reduced energy consumption. 
+learning models at reduced energy consumption.
 
 ## How to cite?
 

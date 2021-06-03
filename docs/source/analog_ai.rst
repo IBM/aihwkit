@@ -7,7 +7,7 @@ What is analog AI and an analog chip?
 In a traditional hardware architecture, computation and memory are siloed in
 different locations. Information is moved back and forth between computation and
 memory units every time an operation is performed, creating a limitation called
-the von Neumann bottleneck. 
+the von Neumann bottleneck.
 
 In-memory computing delivers radical performance improvements by combining
 compute and memory in a single device, eliminating the von Neumann bottleneck.
@@ -19,7 +19,7 @@ in-memory computing :ref:`[1] <references>`.
 Because there is no movement of data, tasks can be performed in a fraction of
 the time and with much less energy. This is different from a conventional
 computer, where the data is transferred from the memory to the CPU every time a
-computation is done. 
+computation is done.
 
 .. image:: ../img/analog_ai_comparison.png
    :alt: Analog AI comparison
@@ -61,7 +61,7 @@ programmed into the in-memory-computing chip which performs inference. Because
 of device and circuit level non-idealities in the analog in-memory computing
 chip, custom techniques must be included into the training algorithm to mitigate
 their effect on the network accuracy (so-called hardware-aware training
-:ref:`[2] <references>`). 
+:ref:`[2] <references>`).
 
 In-memory computing can also be used in the context of supervised training of
 neural networks with backpropagation. This training involves three stages:
@@ -69,7 +69,7 @@ forward propagation of labelled data through the network, backward propagation
 of the error gradients from output to the input of the network, and weight
 update based on the computed gradients with respect to the weights of each
 layer. This procedure is repeated over a large dataset of labelled examples
-for multiple epochs until satisfactory performance is reached by the network. 
+for multiple epochs until satisfactory performance is reached by the network.
 When performing training of a neural network encoded in crossbar arrays,
 forward propagation is performed in the same way as for the inference described
 above. The only difference is that all the activations :math:`x_i` of each layer
@@ -84,7 +84,7 @@ implemented based on the outer product of activations and error gradients
 applying suitable electrical pulses to the devices which will increase their
 conductance in proportion to the desired weight update. See references
 :ref:`[1, 3, 4, 5] <references>` for details on different techniques that
-have been proposed to perform weight updates with in-memory computing chips. 
+have been proposed to perform weight updates with in-memory computing chips.
 
 
 .. _references:
