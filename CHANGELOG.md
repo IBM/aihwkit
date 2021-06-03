@@ -41,10 +41,10 @@ The format is based on [Keep a Changelog], and this project adheres to
   is now the `train=bool` argument. If using a dataset that requires other
   arguments or transforms, they can now be specified via overriding
   `get_dataset_arguments()` and `get_dataset_transform()`. (\#225)
-  
+
 ### Fixed
-* Fixed issue that was causing the epoch training loss per to be higher 
-  than the epoch validation loss.
+* Fixed an issue in the Experiments that was causing the epoch training loss
+  to be higher than the epoch validation loss. (\#238)
 
 ## [0.3.0] - 2021/04/14
 
