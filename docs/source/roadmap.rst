@@ -24,7 +24,7 @@ different features and a sneak peek into the next release.
 
 We have an ambitious plan to incrementally bring new simulation and hardware
 features to our users, but we are eager to hear your feedback on the features
-of value for your work. Please contact us at ``aihwkit@us.ibm.com`` for any
+of value for your work. Please contact us at ``aihwkit@us.ibm.com`` for any
 feedback or information.
 
 .. _Issues: https://github.com/IBM/aihwkit/issues

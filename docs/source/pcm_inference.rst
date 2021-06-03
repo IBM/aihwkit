@@ -52,7 +52,7 @@ is programmed, and the other device is set to 0. Thus, the simplest way to map
 the weights to conductances is to multiply the weights by scaling factor
 :math:`\beta`, which is different for every network layer. A simple approach is
 to use :math:`\beta = 1/w_\text{max}`, where :math:`w_\text{max}` is the maximum
-absolute weight value of a layer. 
+absolute weight value of a layer.
 
 Programming noise
 -----------------
@@ -145,7 +145,7 @@ is obtained by integrating the above equation over the measurement bandwidth:
     σ_{nG}(t) = g_\text{drift}(t)  Q_s  \sqrt{\log\frac{t+t_\text{read}}{2 t_{read}}}
 
 where :math:`t_{read} = 250` ns is the width of the pulse applied when reading
-the devices. 
+the devices.
 
 The :math:`Q_s` measured from the PCM devices as a function of :math:`g_T`
 is given by:
