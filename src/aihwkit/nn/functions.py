@@ -55,9 +55,14 @@ class AnalogFunction(Function):
 
         # Store the parameters needed by the optimizer for `rpu.update()`.
         input_, = ctx.saved_tensors
-        ctx.weights.input = input_
-        ctx.weights.grad_output = grad_output
-        ctx.weights.use_indexed = False
+        if not hasattr(ctx.weights, 'analog_input'):
+            ctx.weights.analog_input = [input_]
+            ctx.weights.analog_grad_output = [grad_output]
+        else:
+            ctx.weights.analog_input.append(input_)
+            ctx.weights.analog_grad_output.append(grad_output)
+
+        ctx.weights.analog_use_indexed = False
 
         return None, grad_input, None, None, None
 
@@ -97,8 +102,13 @@ class AnalogIndexedFunction(Function):
 
         # Store the parameters needed by the optimizer for `rpu.update_indexed()`.
         input_, = ctx.saved_tensors
-        ctx.weights.input = input_
-        ctx.weights.grad_output = grad_output
-        ctx.weights.use_indexed = True
+        if not hasattr(ctx.weights, 'analog_input'):
+            ctx.weights.analog_input = [input_]
+            ctx.weights.analog_grad_output = [grad_output]
+        else:
+            ctx.weights.analog_input.append(input_)
+            ctx.weights.analog_grad_output.append(grad_output)
+
+        ctx.weights.analog_use_indexed = True
 
         return None, grad_input, None, None, None

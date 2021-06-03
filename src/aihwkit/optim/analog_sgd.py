@@ -91,7 +91,7 @@ class AnalogSGD(SGD):
         Returns:
             The loss, if ``closure`` has been passed as a parameter.
         """
-        # pylint: disable=too-many-branches
+        # pylint: disable=too-many-branches,too-many-locals
         loss = None
         if closure is not None:
             loss = closure()
@@ -114,10 +114,18 @@ class AnalogSGD(SGD):
                                if getattr(param, 'is_weight', False))
 
                 # Call `update` in the tile.
-                if weights.use_indexed:
-                    analog_tile.update_indexed(weights.input, weights.grad_output)
+                if not getattr(weights, 'analog_input', None):
+                    continue
+
+                if weights.analog_use_indexed:
+                    for x_input, d_input in zip(weights.analog_input, weights.analog_grad_output):
+                        analog_tile.update_indexed(x_input, d_input)
                 else:
-                    analog_tile.update(weights.input, weights.grad_output)
+                    for x_input, d_input in zip(weights.analog_input, weights.analog_grad_output):
+                        analog_tile.update(x_input, d_input)
+
+                weights.analog_input = []
+                weights.analog_grad_output = []
 
                 # Apply post-update step operations (diffuse, decay, etc).
                 analog_tile.post_update_step()

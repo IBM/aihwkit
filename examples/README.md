@@ -328,7 +328,7 @@ by encapsulating the experiments in single classes.
 
 ## Example 14: [`14_experiment_custom_scheduler.py`]
 
-This example illustrate how to customize the Experiments for adding new features. By subclassing
+This example illustrates how to customize the Experiments for adding new features. By subclassing
 the base `BasicTraining` experiment used in example `13`, the training algorithm is modified in
 order to support the use of a scheduler.
 
@@ -336,6 +336,54 @@ In particular, the new class specializes the `training()` function in order to c
 scheduler when the training is started, and the `training_step()` function in order to step the
 scheduler every time an epoch is completed.
 
+## Example 15: [`15_simple_lstm.py`]
+
+This example performs hardware-aware training of an analog Long Short-Term Memory (LSTM) 
+network on a simple sequence. In hardware aware training, a digital network is trained using 
+noise sources typical of Phase Change Memory (PCM) in order to make the network more 
+resilient to noise sources. Inference is then performed using the analog LSTM 
+network to take full advantage of the speed and efficiency gains of the analog computation. 
+Hardware features can be defined using `rpu_config`:
+
+```python
+# Define a single-layer network, using inference/hardware-aware training tile
+rpu_config = InferenceRPUConfig()
+rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
+rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
+rpu_config.forward.w_noise = 0.02  # Short-term w-noise.
+
+rpu_config.clip.type = WeightClipType.FIXED_VALUE
+rpu_config.clip.fixed_value = 1.0
+rpu_config.modifier.pdrop = 0.03  # Drop connect.
+rpu_config.modifier.type = WeightModifierType.ADD_NORMAL  # Fwd/bwd weight noise.
+rpu_config.modifier.std_dev = 0.1
+rpu_config.modifier.rel_to_actual_wmax = True
+
+# Inference noise model.
+rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
+```
+
+This example also demonstrates the efficacy of `drift_compensation` to improve the inference
+accuracy of the analog LSTM network over time in presence of [weight drift]. The
+`drift_compensation` method is also specified as an `rpu_config` option:
+
+```python
+# drift compensation
+rpu_config.drift_compensation = GlobalDriftCompensation()
+```
+Weight drift is applied to the weights within the analog LSTM model using 
+the `drift_analog_weights` function. This function can be looped over to quantify the impact 
+of weight drift on inference accuracy over time:
+
+```python
+for t_inference in [0., 1., 20., 1000., 1e5]:
+    model.drift_analog_weights(t_inference)
+    states = reset_states()
+    pred_drift, states = model(y_in, states)
+```
+
+More details on Phase Change Memory (PCM) noise sources and weight drift
+can be found in the [Inference and PCM statistical model] documentation.
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
@@ -368,3 +416,4 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`12_simple_layer_with_mixed_precision.py`]: 12_simple_layer_with_mixed_precision.py
 [`13_experiment_3fc.py`]: 13_experiment_3fc.py
 [`14_experiment_custom_scheduler.py`]: 14_experiment_custom_scheduler.py
+[`15_simple_lstm.py`]: 15_simple_lstm.py

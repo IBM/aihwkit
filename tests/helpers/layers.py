@@ -14,7 +14,7 @@
 
 """Layer helpers for aihwkit tests."""
 
-from aihwkit.nn import AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogLinear
+from aihwkit.nn import AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogLinear, AnalogLSTM
 
 
 class Linear:
@@ -71,6 +71,18 @@ class Conv3d:
                             **kwargs)
 
 
+class LSTM:
+    """AnalogLSTM."""
+
+    use_cuda = False
+
+    def get_layer(self, input_size=2, hidden_size=3, **kwargs):
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
+        kwargs.setdefault('bias', self.bias)
+
+        return AnalogLSTM(input_size, hidden_size, **kwargs)
+
+
 class LinearCuda:
     """AnalogLinear."""
 
@@ -123,3 +135,15 @@ class Conv3dCuda:
         return AnalogConv3d(in_channels, out_channels, kernel_size,
                             padding=padding,
                             **kwargs).cuda()
+
+
+class LSTMCuda:
+    """AnalogLSTM."""
+
+    use_cuda = True
+
+    def get_layer(self, input_size=2, hidden_size=3, **kwargs):
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
+        kwargs.setdefault('bias', self.bias)
+
+        return AnalogLSTM(input_size, hidden_size, **kwargs).cuda()
