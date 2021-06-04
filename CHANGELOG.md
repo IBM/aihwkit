@@ -63,7 +63,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fixed an issue in the Experiments that was causing the epoch training loss
   to be higher than the epoch validation loss. (\#238)
 * The default refresh rate is changed to once per mini-batch for
-  `PCMPreset` (as opposed to once per mat-vec). (\#???)
+  `PCMPreset` (as opposed to once per mat-vec). (\#243)
 
 ## [0.3.0] - 2021/04/14
 
