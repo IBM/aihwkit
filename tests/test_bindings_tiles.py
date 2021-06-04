@@ -336,7 +336,7 @@ class FloatingPointTileTest(ParametrizedTestCase):
         add_shape = [4, 2]
 
         python_tile = self.get_tile(out_size, in_size)
-        init_weights = python_tile.get_weights()[0]
+        init_weights = python_tile.get_weights()[0].cpu().numpy()
         d_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [out_size]).astype('float32'))
 
         if python_tile.is_cuda:
@@ -359,7 +359,7 @@ class FloatingPointTileTest(ParametrizedTestCase):
         add_shape = []
 
         python_tile = self.get_tile(out_size, in_size)
-        init_weights = python_tile.get_weights()[0]
+        init_weights = python_tile.get_weights()[0].numpy()
         python_tile.set_learning_rate(lr)
 
         x_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [in_size]).astype('float32'))

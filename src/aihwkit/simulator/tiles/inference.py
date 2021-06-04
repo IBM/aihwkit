@@ -16,7 +16,7 @@ from copy import deepcopy
 from typing import List, Optional, Union, TYPE_CHECKING
 
 from torch import device as torch_device
-from torch import ones, Tensor
+from torch import ones, zeros, Tensor
 from torch.autograd import no_grad
 from torch.cuda import current_device, current_stream
 from torch.cuda import device as cuda_device
@@ -31,6 +31,8 @@ from aihwkit.simulator.tiles.base import BaseTile
 if TYPE_CHECKING:
     from aihwkit.simulator.configs import InferenceRPUConfig
 
+# pylint: disable=too-many-instance-attributes
+
 
 class InferenceTile(AnalogTile):
     """Tile used for analog inference and hardware-aware training for inference.
@@ -42,6 +44,7 @@ class InferenceTile(AnalogTile):
         bias: whether to add a bias column to the tile.
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
+        shared_weights: Whether to keep the weight in torch's memory space
     """
 
     is_cuda = False
@@ -53,8 +56,10 @@ class InferenceTile(AnalogTile):
             rpu_config: Optional['InferenceRPUConfig'] = None,
             bias: bool = False,
             in_trans: bool = False,
-            out_trans: bool = False
+            out_trans: bool = False,
+            shared_weights: bool = True,
     ):
+
         if not rpu_config:
             # Import `InferenceRPUConfig` dynamically to avoid import cycles.
             # pylint: disable=import-outside-toplevel
@@ -78,6 +83,10 @@ class InferenceTile(AnalogTile):
         self.nu_drift_list = None  # type: Optional[List[Tensor]]
 
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
+
+        if shared_weights:
+            self.shared_weights = zeros(out_size, in_size + int(bias), requires_grad=True)
+            self.ensure_shared_weights()
 
     @no_grad()
     def _forward_drift_readout_tensor(self) -> Optional[Tensor]:
@@ -108,13 +117,13 @@ class InferenceTile(AnalogTile):
             from_reference: Whether to use weights from reference
         """
         if not from_reference or self.reference_combined_weights is None:
-            self.reference_combined_weights = Tensor(self.tile.get_weights()).to(self.device)
+            self.reference_combined_weights = Tensor(self.tile.get_weights())
 
         self.programmed_weights, self.nu_drift_list = self.noise_model.apply_programming_noise(
             self.reference_combined_weights)
 
         if self.drift_compensation is not None:
-            self.tile.set_weights(self.programmed_weights.detach().cpu().numpy())
+            self.tile.set_weights(self.programmed_weights.numpy())
             forward_output = self._forward_drift_readout_tensor()
 
             self.drift_baseline = self.drift_compensation.init_baseline(forward_output)
@@ -147,7 +156,8 @@ class InferenceTile(AnalogTile):
 
         if self.drift_compensation is not None:
             forward_output = self._forward_drift_readout_tensor()
-            self.alpha = self.drift_compensation.apply(forward_output, self.drift_baseline)
+            self.alpha = self.drift_compensation.apply(forward_output,
+                                                       self.drift_baseline).to(self.device)
 
     def forward(self, x_input: Tensor, is_test: bool = False) -> Tensor:
         """Forward pass with drift compensation.
@@ -202,15 +212,7 @@ class InferenceTile(AnalogTile):
         with cuda_device(device):
             tile = CudaInferenceTile(self)
 
-        # need also to copy construct!
-        tile.alpha = self.alpha.cuda(device)
-        if self.reference_combined_weights is not None:
-            tile.reference_combined_weights = self.reference_combined_weights.to(device)
-        if self.programmed_weights is not None:
-            tile.programmed_weights = self.programmed_weights.to(device)
-        if self.nu_drift_list is not None:
-            tile.nu_drift_list = [nu.to(device) for nu in self.nu_drift_list]
-
+        # programmed / reference weights are kept in CPU
         return tile
 
 
@@ -236,12 +238,22 @@ class CudaInferenceTile(InferenceTile):
 
         # Create the tile, replacing the simulator tile.
         super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
-                         source_tile.bias, source_tile.in_trans, source_tile.out_trans)
+                         source_tile.bias, source_tile.in_trans, source_tile.out_trans,
+                         shared_weights=False)
         self.tile = tiles.CudaAnalogTile(source_tile.tile)
 
         # Set the cuda properties
         self.stream = current_stream()
         self.device = torch_device(current_device())
+        self.alpha = self.alpha.to(self.device)
+
+        if source_tile.shared_weights is not None:
+            self.shared_weights = zeros(self.in_size + int(source_tile.bias), self.out_size,
+                                        device=self.device, requires_grad=True)
+            self.tile.set_shared_weights(self.shared_weights)
+
+        self.analog_ctx.data = source_tile.analog_ctx.data.cuda(self.device)
+        self.analog_ctx.reset(self)
 
     def cpu(self) -> 'BaseTile':
         """Return a copy of this tile in CPU memory."""

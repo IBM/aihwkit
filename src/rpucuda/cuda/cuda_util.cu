@@ -674,12 +674,13 @@ template <typename T> CudaArray<T>::CudaArray(const CudaArray<T> &other) {
   if (size_ > 0) {
     context_->enforceDeviceId();
     CUDA_CALL(cudaMallocPitch(&values_, &pitch_, size_ * sizeof(T), height_));
-    this->assign(other);
-    context_->synchronize(); // better synchronize. Constructing is slow anyway
-  }
 
-  if (other.shared_if_) {
-    this->setShared(other.values_);
+    if (other.shared_if_) {
+      this->setShared(other.values_);
+    } else {
+      this->assign(other);
+    }
+    context_->synchronize(); // better synchronize. Constructing is slow anyway
   }
 
   DEBUG_OUT("CudaArray copy constructed.");
@@ -837,13 +838,18 @@ template <typename T> void CudaArray<T>::assignFromDevice(const T *device_array)
 
 template <typename T> void CudaArray<T>::setShared(T *device_array) {
 
+  if (device_array == nullptr || size_ <= 0 || values_ == nullptr) {
+    RPU_FATAL("Cannot setShared of empty or to nullptr.");
+  }
+
   // destruct
-  if ((size_ > 0) && (values_ != nullptr) && (!shared_if_)) {
+  if (!shared_if_) {
+    context_->synchronize();
     context_->enforceDeviceId();
     CUDA_CALL(cudaFree(values_));
     values_ = nullptr;
+    shared_if_ = true;
   }
-  shared_if_ = true;
   values_ = device_array; // assign memory shared (memory is governed from outside)
 
   // Caution: does not CHECK THE SIZE OF THE GIVEN ARRAY!

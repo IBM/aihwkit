@@ -16,8 +16,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-* A new `AnalogLSTM` module: a recurrent neural network that uses
-  AnalogLinear. (\#240)
 * A number of new config presets added to the library, namely `EcRamMOPreset`,
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
   `MixedPrecisionEcRamMOPreset`. These can be used for tile configuration
@@ -31,6 +29,10 @@ The format is based on [Keep a Changelog], and this project adheres to
   mixed precision optimizer with a PCM pair. (\#226)
 * ``AnalogLinear`` layer now accepts multi-dimensional inputs in the same
   way as PyTorch's ``Linear`` layer does. (\#227)
+* A new `AnalogLSTM` module: a recurrent neural network that uses
+  AnalogLinear. (\#240)
+* Return of weight gradients for ``InferenceTile`` (only),
+  so that the gradient can be handled with any pytorch optimizer (\#241)
 
 ### Changed
 
@@ -43,6 +45,12 @@ The format is based on [Keep a Changelog], and this project adheres to
   is now the `train=bool` argument. If using a dataset that requires other
   arguments or transforms, they can now be specified via overriding
   `get_dataset_arguments()` and `get_dataset_transform()`. (\#225)
+* ``AnalogContext`` is introduced, along with tile registeration
+  function to handle arbitrary optimizers, so that re-grouping param
+  groups becomes unecessary. (\#241)
+* Removed `weight` and `bias` of analog layers from the module
+  parameters as these parameters are handled internally for analog
+  tiles (\#241).
 
 ### Fixed
 

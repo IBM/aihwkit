@@ -279,6 +279,9 @@ class CudaAnalogTile(AnalogTile):
         self.stream = current_stream()
         self.device = torch_device(current_device())
 
+        self.analog_ctx.data = source_tile.analog_ctx.data.cuda(self.device)
+        self.analog_ctx.reset(self)
+
     def cpu(self) -> 'BaseTile':
         """Return a copy of this tile in CPU memory."""
         raise CudaError('CUDA tiles cannot be moved to CPU')

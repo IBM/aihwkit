@@ -287,9 +287,10 @@ template <typename T> RPUSimple<T>::RPUSimple(const RPUSimple<T> &other) : RPUAb
 
   this->copyWeightsToBuffer();
 
-  if (other.shared_weights_if_) {
-    this->setSharedWeights(*other.weights_);
-  }
+  // note: cannot copy external shared weight pointer... user needs to
+  // ensure that again setShared is called after copying
+  shared_weights_if_ = false;
+
   if (other.wdrifter_) {
     // call copy constructor
     wdrifter_ = make_unique<WeightDrifter<T>>(*other.wdrifter_);
@@ -298,10 +299,8 @@ template <typename T> RPUSimple<T>::RPUSimple(const RPUSimple<T> &other) : RPUAb
   // no copy needed
   wclipper_ = nullptr;
 
-  // do NOT copy external weights...
-  if (other.delta_weights_extern_[0]) {
-    std::cout << "WARNING cannot copy external delta weight pointer..." << std::endl;
-  }
+  // cannot copy external weight pointer... user needs to call it again
+  delta_weights_extern_[0] = nullptr;
 
   if (other.fb_weights_) {
     fb_weights_ = Array_2D_Get<T>(this->d_size_, this->x_size_);
@@ -1351,6 +1350,11 @@ template <typename T> void RPUSimple<T>::setDeltaWeights(T *dw_extern) {
   // need to wrap around a 2D array. WILL BE SLOWER THAN IT SHOULD BE
   // TODO: get rid of the 2D array legacy for CPU... not needed anyway
   if (dw_extern) {
+
+    if (dw_extern == delta_weights_extern_[0]) {
+      // make no op if already set
+      return;
+    }
 
     ENFORCE_NO_DELAYED_UPDATE;
 

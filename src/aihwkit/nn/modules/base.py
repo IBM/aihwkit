@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from torch import device as torch_device
 from torch import Tensor
-from torch.nn import Module
+from torch.nn import Module, Parameter
 
 from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.configs import (
@@ -24,10 +24,8 @@ from aihwkit.simulator.configs import (
     UnitCellRPUConfig
 )
 from aihwkit.simulator.tiles import InferenceTile
-
 if TYPE_CHECKING:
     from aihwkit.simulator.tiles import BaseTile
-
 
 RPUConfigAlias = Union[FloatingPointRPUConfig, SingleRPUConfig,
                        UnitCellRPUConfig, InferenceRPUConfig]
@@ -52,6 +50,39 @@ class AnalogModuleBase(Module):
       ``rpu_config.tile_class`` attribute.
     """
     # pylint: disable=abstract-method
+    _analog_tile_counter: int = 0
+
+    def register_analog_tile(self, tile: 'BaseTile') -> None:
+        """Registers the analog context of the .
+
+        Note: Needs to be called at the end init to register the tile
+        for the analog optimizers
+
+        Args:
+            tile to register
+        """
+        self.register_parameter('analog_ctx_' + str(self._analog_tile_counter),
+                                tile.get_analog_ctx())
+        if tile.shared_weights is not None:
+            if not isinstance(tile.shared_weights, Parameter):
+                tile.shared_weights = Parameter(tile.shared_weights)
+            self.register_parameter('analog_shared_weights_' + str(self._analog_tile_counter),
+                                    tile.shared_weights)
+
+        self._analog_tile_counter += 1
+
+    def unregister_parameter(self, param_name: str) -> None:
+        """Unregister module parameter from parameters.
+
+        Raises:
+            ModuleError: In case parameter is not found
+        """
+        param = getattr(self, param_name, None)
+        if not isinstance(param, Parameter):
+            raise ModuleError(f"Cannot find parameter {param_name} to unregister")
+        param_data = param.detach().clone()
+        delattr(self, param_name)
+        setattr(self, param_name, param_data)
 
     def _setup_tile(
             self,
@@ -96,7 +127,7 @@ class AnalogModuleBase(Module):
         Returns:
             An analog tile with the requested parameters.
         """
-        # pylint: disable=attribute-defined-outside-init
+        # pylint: disable=attribute-defined-outside-init, protected-access
         # Default to constant step device if not provided.
         if not rpu_config:
             rpu_config = SingleRPUConfig()
@@ -223,6 +254,9 @@ class AnalogModuleBase(Module):
         elif strict:
             missing_keys.append(key)
 
+        # update the weight / bias (not saved explicitly)
+        self._sync_weights_from_tile()
+
         super()._load_from_state_dict(
             state_dict, prefix, local_metadata, strict, missing_keys,
             unexpected_keys, error_msgs)
@@ -283,6 +317,8 @@ class AnalogModuleBase(Module):
         # Note: this needs to be an in-place function, not a copy
         super().cuda(device)
         self.analog_tile = self.analog_tile.cuda(device)  # type: ignore[no-redef]
+        self._analog_tile_counter = 0
+        self.register_analog_tile(self.analog_tile)
         self.set_weights(self.weight, self.bias)
         return self
 

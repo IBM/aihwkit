@@ -71,6 +71,7 @@ public:
     swap(a.wdrifter_cuda_, b.wdrifter_cuda_);
     swap(a.wclipper_cuda_, b.wclipper_cuda_);
     swap(a.fb_wmodifier_cuda_, b.fb_wmodifier_cuda_);
+    swap(a.shared_weights_if_, b.shared_weights_if_);
   }
 
   void printToStream(std::stringstream &ss) const override;
@@ -196,6 +197,8 @@ public:
   void applyWeightUpdate(T *dw_and_current_weights_out) override;
 
   void setStream(cudaStream_t s) { context_->setStream(s); };
+  cudaStream_t getStream() { return context_->getStream(); };
+  int getGPUId() { return context_->getGPUId(); };
 
   void modifyFBWeights(const WeightModifierParameter &wmpar) override;
 
@@ -220,6 +223,7 @@ protected:
   std::unique_ptr<WeightClipperCuda<T>> wclipper_cuda_ = nullptr;
 
 private:
+  bool shared_weights_if_ = false;
   void
   initFrom(const RPUSimple<T> &rpu_in); // to populate from CPU->CUDA, will be called by constructor
   void initialize(CudaContext *c);

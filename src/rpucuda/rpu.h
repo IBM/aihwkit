@@ -625,7 +625,6 @@ protected:
   T **weights_buffer_ = nullptr;
   T **fb_weights_ = nullptr;
 
-  bool shared_weights_if_ = false;
   int last_update_m_batch_ = 1;
   bool use_delayed_update_ = false;
 
@@ -637,7 +636,6 @@ private:
   SimpleMetaParameter<T> par_;
 
   T *temp_x_vector_bias_ = nullptr;
-
   T *temp_x_matrix_bias_ = nullptr;
   int temp_x_matrix_bias_size_ = 0;
   T *temp_tensor_ = nullptr;
@@ -652,6 +650,8 @@ private:
 
   T fwd_alpha_ = 1.0;
   T bwd_alpha_ = 1.0;
+
+  bool shared_weights_if_ = false;
 };
 
 }; // namespace RPU

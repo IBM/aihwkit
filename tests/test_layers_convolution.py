@@ -22,7 +22,7 @@ from aihwkit.optim import AnalogSGD
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv1d, Conv1dCuda, Conv2d, Conv2dCuda, Conv3d, Conv3dCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint
+from .helpers.tiles import FloatingPoint, Inference
 
 
 class ConvolutionLayerTest(ParametrizedTestCase):
@@ -51,10 +51,10 @@ class ConvolutionLayerTest(ParametrizedTestCase):
     def get_weights_from_digital_model(analog_model, digital_model):
         """Set the analog model weights based on the digital model."""
         weights = digital_model.weight.data.detach().reshape(
-            [analog_model.out_features, analog_model.in_features])
+            [analog_model.out_features, analog_model.in_features]).cpu()
         biases = None
         if digital_model.bias is not None:
-            biases = digital_model.bias.data.detach()
+            biases = digital_model.bias.data.detach().cpu()
 
         return weights, biases
 
@@ -66,16 +66,16 @@ class ConvolutionLayerTest(ParametrizedTestCase):
 
         epochs = 10
         for _ in range(epochs):
+            opt.zero_grad()
             pred = model(x_b)
             loss = loss_func(pred, y_b)
             loss.backward()
             opt.step()
-            opt.zero_grad()
 
 
 @parametrize_over_layers(
     layers=[Conv1d, Conv1dCuda],
-    tiles=[FloatingPoint],
+    tiles=[FloatingPoint, Inference],
     biases=[True, False]
 )
 class Convolution1dLayerTest(ConvolutionLayerTest):
@@ -174,7 +174,7 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
 
 @parametrize_over_layers(
     layers=[Conv2d, Conv2dCuda],
-    tiles=[FloatingPoint],
+    tiles=[FloatingPoint, Inference],
     biases=[True, False]
 )
 class Convolution2dLayerTest(ConvolutionLayerTest):
@@ -273,7 +273,7 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
 
 @parametrize_over_layers(
     layers=[Conv3d, Conv3dCuda],
-    tiles=[FloatingPoint],
+    tiles=[FloatingPoint, Inference],
     biases=[True, False]
 )
 class Convolution3dLayerTest(ConvolutionLayerTest):

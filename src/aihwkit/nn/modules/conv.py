@@ -64,7 +64,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0
     ):
-        # pylint: disable=too-many-arguments
+        # pylint: disable=too-many-arguments, too-many-locals
         if groups != 1:
             raise ValueError('Only one group is supported')
         if padding_mode != 'zeros':
@@ -86,14 +86,17 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             transposed, output_padding, groups, bias, padding_mode
         )
 
-        # Setup the Parameter custom attributes needed by the optimizer.
-        self.weight.is_weight = True
-        if bias:
-            self.bias.is_bias = True
-
         # Set the index matrices.
         self.fold_indices = Tensor().detach()
         self.input_size = 0
+
+        # Unregister weight/bias as a parameter but keep it as a
+        # field (needed for syncing still)
+        self.unregister_parameter('weight')
+        if bias:
+            self.unregister_parameter('bias')
+
+        self.register_analog_tile(self.analog_tile)
 
     def get_tile_size(
             self,
@@ -128,8 +131,9 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         if not self.fold_indices.numel() or self.input_size != input_size:
             self.recalculate_indexes(x_input)
 
-        return AnalogIndexedFunction.apply(self.analog_tile, x_input, self.weight,
-                                           self.bias, not self.training)
+        return AnalogIndexedFunction.apply(
+            self.analog_tile.get_analog_ctx(), x_input,
+            self.analog_tile.shared_weights, not self.training)
 
 
 class AnalogConv1d(_AnalogConvNd):
