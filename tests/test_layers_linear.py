@@ -26,12 +26,12 @@ from aihwkit.nn import AnalogSequential, AnalogLinear
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, ConstantStep, Inference
+from .helpers.tiles import FloatingPoint, IdealizedConstantStep, Inference
 
 
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
-    tiles=[FloatingPoint, ConstantStep, Inference],
+    tiles=[FloatingPoint, IdealizedConstantStep, Inference],
     biases=[True, False]
 )
 class LinearLayerTest(ParametrizedTestCase):
