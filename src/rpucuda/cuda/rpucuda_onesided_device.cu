@@ -112,6 +112,12 @@ void OneSidedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
   dev_refresh_vecs_ = RPU::make_unique<CudaArray<T>>(
       this->context_, this->x_size_ * this->x_size_, rpu_device->getRefreshVecs());
 
+  // check refresh
+  const auto &par = getPar();
+  if ((par.refresh_every > 0) && (!par.units_in_mbatch)) {
+    RPU_FATAL("refresh_every needs to be in m_batch units for GPU (turn units_in_mbatch on).");
+  }
+
   // inverted
   std::vector<T> rw_inv(2);
   const T *rw = rpu_device->getReduceWeightening();
@@ -351,8 +357,9 @@ void OneSidedRPUDeviceCuda<T>::runUpdateKernel(
   }
 
   if (par.refresh_every > 0 && !up._currently_tuning) {
-    int n1 = this->current_update_idx_ / par.refresh_every;
-    int n2 = (this->current_update_idx_ + m_batch) / par.refresh_every;
+    int refresh_every = par.refresh_every * m_batch; // always in m_batch
+    int n1 = this->current_update_idx_ / refresh_every;
+    int n2 = (this->current_update_idx_ + m_batch) / refresh_every;
     if (n2 > n1) {
       refresh_counter_ += refreshWeights();
     }
