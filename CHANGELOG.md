@@ -33,6 +33,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   AnalogLinear. (\#240)
 * Return of weight gradients for ``InferenceTile`` (only),
   so that the gradient can be handled with any pytorch optimizer (\#241)
+* Added a generic analog optimizer `AnalogOptimizer` that allows extending
+  any existing optimizer with analog-specific features. (\#242)
 
 ### Changed
 
@@ -51,6 +53,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Removed `weight` and `bias` of analog layers from the module
   parameters as these parameters are handled internally for analog
   tiles (\#241).
+* The `AnalogSGD` optimizer is now implemented based on the generic analog
+  optimizer, and its base module is `aihwkit.optim.analog_optimizer`. (\#242)
 
 ### Fixed
 
