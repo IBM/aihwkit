@@ -370,6 +370,7 @@ class PCMPresetUnitCell(OneSidedUnitCell):
         default_factory=lambda: [PCMPresetDevice(), PCMPresetDevice()])
 
     refresh_every: int = 1
+    units_in_mbatch: bool = True
     refresh_forward: IOParameters = field(default_factory=PresetIOParameters)
     refresh_update: UpdateParameters = field(
         default_factory=lambda: PresetUpdateParameters(desired_bl=31))

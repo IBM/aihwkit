@@ -973,6 +973,16 @@ class OneSidedUnitCell(UnitCell):
         impacts.
     """
 
+    units_in_mbatch: bool = True
+    """If set, the ``refresh_every`` counter is given in ``m_batch``
+    which is the re-use factor. Smaller numbers are not possible.
+
+    Caution:
+        For CUDA devices, refresh is always done in  ``m_batch`` (ie
+        the number of re-use per layer for a mini-batch). Smaller
+        numbers will have no effect.
+    """
+
     refresh_upper_thres: float = 0.75
     """Upper threshold for determining the refresh, see above."""
 

@@ -541,6 +541,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("refresh_update", &OneSidedParam::refresh_up)
       .def_readwrite("refresh_upper_thres", &OneSidedParam::refresh_upper_thres)
       .def_readwrite("refresh_lower_thres", &OneSidedParam::refresh_lower_thres)
+      .def_readwrite("units_in_mbatch", &OneSidedParam::units_in_mbatch)
       .def_readwrite("copy_inverted", &OneSidedParam::copy_inverted)
       .def(
           "__str__",
