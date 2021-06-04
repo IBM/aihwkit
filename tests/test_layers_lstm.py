@@ -19,23 +19,25 @@ from numpy.testing import assert_array_almost_equal, assert_raises
 
 from aihwkit.nn.modules.lstm import LSTMState
 from aihwkit.optim import AnalogSGD
+from aihwkit.simulator.configs.configs import InferenceRPUConfig
+from aihwkit.simulator.tiles.base import AnalogContext
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import LSTM, LSTMCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint
+from .helpers.tiles import FloatingPoint, Inference
 
 
 @parametrize_over_layers(
     layers=[LSTM, LSTMCuda],
-    tiles=[FloatingPoint],
+    tiles=[FloatingPoint, Inference],
     biases=[False, True]
 )
 class LSTMLayerTest(ParametrizedTestCase):
     """Tests for AnalogLSTM layer."""
 
     @staticmethod
-    def train_once(model, y_in, y_out, analog_if):
+    def train_once(model, y_in, y_out, analog_if, use_cuda=False):
         """Train once."""
         criterion = MSELoss()
         optimizer = AnalogSGD(model.parameters(), lr=0.5, momentum=0.0, nesterov=0.0)
@@ -43,12 +45,22 @@ class LSTMLayerTest(ParametrizedTestCase):
         if analog_if:
             # why is this format so difference?
             # TODO: better use same state format as for native Pytorch's LSTM?
-            states = [LSTMState(zeros(y_in.size()[1], model.hidden_size),
-                                zeros(y_in.size()[1], model.hidden_size))
-                      for _ in range(model.num_layers)]
+            if use_cuda:
+                states = [LSTMState(zeros(y_in.size()[1], model.hidden_size).cuda(),
+                                    zeros(y_in.size()[1], model.hidden_size).cuda())
+                          for _ in range(model.num_layers)]
+            else:
+                states = [LSTMState(zeros(y_in.size()[1], model.hidden_size),
+                                    zeros(y_in.size()[1], model.hidden_size))
+                          for _ in range(model.num_layers)]
+
         else:
-            states = (zeros(model.num_layers, y_in.size()[1], model.hidden_size),
-                      zeros(model.num_layers, y_in.size()[1], model.hidden_size))
+            if use_cuda:
+                states = (zeros(model.num_layers, y_in.size()[1], model.hidden_size).cuda(),
+                          zeros(model.num_layers, y_in.size()[1], model.hidden_size).cuda())
+            else:
+                states = (zeros(model.num_layers, y_in.size()[1], model.hidden_size),
+                          zeros(model.num_layers, y_in.size()[1], model.hidden_size))
 
         for _ in range(2):
             optimizer.zero_grad()
@@ -79,8 +91,15 @@ class LSTMLayerTest(ParametrizedTestCase):
                 self.assertEqual(layer.cell.weight_ih.in_features, hidden_size)
             self.assertEqual(layer.cell.weight_hh.in_features, hidden_size)
             # Assert over the rpu_config.
-            self.assertEqual(layer.cell.weight_ih.analog_tile.rpu_config, self.get_rpu_config())
-            self.assertEqual(layer.cell.weight_hh.analog_tile.rpu_config, self.get_rpu_config())
+            if not isinstance(layer.cell.weight_ih.analog_tile.rpu_config, InferenceRPUConfig):
+                # TODO: comparison of rpu_config not possible..
+                self.assertEqual(layer.cell.weight_ih.analog_tile.rpu_config, self.get_rpu_config())
+                self.assertEqual(layer.cell.weight_hh.analog_tile.rpu_config, self.get_rpu_config())
+            else:
+                self.assertEqual(layer.cell.weight_ih.analog_tile.rpu_config.__class__,
+                                 self.get_rpu_config().__class__)
+                self.assertEqual(layer.cell.weight_hh.analog_tile.rpu_config.__class__,
+                                 self.get_rpu_config().__class__)
 
     def test_layer_training(self):
         """Test AnalogLSTM layer training."""
@@ -91,10 +110,15 @@ class LSTMLayerTest(ParametrizedTestCase):
                 return dict(model.named_parameters())
 
             dic = {}
-            for name, x in model.named_parameters():
-                splits = name.split('.')
-                new_name = splits[-1] + '_' + splits[-2].split('_')[-1] + '_l' + splits[2]
-                dic[new_name] = x
+            for name, param in model.named_parameters():
+                if isinstance(param, AnalogContext):
+                    weight, bias = param.analog_tile.get_weights()
+                    splits = name.split('.')
+                    add_on = '_' + splits[-2].split('_')[-1] + '_l' + splits[2]
+
+                    dic['weight' + add_on] = weight
+                    if bias is not None:
+                        dic['bias' + add_on] = bias
 
             return dic
 
@@ -136,8 +160,14 @@ class LSTMLayerTest(ParametrizedTestCase):
         # Make independent for comparison below.
         lstm_pars0 = {key: value.detach().clone() for key, value in lstm_pars0.items()}
 
+        if self.use_cuda:
+            y_in = y_in.cuda()
+            y_out = y_out.cuda()
+            lstm_analog.cuda()
+            lstm.cuda()
+
         # First train analog and make sure weights differ.
-        pred_analog = self.train_once(lstm_analog, y_in, y_out, True)
+        pred_analog = self.train_once(lstm_analog, y_in, y_out, True, use_cuda=self.use_cuda)
 
         analog_weights = []
         lstm_analog._apply_to_analog(lambda lay: analog_weights.append(
@@ -148,7 +178,7 @@ class LSTMLayerTest(ParametrizedTestCase):
                 assert_raises(AssertionError, assert_array_almost_equal, weight, weight_org)
 
         # Compare with LSTM.
-        pred = self.train_once(lstm, y_in, y_out, False)
+        pred = self.train_once(lstm, y_in, y_out, False, use_cuda=self.use_cuda)
         assert_array_almost_equal(pred, pred_analog)
 
         lstm_analog._apply_to_analog(lambda lay: lay._sync_weights_from_tile())

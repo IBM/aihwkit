@@ -20,10 +20,35 @@ from torch.nn import Module
 from torch.optim import SGD
 
 from aihwkit.nn.modules.base import AnalogModuleBase
+from aihwkit.simulator.tiles.base import AnalogContext
 
 
 class AnalogSGD(SGD):
+
     """Implements analog-aware stochastic gradient descent."""
+
+    def check_analog_module_devices(self, model: Module) -> None:
+        """Checks and moves analog modules to the correct cuda device."""
+
+        # TODO: remove this check and add a .to / .cuda to the AnalogContext
+        manual_cuda_move = False  # For showing only one warning.
+        for (_, module) in model.named_modules():
+            if isinstance(module, AnalogModuleBase):
+                analog_tile = module.analog_tile
+                analog_ctx = analog_tile.get_analog_ctx()
+
+                # Pytorch module applies everything only to the parameters
+                # and buffers, including the device, so we might need to change
+                # the device of the module to put the analog layer on the
+                # correct device.
+                if analog_ctx.device != analog_tile.device:
+                    module.cuda(analog_ctx.device)
+                    manual_cuda_move = True
+
+        if manual_cuda_move:
+            warn('The tiles of the analog layers have been moved to cuda '
+                 'manually. Please use `.cuda()` directly on the analog layers '
+                 'or `AnalogSequential.cuda()` for automatic handling.')
 
     def regroup_param_groups(self, model: Module) -> None:
         """Reorganize the parameter groups, isolating analog layers.
@@ -31,50 +56,39 @@ class AnalogSGD(SGD):
         Update the `param_groups` of the optimizer, moving the parameters for
         each analog layer to a new single group.
 
+        Also checks analog modules for the correct CUDA device.
+
         Args:
             model: model for the optimizer.
         """
-        new_param_groups = []
-        manual_cuda_move = False  # For showing only one warning.
+
+        self.check_analog_module_devices(model)
 
         # Create the new param groups.
-        for (_, module) in model.named_modules():
-            if isinstance(module, AnalogModuleBase):
-                params = list(module.parameters(recurse=False))
-                new_param_groups.append({
-                    'params': list(module.parameters(recurse=False)),
-                    'analog_tile': module.analog_tile
-                })
-                module.analog_tile.set_learning_rate(self.defaults['lr'])
+        analog_param_groups = []
+        rm_group_lst = []
+        for group in self.param_groups:  # type: ignore[has-type]
+            rm_lst = []
+            for param in group['params']:
+                if isinstance(param, AnalogContext):
 
-                # Pytorch module applies everything only to the parameters
-                # and buffers, including the device, so we might need to change
-                # the device of the module to put the analog layer on the
-                # correct device.
-                if params[0].device != module.analog_tile.device:
-                    module.cuda(params[0].device)
-                    manual_cuda_move = True
+                    param.analog_tile.set_learning_rate(self.defaults['lr'])
+                    analog_param_groups.append({
+                        'params': [param],
+                    })
+                    rm_lst.append(id(param))
 
-        # Remove the analog parameters from the main param group, and add
-        # the group.
-        for param_group in new_param_groups:  # type: dict
-            for param in param_group['params']:
-                # Remove the param by its id(), as removing via list.remove()
-                # seems to involve comparisons that can lead to errors.
-                index = next(
-                    i for i, x in enumerate(self.param_groups[0]['params'])
-                    if id(x) == id(param))
-                self.param_groups[0]['params'].pop(index)
-            self.add_param_group(param_group)
+            group['params'] = [p for p in group['params'] if id(p) not in rm_lst]
 
-        # Cleanup the main parameter group.
-        if not self.param_groups[0]['params']:
-            self.param_groups.pop(0)
+            if len(group['params']) == 0:
+                rm_group_lst.append(id(group))
 
-        if manual_cuda_move:
-            warn('The tiles of the analog layers have been move to cuda '
-                 'manually. Please use `.cuda()` directly on the analog layers '
-                 'or `AnalogSequential.cuda()` for automatic handling.')
+        self.param_groups = [g for g in self.param_groups  # type: ignore[has-type]
+                             if id(g) not in rm_group_lst]
+
+        # Add analog groups
+        for group in analog_param_groups:
+            self.add_param_group(group)
 
     @no_grad()
     def step(self, closure: Optional[Callable] = None) -> Optional[float]:
@@ -91,7 +105,7 @@ class AnalogSGD(SGD):
         Returns:
             The loss, if ``closure`` has been passed as a parameter.
         """
-        # pylint: disable=too-many-branches,too-many-locals
+        # pylint: disable=too-many-branches,too-many-locals, protected-access
         loss = None
         if closure is not None:
             loss = closure()
@@ -104,36 +118,40 @@ class AnalogSGD(SGD):
             nesterov = group['nesterov']
 
             # Use analog_tile object.
-            if group.get('analog_tile'):
-                analog_tile = group['analog_tile']
+            for param in group['params']:
+                if isinstance(param, AnalogContext):
+                    # Handle internal analog update
+                    analog_ctx = param
+                    analog_tile = analog_ctx.analog_tile
 
-                # Update learning rate
-                analog_tile.set_learning_rate(learning_rate)
+                    if analog_ctx.use_torch_update:
+                        # in this case a separate weight parameter exists: do nothing
+                        continue
 
-                weights = next(param for param in group['params']
-                               if getattr(param, 'is_weight', False))
+                    # Update learning rate
+                    analog_tile.set_learning_rate(learning_rate)
 
-                # Call `update` in the tile.
-                if not getattr(weights, 'analog_input', None):
+                    # Call `update` in the tile.
+                    if not analog_ctx.has_gradient():
+                        # forward never used
+                        continue
+
+                    if analog_ctx.use_indexed:
+                        for x_input, d_input in zip(analog_ctx.analog_input,
+                                                    analog_ctx.analog_grad_output):
+                            analog_tile.update_indexed(x_input, d_input)
+                    else:
+                        for x_input, d_input in zip(analog_ctx.analog_input,
+                                                    analog_ctx.analog_grad_output):
+                            analog_tile.update(x_input, d_input)
+
+                    analog_ctx.reset()
+
                     continue
 
-                if weights.analog_use_indexed:
-                    for x_input, d_input in zip(weights.analog_input, weights.analog_grad_output):
-                        analog_tile.update_indexed(x_input, d_input)
-                else:
-                    for x_input, d_input in zip(weights.analog_input, weights.analog_grad_output):
-                        analog_tile.update(x_input, d_input)
-
-                weights.analog_input = []
-                weights.analog_grad_output = []
-
-                # Apply post-update step operations (diffuse, decay, etc).
-                analog_tile.post_update_step()
-                continue
-
-            for param in group['params']:
                 if param.grad is None:
                     continue
+
                 d_p = param.grad
                 if weight_decay != 0:
                     d_p = d_p.add(param, alpha=weight_decay)
@@ -151,6 +169,12 @@ class AnalogSGD(SGD):
 
                 param.add_(d_p, alpha=-group['lr'])
 
+            # Apply post-update step operations (diffuse, decay, etc).
+            # (only here because of unknown params order and shared weights)
+            for param in group['params']:
+                if isinstance(param, AnalogContext):
+                    param.analog_tile.post_update_step()
+
         return loss
 
     def set_learning_rate(self, learning_rate: float = 0.1) -> None:
@@ -164,10 +188,7 @@ class AnalogSGD(SGD):
         """
         for param_group in self.param_groups:
             param_group['lr'] = learning_rate
-
-            if param_group.get('analog_tile'):
-                # Update learning rate on the params
-                analog_tile = param_group['analog_tile']
-
-                # Update learning rate on the tile
-                analog_tile.set_learning_rate(learning_rate)
+            for param in param_group['params']:
+                if isinstance(param, AnalogContext):
+                    # Update learning rate on the tile
+                    param.analog_tile.set_learning_rate(learning_rate)

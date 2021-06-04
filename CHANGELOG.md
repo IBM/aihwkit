@@ -16,8 +16,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-* A new `AnalogLSTM` module: a recurrent neural network that uses
-  AnalogLinear. (\#240)
 * A number of new config presets added to the library, namely `EcRamMOPreset`,
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
   `MixedPrecisionEcRamMOPreset`. These can be used for tile configuration
@@ -31,6 +29,13 @@ The format is based on [Keep a Changelog], and this project adheres to
   mixed precision optimizer with a PCM pair. (\#226)
 * ``AnalogLinear`` layer now accepts multi-dimensional inputs in the same
   way as PyTorch's ``Linear`` layer does. (\#227)
+* A new `AnalogLSTM` module: a recurrent neural network that uses
+  AnalogLinear. (\#240)
+
+    A new AnalogContext is introduced which inherits from Parameter. This is the only proxy needed for the AnalogSGD.
+    In case of "shared_weights" (for inference only) weights are set to the torch memory and handled as a normal Parameter. Thus all SGD should work for inference tiles (including distributed training in principle).
+    Regrouping is not necessary any more, because only an AnalogContext is inserted as parameter, and not the weights/bias of AnalogLinear etc. layers.
+    weight / bias field is still used for syncing as before, but state_dict will not save these values, since they are not Parameters anymore. The weight is handled by the tile instead.
 
 ### Changed
 
@@ -43,7 +48,10 @@ The format is based on [Keep a Changelog], and this project adheres to
   is now the `train=bool` argument. If using a dataset that requires other
   arguments or transforms, they can now be specified via overriding
   `get_dataset_arguments()` and `get_dataset_transform()`. (\#225)
-
+* ``AnalogContext`` is introduced, along with tile registeration
+  function to handle arbitrary optimizers, so that re-grouping param
+  groups becomes unecessary. (\#???)
+*  (\#???)
 ### Fixed
 
 * Fixed autograd functionality for recurrent neural networks. (\#240)

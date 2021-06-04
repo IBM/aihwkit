@@ -78,6 +78,21 @@ void declare_rpu_tiles(py::module &m) {
             return ss.str();
           })
       .def(
+          "get_info",
+          [](Class &self) {
+            std::stringstream ss;
+            self.printParametersToStream(ss);
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "get_brief_info",
+          [](Class &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
           "get_learning_rate", &Class::getLearningRate,
           R"pbdoc(
            Return the tile learning rate.
@@ -222,20 +237,67 @@ void declare_rpu_tiles(py::module &m) {
           "set_shared_weights",
           [](Class &self, torch::Tensor weights) {
             CHECK_TORCH_INPUT(weights);
-            if (weights.numel() != self.getXSize() * self.getDSize()) {
-              throw std::runtime_error("Invalid weight size!");
+            if (weights.dim() != 2 || weights.size(0) != self.getDSize() ||
+                weights.size(1) != self.getXSize()) {
+              throw std::runtime_error(
+                  "Invalid weights dimensions: expected [" + std::to_string(self.getDSize()) + "," +
+                  std::to_string(self.getXSize()) + "] array");
             }
-            // TODO: might want to check for CUDA / device mismatch
-            // Call RPU function.
+            std::lock_guard<std::mutex> lock(self.mutex_);
             return self.setSharedWeights(weights.data_ptr<T>());
           },
           py::arg("weights"))
-      .def("get_parameters", &Class::getPar)
       .def(
-          "set_weights_uniform_random", &Class::setWeightsUniformRandom, py::arg("min_value"),
-          py::arg("max_value"))
+          "set_delta_weights",
+          [](Class &self, torch::Tensor delta_weights) {
+            CHECK_TORCH_INPUT(delta_weights);
+
+            if (delta_weights.dim() != 2 || delta_weights.size(0) != self.getDSize() ||
+                delta_weights.size(1) != self.getXSize()) {
+              throw std::runtime_error(
+                  "Invalid delta weights dimensions: expected [" + std::to_string(self.getDSize()) +
+                  "," + std::to_string(self.getXSize()) + "] array");
+            }
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            return self.setDeltaWeights(delta_weights.data_ptr<T>());
+          },
+          py::arg("delta_weights"))
       .def(
-          "decay_weights", [](Class &self, float alpha = 1.0) { self.decayWeights(alpha, false); },
+          "reset_delta_weights",
+          [](Class &self) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            return self.setDeltaWeights(nullptr);
+          })
+      .def(
+          "get_shared_weights_if", &Class::getSharedWeightsIf,
+          R"pbdoc(
+           Returns whether weight is shared.
+           )pbdoc")
+      .def(
+          "get_parameters", &Class::getPar,
+          R"pbdoc(
+           Returns the current meta parameter structure.
+           )pbdoc")
+      .def(
+          "set_weights_uniform_random",
+          [](Class &self, float min_value, float max_value) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.setWeightsUniformRandom(min_value, max_value);
+          },
+          py::arg("min_value"), py::arg("max_value"),
+          R"pbdoc(
+           Sets weights uniformlay in the range ``min_value`` to ``max_value``.
+
+           Args:
+               min_value: lower bound of uniform distribution
+               max_value: upper bound
+           )pbdoc")
+      .def(
+          "decay_weights",
+          [](Class &self, float alpha = 1.0) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.decayWeights(alpha, false);
+          },
           py::arg("alpha") = 1.0,
           R"pbdoc(
            Decays the weights::
@@ -249,7 +311,10 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "drift_weights",
-          [](Class &self, float time_since_last_call) { self.driftWeights(time_since_last_call); },
+          [](Class &self, float time_since_last_call) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.driftWeights(time_since_last_call);
+          },
           py::arg("time_since_last_call"),
           R"pbdoc(
            Drift weights according to a power law::
@@ -268,7 +333,10 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "clip_weights",
-          [](Class &self, ::RPU::WeightClipParameter &wclip_par) { self.clipWeights(wclip_par); },
+          [](Class &self, ::RPU::WeightClipParameter &wclip_par) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.clipWeights(wclip_par);
+          },
           py::arg("weight_clipper_params"),
           R"pbdoc(
            Clips the weights for use of hardware-aware training.
@@ -280,7 +348,10 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "modify_weights",
-          [](Class &self, ::RPU::WeightModifierParameter &wmpar) { self.modifyFBWeights(wmpar); },
+          [](Class &self, ::RPU::WeightModifierParameter &wmpar) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.modifyFBWeights(wmpar);
+          },
           py::arg("weight_modifier_params"),
           R"pbdoc(
            Modifies the weights in forward and backward (but not update) pass for use of hardware-aware training.
@@ -291,7 +362,11 @@ void declare_rpu_tiles(py::module &m) {
                weight_modifier_params: parameters of the modifications.
            )pbdoc")
       .def(
-          "diffuse_weights", &Class::diffuseWeights,
+          "diffuse_weights",
+          [](Class &self) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.diffuseWeights();
+          },
           R"pbdoc(
            Diffuse the weights.
 
@@ -304,6 +379,7 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "reset_columns",
           [](Class &self, int start_col, int n_cols, T reset_prob) {
+            std::lock_guard<std::mutex> lock(self.mutex_);
             return self.resetCols(start_col, n_cols, reset_prob);
           },
           py::arg("start_column_idx") = 0, py::arg("num_columns") = 1, py::arg("reset_prob") = 1.0,
@@ -325,7 +401,6 @@ void declare_rpu_tiles(py::module &m) {
             auto x_input = x_input_.contiguous();
             CHECK_TORCH_INPUT(x_input);
 
-            // at::cuda::getCurrentCUDAStream() for CUDA
             if (x_input.dim() < 1) {
               throw std::runtime_error(
                   "Invalid x_input dimensions: expected at least 1 dimensional array");
@@ -624,6 +699,7 @@ void declare_rpu_tiles(py::module &m) {
           "set_matrix_indices",
           [](Class &self, const torch::Tensor &indices) {
             CHECK_CONTIGUOUS(indices);
+            std::lock_guard<std::mutex> lock(self.mutex_);
             self.setMatrixIndices(indices.data_ptr<int>());
           },
           py::arg("indices"),
@@ -641,7 +717,6 @@ void declare_rpu_tiles(py::module &m) {
           [](Class &self) {
             std::vector<std::string> v;
             self.getDeviceParameterNames(v);
-
             return v;
           },
           R"pbdoc(

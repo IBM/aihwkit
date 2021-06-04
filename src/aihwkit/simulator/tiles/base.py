@@ -13,12 +13,13 @@
 """High level analog tiles (base)."""
 
 from collections import OrderedDict
-from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union, Type
 
 from numpy import concatenate, expand_dims
 from numpy import abs as numpy_abs
-from torch import Tensor, empty, stack
+from torch import Tensor, stack, ones
 from torch import device as torch_device
+from torch.nn import Parameter
 from torch.autograd import no_grad
 
 from aihwkit.exceptions import TileError
@@ -26,6 +27,38 @@ from aihwkit.simulator.rpu_base import tiles
 
 
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
+
+
+class AnalogContext(Parameter):
+    """Context for analog optimizer"""
+
+    # pylint: disable=signature-differs
+    def __new__(cls: Type['AnalogContext'], analog_tile: 'BaseTile') -> 'AnalogContext':
+        return Parameter.__new__(cls, data=ones((), device=analog_tile.device),
+                                 requires_grad=True)
+
+    def __init__(self, analog_tile: 'BaseTile'):
+        super().__init__()
+        self.analog_tile = analog_tile
+        self.use_torch_update = False
+        self.use_indexed = False
+        self.analog_input = []  # type: list
+        self.analog_grad_output = []  # type: list
+        self.shared_weights = None
+
+    def reset(self, analog_tile: Optional['BaseTile'] = None) -> None:
+        """ Resets the gradient trace and optionally sets the tile pointer. """
+        if analog_tile is not None:
+            self.analog_tile = analog_tile
+        self.analog_input = []
+        self.analog_grad_output = []
+
+    def has_gradient(self) -> bool:
+        """ Whether a gradient trace was stored """
+        return len(self.analog_input) > 0
+
+    def __repr__(self) -> str:
+        return 'AnalogContext of ' + self.analog_tile.get_brief_info()
 
 
 class BaseTile(Generic[RPUConfigGeneric]):
@@ -74,6 +107,51 @@ class BaseTile(Generic[RPUConfigGeneric]):
             self.tile.set_weights_uniform_random(-0.01, 0.01)
 
         self.device = torch_device('cpu')
+        self.shared_weights = None  # type: Optional[Tensor]
+
+        # create analog context
+        self.analog_ctx = AnalogContext(self)
+
+    @no_grad()
+    def get_analog_ctx(self) -> AnalogContext:
+        """Returns the analog context of the tile to be used in ``AnalogFunction``."""
+        return self.analog_ctx
+
+    @no_grad()
+    def ensure_shared_weights(self, shared_weights: Optional[Tensor] = None) -> None:
+        """Ensure that the shared_weights is set properly.
+
+        No-op if shared weights is not used.
+        """
+        if shared_weights is not None:
+            self.shared_weights.data = shared_weights.data  # type: ignore[union-attr]
+
+        if self.shared_weights is not None:
+            self.tile.set_shared_weights(self.shared_weights.data)
+
+    @no_grad()
+    def set_delta_weights(self, delta_weights: Optional[Tensor] = None) -> None:
+        """Set the weight grad tensor and set the update to.
+
+        No-op if shared weights is not used.
+        """
+        if self.shared_weights is not None and delta_weights is not None:
+            self.tile.set_delta_weights(delta_weights)
+
+    @no_grad()
+    def reset_delta_weights(self) -> None:
+        """Reset the weight grad tensor to default update behavior (i.e. adding the
+        update directly to the weight)
+
+        No-op if shared weights is not used.
+        """
+        if self.shared_weights is not None:
+            self.tile.reset_delta_weights()
+
+    @no_grad()
+    def get_brief_info(self) -> str:
+        """Returns short info about the underlying C++ tile"""
+        return self.tile.get_brief_info().rstrip()
 
     def __getstate__(self) -> Dict:
         """Get the state for pickling.
@@ -115,6 +193,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
         self.tile.set_weights(weights)
         self.tile.set_alpha_scale(alpha_scale)
+        self.ensure_shared_weights()
 
     def _create_simulator_tile(
             self,
@@ -229,7 +308,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             weights = Tensor(combined_weights)
             biases = None
 
-        return weights.to(self.device), biases.to(self.device) if self.bias else None
+        return weights, biases if self.bias else None
 
     def set_weights_scaled(
             self,
@@ -611,21 +690,15 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         if len(self.image_sizes) == 3:
             _, _, height_out = self.image_sizes
-            d_tensor = empty(n_batch, channel_out, height_out)
-
+            d_tensor = x_input.new_empty((n_batch, channel_out, height_out))
         elif len(self.image_sizes) == 5:
             _, _, _, height_out, width_out = self.image_sizes
-            d_tensor = empty(n_batch, channel_out, height_out, width_out)
-
+            d_tensor = x_input.new_empty((n_batch, channel_out, height_out, width_out))
         elif len(self.image_sizes) == 7:
             _, _, _, _, depth_out, height_out, width_out = self.image_sizes
-            d_tensor = empty(n_batch, channel_out, depth_out, height_out, width_out)
+            d_tensor = x_input.new_empty((n_batch, channel_out, depth_out, height_out, width_out))
         else:
             raise TileError('self.image_sizes length is not 3, 5 or 7')
-
-        # Move helper tensor to cuda if needed.
-        if self.is_cuda:
-            d_tensor = d_tensor.to(self.device)
 
         return self.tile.forward_indexed(x_input, d_tensor, is_test)
 
@@ -653,22 +726,16 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         if len(self.image_sizes) == 3:
             channel_in, height_in, _ = self.image_sizes
-            x_tensor = empty(n_batch, channel_in, height_in)
-
+            x_tensor = d_input.new_empty((n_batch, channel_in, height_in))
         elif len(self.image_sizes) == 5:
             channel_in, height_in, width_in, _, _ = self.image_sizes
-            x_tensor = empty(n_batch, channel_in, height_in, width_in)
-
+            x_tensor = d_input.new_empty((n_batch, channel_in, height_in, width_in))
         elif len(self.image_sizes) == 7:
             channel_in, depth_in, height_in, width_in, _, _, _ \
                 = self.image_sizes
-            x_tensor = empty(n_batch, channel_in, depth_in, height_in, width_in)
+            x_tensor = d_input.new_empty((n_batch, channel_in, depth_in, height_in, width_in))
         else:
             raise TileError('self.image_sizes length is not 3, 5 or 7')
-
-        # Move helper tensor to cuda if needed.
-        if self.is_cuda:
-            x_tensor = x_tensor.to(self.device)
 
         return self.tile.backward_indexed(d_input, x_tensor)
 

@@ -79,7 +79,8 @@ class ConstantStep:
     use_cuda = False
 
     def get_rpu_config(self):
-        return SingleRPUConfig(device=ConstantStepDevice(w_max_dtod=0, w_min_dtod=0))
+        return SingleRPUConfig(device=ConstantStepDevice(w_max_dtod=0, w_min_dtod=0,
+                                                         up_down_dtod=0.0))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -261,14 +262,16 @@ class MixedPrecision:
 
 
 class Inference:
-    """Inference tile."""
+    """Inference tile (perfect forward)."""
 
     simulator_tile_class = tiles.AnalogTile
     first_hidden_field = None
     use_cuda = False
 
     def get_rpu_config(self):
-        return InferenceRPUConfig()
+        rpu_config = InferenceRPUConfig()
+        rpu_config.forward.is_perfect = True
+        return rpu_config
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()

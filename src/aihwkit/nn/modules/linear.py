@@ -73,10 +73,14 @@ class AnalogLinear(AnalogModuleBase, Linear):
         # Call super() after tile creation, including ``reset_parameters``.
         super().__init__(in_features, out_features, bias=bias)
 
-        # Setup the Parameter custom attributes needed by the optimizer.
-        self.weight.is_weight = True
+        # Unregister weight/bias as a parameter but keep it as a
+        # field (needed for syncing still)
+        self.unregister_parameter('weight')
         if bias:
-            self.bias.is_bias = True
+            self.unregister_parameter('bias')
+
+        # Register tile instead
+        self.register_analog_tile(self.analog_tile)
 
     def reset_parameters(self) -> None:
         """Reset the parameters (weight and bias)."""
@@ -86,5 +90,6 @@ class AnalogLinear(AnalogModuleBase, Linear):
     def forward(self, x_input: Tensor) -> Tensor:
         """Computes the forward pass."""
         # pylint: disable=arguments-differ
-        return AnalogFunction.apply(self.analog_tile, x_input, self.weight, self.bias,
-                                    not self.training)
+        return AnalogFunction.apply(
+            self.analog_tile.get_analog_ctx(), x_input,
+            self.analog_tile.shared_weights, not self.training)

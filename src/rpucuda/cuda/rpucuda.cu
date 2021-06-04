@@ -109,6 +109,9 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
   if (other.dev_weights_) {
     dev_weights_->assign(*other.dev_weights_);
   }
+  // note: cannot copy external shared weight pointer... user needs to
+  // ensure that again setShared is called after copying
+  shared_weights_if_ = false;
 
   if (other.dev_weights_buffer_) {
     getWeightsBufferCuda(); // to initialize
@@ -119,10 +122,7 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
     dev_fb_weights_->assign(*other.dev_fb_weights_);
   }
 
-  // cannot copy external weight pointer...
-  if (other.dev_delta_weights_extern_) {
-    std::cout << "WARNING cannot copy external delta weight pointer..." << std::endl;
-  }
+  // cannot copy external weight pointer... user needs to call it again
   dev_delta_weights_extern_ = nullptr;
 
   if (other.fb_wmodifier_cuda_) {
@@ -197,6 +197,7 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
 
   wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
 
+  shared_weights_if_ = other.shared_weights_if_;
   return *this;
 }
 
@@ -239,16 +240,17 @@ template <typename T> void RPUCudaSimple<T>::setWeights(const T *host_source) {
 }
 
 template <typename T> void RPUCudaSimple<T>::setSharedWeights(T *device_source) {
-  if (!this->shared_weights_if_) {
-    context_->synchronizeDevice();
-    dev_weights_->copyTo(device_source);
-  }
+
   if (device_source != dev_weights_->getData()) {
+
+    if (!this->shared_weights_if_) {
+      context_->synchronizeDevice();
+      dev_weights_->copyTo(device_source);
+    }
     dev_weights_->synchronize();
     dev_weights_->setShared(device_source);
+    this->shared_weights_if_ = true;
   }
-
-  this->shared_weights_if_ = true;
 }
 
 template <typename T>
