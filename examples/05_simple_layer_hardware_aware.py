@@ -19,11 +19,10 @@ to sum all the elements from one array.
 # Imports from PyTorch.
 from torch import Tensor
 from torch.nn.functional import mse_loss
-from torch.optim import AdamW
 
 # Imports from aihwkit.
-from aihwkit.nn import AnalogLinear, AnalogSequential
-from aihwkit.optim import AnalogOptimizer
+from aihwkit.nn import AnalogLinear
+from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
     WeightNoiseType, WeightClipType, WeightModifierType)
@@ -53,9 +52,8 @@ rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
 # drift compensation
 rpu_config.drift_compensation = GlobalDriftCompensation()
 
-model = AnalogSequential(
-    AnalogLinear(4, 3, bias=True, rpu_config=rpu_config),
-    AnalogLinear(3, 2, bias=True, rpu_config=rpu_config))
+model = AnalogLinear(4, 2, bias=True,
+                     rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
@@ -64,9 +62,10 @@ if cuda.is_compiled():
     model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
-opt = AnalogOptimizer(AdamW, model.parameters(), lr=0.1)
+opt = AnalogSGD(model.parameters(), lr=0.1)
+opt.regroup_param_groups(model)
 
-print(model)
+print(model.analog_tile.tile)
 
 for epoch in range(100):
     # Add the training Tensor to the model (input).
