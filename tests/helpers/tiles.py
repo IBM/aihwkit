@@ -87,6 +87,27 @@ class ConstantStep:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs)
 
 
+class IdealizedConstantStep:
+    """AnalogTile with ConstantStepDevice."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        rpu_config = SingleRPUConfig(device=ConstantStepDevice(
+            w_max_dtod=0, w_min_dtod=0, dw_min_std=0.0, dw_min=0.0001, dw_min_dtod=0.0,
+            up_down_dtod=0.0, w_max=1.0, w_min=-1.0)
+        )
+        rpu_config.forward.is_perfect = True
+        rpu_config.backward.is_perfect = True
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
 class LinearStep:
     """AnalogTile with LinearStepDevice."""
 
@@ -317,6 +338,27 @@ class ConstantStepCuda:
 
     def get_rpu_config(self):
         return SingleRPUConfig(device=ConstantStepDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class IdealizedConstantStepCuda:
+    """AnalogTile with ConstantStepDevice."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        rpu_config = SingleRPUConfig(device=ConstantStepDevice(
+            w_max_dtod=0, w_min_dtod=0, dw_min_std=0.0, dw_min=0.0001, dw_min_dtod=0.0,
+            up_down_dtod=0.0, w_max=1.0, w_min=-1.0)
+        )
+        rpu_config.forward.is_perfect = True
+        rpu_config.backward.is_perfect = True
+        return rpu_config
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
