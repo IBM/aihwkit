@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
+* A new `AnalogLSTM` module: a recurrent neural network that uses
+  AnalogLinear. (\#240)
 * A number of new config presets added to the library, namely `EcRamMOPreset`,
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
   `MixedPrecisionEcRamMOPreset`. These can be used for tile configuration
@@ -43,6 +45,9 @@ The format is based on [Keep a Changelog], and this project adheres to
   `get_dataset_arguments()` and `get_dataset_transform()`. (\#225)
 
 ### Fixed
+
+* Fixed autograd functionality for recurrent neural networks. (\#240)
+* N-D support for `AnalogLinear`. (\#227)
 * Fixed an issue in the Experiments that was causing the epoch training loss
   to be higher than the epoch validation loss. (\#238)
 
