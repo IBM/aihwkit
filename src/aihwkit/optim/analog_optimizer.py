@@ -10,27 +10,34 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Analog-aware stochastic gradient descent optimizer."""
+"""Analog-aware inference optimizer."""
 
-from typing import Callable, Optional
+from types import new_class
+from typing import Any, Callable, Dict, Optional, Type
 from warnings import warn
 
-from torch import clone, no_grad
+from torch.optim import Optimizer, SGD
 from torch.nn import Module
-from torch.optim import SGD
 
-from aihwkit.nn.modules.base import AnalogModuleBase
-from aihwkit.simulator.tiles.base import AnalogContext
+from aihwkit.optim.context import AnalogContext
 
 
-class AnalogSGD(SGD):
+class AnalogOptimizerMixin:
+    """Mixin for analog optimizers.
 
-    """Implements analog-aware stochastic gradient descent."""
+    This class contains the methods needed for enabling analog in an existing
+    ``Optimizer``. It is designed to be used as a mixin in conjunction with an
+    ``AnalogOptimizer`` or torch ``Optimizer``.
+    """
 
     def check_analog_module_devices(self, model: Module) -> None:
         """Checks and moves analog modules to the correct cuda device."""
-
         # TODO: remove this check and add a .to / .cuda to the AnalogContext
+
+        # Import dynamically, in order to avoid circular imports.
+        # pylint: disable=import-outside-toplevel
+        from aihwkit.nn.modules.base import AnalogModuleBase
+
         manual_cuda_move = False  # For showing only one warning.
         for (_, module) in model.named_modules():
             if isinstance(module, AnalogModuleBase):
@@ -61,7 +68,6 @@ class AnalogSGD(SGD):
         Args:
             model: model for the optimizer.
         """
-
         self.check_analog_module_devices(model)
 
         # Create the new param groups.
@@ -71,8 +77,8 @@ class AnalogSGD(SGD):
             rm_lst = []
             for param in group['params']:
                 if isinstance(param, AnalogContext):
-
-                    param.analog_tile.set_learning_rate(self.defaults['lr'])
+                    param.analog_tile.set_learning_rate(
+                        self.defaults['lr'])  # type: ignore[attr-defined]
                     analog_param_groups.append({
                         'params': [param],
                     })
@@ -86,11 +92,10 @@ class AnalogSGD(SGD):
         self.param_groups = [g for g in self.param_groups  # type: ignore[has-type]
                              if id(g) not in rm_group_lst]
 
-        # Add analog groups
+        # Add analog groups.
         for group in analog_param_groups:
-            self.add_param_group(group)
+            self.add_param_group(group)  # type: ignore[attr-defined]
 
-    @no_grad()
     def step(self, closure: Optional[Callable] = None) -> Optional[float]:
         """Performs an analog-aware single optimization step.
 
@@ -105,35 +110,32 @@ class AnalogSGD(SGD):
         Returns:
             The loss, if ``closure`` has been passed as a parameter.
         """
-        # pylint: disable=too-many-branches,too-many-locals, protected-access
-        loss = None
-        if closure is not None:
-            loss = closure()
+        # pylint: disable=too-many-branches
+        # Update non-analog parameters using the given optimizer
+        ret = super().step(closure)  # type: ignore[misc]
 
+        # Update analog parameters
         for group in self.param_groups:
-            learning_rate = group['lr']
-            weight_decay = group['weight_decay']
-            momentum = group['momentum']
-            dampening = group['dampening']
-            nesterov = group['nesterov']
+            learning_rate = group.get('lr')
 
             # Use analog_tile object.
             for param in group['params']:
                 if isinstance(param, AnalogContext):
-                    # Handle internal analog update
+                    # Handle internal analog update.
                     analog_ctx = param
                     analog_tile = analog_ctx.analog_tile
 
                     if analog_ctx.use_torch_update:
-                        # in this case a separate weight parameter exists: do nothing
+                        # In this case a separate weight parameter exists: do nothing.
                         continue
 
-                    # Update learning rate
-                    analog_tile.set_learning_rate(learning_rate)
+                    # Update learning rate.
+                    if learning_rate is not None:
+                        analog_tile.set_learning_rate(learning_rate)
 
                     # Call `update` in the tile.
                     if not analog_ctx.has_gradient():
-                        # forward never used
+                        # Forward never used.
                         continue
 
                     if analog_ctx.use_indexed:
@@ -147,35 +149,14 @@ class AnalogSGD(SGD):
 
                     analog_ctx.reset()
 
-                    continue
-
-                if param.grad is None:
-                    continue
-
-                d_p = param.grad
-                if weight_decay != 0:
-                    d_p = d_p.add(param, alpha=weight_decay)
-                if momentum != 0:
-                    param_state = self.state[param]
-                    if 'momentum_buffer' not in param_state:
-                        buf = param_state['momentum_buffer'] = clone(d_p).detach()
-                    else:
-                        buf = param_state['momentum_buffer']
-                        buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
-                    if nesterov:
-                        d_p = d_p.add(buf, alpha=momentum)
-                    else:
-                        d_p = buf
-
-                param.add_(d_p, alpha=-group['lr'])
-
-            # Apply post-update step operations (diffuse, decay, etc).
-            # (only here because of unknown params order and shared weights)
+        # Apply post-update step operations (diffuse, decay, etc).
+        # (only here because of unknown params order and shared weights)
+        for group in self.param_groups:
             for param in group['params']:
                 if isinstance(param, AnalogContext):
                     param.analog_tile.post_update_step()
 
-        return loss
+        return ret
 
     def set_learning_rate(self, learning_rate: float = 0.1) -> None:
         """Update the learning rate to a new value.
@@ -192,3 +173,68 @@ class AnalogSGD(SGD):
                 if isinstance(param, AnalogContext):
                     # Update learning rate on the tile
                     param.analog_tile.set_learning_rate(learning_rate)
+
+
+class AnalogOptimizer(AnalogOptimizerMixin, Optimizer):
+    """Generic optimizer that wraps an existing ``Optimizer`` for analog inference.
+
+    This class wraps an existing ``Optimizer``, customizing the optimization
+    step for triggering the analog update needed for analog tiles. All other
+    (digital) parameters are governed by the given torch optimizer. In case of
+    hardware-aware training (``InferenceTile``) the tile weight update is also
+    governed by the given optimizer, otherwise it is using the internal analog
+    update as defined in the ``rpu_config``.
+
+    The ``AnalogOptimizer`` constructor expects the wrapped optimizer class as
+    the first parameter, followed by any arguments required by the wrapped
+    optimizer.
+
+    Note:
+        The instances returned are of a *new* type that is a subclass of:
+
+        * the wrapped ``Optimizer`` (allowing access to all their methods and
+          attributes).
+        * this ``AnalogOptimizer``.
+
+    Example:
+        The following block illustrate how to create an optimizer that wraps
+        standard SGD:
+
+        >>> from torch.optim import SGD
+        >>> from torch.nn import Linear
+        >>> from aihwkit.simulator.configs.configs import InferenceRPUConfig
+        >>> from aihwkit.optim import AnalogOptimizer
+        >>> model = AnalogLinear(3, 4, rpu_config=InferenceRPUConfig)
+        >>> optimizer = AnalogOptimizer(SGD, model.parameters(), lr=0.02)
+    """
+
+    SUBCLASSES = {}  # type: Dict[str, Type]
+    """Registry of the created subclasses."""
+
+    def __new__(
+            cls,
+            optimizer_cls: Type,
+            *_: Any,
+            **__: Any
+    ) -> 'AnalogOptimizer':
+        subclass_name = '{}{}'.format(cls.__name__, optimizer_cls.__name__)
+
+        # Retrieve or create a new subclass, that inherits both from
+        # `AnalogOptimizer` and for the specific torch optimizer
+        # (`optimizer_cls`).
+        if subclass_name not in cls.SUBCLASSES:
+            cls.SUBCLASSES[subclass_name] = new_class(subclass_name, (cls, optimizer_cls), {})
+
+        return super().__new__(cls.SUBCLASSES[subclass_name])
+
+    def __init__(
+            self,
+            optimizer_cls: Type,  # pylint: disable=unused-argument
+            *args: Any,
+            **kwargs: Any
+    ):
+        super().__init__(*args, **kwargs)
+
+
+class AnalogSGD(AnalogOptimizerMixin, SGD):
+    """Implements analog-aware stochastic gradient descent."""

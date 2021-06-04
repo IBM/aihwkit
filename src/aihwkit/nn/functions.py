@@ -16,7 +16,7 @@ from typing import Any, Optional, Tuple
 
 from torch import Tensor, empty_like
 from torch.autograd import Function
-from aihwkit.simulator.tiles.base import AnalogContext
+from aihwkit.optim.context import AnalogContext
 
 
 class AnalogFunctionBase(Function):

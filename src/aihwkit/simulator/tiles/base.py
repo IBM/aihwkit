@@ -13,52 +13,19 @@
 """High level analog tiles (base)."""
 
 from collections import OrderedDict
-from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union, Type
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from numpy import concatenate, expand_dims
 from numpy import abs as numpy_abs
-from torch import Tensor, stack, ones
+from torch import Tensor, stack
 from torch import device as torch_device
-from torch.nn import Parameter
 from torch.autograd import no_grad
 
 from aihwkit.exceptions import TileError
 from aihwkit.simulator.rpu_base import tiles
-
+from aihwkit.optim.context import AnalogContext
 
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
-
-
-class AnalogContext(Parameter):
-    """Context for analog optimizer"""
-
-    # pylint: disable=signature-differs
-    def __new__(cls: Type['AnalogContext'], analog_tile: 'BaseTile') -> 'AnalogContext':
-        return Parameter.__new__(cls, data=ones((), device=analog_tile.device),
-                                 requires_grad=True)
-
-    def __init__(self, analog_tile: 'BaseTile'):
-        super().__init__()
-        self.analog_tile = analog_tile
-        self.use_torch_update = False
-        self.use_indexed = False
-        self.analog_input = []  # type: list
-        self.analog_grad_output = []  # type: list
-        self.shared_weights = None
-
-    def reset(self, analog_tile: Optional['BaseTile'] = None) -> None:
-        """ Resets the gradient trace and optionally sets the tile pointer. """
-        if analog_tile is not None:
-            self.analog_tile = analog_tile
-        self.analog_input = []
-        self.analog_grad_output = []
-
-    def has_gradient(self) -> bool:
-        """ Whether a gradient trace was stored """
-        return len(self.analog_input) > 0
-
-    def __repr__(self) -> str:
-        return 'AnalogContext of ' + self.analog_tile.get_brief_info()
 
 
 class BaseTile(Generic[RPUConfigGeneric]):
