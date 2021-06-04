@@ -224,8 +224,12 @@ void OneSidedRPUDevice<T>::finishUpdateCycle(
 
   const auto &par = getPar();
   if (par.refresh_every > 0) {
+    int refresh_every = par.refresh_every;
+    if (par.units_in_mbatch) {
+      refresh_every *= m_batch_info;
+    }
     int refresh_count = 0;
-    if (this->current_update_idx_ % par.refresh_every == 0) {
+    if (this->current_update_idx_ % refresh_every == 0) {
       refresh_count += refreshWeights();
     }
     if (refresh_count > 0) {

@@ -62,6 +62,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * N-D support for `AnalogLinear`. (\#227)
 * Fixed an issue in the Experiments that was causing the epoch training loss
   to be higher than the epoch validation loss. (\#238)
+* The default refresh rate is changed to once per mini-batch for
+  `PCMPreset` (as opposed to once per mat-vec). (\#???)
 
 ## [0.3.0] - 2021/04/14
 

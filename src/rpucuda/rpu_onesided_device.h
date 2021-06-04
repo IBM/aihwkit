@@ -25,8 +25,9 @@ template <typename T> class OneSidedRPUDevice;
 
 template <typename T> struct OneSidedRPUDeviceMetaParameter : VectorRPUDeviceMetaParameter<T> {
 
-  int refresh_every = 0;         // refresh every x updates (ie counting single vector updates)
-  IOMetaParameter<T> refresh_io; // the IO for reading out during refresh
+  int refresh_every = 0; // refresh every x updates (ie counting single vector updates)
+  bool units_in_mbatch = true;
+  IOMetaParameter<T> refresh_io;           // the IO for reading out during refresh
   PulsedUpdateMetaParameter<T> refresh_up; // UP parameters for refresh
   T refresh_upper_thres = 0.75;
   T refresh_lower_thres = 0.25;
