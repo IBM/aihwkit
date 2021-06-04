@@ -25,7 +25,7 @@ API Reference
    aihwkit.nn.modules.conv
    aihwkit.nn.modules.linear
    aihwkit.optim
-   aihwkit.optim.analog_sgd
+   aihwkit.optim.analog_optimizer
    aihwkit.utils
    aihwkit.utils.visualization
 

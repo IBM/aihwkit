@@ -19,10 +19,11 @@ to sum all the elements from one array.
 # Imports from PyTorch.
 from torch import Tensor
 from torch.nn.functional import mse_loss
+from torch.optim import SGD
 
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
-from aihwkit.optim import AnalogSGD
+from aihwkit.optim import AnalogOptimizer
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda
@@ -43,7 +44,7 @@ if cuda.is_compiled():
     model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
-opt = AnalogSGD(model.parameters(), lr=0.1)
+opt = AnalogOptimizer(SGD, model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
 for epoch in range(100):
