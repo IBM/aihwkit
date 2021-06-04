@@ -20,7 +20,7 @@ from numpy.testing import assert_array_almost_equal, assert_raises
 from aihwkit.nn.modules.lstm import LSTMState
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
-from aihwkit.simulator.tiles.base import AnalogContext
+from aihwkit.optim.context import AnalogContext
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import LSTM, LSTMCuda
