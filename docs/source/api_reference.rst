@@ -24,6 +24,7 @@ API Reference
    aihwkit.nn.modules.container
    aihwkit.nn.modules.conv
    aihwkit.nn.modules.linear
+   aihwkit.nn.modules.lstm
    aihwkit.optim
    aihwkit.optim.analog_optimizer
    aihwkit.utils

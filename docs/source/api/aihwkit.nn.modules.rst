@@ -17,3 +17,4 @@ Submodules
    aihwkit.nn.modules.container
    aihwkit.nn.modules.conv
    aihwkit.nn.modules.linear
+   aihwkit.nn.modules.lstm
