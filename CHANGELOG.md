@@ -20,19 +20,19 @@ The format is based on [Keep a Changelog], and this project adheres to
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
   `MixedPrecisionEcRamMOPreset`. These can be used for tile configuration
   (`rpu_config`). They specify a particular device and optimizer choice. (\#207)
-* Weight refresh mechanism for ``OneSidedUnitCell`` to counteract
+* Weight refresh mechanism for `OneSidedUnitCell` to counteract
   saturation, by differential read, reset, and re-write. (\#209)
-* Complex cycle-to-cycle noise for ``ExpStepDevice`` (\#226)
-* Added the following presets: ``PCMPresetDevice`` (uni-directional),
-  ``PCMPresetUnitCell`` (a pair of uni-directional devices with
-  periodical refresh) and a ``MixedPrecisionPCMPreset`` for using the
+* Complex cycle-to-cycle noise for `ExpStepDevice`. (\#226)
+* Added the following presets: `PCMPresetDevice` (uni-directional),
+  `PCMPresetUnitCell` (a pair of uni-directional devices with
+  periodical refresh) and a `MixedPrecisionPCMPreset` for using the
   mixed precision optimizer with a PCM pair. (\#226)
-* ``AnalogLinear`` layer now accepts multi-dimensional inputs in the same
-  way as PyTorch's ``Linear`` layer does. (\#227)
+* `AnalogLinear` layer now accepts multi-dimensional inputs in the same
+  way as PyTorch's `Linear` layer does. (\#227)
 * A new `AnalogLSTM` module: a recurrent neural network that uses
   AnalogLinear. (\#240)
-* Return of weight gradients for ``InferenceTile`` (only),
-  so that the gradient can be handled with any pytorch optimizer (\#241)
+* Return of weight gradients for `InferenceTile` (only),
+  so that the gradient can be handled with any pytorch optimizer. (\#241)
 * Added a generic analog optimizer `AnalogOptimizer` that allows extending
   any existing optimizer with analog-specific features. (\#242)
 
@@ -47,12 +47,12 @@ The format is based on [Keep a Changelog], and this project adheres to
   is now the `train=bool` argument. If using a dataset that requires other
   arguments or transforms, they can now be specified via overriding
   `get_dataset_arguments()` and `get_dataset_transform()`. (\#225)
-* ``AnalogContext`` is introduced, along with tile registeration
+* `AnalogContext` is introduced, along with tile registration
   function to handle arbitrary optimizers, so that re-grouping param
-  groups becomes unecessary. (\#241)
+  groups becomes unnecessary. (\#241)
 * Removed `weight` and `bias` of analog layers from the module
   parameters as these parameters are handled internally for analog
-  tiles (\#241).
+  tiles. (\#241)
 * The `AnalogSGD` optimizer is now implemented based on the generic analog
   optimizer, and its base module is `aihwkit.optim.analog_optimizer`. (\#242)
 

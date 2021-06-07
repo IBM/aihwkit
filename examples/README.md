@@ -338,11 +338,11 @@ scheduler every time an epoch is completed.
 
 ## Example 15: [`15_simple_lstm.py`]
 
-This example performs hardware-aware training of an analog Long Short-Term Memory (LSTM) 
-network on a simple sequence. In hardware aware training, a digital network is trained using 
-noise sources typical of Phase Change Memory (PCM) in order to make the network more 
-resilient to noise sources. Inference is then performed using the analog LSTM 
-network to take full advantage of the speed and efficiency gains of the analog computation. 
+This example performs hardware-aware training of an analog Long Short-Term Memory (LSTM)
+network on a simple sequence. In hardware aware training, a digital network is trained using
+noise sources typical of Phase Change Memory (PCM) in order to make the network more
+resilient to noise sources. Inference is then performed using the analog LSTM
+network to take full advantage of the speed and efficiency gains of the analog computation.
 Hardware features can be defined using `rpu_config`:
 
 ```python
@@ -371,8 +371,8 @@ accuracy of the analog LSTM network over time in presence of [weight drift]. The
 # drift compensation
 rpu_config.drift_compensation = GlobalDriftCompensation()
 ```
-Weight drift is applied to the weights within the analog LSTM model using 
-the `drift_analog_weights` function. This function can be looped over to quantify the impact 
+Weight drift is applied to the weights within the analog LSTM model using
+the `drift_analog_weights` function. This function can be looped over to quantify the impact
 of weight drift on inference accuracy over time:
 
 ```python
