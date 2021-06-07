@@ -12,4 +12,4 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   aihwkit.optim.analog_inference
+   aihwkit.optim.analog_optimizer
