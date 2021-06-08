@@ -589,7 +589,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return self.tile.get_hidden_update_index()
 
     def set_hidden_update_index(self, index: int) -> None:
-        """set the current updated hidden device index.
+        """Set the current updated hidden device index.
 
         Usually this is ignored and fixed to 0 as only one device is
         present per cross-point. Other devices, might not allow

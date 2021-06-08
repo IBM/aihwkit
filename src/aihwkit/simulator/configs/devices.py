@@ -991,7 +991,6 @@ class OneSidedUnitCell(UnitCell):
 
     refresh_forward: IOParameters = field(
         default_factory=IOParameters)
-
     """Input-output parameters that define the read during a refresh event.
 
     :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters`
@@ -1222,7 +1221,6 @@ class TransferCompound(UnitCell):
 
     def as_bindings(self) -> devices.TransferResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
-
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError('unit_cell_devices should be a list of devices')
 
@@ -1358,7 +1356,6 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
 
     def as_bindings(self) -> devices.MixedPrecResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
-
         mixed_prec_parameter = parameters_to_bindings(self)
         param_device = self.device.as_bindings()
 

@@ -59,7 +59,7 @@ class AnalogModuleBase(Module):
         for the analog optimizers
 
         Args:
-            tile to register
+            tile: tile to register
         """
         self.register_parameter('analog_ctx_' + str(self._analog_tile_counter),
                                 tile.get_analog_ctx())

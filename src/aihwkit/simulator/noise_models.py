@@ -166,7 +166,7 @@ class BaseNoiseModel:
         Uses the :meth:`~apply_programming_noise_to_conductances` on
         each of the conductance slices.
 
-        Parameters:
+        Args:
             weights: weights tensor
 
         Returns:
@@ -198,7 +198,7 @@ class BaseNoiseModel:
         Uses the :meth:`~apply_drift_noise_to_conductances` on
         each of the conductance slices.
 
-        Parameters:
+        Args:
             weights: weights tensor (usually with programming noise already applied)
             nu_drift_list: list of drift nu for each conductance slice
             t_inference: assumed time of inference (in sec)

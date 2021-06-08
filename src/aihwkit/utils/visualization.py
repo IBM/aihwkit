@@ -318,11 +318,9 @@ def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> i
         Guessed number of steps
 
     Raises:
-
         ConfigError: If rpu_config.device does not have the w_min
             attribute (which is only ensured for
             :class:`~aihwkit.simulator.configs.devices.PulseDevice`)
-
     """
     if not isinstance(rpu_config, SingleRPUConfig):
         return 1000
