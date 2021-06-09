@@ -29,7 +29,7 @@ class BaseConductanceConverter:
 
     @no_grad()
     def convert_to_conductances(self, weights: Tensor) -> Tuple[List[Tensor], Dict]:
-        """Converting a weight matrix into conductances.
+        """Convert a weight matrix into conductances.
 
         Caution:
             The conversion is assumed deterministic and repeatable.
@@ -45,7 +45,7 @@ class BaseConductanceConverter:
 
     @no_grad()
     def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
-        """Converting a matrix of conductances into weights.
+        """Convert a matrix of conductances into weights.
 
         Caution:
             The conversion is assumed deterministic and repeatable.
@@ -131,7 +131,7 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_noise(self, weights: Tensor, t_inference: float) -> Tensor:
-        """Applies the expected noise.
+        """Apply the expected noise.
 
         Applies the noise to a non-perturbed conductance matrix ``weights``
         at time of inference ``t_inference`` (in seconds) where 0 sec
@@ -161,12 +161,12 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_programming_noise(self, weights: Tensor) -> Tuple[Tensor, List[Tensor]]:
-        """Applies the expected programming noise to weights.
+        """Apply the expected programming noise to weights.
 
         Uses the :meth:`~apply_programming_noise_to_conductances` on
         each of the conductance slices.
 
-        Parameters:
+        Args:
             weights: weights tensor
 
         Returns:
@@ -193,12 +193,12 @@ class BaseNoiseModel:
             nu_drift_list: List[Tensor],
             t_inference: float
     ) -> Tensor:
-        """Applies the expected drift noise to weights.
+        """Apply the expected drift noise to weights.
 
         Uses the :meth:`~apply_drift_noise_to_conductances` on
         each of the conductance slices.
 
-        Parameters:
+        Args:
             weights: weights tensor (usually with programming noise already applied)
             nu_drift_list: list of drift nu for each conductance slice
             t_inference: assumed time of inference (in sec)
@@ -219,7 +219,7 @@ class BaseNoiseModel:
 
     @no_grad()
     def generate_drift_coefficients(self, g_target: Tensor) -> Tensor:
-        """Generates drift coefficients ``nu`` based on the target conductances."""
+        """Generate drift coefficients ``nu`` based on the target conductances."""
         raise NotImplementedError
 
     @no_grad()
@@ -395,7 +395,7 @@ class BaseDriftCompensation:
 
     @no_grad()
     def readout(self, out_tensor: Tensor) -> Tensor:
-        """Implements the read out math."""
+        """Implement the read out math."""
         raise NotImplementedError
 
     @no_grad()
@@ -421,7 +421,7 @@ class GlobalDriftCompensation(BaseDriftCompensation):
 
     @no_grad()
     def get_readout_tensor(self, in_size: int) -> Tensor:
-        """Returns the read-out tensor.
+        """Return the read-out tensor.
 
         Uses a single all one vector.
         """

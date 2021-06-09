@@ -81,7 +81,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
     @no_grad()
     def get_analog_ctx(self) -> AnalogContext:
-        """Returns the analog context of the tile to be used in ``AnalogFunction``."""
+        """Return the analog context of the tile to be used in ``AnalogFunction``."""
         return self.analog_ctx
 
     @no_grad()
@@ -108,7 +108,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
     @no_grad()
     def reset_delta_weights(self) -> None:
         """Reset the weight grad tensor to default update behavior (i.e. adding the
-        update directly to the weight)
+        update directly to the weight).
 
         No-op if shared weights is not used.
         """
@@ -117,7 +117,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
     @no_grad()
     def get_brief_info(self) -> str:
-        """Returns short info about the underlying C++ tile"""
+        """Return short info about the underlying C++ tile."""
         return self.tile.get_brief_info().rstrip()
 
     def __getstate__(self) -> Dict:
@@ -589,7 +589,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return self.tile.get_hidden_update_index()
 
     def set_hidden_update_index(self, index: int) -> None:
-        """set the current updated hidden device index.
+        """Set the current updated hidden device index.
 
         Usually this is ignored and fixed to 0 as only one device is
         present per cross-point. Other devices, might not allow
@@ -609,7 +609,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.tile.set_hidden_update_index(index)
 
     def set_indexed(self, indices: Tensor, image_sizes: List) -> None:
-        """Sets the index matrix for convolutions ans switches to
+        """Set the index matrix for convolutions ans switches to
         indexed forward/backward/update versions.
 
         Args:

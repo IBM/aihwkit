@@ -31,7 +31,7 @@ class AnalogOptimizerMixin:
     """
 
     def check_analog_module_devices(self, model: Module) -> None:
-        """Checks and moves analog modules to the correct cuda device."""
+        """Check and move analog modules to the correct cuda device."""
         # TODO: remove this check and add a .to / .cuda to the AnalogContext
 
         # Import dynamically, in order to avoid circular imports.
@@ -97,7 +97,7 @@ class AnalogOptimizerMixin:
             self.add_param_group(group)  # type: ignore[attr-defined]
 
     def step(self, closure: Optional[Callable] = None) -> Optional[float]:
-        """Performs an analog-aware single optimization step.
+        """Perform an analog-aware single optimization step.
 
         If a group containing analog parameters is detected, the optimization
         step calls the related RPU controller. For regular parameter groups,

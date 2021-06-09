@@ -53,13 +53,14 @@ class AnalogModuleBase(Module):
     _analog_tile_counter: int = 0
 
     def register_analog_tile(self, tile: 'BaseTile') -> None:
-        """Registers the analog context of the .
+        """Register the analog context of the tile.
 
-        Note: Needs to be called at the end init to register the tile
-        for the analog optimizers
+        Note:
+            Needs to be called at the end init to register the tile
+            for the analog optimizers.
 
         Args:
-            tile to register
+            tile: tile to register
         """
         self.register_parameter('analog_ctx_' + str(self._analog_tile_counter),
                                 tile.get_analog_ctx())
@@ -148,7 +149,7 @@ class AnalogModuleBase(Module):
             bias: Optional[Tensor] = None,
             force_exact: bool = False
     ) -> None:
-        """Sets the weight (and bias) with given Tensors.
+        """Set the weight (and bias) with given Tensors.
 
         This uses an realistic write if the property ``realistic_read_write``
         of the layer is set, unless it is overwritten by ``force_exact``. It
@@ -240,7 +241,7 @@ class AnalogModuleBase(Module):
             missing_keys: List[str],
             unexpected_keys: List[str],
             error_msgs: List[str]) -> None:
-        """Copies parameters and buffers from `state_dict` into only this
+        """Copy parameters and buffers from `state_dict` into only this
         module, but not its descendants.
 
         This method is a specialization of ``Module._load_from_state_dict``
@@ -267,7 +268,7 @@ class AnalogModuleBase(Module):
             prefix: str = '',
             keep_vars: bool = False
     ) -> Dict:
-        """Returns a dictionary containing a whole state of the module."""
+        """Return a dictionary containing a whole state of the module."""
         self._sync_weights_from_tile()
         # TODO: this will also pickle the resistive device. Problematic?  we
         # could also just save hidden_pars and weights. However, in any case the
@@ -281,7 +282,7 @@ class AnalogModuleBase(Module):
         return current_state
 
     def cpu(self) -> 'AnalogModuleBase':
-        """Moves all model parameters, buffers and tiles to the CPU.
+        """Move all model parameters, buffers and tiles to the CPU.
 
         Note:
             Please be aware that moving analog layers from GPU to CPU is
@@ -300,7 +301,7 @@ class AnalogModuleBase(Module):
             self,
             device: Optional[Union[torch_device, str, int]] = None
     ) -> 'AnalogModuleBase':
-        """Moves all model parameters, buffers and tiles to the GPU.
+        """Move all model parameters, buffers and tiles to the GPU.
 
         This also makes associated parameters and buffers different objects. So
         it should be called before constructing optimizer if the module will

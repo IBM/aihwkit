@@ -10,6 +10,8 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+"""Setup.py for `aihwkit`."""
+
 import os
 
 from setuptools import find_packages

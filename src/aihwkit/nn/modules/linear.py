@@ -88,7 +88,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
         self.set_weights(self.weight, self.bias)
 
     def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
+        """Compute the forward pass."""
         # pylint: disable=arguments-differ
         return AnalogFunction.apply(
             self.analog_tile.get_analog_ctx(), x_input,

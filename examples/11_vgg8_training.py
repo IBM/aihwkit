@@ -62,7 +62,6 @@ RPU_CONFIG = GokmenVlasovPreset()
 
 def load_images():
     """Load images for train from torchvision datasets."""
-
     mean = torch.tensor([0.4377, 0.4438, 0.4728])
     std = torch.tensor([0.1980, 0.2010, 0.1970])
 
@@ -79,7 +78,7 @@ def load_images():
 
 
 def create_analog_network():
-    """Returns a Vgg8 inspired analog model."""
+    """Return a Vgg8 inspired analog model."""
     channel_base = 48
     channel = [channel_base, 2 * channel_base, 3 * channel_base]
     fc_size = 8 * channel_base

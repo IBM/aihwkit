@@ -77,7 +77,7 @@ def load_images():
 
 
 def create_analog_network():
-    """Returns a LeNet5 inspired analog model."""
+    """Return a LeNet5 inspired analog model."""
     channel = [16, 32, 512, 128]
     model = AnalogSequential(
         AnalogConv2d(in_channels=1, out_channels=channel[0], kernel_size=5, stride=1,
@@ -146,7 +146,7 @@ def train_step(train_data, model, criterion, optimizer):
 
 
 def test_evaluation(validation_data, model, criterion):
-    """Test trained network
+    """Test trained network.
 
     Args:
         validation_data (DataLoader): Validation set to perform the evaluation

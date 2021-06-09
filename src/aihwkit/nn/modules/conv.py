@@ -126,7 +126,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         raise NotImplementedError
 
     def forward(self, x_input: Tensor) -> Tensor:
-        """Computes the forward pass."""
+        """Compute the forward pass."""
         input_size = x_input.numel() / x_input.size(0)
         if not self.fold_indices.numel() or self.input_size != input_size:
             self.recalculate_indexes(x_input)

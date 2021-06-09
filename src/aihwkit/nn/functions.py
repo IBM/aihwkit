@@ -20,7 +20,7 @@ from aihwkit.optim.context import AnalogContext
 
 
 class AnalogFunctionBase(Function):
-    """ Base function for analog functions """
+    """Base function for analog functions."""
     # pylint: disable=arguments-differ, protected-access
 
     @staticmethod
@@ -35,7 +35,6 @@ class AnalogFunctionBase(Function):
         Note: Indexed versions can used when analog_ctx.use_indexed is
         set to True.
         """
-
         # Store in context for using during `backward()`.
         analog_tile = analog_ctx.analog_tile
         ctx.analog_ctx = analog_ctx
@@ -61,7 +60,6 @@ class AnalogFunctionBase(Function):
             grad_output: Tensor,
     ) -> Tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor], Optional[Tensor]]:
         """Execute the backward pass in the analog tile."""
-
         analog_ctx = ctx.analog_ctx
         analog_tile = analog_ctx.analog_tile
         input_, = ctx.saved_tensors

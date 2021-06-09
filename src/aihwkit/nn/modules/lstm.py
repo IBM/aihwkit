@@ -360,7 +360,7 @@ def init_stacked_analog_lstm(
         first_layer_args: Any,
         other_layer_args: Any
 ) -> ModuleList:
-    """Constructs a list of LSTMLayers over which to iterate
+    """Construct a list of LSTMLayers over which to iterate.
 
     Args:
         num_layers: number of serially connected LSTM layers
