@@ -132,6 +132,7 @@ rpu_config.drift_compensation = GlobalDriftCompensation()
 
 
 def reset_states():
+    """Reset the LSTM states."""
     LSTMState = namedtuple('LSTMState', ['hx', 'cx'])
     states = [LSTMState(torch.zeros(BATCH_SIZE, HIDDEN_SIZE),
                         torch.zeros(BATCH_SIZE, HIDDEN_SIZE))

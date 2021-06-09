@@ -56,7 +56,7 @@ class BasicTraining(Experiment):
             epochs: int = 30,
             learning_rate: float = 0.05
     ):
-        """BasicTraining constructor.
+        """Create a new ``BasicTraining``.
 
         Args:
             dataset: the dataset class to be used.

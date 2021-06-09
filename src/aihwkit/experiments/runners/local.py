@@ -32,7 +32,7 @@ class LocalRunner(Runner):
 
     def __init__(self,
                  device: Optional[torch_device] = None):
-        """LocalRunner constructor.
+        """Create a new ``LocalRunner``.
 
         Args:
             device: the device where the model will be moved to.

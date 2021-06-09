@@ -34,7 +34,7 @@ class CloudRunner(Runner):
                  api_url: Optional[str] = None,
                  api_token: Optional[str] = None,
                  verify: bool = True):
-        """CloudRunner constructor.
+        """Create a new ``CloudRunner``.
 
         Note:
             If no ``api_token`` or ``api_url`` is provided, this class will

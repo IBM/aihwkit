@@ -77,7 +77,7 @@ class AnalogSequential(Sequential):
             self,
             device: Optional[Union[torch_device, str, int]] = None
     ) -> 'AnalogSequential':
-        """Moves and/or casts the parameters, buffers and analog tiles.
+        """Move and/or cast the parameters, buffers and analog tiles.
 
         Note:
             Please be aware that moving analog layers from GPU to CPU is

@@ -42,7 +42,7 @@ class ApiStub:
     """Base url to be used in the endpoints."""
 
     def __init__(self, session: ApiSession):
-        """ApiStub constructor.
+        """Create a new ``ApiStub``.
 
         Args:
             session: the requests session to be used.

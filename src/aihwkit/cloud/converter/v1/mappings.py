@@ -116,7 +116,7 @@ class Function:
         return getattr(source, field, default)
 
     def get_argument_from_proto(self, source: Any, field: str, default: Any = None) -> Dict:
-        """Get the value of a field."""
+        """Get the value of an argument."""
         return {source.name: getattr(source, field, default)}
 
 
@@ -124,6 +124,7 @@ class LayerFunction(Function):
     """Mapping for a function-like entity (Layer)."""
 
     def get_field_value_to_proto(self, source: Any, field: str, default: Any = None) -> Any:
+        """Get the value of a field."""
         if field == 'bias':
             return getattr(source, 'bias', None) is not None
         if field == 'rpu_config':
@@ -137,7 +138,7 @@ class LayerFunction(Function):
         return super().get_field_value_to_proto(source, field, default)
 
     def get_argument_from_proto(self, source: Any, field: str, default: Any = None) -> Dict:
-        """Get the value of a field."""
+        """Get the value of an argument."""
         if source.name == 'rpu_config':
             preset_str = getattr(source, field, default).decode('utf-8')
             try:

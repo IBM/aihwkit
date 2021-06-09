@@ -50,7 +50,7 @@ def compute_pulse_response(
         direction: ndarray,
         use_forward: bool = False
 ) -> ndarray:
-    """Computes the pulse response of a given device configuration.
+    """Compute the pulse response of a given device configuration.
 
     Args:
         analog_tile: Base tile used for computing the weight traces
@@ -95,7 +95,7 @@ def plot_pulse_response(
         direction: ndarray,
         use_forward: bool = False
 ) -> ndarray:
-    """Plots the pulse response of a direction vector for each weight of
+    """Plot the pulse response of a direction vector for each weight of
     the analog tile.
 
     Args:
@@ -128,7 +128,7 @@ def compute_pulse_statistics(
         up_direction: bool,
         smoothness: float = 0.5
 ) -> Tuple[ndarray, ndarray]:
-    """Computes the statistics of the step trace from :func:`compute_pulse_response`.
+    """Compute the statistics of the step trace from :func:`compute_pulse_response`.
 
     Args:
         w_nodes: weight range vector to estimate the step histogram
@@ -149,7 +149,7 @@ def compute_pulse_statistics(
             delta_w: ndarray,
             lam: float
     ) -> Tuple[ndarray, ndarray]:
-        """Calculates the mean and std of a w location (node).
+        """Calculate the mean and std of a w location (node).
 
         Note:
             In case there are multiple trials then it also includes
@@ -192,7 +192,7 @@ def plot_pulse_statistics(
         num_nodes: int = 100,
         smoothness: float = 0.5
 ) -> Tuple[ndarray, ndarray, ndarray]:
-    """Plots the dG-G curve from a given weight trace and direction vector.
+    """Plot the dG-G curve from a given weight trace and direction vector.
 
     Args:
         w_trace: weight trace from :func:`compute_pulse_response`
@@ -207,7 +207,7 @@ def plot_pulse_statistics(
     """
 
     def errorbar_patch(x: ndarray, mean: ndarray, std: ndarray) -> None:
-        """Plots a patchy error bar."""
+        """Plot a patchy error bar."""
         axis = plt.plot(x, mean)[0]
         plt.fill_between(x, mean - std, mean + std, edgecolor=None,
                          facecolor=axis.get_color(), alpha=0.5)
@@ -240,7 +240,7 @@ def get_tile_for_plotting(
         use_cuda: bool = False,
         noise_free: bool = False
 ) -> BaseTile:
-    """Returns an analog tile for plotting the response curve.
+    """Return an analog tile for plotting the response curve.
 
     Args:
         rpu_config: RPU Configuration to use for plotting
@@ -303,7 +303,7 @@ def get_tile_for_plotting(
 
 
 def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> int:
-    """Estimates the n_steps.
+    """Estimate the n_steps.
 
     Note:
         The estimate of the number of update pulses needed to drive
@@ -347,7 +347,7 @@ def plot_response_overview(
         use_cuda: bool = False,
         smoothness: float = 0.1
 ) -> None:
-    """Plots the step response and statistics of a given device configuration.
+    """Plot the step response and statistics of a given device configuration.
 
     Args:
         rpu_config: RPU Configuration to use for plotting
@@ -393,7 +393,7 @@ def plot_response_overview(
 
 
 def plot_device(device: Union[PulsedDevice, UnitCell], w_noise: float = 0.0, **kwargs: Any) -> None:
-    """Plots the step response figure for a given device (preset).
+    """Plot the step response figure for a given device (preset).
 
     Note:
         It will use an amount of read weight noise ``w_noise`` for
@@ -428,7 +428,7 @@ def plot_device_compact(
         n_traces: int = 3,
         use_cuda: bool = False,
 ) -> Figure:
-    """Plots a compact step response figure for a given device (preset).
+    """Plot a compact step response figure for a given device (preset).
 
     Note:
         It will use an amount of read weight noise ``w_noise`` for
@@ -549,7 +549,7 @@ def plot_device_symmetry(
         n_traces: int = 3,
         use_cuda: bool = False
 ) -> None:
-    """Plots the response figure for a given device (preset).
+    """Plot the response figure for a given device (preset).
 
     It will show the response to alternating up down pulses.
 

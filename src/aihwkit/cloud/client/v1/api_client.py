@@ -37,7 +37,7 @@ class ApiClient:
     """
 
     def __init__(self, session: ApiSession):
-        """ApiClient constructor.
+        """Create a new ``ApiClient``.
 
         Args:
             session: the request session to be used in the client.
