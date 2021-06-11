@@ -5,9 +5,3 @@ aihwkit.cloud.converter.v1 package
    :members:
    :undoc-members:
    :show-inheritance:
-
-Submodules
-----------
-
-.. toctree::
-   :maxdepth: 4
