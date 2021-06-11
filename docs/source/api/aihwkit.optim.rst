@@ -13,3 +13,4 @@ Submodules
    :maxdepth: 4
 
    aihwkit.optim.analog_optimizer
+   aihwkit.optim.context
