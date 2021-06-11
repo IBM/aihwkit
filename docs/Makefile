@@ -20,4 +20,6 @@ help:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 apidoc:
-	sphinx-apidoc --separate --module-first --output-dir source/api ../src/aihwkit
+	sphinx-apidoc --separate --module-first --output-dir source/api ../src/aihwkit \
+	../src/aihwkit/cloud/converter/definitions/*_pb2.py ../src/aihwkit/cloud/converter/v1/mappings.py \
+	../src/aihwkit/cloud/converter/v1/training.py
