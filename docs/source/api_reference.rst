@@ -27,8 +27,10 @@ API Reference
    aihwkit.nn.modules.lstm
    aihwkit.optim
    aihwkit.optim.analog_optimizer
+   aihwkit.optim.context
    aihwkit.utils
    aihwkit.utils.visualization
+   aihwkit.version
 
 
 .. only:: env_local
