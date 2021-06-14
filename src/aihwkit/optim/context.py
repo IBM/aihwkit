@@ -12,11 +12,9 @@
 
 """Parameter context for analog tiles."""
 
-from typing import Optional, Type, Union, Any, TYPE_CHECKING
-
-from torch import ones, dtype, Tensor
+from typing import Optional, Type, TYPE_CHECKING
+from torch import ones
 from torch.nn import Parameter
-from torch import device as torch_device
 
 if TYPE_CHECKING:
     from aihwkit.simulator.tiles.base import BaseTile
@@ -25,8 +23,8 @@ if TYPE_CHECKING:
 class AnalogContext(Parameter):
     """Context for analog optimizer."""
 
+    # pylint: disable=signature-differs
     def __new__(cls: Type['AnalogContext'], analog_tile: 'BaseTile') -> 'AnalogContext':
-        # pylint: disable=signature-differs
         return Parameter.__new__(cls, data=ones((), device=analog_tile.device),
                                  requires_grad=True)
 
@@ -49,57 +47,6 @@ class AnalogContext(Parameter):
     def has_gradient(self) -> bool:
         """Return whether a gradient trace was stored."""
         return len(self.analog_input) > 0
-
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'AnalogContext':
-        """Move the context to a cuda device.
-
-        Args:
-             device: the desired device of the tile.
-
-        Returns:
-            This context in the specified device.
-        """
-        super().cuda(device)
-
-        self.analog_tile = self.analog_tile.cuda(device)
-        self.reset()
-
-        return self
-
-    def to(self, *args: Any, **kwargs: Any) -> 'AnalogContext':
-        """Move analog tiles of the current context to a device.
-
-        Note:
-            Please be aware that moving analog tiles from GPU to CPU is
-            currently not supported.
-
-        Caution:
-            Other tensor conversions than moving the device to CUDA,
-            such as changing the data type are not supported for analog
-            tiles and will be simply ignored.
-
-        Returns:
-            This module in the specified device.
-        """
-        # pylint: disable=invalid-name
-        super().to(*args, **kwargs)
-
-        device = None
-        if 'device' in kwargs:
-            device = kwargs['device']
-        elif len(args) > 0 and not isinstance(args[0], (Tensor, dtype)):
-            device = torch_device(args[0])
-
-        if device is not None:
-            device = torch_device(device)
-            if device.type == 'cuda':
-                self.analog_tile = self.analog_tile.cuda(device)
-                self.reset()
-
-        return self
 
     def __repr__(self) -> str:
         return 'AnalogContext of ' + self.analog_tile.get_brief_info()

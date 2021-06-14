@@ -14,8 +14,10 @@
 
 from types import new_class
 from typing import Any, Callable, Dict, Optional, Type
+from warnings import warn
 
 from torch.optim import Optimizer, SGD
+from torch.nn import Module
 
 from aihwkit.optim.context import AnalogContext
 
@@ -28,12 +30,45 @@ class AnalogOptimizerMixin:
     ``AnalogOptimizer`` or torch ``Optimizer``.
     """
 
-    def regroup_param_groups(self, *_: Any) -> None:
+    def check_analog_module_devices(self, model: Module) -> None:
+        """Check and move analog modules to the correct cuda device."""
+        # TODO: remove this check and add a .to / .cuda to the AnalogContext
+
+        # Import dynamically, in order to avoid circular imports.
+        # pylint: disable=import-outside-toplevel
+        from aihwkit.nn.modules.base import AnalogModuleBase
+
+        manual_cuda_move = False  # For showing only one warning.
+        for (_, module) in model.named_modules():
+            if isinstance(module, AnalogModuleBase):
+                analog_tile = module.analog_tile
+                analog_ctx = analog_tile.get_analog_ctx()
+
+                # Pytorch module applies everything only to the parameters
+                # and buffers, including the device, so we might need to change
+                # the device of the module to put the analog layer on the
+                # correct device.
+                if analog_ctx.device != analog_tile.device:
+                    module.cuda(analog_ctx.device)
+                    manual_cuda_move = True
+
+        if manual_cuda_move:
+            warn('The tiles of the analog layers have been moved to cuda '
+                 'manually. Please use `.cuda()` directly on the analog layers '
+                 'or `AnalogSequential.cuda()` for automatic handling.')
+
+    def regroup_param_groups(self, model: Module) -> None:
         """Reorganize the parameter groups, isolating analog layers.
 
         Update the `param_groups` of the optimizer, moving the parameters for
         each analog layer to a new single group.
+
+        Also checks analog modules for the correct CUDA device.
+
+        Args:
+            model: model for the optimizer.
         """
+        self.check_analog_module_devices(model)
 
         # Create the new param groups.
         analog_param_groups = []
@@ -113,6 +148,7 @@ class AnalogOptimizerMixin:
                             analog_tile.update(x_input, d_input)
 
                     analog_ctx.reset()
+
         # Apply post-update step operations (diffuse, decay, etc).
         # (only here because of unknown params order and shared weights)
         for group in self.param_groups:
