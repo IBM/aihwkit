@@ -180,22 +180,22 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   CUDA_CALL(cudaDeviceSynchronize());
 
   IndexReader<T> idx_reader(dev_in.getData());
-  cub::TransformInputIterator<T, IndexReader<T>, int *> in_itr(dev_in_index.getData(), idx_reader);
+  RPU::cub::TransformInputIterator<T, IndexReader<T>, int *> in_itr(dev_in_index.getData(), idx_reader);
 
-  cub::CountingInputIterator<int> index(0);
+  RPU::cub::CountingInputIterator<int> index(0);
   BatchTransposer<T> batch_transposer(dev_in.getData(), size, m_batch);
-  cub::TransformInputIterator<T, BatchTransposer<T>, cub::CountingInputIterator<int>> in_trans_itr(
+  RPU::cub::TransformInputIterator<T, BatchTransposer<T>, RPU::cub::CountingInputIterator<int>> in_trans_itr(
       index, batch_transposer);
 
   IndexReader<int> idx_reader_host(tmp);
-  cub::TransformInputIterator<int, IndexReader<int>, int *> test_host(tmp, idx_reader_host);
+  RPU::cub::TransformInputIterator<int, IndexReader<int>, int *> test_host(tmp, idx_reader_host);
   std::cout << test_host[0] << std::endl;
 
   CustomMaxAbs max_abs;
   // Determine temporary device storage requirements
   void *d_temp_storage = NULL;
   size_t temp_storage_bytes = 0;
-  cub::DeviceSegmentedReduce::Reduce(
+  RPU::cub::DeviceSegmentedReduce::Reduce(
       d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
       dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c.getStream());
   // Allocate temporary storage
@@ -212,7 +212,7 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   if (trans) {
 
     // this works, too, but has some performance hit, because of non-aligned memory reads
-    // cub::DeviceSegmentedReduce::Reduce(d_temp_storage, temp_storage_bytes,
+    // RPU::cub::DeviceSegmentedReduce::Reduce(d_temp_storage, temp_storage_bytes,
     // 				   in_trans_itr, dev_max_values.getData(),
     // 				   m_batch, dev_offsets.getData(),
     // 				   dev_offsets.getData()+1, max_abs,0,c.getStream());
@@ -229,7 +229,7 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   } else {
     // only trans==false
     // Fast Segmented reduction (much faster than loop from outside)
-    cub::DeviceSegmentedReduce::Reduce(
+    RPU::cub::DeviceSegmentedReduce::Reduce(
         d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
         dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c.getStream());
   }
@@ -267,11 +267,11 @@ Maximizer<T>::Maximizer(CudaContext *c, int size, bool abs_if)
   dev_max_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);
   size_t temp_storage_bytes = 0;
   if (abs_if_) {
-    cub::DeviceReduce::Reduce(
+    RPU::cub::DeviceReduce::Reduce(
         nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(), size_,
         max_abs_op_, 0, context_->getStream());
   } else {
-    cub::DeviceReduce::Max(
+    RPU::cub::DeviceReduce::Max(
         nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(), size_,
         context_->getStream());
   }
@@ -299,12 +299,12 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
 
     size_t temp_storage_bytes = 0;
     if (abs_if_) {
-      cub::DeviceSegmentedReduce::Reduce(
+      RPU::cub::DeviceSegmentedReduce::Reduce(
           nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, max_abs_op_, 0,
           context_->getStream());
     } else {
-      cub::DeviceSegmentedReduce::Max(
+      RPU::cub::DeviceSegmentedReduce::Max(
           nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, context_->getStream());
     }
@@ -336,11 +336,11 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
   if (m_batch == 1) {
     size_t ssz = dev_v_temp_storage_->getSize();
     if (abs_if_) {
-      cub::DeviceReduce::Reduce(
+      RPU::cub::DeviceReduce::Reduce(
           (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(), size_,
           max_abs_op_, (T)0, s);
     } else {
-      cub::DeviceReduce::Max(
+      RPU::cub::DeviceReduce::Max(
           (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(), size_,
           s);
     }
@@ -379,11 +379,11 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
       // Fast Segmented reduction (much faster than loop from outside)
       size_t ssz = dev_m_temp_storage_->getSize();
       if (abs_if_) {
-        cub::DeviceSegmentedReduce::Reduce(
+        RPU::cub::DeviceSegmentedReduce::Reduce(
             (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(),
             m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, max_abs_op_, (T)0.0, s);
       } else {
-        cub::DeviceSegmentedReduce::Max(
+        RPU::cub::DeviceSegmentedReduce::Max(
             (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(),
             m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, s);
       }

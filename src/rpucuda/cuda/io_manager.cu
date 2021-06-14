@@ -946,8 +946,8 @@ template <typename T> void InputOutputManager<T>::initializeBatchBuffer(int m_ba
         MIN(nblocks_batch_max_, this->context_->getNBlocks(in_size_ * m_batch, nthreads_));
 
     size_t byte_size = 0;
-    cub::CountingInputIterator<int> itr(0);
-    cub::DeviceSelect::Flagged(
+    RPU::cub::CountingInputIterator<int> itr(0);
+    RPU::cub::DeviceSelect::Flagged(
         (void *)nullptr, byte_size, itr, dev_bound_exceeded_->getData(),
         dev_selected_bidx_->getData(), dev_selected_m_batch_->getData(), m_batch,
         context_->getStream());
@@ -1116,9 +1116,9 @@ int InputOutputManager<T>::applyToInputWithBoundManagement(InputIteratorT dev_in
     // dev_bound_exceeded_->printValues();
 
     // it is bound_management_round_>1 here
-    cub::CountingInputIterator<int> itr(0);
+    RPU::cub::CountingInputIterator<int> itr(0);
     size_t byte_size = dev_flagged_temp_storage_->getSize();
-    cub::DeviceSelect::Flagged(
+    RPU::cub::DeviceSelect::Flagged(
         (void *)dev_flagged_temp_storage_->getData(), byte_size, itr,
         dev_bound_exceeded_->getData(), dev_selected_bidx_->getData(),
         dev_selected_m_batch_->getData(), m_batch, s);

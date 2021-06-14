@@ -190,7 +190,7 @@ NoiseManager<T>::NoiseManager(CudaContext *c, int size)
   maximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, false);
 
   size_t temp_storage_bytes = 0;
-  cub::DeviceReduce::Reduce(
+  RPU::cub::DeviceReduce::Reduce(
       nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(), size_,
       nsum_op_, 0, context_->getStream());
 
@@ -222,7 +222,7 @@ template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
     dev_offsets_ = RPU::make_unique<CudaArray<int>>(context_, m_batch + 1, offsets);
 
     size_t temp_storage_bytes = 0;
-    cub::DeviceSegmentedReduce::Reduce(
+    RPU::cub::DeviceSegmentedReduce::Reduce(
         nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(),
         m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, 0,
         context_->getStream());
@@ -241,10 +241,10 @@ void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool t
 
   if (m_batch == 1) {
     size_t ssz = dev_v_temp_storage_->getSize();
-    cub::DeviceReduce::Reduce(
+    RPU::cub::DeviceReduce::Reduce(
         (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_psum_values_->getData(), size_,
         psum_op_, (T)0, s);
-    cub::DeviceReduce::Reduce(
+    RPU::cub::DeviceReduce::Reduce(
         (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_nsum_values_->getData(), size_,
         nsum_op_, (T)0, s);
 
@@ -285,10 +285,10 @@ void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool t
 
       // Fast Segmented reduction
       size_t ssz = dev_m_temp_storage_->getSize();
-      cub::DeviceSegmentedReduce::Reduce(
+      RPU::cub::DeviceSegmentedReduce::Reduce(
           (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_psum_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, (T)0.0, s);
-      cub::DeviceSegmentedReduce::Reduce(
+      RPU::cub::DeviceSegmentedReduce::Reduce(
           (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_nsum_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, nsum_op_, (T)0.0, s);
     }
@@ -416,14 +416,14 @@ void NoiseManager<T>::compute(
           dev_avgmax_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
 
           size_t temp_storage_bytes = 0;
-          cub::DeviceReduce::Sum(
+          RPU::cub::DeviceReduce::Sum(
               nullptr, temp_storage_bytes, amaximizer_->getMaxValues(),
               dev_avgmax_value_->getData(), m_batch, s);
           dev_a_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
         }
 
         size_t ssz = dev_v_temp_storage_->getSize();
-        cub::DeviceReduce::Sum(
+        RPU::cub::DeviceReduce::Sum(
             (void *)dev_v_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
             dev_avgmax_value_->getData(), m_batch, s);
       }
