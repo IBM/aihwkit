@@ -256,7 +256,7 @@ template <typename T> void PulsedRPUDevice<T>::getDPNames(std::vector<std::strin
         "drift_nu")); // we only save the nu, not the t/w0 etc. drift will thus reset at zero
   }
   if (getPar().usesPersistentWeight()) {
-    names.push_back(std::string("hidden_weigths"));
+    names.push_back(std::string("persistent_weights"));
   }
 }
 
