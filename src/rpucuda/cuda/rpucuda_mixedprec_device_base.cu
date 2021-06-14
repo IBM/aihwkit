@@ -167,14 +167,14 @@ void MixedPrecRPUDeviceBaseCuda<T>::computeSparsityPartly(
     // init
     current_zero_size_ = size;
     size_t temp_storage_bytes = 0;
-    cub::DeviceReduce::Sum(
+    RPU::cub::DeviceReduce::Sum(
         nullptr, temp_storage_bytes, input_values, sparsity, size, this->context_->getStream());
     dev_zc_temp_storage_ = RPU::make_unique<CudaArray<char>>(this->context_, temp_storage_bytes);
   }
 
   // Run sum-reduction (use T as output)
   size_t temp_storage_bytes = dev_zc_temp_storage_->getSize();
-  cub::DeviceReduce::Sum(
+  RPU::cub::DeviceReduce::Sum(
       dev_zc_temp_storage_->getData(), temp_storage_bytes, input_values, sparsity, size,
       this->context_->getStream());
 }

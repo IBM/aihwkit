@@ -51,9 +51,9 @@ WeightClipperCuda<T>::WeightClipperCuda(CudaContext *context, int x_size, int d_
 
   T *tmp = nullptr;
   StdFunctor<T> std_functor((T)x_size_, tmp);
-  cub::TransformInputIterator<T, StdFunctor<T>, T *> std_input(tmp, std_functor);
+  RPU::cub::TransformInputIterator<T, StdFunctor<T>, T *> std_input(tmp, std_functor);
 
-  cub::DeviceReduce::Sum(
+  RPU::cub::DeviceReduce::Sum(
       nullptr, temp_storage_bytes_, std_input, tmp, size_, context_->getStream());
   dev_temp_storage_ = RPU::make_unique<CudaArray<char>>(context, temp_storage_bytes_);
 }
@@ -79,7 +79,7 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
     }
     row_amaximizer_->compute(weights, d_size_, true);
 
-    cub::DeviceReduce::Sum(
+    RPU::cub::DeviceReduce::Sum(
         dev_temp_storage_->getData(), temp_storage_bytes_, row_amaximizer_->getMaxValues(),
         dev_sum_value_->getData(), d_size_, s);
 
@@ -98,15 +98,15 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
     }
 
     StdFunctor<T> std_functor((T)size_, dev_sum_value_->getData());
-    cub::TransformInputIterator<T, StdFunctor<T>, T *> std_input(weights, std_functor);
+    RPU::cub::TransformInputIterator<T, StdFunctor<T>, T *> std_input(weights, std_functor);
 
     // mean (sum)
-    cub::DeviceReduce::Sum(
+    RPU::cub::DeviceReduce::Sum(
         dev_temp_storage_->getData(), temp_storage_bytes_, weights, dev_sum_value_->getData(),
         size_, s);
 
     // std
-    cub::DeviceReduce::Sum(
+    RPU::cub::DeviceReduce::Sum(
         dev_temp_storage_->getData(), temp_storage_bytes_, std_input, dev_std_value_->getData(),
         size_, s);
 

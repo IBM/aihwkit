@@ -34,6 +34,11 @@
 #define BLUE_ON "\033[0;34m"
 #define COLOR_OFF "\033[0m"
 
+#undef CUB_NS_PREFIX
+#undef CUB_NS_POSTFIX
+#define CUB_NS_PREFIX namespace RPU {
+#define CUB_NS_POSTFIX }
+
 #define CUBLAS_CALL(x)                                                                             \
   if ((x) != CUBLAS_STATUS_SUCCESS) {                                                              \
     std::ostringstream ss;                                                                         \

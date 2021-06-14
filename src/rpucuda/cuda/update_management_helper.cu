@@ -453,7 +453,7 @@ __global__ void kernelGetKBlockAggregate(
 
   const int m_batch = m_batch_in;
   const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  __shared__ typename cub::BlockScan<kagg_t, thread_block_size>::TempStorage temp_storage;
+  __shared__ typename RPU::cub::BlockScan<kagg_t, thread_block_size>::TempStorage temp_storage;
 
   int K = 0;
   if (tid < m_batch) {
@@ -461,7 +461,7 @@ __global__ void kernelGetKBlockAggregate(
   }
   kagg_t Kc = 0;
   kagg_t block_aggregate = 0;
-  cub::BlockScan<kagg_t, thread_block_size>(temp_storage).ExclusiveSum(K, Kc, block_aggregate);
+  RPU::cub::BlockScan<kagg_t, thread_block_size>(temp_storage).ExclusiveSum(K, Kc, block_aggregate);
 
   if (tid < m_batch) {
     Kc_block[tid] = Kc;
@@ -503,14 +503,14 @@ template <typename T> void UpdateManagementHelper<T>::initializeBuffers(int m_ba
   // Determine temporary device storage requirements
   void *temp_storage = NULL;
   size_t temp_storage_bytes = 0;
-  CUDA_CALL(cub::DeviceReduce::Sum(
+  CUDA_CALL(RPU::cub::DeviceReduce::Sum(
       temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kn_->getData(), m_batch,
       context_->getStream()));
   context_->synchronize();
   dev_Kn_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
   context_->synchronize();
 
-  CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+  CUDA_CALL(RPU::cub::DeviceScan::ExclusiveSum(
       temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kc_values_->getData(),
       m_batch, context_->getStream()));
   context_->synchronize();
@@ -533,7 +533,7 @@ template <typename T> void UpdateManagementHelper<T>::computeKc(int m_batch) {
 
   // CAUTION: needs K_values to be already computed !!
   size_t temp_storage_bytes = dev_Kc_temp_storage_->getSize();
-  CUDA_CALL(cub::DeviceScan::ExclusiveSum(
+  CUDA_CALL(RPU::cub::DeviceScan::ExclusiveSum(
       (void *)dev_Kc_temp_storage_->getData(), temp_storage_bytes, dev_K_values_->getData(),
       dev_Kc_values_->getData(), m_batch, context_->getStream()));
 }
@@ -543,7 +543,7 @@ template <typename T> void UpdateManagementHelper<T>::computeKn(int m_batch) {
   // CAUTION: needs K_values to be already computed !!
 
   size_t temp_storage_bytes = dev_Kn_temp_storage_->getSize();
-  CUDA_CALL(cub::DeviceReduce::Sum(
+  CUDA_CALL(RPU::cub::DeviceReduce::Sum(
       (void *)dev_Kn_temp_storage_->getData(), temp_storage_bytes, dev_K_values_->getData(),
       dev_Kn_->getData(), m_batch, context_->getStream()));
 }
