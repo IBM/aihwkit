@@ -25,7 +25,7 @@ from copy import deepcopy
 from matplotlib.figure import Figure
 from numpy import ndarray
 
-from torch import ones, eye, from_numpy, zeros
+from torch import ones, eye, from_numpy
 from torch import device as torch_device
 
 import numpy as np
@@ -547,7 +547,8 @@ def plot_device_symmetry(
         w_noise: float = 0.0,
         n_pulses: int = 10000,
         n_traces: int = 3,
-        use_cuda: bool = False
+        use_cuda: bool = False,
+        w_init: float = 1.0,
 ) -> None:
     """Plot the response figure for a given device (preset).
 
@@ -562,7 +563,8 @@ def plot_device_symmetry(
         n_pulses: total number of pulses
         w_noise: Weight noise standard deviation during read
         n_traces: Number of device traces
-        use_cuda: Whether to use CUDA
+        use_cuda: Whether to use CUDA,
+        w_init: Initial value of the weights
     """
     plt.figure(figsize=[10, 5])
 
@@ -581,7 +583,7 @@ def plot_device_symmetry(
     plt.clf()
 
     analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
-    weights = zeros((n_traces, 1))
+    weights = w_init*ones((n_traces, 1))
     analog_tile.set_weights(weights)
 
     plot_pulse_response(analog_tile, direction, use_forward=False)

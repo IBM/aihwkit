@@ -65,7 +65,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The default refresh rate is changed to once per mini-batch for
   `PCMPreset` (as opposed to once per mat-vec). (\#243)
 * Fixed "Wrong device ordinal" errors for CUDA which resulted from a known
-  issue of using CUB together with pytorch. (#\250)
+  issue of using CUB together with pytorch. (\#250)
+* Renamed persistent weight hidden parameter field to
+  `persistent_weights`. (\#251)
 
 ## [0.3.0] - 2021/04/14
 
