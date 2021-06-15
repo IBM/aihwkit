@@ -68,6 +68,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   issue of using CUB together with pytorch. (\#250)
 * Renamed persistent weight hidden parameter field to
   `persistent_weights`. (\#251)
+* Analog tiles now always move correctly to CUDA when `model.cuda()`
+  or `model.to(device)` is used. (\#252)
 
 ## [0.3.0] - 2021/04/14
 
