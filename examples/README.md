@@ -385,6 +385,69 @@ for t_inference in [0., 1., 20., 1000., 1e5]:
 More details on Phase Change Memory (PCM) noise sources and weight drift
 can be found in the [Inference and PCM statistical model] documentation.
 
+## Example 16: [`16_mnist_gan.py`]
+
+This example depicts how to train a [Generative Adversarial Network (GAN)] using the `aihwkit`
+package and its analog capabilities.
+
+To do so, we implemented a very basic GAN architecture in which an analog generator learns to draw
+characters, trying to mimic those appearing in the MNIST dataset. In contrast, a non-analog
+discriminator tries to classify the generated images as fake or original (to give feedback to the
+generator). The full architecture of the generator and the discriminator are printed in terminal
+during execution:
+
+```
+Generator(
+  (gen): AnalogSequential(
+    (0): AnalogSequential(
+      (0): AnalogLinear(in_features=64, out_features=128, bias=True)
+      (1): BatchNorm1d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): ReLU(inplace=True)
+    )
+    (1): AnalogSequential(
+      (0): AnalogLinear(in_features=128, out_features=256, bias=True)
+      (1): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): ReLU(inplace=True)
+    )
+    (2): AnalogSequential(
+      (0): AnalogLinear(in_features=256, out_features=512, bias=True)
+      (1): BatchNorm1d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): ReLU(inplace=True)
+    )
+    (3): AnalogSequential(
+      (0): AnalogLinear(in_features=512, out_features=1024, bias=True)
+      (1): BatchNorm1d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): ReLU(inplace=True)
+    )
+    (4): AnalogLinear(in_features=1024, out_features=784, bias=True)
+    (5): Sigmoid()
+  )
+)
+Discriminator(
+  (disc): Sequential(
+    (0): Sequential(
+      (0): Linear(in_features=784, out_features=512, bias=True)
+      (1): LeakyReLU(negative_slope=0.2, inplace=True)
+    )
+    (1): Sequential(
+      (0): Linear(in_features=512, out_features=256, bias=True)
+      (1): LeakyReLU(negative_slope=0.2, inplace=True)
+    )
+    (2): Sequential(
+      (0): Linear(in_features=256, out_features=128, bias=True)
+      (1): LeakyReLU(negative_slope=0.2, inplace=True)
+    )
+    (3): Linear(in_features=128, out_features=1, bias=True)
+  )
+)
+```
+
+The results of this example are the fake images generated during the training and a GIF animation
+that gives an overview of the generator's capabilities evolution. An example of the resulting GIF
+animation:
+
+![replay_fake_images_gan](img/replay_fake_images_gan.gif)
+
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
@@ -401,6 +464,7 @@ Resistive Cross-Point Devices. Front. Neurosci.]:
 https://www.frontiersin.org/articles/10.3389/fnins.2017.00538/full
 [Gokmen T and Haensch W (2020) Algorithm for Training Neural Networks on Resistive Device Arrays.
 Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
+[Generative Adversarial Network (GAN)]: https://arxiv.org/abs/1406.2661
 
 [`01_simple_layer.py`]: 01_simple_layer.py
 [`02_multiple_layer.py`]: 02_multiple_layer.py
@@ -417,3 +481,4 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`13_experiment_3fc.py`]: 13_experiment_3fc.py
 [`14_experiment_custom_scheduler.py`]: 14_experiment_custom_scheduler.py
 [`15_simple_lstm.py`]: 15_simple_lstm.py
+[`16_mnist_gan.py`]: 16_mnist_gan.py
