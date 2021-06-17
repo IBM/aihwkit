@@ -21,11 +21,12 @@ from torch import Tensor, save, load
 from torch.nn import Sequential, Module
 from torch.nn.functional import mse_loss
 
-from aihwkit.nn import AnalogConv2d
+from aihwkit.nn import AnalogConv2d, AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.presets.configs import ReRamESPreset
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, Conv2d, LinearCuda, Conv2dCuda
@@ -319,3 +320,32 @@ class SerializationTest(ParametrizedTestCase):
 
         # Check that it passes when not using `strict`.
         model.load_state_dict(state_dict, strict=False)
+
+    def test_using_state_dict_directly(self):
+        """Test saving and loading using a state dict after training."""
+        model = AnalogLinear(2, 4, rpu_config=ReRamESPreset())
+        loss_func = mse_loss
+        input_x = Tensor(rand(2, model.in_features))*0.2
+        input_y = Tensor(rand(2, model.out_features))*0.2
+
+        state_dict = model.state_dict()
+        new_model = AnalogLinear(2, 4, rpu_config=ReRamESPreset())
+        new_model.load_state_dict(state_dict)
+
+        self.train_model(new_model, loss_func, input_x, input_y)
+
+    def test_using_file(self):
+        """Test saving and loading using a state dict after training."""
+        model = AnalogLinear(2, 4, rpu_config=ReRamESPreset())
+        loss_func = mse_loss
+        input_x = Tensor(rand(2, model.in_features))*0.2
+        input_y = Tensor(rand(2, model.out_features))*0.2
+
+        with TemporaryFile() as file:
+            save(model.state_dict(), file)
+            # Create a new model and load its state dict.
+            file.seek(0)
+            new_model = AnalogLinear(2, 4, rpu_config=ReRamESPreset())
+            new_model.load_state_dict(load(file))
+
+        self.train_model(new_model, loss_func, input_x, input_y)

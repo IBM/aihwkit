@@ -41,8 +41,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
     """
     # pylint: disable=too-many-instance-attributes,too-many-public-methods
 
-    is_cuda = False
-
     def __init__(
             self,
             out_size: int,
@@ -65,15 +63,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
         x_size = in_size + 1 if self.bias else in_size
         d_size = out_size
 
-        # Cuda tiles are assumed to init `self.tile` manually.
-        if self.is_cuda:
-            self.tile = None  # type: Union[tiles.FloatingPointTile, tiles.AnalogTile]
-        else:
-            self.tile = self._create_simulator_tile(x_size, d_size, rpu_config)
-            self.tile.set_learning_rate(0.01)
-            self.tile.set_weights_uniform_random(-0.01, 0.01)
+        self.tile = self._create_simulator_tile(x_size, d_size, rpu_config)
+        self.tile.set_learning_rate(0.01)
+        self.tile.set_weights_uniform_random(-0.01, 0.01)
 
         self.device = torch_device('cpu')
+        self.is_cuda = False
         self.shared_weights = None  # type: Optional[Tensor]
 
         # create analog context
@@ -160,6 +155,15 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
         self.tile.set_weights(weights)
         self.tile.set_alpha_scale(alpha_scale)
+
+        # keep the data (for future use)
+        data = self.analog_ctx.data.detach()
+        self.analog_ctx = AnalogContext(self)
+        self.analog_ctx.set_data(data)
+
+        if self.is_cuda:
+            self.cuda(self.device)
+
         self.ensure_shared_weights()
 
     def _create_simulator_tile(
