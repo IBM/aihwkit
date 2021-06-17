@@ -55,6 +55,13 @@ The format is based on [Keep a Changelog], and this project adheres to
   tiles. (\#241)
 * The `AnalogSGD` optimizer is now implemented based on the generic analog
   optimizer, and its base module is `aihwkit.optim.analog_optimizer`. (\#242)
+* Deprecated the `CudaAnalogTile` and `CudaInferenceTile` and
+  `CudaFloatingPointTile`. Now the `AnalogTile` can be either on cuda
+  or on cpu (determined by the `tile` and the `device` attribute)
+  similiar to a torch `Tensor`. In partciular, call of `cuda()` does
+  not change the `AnalogTile` to `CudaAnalogTile` anymore, but only
+  changes the instance in the `tile` field, which makes in-place
+  calls to `cuda()` possible. (\#257)
 
 ### Fixed
 
@@ -69,7 +76,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Renamed persistent weight hidden parameter field to
   `persistent_weights`. (\#251)
 * Analog tiles now always move correctly to CUDA when `model.cuda()`
-  or `model.to(device)` is used. (\#252)
+  or `model.to(device)` is used. (\#252, \#257)
 
 ## [0.3.0] - 2021/04/14
 
