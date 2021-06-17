@@ -17,6 +17,6 @@
 from aihwkit.simulator.tiles.analog import AnalogTile, CudaAnalogTile
 from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.tiles.floating_point import (
-    CudaFloatingPointTile, FloatingPointTile
+    FloatingPointTile, CudaFloatingPointTile
 )
-from aihwkit.simulator.tiles.inference import CudaInferenceTile, InferenceTile
+from aihwkit.simulator.tiles.inference import InferenceTile, CudaInferenceTile

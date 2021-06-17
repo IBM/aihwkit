@@ -18,18 +18,16 @@ from typing import List, Optional, Union, TYPE_CHECKING
 from torch import device as torch_device
 from torch import ones, zeros, Tensor
 from torch.autograd import no_grad
-from torch.cuda import current_device, current_stream
-from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
 from aihwkit.simulator.configs.helpers import parameters_to_bindings
 from aihwkit.simulator.configs.utils import WeightClipType, WeightModifierType
-from aihwkit.simulator.rpu_base import cuda, tiles
+from aihwkit.simulator.rpu_base import cuda
 from aihwkit.simulator.tiles.analog import AnalogTile
-from aihwkit.simulator.tiles.base import BaseTile
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs import InferenceRPUConfig
+    from aihwkit.simulator.tiles import BaseTile
 
 # pylint: disable=too-many-instance-attributes
 
@@ -46,8 +44,6 @@ class InferenceTile(AnalogTile):
         out_trans: Whether to assume an transposed output (batch first)
         shared_weights: Whether to keep the weight in torch's memory space
     """
-
-    is_cuda = False
 
     def __init__(
             self,
@@ -85,7 +81,8 @@ class InferenceTile(AnalogTile):
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
         if shared_weights:
-            self.shared_weights = zeros(out_size, in_size + int(bias), requires_grad=True)
+            self.shared_weights = zeros(out_size, in_size + int(bias),
+                                        requires_grad=True)  # type: Tensor
             self.ensure_shared_weights()
 
     @no_grad()
@@ -187,33 +184,30 @@ class InferenceTile(AnalogTile):
             weight_clip_params = parameters_to_bindings(self.rpu_config.clip)
             self.tile.clip_weights(weight_clip_params)
 
-    def cpu(self) -> 'BaseTile':
-        """Return a copy of this tile in CPU memory."""
-        return self
-
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
-    ) -> BaseTile:
+    ) -> 'BaseTile':
         """Return a copy of this tile in CUDA memory.
 
         Args:
             device: CUDA device
 
         Returns:
-            A copy of this tile in CUDA memory.
+            Self with the underlying C++ tile moved to CUDA memory.
 
         Raises:
             CudaError: if the library has not been compiled with CUDA.
         """
-        if not cuda.is_compiled():
-            raise CudaError('aihwkit has not been compiled with CUDA support')
+        super().cuda(device)
 
-        with cuda_device(device):
-            tile = CudaInferenceTile(self)
+        self.alpha = self.alpha.cuda(device)
+        self.shared_weights.data = zeros(self.tile.get_x_size(),
+                                         self.tile.get_d_size(),
+                                         requires_grad=True).cuda(device)
+        self.ensure_shared_weights()
 
-        # programmed / reference weights are kept in CPU
-        return tile
+        return self
 
 
 class CudaInferenceTile(InferenceTile):
@@ -223,11 +217,12 @@ class CudaInferenceTile(InferenceTile):
     an existing non-cuda tile: all the source attributes are copied except
     for the simulator tile, which is recreated using a GPU tile.
 
+    Caution:
+        Deprecated. Use ``InferenceTile(..).cuda()`` instead.
+
     Args:
         source_tile: tile to be used as the source of this tile
     """
-
-    is_cuda = True
 
     def __init__(self, source_tile: AnalogTile):
         if not cuda.is_compiled():
@@ -239,31 +234,6 @@ class CudaInferenceTile(InferenceTile):
         # Create the tile, replacing the simulator tile.
         super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
                          source_tile.bias, source_tile.in_trans, source_tile.out_trans,
-                         shared_weights=False)
-        self.tile = tiles.CudaAnalogTile(source_tile.tile)
+                         shared_weights=True)
 
-        # Set the cuda properties
-        self.stream = current_stream()
-        self.device = torch_device(current_device())
-        self.alpha = self.alpha.to(self.device)
-
-        if source_tile.shared_weights is not None:
-            self.shared_weights = zeros(self.in_size + int(source_tile.bias), self.out_size,
-                                        device=self.device, requires_grad=True)
-            self.tile.set_shared_weights(self.shared_weights)
-
-        self.analog_ctx.data = source_tile.analog_ctx.data.cuda(self.device)
-        self.analog_ctx.reset(self)
-
-    def cpu(self) -> 'BaseTile':
-        """Return a copy of this tile in CPU memory."""
-        raise CudaError('CUDA tiles cannot be moved to CPU')
-
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'CudaInferenceTile':
-        if self.stream != current_stream(device):
-            raise CudaError('Cannot switch CUDA devices of existing Cuda tiles')
-
-        return self
+        self.cuda(self.device)
