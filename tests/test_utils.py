@@ -14,22 +14,21 @@
 
 from tempfile import TemporaryFile
 
-from numpy.random import rand
 from numpy import array
+from numpy.random import rand
 from numpy.testing import assert_array_almost_equal, assert_raises
-from torch import Tensor, save, load
-from torch.nn import Sequential, Module
+from torch import Tensor, load, save
+from torch.nn import Module, Sequential
 from torch.nn.functional import mse_loss
 
-from aihwkit.nn import AnalogConv2d, AnalogLinear
+from aihwkit.nn import AnalogConv2d
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
-from aihwkit.simulator.presets.configs import ReRamESPreset
 
 from .helpers.decorators import parametrize_over_layers
-from .helpers.layers import Linear, Conv2d, LinearCuda, Conv2dCuda
+from .helpers.layers import Conv2d, Conv2dCuda, Linear, LinearCuda
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import FloatingPoint
 
