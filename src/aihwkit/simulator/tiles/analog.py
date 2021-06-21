@@ -20,7 +20,6 @@ from torch.cuda import current_device
 from torch.cuda import device as cuda_device
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda, tiles
 from aihwkit.simulator.tiles.base import BaseTile
 
@@ -194,9 +193,11 @@ class AnalogTile(BaseTile):
             out_trans: bool = False,
     ):
         if not rpu_config:
-            # Import `SingleRPUConfig` dynamically to avoid import cycles.
+            # Import `SingleRPUConfig` and `ConstantStepDevice` dynamically to
+            # avoid import cycles.
             # pylint: disable=import-outside-toplevel
             from aihwkit.simulator.configs import SingleRPUConfig
+            from aihwkit.simulator.configs.devices import ConstantStepDevice
             rpu_config = SingleRPUConfig(device=ConstantStepDevice())
 
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
