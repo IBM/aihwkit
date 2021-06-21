@@ -193,12 +193,10 @@ class AnalogTile(BaseTile):
             out_trans: bool = False,
     ):
         if not rpu_config:
-            # Import `SingleRPUConfig` and `ConstantStepDevice` dynamically to
-            # avoid import cycles.
+            # Import `SingleRPUConfig` dynamically to avoid import cycles.
             # pylint: disable=import-outside-toplevel
             from aihwkit.simulator.configs import SingleRPUConfig
-            from aihwkit.simulator.configs.devices import ConstantStepDevice
-            rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+            rpu_config = SingleRPUConfig()
 
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
