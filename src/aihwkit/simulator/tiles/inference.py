@@ -20,8 +20,6 @@ from torch import ones, zeros, Tensor
 from torch.autograd import no_grad
 
 from aihwkit.exceptions import CudaError
-from aihwkit.simulator.configs.helpers import parameters_to_bindings
-from aihwkit.simulator.configs.utils import WeightClipType, WeightModifierType
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.simulator.tiles.analog import AnalogTile
 
@@ -163,6 +161,11 @@ class InferenceTile(AnalogTile):
             The drift compensation scale will only be applied during
             testing, ie if ``is_test=True``.
         """
+        # Import `aihwkit.simulator.configs` items dynamically to avoid import cycles.
+        # pylint: disable=import-outside-toplevel
+        from aihwkit.simulator.configs.helpers import parameters_to_bindings
+        from aihwkit.simulator.configs.utils import WeightModifierType
+
         if not is_test and (self.rpu_config.modifier.type != WeightModifierType.COPY or
                             self.rpu_config.modifier.pdrop > 0.0):
             weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
@@ -177,6 +180,11 @@ class InferenceTile(AnalogTile):
     @no_grad()
     def post_update_step(self) -> None:
         """Operators that need to be called once per mini-batch."""
+        # Import `aihwkit.simulator.configs` items dynamically to avoid import cycles.
+        # pylint: disable=import-outside-toplevel
+        from aihwkit.simulator.configs.helpers import parameters_to_bindings
+        from aihwkit.simulator.configs.utils import WeightClipType
+
         super().post_update_step()
 
         # TODO: make this a little nicer. Now each time bindings are generated.
