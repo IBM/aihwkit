@@ -224,7 +224,9 @@ have more parameters. For instance, to configure a device that has 3
 resistive device materials per cross-point, which all have different
 pulse update behavior, one could do (see also `Example 7`_)::
 
+    from aihwkit.nn import AnalogLinear
     from aihwkit.simulator.configs import UnitCellRPUConfig
+    from aihwkit.simulator.configs.utils import VectorUnitCellUpdatePolicy
     from aihwkit.simulator.configs.devices import (
         ConstantStepDevice,
         VectorUnitCell,
@@ -250,8 +252,7 @@ pulse update behavior, one could do (see also `Example 7`_)::
     # only one of the devices should receive a single update that is
     # selected randomly, the effective weights is the sum of all
     # weights
-    rpu_config.device.single_device_update = True
-    rpu_config.device.single_device_update_random = True
+    rpu_config.device.update_policy = VectorUnitCellUpdatePolicy.SINGLE_RANDOM
 
     # use this configuration for a simple model with one analog tile
     model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
@@ -287,6 +288,7 @@ use the following tile configuration for that (see also `Example 8`_)::
 
 
     # Imports from aihwkit.
+    from aihwkit.nn import AnalogLinear
     from aihwkit.simulator.configs import UnitCellRPUConfig
     from aihwkit.simulator.configs.devices import (
         TransferCompound,
@@ -352,15 +354,21 @@ et al. 2020`_.
 To enable mixed-precision one defines for example the following ``rpu_config``::
 
     # Imports from aihwkit.
+    from aihwkit.nn import AnalogLinear
     from aihwkit.simulator.configs import DigitalRankUpdateRPUConfig
-    from aihwkit.simulator.configs.devices import SoftBoundsDevice
+    from aihwkit.simulator.configs.devices import (
+        SoftBoundsDevice, MixedPrecisionCompound
+    )
 
     rpu_config = DigitalRankUpdateRPUConfig(
-        device=SoftBoundsDevice(),
-        # make some adjustments of mixed-precision hyper parameter
-        granularity=0.001,
-        n_x_bins=15,
-        n_d_bins=31,
+        device=MixedPrecisionCompound(
+            device=SoftBoundsDevice(),
+
+            # make some adjustments of mixed-precision hyper parameter
+            granularity=0.001,
+            n_x_bins=0,  # floating point actiations for Chi update
+            n_d_bins=0,  # floating point delta for Chi update
+	)
     )
 
     # use tile configuration in model

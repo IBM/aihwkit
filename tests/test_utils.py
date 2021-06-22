@@ -24,18 +24,19 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogConv2d
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from aihwkit.exceptions import TileError
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv2d, Conv2dCuda, Linear, LinearCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint
+from .helpers.tiles import FloatingPoint, ConstantStep, Inference
 
 
 @parametrize_over_layers(
     layers=[Linear, Conv2d, LinearCuda, Conv2dCuda],
-    tiles=[FloatingPoint],
+    tiles=[FloatingPoint, ConstantStep, Inference],
     biases=[True, False]
 )
 class SerializationTest(ParametrizedTestCase):
@@ -337,3 +338,18 @@ class SerializationTest(ParametrizedTestCase):
         self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
         self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
                               model.analog_tile.__class__)
+
+    def test_hidden_parameter_mismatch(self):
+        """Test for error if tile structure mismatches."""
+        model = self.get_layer()
+        state_dict = model.state_dict()
+
+        # Create the device and the array.
+        rpu_config = SingleRPUConfig(
+            device=LinearStepDevice()  # different hidden structure
+        )
+
+        new_model = self.get_layer(rpu_config=rpu_config)
+        if new_model.analog_tile.__class__.__name__ != model.analog_tile.__class__.__name__:
+            with self.assertRaises(TileError):
+                self.assertRaises(new_model.load_state_dict(state_dict))
