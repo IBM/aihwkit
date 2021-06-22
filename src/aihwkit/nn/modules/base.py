@@ -14,7 +14,6 @@
 
 from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
-from torch import device as torch_device
 from torch import Tensor
 from torch.nn import Module, Parameter
 
@@ -280,48 +279,6 @@ class AnalogModuleBase(Module):
         current_state = super().state_dict(destination, prefix, keep_vars)
         current_state['{}analog_tile_state'.format(prefix)] = analog_state
         return current_state
-
-    def cpu(self) -> 'AnalogModuleBase':
-        """Move all model parameters, buffers and tiles to the CPU.
-
-        Note:
-            Please be aware that moving analog layers from GPU to CPU is
-            currently not supported.
-
-        Returns:
-            This layer with its parameters, buffers and tiles in CPU.
-        """
-        # pylint: disable=attribute-defined-outside-init
-        super().cpu()
-        self.analog_tile = self.analog_tile.cpu()  # type: BaseTile
-        self.set_weights(self.weight, self.bias)
-        return self
-
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'AnalogModuleBase':
-        """Move all model parameters, buffers and tiles to the GPU.
-
-        This also makes associated parameters and buffers different objects. So
-        it should be called before constructing optimizer if the module will
-        live on GPU while being optimized.
-
-        Arguments:
-            device (int, optional): if specified, all parameters will be
-                copied to that GPU device
-
-        Returns:
-            This layer with its parameters, buffers and tiles in GPU.
-        """
-        # pylint: disable=attribute-defined-outside-init
-        # Note: this needs to be an in-place function, not a copy
-        super().cuda(device)
-        self.analog_tile = self.analog_tile.cuda(device)  # type: ignore[no-redef]
-        self._analog_tile_counter = 0
-        self.register_analog_tile(self.analog_tile)
-        self.set_weights(self.weight, self.bias)
-        return self
 
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
         """(Program) and drift the analog weights.

@@ -63,11 +63,12 @@ class AnalogFunctionBase(Function):
         analog_ctx = ctx.analog_ctx
         analog_tile = analog_ctx.analog_tile
         input_, = ctx.saved_tensors
+
         shared_weights_grad = None
         use_indexed = analog_ctx.use_indexed
 
-        if analog_ctx.shared_weights is not None:
-            analog_tile.ensure_shared_weights(analog_ctx.shared_weights)
+        if ctx.shared_weights is not None:
+            analog_tile.ensure_shared_weights(ctx.shared_weights)
 
         # Call the backward function in the tile instance.
         if use_indexed:

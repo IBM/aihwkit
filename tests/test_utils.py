@@ -14,11 +14,11 @@
 
 from tempfile import TemporaryFile
 
-from numpy.random import rand
 from numpy import array
+from numpy.random import rand
 from numpy.testing import assert_array_almost_equal, assert_raises
-from torch import Tensor, save, load
-from torch.nn import Sequential, Module
+from torch import Tensor, load, save
+from torch.nn import Module, Sequential
 from torch.nn.functional import mse_loss
 
 from aihwkit.nn import AnalogConv2d
@@ -28,7 +28,7 @@ from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 
 from .helpers.decorators import parametrize_over_layers
-from .helpers.layers import Linear, Conv2d, LinearCuda, Conv2dCuda
+from .helpers.layers import Conv2d, Conv2dCuda, Linear, LinearCuda
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import FloatingPoint
 
@@ -147,6 +147,11 @@ class SerializationTest(ParametrizedTestCase):
         if self.bias:
             assert_array_almost_equal(model_biases, new_model_biases)
             assert_array_almost_equal(tile_biases, new_tile_biases)
+
+        # Asserts over the AnalogContext of the new model.
+        self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
+        self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
+                              model.analog_tile.__class__)
 
     def test_save_load_meta_parameter(self):
         """Test saving and loading a device with custom parameters."""
@@ -319,3 +324,16 @@ class SerializationTest(ParametrizedTestCase):
 
         # Check that it passes when not using `strict`.
         model.load_state_dict(state_dict, strict=False)
+
+    def test_state_dict(self):
+        """Test creating a new model using a state dict, without saving to disk."""
+        model = self.get_layer()
+        state_dict = model.state_dict()
+
+        new_model = self.get_layer()
+        new_model.load_state_dict(state_dict)
+
+        # Asserts over the AnalogContext of the new model.
+        self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
+        self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
+                              model.analog_tile.__class__)

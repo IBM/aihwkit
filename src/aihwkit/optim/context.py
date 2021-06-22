@@ -37,12 +37,23 @@ class AnalogContext(Parameter):
         self.use_indexed = False
         self.analog_input = []  # type: list
         self.analog_grad_output = []  # type: list
-        self.shared_weights = None
+
+    def set_data(self, data: Tensor) -> None:
+        """Set the data value of the Tensor."""
+        # pylint: disable=attribute-defined-outside-init
+        self.data.copy_(data)
+
+    def get_data(self) -> Tensor:
+        """Get the data value of the underlying Tensor. """
+        # pylint: disable=attribute-defined-outside-init
+        return self.data.detach()
 
     def reset(self, analog_tile: Optional['BaseTile'] = None) -> None:
         """Reset the gradient trace and optionally sets the tile pointer."""
         if analog_tile is not None:
             self.analog_tile = analog_tile
+            self.analog_tile.analog_ctx = self
+
         self.analog_input = []
         self.analog_grad_output = []
 
@@ -62,11 +73,25 @@ class AnalogContext(Parameter):
         Returns:
             This context in the specified device.
         """
-        super().cuda(device)
+        # pylint: disable=attribute-defined-outside-init
+        self.data = self.data.cuda(device)  # type: Tensor
 
-        self.analog_tile = self.analog_tile.cuda(device)
-        self.reset()
+        if not self.analog_tile.is_cuda:
+            self.analog_tile = self.analog_tile.cuda(device)
+        self.reset(self.analog_tile)
 
+        return self
+
+    def cpu(self) -> 'AnalogContext':
+        """Move the context to CPU.
+
+        Note:
+            This is a no-op for CPU context.
+
+        Returns:
+            self
+        """
+        self.analog_tile.cpu()  # will raise an error if not possile
         return self
 
     def to(self, *args: Any, **kwargs: Any) -> 'AnalogContext':
@@ -84,8 +109,8 @@ class AnalogContext(Parameter):
         Returns:
             This module in the specified device.
         """
-        # pylint: disable=invalid-name
-        super().to(*args, **kwargs)
+        # pylint: disable=invalid-name, attribute-defined-outside-init
+        self.data = self.data.to(*args, **kwargs)
 
         device = None
         if 'device' in kwargs:
@@ -95,9 +120,9 @@ class AnalogContext(Parameter):
 
         if device is not None:
             device = torch_device(device)
-            if device.type == 'cuda':
+            if device.type == 'cuda' and not self.analog_tile.is_cuda:
                 self.analog_tile = self.analog_tile.cuda(device)
-                self.reset()
+            self.reset(self.analog_tile)
 
         return self
 
