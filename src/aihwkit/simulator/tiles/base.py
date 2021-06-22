@@ -126,8 +126,11 @@ class BaseTile(Generic[RPUConfigGeneric]):
         current_dict['analog_tile_weights'] = self.tile.get_weights()
         # Store the hidden parameters as a numpy array, as storing it as
         # Tensor causes issues in PyTorch 1.5.
-        current_dict['analog_tile_hidden_parameters'] = \
-            self.tile.get_hidden_parameters().data.numpy()
+        current_dict['analog_tile_hidden_parameters'] \
+            = self.tile.get_hidden_parameters().data.numpy()
+        current_dict['analog_tile_hidden_parameter_names'] \
+            = self.tile.get_hidden_parameter_names()
+        current_dict['analog_tile_class'] = self.__class__.__name__
         current_dict['analog_alpha_scale'] = self.tile.get_alpha_scale()
         current_dict.pop('tile')
         current_dict.pop('stream', None)
@@ -139,24 +142,43 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         This method recreates the ``tile`` member, creating a new one from
         scratch, as the binding Tiles are not serializable.
+
+        Caution:
+            RPU configs are overwritten by loading the state.
+
+        Raises:
+            TileError: if tile class does not match or hidden parameters do not match
         """
         current_dict = state.copy()
         weights = current_dict.pop('analog_tile_weights')
         hidden_parameters = current_dict.pop('analog_tile_hidden_parameters')
+        hidden_parameters_names = current_dict.pop('analog_tile_hidden_parameter_names', [])
         alpha_scale = current_dict.pop('analog_alpha_scale')
-
+        tile_class = current_dict.pop('analog_tile_class', self.__class__.__name__)
         self.__dict__.update(current_dict)
 
         x_size = self.in_size + 1 if self.bias else self.in_size
         d_size = self.out_size
 
         # Recreate the tile.
+        # Check for tile mismatch
+        if tile_class != self.__class__.__name__:
+            raise TileError(
+                'Mismatch of tile class: {} versus {}. Can only load analog '
+                'state from the same tile class.'.format(self.__class__.__name__, tile_class))
+
         self.tile = self._create_simulator_tile(x_size, d_size, self.rpu_config)
+        names = self.tile.get_hidden_parameter_names()
+        if len(hidden_parameters_names) > 0 and names != hidden_parameters_names:
+            # Check whether names match
+            raise TileError('Mismatch with loaded analog state: '
+                            'Hidden parameter structure is unexpected.')
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
         self.tile.set_weights(weights)
-        self.tile.set_alpha_scale(alpha_scale)
+        if alpha_scale is not None:
+            self.tile.set_alpha_scale(alpha_scale)
 
-        # keep the data (for future use)
+        # Keep the data (for future use)
         data = self.analog_ctx.data.detach()
         self.analog_ctx = AnalogContext(self)
         self.analog_ctx.set_data(data)
@@ -567,11 +589,21 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         Args:
             ordered_parameters: Ordered dictionary of hidden parameter tensors.
+
+        Raises:
+            TileError: In case the ordered dict keys do not conform
+                with the current rpu config tile structure of the hidden
+                parameters
         """
         if len(ordered_parameters) == 0:
             return
 
         hidden_parameters = stack(list(ordered_parameters.values()), dim=0)
+        names = self.tile.get_hidden_parameter_names()
+        if names != list(ordered_parameters.keys()):
+            raise TileError('Mismatch with loaded analog state:'
+                            'Hidden parameter structure is unexpected.')
+
         self.tile.set_hidden_parameters(hidden_parameters)
 
     def get_hidden_update_index(self) -> int:
