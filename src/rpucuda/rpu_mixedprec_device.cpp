@@ -199,7 +199,6 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
   const auto &par = getPar();
 
   // NEED TO CHECK LEARNING RATE DIRECTION CORRECT ...
-
   T x_width = 1.0;
   T half_x_bins = par.n_x_bins / 2; // floor
   if (par.n_x_bins > 0) {

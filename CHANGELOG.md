@@ -77,6 +77,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   `persistent_weights`. (\#251)
 * Analog tiles now always move correctly to CUDA when `model.cuda()`
   or `model.to(device)` is used. (\#252, \#257)
+* Error message when wrong tile class is used for loading an analog
+  state dict. (\# ???)
 
 ## [0.3.0] - 2021/04/14
 

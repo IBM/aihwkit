@@ -290,6 +290,9 @@ void PulsedWeightUpdater<T>::doDirectUpdate(
 template <typename T>
 bool PulsedWeightUpdater<T>::checkForFPUpdate(
     AbstractRPUDeviceCuda<T> *rpucuda_device_in, const PulsedUpdateMetaParameter<T> &up) {
+  if (rpucuda_device_in->hasDirectUpdate()) {
+    return false;
+  }
   return (up.pulse_type == PulseType::None) || (rpucuda_device_in == nullptr) ||
          !rpucuda_device_in->isPulsedDevice() ||
          (rpucuda_device_in->implements() == DeviceUpdateType::FloatingPoint);

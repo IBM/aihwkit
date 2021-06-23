@@ -180,12 +180,13 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   CUDA_CALL(cudaDeviceSynchronize());
 
   IndexReader<T> idx_reader(dev_in.getData());
-  RPU::cub::TransformInputIterator<T, IndexReader<T>, int *> in_itr(dev_in_index.getData(), idx_reader);
+  RPU::cub::TransformInputIterator<T, IndexReader<T>, int *> in_itr(
+      dev_in_index.getData(), idx_reader);
 
   RPU::cub::CountingInputIterator<int> index(0);
   BatchTransposer<T> batch_transposer(dev_in.getData(), size, m_batch);
-  RPU::cub::TransformInputIterator<T, BatchTransposer<T>, RPU::cub::CountingInputIterator<int>> in_trans_itr(
-      index, batch_transposer);
+  RPU::cub::TransformInputIterator<T, BatchTransposer<T>, RPU::cub::CountingInputIterator<int>>
+      in_trans_itr(index, batch_transposer);
 
   IndexReader<int> idx_reader_host(tmp);
   RPU::cub::TransformInputIterator<int, IndexReader<int>, int *> test_host(tmp, idx_reader_host);

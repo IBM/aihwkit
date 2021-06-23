@@ -108,15 +108,16 @@ __global__ void kernelQuantizeBatch(
   volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
   int size = size_in;
   int m_batch = m_batch_in;
+  int total_size = size * m_batch;
   bool trans = trans_in;
   T half_bins = (T)(n_bins / 2); // floor
   T res = (T)1.0 / ((T)half_bins);
   T value;
   int total_threads = blockDim.x * gridDim.x;
-  for (int i_stride = 0; i_stride < size; i_stride += total_threads) {
+  for (int i_stride = 0; i_stride < total_size; i_stride += total_threads) {
     int idx = i_stride + tid;
 
-    if (idx < size) {
+    if (idx < total_size) {
       value = values[idx];
 
       int sidx = trans ? (idx % m_batch) : (idx / size);
