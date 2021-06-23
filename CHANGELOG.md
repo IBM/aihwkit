@@ -36,7 +36,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a generic analog optimizer `AnalogOptimizer` that allows extending
   any existing optimizer with analog-specific features. (\#242)
 * Conversion tools for converting torch models into a model having
-  analog layers. (\#???)
+  analog layers. (\#265)
 
 ### Changed
 
