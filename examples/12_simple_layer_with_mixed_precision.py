@@ -42,9 +42,6 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 rpu_config = DigitalRankUpdateRPUConfig(
     device=MixedPrecisionCompound(
         device=SoftBoundsDevice(),
-        # adjust quantization level (0 means FP)
-        n_x_bins=5,  # quantization bins of the digital rank update (activation)
-        n_d_bins=3   # quantization bins of the digital rank update (error)
     )
 )
 

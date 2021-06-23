@@ -133,6 +133,9 @@ void PulsedRPUWeightUpdater<T>::setUpPar(const PulsedUpdateMetaParameter<T> &up)
 
 template <typename T>
 bool PulsedRPUWeightUpdater<T>::checkForFPUpdate(AbstractRPUDevice<T> *rpu_device_in) {
+  if (rpu_device_in->hasDirectUpdate()) {
+    return false;
+  }
   return (up_.pulse_type == PulseType::None) || (rpu_device_in == nullptr) ||
          !rpu_device_in->isPulsedDevice() ||
          (rpu_device_in->implements() == DeviceUpdateType::FloatingPoint);
