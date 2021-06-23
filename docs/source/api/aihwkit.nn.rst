@@ -20,4 +20,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   aihwkit.nn.conversion
    aihwkit.nn.functions
