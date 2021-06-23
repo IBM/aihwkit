@@ -35,6 +35,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   so that the gradient can be handled with any pytorch optimizer. (\#241)
 * Added a generic analog optimizer `AnalogOptimizer` that allows extending
   any existing optimizer with analog-specific features. (\#242)
+* Conversion tools for converting torch models into a model having
+  analog layers. (\#265)
 
 ### Changed
 
@@ -78,7 +80,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Analog tiles now always move correctly to CUDA when `model.cuda()`
   or `model.to(device)` is used. (\#252, \#257)
 * Error message when wrong tile class is used for loading an analog
-  state dict. (\# ???)
+  state dict. (\# 262)
+* `MixedPrecisionCompound` was bypassed with floating point
+  compute. Fixed. (\# 263)
 
 ## [0.3.0] - 2021/04/14
 

@@ -18,6 +18,7 @@ API Reference
    aihwkit.simulator.presets
    aihwkit.simulator.tiles
    aihwkit.nn
+   aihwkit.nn.conversion
    aihwkit.nn.functions
    aihwkit.nn.modules
    aihwkit.nn.modules.base

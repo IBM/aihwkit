@@ -82,6 +82,44 @@ class AnalogLinear(AnalogModuleBase, Linear):
         # Register tile instead
         self.register_analog_tile(self.analog_tile)
 
+    @classmethod
+    def from_digital(
+            cls,
+            module: Linear,
+            rpu_config: Optional[RPUConfigAlias] = None,
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
+    ) -> 'AnalogLinear':
+        """Return an AnalogLinear layer from a torch Linear layer.
+
+        Args:
+            module: The torch module to convert. All layers that are
+                defined in the ``conversion_map``.
+            rpu_config: RPU config to apply to all converted tiles.
+                Applied to all converted tiles.
+            realistic_read_write: Whether to use closed-loop programming
+                when setting the weights. Applied to all converted tiles.
+            weight_scaling_omega: If non-zero, applied weights of analog
+                layers will be scaled by ``weight_scaling_omega`` divided by
+                the absolute maximum value of the original weight matrix.
+
+                Note:
+                    Make sure that the weight max and min setting of the
+                    device support the desired analog weight range.
+
+        Returns:
+            an AnalogLinear layer based on the digital Linear ``module``.
+        """
+        analog_module = cls(module.in_features,
+                            module.out_features,
+                            module.bias is not None,
+                            rpu_config,
+                            realistic_read_write,
+                            weight_scaling_omega)
+
+        analog_module.set_weights(module.weight, module.bias)
+        return analog_module
+
     def reset_parameters(self) -> None:
         """Reset the parameters (weight and bias)."""
         super().reset_parameters()

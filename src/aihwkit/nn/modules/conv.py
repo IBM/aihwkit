@@ -17,7 +17,7 @@ from typing import Optional, Tuple, Union
 from torch import Tensor, arange, cat, float64, int32, ones
 from torch.nn import Unfold
 from torch.nn.functional import pad
-from torch.nn.modules.conv import _ConvNd
+from torch.nn.modules.conv import _ConvNd, Conv1d, Conv2d, Conv3d
 from torch.nn.modules.utils import _single, _pair, _triple
 
 from aihwkit.nn.functions import AnalogIndexedFunction
@@ -199,6 +199,50 @@ class AnalogConv1d(_AnalogConvNd):
             rpu_config, realistic_read_write, weight_scaling_omega
         )
 
+    @classmethod
+    def from_digital(
+            cls,
+            module: Conv1d,
+            rpu_config: Optional[RPUConfigAlias] = None,
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
+    ) -> 'AnalogConv1d':
+        """Return an AnalogConv1d layer from a torch Conv1d layer.
+
+        Args:
+            module: The torch module to convert. All layers that are
+                defined in the ``conversion_map``.
+            rpu_config: RPU config to apply to all converted tiles.
+                Applied to all converted tiles.
+            realistic_read_write: Whether to use closed-loop programming
+                when setting the weights. Applied to all converted tiles.
+            weight_scaling_omega: If non-zero, applied weights of analog
+                layers will be scaled by ``weight_scaling_omega`` divided by
+                the absolute maximum value of the original weight matrix.
+
+                Note:
+                    Make sure that the weight max and min setting of the
+                    device support the desired analog weight range.
+
+        Returns:
+            an AnalogConv1d layer based on the digital Conv1d ``module``.
+        """
+        analog_module = cls(module.in_channels,
+                            module.out_channels,
+                            module.kernel_size,
+                            module.stride,
+                            module.padding,
+                            module.dilation,
+                            module.groups,
+                            module.bias is not None,
+                            module.padding_mode,
+                            rpu_config,
+                            realistic_read_write,
+                            weight_scaling_omega)
+
+        analog_module.set_weights(module.weight, module.bias)
+        return analog_module
+
     def get_tile_size(
             self,
             in_channels: int,
@@ -309,6 +353,50 @@ class AnalogConv2d(_AnalogConvNd):
             rpu_config, realistic_read_write, weight_scaling_omega
         )
 
+    @classmethod
+    def from_digital(
+            cls,
+            module: Conv2d,
+            rpu_config: Optional[RPUConfigAlias] = None,
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
+    ) -> 'AnalogConv2d':
+        """Return an AnalogConv2d layer from a torch Conv2d layer.
+
+        Args:
+            module: The torch module to convert. All layers that are
+                defined in the ``conversion_map``.
+            rpu_config: RPU config to apply to all converted tiles.
+                Applied to all converted tiles.
+            realistic_read_write: Whether to use closed-loop programming
+                when setting the weights. Applied to all converted tiles.
+            weight_scaling_omega: If non-zero, applied weights of analog
+                layers will be scaled by ``weight_scaling_omega`` divided by
+                the absolute maximum value of the original weight matrix.
+
+                Note:
+                    Make sure that the weight max and min setting of the
+                    device support the desired analog weight range.
+
+        Returns:
+            an AnalogConv2d layer based on the digital Conv2d ``module``.
+        """
+        analog_module = cls(module.in_channels,
+                            module.out_channels,
+                            module.kernel_size,
+                            module.stride,
+                            module.padding,
+                            module.dilation,
+                            module.groups,
+                            module.bias is not None,
+                            module.padding_mode,
+                            rpu_config,
+                            realistic_read_write,
+                            weight_scaling_omega)
+
+        analog_module.set_weights(module.weight, module.bias)
+        return analog_module
+
     def get_tile_size(
             self,
             in_channels: int,
@@ -411,6 +499,50 @@ class AnalogConv3d(_AnalogConvNd):
             False, _triple(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
+
+    @classmethod
+    def from_digital(
+            cls,
+            module: Conv3d,
+            rpu_config: Optional[RPUConfigAlias] = None,
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
+    ) -> 'AnalogConv3d':
+        """Return an AnalogConv3d layer from a torch Conv3d layer.
+
+        Args:
+            module: The torch module to convert. All layers that are
+                defined in the ``conversion_map``.
+            rpu_config: RPU config to apply to all converted tiles.
+                Applied to all converted tiles.
+            realistic_read_write: Whether to use closed-loop programming
+                when setting the weights. Applied to all converted tiles.
+            weight_scaling_omega: If non-zero, applied weights of analog
+                layers will be scaled by ``weight_scaling_omega`` divided by
+                the absolute maximum value of the original weight matrix.
+
+                Note:
+                    Make sure that the weight max and min setting of the
+                    device support the desired analog weight range.
+
+        Returns:
+            an AnalogConv3d layer based on the digital Conv3d ``module``.
+        """
+        analog_module = cls(module.in_channels,
+                            module.out_channels,
+                            module.kernel_size,
+                            module.stride,
+                            module.padding,
+                            module.dilation,
+                            module.groups,
+                            module.bias is not None,
+                            module.padding_mode,
+                            rpu_config,
+                            realistic_read_write,
+                            weight_scaling_omega)
+
+        analog_module.set_weights(module.weight, module.bias)
+        return analog_module
 
     def get_tile_size(
             self,
