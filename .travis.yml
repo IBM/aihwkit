@@ -112,7 +112,7 @@ jobs:
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 && pip install -r requirements.txt"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp39-manylinux_x86_64"
     before_install:
@@ -137,7 +137,7 @@ jobs:
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 && pip install ./delocate && pip install -r requirements.txt"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install ./delocate && pip install -r requirements.txt"
       - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64 cp39-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
