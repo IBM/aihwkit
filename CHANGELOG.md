@@ -20,28 +20,28 @@ The format is based on [Keep a Changelog], and this project adheres to
   `EcRamMO2Preset`, `EcRamMO4Preset`, `TikiTakaEcRamMOPreset`,
   `MixedPrecisionEcRamMOPreset`. These can be used for tile configuration
   (`rpu_config`). They specify a particular device and optimizer choice. (\#207)
-* Weight refresh mechanism for `OneSidedUnitCell` to counteract
-  saturation, by differential read, reset, and re-write. (\#209)
+* Weight refresh mechanism for `OneSidedUnitCell` to counteract saturation, by
+  differential read, reset, and re-write. (\#209)
 * Complex cycle-to-cycle noise for `ExpStepDevice`. (\#226)
 * Added the following presets: `PCMPresetDevice` (uni-directional),
-  `PCMPresetUnitCell` (a pair of uni-directional devices with
-  periodical refresh) and a `MixedPrecisionPCMPreset` for using the
-  mixed precision optimizer with a PCM pair. (\#226)
+  `PCMPresetUnitCell` (a pair of uni-directional devices with periodical
+  refresh) and a `MixedPrecisionPCMPreset` for using the mixed precision
+  optimizer with a PCM pair. (\#226)
 * `AnalogLinear` layer now accepts multi-dimensional inputs in the same
   way as PyTorch's `Linear` layer does. (\#227)
 * A new `AnalogLSTM` module: a recurrent neural network that uses
-  AnalogLinear. (\#240)
-* Return of weight gradients for `InferenceTile` (only),
-  so that the gradient can be handled with any pytorch optimizer. (\#241)
+ `AnalogLinear`. (\#240)
+* Return of weight gradients for `InferenceTile` (only), so that the gradient
+  can be handled with any PyTorch optimizer. (\#241)
 * Added a generic analog optimizer `AnalogOptimizer` that allows extending
   any existing optimizer with analog-specific features. (\#242)
-* Conversion tools for converting torch models into a model having
-  analog layers. (\#265)
+* Conversion tools for converting torch models into a model having analog
+  layers. (\#265)
 
 ### Changed
 
-* Renamed the `DifferenceUnitCell` to `OneSidedUnitCell` which more
-  properly reflects its function. (\#209)
+* Renamed the `DifferenceUnitCell` to `OneSidedUnitCell` which more properly
+  reflects its function. (\#209)
 * The `BaseTile` subclass that is instantiated in the analog layers is now
   retrieved from the new `RPUConfig.tile_class` attribute, facilitating the
   use of custom tiles. (\#218)
@@ -49,40 +49,44 @@ The format is based on [Keep a Changelog], and this project adheres to
   is now the `train=bool` argument. If using a dataset that requires other
   arguments or transforms, they can now be specified via overriding
   `get_dataset_arguments()` and `get_dataset_transform()`. (\#225)
-* `AnalogContext` is introduced, along with tile registration
-  function to handle arbitrary optimizers, so that re-grouping param
-  groups becomes unnecessary. (\#241)
-* Removed `weight` and `bias` of analog layers from the module
-  parameters as these parameters are handled internally for analog
-  tiles. (\#241)
+* `AnalogContext` is introduced, along with tile registration function to
+  handle arbitrary optimizers, so that re-grouping param groups becomes
+  unnecessary. (\#241)
 * The `AnalogSGD` optimizer is now implemented based on the generic analog
   optimizer, and its base module is `aihwkit.optim.analog_optimizer`. (\#242)
+* The default refresh rate is changed to once per mini-batch for `PCMPreset`
+  (as opposed to once per mat-vec). (\#243)
+
+### Deprecated
+
 * Deprecated the `CudaAnalogTile` and `CudaInferenceTile` and
-  `CudaFloatingPointTile`. Now the `AnalogTile` can be either on cuda
-  or on cpu (determined by the `tile` and the `device` attribute)
-  similiar to a torch `Tensor`. In partciular, call of `cuda()` does
-  not change the `AnalogTile` to `CudaAnalogTile` anymore, but only
-  changes the instance in the `tile` field, which makes in-place
-  calls to `cuda()` possible. (\#257)
+  `CudaFloatingPointTile`. Now the `AnalogTile` can be either on cuda or on cpu
+  (determined by the `tile` and the `device` attribute) similar to a torch
+  `Tensor`. In particular, call of `cuda()` does not change the `AnalogTile` to
+  `CudaAnalogTile` anymore, but only changes the instance in the `tile` field,
+  which makes in-place calls to `cuda()` possible. (\#257)
+
+### Removed
+
+* Removed `weight` and `bias` of analog layers from the module parameters as
+  these parameters are handled internally for analog tiles. (\#241)
 
 ### Fixed
 
 * Fixed autograd functionality for recurrent neural networks. (\#240)
 * N-D support for `AnalogLinear`. (\#227)
-* Fixed an issue in the Experiments that was causing the epoch training loss
+* Fixed an issue in the `Experiments` that was causing the epoch training loss
   to be higher than the epoch validation loss. (\#238)
-* The default refresh rate is changed to once per mini-batch for
-  `PCMPreset` (as opposed to once per mat-vec). (\#243)
 * Fixed "Wrong device ordinal" errors for CUDA which resulted from a known
   issue of using CUB together with pytorch. (\#250)
-* Renamed persistent weight hidden parameter field to
-  `persistent_weights`. (\#251)
+* Renamed persistent weight hidden parameter field to `persistent_weights`.
+  (\#251)
 * Analog tiles now always move correctly to CUDA when `model.cuda()`
   or `model.to(device)` is used. (\#252, \#257)
-* Error message when wrong tile class is used for loading an analog
-  state dict. (\# 262)
-* `MixedPrecisionCompound` was bypassed with floating point
-  compute. Fixed. (\# 263)
+* Added an error message when wrong tile class is used for loading an analog
+  state dict. (\#262)
+* Fixed `MixedPrecisionCompound` being bypassed with floating point compute.
+  (\#263)
 
 ## [0.3.0] - 2021/04/14
 
@@ -251,7 +255,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.3.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/IBM/aihwkit/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/IBM/aihwkit/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
 [0.2.0]: https://github.com/IBM/aihwkit/compare/v0.1.0..v0.2.0
