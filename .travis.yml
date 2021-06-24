@@ -102,7 +102,7 @@ jobs:
     env:
       - TORCH_VERSION_SPECIFIER="==1.7.1"
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
+  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on Linux x86_64"
     os: linux
     dist: bionic
     language: python
@@ -124,7 +124,7 @@ jobs:
       - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
+  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on OS X"
     os: osx
     osx_image: xcode12.2
     stage: Build wheels
@@ -148,7 +148,7 @@ jobs:
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on win64"
+  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on win64"
     os: windows
     language: shell
     stage: Build wheels
