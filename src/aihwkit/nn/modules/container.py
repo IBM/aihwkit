@@ -12,7 +12,8 @@
 
 """Analog Modules that contain children Modules."""
 
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, Any
+from collections import OrderedDict
 
 from torch import device as torch_device
 from torch.nn import Sequential
@@ -128,3 +129,10 @@ class AnalogSequential(Sequential):
                               'evaluation mode')
 
         self._apply_to_analog(lambda m: m.program_weights())
+
+    @classmethod
+    def from_digital(cls, module: Sequential,  # pylint: disable=unused-argument
+                     *args: Any,
+                     **kwargs: Any) -> 'AnalogSequential':
+        """Construct AnalogSequential in-place from Sequential."""
+        return cls(OrderedDict(mod for mod in module.named_children()))
