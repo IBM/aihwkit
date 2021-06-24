@@ -135,5 +135,4 @@ class AnalogSequential(Sequential):
                      *args: Any,
                      **kwargs: Any) -> 'AnalogSequential':
         """Construct AnalogSequential in-place from Sequential."""
-
         return cls(OrderedDict(mod for mod in module.named_children()))

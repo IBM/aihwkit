@@ -44,7 +44,7 @@ class AnalogContext(Parameter):
         self.data.copy_(data)
 
     def get_data(self) -> Tensor:
-        """Get the data value of the underlying Tensor. """
+        """Get the data value of the underlying Tensor."""
         # pylint: disable=attribute-defined-outside-init
         return self.data.detach()
 

@@ -34,7 +34,6 @@ class AnalogOptimizerMixin:
         Update the `param_groups` of the optimizer, moving the parameters for
         each analog layer to a new single group.
         """
-
         # Create the new param groups.
         analog_param_groups = []
         rm_group_lst = []
@@ -68,7 +67,7 @@ class AnalogOptimizerMixin:
         step calls the related RPU controller. For regular parameter groups,
         the optimization step has the same behaviour as ``torch.optim.SGD``.
 
-        Arguments:
+        Args:
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
 

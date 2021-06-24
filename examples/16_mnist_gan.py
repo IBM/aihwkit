@@ -76,7 +76,7 @@ RESULTS = os.path.join(os.getcwd(), 'results', 'GAN')
 
 
 def store_tensor_images(image_tensor, label, current_step, num_images=25, size=(1, 28, 28)):
-    """Function for storing images.
+    """Store images using a uniform grid.
 
     Given a tensor of images, number of images, and size per image, stores the
     images using a uniform grid.
@@ -87,7 +87,7 @@ def store_tensor_images(image_tensor, label, current_step, num_images=25, size=(
 
 
 def show_animation_fake_images():
-    """Function for visualizing images.
+    """Display images using a matplotlib animation.
 
     Displays every image labeled as "fake_images_step_*.png" inside the
     results/GAN folder using a matplotlib animation.
@@ -105,8 +105,8 @@ def show_animation_fake_images():
 
 
 def get_generator_block(input_dim, output_dim):
-    """Function for returning a block of the generator's neural network
-    given input and output dimensions.
+    """Return a block of the generator's neural network given input and output
+    dimensions.
 
     Args:
         input_dim: the dimension of the input vector, a scalar
@@ -130,7 +130,7 @@ def get_generator_block(input_dim, output_dim):
 
 
 class Generator(nn.Module):
-    """Generator Class
+    """Generator Class.
 
     Args:
         z_dim: the dimension of the noise vector, a scalar
@@ -158,7 +158,7 @@ class Generator(nn.Module):
         )
 
     def forward(self, noise):
-        """Function for completing a forward pass of the generator.
+        """Complete a forward pass of the generator.
 
         Given a noise tensor, returns generated images.
 
@@ -172,7 +172,7 @@ class Generator(nn.Module):
 
 
 def get_noise(n_samples, z_dim, device='cpu'):
-    """Function for creating noise vectors.
+    """Create noise vectors.
 
     Given the dimensions (n_samples, z_dim), creates a tensor of that shape
     filled with random numbers from the normal distribution.
@@ -226,7 +226,7 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, image):
-        """Function for completing a forward pass of the discriminator.
+        """Complete a forward pass of the discriminator.
 
         Given an image tensor, returns a 1-dimension tensor representing fake/real.
 
