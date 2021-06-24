@@ -102,7 +102,7 @@ jobs:
     env:
       - TORCH_VERSION_SPECIFIER="==1.7.1"
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on Linux x86_64"
+  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on Linux x86_64"
     os: linux
     dist: bionic
     language: python
@@ -112,7 +112,7 @@ jobs:
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 && pip install -r requirements.txt"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp39-manylinux_x86_64"
     before_install:
@@ -124,7 +124,7 @@ jobs:
       - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on OS X"
+  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on OS X"
     os: osx
     osx_image: xcode12.2
     stage: Build wheels
@@ -137,7 +137,7 @@ jobs:
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 && pip install ./delocate && pip install -r requirements.txt"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install ./delocate && pip install -r requirements.txt"
       - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64 cp39-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
@@ -148,7 +148,7 @@ jobs:
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8 on win64"
+  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on win64"
     os: windows
     language: shell
     stage: Build wheels
