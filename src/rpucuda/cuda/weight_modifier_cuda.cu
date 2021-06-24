@@ -30,9 +30,7 @@ namespace RPU {
   for (int i_stride = 0; i_stride < size; i_stride += total_threads) {                             \
     int i = i_stride + tid;                                                                        \
     if (i < size_without_bias) {                                                                   \
-      {                                                                                            \
-        BODY;                                                                                      \
-      }                                                                                            \
+      { BODY; }                                                                                    \
     } else if ((i < size) && (new_weights != weights)) {                                           \
       new_weights[i] = weights[i];                                                                 \
     }                                                                                              \

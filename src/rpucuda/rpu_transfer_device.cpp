@@ -386,7 +386,7 @@ void TransferRPUDevice<T>::forwardUpdate(
     transfer_pwu_->updateVectorWithDevice(
         W, x, 1, &transfer_tmp_[0], 1,
         -fabs(lr), // need to be negative...
-        1, &*this->rpu_device_vec_[to_device_idx]);
+        n_vec, &*this->rpu_device_vec_[to_device_idx]);
   }
 }
 
