@@ -41,7 +41,7 @@ def convert_to_analog(
         weight_scaling_omega: float = 0.0,
         conversion_map: Optional[Dict] = None
 ) -> Module:
-    """Converts a given digital model to analog counter parts.
+    """Convert a given digital model to analog counter parts.
 
     Note:
         The torch device (cuda/cpu) is inferred from the original
