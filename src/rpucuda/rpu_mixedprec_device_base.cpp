@@ -288,8 +288,6 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
     n_transfers = this->d_size_;
   }
   n_transfers = MIN(n_transfers, this->d_size_);
-  // std::cout << "n_transfers: "  << n_transfers << ", current_row_index:" <<  current_row_index_
-  // << std::endl;
   int i_row = current_row_index_;
   if (par.random_row && (n_transfers < this->d_size_)) {
     i_row = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
