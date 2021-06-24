@@ -125,7 +125,7 @@ An **analog optimizer** is a representation of an algorithm that determines
 the training strategy taking into account the particularities of the analog
 layers involved. The library currently includes the following optimizers:
 
-* :class:`~aihwkit.optim.analog_sgd.AnalogSGD`:
+* :class:`~aihwkit.optim.analog_optimizer.AnalogSGD`:
   implements stochastic gradient descent for analog layers. It is the
   counterpart of PyTorch `optim.SGD`_ optimizer.
 
@@ -146,7 +146,7 @@ analog layers of the model::
 
 .. note::
 
-    The :meth:`~aihwkit.optim.analog_sgd.AnalogSGD.regroup_param_groups` method
+    The :meth:`~aihwkit.optim.analog_optimizer.AnalogSGD.regroup_param_groups` method
     needs to be invoked in order to set up the parameter groups, as they are
     used for handling the analog layers correctly.
 
