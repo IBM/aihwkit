@@ -72,7 +72,7 @@ class ConversionLayerTest(ParametrizedTestCase):
         analog_model = convert_to_analog(model, FloatingPointRPUConfig())
         self.assertEqual(analog_model[0].__class__, AnalogLinear)
         self.assertEqual(analog_model.__class__, AnalogSequential)
-        self.assertEqual(loss_func(analog_model(x_b), y_b), digital_loss)
+        self.assertTensorAlmostEqual(loss_func(analog_model(x_b), y_b), digital_loss)
 
     def test_conversion_torchvision_resnet(self):
         """Test converting resnet model from torchvision."""
