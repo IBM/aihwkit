@@ -448,6 +448,25 @@ animation:
 
 ![replay_fake_images_gan](img/replay_fake_images_gan.gif)
 
+## Example 17: [`17_resnet34_digital_to_analog.py`]
+
+This example downloads a pre-defined network architecture (ResNet34) from the pytorch library
+and converts it to its analog counterpart using the function:
+```python
+   # Convert the model to its analog version
+    model = convert_to_analog(model, RPU_CONFIG, weight_scaling_omega=0.6)
+```
+This function passes all the additional parameters that define the analog tile to the model so that
+these can be used during the training/inference phase.
+The model from the [PyTorch library] is suitable for training/inference on the [ImageNet] dataset.
+
+## Example 18: [`18_cifar10_on_resnet.py`]
+
+In this example we define a ResNet34 inspired model that is trained using the CIFAR10 dataset.
+The model is defined using the various digital layer and then the `convert_to_analog()`
+is called to convert the model to its analog version. The CIFAR10 dataset is then used to train the
+model and the weights are then saved so that these can be used for additional training or inference.
+
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
@@ -465,6 +484,8 @@ https://www.frontiersin.org/articles/10.3389/fnins.2017.00538/full
 [Gokmen T and Haensch W (2020) Algorithm for Training Neural Networks on Resistive Device Arrays.
 Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
 [Generative Adversarial Network (GAN)]: https://arxiv.org/abs/1406.2661
+[PyTorch library]: https://pytorch.org/vision/stable/models.html
+[ImageNet]: https://www.image-net.org/
 
 [`01_simple_layer.py`]: 01_simple_layer.py
 [`02_multiple_layer.py`]: 02_multiple_layer.py
@@ -482,3 +503,5 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`14_experiment_custom_scheduler.py`]: 14_experiment_custom_scheduler.py
 [`15_simple_lstm.py`]: 15_simple_lstm.py
 [`16_mnist_gan.py`]: 16_mnist_gan.py
+[`17_resnet34_digital_to_analog.py`]: 17_resnet34_imagenet_conversion_to_analog.py
+[`18_cifar10_on_resnet.py`]: 18_cifar10_on_resnet.py
