@@ -1,0 +1,290 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+"""aihwkit example 18: resnet32 CNN with CIFAR10.
+
+CIFAR10 dataset on a resnet inspired network based on the paper:
+https://arxiv.org/abs/1512.03385
+"""
+
+# Imports
+import os
+from datetime import datetime
+
+# Imports from PyTorch.
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torchvision import datasets, transforms
+
+# Imports from aihwkit.
+from aihwkit.optim import AnalogSGD
+from aihwkit.nn.conversion import convert_to_analog
+from aihwkit.simulator.presets import TikiTakaEcRamPreset
+
+# Device to use
+USE_CUDA = 0
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.cuda.is_available():
+    USE_CUDA = 1
+
+# Path to store datasets
+PATH_DATASET = os.path.join(os.getcwd(), 'data', 'DATASET')
+
+# Path to store results
+RESULTS = os.path.join(os.getcwd(), 'results', 'RESNET')
+WEIGHT_PATH = os.path.join(RESULTS, 'example_18_model_weight.pth')
+
+# Training parameters
+SEED = 1
+N_EPOCHS = 30
+BATCH_SIZE = 128
+LEARNING_RATE = 0.1
+N_CLASSES = 10
+
+# Device used in the RPU tile
+RPU_CONFIG = TikiTakaEcRamPreset()
+
+
+class ResidualBlock(nn.Module):
+    """Residual block of a residual network with option for the skip connection."""
+    def __init__(self, in_ch, hidden_ch, use_conv=False, stride=1):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(in_ch, hidden_ch, kernel_size=3, padding=1, stride=stride)
+        self.bn1 = nn.BatchNorm2d(hidden_ch)
+        self.conv2 = nn.Conv2d(hidden_ch, hidden_ch, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(hidden_ch)
+
+        if use_conv:
+            self.convskip = nn.Conv2d(in_ch, hidden_ch, kernel_size=1, stride=stride)
+        else:
+            self.convskip = None
+
+    def forward(self, x):
+        y = F.relu(self.bn1(self.conv1(x)))
+        y = self.bn2(self.conv2(y))
+        if self.convskip:
+            x = self.convskip(x)
+        y += x
+        return F.relu(y)
+
+
+def concatenate_layer_blocks(in_ch, hidden_ch, num_layer, first_layer=False):
+    """Concatenate multiple residual block to form a layer."""
+    layers = []
+    for i in range(num_layer):
+        if i == 0 and not first_layer:
+            layers.append(ResidualBlock(in_ch, hidden_ch, use_conv=True, stride=2))
+        else:
+            layers.append(ResidualBlock(hidden_ch, hidden_ch))
+    return layers
+
+
+def create_model():
+    """ResNet34 inspired analog model."""
+    block_per_layers = (3, 4, 6, 3)
+    base_channel = 16
+    channel = (base_channel, 2*base_channel, 4*base_channel)
+
+    l0 = nn.Sequential(
+        nn.Conv2d(3, channel[0], kernel_size=3, stride=1, padding=1),
+        nn.BatchNorm2d(channel[0]),
+        nn.ReLU()
+    )
+
+    l1 = nn.Sequential(*concatenate_layer_blocks(channel[0], channel[0], block_per_layers[0],
+                                                 first_layer=True))
+    l2 = nn.Sequential(*concatenate_layer_blocks(channel[0], channel[1], block_per_layers[1]))
+    l3 = nn.Sequential(*concatenate_layer_blocks(channel[1], channel[2], block_per_layers[2]))
+    l4 = nn.Sequential(
+        nn.AdaptiveAvgPool2d((1, 1)),
+        nn.Flatten(),
+        nn.Linear(channel[2], N_CLASSES)
+    )
+
+    return nn.Sequential(l0, l1, l2, l3, l4)
+
+
+def load_images():
+    """Load images for train from torchvision datasets."""
+    mean = torch.tensor([0.4914, 0.4822, 0.4465])
+    std = torch.tensor([0.2470, 0.2435, 0.2616])
+
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize(mean, std)])
+    train_set = datasets.CIFAR10(PATH_DATASET, download=True, train=True, transform=transform)
+    val_set = datasets.CIFAR10(PATH_DATASET, download=True, train=False, transform=transform)
+    train_data = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    validation_data = torch.utils.data.DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
+
+    return train_data, validation_data
+
+
+def create_sgd_optimizer(model, learning_rate):
+    """Create the analog-aware optimizer.
+
+    Args:
+        model (nn.Module): model to be trained
+        learning_rate (float): global parameter to define learning rate
+    """
+    optimizer = AnalogSGD(model.parameters(), lr=learning_rate)
+    optimizer.regroup_param_groups(model)
+
+    return optimizer
+
+
+def train_step(train_data, model, criterion, optimizer):
+    """Train network.
+
+    Args:
+        train_data (DataLoader): Validation set to perform the evaluation
+        model (nn.Module): Trained model to be evaluated
+        criterion (nn.CrossEntropyLoss): criterion to compute loss
+        optimizer (Optimizer): analog model optimizer
+    """
+    total_loss = 0
+
+    model.train()
+
+    for images, labels in train_data:
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
+        optimizer.zero_grad()
+
+        # Add training Tensor to the model (input).
+        output = model(images)
+        loss = criterion(output, labels)
+
+        # Run training (backward propagation).
+        loss.backward()
+
+        # Optimize weights.
+        optimizer.step()
+        total_loss += loss.item() * images.size(0)
+    epoch_loss = total_loss / len(train_data.dataset)
+
+    return model, optimizer, epoch_loss
+
+
+def test_evaluation(validation_data, model, criterion):
+    """Test trained network
+
+    Args:
+        validation_data (DataLoader): Validation set to perform the evaluation
+        model (nn.Module): Trained model to be evaluated
+        criterion (nn.CrossEntropyLoss): criterion to compute loss
+    """
+    total_loss = 0
+    predicted_ok = 0
+    total_images = 0
+
+    model.eval()
+
+    for images, labels in validation_data:
+        images = images.to(DEVICE)
+        labels = labels.to(DEVICE)
+
+        pred = model(images)
+        loss = criterion(pred, labels)
+        total_loss += loss.item() * images.size(0)
+
+        _, predicted = torch.max(pred.data, 1)
+        total_images += labels.size(0)
+        predicted_ok += (predicted == labels).sum().item()
+        accuracy = predicted_ok/total_images*100
+        error = (1-predicted_ok/total_images)*100
+
+    epoch_loss = total_loss / len(validation_data.dataset)
+
+    return model, epoch_loss, error, accuracy
+
+
+def training_loop(model, criterion, optimizer, train_data, validation_data, epochs, print_every=1):
+    """Training loop.
+
+    Args:
+        model (nn.Module): Trained model to be evaluated
+        criterion (nn.CrossEntropyLoss): criterion to compute loss
+        optimizer (Optimizer): analog model optimizer
+        train_data (DataLoader): Validation set to perform the evaluation
+        validation_data (DataLoader): Validation set to perform the evaluation
+        epochs (int): global parameter to define epochs number
+        print_every (int): defines how many times to print training progress
+    """
+    train_losses = []
+    valid_losses = []
+    test_error = []
+
+    # Train model
+    for epoch in range(0, epochs):
+        # Train_step
+        model, optimizer, train_loss = train_step(train_data, model, criterion, optimizer)
+        train_losses.append(train_loss)
+
+        if epoch % print_every == (print_every - 1):
+            # Validate_step
+            with torch.no_grad():
+                model, valid_loss, error, accuracy = test_evaluation(
+                    validation_data, model, criterion)
+                valid_losses.append(valid_loss)
+                test_error.append(error)
+
+            print(f'{datetime.now().time().replace(microsecond=0)} --- '
+                  f'Epoch: {epoch}\t'
+                  f'Train loss: {train_loss:.4f}\t'
+                  f'Valid loss: {valid_loss:.4f}\t'
+                  f'Test error: {error:.2f}%\t'
+                  f'Test accuracy: {accuracy:.2f}%\t')
+
+    return model, optimizer
+
+
+def main():
+    """Train a PyTorch CNN analog model with the MNIST dataset."""
+    # Make sure the directory where to save the results exist.
+    # Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
+    os.makedirs(RESULTS, exist_ok=True)
+    torch.manual_seed(SEED)
+
+    # Load datasets.
+    train_data, validation_data = load_images()
+
+    # Load the pytorch model
+    model = create_model()
+
+    # Convert the model to its analog version
+    model = convert_to_analog(model, RPU_CONFIG, weight_scaling_omega=0.6)
+    # Load saved weights if previously saved
+    # model.load_state_dict(torch.load(WEIGHT_PATH))
+
+    if USE_CUDA:
+        model.cuda()
+
+    optimizer = create_sgd_optimizer(model, LEARNING_RATE)
+    criterion = nn.CrossEntropyLoss()
+
+    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
+          f'Started ResNet Training')
+
+    model, optimizer = training_loop(model, criterion, optimizer, train_data, validation_data,
+                                     N_EPOCHS)
+
+    print(f'{datetime.now().time().replace(microsecond=0)} --- '
+          f'Completed ResNet Training')
+
+    torch.save(model.state_dict(), WEIGHT_PATH)
+
+
+if __name__ == '__main__':
+    # Execute only if run as the entry point into the program
+    main()
