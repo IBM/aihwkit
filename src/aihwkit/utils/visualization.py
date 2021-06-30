@@ -34,8 +34,10 @@ from torch import eye, from_numpy, ones
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig
 from aihwkit.simulator.configs.devices import PulsedDevice, UnitCell
-from aihwkit.simulator.configs.utils import (BoundManagementType, IOParameters, NoiseManagementType,
-                                             PulseType, UpdateParameters, WeightNoiseType)
+from aihwkit.simulator.configs.utils import (
+    BoundManagementType, IOParameters, NoiseManagementType, PulseType,
+    UpdateParameters, WeightNoiseType
+)
 from aihwkit.simulator.tiles import AnalogTile, BaseTile
 from aihwkit.simulator.rpu_base import cuda
 
