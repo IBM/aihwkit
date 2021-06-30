@@ -3,5 +3,5 @@ types-dataclasses
 types-requests
 pycodestyle==2.7.0
 pylint==2.8.2
-pytest==6.2.3
+pytest==6.2.4
 parameterized==0.8.1
