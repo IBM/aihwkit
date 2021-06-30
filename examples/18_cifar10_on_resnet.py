@@ -57,6 +57,7 @@ RPU_CONFIG = TikiTakaEcRamPreset()
 
 class ResidualBlock(nn.Module):
     """Residual block of a residual network with option for the skip connection."""
+
     def __init__(self, in_ch, hidden_ch, use_conv=False, stride=1):
         super().__init__()
 

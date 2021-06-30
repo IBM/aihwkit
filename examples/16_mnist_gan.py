@@ -50,8 +50,10 @@ from aihwkit.simulator.presets import MixedPrecisionPCMPreset
 #   floating point devices will be used
 
 # RPU_CONFIG = FloatingPointRPUConfig()
-# RPU_CONFIG = GokmenVlasovPreset()  # parallel SGD in anlog with constant step device from Gokmen & Vlasov 2016
-RPU_CONFIG = MixedPrecisionPCMPreset()  # using digital floating point rank-update and transfer to PCM
+# Parallel SGD in analog with constant step device from Gokmen & Vlasov 2016.
+# RPU_CONFIG = GokmenVlasovPreset()
+# Using digital floating point rank-update and transfer to PCM.
+RPU_CONFIG = MixedPrecisionPCMPreset()
 WS_OMEGA = 0.8
 
 # Set your parameters

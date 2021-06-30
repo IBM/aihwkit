@@ -131,7 +131,7 @@ class BasicTrainingConverter:
         optimizer.arguments.append(
             AttributeProto(
                 name='lr',
-                type=AttributeProto.AttributeType.FLOAT,  # type: ignore
+                type=AttributeProto.AttributeType.FLOAT,
                 f=learning_rate))
 
         training = Training(

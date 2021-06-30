@@ -19,30 +19,27 @@ extras mechanism::
     pip install aihwkit[visualization]
 """
 
-from typing import Tuple, Any, Union
 from copy import deepcopy
+from typing import Any, Tuple, Union
 
+import matplotlib.pyplot as plt
+import numpy as np
+
+from matplotlib import ticker
 from matplotlib.figure import Figure
 from numpy import ndarray
-
-from torch import ones, eye, from_numpy
 from torch import device as torch_device
+from torch import eye, from_numpy, ones
 
-import numpy as np
-import matplotlib.ticker as ticker
-import matplotlib.pyplot as plt
-
-from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.tiles import (
-    AnalogTile, BaseTile
-)
-from aihwkit.simulator.rpu_base import cuda
+from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig
 from aihwkit.simulator.configs.devices import PulsedDevice, UnitCell
 from aihwkit.simulator.configs.utils import (
-    IOParameters, WeightNoiseType, NoiseManagementType, BoundManagementType,
-    PulseType, UpdateParameters
+    BoundManagementType, IOParameters, NoiseManagementType, PulseType,
+    UpdateParameters, WeightNoiseType
 )
+from aihwkit.simulator.tiles import AnalogTile, BaseTile
+from aihwkit.simulator.rpu_base import cuda
 
 
 def compute_pulse_response(
