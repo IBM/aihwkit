@@ -1,4 +1,6 @@
-mypy==0.812
+mypy==0.910
+types-dataclasses
+types-requests
 pycodestyle==2.7.0
 pylint==2.8.2
 pytest==6.2.3
