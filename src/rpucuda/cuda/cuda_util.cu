@@ -324,7 +324,6 @@ CudaContext::CudaContext(cudaStream_t shared_stream, int gpu_id) : gpu_id_(gpu_i
 CudaContext::~CudaContext() {
   DEBUG_OUT("Destroy Cuda Context...");
   if (env_ != nullptr) {
-    enforceDeviceId();
     int i_start = shared_ ? 1 : 0;
     for (int i = i_start; i < streams_.size(); i++) {
       cudaStreamSynchronize(streams_[i]);
