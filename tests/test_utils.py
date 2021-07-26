@@ -13,6 +13,7 @@
 """Test for different utility functionality."""
 
 from tempfile import TemporaryFile
+from copy import deepcopy
 
 from numpy import array
 from numpy.random import rand
@@ -23,10 +24,10 @@ from torch.nn.functional import mse_loss
 
 from aihwkit.nn import AnalogConv2d
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
-from aihwkit.exceptions import TileError
+from aihwkit.exceptions import TileError, ModuleError
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv2d, Conv2dCuda, Linear, LinearCuda
@@ -353,3 +354,50 @@ class SerializationTest(ParametrizedTestCase):
         if new_model.analog_tile.__class__.__name__ != model.analog_tile.__class__.__name__:
             with self.assertRaises(TileError):
                 self.assertRaises(new_model.load_state_dict(state_dict))
+
+    def test_load_state_load_rpu_config(self):
+        """Test creating a new model using a state dict, while using a different RPU config."""
+
+        # Create the device and the array.
+
+        model = self.get_layer()
+        state_dict = model.state_dict()
+
+        rpu_config = deepcopy(model.analog_tile.rpu_config)
+
+        # Skipped for FP
+        if isinstance(rpu_config, FloatingPointRPUConfig):
+            return
+
+        old_value = rpu_config.forward.inp_noise
+        rpu_config.forward.inp_noise = 0.51
+
+        # Test restore_rpu_config=False
+        new_model = self.get_layer(rpu_config=rpu_config)
+        new_model.load_state_dict(state_dict, load_rpu_config=False)
+
+        parameters = new_model.analog_tile.tile.get_parameters()
+        self.assertAlmostEqual(parameters.forward_io.inp_noise, 0.51)
+
+        # Test restore_rpu_config=True
+        new_model = self.get_layer(rpu_config=rpu_config)
+        new_model.load_state_dict(state_dict, load_rpu_config=True)
+
+        parameters = new_model.analog_tile.tile.get_parameters()
+        self.assertAlmostEqual(parameters.forward_io.inp_noise, old_value)
+
+    def test_load_state_load_rpu_config_wrong(self):
+        """Test creating a new model using a state dict, while using a different RPU config."""
+
+        # Create the device and the array.
+        model = self.get_layer()
+        state_dict = model.state_dict()
+
+        # Skipped for FP
+        if isinstance(model.analog_tile.rpu_config, FloatingPointRPUConfig):
+            return
+
+        rpu_config = FloatingPointRPUConfig()
+
+        new_model = self.get_layer(rpu_config=rpu_config)
+        assert_raises(ModuleError, new_model.load_state_dict, state_dict, load_rpu_config=False)
