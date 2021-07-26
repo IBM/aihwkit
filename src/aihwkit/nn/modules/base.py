@@ -12,7 +12,7 @@
 
 """Base class for analog Modules."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, Union, NamedTuple, TYPE_CHECKING
 
 from torch import Tensor
 from torch.nn import Module, Parameter
@@ -25,6 +25,7 @@ from aihwkit.simulator.configs import (
 from aihwkit.simulator.tiles import InferenceTile
 if TYPE_CHECKING:
     from aihwkit.simulator.tiles import BaseTile
+    from collections import OrderedDict
 
 RPUConfigAlias = Union[FloatingPointRPUConfig, SingleRPUConfig,
                        UnitCellRPUConfig, InferenceRPUConfig]
@@ -50,6 +51,7 @@ class AnalogModuleBase(Module):
     """
     # pylint: disable=abstract-method
     _analog_tile_counter: int = 0
+    _load_rpu_config = True
 
     def register_analog_tile(self, tile: 'BaseTile') -> None:
         """Register the analog context of the tile.
@@ -231,6 +233,37 @@ class AnalogModuleBase(Module):
         """
         self.set_weights(self.weight, self.bias, force_exact=True)
 
+    def load_state_dict(self,  # pylint: disable=arguments-differ
+                        state_dict: 'OrderedDict[str, Tensor]',
+                        strict: bool = True,
+                        load_rpu_config: bool = True) -> NamedTuple:
+        """Specializes torch's ``load_state_dict`` to add a flag whether to
+        load the RPU config from the saved state.
+
+        Args:
+            state_dict: see torch's ``load_state_dict``
+            strict: see torch's ``load_state_dict``
+            load_rpu_config: Whether to load the saved RPU
+                config or use the current RPU config of the model.
+
+                Caution:
+
+                    If ``load_rpu_config=False`` the RPU config can
+                    be changed from the stored model. However, the user has to
+                    make sure that the changed RPU config makes sense.
+
+                    For instance, changing the device type might
+                    change the expected fields in the hidden
+                    parameters and result in an error.
+        Returns:
+            see torch's ``load_state_dict``
+
+        Raises: ModuleError: in case the rpu_config class mismatches
+            for ``load_rpu_config=False``.
+        """
+        self._load_rpu_config = load_rpu_config
+        return super().load_state_dict(state_dict, strict)
+
     def _load_from_state_dict(
             self,
             state_dict: Dict,
@@ -246,10 +279,21 @@ class AnalogModuleBase(Module):
         This method is a specialization of ``Module._load_from_state_dict``
         that takes into account the extra ``analog_tile_state`` key used by
         analog layers.
+
+        Raises:
+            ModuleError: in case the rpu_config class mismatches.
         """
         key = '{}analog_tile_state'.format(prefix)
         if key in state_dict:
-            analog_state = state_dict.pop(key)
+            analog_state = state_dict.pop(key).copy()
+            if not self._load_rpu_config:
+                if self.analog_tile.rpu_config.__class__ != analog_state['rpu_config'].__class__:
+                    raise ModuleError("RPU config mismatch during loading: "
+                                      "Tried to replace "
+                                      f"{analog_state['rpu_config'].__class__.__name__} "
+                                      f"with {self.analog_tile.rpu_config.__class__.__name__}")
+                analog_state['rpu_config'] = self.analog_tile.rpu_config
+
             self.analog_tile.__setstate__(analog_state)
         elif strict:
             missing_keys.append(key)
@@ -269,15 +313,12 @@ class AnalogModuleBase(Module):
     ) -> Dict:
         """Return a dictionary containing a whole state of the module."""
         self._sync_weights_from_tile()
-        # TODO: this will also pickle the resistive device. Problematic?  we
-        # could also just save hidden_pars and weights. However, in any case the
-        # state_dict will not reflect the model.parameters() any more, which
-        # might get tricky. In any case, internal hidden weights need to be
-        # saved to reconstruct a meaningful analog tile
 
         analog_state = self.analog_tile.__getstate__()
         current_state = super().state_dict(destination, prefix, keep_vars)
-        current_state['{}analog_tile_state'.format(prefix)] = analog_state
+        analog_state_name = '{}analog_tile_state'.format(prefix)
+        current_state[analog_state_name] = analog_state
+
         return current_state
 
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
