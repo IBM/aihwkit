@@ -41,6 +41,10 @@ from aihwkit.simulator.configs.utils import (
 from aihwkit.simulator.tiles import AnalogTile, BaseTile
 from aihwkit.simulator.rpu_base import cuda
 
+from aihwkit.simulator.noise_models import BaseNoiseModel, PCMLikeNoiseModel
+
+from aihwkit.simulator.noise_models import BaseNoiseModel, PCMLikeNoiseModel
+
 
 def compute_pulse_response(
         analog_tile: BaseTile,
@@ -586,3 +590,54 @@ def plot_device_symmetry(
     plot_pulse_response(analog_tile, direction, use_forward=False)
     plt.ylim([-1, 1])
     plt.grid(True)
+
+
+def plot_weight_drift(noise_model: BaseNoiseModel = None,
+                      t_inference_list: ndarray = None,
+                      w_inits: ndarray = None,
+                      n_repeats: int = 25) -> None:
+    """Plots the weight drift behavior of a given noise model over time.
+
+    Args:
+        noise_model: Noise model of derived from
+            :class:`~aihwkit.simulator.noise_models.BaseNoiseModel`
+        t_inference_list: Numpy array of times of inference after
+            programming at time 0 (in seconds)
+        w_inits: Numpy array of target weights to program
+        n_repeats: How many repeats to estimate the standard deviation
+    """
+
+    plt.figure(figsize=[10, 5])
+    if noise_model is None:
+        noise_model = PCMLikeNoiseModel()
+    if t_inference_list is None:
+        t_inference_list = np.logspace(0., 7.0, 15)
+    if w_inits is None:
+        w_inits = np.linspace(-1., 1., 9)
+
+    weights = w_inits.flatten()
+    weights.sort()
+    weights = np.tile(weights, [n_repeats, 1])
+
+    m_list = []
+    s_list = []
+    for t_inference in t_inference_list:
+        noisy_weights = noise_model.apply_noise(from_numpy(weights), t_inference).numpy()
+        m_list.append(noisy_weights.mean(axis=0))
+        s_list.append(noisy_weights.std(axis=0))
+
+    m_array = np.stack(m_list, axis=1)
+    s_array = np.stack(s_list, axis=1)
+
+    for i in range(w_inits.size):
+        curve = plt.plot(t_inference_list, m_array[i])
+
+        plt.fill_between(t_inference_list,
+                         m_array[i] - s_array[i],
+                         m_array[i] + s_array[i],
+                         edgecolor=None, linewidth=0, alpha=0.3, antialiased=True,
+                         facecolor=curve[0].get_color())
+
+    plt.gca().set_xscale('log')
+    plt.xlabel('Time after programming [sec]')
+    plt.ylabel('Weight value [norm. units]')

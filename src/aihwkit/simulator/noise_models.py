@@ -275,6 +275,10 @@ class PCMLikeNoiseModel(BaseNoiseModel):
                 The ``t_inference`` is relative to this time `t0`
                 e.g. t_inference counts from the completion of the programming
                 of a device.
+        prog_noise_scale: scale for the programming noise
+        read_noise_scale: scale for the read and accumulated noise
+        drift_noise: scale for the  drfit coefficient
+
     """
 
     def __init__(
@@ -284,6 +288,9 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             g_max: Optional[float] = None,
             t_read: float = 250.0e-9,
             t_0: float = 20.0,
+            prog_noise_scale: float = 1.0,
+            read_noise_scale: float = 1.0,
+            drift_scale: float = 1.0,
     ):
         g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
@@ -296,6 +303,9 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         self.prog_coeff = [0.26348, 1.9650, -1.1731] if prog_coeff is None else prog_coeff
         self.t_0 = t_0
         self.t_read = t_read
+        self.prog_noise_scale = prog_noise_scale
+        self.read_noise_scale = read_noise_scale
+        self.drift_scale = drift_scale
 
     def __str__(self) -> str:
         return ('{}(prog_coeff={}, g_converter={}, g_max={:1.2f}, t_read={}, '
@@ -317,7 +327,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             mat *= g_target / self.g_max
             sig_prog += mat * coeff
 
-        g_prog = g_target + sig_prog * randn_like(g_target)
+        g_prog = g_target + self.prog_noise_scale * sig_prog * randn_like(g_target)
         g_prog.clamp_(min=0.0)  # no negative conductances allowed
 
         return g_prog
@@ -332,7 +342,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         sig_drift = (-0.0125 * log(g_relative) - 0.0059).clamp(min=0.008, max=0.045)
         nu_drift = torch_abs(mu_drift + sig_drift * randn_like(g_relative)).clamp(min=0.0)
 
-        return nu_drift
+        return nu_drift * self.drift_scale
 
     @no_grad()
     def apply_drift_noise_to_conductance(
@@ -356,7 +366,8 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             q_s = (0.0088 / ((torch_abs(g_prog) /
                               self.g_max) ** 0.65).clamp(min=1e-3)).clamp(max=0.2)
             sig_noise = q_s * sqrt(numpy_log((t + self.t_read) / (2 * self.t_read)))
-            g_final = g_drift + torch_abs(g_drift) * sig_noise * randn_like(g_prog)
+            g_final = g_drift + torch_abs(g_drift) * self.read_noise_scale \
+                * sig_noise * randn_like(g_prog)
         else:
             g_final = g_prog
 
