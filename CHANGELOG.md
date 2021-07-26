@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Conversion tools for converting torch models into a model having analog
   layers. (\#265)
 * Load model state dict into a new model with modified `RPUConfig`. (\#276)
+* Visualization for noise models for analog inference hardware simulation. (#278)
 
 ### Changed
 
