@@ -154,8 +154,8 @@ class LSTMLayerTest(ParametrizedTestCase):
         lstm_pars0 = get_parameters(lstm, False)
         lstm_analog_pars0 = get_parameters(lstm_analog, True)
 
-        for par_name in lstm_pars0.keys():
-            lstm_pars0[par_name].data = lstm_analog_pars0[par_name].detach().clone()
+        for par_name, par_item in lstm_pars0.items():
+            par_item.data = lstm_analog_pars0[par_name].detach().clone()
 
         # Make independent for comparison below.
         lstm_pars0 = {key: value.detach().clone() for key, value in lstm_pars0.items()}
@@ -187,11 +187,11 @@ class LSTMLayerTest(ParametrizedTestCase):
         lstm_analog_pars = get_parameters(lstm_analog, True)
 
         if test_for_update:
-            for par_name in lstm_pars.keys():
+            for par_name, par_item in lstm_pars.items():
                 par0 = lstm_pars0[par_name].detach().cpu().numpy()
-                par = lstm_pars[par_name].detach().cpu().numpy()
+                par = par_item.detach().cpu().numpy()
                 assert_raises(AssertionError, assert_array_almost_equal, par, par0)
 
-        for par_name in lstm_pars.keys():
-            assert_array_almost_equal(lstm_pars[par_name].detach().cpu().numpy(),
+        for par_name, par_item in lstm_pars.items():
+            assert_array_almost_equal(par_item.detach().cpu().numpy(),
                                       lstm_analog_pars[par_name].detach().cpu().numpy())

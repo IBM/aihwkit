@@ -177,7 +177,7 @@ void MixedPrecRPUDevice<T>::forwardUpdate(
 
     this->transfer_pwu_->updateVectorWithDevice(
         weights, this->transfer_tmp_.data(), 1, transfer_d_vec + this->d_size_ * j, 1,
-        this->granularity_, 1, &*this->rpu_device_);
+        this->granularity_, n_vec, &*this->rpu_device_);
   }
 }
 

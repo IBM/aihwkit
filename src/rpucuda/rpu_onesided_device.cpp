@@ -375,6 +375,11 @@ template <typename T> int OneSidedRPUDevice<T>::refreshWeights() {
 
     // do the refresh write
     // writing might be quite big. Probably need closed loop? Or can let training do the rest
+
+    // CAUTION: this refresh does also increase the update
+    // counter... Note that we use 1 as m_batch info since not
+    // every time the update is called.
+
     if (refresh_p_counter > 0) {
       refresh_pwu_->updateVectorWithDevice(
           weights_p, x, 1, refresh_p_vec_.data(), 1,

@@ -39,19 +39,19 @@ from aihwkit.simulator.presets import (
 Type = namedtuple('Type', ['attribute_type', 'field', 'fn'])
 
 TYPES = {
-    int: Type(AttributeProto.AttributeType.INT, 'i', lambda x: x),  # type: ignore
-    bool: Type(AttributeProto.AttributeType.BOOL, 'b', lambda x: x),  # type: ignore
-    str: Type(AttributeProto.AttributeType.STRING, 's',  # type: ignore
+    int: Type(AttributeProto.AttributeType.INT, 'i', lambda x: x),
+    bool: Type(AttributeProto.AttributeType.BOOL, 'b', lambda x: x),
+    str: Type(AttributeProto.AttributeType.STRING, 's',
               lambda x: x.encode('utf-8')),
-    float: Type(AttributeProto.AttributeType.FLOAT, 'f', lambda x: x)  # type: ignore
+    float: Type(AttributeProto.AttributeType.FLOAT, 'f', lambda x: x)
 }
 
 TYPES_LISTS = {
-    int: Type(AttributeProto.AttributeType.INTS, 'ints', lambda x: x),  # type: ignore
-    bool: Type(AttributeProto.AttributeType.BOOLS, 'bools', lambda x: x),  # type: ignore
-    str: Type(AttributeProto.AttributeType.STRINGS, 'strings',  # type: ignore
+    int: Type(AttributeProto.AttributeType.INTS, 'ints', lambda x: x),
+    bool: Type(AttributeProto.AttributeType.BOOLS, 'bools', lambda x: x),
+    str: Type(AttributeProto.AttributeType.STRINGS, 'strings',
               lambda x: [y.encode('utf-8') for y in x]),
-    float: Type(AttributeProto.AttributeType.FLOATS, 'floats', lambda x: x)  # type: ignore
+    float: Type(AttributeProto.AttributeType.FLOATS, 'floats', lambda x: x)
 }
 
 

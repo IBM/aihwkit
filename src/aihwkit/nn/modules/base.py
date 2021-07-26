@@ -218,10 +218,10 @@ class AnalogModuleBase(Module):
         Update the ``self.weight`` and ``self.bias`` Parameters with an
         exact copy of the internal analog tile weights.
         """
-        tile_weight, tile_bias = self.get_weights(force_exact=True)
+        tile_weight, tile_bias = self.get_weights(force_exact=True)  # type: Tuple[Tensor, Tensor]
         self.weight.data[:] = tile_weight.reshape(self.weight.shape)
         if self.use_bias:
-            self.bias.data[:] = tile_bias.reshape(self.bias.shape)  # type: ignore
+            self.bias.data[:] = tile_bias.reshape(self.bias.shape)
 
     def _sync_weights_to_tile(self) -> None:
         """Update the tile values from the layer weights and bias.
