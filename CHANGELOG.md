@@ -37,7 +37,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   any existing optimizer with analog-specific features. (\#242)
 * Conversion tools for converting torch models into a model having analog
   layers. (\#265)
-* Load model state dict into a new model with modified `RPUConfig`. (\#273)
+* Load model state dict into a new model with modified `RPUConfig`. (\#276)
 
 ### Changed
 
