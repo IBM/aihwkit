@@ -88,6 +88,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   state dict. (\#262)
 * Fixed `MixedPrecisionCompound` being bypassed with floating point compute.
   (\#263)
+* Removed GPU warning during destruction when using multiple GPUs. (\#277)
 
 ## [0.3.0] - 2021/04/14
 
