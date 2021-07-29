@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 
 * Load model state dict into a new model with modified `RPUConfig`. (\#276)
-* Visualization for noise models for analog inference hardware simulation. (#278)
+* Visualization for noise models for analog inference hardware simulation. (\#278)
 
 ### Fixed
 
