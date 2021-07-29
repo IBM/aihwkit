@@ -17,7 +17,7 @@ from tempfile import TemporaryFile
 from unittest import SkipTest
 
 from torch import Tensor, device, load, save
-from torch.cuda import current_device
+from torch.cuda import current_device, device_count
 
 from aihwkit.nn import AnalogSequential
 from aihwkit.simulator.configs import SingleRPUConfig
@@ -180,6 +180,88 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
         # Create a container and move to cuda.
         model = AnalogSequential(layer)
         model.to(device('cuda'))
+
+        analog_tile = layer.analog_tile
+        self.assertEqual(analog_tile.device, expected_device)
+        self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
+        if analog_tile.shared_weights is not None:
+            self.assertEqual(analog_tile.shared_weights.data.device, expected_device)
+            self.assertEqual(analog_tile.shared_weights.data.size()[0],
+                             analog_tile.tile.get_x_size())
+            self.assertEqual(analog_tile.shared_weights.data.size()[1],
+                             analog_tile.tile.get_d_size())
+
+        # Assert the tile has been moved to cuda.
+        self.assertIsInstance(layer.analog_tile.tile, expected_class)
+
+    def test_sequential_move_to_cuda_via_to_multiple_gpus(self):
+        """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
+        if not cuda.is_compiled():
+            raise SkipTest('not compiled with CUDA support')
+        if device_count() < 2:
+            raise SkipTest('Need at least two devices for this test')
+
+        # Map the original tile classes to the expected ones after `cuda()`.
+        tile_classes = {
+            tiles.AnalogTile: tiles.CudaAnalogTile,
+            tiles.CudaAnalogTile: tiles.CudaAnalogTile
+        }
+
+        # Test whether it can move to GPU with index 1
+        expected_device_num = 1
+
+        layer = self.get_layer()
+        if isinstance(layer.analog_tile.tile.__class__, (tiles.CudaAnalogTile,
+                                                         tiles.CudaFloatingPointTile)):
+            raise SkipTest('Layer is already on CUDA')
+
+        expected_class = tile_classes[layer.analog_tile.tile.__class__]
+        expected_device = device('cuda', expected_device_num)
+
+        # Create a container and move to cuda.
+        model = AnalogSequential(layer)
+        model.to(device('cuda', expected_device_num))
+
+        analog_tile = layer.analog_tile
+        self.assertEqual(analog_tile.device, expected_device)
+        self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
+        if analog_tile.shared_weights is not None:
+            self.assertEqual(analog_tile.shared_weights.data.device, expected_device)
+            self.assertEqual(analog_tile.shared_weights.data.size()[0],
+                             analog_tile.tile.get_x_size())
+            self.assertEqual(analog_tile.shared_weights.data.size()[1],
+                             analog_tile.tile.get_d_size())
+
+        # Assert the tile has been moved to cuda.
+        self.assertIsInstance(layer.analog_tile.tile, expected_class)
+
+    def test_sequential_move_to_cuda_multiple_gpus(self):
+        """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
+        if not cuda.is_compiled():
+            raise SkipTest('not compiled with CUDA support')
+        if device_count() < 2:
+            raise SkipTest('Need at least two devices for this test')
+
+        # Map the original tile classes to the expected ones after `cuda()`.
+        tile_classes = {
+            tiles.AnalogTile: tiles.CudaAnalogTile,
+            tiles.CudaAnalogTile: tiles.CudaAnalogTile
+        }
+
+        # Test whether it can move to GPU with index 1
+        expected_device_num = 1
+
+        layer = self.get_layer()
+        if isinstance(layer.analog_tile.tile.__class__, (tiles.CudaAnalogTile,
+                                                         tiles.CudaFloatingPointTile)):
+            raise SkipTest('Layer is already on CUDA')
+
+        expected_class = tile_classes[layer.analog_tile.tile.__class__]
+        expected_device = device('cuda', expected_device_num)
+
+        # Create a container and move to cuda.
+        model = AnalogSequential(layer)
+        model.cuda(device('cuda', expected_device_num))
 
         analog_tile = layer.analog_tile
         self.assertEqual(analog_tile.device, expected_device)

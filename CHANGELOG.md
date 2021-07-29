@@ -12,6 +12,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## [UNRELEASED]
+
+### Added
+
+* Load model state dict into a new model with modified `RPUConfig`. (\#276)
+* Visualization for noise models for analog inference hardware simulation. (\#278)
+
+### Fixed
+
+* Removed GPU warning during destruction when using multiple GPUs. (\#277)
+
 ## [0.4.0] - 2021/06/25
 
 ### Added
@@ -37,7 +48,6 @@ The format is based on [Keep a Changelog], and this project adheres to
   any existing optimizer with analog-specific features. (\#242)
 * Conversion tools for converting torch models into a model having analog
   layers. (\#265)
-* Load model state dict into a new model with modified `RPUConfig`. (\#276)
 
 ### Changed
 
