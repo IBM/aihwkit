@@ -15,6 +15,7 @@
 resnet34 inspired network based on the paper:
 https://arxiv.org/abs/1512.03385
 """
+# pylint: disable=invalid-name
 
 # Imports from PyTorch.
 from torchvision.models import resnet34

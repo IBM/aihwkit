@@ -26,7 +26,7 @@ from aihwkit.simulator.configs.utils import (
     IOParameters, PulseType, UpdateParameters, WeightClipParameter,
     WeightModifierParameter
 )
-from aihwkit.simulator.noise_models import (
+from aihwkit.inference import (
     BaseDriftCompensation, BaseNoiseModel, GlobalDriftCompensation,
     PCMLikeNoiseModel
 )

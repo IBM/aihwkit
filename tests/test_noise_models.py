@@ -14,7 +14,7 @@
 
 from torch import randn
 
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel, SinglePairConductanceConverter
+from aihwkit.inference import PCMLikeNoiseModel, SinglePairConductanceConverter
 
 from .helpers.testcases import AihwkitTestCase
 

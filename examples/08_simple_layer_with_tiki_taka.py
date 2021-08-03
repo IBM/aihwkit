@@ -15,6 +15,7 @@
 Simple network that consist of one analog layer. The network aims to learn
 to sum all the elements from one array.
 """
+# pylint: disable=invalid-name
 
 # Imports from PyTorch.
 from torch import Tensor

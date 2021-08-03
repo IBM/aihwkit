@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 
 # (C) Copyright 2020, 2021 IBM. All Rights Reserved.
@@ -15,6 +16,7 @@
 Network that consists of multiple analog layers. It aims to learn to sum all
 the elements from one array.
 """
+# pylint: disable=invalid-name
 
 # Imports from PyTorch.
 from torch import Tensor

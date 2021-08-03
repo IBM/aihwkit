@@ -18,6 +18,7 @@ https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
 Uses learning rates of η = 0.01, 0.005, and 0.0025
 for epochs 0–10, 11–20, and 21–30, respectively.
 """
+# pylint: disable=invalid-name
 
 import os
 from time import time
@@ -77,6 +78,9 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         input_size (int): size of the Tensor at the input.
         hidden_sizes (list): list of sizes of the hidden layers (2 layers).
         output_size (int): size of the Tensor at the output.
+
+    Returns:
+        nn.Module: created analog model
     """
     model = AnalogSequential(
         AnalogLinear(input_size, hidden_sizes[0], True,
@@ -102,6 +106,8 @@ def create_sgd_optimizer(model):
 
     Args:
         model (nn.Module): model to be trained.
+    Returns:
+        nn.Module: optimizer
     """
     optimizer = AnalogSGD(model.parameters(), lr=0.05)
     optimizer.regroup_param_groups(model)

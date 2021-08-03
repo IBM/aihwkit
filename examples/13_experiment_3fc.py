@@ -15,6 +15,7 @@
 Creation and execution of a Basic Training experiment, where the model uses
 3 fully connected analog layers.
 """
+# pylint: disable=invalid-name
 
 import os
 

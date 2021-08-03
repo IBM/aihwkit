@@ -16,6 +16,7 @@ SVHN dataset on Analog Network using weight scaling.
 
 Learning rates of η = 0.1 for all the epochs with minibatch 128.
 """
+# pylint: disable=invalid-name
 
 import os
 from datetime import datetime
@@ -24,8 +25,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Imports from PyTorch.
-import torch
-from torch import nn
+from torch import nn, Tensor, cuda, device, no_grad, manual_seed
+from torch import max as torch_max
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 # Imports from aihwkit.
@@ -36,8 +38,8 @@ from aihwkit.simulator.presets.configs import GokmenVlasovPreset
 
 # Check device
 USE_CUDA = 0
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
+DEVICE = device('cuda' if cuda.is_available() else 'cpu')
+if cuda.is_available():
     USE_CUDA = 1
 
 # Path to store datasets
@@ -62,8 +64,8 @@ RPU_CONFIG = GokmenVlasovPreset()
 
 def load_images():
     """Load images for train from torchvision datasets."""
-    mean = torch.tensor([0.4377, 0.4438, 0.4728])
-    std = torch.tensor([0.1980, 0.2010, 0.1970])
+    mean = Tensor([0.4377, 0.4438, 0.4728])
+    std = Tensor([0.1980, 0.2010, 0.1970])
 
     print(f'Normalization data: ({mean},{std})')
 
@@ -71,14 +73,18 @@ def load_images():
         [transforms.ToTensor(), transforms.Normalize(mean, std)])
     train_set = datasets.SVHN(PATH_DATASET, download=True, split='train', transform=transform)
     val_set = datasets.SVHN(PATH_DATASET, download=True, split='test', transform=transform)
-    train_data = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
-    validation_data = torch.utils.data.DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
+    train_data = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    validation_data = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
     return train_data, validation_data
 
 
 def create_analog_network():
-    """Return a Vgg8 inspired analog model."""
+    """Create a Vgg8 inspired analog model.
+
+    Returns:
+       nn.Module: VGG8 model
+    """
     channel_base = 48
     channel = [channel_base, 2 * channel_base, 3 * channel_base]
     fc_size = 8 * channel_base
@@ -127,6 +133,8 @@ def create_sgd_optimizer(model, learning_rate):
     Args:
         model (nn.Module): model to be trained
         learning_rate (float): global parameter to define learning rate
+    Returns:
+        Optimizer: optimizer
     """
     optimizer = AnalogSGD(model.parameters(), lr=learning_rate)
     optimizer.regroup_param_groups(model)
@@ -142,6 +150,9 @@ def train_step(train_data, model, criterion, optimizer):
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
         optimizer (Optimizer): analog model optimizer
+
+    Returns:
+        nn.Module, Optimizer, float: model, optimizer, and epoch loss
     """
     total_loss = 0
 
@@ -174,6 +185,9 @@ def test_evaluation(validation_data, model, criterion):
         validation_data (DataLoader): Validation set to perform the evaluation
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
+
+    Returns:
+        nn.Module, float, float, float: model, test epoch loss, test error, and test accuracy
     """
     total_loss = 0
     predicted_ok = 0
@@ -189,7 +203,7 @@ def test_evaluation(validation_data, model, criterion):
         loss = criterion(pred, labels)
         total_loss += loss.item() * images.size(0)
 
-        _, predicted = torch.max(pred.data, 1)
+        _, predicted = torch_max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
         accuracy = predicted_ok/total_images*100
@@ -211,6 +225,11 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
         validation_data (DataLoader): Validation set to perform the evaluation
         epochs (int): global parameter to define epochs number
         print_every (int): defines how many times to print training progress
+
+    Returns:
+        nn.Module, Optimizer, Tuple: model, optimizer, and a tuple of
+            lists of train losses, validation losses, and test error
+
     """
     train_losses = []
     valid_losses = []
@@ -224,7 +243,7 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
 
         if epoch % print_every == (print_every - 1):
             # Validate_step
-            with torch.no_grad():
+            with no_grad():
                 model, valid_loss, error, accuracy = test_evaluation(
                     validation_data, model, criterion)
                 valid_losses.append(valid_loss)
@@ -250,9 +269,9 @@ def plot_results(train_losses, valid_losses, test_error):
     """Plot results.
 
     Args:
-        train_losses: training losses as calculated in the training_loop
-        valid_losses: validation losses as calculated in the training_loop
-        test_error: test error as calculated in the training_loop
+        train_losses (List): training losses as calculated in the training_loop
+        valid_losses (List): validation losses as calculated in the training_loop
+        test_error (List): test error as calculated in the training_loop
     """
     fig = plt.plot(train_losses, 'r-s', valid_losses, 'b-o')
     plt.title('aihwkit VGG8')
@@ -280,7 +299,7 @@ def main():
     # Make sure the directory where to save the results exist.
     # Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
     os.makedirs(RESULTS, exist_ok=True)
-    torch.manual_seed(SEED)
+    manual_seed(SEED)
 
     # Load datasets.
     train_data, validation_data = load_images()

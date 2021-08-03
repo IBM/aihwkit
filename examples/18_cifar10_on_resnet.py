@@ -15,15 +15,18 @@
 CIFAR10 dataset on a resnet inspired network based on the paper:
 https://arxiv.org/abs/1512.03385
 """
+# pylint: disable=invalid-name
 
 # Imports
 import os
 from datetime import datetime
 
 # Imports from PyTorch.
-import torch
+from torch import nn, Tensor, cuda, device, no_grad, manual_seed, save
+from torch import max as torch_max
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
-from torch import nn
+
 from torchvision import datasets, transforms
 
 # Imports from aihwkit.
@@ -33,8 +36,8 @@ from aihwkit.simulator.presets import TikiTakaEcRamPreset
 
 # Device to use
 USE_CUDA = 0
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
+DEVICE = device('cuda' if cuda.is_available() else 'cpu')
+if cuda.is_available():
     USE_CUDA = 1
 
 # Path to store datasets
@@ -72,6 +75,7 @@ class ResidualBlock(nn.Module):
             self.convskip = None
 
     def forward(self, x):
+        """ Forward pass"""
         y = F.relu(self.bn1(self.conv1(x)))
         y = self.bn2(self.conv2(y))
         if self.convskip:
@@ -81,7 +85,11 @@ class ResidualBlock(nn.Module):
 
 
 def concatenate_layer_blocks(in_ch, hidden_ch, num_layer, first_layer=False):
-    """Concatenate multiple residual block to form a layer."""
+    """Concatenate multiple residual block to form a layer.
+
+    Returns:
+       List: list of layer blocks
+    """
     layers = []
     for i in range(num_layer):
         if i == 0 and not first_layer:
@@ -92,7 +100,12 @@ def concatenate_layer_blocks(in_ch, hidden_ch, num_layer, first_layer=False):
 
 
 def create_model():
-    """ResNet34 inspired analog model."""
+    """ResNet34 inspired analog model.
+
+    Returns:
+       nn.Modules: created model
+    """
+
     block_per_layers = (3, 4, 6, 3)
     base_channel = 16
     channel = (base_channel, 2*base_channel, 4*base_channel)
@@ -117,16 +130,20 @@ def create_model():
 
 
 def load_images():
-    """Load images for train from torchvision datasets."""
-    mean = torch.tensor([0.4914, 0.4822, 0.4465])
-    std = torch.tensor([0.2470, 0.2435, 0.2616])
+    """Load images for train from torchvision datasets.
+
+    Returns:
+        Dataset, Dataset: train data and validation data
+"""
+    mean = Tensor([0.4914, 0.4822, 0.4465])
+    std = Tensor([0.2470, 0.2435, 0.2616])
 
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize(mean, std)])
     train_set = datasets.CIFAR10(PATH_DATASET, download=True, train=True, transform=transform)
     val_set = datasets.CIFAR10(PATH_DATASET, download=True, train=False, transform=transform)
-    train_data = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
-    validation_data = torch.utils.data.DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
+    train_data = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    validation_data = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
     return train_data, validation_data
 
@@ -137,6 +154,9 @@ def create_sgd_optimizer(model, learning_rate):
     Args:
         model (nn.Module): model to be trained
         learning_rate (float): global parameter to define learning rate
+
+    Returns:
+        Optimizer: created analog optimizer
     """
     optimizer = AnalogSGD(model.parameters(), lr=learning_rate)
     optimizer.regroup_param_groups(model)
@@ -152,6 +172,9 @@ def train_step(train_data, model, criterion, optimizer):
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
         optimizer (Optimizer): analog model optimizer
+
+    Returns:
+        nn.Module, Optimizer, float: model, optimizer, and epoch loss
     """
     total_loss = 0
 
@@ -184,6 +207,9 @@ def test_evaluation(validation_data, model, criterion):
         validation_data (DataLoader): Validation set to perform the evaluation
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
+
+    Returns:
+        nn.Module, float, float, float: model, test epoch loss, test error, and test accuracy
     """
     total_loss = 0
     predicted_ok = 0
@@ -199,7 +225,7 @@ def test_evaluation(validation_data, model, criterion):
         loss = criterion(pred, labels)
         total_loss += loss.item() * images.size(0)
 
-        _, predicted = torch.max(pred.data, 1)
+        _, predicted = torch_max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
         accuracy = predicted_ok/total_images*100
@@ -221,6 +247,10 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
         validation_data (DataLoader): Validation set to perform the evaluation
         epochs (int): global parameter to define epochs number
         print_every (int): defines how many times to print training progress
+
+    Returns:
+        nn.Module, Optimizer, Tuple: model, optimizer, and a tuple of
+            lists of train losses, validation losses, and test error
     """
     train_losses = []
     valid_losses = []
@@ -234,7 +264,7 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
 
         if epoch % print_every == (print_every - 1):
             # Validate_step
-            with torch.no_grad():
+            with no_grad():
                 model, valid_loss, error, accuracy = test_evaluation(
                     validation_data, model, criterion)
                 valid_losses.append(valid_loss)
@@ -255,7 +285,7 @@ def main():
     # Make sure the directory where to save the results exist.
     # Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
     os.makedirs(RESULTS, exist_ok=True)
-    torch.manual_seed(SEED)
+    manual_seed(SEED)
 
     # Load datasets.
     train_data, validation_data = load_images()
@@ -266,7 +296,7 @@ def main():
     # Convert the model to its analog version
     model = convert_to_analog(model, RPU_CONFIG, weight_scaling_omega=0.6)
     # Load saved weights if previously saved
-    # model.load_state_dict(torch.load(WEIGHT_PATH))
+    # model.load_state_dict(load(WEIGHT_PATH))
 
     if USE_CUDA:
         model.cuda()
@@ -283,7 +313,7 @@ def main():
     print(f'{datetime.now().time().replace(microsecond=0)} --- '
           f'Completed ResNet Training')
 
-    torch.save(model.state_dict(), WEIGHT_PATH)
+    save(model.state_dict(), WEIGHT_PATH)
 
 
 if __name__ == '__main__':

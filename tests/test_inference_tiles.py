@@ -27,7 +27,7 @@ from aihwkit.simulator.configs.utils import (
     WeightModifierType,
     WeightModifierParameter
 )
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel
+from aihwkit.inference import PCMLikeNoiseModel
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase

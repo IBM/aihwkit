@@ -15,6 +15,7 @@
 Simple network that consist of one analog layer. The network aims to learn
 to sum all the elements from one array.
 """
+# pylint: disable=invalid-name
 
 # Imports from PyTorch.
 from torch import Tensor
@@ -26,7 +27,7 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
     WeightNoiseType, WeightClipType, WeightModifierType)
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
+from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
