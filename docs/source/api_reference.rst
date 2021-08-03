@@ -16,6 +16,7 @@ API Reference
    aihwkit.inference.compensation
    aihwkit.inference.compensation.base
    aihwkit.inference.compensation.drift
+   aihwkit.inference.converter
    aihwkit.inference.converter.base
    aihwkit.inference.converter.conductance
    aihwkit.inference.noise

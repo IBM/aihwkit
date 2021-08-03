@@ -211,6 +211,10 @@ inference features, one has to build an model using our
 :class:`~aihwkit.simulator.tiles.inference.InferenceTile` (see also
 `example 5 <https://github.com/IBM/aihwkit/blob/master/examples/05_simple_layer_hardware_aware.py>`_)::
 
+    from aihwkit.simulator.configs import InferenceRPUConfig
+    from aihwkit.simulator.configs.utils import WeightNoiseType
+    from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
+
     # Define a single-layer network, using inference/hardware-aware training tile
     rpu_config = InferenceRPUConfig()
 
