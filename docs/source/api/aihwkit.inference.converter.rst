@@ -1,5 +1,6 @@
+
 aihwkit.inference.converter package
-======================================
+===================================
 
 .. automodule:: aihwkit.inference.converter
    :members:
