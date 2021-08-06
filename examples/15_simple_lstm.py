@@ -17,6 +17,7 @@ a simple temporal sequence. The experiment plots training perplexity,
 inference results on the test dataset using analog hardware, and inference
 results over time using analog hardware and drift compensation.
 """
+# pylint: disable=invalid-name
 
 import os
 from collections import namedtuple
@@ -31,12 +32,12 @@ from torch import nn
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLSTM
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice, FloatingPointDevice
+from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
     WeightNoiseType, WeightClipType, WeightModifierType)
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
+from aihwkit.simulator.presets import GokmenVlasovPreset
+from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn import AnalogLinear, AnalogSequential
 
 LEARNING_RATE = 0.05
@@ -51,6 +52,33 @@ NOISE = 0.0
 EPOCHS = 100
 BATCH_SIZE = 5
 SEQ_LEN = 501
+WITH_EMBEDDING = False  # LSTM with embedding
+USE_ANALOG_TRAINING = False  # or hardware-aware training
+
+if USE_ANALOG_TRAINING:
+    # Define a RPU configuration for analog training
+    rpu_config = SingleRPUConfig(device=GokmenVlasovPreset())
+
+else:
+    # Define an RPU configuration using inference/hardware-aware training tile
+    rpu_config = InferenceRPUConfig()
+    rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
+    rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
+    rpu_config.forward.w_noise = 0.02  # Short-term w-noise.
+
+    rpu_config.clip.type = WeightClipType.FIXED_VALUE
+    rpu_config.clip.fixed_value = 1.0
+    rpu_config.modifier.pdrop = 0.03  # Drop connect.
+    rpu_config.modifier.type = WeightModifierType.ADD_NORMAL  # Fwd/bwd weight noise.
+    rpu_config.modifier.std_dev = 0.1
+    rpu_config.modifier.rel_to_actual_wmax = True
+
+    # Inference noise model.
+    rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
+
+    # drift compensation
+    rpu_config.drift_compensation = GlobalDriftCompensation()
+
 
 # Path to store results
 RESULTS = os.path.join(os.getcwd(), 'results', 'LSTM')
@@ -83,11 +111,11 @@ class AnalogLSTMNetwork(AnalogSequential):
                                rpu_config=rpu_config)
         self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
 
-    def forward(self, x, states):
-        embed = self.dropout(self.embedding(x))
-        out, out_states = self.lstm(embed, states)
+    def forward(self, x_in, in_states):  # pylint: disable=arguments-differ
+        embed = self.dropout(self.embedding(x_in))
+        out, out_states = self.lstm(embed, in_states)
         out = self.dropout(self.decoder(out))
-        return out, states
+        return out, out_states
 
 
 class AnalogLSTMNetwork_noEmbedding(AnalogSequential):
@@ -102,46 +130,26 @@ class AnalogLSTMNetwork_noEmbedding(AnalogSequential):
         self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
                                     rpu_config=rpu_config)
 
-    def forward(self, x, states):
-        out, out_states = self.lstm(x, states)
+    def forward(self, x_in, in_states):  # pylint: disable=arguments-differ
+        """ Forward pass """
+        out, out_states = self.lstm(x_in, in_states)
         out = self.dropout(self.decoder(out))
-        return out, states
-
-
-# Define a single-layer network, using inference/hardware-aware training tile
-rpu_config = InferenceRPUConfig()
-rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
-rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
-rpu_config.forward.w_noise = 0.02  # Short-term w-noise.
-
-rpu_config.clip.type = WeightClipType.FIXED_VALUE
-rpu_config.clip.fixed_value = 1.0
-rpu_config.modifier.pdrop = 0.03  # Drop connect.
-rpu_config.modifier.type = WeightModifierType.ADD_NORMAL  # Fwd/bwd weight noise.
-rpu_config.modifier.std_dev = 0.1
-rpu_config.modifier.rel_to_actual_wmax = True
-
-# Inference noise model.
-rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
-
-# drift compensation
-rpu_config.drift_compensation = GlobalDriftCompensation()
-
-# rpu_config = SingleRPUConfig(device=ConstantStepDevice())
-# rpu_config = FloatingPointRPUConfig(device=FloatingPointDevice())
+        return out, out_states
 
 
 def reset_states():
     """Reset the LSTM states."""
     LSTMState = namedtuple('LSTMState', ['hx', 'cx'])
-    states = [LSTMState(torch.zeros(BATCH_SIZE, HIDDEN_SIZE),
-                        torch.zeros(BATCH_SIZE, HIDDEN_SIZE))
-              for _ in range(NUM_LAYERS)]
-    return states
+    out_states = [LSTMState(torch.zeros(BATCH_SIZE, HIDDEN_SIZE),
+                            torch.zeros(BATCH_SIZE, HIDDEN_SIZE))
+                  for _ in range(NUM_LAYERS)]
+    return out_states
 
 
-model = AnalogLSTMNetwork()
-# model = AnalogLSTMNetwork_noEmbedding()
+if WITH_EMBEDDING:
+    model = AnalogLSTMNetwork()
+else:
+    model = AnalogLSTMNetwork_noEmbedding()
 
 optimizer = AnalogSGD(model.parameters(), lr=LEARNING_RATE)
 optimizer.regroup_param_groups(model)

@@ -133,7 +133,7 @@ class WeightNoiseType(Enum):
 
     The same general for is taken as for PCM-like statistical model of the 1/f
     noise during inference, see
-    :class:`aihwkit.simulator.noise_models.PCMLikeNoiseModel`.
+    :class:`aihwkit.inference.noise.pcm.PCMLikeNoiseModel`.
     """
 
 

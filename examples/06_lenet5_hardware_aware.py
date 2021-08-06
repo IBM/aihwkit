@@ -14,6 +14,7 @@
 
 Mnist dataset on a LeNet5 inspired network.
 """
+# pylint: disable=invalid-name
 
 import os
 from datetime import datetime
@@ -22,9 +23,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Imports from PyTorch.
-import torch
-import torch.nn.functional as F
-from torch import nn
+from torch import nn, device, cuda, manual_seed, no_grad
+from torch import max as torch_max
+from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 # Imports from aihwkit.
@@ -32,12 +33,12 @@ from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import BoundManagementType, WeightNoiseType
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel
+from aihwkit.inference import PCMLikeNoiseModel
 
 # Check device
 USE_CUDA = 0
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
+DEVICE = device('cuda' if cuda.is_available() else 'cpu')
+if cuda.is_available():
     USE_CUDA = 1
 
 # Path to store datasets
@@ -68,8 +69,8 @@ def load_images():
     transform = transforms.Compose([transforms.ToTensor()])
     train_set = datasets.MNIST(PATH_DATASET, download=True, train=True, transform=transform)
     val_set = datasets.MNIST(PATH_DATASET, download=True, train=False, transform=transform)
-    train_data = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
-    validation_data = torch.utils.data.DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
+    train_data = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    validation_data = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
     return train_data, validation_data
 
@@ -103,6 +104,10 @@ def create_sgd_optimizer(model, learning_rate):
     Args:
         model (nn.Module): model to be trained
         learning_rate (float): global parameter to define learning rate
+
+    Returns:
+        Optimizer: created analog optimizer
+
     """
     optimizer = AnalogSGD(model.parameters(), lr=learning_rate)
     optimizer.regroup_param_groups(model)
@@ -118,6 +123,9 @@ def train_step(train_data, model, criterion, optimizer):
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
         optimizer (Optimizer): analog model optimizer
+
+    Returns:
+        nn.Module, Optimizer, float: model, optimizer, and epoch loss
     """
     total_loss = 0
 
@@ -150,6 +158,10 @@ def test_evaluation(validation_data, model, criterion):
         validation_data (DataLoader): Validation set to perform the evaluation
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
+
+
+    Returns:
+        nn.Module, float, float, float: model, test epoch loss, test error, and test accuracy
     """
     total_loss = 0
     predicted_ok = 0
@@ -165,7 +177,7 @@ def test_evaluation(validation_data, model, criterion):
         loss = criterion(pred, labels)
         total_loss += loss.item() * images.size(0)
 
-        _, predicted = torch.max(pred.data, 1)
+        _, predicted = torch_max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
         accuracy = predicted_ok/total_images*100
@@ -187,6 +199,11 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
         validation_data (DataLoader): Validation set to perform the evaluation
         epochs (int): global parameter to define epochs number
         print_every (int): defines how many times to print training progress
+
+    Returns:
+        nn.Module, Optimizer, Tuple: model, optimizer,
+            and a tuple of lists of train losses, validation losses, and test
+            error
     """
     train_losses = []
     valid_losses = []
@@ -199,7 +216,7 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
         train_losses.append(train_loss)
 
         # Validate_step
-        with torch.no_grad():
+        with no_grad():
             model, valid_loss, error, accuracy = test_evaluation(
                 validation_data, model, criterion)
             valid_losses.append(valid_loss)
@@ -226,9 +243,9 @@ def plot_results(train_losses, valid_losses, test_error):
     """Plot results.
 
     Args:
-        train_losses: training losses as calculated in the training_loop
-        valid_losses: validation losses as calculated in the training_loop
-        test_error: test error as calculated in the training_loop
+        train_losses (List): training losses as calculated in the training_loop
+        valid_losses (List): validation losses as calculated in the training_loop
+        test_error (List): test error as calculated in the training_loop
     """
     fig = plt.plot(train_losses, 'r-s', valid_losses, 'b-o')
     plt.title('aihwkit LeNet5')
@@ -272,16 +289,16 @@ def training_phase(model, criterion, optimizer, train_data, validation_data):
           f'Completed LeNet5 Training')
 
 
-def inference_phase(model, criterion, optimizer, validation_data):
+def inference_phase(model, criterion, validation_data):
     """Inference phase.
 
     Args:
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
-        optimizer (Optimizer): analog model optimizer
         validation_data (DataLoader): Validation set to perform the evaluation
-
     """
+    # pylint: disable=too-many-locals
+
     total_loss = 0
     predicted_ok = 0
     total_images = 0
@@ -303,7 +320,7 @@ def inference_phase(model, criterion, optimizer, validation_data):
         loss = criterion(pred, labels)
         total_loss += loss.item() * images.size(0)
 
-        _, predicted = torch.max(pred.data, 1)
+        _, predicted = torch_max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
         accuracy_pre = predicted_ok/total_images*100
@@ -331,7 +348,7 @@ def inference_phase(model, criterion, optimizer, validation_data):
             loss = criterion(pred, labels)
             total_loss += loss.item() * images.size(0)
 
-            _, predicted = torch.max(pred.data, 1)
+            _, predicted = torch_max(pred.data, 1)
             total_images += labels.size(0)
             predicted_ok += (predicted == labels).sum().item()
             accuracy_post = predicted_ok/total_images*100
@@ -348,7 +365,7 @@ def main():
     # Make sure the directory where to save the results exist.
     # Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
     os.makedirs(RESULTS, exist_ok=True)
-    torch.manual_seed(SEED)
+    manual_seed(SEED)
 
     # Load datasets.
     train_data, validation_data = load_images()
@@ -367,7 +384,7 @@ def main():
     training_phase(model, criterion, optimizer, train_data, validation_data)
 
     # Test model inference over time
-    inference_phase(model, criterion, optimizer, validation_data)
+    inference_phase(model, criterion, validation_data)
 
 
 if __name__ == '__main__':

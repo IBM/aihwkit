@@ -14,10 +14,11 @@
 
 Plot the step response of different preset devices and preset configurations.
 """
+# pylint: disable=invalid-name
 
 import matplotlib.pyplot as plt
 
-from aihwkit.utils.visualization import plot_device, plot_device_compact
+from aihwkit.utils.visualization import plot_device
 
 from aihwkit.simulator.presets.devices import (
     ReRamSBPresetDevice, ReRamESPresetDevice, CapacitorPresetDevice,

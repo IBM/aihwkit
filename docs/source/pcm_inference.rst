@@ -193,7 +193,7 @@ two numbers is the global drift compensation scaling factor of that layer, and
 it is applied (in digital) to the (digital) output of the analog tile.
 
 Note that the drift compensation class
-:class:`~aihwkit.simulator.noise_models.BaseDriftCompensation` is user
+:class:`~aihwkit.inference.compensation.base.BaseDriftCompensation` is user
 extendable, so that new drift compensation methods can be added
 easily.
 
@@ -210,6 +210,10 @@ realistic weight noise and drift as described above. To enable this
 inference features, one has to build an model using our
 :class:`~aihwkit.simulator.tiles.inference.InferenceTile` (see also
 `example 5 <https://github.com/IBM/aihwkit/blob/master/examples/05_simple_layer_hardware_aware.py>`_)::
+
+    from aihwkit.simulator.configs import InferenceRPUConfig
+    from aihwkit.simulator.configs.utils import WeightNoiseType
+    from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 
     # Define a single-layer network, using inference/hardware-aware training tile
     rpu_config = InferenceRPUConfig()
@@ -260,13 +264,13 @@ with each usage of the analog tile and are specified in the
 ``rpu_config.forward``.
 
 For details on the implementation of our inference noise model, please
-consult :class:`~aihwkit.simulator.noise_models.PCMLikeNoiseModel`. In
+consult :class:`~aihwkit.inference.noise.pcm.PCMLikeNoiseModel`. In
 particular, we use a
-:class:`~aihwkit.simulator.noise_models.SinglePairConductanceConverter`
+:class:`~aihwkit.inference.converter.conductance.SinglePairConductanceConverter`
 to convert weights into conductance paris and then apply the noise pn
 both of these pairs. More elaborate mapping schemes can be
 incorporated by extending
-:class:`~aihwkit.simulator.noise_models.BaseConductanceConverter`.
+:class:`~aihwkit.inference.converter.base.BaseConductanceConverter`.
 
 .. _references_pcm:
 

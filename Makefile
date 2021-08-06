@@ -36,10 +36,10 @@ mypy:
 	mypy --show-error-codes src/
 
 pycodestyle:
-	pycodestyle src/ tests/
+	pycodestyle src/ tests/ examples/
 
 pylint:
-	PYTHONPATH=src/ pylint -rn src/ tests/
+	PYTHONPATH=src/ pylint -rn src/ tests/ examples/
 
 pytest:
 	PYTHONPATH=src/ pytest -v -s tests/

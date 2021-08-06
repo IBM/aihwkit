@@ -17,6 +17,7 @@ https://www.frontiersin.org/articles/10.3389/fnins.2017.00538/full
 
 Learning rates of η = 0.01 for all the epochs with minibatch 8.
 """
+# pylint: disable=invalid-name
 
 import os
 from datetime import datetime
@@ -26,7 +27,6 @@ import numpy as np
 
 # Imports from PyTorch.
 import torch
-import torch.nn.functional as F
 from torch import nn
 from torchvision import datasets, transforms
 
@@ -35,7 +35,6 @@ from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, FloatingPointDevice
-
 
 # Check device
 USE_CUDA = 0
@@ -61,12 +60,16 @@ N_CLASSES = 10
 #   constant step devices will be used,
 # * If `FloatingPointRPUConfig(device=FloatingPointDevice())` then standard
 #   floating point devices will be used
-RPU_CONFIG = SingleRPUConfig(device=ConstantStepDevice())
-# RPU_CONFIG = FloatingPointRPUConfig(device=FloatingPointDevice())
+USE_ANALOG_TRAINING = True
+if USE_ANALOG_TRAINING:
+    RPU_CONFIG = SingleRPUConfig(device=ConstantStepDevice())
+else:
+    RPU_CONFIG = FloatingPointRPUConfig(device=FloatingPointDevice())
 
 
 def load_images():
     """Load images for train from torchvision datasets."""
+
     transform = transforms.Compose([transforms.ToTensor()])
     train_set = datasets.MNIST(PATH_DATASET, download=True, train=True, transform=transform)
     val_set = datasets.MNIST(PATH_DATASET, download=True, train=False, transform=transform)
@@ -105,6 +108,9 @@ def create_sgd_optimizer(model, learning_rate):
     Args:
         model (nn.Module): model to be trained
         learning_rate (float): global parameter to define learning rate
+
+    Returns:
+        nn.Module: Analog optimizer
     """
     optimizer = AnalogSGD(model.parameters(), lr=learning_rate)
     optimizer.regroup_param_groups(model)
@@ -120,6 +126,9 @@ def train_step(train_data, model, criterion, optimizer):
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
         optimizer (Optimizer): analog model optimizer
+
+    Returns:
+        nn.Module, nn.Module, float:  model, optimizer and loss for per epoch
     """
     total_loss = 0
 
@@ -152,6 +161,9 @@ def test_evaluation(validation_data, model, criterion):
         validation_data (DataLoader): Validation set to perform the evaluation
         model (nn.Module): Trained model to be evaluated
         criterion (nn.CrossEntropyLoss): criterion to compute loss
+
+    Returns:
+        nn.Module, float, float, float:  model, loss, error, and accuracy
     """
     total_loss = 0
     predicted_ok = 0
@@ -189,6 +201,11 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
         validation_data (DataLoader): Validation set to perform the evaluation
         epochs (int): global parameter to define epochs number
         print_every (int): defines how many times to print training progress
+
+    Returns:
+        nn.Module, Optimizer, Tuple: model, optimizer,
+            and a tuple of train losses, validation losses, and test
+            error
     """
     train_losses = []
     valid_losses = []
@@ -228,9 +245,9 @@ def plot_results(train_losses, valid_losses, test_error):
     """Plot results.
 
     Args:
-        train_losses: training losses as calculated in the training_loop
-        valid_losses: validation losses as calculated in the training_loop
-        test_error: test error as calculated in the training_loop
+        train_losses (List): training losses as calculated in the training_loop
+        valid_losses (List): validation losses as calculated in the training_loop
+        test_error (List): test error as calculated in the training_loop
     """
     fig = plt.plot(train_losses, 'r-s', valid_losses, 'b-o')
     plt.title('aihwkit LeNet5')

@@ -12,9 +12,18 @@ API Reference
    aihwkit.experiments
    aihwkit.experiments.experiments
    aihwkit.experiments.runners
+   aihwkit.inference
+   aihwkit.inference.compensation
+   aihwkit.inference.compensation.base
+   aihwkit.inference.compensation.drift
+   aihwkit.inference.converter
+   aihwkit.inference.converter.base
+   aihwkit.inference.converter.conductance
+   aihwkit.inference.noise
+   aihwkit.inference.noise.base
+   aihwkit.inference.noise.pcm
    aihwkit.simulator
    aihwkit.simulator.configs
-   aihwkit.simulator.noise_models
    aihwkit.simulator.presets
    aihwkit.simulator.tiles
    aihwkit.nn
