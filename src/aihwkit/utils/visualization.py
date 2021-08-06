@@ -40,7 +40,8 @@ from aihwkit.simulator.configs.utils import (
 )
 from aihwkit.simulator.tiles import AnalogTile, BaseTile
 from aihwkit.simulator.rpu_base import cuda
-from aihwkit.simulator.noise_models import BaseNoiseModel, PCMLikeNoiseModel
+from aihwkit.inference.noise.base import BaseNoiseModel
+from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
 
 
 def compute_pulse_response(

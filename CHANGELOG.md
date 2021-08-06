@@ -23,6 +23,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Removed GPU warning during destruction when using multiple GPUs. (\#277)
 
+### Changed
+
+* The inference noise models are now located in `aihwkit.inference`. (\#281)
+
+### Deprecated
+
+* The module `aihwkit.simulator.noise_models` has been depreciated in
+  favor of `aihwkit.inference`. (\#281)
+
+
 ## [0.4.0] - 2021/06/25
 
 ### Added

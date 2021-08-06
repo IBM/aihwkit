@@ -15,6 +15,7 @@
 Mixed precision is based on the paper Nandakumar et al (2020) (see
 https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full).
 """
+# pylint: disable=invalid-name
 
 # Imports from PyTorch.
 from torch import Tensor

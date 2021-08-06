@@ -15,6 +15,7 @@
 Example of customization of a Basic Training experiment, adding the use of
 a scheduler to the base experiment.
 """
+# pylint: disable=invalid-name
 
 import os
 
@@ -58,6 +59,7 @@ class BasicTrainingWithScheduler(BasicTraining):
     This is an example on how to extend BasicTraining. In this case, we change
     the training algorithm in order to support using a scheduler.
     """
+    scheduler = None
 
     def train(self, training_loader, validation_loader, model, optimizer,
               loss_function, epochs, device):
@@ -69,13 +71,11 @@ class BasicTrainingWithScheduler(BasicTraining):
 
     def training_step(self, training_loader, model, optimizer, loss_function,
                       device):
-        ret = super().training_step(training_loader, model, optimizer,
-                                    loss_function, device)
+        super().training_step(training_loader, model, optimizer,
+                              loss_function, device)
 
         # Decay learning rate if needed.
         self.scheduler.step()
-
-        return ret
 
 
 def main():

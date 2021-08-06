@@ -23,4 +23,4 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   aihwkit.simulator.noise_models
+   aihwkit.inference
