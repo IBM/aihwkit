@@ -24,7 +24,7 @@ A series of primitives and features that allow using the toolkit within
 [`PyTorch`]:
 
 * Analog neural network modules (fully connected layer, 1d/2d/3d convolution
-  layers, sequential container).
+  layers, LSTM layer, sequential container).
 * Analog training using torch training workflow:
   * Analog torch optimizers (SGD).
   * Analog in-situ training using customizable device models and algorithms
@@ -33,7 +33,7 @@ A series of primitives and features that allow using the toolkit within
   * State-of-the-art statistical model of a phase-change memory (PCM) array
     calibrated on hardware measurements from a 1 million PCM devices chip.
   * Hardware-aware training with hardware non-idealities and noise included
-    in the forward pass.
+    in the forward pass to make the trained models more robust during inference on Analog hardware.
 
 ### Analog devices simulator
 
@@ -55,14 +55,15 @@ adjustable parameters. Features include:
 
 ### Other features
 
-Along with the two main components, the toolkit includes other functionality:
+Along with the two main components, the toolkit includes other functionalities such as:
 
 * A library of device presets that are calibrated to real hardware data and
-  device presets that are based on models in the literature, along with config
-  preset that specify a particular device and optimizer choice.
+  based on models in the literature, along with configuration that specifies a particular device and optimizer choice.
 * A module for executing high-level use cases ("experiments"), such as neural
   network training with minimal code overhead.
-* Integration with the [AIHW Composer] platform that allows executing
+* A utility to automatically convert a downloaded model (e.g., pre-trained) to its equivalent Analog 
+  model by replacing all linear/conv layers to Analog layers (e.g., for convenient hardware-aware training).
+* Integration with the [AIHW Composer] platform, a no-code web experience, that allows executing
   experiments in the cloud.
 
 ## Example
@@ -114,7 +115,7 @@ Analog AI delivers radical performance improvements by combining compute and
 memory in a single device, eliminating the von Neumann bottleneck. By leveraging
 the physical properties of memory devices, computation happens at the same place
 where the data is stored. Such in-memory computing hardware increases the speed
-and energy-efficiency needed for the next generation of AI.
+and energy-efficiency needed for next generation AI workloads.
 
 ## What is an in-memory computing chip?
 
@@ -172,7 +173,7 @@ compiling the sources, using a build system based on `cmake`.
 ## Authors
 
 IBM Analog Hardware Acceleration Kit has been developed by IBM Research,
-with Malte Rasch, Tayfun Gokmen, Diego Moreda and Manuel Le Gallo-Bourdeau
+with Malte Rasch, Tayfun Gokmen, Diego Moreda, Manuel Le Gallo-Bourdeau, and Kaoutar El Maghraoui
 as the initial core authors, along with many [contributors].
 
 You can contact us by opening a new issue in the repository, or alternatively
