@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Phenomenological noise models for inference."""
+"""Phenomenological noise models for PCM devices for inference."""
 
 from copy import deepcopy
 from typing import List, Optional
@@ -50,7 +50,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
                 of a device.
         prog_noise_scale: scale for the programming noise
         read_noise_scale: scale for the read and accumulated noise
-        drift_noise: scale for the  drfit coefficient
+        drift_scale: scale for the  drfit coefficient
 
     """
 

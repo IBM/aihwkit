@@ -1,6 +1,14 @@
 aihwkit.inference package
 =========================
 
+.. autosummary::
+   :recursive:
+
+   aihwkit.inference.compensation
+   aihwkit.inference.converter
+   aihwkit.inference.noise
+
+      
 .. automodule:: aihwkit.inference
    :members:
    :undoc-members:
