@@ -18,10 +18,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Load model state dict into a new model with modified `RPUConfig`. (\#276)
 * Visualization for noise models for analog inference hardware simulation. (\#278)
-
+* Transfer LR parameter for ``MixedPrecisionCompound``. (\#283)
+  
 ### Fixed
 
 * Removed GPU warning during destruction when using multiple GPUs. (\#277)
+* Fix issue in transfer counter for mixed precision in case of GPU. (\#283)
 
 ### Changed
 
