@@ -50,7 +50,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
                 of a device.
         prog_noise_scale: scale for the programming noise
         read_noise_scale: scale for the read and accumulated noise
-        drift_scale: scale for the  drfit coefficient
+        drift_scale: scale for the  drift coefficient
 
     """
 
