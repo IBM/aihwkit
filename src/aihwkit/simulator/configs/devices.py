@@ -1332,10 +1332,20 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
     granularity: float = 0.0
     r"""Granularity of the device.
 
-    Granularity of the device that is used to calculate the number of pulses
-    transferred from :math:`\chi` to analog.
+    Granularity :math:`\varepsilon` of the device that is used to
+    calculate the number of pulses transferred from :math:`\chi` to
+    analog.
 
     If 0, it will take granularity from the analog device used.
+    """
+
+    transfer_lr: float = 1.0
+    r"""Scale of the transfer to analog .
+
+    The update onto the analog tile will be proportional to
+    :math:`\langle\chi/\varepsilon\rangle\varepsilon\lambda_\text{tr}`,
+    where :math:`\lambda_\text{tr}` is given by ``transfer_lr`` and
+    :math:`\varepsilon` is the granularity.
     """
 
     n_x_bins: int = 0

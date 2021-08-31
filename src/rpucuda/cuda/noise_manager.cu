@@ -201,7 +201,7 @@ NoiseManager<T>::NoiseManager(CudaContext *c, int size)
 template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
   // this inits all the buffers needed for PMSum only !!
 
-  if ((m_batch > 1) && (buffer_m_batch_ != m_batch)) {
+  if ((m_batch > 1) && (buffer_m_batch_ < m_batch)) {
     buffer_m_batch_ = m_batch;
 
     dev_psum_values_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
@@ -250,11 +250,11 @@ void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool t
 
   } else {
 
-    if (trans) {
+    if (buffer_m_batch_ < m_batch) {
+      this->initializeBatchBuffer(m_batch);
+    }
 
-      if (buffer_m_batch_ < m_batch) {
-        this->initializeBatchBuffer(m_batch);
-      }
+    if (trans) {
 
       std::swap(dev_psum_values_, dev_psum_values0_);
       std::swap(dev_nsum_values_, dev_nsum_values0_);
@@ -279,9 +279,6 @@ void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool t
       }
 
     } else {
-      if (buffer_m_batch_ != m_batch) { // !! need to reinitilize offsets when batch changes !
-        this->initializeBatchBuffer(m_batch);
-      }
 
       // Fast Segmented reduction
       size_t ssz = dev_m_temp_storage_->getSize();

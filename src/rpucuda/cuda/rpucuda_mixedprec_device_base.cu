@@ -149,12 +149,16 @@ void MixedPrecRPUDeviceBaseCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu
 
 template <typename T>
 __global__ void kernelAddSparsity(
-    T *sparsity, const T *x_sparsity, const T *d_sparsity, int64_t current_update_index) {
+    T *sparsity,
+    const T *x_sparsity,
+    const T *d_sparsity,
+    int64_t current_update_index,
+    const int m_batch) {
   volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tid == 0) {
-    sparsity[0] = (sparsity[0] * (current_update_index - 1) + x_sparsity[0] * d_sparsity[0]) /
-                  current_update_index;
+    sparsity[0] = (sparsity[0] * current_update_index + x_sparsity[0] * d_sparsity[0]) /
+                  (current_update_index + m_batch);
   }
 }
 
@@ -191,7 +195,7 @@ void MixedPrecRPUDeviceBaseCuda<T>::computeSparsity(
   computeSparsityPartly(dev_sparsity_x_->getData(), x_values, this->x_size_ * m_batch);
   kernelAddSparsity<<<1, 1, 0, this->context_->getStream()>>>(
       dev_avg_sparsity_->getData(), dev_sparsity_x_->getData(), dev_sparsity_d_->getData(),
-      current_update_index_);
+      current_update_index_, m_batch);
 }
 
 template <typename T> T MixedPrecRPUDeviceBaseCuda<T>::getAvgSparsity() const {
@@ -266,7 +270,7 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::transfer(T *dev_weight
 template <typename T>
 void MixedPrecRPUDeviceBaseCuda<T>::doTransfer(T *dev_weights, const T lr, const int m_batch) {
   const auto &par = getPar();
-  int every = par.transfer_every * m_batch;
+  int every = par.transfer_every * m_batch; // current_update_index_ is in mat-vecs
   if (every > 0 && current_update_index_ > 0 && (current_update_index_ % every == 0)) {
     transfer(dev_weights, lr);
   }

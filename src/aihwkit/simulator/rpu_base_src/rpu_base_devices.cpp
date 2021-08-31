@@ -600,6 +600,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("compute_sparsity", &MixedPrecParam::compute_sparsity)
       .def_readwrite("n_x_bins", &MixedPrecParam::n_x_bins)
       .def_readwrite("n_d_bins", &MixedPrecParam::n_d_bins)
+      .def_readwrite("transfer_lr", &MixedPrecParam::transfer_lr)
       .def(
           "set_device_parameter",
           [](MixedPrecParam &self, const RPU::AbstractRPUDeviceMetaParameter<T> &dp) {

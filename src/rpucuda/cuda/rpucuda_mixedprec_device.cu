@@ -199,10 +199,9 @@ void MixedPrecRPUDeviceCuda<T>::doDirectUpdate(
         1.0, // set beta to 1.0. We want to add to Chi
         dev_chi_->getData(), this->x_size_);
   }
-
-  this->doTransfer(dev_weights, 1.0, m_batch);
-  this->advanceUpdateCounter();
+  this->doTransfer(dev_weights, par.transfer_lr, m_batch);
   this->computeSparsity(x_buffer, d_buffer, m_batch);
+  this->advanceUpdateCounter(m_batch);
 }
 
 template <typename T>
@@ -248,7 +247,8 @@ void MixedPrecRPUDeviceCuda<T>::forwardUpdate(
   this->transfer_pwu_->update(
       this->dev_transfer_tmp_->getDataConst(), // this is the transfer vector (x_size)
       transfer_vec,                            // this should be d_size, non-trans
-      dev_weights, &*this->rpucuda_device_, this->up_, this->granularity_, n_vec, trans, false);
+      dev_weights, &*this->rpucuda_device_, this->up_, lr * this->granularity_, n_vec, trans,
+      false);
 }
 
 template <typename T> std::vector<T> MixedPrecRPUDeviceCuda<T>::getHiddenWeights() const {

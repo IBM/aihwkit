@@ -270,9 +270,9 @@ void MixedPrecRPUDeviceBase<T>::setUpPar(const PulsedUpdateMetaParameter<T> &up)
 template <typename T> void MixedPrecRPUDeviceBase<T>::computeSparsity(const int kx, const int kd) {
   const auto &par = getPar();
   if (par.compute_sparsity) {
-    avg_sparsity_ = ((current_update_index_ - 1) * avg_sparsity_ +
+    avg_sparsity_ = (current_update_index_ * avg_sparsity_ +
                      (T)((this->d_size_ - kd) * (this->x_size_ - kx)) / (T)this->size_) /
-                    (T)(current_update_index_);
+                    (T)(current_update_index_ + 1);
   }
 }
 
