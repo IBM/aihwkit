@@ -282,7 +282,7 @@ Maximizer<T>::Maximizer(CudaContext *c, int size, bool abs_if)
 
 template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
 
-  if ((m_batch > 1) && (buffer_m_batch_ != m_batch)) {
+  if ((m_batch > 1) && (buffer_m_batch_ < m_batch)) {
     buffer_m_batch_ = m_batch;
 
     dev_max_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
@@ -348,11 +348,11 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
 
   } else {
 
-    if (trans) {
+    if (buffer_m_batch_ < m_batch) {
+      this->initializeBatchBuffer(m_batch);
+    }
 
-      if (buffer_m_batch_ < m_batch) {
-        this->initializeBatchBuffer(m_batch);
-      }
+    if (trans) {
 
       std::swap(dev_max_values_, dev_max_values0_);
       int nthreads = context_->getNThreads();
@@ -373,9 +373,6 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
       }
 
     } else {
-      if (buffer_m_batch_ != m_batch) { // !! need to reinitilize offsets when batch changes !
-        this->initializeBatchBuffer(m_batch);
-      }
 
       // Fast Segmented reduction (much faster than loop from outside)
       size_t ssz = dev_m_temp_storage_->getSize();

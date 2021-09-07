@@ -95,7 +95,7 @@ protected:
   virtual void transfer(T *dev_weights, const T lr);
   void doTransfer(T *dev_weights, const T lr, const int m_batch);
   void setUpPar(const PulsedUpdateMetaParameter<T> &up);
-  inline void advanceUpdateCounter() { current_update_index_++; };
+  inline void advanceUpdateCounter(int m_batch) { current_update_index_ += m_batch; };
 
   void computeSparsity(const T *x_values, const T *d_values, const int m_batch);
 
@@ -118,7 +118,7 @@ private:
 
   int current_zero_size_ = 0;
   int current_row_index_ = 0;
-  uint64_t current_update_index_ = 0;
+  uint64_t current_update_index_ = 0; // this is in mat-vecs!
 
   std::unique_ptr<CudaArray<char>> dev_zc_temp_storage_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_sparsity_d_ = nullptr;

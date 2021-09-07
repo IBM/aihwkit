@@ -295,6 +295,7 @@ void CudaContext::init() {
   rng_created_ = false;
   shared_ = false;
   non_blocking_ = true;
+  allocated_mem_ = 0;
 
   CUDA_CALL(cudaEventCreate(&event_));
 
@@ -363,6 +364,7 @@ CudaContext::CudaContext(const CudaContext &other) {
 
   shared_ = true;
   non_blocking_ = other.non_blocking_;
+  allocated_mem_ = 0; // start counting from 0
 
   // only stream 0 is ever shared !!
   if (other.streams_.size() > 0) {
@@ -406,6 +408,7 @@ CudaContext &CudaContext::operator=(CudaContext &&other) {
   stream_id_ = other.stream_id_;
   shared_ = other.shared_;
   non_blocking_ = other.non_blocking_;
+  allocated_mem_ = other.allocated_mem_;
 
   prop_ = other.prop_;
   other.prop_ = nullptr;
@@ -441,8 +444,7 @@ void CudaContext::enforceDeviceId() const {
   int gpu_id;
   CUDA_CALL(cudaGetDevice(&gpu_id));
   if (gpu_id != gpu_id_) {
-    std::cout << "WARNING wrong device detected " << gpu_id << " versus " << gpu_id_ << "!"
-              << std::endl;
+    std::cout << "WARNING wrong device detected: " << gpu_id << " vs. " << gpu_id_ << std::endl;
     CUDA_CALL(cudaSetDevice(gpu_id_));
   }
 #endif
@@ -629,6 +631,21 @@ void CudaContext::recordWaitEvent(cudaStream_t s, cudaEvent_t e) {
   }
 }
 
+void CudaContext::addToMemCounter(int64_t n_bytes) {
+  allocated_mem_ += n_bytes;
+  std::lock_guard<std::mutex> lock(global_mem_counter_mutex);
+  global_mem_counter += n_bytes;
+  // std::cout << "MEM at " << global_mem_counter /1024 / 1024 << " MB\n";
+}
+
+void CudaContext::subtractMemCounter(int64_t n_bytes) {
+  allocated_mem_ -= n_bytes;
+  std::lock_guard<std::mutex> lock(global_mem_counter_mutex);
+  global_mem_counter -= n_bytes;
+}
+
+int64_t CudaContext::getTotalMem() { return global_mem_counter; }
+
 //**********************************************************************//
 
 template <typename T>
@@ -641,6 +658,7 @@ template <typename T> CudaArray<T>::CudaArray(CudaContext *c, int n) : CudaArray
   if (n > 0) {
     context_->enforceDeviceId();
     CUDA_CALL(cudaMallocPitch(&values_, &pitch_, n * sizeof(T), height_));
+    context_->addToMemCounter(size_ * sizeof(T));
   }
 }
 
@@ -656,6 +674,7 @@ template <typename T> CudaArray<T>::~CudaArray() {
 
   // no sync because no ownership of context !! (might be already destructed)
   if ((size_ > 0) && (values_ != nullptr) && (!shared_if_)) {
+    context_->subtractMemCounter(size_ * sizeof(T));
     cudaFree(values_);
     values_ = nullptr;
   }
@@ -680,6 +699,7 @@ template <typename T> CudaArray<T>::CudaArray(const CudaArray<T> &other) {
       this->assign(other);
     }
     context_->synchronize(); // better synchronize. Constructing is slow anyway
+    context_->addToMemCounter(size_ * sizeof(T));
   }
 
   DEBUG_OUT("CudaArray copy constructed.");

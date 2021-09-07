@@ -16,6 +16,7 @@
 
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <string.h>
 
@@ -163,6 +164,9 @@
 
 namespace RPU {
 
+static int64_t global_mem_counter = 0;
+static std::mutex global_mem_counter_mutex;
+
 typedef uint32_t kagg_t; // K aggregate type
 
 class CublasEnvironment {
@@ -226,7 +230,7 @@ public:
     swap(a.non_blocking_, b.non_blocking_);
     swap(a.event_, b.event_);
     swap(a.prop_, b.prop_);
-
+    swap(a.allocated_mem_, b.allocated_mem_);
     swap(a.shared_random_states_, b.shared_random_states_);
   }
 
@@ -270,12 +274,22 @@ public:
 
   inline int getSMCount() const { return prop_->multiProcessorCount; };
   inline int getSharedMemPerBlock() const { return prop_->sharedMemPerBlock; };
+  inline int getSharedMemPerSM() const {
+    return this->getSharedMemPerBlock() * this->maxThreadsPerSM() / this->maxThreadsPerBlock();
+  };
   inline int maxThreadsPerBlock() const { return prop_->maxThreadsPerBlock; };
   inline int maxThreadsPerSM() const { return prop_->maxThreadsPerMultiProcessor; };
   inline cudaEvent_t getEvent() const { return event_; };
   inline bool hasRandomGenerator() const { return rng_created_; };
 
   curandState_t *getRandomStates(int size = 0);
+
+  void addToMemCounter(int64_t n_bytes);
+  void subtractMemCounter(int64_t n_bytes);
+
+  inline int64_t getAllocatedMem() { return allocated_mem_; }
+
+  int64_t getTotalMem();
 
 private:
   int gpu_id_ = 0;
@@ -290,6 +304,7 @@ private:
   cudaDeviceProp *prop_ = nullptr;
   std::vector<std::unique_ptr<CudaArray<curandState_t>>> shared_random_states_ = {};
   void init();
+  int64_t allocated_mem_ = 0;
 };
 
 template <typename T> class CudaArray {

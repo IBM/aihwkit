@@ -503,12 +503,16 @@ template <typename T> void UpdateManagementHelper<T>::initializeBuffers(int m_ba
   // Determine temporary device storage requirements
   void *temp_storage = NULL;
   size_t temp_storage_bytes = 0;
+
   CUDA_CALL(RPU::cub::DeviceReduce::Sum(
       temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kn_->getData(), m_batch,
       context_->getStream()));
   context_->synchronize();
   dev_Kn_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
   context_->synchronize();
+
+  temp_storage = NULL;
+  temp_storage_bytes = 0;
 
   CUDA_CALL(RPU::cub::DeviceScan::ExclusiveSum(
       temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kc_values_->getData(),
