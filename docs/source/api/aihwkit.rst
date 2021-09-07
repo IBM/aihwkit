@@ -14,6 +14,7 @@ Subpackages
 
    aihwkit.cloud
    aihwkit.experiments
+   aihwkit.inference
    aihwkit.nn
    aihwkit.optim
    aihwkit.simulator
