@@ -30,6 +30,8 @@ void MixedPrecRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) co
   ss << n_x_bins << std::endl;
   ss << "\t n_d_bins: \t\t";
   ss << n_d_bins << std::endl;
+  ss << "\t transfer_lr: \t\t";
+  ss << transfer_lr << std::endl;
 
   MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(ss);
 }
@@ -177,7 +179,7 @@ void MixedPrecRPUDevice<T>::forwardUpdate(
 
     this->transfer_pwu_->updateVectorWithDevice(
         weights, this->transfer_tmp_.data(), 1, transfer_d_vec + this->d_size_ * j, 1,
-        this->granularity_, n_vec, &*this->rpu_device_);
+        this->granularity_ * lr, n_vec, &*this->rpu_device_);
   }
 }
 
@@ -308,10 +310,9 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
       }
     }
   }
-
-  this->doTransfer(weights, 1.0, m_batch_info);
-  this->advanceUpdateCounter();
+  this->doTransfer(weights, par.transfer_lr, m_batch_info);
   this->computeSparsity(kx, kd); // will only compute if both are quantized
+  this->advanceUpdateCounter();
 }
 
 template <typename T> bool MixedPrecRPUDevice<T>::onSetWeights(T **weights) {

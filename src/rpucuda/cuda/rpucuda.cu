@@ -304,7 +304,7 @@ template <typename T> void RPUCudaSimple<T>::copyWeightsToBuffer() {
 
 template <typename T> T *RPUCudaSimple<T>::getMatrixBiasBuffer(int m_batch) {
 
-  if (m_batch != dev_x_matrix_bias_size_) {
+  if (m_batch > dev_x_matrix_bias_size_) {
     DEBUG_OUT("Get new buffer size " << m_batch);
     dev_x_matrix_bias_ = nullptr;
     dev_x_matrix_bias_size_ = m_batch;
@@ -327,7 +327,7 @@ T *RPUCudaSimple<T>::copyToMatrixBiasBuffer(
 template <typename T>
 void RPUCudaSimple<T>::copyFromMatrixBiasBuffer(
     T *X_input_without_bias, int m_batch, bool x_trans) {
-  if ((m_batch != dev_x_matrix_bias_size_) || (dev_x_matrix_bias_ == nullptr)) {
+  if ((m_batch < dev_x_matrix_bias_size_) || (dev_x_matrix_bias_ == nullptr)) {
     RPU_FATAL("Buffer size mismatch. This should never happen!")
   }
   RPU::math::copyWithoutBias<T>(

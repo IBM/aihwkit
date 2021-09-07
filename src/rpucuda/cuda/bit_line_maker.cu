@@ -1234,12 +1234,14 @@ template int debugKernelUpdateGetCountsBatchImplicit<double>(
 
 #define RPU_BLM_ITEMS_PER_THREAD 4
 #define RPU_BLM_BL_TO_SELECT_SIMPLE_LOOP 0
-#define RPU_BLM_BLOCKS_PER_SM 2
 
 template <typename T>
 BitLineMaker<T>::BitLineMaker(CudaContext *c, int x_size, int d_size)
     : context_{c}, x_size_{x_size}, d_size_{d_size}, umh_{nullptr}, buffer_m_batch_{0} {
-  max_block_count_ = context_->getSMCount() * RPU_BLM_BLOCKS_PER_SM;
+
+  max_block_count_ =
+      context_->getSMCount() * (context_->maxThreadsPerSM() / RPU_THREADS_PER_BLOCK_UPDATE);
+
   nthreads_ = RPU_THREADS_PER_BLOCK_UPDATE;
 }
 
