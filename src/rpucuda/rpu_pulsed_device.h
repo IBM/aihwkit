@@ -56,7 +56,7 @@ template <typename T> struct PulsedRPUDeviceMetaParameterBase : SimpleRPUDeviceM
 
 template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaParameterBase<T> {
 
-  bool legacy_params = false; // to not load the reset/drfit params
+  bool legacy_params = false; // to not load the reset/drift params
 
   T dw_min = (T)0.001;
   T dw_min_dtod = (T)0.3;

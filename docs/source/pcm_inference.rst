@@ -142,9 +142,9 @@ is obtained by integrating the above equation over the measurement bandwidth:
 
 .. math::
 
-    σ_{nG}(t) = g_\text{drift}(t)  Q_s  \sqrt{\log\frac{t+t_\text{read}}{2 t_{read}}}
+    σ_{nG}(t) = g_\text{drift}(t)  Q_s  \sqrt{\log\frac{t+t_\text{read}}{2 t_\text{read}}}
 
-where :math:`t_{read} = 250` ns is the width of the pulse applied when reading
+where :math:`t_\text{read} = 250` ns is the width of the pulse applied when reading
 the devices.
 
 The :math:`Q_s` measured from the PCM devices as a function of :math:`g_T`

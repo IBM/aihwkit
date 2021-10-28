@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 
 # (C) Copyright 2020, 2021 IBM. All Rights Reserved.
@@ -14,7 +15,9 @@
 
 from torch import randn
 
-from aihwkit.inference import PCMLikeNoiseModel, SinglePairConductanceConverter
+from aihwkit.inference import (
+    PCMLikeNoiseModel, StateIndependentNoiseModel, SinglePairConductanceConverter
+)
 
 from .helpers.testcases import AihwkitTestCase
 
@@ -22,11 +25,21 @@ from .helpers.testcases import AihwkitTestCase
 class NoiseModelTest(AihwkitTestCase):
     """Noise model tests."""
 
-    def test_apply_noise(self):
+    def test_apply_noise_pcm(self):
         """Test using realistic weights (bias)."""
         weights = randn(10, 35)
 
         noise_model = PCMLikeNoiseModel()
+        t_inference = 100.
+        noisy_weights = noise_model.apply_noise(weights, t_inference)
+
+        self.assertNotAlmostEqualTensor(noisy_weights, weights)
+
+    def test_apply_noise_custom(self):
+        """Test using realistic weights (bias)."""
+        weights = randn(10, 35)
+
+        noise_model = StateIndependentNoiseModel()
         t_inference = 100.
         noisy_weights = noise_model.apply_noise(weights, t_inference)
 
