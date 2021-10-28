@@ -14,11 +14,12 @@
 
 from tempfile import TemporaryFile
 from copy import deepcopy
+from unittest import SkipTest
 
 from numpy import array
 from numpy.random import rand
 from numpy.testing import assert_array_almost_equal, assert_raises
-from torch import Tensor, load, save
+from torch import Tensor, load, save, device
 from torch.nn import Module, Sequential
 from torch.nn.functional import mse_loss
 
@@ -27,6 +28,7 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.rpu_base import cuda
 from aihwkit.exceptions import TileError, ModuleError
 
 from .helpers.decorators import parametrize_over_layers
@@ -154,6 +156,53 @@ class SerializationTest(ParametrizedTestCase):
         self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
         self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
                               model.analog_tile.__class__)
+        self.assertTrue(new_model.analog_tile.is_cuda == model.analog_tile.is_cuda)
+
+    def test_save_load_model_cross_device(self):
+        """Test saving and loading a model directly."""
+
+        if not cuda.is_compiled():
+            raise SkipTest('CUDA not available.')
+
+        model = self.get_layer()
+
+        map_location = 'cuda'
+        if model.analog_tile.is_cuda:
+            map_location = 'cpu'
+
+        # Keep track of the current weights and biases for comparing.
+        (model_weights, model_biases,
+         tile_weights, tile_biases) = self.get_layer_and_tile_weights(model)
+        assert_array_almost_equal(model_weights, tile_weights)
+        if self.bias:
+            assert_array_almost_equal(model_biases, tile_biases)
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file, map_location=device(map_location))
+
+        # Compare the new model weights and biases.
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(new_model)
+
+        assert_array_almost_equal(model_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(model_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
+
+        # Asserts over the AnalogContext of the new model.
+        self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
+        self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
+                              model.analog_tile.__class__)
+
+        self.assertTrue(new_model.analog_tile.is_cuda != model.analog_tile.is_cuda)
+
+        if model.analog_tile.shared_weights is not None:
+            self.assertTrue(new_model.analog_tile.shared_weights.device.type == map_location)
 
     def test_save_load_meta_parameter(self):
         """Test saving and loading a device with custom parameters."""
@@ -179,6 +228,7 @@ class SerializationTest(ParametrizedTestCase):
         self.assertAlmostEqual(parameters.forward_io.inp_noise, 0.321)
         self.assertAlmostEqual(parameters.backward_io.inp_noise, 0.456)
         self.assertAlmostEqual(parameters.update.desired_bl, 78)
+        self.assertTrue(new_model.analog_tile.is_cuda == model.analog_tile.is_cuda)
 
     def test_save_load_hidden_parameters(self):
         """Test saving and loading a device with hidden parameters."""
@@ -214,6 +264,31 @@ class SerializationTest(ParametrizedTestCase):
         # Assert over the new model tile parameters.
         alpha_new = new_model.analog_tile.tile.get_alpha_scale()
         assert_array_almost_equal(array(alpha), array(alpha_new))
+
+    def test_save_load_shared_weights(self):
+        """Test saving and loading a device with shared_weights."""
+
+        if isinstance(self.get_rpu_config(), FloatingPointRPUConfig):
+            raise SkipTest('Not available for FP')
+
+        # Create the device and the array.
+        model = self.get_layer()
+
+        shared_weights = None
+        if model.analog_tile.shared_weights is not None:
+            shared_weights = model.analog_tile.shared_weights.detach().cpu().numpy()
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file)
+
+        # Assert over the new model tile parameters.
+        if shared_weights is not None:
+            new_shared_weights = new_model.analog_tile.shared_weights
+            assert_array_almost_equal(shared_weights, new_shared_weights.detach().cpu().numpy())
 
     def test_save_load_weight_scaling_omega(self):
         """Test saving and loading a device with weight scaling omega."""
@@ -359,25 +434,29 @@ class SerializationTest(ParametrizedTestCase):
         """Test creating a new model using a state dict, while using a different RPU config."""
 
         # Create the device and the array.
-
-        model = self.get_layer()
-        state_dict = model.state_dict()
-
-        rpu_config = deepcopy(model.analog_tile.rpu_config)
+        rpu_config_org = self.get_rpu_config()
 
         # Skipped for FP
-        if isinstance(rpu_config, FloatingPointRPUConfig):
-            return
+        if isinstance(rpu_config_org, FloatingPointRPUConfig):
+            raise SkipTest('Not available for FP')
 
-        old_value = rpu_config.forward.inp_noise
-        rpu_config.forward.inp_noise = 0.51
+        rpu_config_org.forward.is_perfect = False
+        old_value = 0.11
+        rpu_config_org.forward.inp_noise = old_value
+
+        model = self.get_layer(rpu_config=rpu_config_org)
+        state_dict = model.state_dict()
+
+        rpu_config = deepcopy(rpu_config_org)
+        new_value = 0.51
+        rpu_config.forward.inp_noise = new_value
 
         # Test restore_rpu_config=False
         new_model = self.get_layer(rpu_config=rpu_config)
         new_model.load_state_dict(state_dict, load_rpu_config=False)
 
         parameters = new_model.analog_tile.tile.get_parameters()
-        self.assertAlmostEqual(parameters.forward_io.inp_noise, 0.51)
+        self.assertAlmostEqual(parameters.forward_io.inp_noise, new_value)
 
         # Test restore_rpu_config=True
         new_model = self.get_layer(rpu_config=rpu_config)
@@ -389,13 +468,13 @@ class SerializationTest(ParametrizedTestCase):
     def test_load_state_load_rpu_config_wrong(self):
         """Test creating a new model using a state dict, while using a different RPU config."""
 
+        # Skipped for FP
+        if isinstance(self.get_rpu_config(), FloatingPointRPUConfig):
+            raise SkipTest('Not available for FP')
+
         # Create the device and the array.
         model = self.get_layer()
         state_dict = model.state_dict()
-
-        # Skipped for FP
-        if isinstance(model.analog_tile.rpu_config, FloatingPointRPUConfig):
-            return
 
         rpu_config = FloatingPointRPUConfig()
 

@@ -50,8 +50,13 @@ class AnalogModuleBase(Module):
       ``rpu_config.tile_class`` attribute.
     """
     # pylint: disable=abstract-method
-    _analog_tile_counter: int = 0
-    _load_rpu_config = True
+    ANALOG_CTX_PREFIX: str = 'analog_ctx_'
+    ANALOG_SHARED_WEIGHT_PREFIX: str = 'analog_shared_weights_'
+
+    def __init__(self) -> None:  # pylint: disable=super-init-not-called
+        self._analog_tile_counter = 0
+        self._registered_helper_parameter = []  # type: list
+        self._load_rpu_config = True
 
     def register_analog_tile(self, tile: 'BaseTile') -> None:
         """Register the analog context of the tile.
@@ -63,13 +68,20 @@ class AnalogModuleBase(Module):
         Args:
             tile: tile to register
         """
-        self.register_parameter('analog_ctx_' + str(self._analog_tile_counter),
-                                tile.get_analog_ctx())
+
+        ctx_name = self.ANALOG_CTX_PREFIX + str(self._analog_tile_counter)
+        if ctx_name not in self._registered_helper_parameter:
+            self._registered_helper_parameter.append(ctx_name)
+        self.register_parameter(ctx_name, tile.get_analog_ctx())
+
         if tile.shared_weights is not None:
             if not isinstance(tile.shared_weights, Parameter):
                 tile.shared_weights = Parameter(tile.shared_weights)
-            self.register_parameter('analog_shared_weights_' + str(self._analog_tile_counter),
-                                    tile.shared_weights)
+            par_name = self.ANALOG_SHARED_WEIGHT_PREFIX + str(self._analog_tile_counter)
+            self.register_parameter(par_name, tile.shared_weights)
+
+            if par_name not in self._registered_helper_parameter:
+                self._registered_helper_parameter.append(par_name)
 
         self._analog_tile_counter += 1
 
@@ -301,9 +313,23 @@ class AnalogModuleBase(Module):
         # update the weight / bias (not saved explicitly)
         self._sync_weights_from_tile()
 
+        # remove helper parameters. We never load context or shared
+        # weights. These will be re-generated and should not be
+        # overwritten
+        rm_keys = []
+        for par_name in self._registered_helper_parameter:
+            key = prefix + par_name
+            if key in state_dict:
+                state_dict.pop(key)
+                rm_keys.append(key)
+
         super()._load_from_state_dict(
             state_dict, prefix, local_metadata, strict, missing_keys,
             unexpected_keys, error_msgs)
+
+        # remove the missing keys of the helper parameters
+        for key in rm_keys:
+            missing_keys.remove(key)
 
     def state_dict(
             self,

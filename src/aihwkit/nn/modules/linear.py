@@ -71,7 +71,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
                                             realistic_read_write,
                                             weight_scaling_omega)
         # Call super() after tile creation, including ``reset_parameters``.
-        super().__init__(in_features, out_features, bias=bias)
+        AnalogModuleBase.__init__(self)
+        Linear.__init__(self, in_features, out_features, bias=bias)
 
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
@@ -127,7 +128,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
 
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
-        # pylint: disable=arguments-differ,arguments-renamed
+        # pylint: disable=arguments-differ, arguments-renamed
         return AnalogFunction.apply(
             self.analog_tile.get_analog_ctx(), x_input,
             self.analog_tile.shared_weights, not self.training)
