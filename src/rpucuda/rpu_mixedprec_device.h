@@ -39,6 +39,7 @@ struct MixedPrecRPUDeviceMetaParameter : MixedPrecRPUDeviceBaseMetaParameter<T> 
 
   int n_x_bins = 255;
   int n_d_bins = 255;
+  float transfer_lr = 1.0;
 
   MixedPrecRPUDeviceMetaParameter() = default;
   ~MixedPrecRPUDeviceMetaParameter() = default;
