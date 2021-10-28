@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Fixed
 
 * Removed GPU warning during destruction when using multiple GPUs. (\#277)
+* Mixed precision ... .(\#292)
 
 ### Changed
 
