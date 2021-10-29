@@ -39,7 +39,8 @@ class StateIndependentNoiseModel(BaseNoiseModel):  # pylint: disable=too-many-in
 
     .. math::
 
-         \sigma_text{programming noise}=\gamma\,\left(c_0 + c_1 \frac{g_T}{g_\text{max}} + c_2 \frac{g_T^2}{g_\text{max}^2}\right)
+         \sigma_text{programming noise}=\gamma\,\left(c_0 + c_1 \frac{g_T}{g_\text{max}}
+         + c_2 \frac{g_T^2}{g_\text{max}^2}\right)
 
     where :math:`\gamma` is a additional convenience scale and :math:`g_T`
     is the target conductance established from the given
