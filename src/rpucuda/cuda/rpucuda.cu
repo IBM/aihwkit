@@ -304,13 +304,12 @@ template <typename T> void RPUCudaSimple<T>::copyWeightsToBuffer() {
 
 template <typename T> T *RPUCudaSimple<T>::getMatrixBiasBuffer(int m_batch) {
 
-  if (m_batch > dev_x_matrix_bias_size_) {
+  if (dev_x_matrix_bias_ == nullptr || m_batch * this->x_size_ > dev_x_matrix_bias_->getSize()) {
     DEBUG_OUT("Get new buffer size " << m_batch);
     dev_x_matrix_bias_ = nullptr;
-    dev_x_matrix_bias_size_ = m_batch;
-    dev_x_matrix_bias_ =
-        RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * dev_x_matrix_bias_size_);
+    dev_x_matrix_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * m_batch);
   }
+  dev_x_matrix_bias_size_ = m_batch; // allow shrinking
   return dev_x_matrix_bias_->getData();
 }
 

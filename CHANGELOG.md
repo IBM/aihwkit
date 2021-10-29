@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Removed GPU warning during destruction when using multiple GPUs. (\#277)
 * Fixed issue in transfer counter for mixed precision in case of GPU. (\#283)
 * Map location keyword for load / save observed. (\#293)
+* Fixed issue with CUDA buffer allocation when batch size changed. (\294)
 * Fixed missing load statedict for AnalogSequential. (\#295) 
 
 ### Changed
