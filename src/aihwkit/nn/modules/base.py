@@ -245,6 +245,9 @@ class AnalogModuleBase(Module):
         """
         self.set_weights(self.weight, self.bias, force_exact=True)
 
+    def _set_load_rpu_config_state(self, load_rpu_config: bool = True) -> None:
+        self._load_rpu_config = load_rpu_config
+
     def load_state_dict(self,  # pylint: disable=arguments-differ
                         state_dict: 'OrderedDict[str, Tensor]',
                         strict: bool = True,
@@ -273,7 +276,7 @@ class AnalogModuleBase(Module):
         Raises: ModuleError: in case the rpu_config class mismatches
             for ``load_rpu_config=False``.
         """
-        self._load_rpu_config = load_rpu_config
+        self._set_load_rpu_config_state(load_rpu_config)
         return super().load_state_dict(state_dict, strict)
 
     def _load_from_state_dict(
