@@ -81,10 +81,11 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
                                             weight_scaling_omega)
 
         # Call super() after tile creation, including ``reset_parameters``.
-        super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding, dilation,
-            transposed, output_padding, groups, bias, padding_mode
-        )
+        AnalogModuleBase.__init__(self)
+        _ConvNd.__init__(self, in_channels, out_channels, kernel_size, stride,
+                         padding, dilation, transposed, output_padding, groups, bias,
+                         padding_mode
+                         )
 
         # Set the index matrices.
         self.fold_indices = Tensor().detach()

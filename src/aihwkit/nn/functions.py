@@ -21,7 +21,7 @@ from aihwkit.optim.context import AnalogContext
 
 class AnalogFunctionBase(Function):
     """Base function for analog functions."""
-    # pylint: disable=arguments-differ, protected-access
+    # pylint: disable=arguments-differ, protected-access, abstract-method
 
     @staticmethod
     def forward(
@@ -95,7 +95,7 @@ class AnalogFunctionBase(Function):
 
 class AnalogFunction(AnalogFunctionBase):
     """Function that delegates into a `RPU` unit."""
-    # pylint: disable=arguments-differ
+    # pylint: disable=arguments-differ, abstract-method
 
     @staticmethod
     def forward(
@@ -112,7 +112,7 @@ class AnalogFunction(AnalogFunctionBase):
 
 class AnalogIndexedFunction(AnalogFunctionBase):
     """Function that delegates into a `RPU` unit to use the indexed forward/backward/update."""
-    # pylint: disable=arguments-differ
+    # pylint: disable=arguments-differ, abstract-method
 
     @staticmethod
     def forward(
