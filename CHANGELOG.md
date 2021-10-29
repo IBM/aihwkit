@@ -26,7 +26,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Removed GPU warning during destruction when using multiple GPUs. (\#277)
 * Fix issue in transfer counter for mixed precision in case of GPU. (\#283)
 * Map location keyword for load / save observed. (\#293)
-
+* Fix issue with CUDA buffer allocation when batch size changed. (\294)
+ 
 ### Changed
 
 * The inference noise models are now located in `aihwkit.inference`. (\#281)
