@@ -171,7 +171,7 @@ public:
   void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
 
-  void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   void setHiddenUpdateIdx(int idx) override{};
 
   void finishUpdateCycle(

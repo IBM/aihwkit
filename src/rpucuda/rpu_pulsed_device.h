@@ -224,7 +224,7 @@ public:
 
   void getDPNames(std::vector<std::string> &names) const override;
   void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
-  void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   void printDP(int x_count, int d_count) const override;
 
   inline T **getPersistentWeights() const { return w_persistent_; };
@@ -372,12 +372,13 @@ public:                                                                         
     {DP2V_BODY};                                                                                   \
   };                                                                                               \
                                                                                                    \
-  void setDeviceParameter(const std::vector<T *> &data_ptrs) override {                            \
-    PulsedRPUDevice<T>::setDeviceParameter(data_ptrs);                                             \
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override {           \
+    PulsedRPUDevice<T>::setDeviceParameter(out_weights, data_ptrs);                                \
                                                                                                    \
     std::vector<std::string> names;                                                                \
     PulsedRPUDevice<T>::getDPNames(names);                                                         \
     {V2DP_BODY};                                                                                   \
+    this->onSetWeights(out_weights);                                                               \
   }
 
 #define BUILD_PULSED_DEVICE_META_PARAMETER(                                                        \

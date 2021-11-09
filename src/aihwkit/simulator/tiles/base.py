@@ -661,7 +661,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Usually this is ignored and fixed to 0 as only one device is
         present per cross-point. Other devices, might not allow
         explicit setting as it would interfere with the implemented
-        learning However rule. However, some tiles have internally
+        learning rule. However, some tiles have internally
         multiple devices per cross-point (eg. unit cell) that can be
         chosen depending on the update policy.
 

@@ -206,36 +206,6 @@ template <typename T> void VectorRPUDevice<T>::getDPNames(std::vector<std::strin
   }
 }
 
-template <typename T>
-void VectorRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
-
-  std::vector<std::string> names;
-  getDPNames(names);
-
-  if (data_ptrs.size() < names.size()) {
-    RPU_FATAL("Expected " << names.size() << " data pointers!");
-  }
-
-  size_t m = 0;
-  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
-    std::vector<std::string> n;
-    rpu_device_vec_[k]->getDPNames(n);
-
-    std::vector<T *> v;
-    for (size_t i = 0; i < n.size(); i++) {
-      v.push_back(data_ptrs[m + i]);
-    }
-    rpu_device_vec_[k]->getDeviceParameter(v);
-    m += n.size();
-
-    // "hidden weights"
-    for (int i = 0; i < this->size_; ++i) {
-      data_ptrs[m][i] = weights_vec_[k][0][i];
-    }
-    m++;
-  }
-};
-
 template <typename T> int VectorRPUDevice<T>::getHiddenWeightsCount() const {
   if (!n_devices_) {
     return 0;
@@ -286,7 +256,37 @@ template <typename T> int VectorRPUDevice<T>::getHiddenUpdateIdx() const {
 }
 
 template <typename T>
-void VectorRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
+void VectorRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+
+  std::vector<std::string> names;
+  getDPNames(names);
+
+  if (data_ptrs.size() < names.size()) {
+    RPU_FATAL("Expected " << names.size() << " data pointers!");
+  }
+
+  size_t m = 0;
+  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+    std::vector<std::string> n;
+    rpu_device_vec_[k]->getDPNames(n);
+
+    std::vector<T *> v;
+    for (size_t i = 0; i < n.size(); i++) {
+      v.push_back(data_ptrs[m + i]);
+    }
+    rpu_device_vec_[k]->getDeviceParameter(v);
+    m += n.size();
+
+    // "hidden weights"
+    for (int i = 0; i < this->size_; ++i) {
+      data_ptrs[m][i] = weights_vec_[k][0][i];
+    }
+    m++;
+  }
+};
+
+template <typename T>
+void VectorRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) {
 
   std::vector<std::string> names;
   getDPNames(names);
@@ -305,18 +305,22 @@ void VectorRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
     for (size_t i = 0; i < n.size(); i++) {
       v.push_back(data_ptrs[m + i]);
     }
-    rpu_device_vec_[k]->setDeviceParameter(v);
-    T weight_granularity_device = rpu_device_vec_[k]->getWeightGranularity();
     m += n.size();
 
-    // "hidden weights"
+    // Following logic: The lowest hierachy weights will overwrite the
+    // higher compound weights.
     for (int i = 0; i < this->size_; ++i) {
       weights_vec_[k][0][i] = data_ptrs[m][i];
     }
-    m++;
 
+    rpu_device_vec_[k]->setDeviceParameter(weights_vec_[k], v);
+
+    T weight_granularity_device = rpu_device_vec_[k]->getWeightGranularity();
     weight_granularity += weight_granularity_device;
+
+    m++;
   }
+  this->reduceToWeights(out_weights); // need to update the weights
 
   weight_granularity /= rpu_device_vec_.size();
   this->setWeightGranularity(weight_granularity);
@@ -550,15 +554,15 @@ template <typename T> bool VectorRPUDevice<T>::onSetWeights(T **weights) {
 
   // e.g. apply hard bounds
   for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {
+
     // only in case of SingleFixed policy set the weight chosen.
-    if (fixed_index >= 0 && fixed_index != k) {
-      continue;
+    if ((fixed_index >= 0 && fixed_index == k) || (fixed_index < 0)) {
+      for (int i = 0; i < this->size_; i++) {
+        weights_vec_[k][0][i] = w[i];
+      }
     }
 
-    for (int i = 0; i < this->size_; i++) {
-      weights_vec_[k][0][i] = w[i];
-    }
-
+    // reset all counter etc. always (hidden parameter might have changed)
     rpu_device_vec_[k]->onSetWeights(weights_vec_[k]);
   }
   reduceToWeights(weights);

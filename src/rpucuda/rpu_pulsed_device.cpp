@@ -294,7 +294,7 @@ void PulsedRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
 };
 
 template <typename T>
-void PulsedRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
+void PulsedRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) {
 
   std::vector<std::string> names;
   getDPNames(names);
@@ -348,6 +348,9 @@ void PulsedRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
     getPar().dw_min = dw_min; //!! update par. Should be possible since unique
     this->setWeightGranularity(getPar().calcWeightGranularity());
   }
+
+  // update the weights according to the bounds
+  this->onSetWeights(out_weights);
 };
 
 /********************************************************************************/

@@ -374,8 +374,7 @@ template <typename T> void RPUPulsed<T>::getDeviceParameter(std::vector<T *> &da
 template <typename T> void RPUPulsed<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
   // note that memory (x_sz*d_sz per ptr) assumed to be initialized from outside !!
   CHECK_RPU_DEVICE_INIT;
-  rpu_device_->setDeviceParameter(data_ptrs);
-  rpu_device_->onSetWeights(this->getWeightsPtr());
+  rpu_device_->setDeviceParameter(this->getWeightsPtr(), data_ptrs);
 };
 
 template <typename T> void RPUPulsed<T>::setHiddenUpdateIdx(int idx) {

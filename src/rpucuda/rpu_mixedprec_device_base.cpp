@@ -387,10 +387,11 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::setHiddenWeights(const std
 }
 
 template <typename T>
-void MixedPrecRPUDeviceBase<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
+void MixedPrecRPUDeviceBase<T>::setDeviceParameter(
+    T **out_weights, const std::vector<T *> &data_ptrs) {
 
   CHECK_RPU_DEVICE_INIT;
-  rpu_device_->setDeviceParameter(data_ptrs);
+  rpu_device_->setDeviceParameter(out_weights, data_ptrs);
 };
 
 template <typename T> void MixedPrecRPUDeviceBase<T>::printDP(int x_count, int d_count) const {
