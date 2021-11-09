@@ -43,7 +43,8 @@ from .helpers.tiles import FloatingPoint, ConstantStep, Inference
 @parametrize_over_layers(
     layers=[Linear, Conv2d, LinearCuda, Conv2dCuda],
     tiles=[FloatingPoint, ConstantStep, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class SerializationTest(ParametrizedTestCase):
     """Tests for serialization."""
@@ -523,7 +524,8 @@ class SerializationTest(ParametrizedTestCase):
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
     tiles=[FloatingPoint],
-    biases=[False]
+    biases=[False],
+    digital_biases=[False]
 )
 class SerializationTestExtended(ParametrizedTestCase):
     """Tests for serialization."""

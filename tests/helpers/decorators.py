@@ -45,7 +45,8 @@ def parametrize_over_tiles(tiles: List) -> Callable:
                                class_name_func=class_name)
 
 
-def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable:
+def parametrize_over_layers(layers: List, tiles: List, biases: List, digital_biases: List) \
+        -> Callable:
     """Parametrize a TestCase over different kind of layers.
 
     The ``TestCase`` will be repeated for each combination of `layer`, `tile`
@@ -55,12 +56,13 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable
         layers: list of layer descriptions.
         tiles: list of tile descriptions.
         biases: list of bias values.
+        digital_biases: list of digital_biases values.
 
     Returns:
         The decorated TestCase.
     """
 
-    def object_to_dict(layer, tile, bias):
+    def object_to_dict(layer, tile, bias, digital_bias):
         """Convert the public members of an object to a dictionary."""
         ret = {key: value for key, value in vars(layer).items()
                if not key.startswith('_')}
@@ -69,6 +71,7 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable
                                              'Bias' if bias else 'NoBias')
         ret['get_rpu_config'] = tile.get_rpu_config
         ret['bias'] = bias
+        ret['digital_bias'] = digital_bias
 
         return ret
 
@@ -77,8 +80,8 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable
         return '{}_{}'.format(cls.__name__, params_dict['parameter'])
 
     return parameterized_class(
-        [object_to_dict(layer, tile, bias) for
-         layer, tile, bias in product(layers, tiles, biases)],
+        [object_to_dict(layer, tile, bias, digital_bias) for
+         layer, tile, bias, digital_bias in product(layers, tiles, biases, digital_biases)],
         class_name_func=class_name)
 
 

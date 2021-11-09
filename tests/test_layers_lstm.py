@@ -31,7 +31,8 @@ from .helpers.tiles import FloatingPoint, Inference
 @parametrize_over_layers(
     layers=[LSTM, LSTMCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[False, True]
+    biases=[False, True],
+    digital_biases=[False]
 )
 class LSTMLayerTest(ParametrizedTestCase):
     """Tests for AnalogLSTM layer."""

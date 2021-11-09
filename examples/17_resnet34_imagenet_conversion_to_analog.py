@@ -35,7 +35,7 @@ def main():
     print(model)
 
     # Convert the model to its analog version.
-    model = convert_to_analog(model, RPU_CONFIG, weight_scaling_omega=0.6)
+    model = convert_to_analog(model, RPU_CONFIG, weight_scaling_omega=0.6, digital_bias=True)
 
     print(model)
 

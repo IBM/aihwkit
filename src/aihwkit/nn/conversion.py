@@ -39,6 +39,7 @@ def convert_to_analog(
         rpu_config: RPUConfigGeneric,
         realistic_read_write: bool = False,
         weight_scaling_omega: float = 0.0,
+        digital_bias: bool = False,
         conversion_map: Optional[Dict] = None
 ) -> Module:
     """Convert a given digital model to analog counter parts.
@@ -59,6 +60,8 @@ def convert_to_analog(
         weight_scaling_omega: If non-zero, applied weights of analog
             layers will be scaled by ``weight_scaling_omega`` divided by
             the absolute maximum value of the original weight matrix.
+        digital_bias: decide whether the bias term is handled by the analog tile
+                or kept in digital.
 
             Note:
                 Make sure that the weight max and min setting of the
@@ -83,7 +86,7 @@ def convert_to_analog(
     # Convert parent.
     if module.__class__ in conversion_map:
         module = conversion_map[module.__class__].from_digital(  # type: ignore
-            module, rpu_config, realistic_read_write, weight_scaling_omega)
+            module, rpu_config, realistic_read_write, weight_scaling_omega, digital_bias)
 
     # Convert children.
     convert_dic = {}
@@ -92,11 +95,11 @@ def convert_to_analog(
         n_grand_children = len(list(mod.named_children()))
         if n_grand_children > 0:
             new_mod = convert_to_analog(mod, rpu_config, realistic_read_write,
-                                        weight_scaling_omega, conversion_map)
+                                        weight_scaling_omega, digital_bias, conversion_map)
 
         elif mod.__class__ in conversion_map:
             new_mod = conversion_map[mod.__class__].from_digital(   # type: ignore
-                mod, rpu_config, realistic_read_write, weight_scaling_omega)
+                mod, rpu_config, realistic_read_write, weight_scaling_omega, digital_bias)
         else:
             continue
 

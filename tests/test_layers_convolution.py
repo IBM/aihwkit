@@ -76,7 +76,8 @@ class ConvolutionLayerTest(ParametrizedTestCase):
 @parametrize_over_layers(
     layers=[Conv1d, Conv1dCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class Convolution1dLayerTest(ConvolutionLayerTest):
     """Tests for AnalogConv1d layer."""
@@ -175,7 +176,8 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
 @parametrize_over_layers(
     layers=[Conv2d, Conv2dCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class Convolution2dLayerTest(ConvolutionLayerTest):
     """Tests for AnalogConv2d layer."""
@@ -274,7 +276,8 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
 @parametrize_over_layers(
     layers=[Conv3d, Conv3dCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class Convolution3dLayerTest(ConvolutionLayerTest):
     """Tests for AnalogConv3d layer."""
