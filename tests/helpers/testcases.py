@@ -59,6 +59,9 @@ class ParametrizedTestCase(AihwkitTestCase):
     bias: bool = False
     """If True, the tiles and layer in this test will use bias."""
 
+    digital_bias: bool = False
+    """If True, the tiles and layer in this test will use bias."""
+
     parameter: str = ''
     """Friendly name of the parameters used in this test."""
 

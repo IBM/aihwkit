@@ -62,7 +62,8 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             padding_mode: str,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0
+            weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ):
         # pylint: disable=too-many-arguments, too-many-locals
         if groups != 1:
@@ -78,7 +79,8 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
                                             bias,
                                             rpu_config,
                                             realistic_read_write,
-                                            weight_scaling_omega)
+                                            weight_scaling_omega,
+                                            digital_bias)
 
         # Call super() after tile creation, including ``reset_parameters``.
         AnalogModuleBase.__init__(self)
@@ -94,7 +96,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
         self.unregister_parameter('weight')
-        if bias:
+        if self.analog_bias:
             self.unregister_parameter('bias')
 
         self.register_analog_tile(self.analog_tile)
@@ -132,9 +134,13 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         if not self.fold_indices.numel() or self.input_size != input_size:
             self.recalculate_indexes(x_input)
 
-        return AnalogIndexedFunction.apply(
+        out = AnalogIndexedFunction.apply(
             self.analog_tile.get_analog_ctx(), x_input,
             self.analog_tile.shared_weights, not self.training)
+
+        if self.digital_bias:
+            return out + self.bias.view(self.out_channels, 1, 1)
+        return out
 
 
 class AnalogConv1d(_AnalogConvNd):
@@ -167,6 +173,8 @@ class AnalogConv1d(_AnalogConvNd):
             setting initial weights and read out of weights.
         weight_scaling_omega: the weight value where the max weight will be
             scaled to. If zero, no weight scaling will be performed.
+        digital_bias: decide whether the bias term is handled by the analog tile
+            or kept in digital.
     """
     # pylint: disable=abstract-method
 
@@ -183,7 +191,8 @@ class AnalogConv1d(_AnalogConvNd):
             padding_mode: str = 'zeros',
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0
+            weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _single(kernel_size)
@@ -197,7 +206,7 @@ class AnalogConv1d(_AnalogConvNd):
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _single(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega
+            rpu_config, realistic_read_write, weight_scaling_omega, digital_bias
         )
 
     @classmethod
@@ -207,6 +216,7 @@ class AnalogConv1d(_AnalogConvNd):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ) -> 'AnalogConv1d':
         """Return an AnalogConv1d layer from a torch Conv1d layer.
 
@@ -220,6 +230,8 @@ class AnalogConv1d(_AnalogConvNd):
             weight_scaling_omega: If non-zero, applied weights of analog
                 layers will be scaled by ``weight_scaling_omega`` divided by
                 the absolute maximum value of the original weight matrix.
+            digital_bias: decide whether the bias term is handled by the analog tile
+                or kept in digital.
 
                 Note:
                     Make sure that the weight max and min setting of the
@@ -239,7 +251,8 @@ class AnalogConv1d(_AnalogConvNd):
                             module.padding_mode,
                             rpu_config,
                             realistic_read_write,
-                            weight_scaling_omega)
+                            weight_scaling_omega,
+                            digital_bias)
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module
@@ -324,6 +337,8 @@ class AnalogConv2d(_AnalogConvNd):
             for setting initial weights and read out of weights.
         weight_scaling_omega: the weight value where the max weight will be
             scaled to. If zero, no weight scaling will be performed.
+        digital_bias: decide whether the bias term is handled by the analog tile
+            or kept in digital.
     """
     # pylint: disable=abstract-method
 
@@ -341,6 +356,7 @@ class AnalogConv2d(_AnalogConvNd):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _pair(kernel_size)
@@ -351,7 +367,7 @@ class AnalogConv2d(_AnalogConvNd):
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _pair(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega
+            rpu_config, realistic_read_write, weight_scaling_omega, digital_bias
         )
 
     @classmethod
@@ -361,6 +377,7 @@ class AnalogConv2d(_AnalogConvNd):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ) -> 'AnalogConv2d':
         """Return an AnalogConv2d layer from a torch Conv2d layer.
 
@@ -374,6 +391,8 @@ class AnalogConv2d(_AnalogConvNd):
             weight_scaling_omega: If non-zero, applied weights of analog
                 layers will be scaled by ``weight_scaling_omega`` divided by
                 the absolute maximum value of the original weight matrix.
+            digital_bias: decide whether the bias term is handled by the analog tile
+                or kept in digital.
 
                 Note:
                     Make sure that the weight max and min setting of the
@@ -393,7 +412,8 @@ class AnalogConv2d(_AnalogConvNd):
                             module.padding_mode,
                             rpu_config,
                             realistic_read_write,
-                            weight_scaling_omega)
+                            weight_scaling_omega,
+                            digital_bias,)
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module
@@ -468,6 +488,8 @@ class AnalogConv3d(_AnalogConvNd):
             for setting initial weights and read out of weights.
         weight_scaling_omega: the weight value where the max weight will be
             scaled to. If zero, no weight scaling will be performed.
+        digital_bias: decide whether the bias term is handled by the analog tile
+            or kept in digital.
     """
     # pylint: disable=abstract-method
 
@@ -485,6 +507,7 @@ class AnalogConv3d(_AnalogConvNd):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _triple(kernel_size)
@@ -498,7 +521,7 @@ class AnalogConv3d(_AnalogConvNd):
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _triple(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega
+            rpu_config, realistic_read_write, weight_scaling_omega, digital_bias
         )
 
     @classmethod
@@ -508,6 +531,7 @@ class AnalogConv3d(_AnalogConvNd):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ) -> 'AnalogConv3d':
         """Return an AnalogConv3d layer from a torch Conv3d layer.
 
@@ -521,6 +545,8 @@ class AnalogConv3d(_AnalogConvNd):
             weight_scaling_omega: If non-zero, applied weights of analog
                 layers will be scaled by ``weight_scaling_omega`` divided by
                 the absolute maximum value of the original weight matrix.
+            digital_bias: decide whether the bias term is handled by the analog tile
+                or kept in digital.
 
                 Note:
                     Make sure that the weight max and min setting of the
@@ -540,7 +566,8 @@ class AnalogConv3d(_AnalogConvNd):
                             module.padding_mode,
                             rpu_config,
                             realistic_read_write,
-                            weight_scaling_omega)
+                            weight_scaling_omega,
+                            digital_bias)
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module

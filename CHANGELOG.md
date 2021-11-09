@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Visualization for noise models for analog inference hardware simulation. (\#278)
 * State indipendent inference noise model. (\# 284)
 * Transfer LR parameter for ``MixedPrecisionCompound``. (\#283)
+* The bias term can now be handled either by the analog or digital domain by controlling
+  the `digital_bias` layer parameter. (\#306 to be updated)
 
 ### Fixed
 

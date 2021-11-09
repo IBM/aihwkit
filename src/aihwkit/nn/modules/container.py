@@ -12,15 +12,17 @@
 
 """Analog Modules that contain children Modules."""
 
-from typing import Callable, Optional, Union, Any, NamedTuple
+from typing import Callable, Optional, Union, Any, NamedTuple, TYPE_CHECKING
 from collections import OrderedDict
 
-from torch import Tensor
 from torch import device as torch_device
 from torch.nn import Sequential
 
 from aihwkit.exceptions import ModuleError
 from aihwkit.nn.modules.base import AnalogModuleBase
+
+if TYPE_CHECKING:
+    from torch import Tensor  # pylint: disable=ungrouped-imports
 
 
 class AnalogSequential(Sequential):
