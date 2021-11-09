@@ -94,7 +94,9 @@
       switch (x) {                                                                                 \
       case CURAND_STATUS_VERSION_MISMATCH:                                                         \
         ss << "CURAND_STATUS_VERSION_MISMATCH";                                                    \
-        break case CURAND_STATUS_NOT_INITIALIZED : ss << "CURAND_STATUS_NOT_INITIALIZED";          \
+        break;                                                                                     \
+      case CURAND_STATUS_NOT_INITIALIZED:                                                          \
+        ss << "CURAND_STATUS_NOT_INITIALIZED";                                                     \
         break;                                                                                     \
       case CURAND_STATUS_ALLOCATION_FAILED:                                                        \
         ss << "CURAND_STATUS_ALLOCATION_FAILED";                                                   \
@@ -159,9 +161,6 @@
 #ifndef MAX
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
-
-#define RPU_CUDA_1D_KERNEL_LOOP(i, n)                                                              \
-  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i += blockDim.x * gridDim.x)
 
 #define RPU_GET_CUDA_BUFFER(CONTEXT, TYPE, BUFFER, SIZE)                                           \
   if (!BUFFER || BUFFER->getSize() < (SIZE)) {                                                     \
@@ -329,7 +328,7 @@ public:
 
   inline int64_t getAllocatedMem() { return allocated_mem_; }
 
-  int64_t getTotalMem();
+  int64_t getTotalMem() { return global_mem_counter; }
 
 private:
   int gpu_id_ = 0;

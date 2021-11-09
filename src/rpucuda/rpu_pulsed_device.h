@@ -159,6 +159,7 @@ public:
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info){};
 
   inline T getWeightGranularity() const { return weight_granularity_; };
+  virtual T getPulseCountLearningRate(T learning_rate) { return learning_rate; };
 
 protected:
   inline void setWeightGranularity(T weight_granularity) {

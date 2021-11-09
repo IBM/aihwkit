@@ -94,17 +94,19 @@ void PulsedWeightUpdater<T>::executeUpdate(
     const bool x_trans_in,
     const bool d_trans_in) {
 
+  T pc_lr = rpucuda_device->getPulseCountLearningRate(lr);
   blm_->makeCounts(
-      x_in, d_in, up, rpucuda_device->getWeightGranularity(), lr, m_batch, x_trans_in, d_trans_in,
-      kpars->getOutTrans(), kpars->getUseBo64(), kpars->getImplicitPulses());
+      x_in, d_in, up, rpucuda_device->getWeightGranularity(), pc_lr, m_batch, x_trans_in,
+      d_trans_in, kpars->getOutTrans(), kpars->getUseBo64(), kpars->getImplicitPulses());
 
   CudaContext *c = context_;
   if (is_async_update_) {
     up_context_->recordWaitEvent(context_->getStream(), context_->getEvent());
     c = &*up_context_;
   }
+  // the original learninig rate needs to be passed
   rpucuda_device->runUpdateKernel(
-      kpars, c, dev_weights, m_batch, &*blm_, up, c->getRandomStates(kpars->getNStates()));
+      kpars, c, dev_weights, m_batch, &*blm_, up, lr, c->getRandomStates(kpars->getNStates()));
 }
 
 template <typename T>
@@ -290,12 +292,23 @@ void PulsedWeightUpdater<T>::doDirectUpdate(
 template <typename T>
 bool PulsedWeightUpdater<T>::checkForFPUpdate(
     AbstractRPUDeviceCuda<T> *rpucuda_device_in, const PulsedUpdateMetaParameter<T> &up) {
+
+  if (rpucuda_device_in == nullptr) {
+    return true;
+  }
+  if (rpucuda_device_in->implements() == DeviceUpdateType::FloatingPoint) {
+    return true;
+  }
+  if (rpucuda_device_in->isPulsedDevice() && up.pulse_type == PulseType::None) {
+    return true;
+  }
   if (rpucuda_device_in->hasDirectUpdate()) {
+    // also FP has direct, but that is handled above
     return false;
   }
-  return (up.pulse_type == PulseType::None) || (rpucuda_device_in == nullptr) ||
-         !rpucuda_device_in->isPulsedDevice() ||
-         (rpucuda_device_in->implements() == DeviceUpdateType::FloatingPoint);
+  // omitting !isPulsedDevice
+
+  return false;
 }
 
 #define FORCE_TUNING_THRES 0

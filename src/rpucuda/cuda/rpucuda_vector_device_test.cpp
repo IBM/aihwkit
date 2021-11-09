@@ -54,7 +54,7 @@ template <> void setAdditionalValues(TransferRPUDeviceMetaParameter<num_t> *vp, 
   vp->transfer_io.out_res = -1;
   vp->transfer_every = 1;
   vp->transfer_lr = 0.5;
-  vp->n_cols_per_transfer = 1;
+  vp->n_reads_per_transfer = 1;
   vp->gamma = value;
 }
 
@@ -62,8 +62,7 @@ template <typename VectorDeviceParT> class RPUDeviceTestFixture : public ::testi
 public:
   void SetUp() {
 
-    this->context_container = RPU::make_unique<CudaContext>(-1, false);
-    this->context = &*context_container;
+    context = &context_container;
 
     this->x_size = 4;
     this->d_size = 5;
@@ -261,7 +260,7 @@ public:
   };
   void TearDown() { Array_2D_Free(refweights); }
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
 
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;

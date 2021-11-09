@@ -48,7 +48,6 @@ public:
       T *x_buffer,
       T *d_buffer) = 0;
   virtual bool hasDirectUpdate() const = 0;
-
   virtual int getHiddenUpdateIdx() const { return 0; };
   virtual void setHiddenUpdateIdx(int idx){};
 

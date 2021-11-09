@@ -43,8 +43,7 @@ template <typename DeviceParT> class RPUDeviceTestFixture : public ::testing::Te
 public:
   void SetUp() {
 
-    context_container = RPU::make_unique<CudaContext>(-1, false);
-    context = &*context_container;
+    context = &context_container;
 
     this->x_size = 53;
     this->d_size = 43;
@@ -226,7 +225,7 @@ public:
 
   void TearDown() { Array_2D_Free(refweights); }
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
 
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;

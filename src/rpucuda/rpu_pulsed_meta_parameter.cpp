@@ -148,6 +148,7 @@ void PulsedUpdateMetaParameter<T>::calculateBlAB(
     A = (T)0.0;
     B = (T)0.0;
     BL = 0;
+    return;
   }
 
   if (fixed_BL || update_bl_management) {
@@ -158,7 +159,7 @@ void PulsedUpdateMetaParameter<T>::calculateBlAB(
     if ((weight_granularity * desired_BL) < lr) {
       A = (T)1.0;
       B = (T)1.0;
-      BL = (int)ceil(lr / weight_granularity);
+      BL = MAX((int)ceil(lr / weight_granularity), 1);
     } else {
       BL = desired_BL;
       A = sqrt(lr / (weight_granularity * BL));

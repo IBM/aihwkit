@@ -452,6 +452,20 @@ void VectorRPUDevice<T>::doSparseUpdate(
 }
 
 template <typename T>
+void VectorRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) {
+  if (getPar().singleDeviceUpdate()) {
+    rpu_device_vec_[current_device_idx_]->doDenseUpdate(
+        weights_vec_[current_device_idx_], coincidences, rng);
+  } else {
+
+    for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+      rpu_device_vec_[k]->doDenseUpdate(weights_vec_[k], coincidences, rng);
+    }
+  }
+  this->reduceToWeights(weights);
+}
+
+template <typename T>
 void VectorRPUDevice<T>::finishUpdateCycle(
     T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {
 

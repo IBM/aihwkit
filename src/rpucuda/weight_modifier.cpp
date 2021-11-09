@@ -126,6 +126,7 @@ void WeightModifier<T>::apply(
         new_weights[i] += amax * sig * rw_rng_.sampleGauss();
       }
     }
+
     break;
   }
 

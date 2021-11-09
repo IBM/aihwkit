@@ -35,8 +35,7 @@ template <typename T> class RPUCudaSimpleTestFixture : public ::testing::Test {
 public:
   void SetUp() {
 
-    context_container = RPU::make_unique<CudaContext>(-1, false);
-    context = &*context_container;
+    context = &context_container;
 
     is_test = true;
 
@@ -83,7 +82,7 @@ public:
     d_vec2.resize(d_size);
   }
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
 
   std::unique_ptr<RPUSimple<T>> layer_simple;

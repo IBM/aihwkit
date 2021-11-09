@@ -138,7 +138,7 @@ class AnalogModuleBase(Module):
             weight_scaling_omega: the weight value where the max
                 weight will be scaled to. If zero, no weight scaling will
                 be performed
-            digital
+            digital_bias: whether to use bias in digital
 
         Returns:
             An analog tile with the requested parameters.

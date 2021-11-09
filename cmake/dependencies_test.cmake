@@ -13,8 +13,8 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 if(BUILD_TEST)
   include(ExternalProject)
   ExternalProject_Add(GTest
-    URL               https://github.com/google/googletest/archive/release-1.10.0.zip
-    URL_HASH          MD5=82358affdd7ab94854c8ee73a180fc53
+    URL               https://github.com/google/googletest/archive/release-1.11.0.zip
+    URL_HASH          MD5=52943a59cefce0ae0491d4d2412c120b
     CMAKE_ARGS        "-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI\=0"
     INSTALL_COMMAND   ""
   )
