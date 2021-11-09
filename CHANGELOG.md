@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * State indipendent inference noise model. (\# 284)
 * Transfer LR parameter for ``MixedPrecisionCompound``. (\#283)
 * The bias term can now be handled either by the analog or digital domain by controlling
-  the `digital_bias` layer parameter. (\#190 to be updated)
+  the `digital_bias` layer parameter. (\#306 to be updated)
 
 ### Fixed
 
