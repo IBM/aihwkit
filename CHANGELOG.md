@@ -21,7 +21,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * State indipendent inference noise model. (\# 284)
 * Transfer LR parameter for ``MixedPrecisionCompound``. (\#283)
 * The bias term can now be handled either by the analog or digital domain by controlling
-  the `digital_bias` layer parameter. (\#306 to be updated)
+  the `digital_bias` layer parameter. (\#307)
+* PCM short-term weight noise. (#???)
+* IR-drop simulation across columns during analog mat-vec. (\#???)
+* Transposed-read for ``TransferCompound``. (\???)
 
 ### Fixed
 
@@ -35,6 +38,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * The inference noise models are now located in `aihwkit.inference`. (\#281)
 * Analog state dict structure `has changed (shared weight are not saved). (\#293)
+* Some of the parameter names of the``TransferCompound`` have
+  changed. (\#???)
+* New fast learning rate parameter for TransferCompound, SGD learning
+  rate then is applied on the slow matrix (\#???). 
 
 ### Deprecated
 

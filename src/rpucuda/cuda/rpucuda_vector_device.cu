@@ -124,6 +124,7 @@ VectorRPUDeviceCuda<T> &VectorRPUDeviceCuda<T>::operator=(VectorRPUDeviceCuda<T>
   context_vec_ = std::move(other.context_vec_);
   other.context_vec_.clear();
 
+  rw_rng_ = std::move(other.rw_rng_);
   return *this;
 };
 
@@ -275,6 +276,7 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
     int m_batch,
     const BitLineMaker<T> *blm,
     const PulsedUpdateMetaParameter<T> &up,
+    const T lr,
     curandState_t *dev_states,
     int one_sided,
     uint32_t *x_counts_chunk,

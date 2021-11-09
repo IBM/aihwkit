@@ -42,6 +42,7 @@ public:
     swap(a.current_device_idx_, b.current_device_idx_);
     swap(a.current_update_idx_, b.current_update_idx_);
     swap(a.dev_reduce_weightening_, b.dev_reduce_weightening_);
+    swap(a.rw_rng_, b.rw_rng_);
   };
 
   // implement abstract functions
@@ -74,6 +75,7 @@ public:
       int m_batch,
       const BitLineMaker<T> *blm,
       const PulsedUpdateMetaParameter<T> &up,
+      const T lr,
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
@@ -89,9 +91,9 @@ public:
   std::vector<T> getReduceWeightening() const;
 
 protected:
-  int n_devices_ = 0;
-
   virtual void reduceToWeights(CudaContext *c, T *dev_weights);
+
+  int n_devices_ = 0;
   RealWorldRNG<T> rw_rng_{0};
   std::vector<T *> dev_weights_ptrs_;
   std::unique_ptr<CudaArray<T>> dev_weights_vec_ = nullptr;

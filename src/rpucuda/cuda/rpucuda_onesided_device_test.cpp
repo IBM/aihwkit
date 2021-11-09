@@ -36,8 +36,7 @@ class RPUDeviceCudaTestFixture : public ::testing::TestWithParam<int> {
 public:
   void SetUp() {
 
-    context_container = RPU::make_unique<CudaContext>(-1, false);
-    context = &*context_container;
+    context = &context_container;
 
     x_size = 5;
     d_size = 8;
@@ -119,7 +118,7 @@ public:
   std::unique_ptr<AbstractRPUDevice<num_t>> rpu_device;
   std::unique_ptr<AbstractRPUDeviceCuda<num_t>> rpucuda_device;
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
 };
 

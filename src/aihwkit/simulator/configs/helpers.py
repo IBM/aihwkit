@@ -49,7 +49,7 @@ def tile_parameters_to_bindings(params: Any) -> Any:
     field_map = {'forward': 'forward_io',
                  'backward': 'backward_io'}
     excluded_fields = ('device', 'noise_model', 'drift_compensation',
-                       'clip', 'modifier', 'mapping')
+                       'clip', 'modifier')
 
     result = params.bindings_class()
     for field, value in params.__dict__.items():

@@ -308,8 +308,7 @@ public:
     up.res = resolution;
     up.sto_round = false;
 
-    context_container = RPU::make_unique<CudaContext>(-1, false); // blocking for timings
-    context = &*context_container;
+    context = &context_container;
 
     blm = RPU::make_unique<BitLineMaker<num_t>>(context, x_size, d_size);
 
@@ -352,7 +351,7 @@ public:
     delete[] d_counts;
   }
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
   int nK32;
   int x_size;

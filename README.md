@@ -32,8 +32,9 @@ A series of primitives and features that allow using the toolkit within
 * Analog inference using torch inference workflow:
   * State-of-the-art statistical model of a phase-change memory (PCM) array
     calibrated on hardware measurements from a 1 million PCM devices chip.
-  * Hardware-aware training with hardware non-idealities and noise included
-    in the forward pass to make the trained models more robust during inference on Analog hardware.
+  * Hardware-aware training with hardware non-idealities and noise
+    included in the forward pass to make the trained models more
+    robust during inference on Analog hardware.
 
 ### Analog devices simulator
 
@@ -55,7 +56,8 @@ adjustable parameters. Features include:
 
 ### Other features
 
-Along with the two main components, the toolkit includes other functionalities such as:
+Along with the two main components, the toolkit includes other
+functionalities such as:
 
 * A library of device presets that are calibrated to real hardware data and
   based on models in the literature, along with configuration that specifies a particular device and optimizer choice.

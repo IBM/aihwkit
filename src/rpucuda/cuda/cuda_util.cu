@@ -644,8 +644,6 @@ void CudaContext::subtractMemCounter(int64_t n_bytes) {
   global_mem_counter -= n_bytes;
 }
 
-int64_t CudaContext::getTotalMem() { return global_mem_counter; }
-
 //**********************************************************************//
 
 template <typename T>

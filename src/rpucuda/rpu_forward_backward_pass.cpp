@@ -118,106 +118,13 @@ inline T computeNoiseManagement(
 /*********************************************************************/
 /* Noisy forward / backward pass with ADC/DAC and IO management*/
 
-template <typename T> void ForwardBackwardPassIOManaged<T>::allocateContainers() {
-
-  if (!containers_allocated_) {
-    freeContainers();
-
-    tmp_x_values_ = new T[this->x_size_]();
-    tmp_d_values_ = new T[this->d_size_]();
-    containers_allocated_ = true;
-  }
-}
-
-template <typename T> void ForwardBackwardPassIOManaged<T>::freeContainers() {
-
-  if (containers_allocated_) {
-
-    delete[] tmp_d_values_;
-    delete[] tmp_x_values_;
-
-    tmp_d_values_ = nullptr;
-    tmp_x_values_ = nullptr;
-
-    rng_ = nullptr;
-
-    containers_allocated_ = false;
-  }
-}
-
 // ctor
 template <typename T>
 ForwardBackwardPassIOManaged<T>::ForwardBackwardPassIOManaged(
     int x_size, int d_size, std::shared_ptr<RNG<T>> rng)
     : ForwardBackwardPass<T>(x_size, d_size) {
   rng_ = rng;
-  allocateContainers();
   aux_nm_value_ = (T)-1.0;
-}
-
-// dtor
-template <typename T> ForwardBackwardPassIOManaged<T>::~ForwardBackwardPassIOManaged() {
-  freeContainers();
-}
-
-// copy construcutor
-template <typename T>
-ForwardBackwardPassIOManaged<T>::ForwardBackwardPassIOManaged(
-    const ForwardBackwardPassIOManaged<T> &other)
-    : ForwardBackwardPass<T>(other) {
-  f_io_ = other.f_io_;
-  b_io_ = other.b_io_;
-  aux_nm_value_ = other.aux_nm_value_;
-  rng_ = other.rng_;
-  checked_implemented_ = other.checked_implemented_;
-
-  if (other.containers_allocated_) {
-    allocateContainers();
-  }
-}
-
-// copy assignment
-template <typename T>
-ForwardBackwardPassIOManaged<T> &
-ForwardBackwardPassIOManaged<T>::operator=(const ForwardBackwardPassIOManaged<T> &other) {
-
-  ForwardBackwardPassIOManaged<T> tmp(other);
-  swap(*this, tmp);
-  return *this;
-}
-
-// move constructor
-template <typename T>
-ForwardBackwardPassIOManaged<T>::ForwardBackwardPassIOManaged(
-    ForwardBackwardPassIOManaged<T> &&other) {
-
-  *this = std::move(other);
-}
-
-// move assignment
-template <typename T>
-ForwardBackwardPassIOManaged<T> &
-ForwardBackwardPassIOManaged<T>::operator=(ForwardBackwardPassIOManaged<T> &&other) {
-
-  ForwardBackwardPass<T>::operator=(std::move(other));
-
-  f_io_ = other.f_io_;
-  b_io_ = other.b_io_;
-
-  // pointers
-  tmp_d_values_ = other.tmp_d_values_;
-  tmp_x_values_ = other.tmp_x_values_;
-
-  // set pointers to null
-  other.tmp_d_values_ = nullptr;
-  other.tmp_x_values_ = nullptr;
-
-  rng_ = std::move(other.rng_);
-
-  containers_allocated_ = other.containers_allocated_;
-  checked_implemented_ = other.checked_implemented_;
-  aux_nm_value_ = other.aux_nm_value_;
-  return *this;
 }
 
 template <typename T>
@@ -232,19 +139,126 @@ void ForwardBackwardPassIOManaged<T>::setIOPar(
   checked_implemented_ = false; // need to check in forward because CUDA also shares this with CPU
 }
 
-template <typename T> void ForwardBackwardPassIOManaged<T>::ensureImplemented() {
-  if (b_io_.w_noise_type != OutputWeightNoiseType::AdditiveConstant &&
-      b_io_.w_noise_type != OutputWeightNoiseType::None) {
-    RPU_FATAL("CPU version of OutputWeightNoiseType not yet implemented ");
+template <typename T> void ForwardBackwardPassIOManaged<T>::ensureImplemented() {}
+
+template <typename T>
+void ForwardBackwardPassIOManaged<T>::applyOutputWeightNoise(
+    T **weights,
+    T *out_values,
+    const int out_size,
+    const int out_inc,
+    const T *in_values,
+    const int in_size,
+    IOMetaParameter<T> &io,
+    bool transposed) {
+
+  if (io.w_noise_type == OutputWeightNoiseType::None) {
+    return;
   }
 
-  if (f_io_.w_noise_type != OutputWeightNoiseType::AdditiveConstant &&
-      f_io_.w_noise_type != OutputWeightNoiseType::None) {
-    RPU_FATAL("CPU version of OutputWeightNoiseType not yet implemented ");
+  switch (io.w_noise_type) {
+  case OutputWeightNoiseType::AdditiveConstant:
+    if (io.w_noise > 0) {
+      T x_norm = RPU::math::nrm2<T>(in_size, in_values, 1);
+      T w_std = io.w_noise * x_norm;
+      int i_out = 0;
+      PRAGMA_SIMD
+      for (int i = 0; i < out_size; ++i) {
+        out_values[i_out] += w_std * rng_->sampleGauss();
+        i_out += out_inc;
+      }
+    }
+    break;
+  case OutputWeightNoiseType::PCMRead:
+    if (io.w_noise > 0) {
+      T w_std = io.w_noise;
+      tmp_in_values_.resize(in_size);
+
+      PRAGMA_SIMD
+      for (int j = 0; j < in_size; ++j) {
+        tmp_in_values_[j] = in_values[j] * in_values[j];
+      }
+      // likely realtively slow. Since |W|*x.^2 without GEMV...
+      int i_out = 0;
+      for (int i = 0; i < out_size; ++i) {
+        T accum = 0.0;
+        if (transposed) {
+          PRAGMA_SIMD
+          for (int j = 0; j < in_size; ++j) {
+            accum += fabs(weights[j][i]) * tmp_in_values_[j];
+          }
+        } else {
+          PRAGMA_SIMD
+          for (int j = 0; j < in_size; ++j) {
+            accum += fabs(weights[i][j]) * tmp_in_values_[j];
+          }
+        }
+        out_values[i_out] += w_std * sqrtf(accum) * rng_->sampleGauss();
+        i_out += out_inc;
+      }
+    }
+    break;
+  default:
+    RPU_FATAL("Output noise type not implemented")
+  }
+}
+
+template <typename T>
+void ForwardBackwardPassIOManaged<T>::applyIrDrop(
+    T **weights,
+    T *out_values,
+    int out_size,
+    const int out_inc,
+    const T *in_values, // inc = 1 expected
+    const int in_size,
+    IOMetaParameter<T> &io,
+    bool transposed) {
+
+  if (io.ir_drop <= 0.0) {
+    return;
+  }
+  tmp_in_values_.resize(in_size);
+  tmp_c_values_.resize(out_size);
+  tmp_out_values_.resize(out_size);
+
+  T a_scale = in_size / io.ir_drop_Gw_div_gmax;
+  // a_i = sum_j(|w_ij|*|x_j|)*n/Gw*gmax
+  for (int i = 0; i < out_size; ++i) {
+    T accum = 0.0;
+    if (transposed) {
+      PRAGMA_SIMD
+      for (int j = 0; j < in_size; ++j) {
+        accum += fabs(weights[j][i]) * fabs(in_values[j]);
+      }
+    } else {
+      PRAGMA_SIMD
+      for (int j = 0; j < in_size; ++j) {
+        accum += fabs(weights[i][j]) * fabs(in_values[j]);
+      }
+    }
+    T a = a_scale * accum;
+    // c_i = a_i*(a_i*(0.05*a_i - 0.2) + 0.5);
+    tmp_c_values_[i] = a * (a * ((T)0.05 * a - (T)0.2) + (T)0.5);
   }
 
-  if (f_io_.bound_management == BoundManagementType::SignalChannel) {
-    RPU_FATAL("CPU version of BoundManagementType::SignalChannel not yet implemented.");
+  // compute x_j*(1-(1-j/n)^2)
+  PRAGMA_SIMD
+  for (int j = 0; j < in_size; ++j) {
+    T p = ((T)1 - (T)j / in_size);
+    tmp_in_values_[j] = in_values[j] * (1 - p * p);
+  }
+
+  // y_i = y_i_ideal - ir_drop*c_i*sum_j(w_ij * x'_j)
+  RPU::math::gemv<T>(
+      CblasRowMajor, transposed ? CblasTrans : CblasNoTrans, this->d_size_, this->x_size_,
+      io.ir_drop, weights[0], this->x_size_, tmp_in_values_.data(), 1, (T)0.0,
+      tmp_out_values_.data(), 1);
+
+  int i_out = 0;
+  PRAGMA_SIMD
+  for (int i = 0; i < out_size; ++i) {
+    out_values[i_out] -= tmp_c_values_[i] * tmp_out_values_[i];
+    i_out += out_inc;
   }
 }
 
@@ -267,8 +281,9 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
     ensureImplemented();
     checked_implemented_ = true;
   }
+  tmp_x_values_.resize(this->x_size_);
 
-  T *x_value = tmp_x_values_;
+  T *x_value = tmp_x_values_.data();
   T nm_scale_value = computeNoiseManagement(
       x_input, this->x_size_, x_inc, f_io_.noise_management, aux_nm_value_, f_io_);
   bool nm = f_io_.noise_management != NoiseManagementType::None;
@@ -382,15 +397,13 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
         CblasRowMajor, CblasNoTrans, this->d_size_, this->x_size_, 1.0, weights[0], this->x_size_,
         x_value, 1, f_io_.out_noise, d_output, d_inc);
 
-    if (f_io_.w_noise > 0 && f_io_.w_noise_type == OutputWeightNoiseType::AdditiveConstant) {
-      T x_norm = RPU::math::nrm2<T>(this->x_size_, x_value, 1);
-      T w_std = f_io_.w_noise * x_norm;
-      int i_d = 0;
-      PRAGMA_SIMD
-      for (int i = 0; i < this->d_size_; ++i) {
-        d_output[i_d] += w_std * rng_->sampleGauss();
-        i_d += d_inc;
-      }
+    if (f_io_.w_noise_type != OutputWeightNoiseType::None) {
+      applyOutputWeightNoise(
+          weights, d_output, this->d_size_, d_inc, x_value, this->x_size_, f_io_, false);
+    }
+
+    if (f_io_.ir_drop != (T)0) {
+      applyIrDrop(weights, d_output, this->d_size_, d_inc, x_value, this->x_size_, f_io_, false);
     }
 
     if (sm) {
@@ -461,7 +474,9 @@ void ForwardBackwardPassIOManaged<T>::backwardVector(
   }
 
   // io managed version
-  T *d_value = tmp_d_values_;
+  tmp_d_values_.resize(this->d_size_);
+
+  T *d_value = tmp_d_values_.data();
   T nm_scale_value = computeNoiseManagement(
       d_input, this->d_size_, d_inc, b_io_.noise_management, aux_nm_value_, b_io_);
   bool nm = b_io_.noise_management != NoiseManagementType::None;
@@ -516,15 +531,13 @@ void ForwardBackwardPassIOManaged<T>::backwardVector(
       CblasRowMajor, CblasTrans, this->d_size_, this->x_size_, 1.0, weights[0], this->x_size_,
       d_value, 1, b_io_.out_noise, x_output, x_inc);
 
-  if (b_io_.w_noise > 0 && b_io_.w_noise_type == OutputWeightNoiseType::AdditiveConstant) {
-    T d_norm = RPU::math::nrm2<T>(this->d_size_, d_value, 1);
-    T w_std = b_io_.w_noise * d_norm;
-    int j_x = 0;
-    PRAGMA_SIMD
-    for (int j = 0; j < this->x_size_; j++) {
-      x_output[j_x] += w_std * rng_->sampleGauss();
-      j_x += x_inc;
-    }
+  if (b_io_.w_noise_type != OutputWeightNoiseType::None) {
+    applyOutputWeightNoise(
+        weights, x_output, this->x_size_, x_inc, d_value, this->d_size_, b_io_, true);
+  }
+
+  if (b_io_.ir_drop != (T)0) {
+    applyIrDrop(weights, x_output, this->x_size_, x_inc, d_value, this->d_size_, b_io_, true);
   }
 
   int j_x = 0;

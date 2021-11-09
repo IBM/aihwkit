@@ -13,6 +13,7 @@
 #include "forward_backward_pass.h"
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_transfer_device.h"
+#include <limits>
 #include <memory>
 
 namespace RPU {
@@ -24,11 +25,17 @@ namespace RPU {
 
 */
 
-template <typename T> void TransferRPUDeviceCuda<T>::initialize() {
+template <typename T> void TransferRPUDeviceCuda<T>::initialize(bool transfer_columns) {
   transfer_pwu_ =
       RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
-  transfer_iom_ =
-      RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
+
+  if (transfer_columns) {
+    transfer_iom_ =
+        RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
+  } else {
+    transfer_iom_ =
+        RPU::make_unique<InputOutputManager<T>>(this->context_, this->d_size_, this->x_size_);
+  }
   this->context_->synchronize();
 }
 
@@ -47,10 +54,8 @@ TransferRPUDeviceCuda<T>::TransferRPUDeviceCuda(const TransferRPUDeviceCuda<T> &
   if (other.transfer_vecs_ != nullptr) {
     transfer_vecs_ = RPU::make_unique<CudaArray<T>>(*other.transfer_vecs_);
   }
-
-  initialize();
-
-  current_col_indices_ = other.current_col_indices_;
+  initialize(other.getPar().transfer_columns);
+  current_slice_indices_ = other.current_slice_indices_;
   fully_hidden_ = other.fully_hidden_;
   this->context_->synchronizeDevice();
 };
@@ -76,13 +81,14 @@ TransferRPUDeviceCuda<T> &TransferRPUDeviceCuda<T>::operator=(TransferRPUDeviceC
   VectorRPUDeviceCuda<T>::operator=(std::move(other));
 
   transfer_vecs_ = std::move(other.transfer_vecs_);
-  current_col_indices_ = other.current_col_indices_;
-  other.current_col_indices_.clear();
-  fully_hidden_ = other.fully_hidden_;
 
+  current_slice_indices_ = other.current_slice_indices_;
+  other.current_slice_indices_.clear();
+
+  fully_hidden_ = other.fully_hidden_;
   transfer_pwu_ = std::move(other.transfer_pwu_);
   transfer_iom_ = std::move(other.transfer_iom_);
-  // ignore transfer_tmp_ or RNG
+  transfer_tmp_ = std::move(other.transfer_tmp_);
 
   return *this;
 };
@@ -116,107 +122,162 @@ void TransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
       RPU_FATAL("Later transfer periods need to be larger than first for CUDA.");
     }
   }
-
+  int in_size = par.getInSize();
   transfer_vecs_ = RPU::make_unique<CudaArray<T>>(
-      this->context_, this->x_size_ * this->x_size_, rpu_device.getTransferVecs());
+      this->context_, in_size * in_size, rpu_device.getTransferVecs());
 
-  initialize(); // pwu/iom
+  initialize(par.transfer_columns); // pwu/iom
 
-  current_col_indices_.resize(this->n_devices_ - 1);
-  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int)0);
+  current_slice_indices_.resize(this->n_devices_ - 1);
+  std::fill(current_slice_indices_.begin(), current_slice_indices_.end(), (int)0);
 
   this->current_update_idx_ = 0;
 
   fully_hidden_ = par.fullyHidden();
 }
 
+/*********************************************************************************/
+/* getPulseCountLearningRate */
+/* Here we compute the LR for the A matrix (the SGD update). Because
+   of the device properties it is beneficial to use a constant LR
+   here, but scale the buffer with the scheduled SGD learning rate
+   later*/
+template <typename T> T TransferRPUDeviceCuda<T>::getPulseCountLearningRate(T learning_rate) {
+  const auto &par = getPar();
+
+  if (par.fast_lr > 0) {
+    return par.fast_lr;
+  } else {
+    return learning_rate;
+  }
+}
+
+template <typename T>
+void TransferRPUDeviceCuda<T>::readMatrix(
+    int device_idx, const T *in_vec, T *out_vec, int m_batch, T alpha) {
+  const auto &par = getPar();
+
+  if (par.transfer_columns) {
+    // forward with transfer vectors
+    RPU::detail::forwardMatrixIteratorIOManaged(
+        this->context_, this->dev_weights_ptrs_[device_idx], in_vec, this->x_size_, false, out_vec,
+        this->d_size_, false, m_batch, alpha, *transfer_iom_, par.transfer_io, false);
+
+  } else {
+    // backward with transfer vectors
+    RPU::detail::backwardMatrixIteratorIOManaged(
+        this->context_, this->dev_weights_ptrs_[device_idx], in_vec, this->d_size_, false, out_vec,
+        this->x_size_, false, m_batch, alpha, *transfer_iom_, par.transfer_io);
+  }
+}
+
+template <typename T>
+void TransferRPUDeviceCuda<T>::writeMatrix(
+    int device_idx,
+    const T *in_vec,
+    const T *out_vec,
+    int m_batch,
+    const T lr,
+    const PulsedUpdateMetaParameter<T> &up) {
+  const auto &par = getPar();
+  // note that the ptrs might point to the current weight
+  T *W = this->dev_weights_ptrs_[device_idx];
+
+  if (par.transfer_columns) {
+    transfer_pwu_->update(
+        in_vec, out_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
+        false);
+  } else {
+    transfer_pwu_->update(
+        out_vec, in_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
+        false);
+  }
+}
+
+/*********************************************************************************/
 /* partially transfer using the given "readout" transfer vectors
    (with io-managed forward) and the usualy device update */
 template <typename T>
-void TransferRPUDeviceCuda<T>::forwardUpdate(
+void TransferRPUDeviceCuda<T>::readAndUpdate(
     int to_device_idx,
     int from_device_idx,
     int i_col_start,
     const T lr,
-    const T *x_input,
+    const T *vec,
     const int n_vec,
-    const bool trans,
     const PulsedUpdateMetaParameter<T> &up) {
-  if (!lr) {
+  if (lr == (T)0.0) {
     return;
   }
 
-  if ((transfer_tmp_ == nullptr) || transfer_tmp_->getSize() < n_vec * this->d_size_) {
-    transfer_tmp_ = RPU::make_unique<CudaArray<T>>(this->context_, this->d_size_ * n_vec);
+  const auto &par = getPar();
+  int out_size = par.getOutSize();
+  int t_size = n_vec * out_size; // transfer size
+  if ((transfer_tmp_ == nullptr) || transfer_tmp_->getSize() < t_size) {
+    transfer_tmp_ = RPU::make_unique<CudaArray<T>>(this->context_, t_size);
     this->context_->synchronize();
   }
-  // forward with transfer vectors
-  RPU::detail::forwardMatrixIteratorIOManaged(
-      this->context_, this->dev_weights_ptrs_[from_device_idx], x_input, this->x_size_, trans,
-      transfer_tmp_->getData(), this->d_size_, trans, n_vec,
-      (T)1.0, // additional output scaling. Obey?
-      *transfer_iom_, getPar().transfer_io, false);
+  T *out_vec = transfer_tmp_->getData();
 
+  // forward / backward with transfer vectors. Since we need *positive*
+  // update, LR needs to be negative. However, this is not supported
+  // in the PWU really. Thus we scale the output by -1 and set alpha
+  // accordingly
+  readMatrix(from_device_idx, vec, out_vec, n_vec, -1.0);
   // update according to device
-  T *W = this->dev_weights_ptrs_[to_device_idx]; /// note that the ptrs might point to the current
-                                                 /// weight
-
-  // since we need *positive* update, LR needs to be
-  // negative. However, this is not supported in the PWU
-  // really. Thus we scale the temp-vector by -1
-  RPU::math::scal(this->context_, this->d_size_ * n_vec, (T)-1.0, transfer_tmp_->getData(), 1);
-
-  transfer_pwu_->update(
-      x_input,                       // this is the transfer vector (x_size)
-      transfer_tmp_->getDataConst(), // this should be d_size
-      W, &*this->rpucuda_device_vec_[to_device_idx], up, fabs(lr), n_vec, trans, trans);
+  writeMatrix(to_device_idx, vec, out_vec, n_vec, fabs(lr), up);
 }
 
+/*********************************************************************************/
 template <typename T>
 void TransferRPUDeviceCuda<T>::transfer(
     int to_device_idx,
     int from_device_idx,
     const PulsedUpdateMetaParameter<T> &current_up,
     const T current_lr) {
-  int i_col = current_col_indices_[from_device_idx];
+  int i_slice = current_slice_indices_[from_device_idx];
   const auto &par = getPar();
-  if (par.random_column) {
-    i_col = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->x_size_), this->x_size_ - 1), 0);
+
+  int in_size = par.getInSize();
+  int out_size = par.getOutSize();
+
+  if (par.random_selection) {
+    i_slice = MAX(MIN(floor(this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
   }
 
-  // transfer_vecs_ is always x_size-major (that is trans==false)
-  T *tvec = transfer_vecs_->getData() + i_col * this->x_size_;
-  int n_rest = this->x_size_ - i_col;
+  // transfer_vecs_ is always in_size-major (that is trans==false)
+  T *tvec = transfer_vecs_->getData() + i_slice * in_size;
+  int n_rest = in_size - i_slice;
 
   T lr = par.getTransferLR(to_device_idx, from_device_idx, current_lr);
 
   const PulsedUpdateMetaParameter<T> *up;
   up = &par.transfer_up;
 
-  int n_transfers = MIN(par.n_cols_per_transfer, this->x_size_);
+  int n_transfers = MIN(par.n_reads_per_transfer, in_size);
 
   if (n_rest < n_transfers) {
-
     // rest
-    forwardUpdate(to_device_idx, from_device_idx, i_col, lr, tvec, n_rest, false, *up);
+    readAndUpdate(to_device_idx, from_device_idx, i_slice, lr, tvec, n_rest, *up);
     // from beginning
-    forwardUpdate(
+    readAndUpdate(
         to_device_idx, from_device_idx, 0, lr, transfer_vecs_->getData(), n_transfers - n_rest,
-        false, *up);
+        *up);
 
   } else {
-    forwardUpdate(to_device_idx, from_device_idx, i_col, lr, tvec, n_transfers, false, *up);
+    readAndUpdate(to_device_idx, from_device_idx, i_slice, lr, tvec, n_transfers, *up);
   }
 
-  if (this->rw_rng_.sampleUniform() <
-      par.with_reset_prob) { // COL-wise prob!! device-wise reset_prob=1
+  if (par.transfer_columns && this->rw_rng_.sampleUniform() < par.with_reset_prob) {
+    // COL-wise prob!! device-wise reset_prob=1
     this->rpucuda_device_vec_[from_device_idx]->resetCols(
-        this->dev_weights_ptrs_[from_device_idx], i_col, n_transfers, 1);
+        this->dev_weights_ptrs_[from_device_idx], i_slice, n_transfers, 1);
   }
 
-  current_col_indices_[from_device_idx] = (i_col + n_transfers) % this->x_size_;
+  current_slice_indices_[from_device_idx] = (i_slice + n_transfers) % in_size;
 }
 
+/*********************************************************************************/
 template <typename T>
 inline int TransferRPUDeviceCuda<T>::getTransferEvery(int didx, int m_batch) const {
 
@@ -227,6 +288,7 @@ inline int TransferRPUDeviceCuda<T>::getTransferEvery(int didx, int m_batch) con
   }
 }
 
+/*********************************************************************************/
 template <typename T> inline int getNChunks(int m_batch, T every) {
   if (every <= 0) {
     return 1;
@@ -239,12 +301,22 @@ inline int getChunkSize(int m_batch, int nchunks) {
   return (m_batch + nchunks - 1) / nchunks; // to ensure not to have residual
 }
 
+inline uint64_t getNextTransfer(uint64_t current_update_idx, int transfer_every) {
+
+  if (transfer_every <= 0) {
+    return std::numeric_limits<uint64_t>::max();
+  }
+  return current_update_idx + transfer_every - (current_update_idx % transfer_every);
+}
+
+/*********************************************************************************/
 template <typename T>
 pwukpvec_t<T> TransferRPUDeviceCuda<T>::getUpdateKernels(
     int m_batch, int nK32, int use_bo64, bool out_trans, const PulsedUpdateMetaParameter<T> &up) {
 
   pwukpvec_t<T> v;
 
+  // just get approx chunk size for tuning
   int nchunks = getNChunks(m_batch, getTransferEvery(0, m_batch));
   int chunk_size = getChunkSize(m_batch, nchunks);
   // use the first device as the "FAST" device that gets updates with the true gradients.
@@ -259,6 +331,7 @@ pwukpvec_t<T> TransferRPUDeviceCuda<T>::getUpdateKernels(
   return v;
 }
 
+/*********************************************************************************/
 template <typename T>
 void TransferRPUDeviceCuda<T>::runUpdateKernel(
     pwukp_t<T> kpars,
@@ -267,6 +340,7 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
     int m_batch,
     const BitLineMaker<T> *blm,
     const PulsedUpdateMetaParameter<T> &up,
+    const T lr,
     curandState_t *dev_states,
     int one_sided,
     uint32_t *x_counts_chunk,
@@ -287,10 +361,12 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
     RPU_FATAL("Chunking not allowed here.");
   }
 
-  int nchunks = getNChunks(m_batch, getTransferEvery(0, m_batch));
-  T lr = blm->getCurrentLR();
+  // only look at first device here as it makes no sense to transfer
+  // the higer order devices more often
+  int transfer_every = getTransferEvery(0, m_batch);
+  auto next_transfer = getNextTransfer(this->current_update_idx_, transfer_every);
 
-  if (nchunks <= 1) {
+  if (next_transfer >= m_batch + this->current_update_idx_) {
 
     // just update the whole batch we do not call kpars directly to
     // also make possible to have non-pulsed devices. Note that only
@@ -300,7 +376,7 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
     // during transfer, since we use a seperate PWU object
 
     this->rpucuda_device_vec_[0]->runUpdateKernel(
-        kpars, c, this->dev_weights_ptrs_[0], m_batch, blm, up, dev_states, one_sided);
+        kpars, c, this->dev_weights_ptrs_[0], m_batch, blm, up, lr, dev_states, one_sided);
 
     if (up._currently_tuning) {
       return;
@@ -308,31 +384,39 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
 
     this->current_update_idx_ += m_batch; // first update idx
 
-    for (int j = 0; j < this->n_devices_ - 1; j++) {
-      // all transfer periods will be rounded up to batches.
-      int period = (getTransferEvery(j, m_batch) + m_batch - 1) / m_batch; // in m_batch
-      if (period > 0 && this->current_update_idx_ / m_batch % period == 0) {
+    // transfer
+    if (next_transfer == this->current_update_idx_) {
+      transfer(1, 0, up, lr);
+    }
+
+    // other higher order devices
+    for (int j = 1; j < this->n_devices_ - 1; j++) {
+      // all transfer periods will be rounded up to chunk_sizes
+      auto higher_order_next_transfer =
+          getNextTransfer(this->current_update_idx_ - m_batch, getTransferEvery(j, m_batch));
+      if (higher_order_next_transfer <= this->current_update_idx_) {
         transfer(j + 1, j, up, lr);
       }
     }
 
   } else {
+    // transfer is inbetween the mbatch, we need to chunk in some way
+
     // need to do it chunkwise
-    int chunk_size = getChunkSize(m_batch, nchunks);
     int batch_start = 0;
     int nK32 = blm->getNK32Current();
     auto x_counts = blm->getXCountsData();
     auto d_counts = blm->getDCountsData();
+    uint64_t final_update_idx = this->current_update_idx_ + m_batch;
 
-    for (int i_chunk = 0; i_chunk < nchunks; i_chunk++) {
+    while (next_transfer <= final_update_idx) {
 
-      // note that last chunk might be smaller.
-      int current_m_batch = chunk_size - MAX(batch_start + chunk_size - m_batch, 0);
+      int current_m_batch = (int)(next_transfer - this->current_update_idx_);
 
       this->rpucuda_device_vec_[0]->runUpdateKernel(
           kpars,
           c, // same context since sequence important
-          this->dev_weights_ptrs_[0], current_m_batch, blm, up, dev_states, one_sided,
+          this->dev_weights_ptrs_[0], current_m_batch, blm, up, lr, dev_states, one_sided,
           x_counts + batch_start * this->x_size_ * nK32, // always non-trans
           d_counts + batch_start * this->d_size_ * nK32);
 
@@ -344,19 +428,27 @@ void TransferRPUDeviceCuda<T>::runUpdateKernel(
       batch_start += current_m_batch;
 
       // transfer
-      for (int j = 0; j < this->n_devices_ - 1; j++) {
+      if (next_transfer == this->current_update_idx_) {
+        transfer(1, 0, up, lr);
+      }
+
+      // other higher order devices
+      for (int j = 1; j < this->n_devices_ - 1; j++) {
         // all transfer periods will be rounded up to chunk_sizes
-        int period = (getTransferEvery(j, m_batch) + chunk_size - 1) / chunk_size;
-        if (period > 0 && this->current_update_idx_ / chunk_size % period == 0) {
+        auto higher_order_next_transfer = getNextTransfer(
+            this->current_update_idx_ - current_m_batch, getTransferEvery(j, m_batch));
+        if (higher_order_next_transfer <= this->current_update_idx_) {
           transfer(j + 1, j, up, lr);
         }
       }
+      next_transfer = getNextTransfer(this->current_update_idx_, transfer_every);
     }
   }
   // only reduce at end
   this->reduceToWeights(up_context, dev_weights);
 }
 
+/*********************************************************************************/
 template <typename T>
 void TransferRPUDeviceCuda<T>::reduceToWeights(CudaContext *context, T *dev_weights) {
 
