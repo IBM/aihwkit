@@ -22,16 +22,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Transfer LR parameter for ``MixedPrecisionCompound``. (\#283)
 * The bias term can now be handled either by the analog or digital domain by controlling
   the `digital_bias` layer parameter. (\#307)
-* PCM short-term weight noise. (#???)
-* IR-drop simulation across columns during analog mat-vec. (\#???)
-* Transposed-read for ``TransferCompound``. (\???)
+* PCM short-term weight noise. (\#312)
+* IR-drop simulation across columns during analog mat-vec. (\#312)
+* Transposed-read for ``TransferCompound``. (\#312)
 
 ### Fixed
 
 * Removed GPU warning during destruction when using multiple GPUs. (\#277)
 * Fixed issue in transfer counter for mixed precision in case of GPU. (\#283)
 * Map location keyword for load / save observed. (\#293)
-* Fixed issue with CUDA buffer allocation when batch size changed. (\294)
+* Fixed issue with CUDA buffer allocation when batch size changed. (\#294)
 * Fixed missing load statedict for AnalogSequential. (\#295) 
 
 ### Changed
@@ -39,9 +39,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The inference noise models are now located in `aihwkit.inference`. (\#281)
 * Analog state dict structure `has changed (shared weight are not saved). (\#293)
 * Some of the parameter names of the``TransferCompound`` have
-  changed. (\#???)
+  changed. (\#312)
 * New fast learning rate parameter for TransferCompound, SGD learning
-  rate then is applied on the slow matrix (\#???). 
+  rate then is applied on the slow matrix (\#312). 
 
 ### Deprecated
 
