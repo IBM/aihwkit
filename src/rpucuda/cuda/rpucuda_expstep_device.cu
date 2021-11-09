@@ -47,6 +47,8 @@ template <typename T> struct UpdateFunctorExpStep {
       curandState &local_state)
 
   {
+    (void)par_2; // no used here
+
     // par_4 order (min_bound, scale_down, max_bound, scale_up )
     // global_pars see below
     T uw_std = global_pars[6];
@@ -110,6 +112,8 @@ template <typename T> struct UpdateFunctorExpStepComplexNoise {
       curandState &local_state)
 
   {
+    (void)par_2; // no used here
+
     // par_4 order (min_bound, scale_down, max_bound, scale_up )
     // global_pars see below
     T uw_std = global_pars[6];
