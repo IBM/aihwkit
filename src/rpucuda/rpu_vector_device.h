@@ -156,7 +156,7 @@ public:
 
   void getDPNames(std::vector<std::string> &names) const override;
   void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
-  void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
   int getHiddenUpdateIdx() const override;

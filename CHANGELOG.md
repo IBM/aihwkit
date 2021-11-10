@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Map location keyword for load / save observed. (\#293)
 * Fixed issue with CUDA buffer allocation when batch size changed. (\#294)
 * Fixed missing load statedict for AnalogSequential. (\#295) 
+* Fixed issue with hierarchical hidden parameter settings. (\#313)
 
 ### Changed
 

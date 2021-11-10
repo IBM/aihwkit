@@ -632,8 +632,14 @@ void TransferRPUDevice<T>::resetCols(
 #undef LOOP_WITH_HIDDEN
 
 template <typename T>
-void TransferRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
-  VectorRPUDevice<T>::setDeviceParameter(data_ptrs);
+void TransferRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) {
+  VectorRPUDevice<T>::setDeviceParameter(out_weights, data_ptrs);
+
+  if (fully_hidden_) {
+    // weight might have changed because of hidden weight change
+    RPU::math::copy<T>(
+        this->size_, this->weights_vec_[this->n_devices_ - 1][0], 1, out_weights[0], 1);
+  }
 }
 
 template class TransferRPUDevice<float>;
