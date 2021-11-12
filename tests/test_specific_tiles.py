@@ -12,7 +12,8 @@
 
 """Some more tests for specific tiles."""
 
-from torch import ones
+from torch import ones, Tensor
+from torch.nn.functional import mse_loss
 
 from aihwkit.simulator.configs.devices import (
     TransferCompound,
@@ -20,6 +21,7 @@ from aihwkit.simulator.configs.devices import (
     SoftBoundsDevice
 )
 from aihwkit.simulator.configs.configs import UnitCellRPUConfig
+from aihwkit.optim import AnalogSGD
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearCuda
@@ -37,19 +39,21 @@ class TransferCompoundTest(ParametrizedTestCase):
     """Tests for transfer compound."""
 
     @staticmethod
-    def get_transfer_compound(gamma):
+    def get_transfer_compound(gamma, **kwargs):
         """Get a Tiki-taka compound with reference cell """
-        def custom_device():
+        def custom_device(**kwargs):
             """Custom device """
-            return SoftBoundsDevice(w_max_dtod=0.0, w_min_dtod=0.0, w_max=1.0, w_min=-1.0)
+            return SoftBoundsDevice(w_max_dtod=0.0, w_min_dtod=0.0, w_max=1.0, w_min=-1.0, **kwargs)
 
         rpu_config = UnitCellRPUConfig(
             device=TransferCompound(
 
                 # Devices that compose the Tiki-taka compound.
                 unit_cell_devices=[
-                    ReferenceUnitCell([custom_device(), custom_device()]),  # fast "A" matrix
-                    ReferenceUnitCell([custom_device(), custom_device()])   # slow "C" matrix
+                    # fast "A" matrix
+                    ReferenceUnitCell([custom_device(**kwargs), custom_device(**kwargs)]),
+                    # slow "C" matrix
+                    ReferenceUnitCell([custom_device(**kwargs), custom_device(**kwargs)])
                 ],
                 gamma=gamma,
             )
@@ -88,3 +92,67 @@ class TransferCompoundTest(ParametrizedTestCase):
                 self.assertEqual(bias[0], gamma*(a - b) + c - d)
 
             self.assertEqual(weight[0][0], gamma*(a - b) + c - d)
+
+    def test_decay(self):
+        """Test hidden parameter set."""
+        # pylint: disable=invalid-name, too-many-locals
+
+        lifetime = 100.  # initial setting (needs to be larger 1)
+        gamma = 0.1
+        rpu_config = self.get_transfer_compound(gamma=gamma,
+                                                lifetime=lifetime,
+                                                lifetime_dtod=0.0)
+
+        model = self.get_layer(in_features=2, out_features=1, rpu_config=rpu_config)
+
+        weight, bias = model.get_weights()
+        model.set_weights(weight * 0.0, bias * 0.0 if bias is not None else None)
+
+        params = model.analog_tile.get_hidden_parameters()
+        shape = params['hidden_weights_0_0'].shape
+
+        # just dummy settings
+        a, b, c, d = 0.47, 0.21, 0.64, 0.12
+        params['hidden_weights_0_0'] = a * ones(*shape)  # A
+        params['hidden_weights_1_0'] = b * ones(*shape)  # A ref
+        params['hidden_weights_0_1'] = c * ones(*shape)  # C
+        params['hidden_weights_1_1'] = d * ones(*shape)  # C_ref
+
+        # explicitly set the decay scales (which is 1-1/lifetime)
+        a_dcy, b_dcy, c_dcy, d_dcy = 0.95, 0.78, 0.93, 0.92
+        params['decay_scales_0_0'] = a_dcy * ones(*shape)  # A
+        params['decay_scales_1_0'] = b_dcy * ones(*shape)  # A ref
+        params['decay_scales_0_1'] = c_dcy * ones(*shape)  # C
+        params['decay_scales_1_1'] = d_dcy * ones(*shape)  # C_ref
+
+        model.analog_tile.set_hidden_parameters(params)
+
+        # LR set to zero. Only lifetime will be applied
+        opt = AnalogSGD(model.parameters(), lr=0.0)
+
+        x_b = Tensor([[0.1, 0.2], [0.2, 0.4]])
+        y_b = Tensor([[0.3], [0.6]])
+
+        epochs = 2
+        for _ in range(epochs):
+            opt.zero_grad()
+            pred = model(x_b)
+            loss = mse_loss(pred, y_b)
+
+            loss.backward()
+            opt.step()
+
+        weight, bias = model.get_weights()
+
+        # reference values
+        a = a * pow(a_dcy, epochs)
+        b = b * pow(b_dcy, epochs)
+        c = c * pow(c_dcy, epochs)
+        d = d * pow(d_dcy, epochs)
+
+        if self.digital_bias:
+            self.assertEqual(bias[0], 0.0)
+        if self.bias and not self.digital_bias:
+            self.assertEqual(bias[0], gamma*(a - b) + c - d)
+
+        self.assertEqual(weight[0][0], gamma*(a - b) + c - d)

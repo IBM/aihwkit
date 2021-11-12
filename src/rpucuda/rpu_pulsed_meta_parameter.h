@@ -26,7 +26,8 @@ enum class NoiseManagementType {
   Max,
   Constant,
   AverageAbsMax,
-  AverageAbsMaxSingleValue
+  AverageAbsMaxSingleValue,
+  AbsMaxSingleValue
 };
 
 enum class BoundManagementType { None, Iterative, IterativeWorstCase, Shift };

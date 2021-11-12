@@ -26,6 +26,12 @@
 
 namespace RPU {
 
+template <typename T> struct NonZeroFunctor {
+  __device__ __forceinline__ T operator()(const T &a) const {
+    return a == (T)0.0 ? (T)0.0 : (T)1.0;
+  }
+};
+
 template <typename T>
 __global__ void kernelAbsMaxNPSum(
     float *scale_values,
@@ -160,13 +166,27 @@ __global__ void kernelAverageAbsMaxSetScales(
 }
 
 template <typename T>
-__global__ void
-kernelAverageAbsMaxSingleMomentum(float *ravg, const float *sum, const int m_batch, T decay_rate) {
+__global__ void kernelAverageAbsMaxSingleMomentum(
+    float *ravg, const float *sum, const int m_batch, const T *nz_value, T decay_rate) {
   // just single block!
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   if (tid == 0) {
-    T max_avg = (*sum) / m_batch;
-    *ravg = (float)(*ravg * (1.0 - decay_rate) + decay_rate * max_avg);
+    T sum_value = *sum;
+    T nz = m_batch > 1 ? *nz_value : (sum_value != 0.0 ? 1.0 : 0.0);
+    if (nz > (T)0.5) { // at least one non-zero
+      T max_avg = (sum_value) / nz;
+      *ravg = (float)(*ravg * (1.0 - decay_rate) + decay_rate * max_avg);
+    }
+  }
+}
+
+template <typename T>
+__global__ void kernelAbsMaxSingleMomentum(float *ravg, const float *amax, T decay_rate) {
+  // just single block!
+  int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  if (tid == 0) {
+    T amax_value = *amax;
+    *ravg = (float)(*ravg * (1.0 - decay_rate) + decay_rate * amax_value);
   }
 }
 
@@ -178,13 +198,14 @@ kernelAverageAbsMaxSingleMomentum(float *ravg, const float *sum, const int m_bat
 
 template <typename T>
 NoiseManager<T>::NoiseManager(CudaContext *c, int size)
-    : size_(size), context_(c), buffer_m_batch_(0), const_set_if_(false) {
+    : size_(size), context_(c), buffer_m_batch_(0), last_m_batch_(0), const_set_if_(false) {
   // initialize for m_batch=1
   dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);
   dev_psum_values_ = RPU::make_unique<CudaArray<T>>(context_, 1);
   dev_nsum_values_ = RPU::make_unique<CudaArray<T>>(context_, 1);
   dev_ravg_scale_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
   dev_ravg_scale_value_->setConst(1.0);
+  dev_nzeros_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
 
   amaximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, true);
   maximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, false);
@@ -402,14 +423,14 @@ void NoiseManager<T>::compute(
     if (!is_test) {
 
       this->amaximizer_->compute(dev_input, m_batch, trans);
-
+      context_->synchronize();
       cudaStream_t s = context_->getStream();
       int nthreads = context_->getNThreads();
       int nblocks = context_->getNBlocks(m_batch, nthreads);
 
       if (m_batch > 1) {
         // first compute the average of the max over batch
-        if (!dev_a_temp_storage_) {
+        if (!dev_a_temp_storage_ || m_batch > last_m_batch_) {
           dev_avgmax_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
 
           size_t temp_storage_bytes = 0;
@@ -417,11 +438,13 @@ void NoiseManager<T>::compute(
               nullptr, temp_storage_bytes, amaximizer_->getMaxValues(),
               dev_avgmax_value_->getData(), m_batch, s);
           dev_a_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
+          last_m_batch_ = m_batch;
+          context_->synchronize();
         }
 
-        size_t ssz = dev_v_temp_storage_->getSize();
+        size_t ssz = dev_a_temp_storage_->getSize();
         RPU::cub::DeviceReduce::Sum(
-            (void *)dev_v_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
+            (void *)dev_a_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
             dev_avgmax_value_->getData(), m_batch, s);
       }
 
@@ -431,16 +454,73 @@ void NoiseManager<T>::compute(
             <<<context_->getNBlocks(m_batch + 1, nthreads), nthreads, 0, s>>>(
                 dev_scale_values_->getData(), dev_ravg_scale_value_->getData(),
                 m_batch > 1 ? dev_avgmax_value_->getData() : amaximizer_->getMaxValues(),
-                dev_scale_values_->getSize(),
-                ravg_initialized_ ? MIN(io.nm_decay * m_batch, 1.) : 1.0);
+                dev_scale_values_->getSize(), ravg_initialized_ ? MIN(io.nm_decay, 1.) : 1.0);
 
       } else {
+        // count non-zero
+
+        if (m_batch > 1) {
+          NonZeroFunctor<T> nonzero_functor;
+          RPU::cub::TransformInputIterator<T, NonZeroFunctor<T>, T *> nz_input(
+              amaximizer_->getMaxValues(), nonzero_functor);
+          // temp storage already requested above
+          size_t ssz = dev_a_temp_storage_->getSize();
+          RPU::cub::DeviceReduce::Sum(
+              (void *)dev_a_temp_storage_->getData(), ssz, nz_input, dev_nzeros_value_->getData(),
+              m_batch, s);
+        }
         // just update the running avg value as only single output requested
         kernelAverageAbsMaxSingleMomentum<T><<<1, 1, 0, s>>>(
             dev_ravg_scale_value_->getData(),
             m_batch > 1 ? dev_avgmax_value_->getData() : amaximizer_->getMaxValues(), m_batch,
-            ravg_initialized_ ? MIN(io.nm_decay * m_batch, 1.0) : 1.0);
+            m_batch > 1 ? dev_nzeros_value_->getData() : nullptr,
+            ravg_initialized_ ? MIN(io.nm_decay, 1.0)
+                              : 1.0); // Note that meaning of decay is per batch here
       }
+      ravg_initialized_ = true;
+    }
+    return;
+  }
+  case NoiseManagementType::AbsMaxSingleValue: {
+    // CAUTION: the running average will not be saved for checkpointing... so there might be a
+    // glitch when continueing training from checkpoint...
+
+    // this is overall max over m_batch
+    if (!is_test) {
+
+      this->amaximizer_->compute(dev_input, m_batch, trans);
+      context_->synchronize();
+      cudaStream_t s = context_->getStream();
+      int nthreads = context_->getNThreads();
+      int nblocks = context_->getNBlocks(m_batch, nthreads);
+
+      if (m_batch > 1) {
+        // another max pass
+        if (!dev_a_temp_storage_ || m_batch > last_m_batch_) {
+          dev_avgmax_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
+
+          size_t temp_storage_bytes = 0;
+          RPU::cub::DeviceReduce::Sum(
+              nullptr, temp_storage_bytes, amaximizer_->getMaxValues(),
+              dev_avgmax_value_->getData(), m_batch, s);
+          dev_a_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
+          last_m_batch_ = m_batch;
+          context_->synchronize();
+        }
+
+        size_t ssz = dev_a_temp_storage_->getSize();
+        RPU::cub::DeviceReduce::Max(
+            (void *)dev_a_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
+            dev_avgmax_value_->getData(), m_batch, s);
+      }
+
+      // just update the running avg value as only single output requested
+      kernelAbsMaxSingleMomentum<T><<<1, 1, 0, s>>>(
+          dev_ravg_scale_value_->getData(),
+          m_batch > 1 ? dev_avgmax_value_->getData() : amaximizer_->getMaxValues(),
+          ravg_initialized_ ? MIN(io.nm_decay, 1.0)
+                            : 1.0); // Note that meaning of decay is per batch here
+
       ravg_initialized_ = true;
     }
     return;
@@ -464,6 +544,10 @@ template <typename T> float *NoiseManager<T>::getScaleValues() const {
   case NoiseManagementType::Max:
     return maximizer_->getMaxValues();
   case NoiseManagementType::AverageAbsMaxSingleValue:
+  case NoiseManagementType::AbsMaxSingleValue:
+    if (!ravg_initialized_) {
+      RPU_FATAL("Running average not yet initializated. Cannot use getScaleValues() yet.");
+    }
     return dev_ravg_scale_value_->getData();
   default:
     RPU_FATAL("Noise management type not implemented.");

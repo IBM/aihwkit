@@ -12,14 +12,13 @@
 
 """Configuration for Analog (Resistive Device) tiles."""
 
-# pylint: disable=too-many-instance-attributes,too-many-lines
+# pylint: disable=too-many-instance-attributes, too-many-lines
 
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import ClassVar, List, Type, Union
 from warnings import warn
 from numpy import exp
-
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.configs.helpers import (
@@ -1267,9 +1266,53 @@ class TransferCompound(UnitCell):
         return transfer_parameters
 
 
+@dataclass
+class BufferedTransferCompound(TransferCompound):
+    r"""Abstract device model that takes 2 or more devices and
+    implements a buffered transfer-based learning rule.
+
+    Different to :class:`TransferCompound`, however,  readout is done
+    first onto a digital buffer (in floating point precision), from
+    which then the second analog matrix is updated. This second step is
+    very similar to the analog update in :class:`MixedPrecisionCompound`.
+
+    Note, however, that in contrast to :class:`MixedPrecisionCompound`
+    the rank-update is still done in analog with parallel update using
+    pulse trains.
+
+    The buffer is assumed to be in floating point precision and
+    only one row/column at a time needs to be processed in one update cycle,
+    thus greatly reducing on-chip memory requirements.
+
+    For details, see `Gokmen (2021)`_.
+
+    .. _Gokmen (2021): https://www.frontiersin.org/articles/10.3389/frai.2021.699148/full
+    """
+
+    bindings_class: ClassVar[Type] = devices.BufferedTransferResistiveDeviceParameter
+
+    thres_scale: float = 1.0
+    """Threshold scale for buffer to determine whether to transfer to next
+    device. Will be multiplied by the device granularity to get the
+    threshold.
+    """
+
+    step: float = 1.0
+    """Value to fill the ``d`` vector for the update if buffered value is
+    above threshold.
+    """
+
+    momentum: float = 0.0
+    """Momentum of the buffer.
+
+    After transfer, this momentum fraction stays on the buffer instead
+    of subtracting all of what was transferred.
+    """
+
 ###############################################################################
 # Specific compound-devices with digital rank update
 ###############################################################################
+
 
 @dataclass
 class DigitalRankUpdateCell(_PrintableMixin):

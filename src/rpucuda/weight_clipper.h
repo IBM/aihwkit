@@ -28,7 +28,7 @@ enum class WeightClipType {
 struct WeightClipParameter {
 
   WeightClipType type = WeightClipType::None;
-  double fixed_value = 1.0;
+  double fixed_value = -1.0; // will always be applied if larger >0
   double sigma = 2.5;
 
   void print() const {
@@ -43,9 +43,7 @@ struct WeightClipParameter {
     if (type == WeightClipType::None) {
       return;
     }
-    if (type == WeightClipType::FixedValue) {
-      ss << "\t fixed value:\t\t" << fixed_value << std::endl;
-    }
+    ss << "\t fixed value:\t\t" << fixed_value << std::endl;
     if (type == WeightClipType::LayerGaussian) {
       ss << "\t sigma:\t\t" << sigma << std::endl;
     }

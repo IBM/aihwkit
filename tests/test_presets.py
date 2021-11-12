@@ -24,7 +24,8 @@ from aihwkit.simulator.presets import (
     TikiTakaCapacitorPreset, TikiTakaEcRamPreset, TikiTakaEcRamMOPreset, TikiTakaIdealizedPreset,
     MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
     MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
-    MixedPrecisionGokmenVlasovPreset, MixedPrecisionPCMPreset,
+    MixedPrecisionGokmenVlasovPreset, MixedPrecisionPCMPreset, TTv2ReRamESPreset, TTv2ReRamSBPreset,
+    TTv2CapacitorPreset, TTv2EcRamPreset, TTv2EcRamMOPreset, TTv2IdealizedPreset,
 )
 from .helpers.decorators import parametrize_over_presets
 from .helpers.testcases import AihwkitTestCase
@@ -41,7 +42,9 @@ from .helpers.testcases import AihwkitTestCase
         TikiTakaIdealizedPreset,
         MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
         MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
-        MixedPrecisionGokmenVlasovPreset, MixedPrecisionPCMPreset,
+        MixedPrecisionGokmenVlasovPreset, MixedPrecisionPCMPreset, TTv2ReRamESPreset,
+        TTv2ReRamSBPreset, TTv2CapacitorPreset, TTv2EcRamPreset, TTv2EcRamMOPreset,
+        TTv2IdealizedPreset
     ]
 )
 class PresetTest(AihwkitTestCase):

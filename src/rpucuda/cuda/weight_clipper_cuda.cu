@@ -28,20 +28,25 @@ template <typename T> struct StdFunctor {
   T *sum_;
 };
 
-template <typename T> __global__ void kernelAClipC(T *values, int size, T *a, T c) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
+template <typename T> __global__ void kernelAClipC(T *values, int size, T *a, T c, T max_clip) {
+
   T abs_a = fabs(*a / c);
-  if (tid < size) {
-    values[tid] = MIN(MAX(values[tid], -abs_a), abs_a);
+  if (max_clip > 0) {
+    abs_a = MIN(abs_a, max_clip);
   }
+
+  RPU_CUDA_1D_KERNEL_LOOP(tid, size) { values[tid] = MIN(MAX(values[tid], -abs_a), abs_a); }
 }
 
-template <typename T> __global__ void kernelAClipSqrt(T *values, int size, T *a, T sigma) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
+template <typename T>
+__global__ void kernelAClipSqrt(T *values, int size, T *a, T sigma, T max_clip) {
+
   T abs_a = sqrtf(fabs(*a) / (size - 1)) * sigma;
-  if (tid < size) {
-    values[tid] = MIN(MAX(values[tid], -abs_a), abs_a);
+  if (max_clip > 0) {
+    abs_a = MIN(abs_a, max_clip);
   }
+
+  RPU_CUDA_1D_KERNEL_LOOP(tid, size) { values[tid] = MIN(MAX(values[tid], -abs_a), abs_a); }
 }
 
 // ctor
@@ -83,8 +88,8 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
         dev_temp_storage_->getData(), temp_storage_bytes_, row_amaximizer_->getMaxValues(),
         dev_sum_value_->getData(), d_size_, s);
 
-    kernelAClipC<T>
-        <<<nblocks, nthreads, 0, s>>>(weights, size_, dev_sum_value_->getData(), (T)d_size_);
+    kernelAClipC<T><<<nblocks, nthreads, 0, s>>>(
+        weights, size_, dev_sum_value_->getData(), (T)d_size_, wclpar.fixed_value);
     break;
   }
 
@@ -110,14 +115,15 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
         dev_temp_storage_->getData(), temp_storage_bytes_, std_input, dev_std_value_->getData(),
         size_, s);
 
-    kernelAClipSqrt<T>
-        <<<nblocks, nthreads, 0, s>>>(weights, size_, dev_std_value_->getData(), wclpar.sigma);
+    kernelAClipSqrt<T><<<nblocks, nthreads, 0, s>>>(
+        weights, size_, dev_std_value_->getData(), wclpar.sigma, wclpar.fixed_value);
 
     break;
   }
 
   case WeightClipType::FixedValue: {
-    if (wclpar.fixed_value >= 0) {
+
+    if (wclpar.fixed_value > 0) {
       RPU::math::aclip(context_, weights, size_, (T)wclpar.fixed_value);
     }
     break;

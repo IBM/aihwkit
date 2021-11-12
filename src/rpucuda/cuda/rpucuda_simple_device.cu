@@ -15,6 +15,7 @@
 #include "rpucuda_pulsed_device.h"
 #include <memory>
 
+#include "rpucuda_buffered_transfer_device.h"
 #include "rpucuda_constantstep_device.h"
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_linearstep_device.h"
@@ -49,6 +50,9 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> 
     return new OneSidedRPUDeviceCuda<T>(c, static_cast<const OneSidedRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::Transfer:
     return new TransferRPUDeviceCuda<T>(c, static_cast<const TransferRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::BufferedTransfer:
+    return new BufferedTransferRPUDeviceCuda<T>(
+        c, static_cast<const BufferedTransferRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::FloatingPoint:
     return new SimpleRPUDeviceCuda<T>(c, static_cast<const SimpleRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::MixedPrec:

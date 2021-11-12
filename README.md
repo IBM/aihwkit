@@ -63,7 +63,7 @@ functionalities such as:
   based on models in the literature, along with configuration that specifies a particular device and optimizer choice.
 * A module for executing high-level use cases ("experiments"), such as neural
   network training with minimal code overhead.
-* A utility to automatically convert a downloaded model (e.g., pre-trained) to its equivalent Analog 
+* A utility to automatically convert a downloaded model (e.g., pre-trained) to its equivalent Analog
   model by replacing all linear/conv layers to Analog layers (e.g., for convenient hardware-aware training).
 * Integration with the [AIHW Composer] platform, a no-code web experience, that allows executing
   experiments in the cloud.

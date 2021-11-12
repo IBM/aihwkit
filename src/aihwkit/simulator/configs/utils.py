@@ -562,8 +562,15 @@ class WeightClipParameter(_PrintableMixin):
 
     bindings_class: ClassVar[Type] = tiles.WeightClipParameter
 
-    fixed_value: float = 1.0
-    """Clipping value in case of ``FixedValue`` type."""
+    fixed_value: float = -1.0
+    """Clipping value in case of ``FixedValue`` type.
+
+    Caution:
+
+        If ``fixed_value > 0`` it will be also applied during other
+        clipping types.
+
+    """
 
     sigma: float = 2.5
     """Sigma value for clipping for the ``LayerGaussian`` type."""

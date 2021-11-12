@@ -162,6 +162,8 @@ protected:
   std::unique_ptr<PulsedRPUWeightUpdater<T>> transfer_pwu_ = nullptr;
   T granularity_ = 0.0f;
   std::vector<T> transfer_tmp_;
+  RealWorldRNG<T> rw_rng_{0};
+  RNG<T> rng_{0};
 
 private:
   int current_row_index_ = 0;
@@ -169,7 +171,6 @@ private:
   std::vector<T> transfer_d_vecs_;
   T avg_sparsity_ = 0.0f;
   const PulsedUpdateMetaParameter<T> *up_ptr_ = nullptr;
-  RealWorldRNG<T> rw_rng_{0};
 };
 
 } // namespace RPU

@@ -37,8 +37,6 @@ public:
         static_cast<MixedPrecRPUDeviceBaseCuda<T> &>(b));
 
     swap(a.dev_chi_, b.dev_chi_);
-    swap(a.chi_scale_, b.chi_scale_);
-    swap(a.nblocks_batch_max_, b.nblocks_batch_max_);
   };
   bool hasDirectUpdate() const override { return true; };
   void doDirectUpdate(
@@ -55,7 +53,6 @@ public:
       T *d_buffer) override;
 
   std::vector<T> getHiddenWeights() const override;
-
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
 
   MixedPrecRPUDeviceMetaParameter<T> &getPar() const override {
@@ -83,11 +80,10 @@ private:
       int n_bins,
       int size,
       int m_batch,
-      bool trans);
+      bool trans,
+      bool stochastic_rounding);
 
   std::unique_ptr<CudaArray<T>> dev_chi_ = nullptr;
-  int32_t chi_scale_ = 0;
-  int nblocks_batch_max_ = 0;
 };
 
 } // namespace RPU

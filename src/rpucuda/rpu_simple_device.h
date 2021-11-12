@@ -42,6 +42,7 @@ enum DeviceUpdateType {
   Transfer,
   MixedPrec,
   PowStep,
+  BufferedTransfer
 };
 
 // inherit from Simple
