@@ -23,6 +23,7 @@ template <typename T> class ForwardBackwardPass {
 public:
   explicit ForwardBackwardPass(int x_size, int d_size) : x_size_(x_size), d_size_(d_size){};
   ForwardBackwardPass(){};
+  virtual ~ForwardBackwardPass(){};
 
   virtual void forwardVector(
       T **weights,

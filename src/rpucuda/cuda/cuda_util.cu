@@ -103,8 +103,9 @@ CublasEnvironment::~CublasEnvironment() {
 CublasEnvironment::CublasEnvironment(int gpu_id) {
 
   DEBUG_OUT("GET BLAS env.");
-  if (gpu_id >= 0)
+  if (gpu_id >= 0) {
     CUDA_CALL(cudaSetDevice(gpu_id));
+  }
 
   // create host
   cublasStatus_t stat = cublasCreate(&handle_);
@@ -289,6 +290,7 @@ void CudaContext::init() {
   } else {
     CUDA_CALL(cudaGetDevice(&gpu_id_));
   }
+  CUDA_CALL(cudaDeviceSynchronize());
   DEBUG_OUT("Create context on GPU " << gpu_id_);
   env_ = new CublasEnvironment(gpu_id_);
   stream_id_ = 0;
@@ -301,6 +303,7 @@ void CudaContext::init() {
 
   prop_ = new cudaDeviceProp();
   CUDA_CALL(cudaGetDeviceProperties(prop_, gpu_id_));
+  CUDA_CALL(cudaDeviceSynchronize());
 }
 
 CudaContext::CudaContext(int gpu_id, bool non_blocking)

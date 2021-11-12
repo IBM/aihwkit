@@ -37,9 +37,11 @@ template <typename T> class MixedPrecRPUDevice;
 template <typename T>
 struct MixedPrecRPUDeviceMetaParameter : MixedPrecRPUDeviceBaseMetaParameter<T> {
 
-  int n_x_bins = 255;
-  int n_d_bins = 255;
-  float transfer_lr = 1.0;
+  int n_x_bins = 0;
+  int n_d_bins = 0;
+  bool stoc_round_d = false;
+  bool stoc_round_x = false;
+  T transfer_lr = 1.0;
 
   MixedPrecRPUDeviceMetaParameter() = default;
   ~MixedPrecRPUDeviceMetaParameter() = default;
@@ -53,6 +55,9 @@ struct MixedPrecRPUDeviceMetaParameter : MixedPrecRPUDeviceBaseMetaParameter<T> 
 
     swap(a.n_d_bins, b.n_d_bins);
     swap(a.n_x_bins, b.n_x_bins);
+    swap(a.transfer_lr, b.transfer_lr);
+    swap(a.stoc_round_x, b.stoc_round_x);
+    swap(a.stoc_round_d, b.stoc_round_d);
   }
 
   std::string getName() const override {

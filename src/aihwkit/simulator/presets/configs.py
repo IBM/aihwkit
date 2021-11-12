@@ -10,6 +10,8 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=too-many-lines
+
 """RPU configurations presets for resistive processing units."""
 
 from dataclasses import dataclass, field
@@ -19,7 +21,8 @@ from aihwkit.simulator.configs.configs import (
 )
 from aihwkit.simulator.configs.devices import (
     PulsedDevice, TransferCompound, UnitCell, VectorUnitCell,
-    DigitalRankUpdateCell, MixedPrecisionCompound
+    DigitalRankUpdateCell, MixedPrecisionCompound,
+    BufferedTransferCompound
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
@@ -685,8 +688,178 @@ class TikiTakaIdealizedPreset(UnitCellRPUConfig):
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
 
+# TTv2 configs.
+
+
+@dataclass
+class TTv2ReRamESPreset(UnitCellRPUConfig):
+    """Configuration using TTv2 with
+    :class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: BufferedTransferCompound(
+            unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
+            transfer_forward=PresetIOParameters(),
+            transfer_update=PresetUpdateParameters(),
+            transfer_every=1.0,
+            units_in_mbatch=True,
+            ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class TTv2ReRamSBPreset(UnitCellRPUConfig):
+    """Configuration using TTv2 with
+    :class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: BufferedTransferCompound(
+            unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice()],
+            transfer_forward=PresetIOParameters(),
+            transfer_update=PresetUpdateParameters(),
+            transfer_every=1.0,
+            units_in_mbatch=True,
+            ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class TTv2CapacitorPreset(UnitCellRPUConfig):
+    """Configuration using TTv2 with
+    :class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: BufferedTransferCompound(
+            unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
+            transfer_forward=PresetIOParameters(),
+            transfer_update=PresetUpdateParameters(),
+            transfer_every=1.0,
+            units_in_mbatch=True,
+            ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class TTv2EcRamPreset(UnitCellRPUConfig):
+    """Configuration using TTv2 with
+    :class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: BufferedTransferCompound(
+            unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
+            transfer_forward=PresetIOParameters(),
+            transfer_update=PresetUpdateParameters(),
+            transfer_every=1.0,
+            units_in_mbatch=True,
+            ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class TTv2EcRamMOPreset(UnitCellRPUConfig):
+    """Configuration using TTv2 with
+    :class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: BufferedTransferCompound(
+            unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
+            transfer_forward=PresetIOParameters(),
+            transfer_update=PresetUpdateParameters(),
+            transfer_every=1.0,
+            units_in_mbatch=True,
+            ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
+
+@dataclass
+class TTv2IdealizedPreset(UnitCellRPUConfig):
+    """Configuration using TTv2 with
+    :class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: BufferedTransferCompound(
+            unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
+            transfer_forward=PresetIOParameters(),
+            transfer_update=PresetUpdateParameters(),
+            transfer_every=1.0,
+            units_in_mbatch=True,
+            ))
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
 
 # Mixed precision presets
+
 
 @dataclass
 class MixedPrecisionReRamESPreset(DigitalRankUpdateRPUConfig):

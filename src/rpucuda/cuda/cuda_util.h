@@ -39,6 +39,7 @@
 #undef CUB_NS_POSTFIX
 #define CUB_NS_PREFIX namespace RPU {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::RPU::cub
 
 #define CUBLAS_CALL(X)                                                                             \
   if (X != CUBLAS_STATUS_SUCCESS) {                                                                \

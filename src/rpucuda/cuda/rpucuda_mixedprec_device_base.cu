@@ -45,6 +45,9 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::allocateContainers() {
   dev_avg_sparsity_ = RPU::make_unique<CudaArray<T>>(this->context_, 1);
   dev_avg_sparsity_->setConst((T)0);
 
+  nblocks_batch_max_ = this->context_->getSMCount() *
+                       (this->context_->maxThreadsPerBlock() / this->context_->getNThreads());
+
   dev_zc_temp_storage_ = nullptr;
   current_zero_size_ = 0;
   current_update_index_ = 0;
@@ -77,7 +80,7 @@ MixedPrecRPUDeviceBaseCuda<T>::MixedPrecRPUDeviceBaseCuda(
   granularity_ = other.granularity_;
 
   // do not copy tmps, noise managers, up_ptrs,  rw_rng_, nor transfer_pwu
-
+  nblocks_batch_max_ = other.nblocks_batch_max_;
   this->context_->synchronize();
 };
 
@@ -125,7 +128,7 @@ MixedPrecRPUDeviceBaseCuda<T>::operator=(MixedPrecRPUDeviceBaseCuda<T> &&other) 
   up_ = other.up_;
 
   granularity_ = other.granularity_;
-
+  nblocks_batch_max_ = other.nblocks_batch_max_;
   return *this;
 };
 
@@ -234,7 +237,7 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::transfer(T *dev_weight
   }
   n_transfers = MIN(n_transfers, this->d_size_);
   // std::cout << "n_transfers: "  << n_transfers << ", current_row_index:" <<  current_row_index_
-  // << std::endl;
+  //  << std::endl;
   int i_row = current_row_index_;
   if (par.random_row) {
     i_row = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
@@ -270,8 +273,9 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::transfer(T *dev_weight
 template <typename T>
 void MixedPrecRPUDeviceBaseCuda<T>::doTransfer(T *dev_weights, const T lr, const int m_batch) {
   const auto &par = getPar();
-  int every = par.transfer_every * m_batch; // current_update_index_ is in mat-vecs
-  if (every > 0 && current_update_index_ > 0 && (current_update_index_ % every == 0)) {
+  int every = par.transfer_every; // current_update_index_ is in mat-vecs, but every in m_batch
+  if (every > 0 && (current_update_index_ / m_batch) > 0 &&
+      ((current_update_index_ / m_batch) % every == 0)) {
     transfer(dev_weights, lr);
   }
 }

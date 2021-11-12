@@ -66,6 +66,10 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
 
     clip_value = fabs(sum_amax / d_size_);
 
+    if (wclpar.fixed_value > 0) {
+      clip_value = MIN(clip_value, wclpar.fixed_value);
+    }
+
     break;
   }
   case WeightClipType::LayerGaussian: {
@@ -90,6 +94,9 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
     std_value = sqrt(std_value);
 
     clip_value = std_value * wclpar.sigma;
+    if (wclpar.fixed_value > 0) {
+      clip_value = MIN(clip_value, wclpar.fixed_value);
+    }
     break;
   }
 
@@ -102,7 +109,9 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
   } // switch
 
   // do the clippping
-  clip(weights, clip_value);
+  if (clip_value > 0) {
+    clip(weights, clip_value);
+  }
 }
 
 template class WeightClipper<float>;
