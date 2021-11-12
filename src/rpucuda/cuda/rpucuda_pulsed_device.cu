@@ -106,36 +106,49 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 
   PulsedRPUDeviceCudaBase<T>::populateFrom(rpu_device_in);
 
-  PulsedDPStruc<T> **sup = rpu_device.getDPStruc();
-
   // copy RPU to device variables
   float *tmp = new float[4 * size];
+
   T *tmp_ds = new T[size];
   T *tmp_df = new T[size];
   T *tmp_rb = new T[size];
   T *tmp_pw = new T[size];
 
+  T *mn = rpu_device.getMinBound()[0];
+  T *mx = rpu_device.getMaxBound()[0];
+  T *su = rpu_device.getScaleUp()[0];
+  T *sd = rpu_device.getScaleDown()[0];
+
   T *ds = rpu_device.getDecayScale()[0];
   T *df = rpu_device.getDiffusionRate()[0];
   T *rb = rpu_device.getResetBias()[0];
   T *pw = rpu_device.getPersistentWeights()[0];
+  bool with_diffusion = false;
+  bool with_reset_bias = false;
 
   for (int i = 0; i < d_size; ++i) {
     for (int j = 0; j < x_size; ++j) {
 
-      int k = j * (d_size * 4) +
-              4 * i; // transposed: col major required by cuBLAS .. linear arangmenet for now
-      tmp[k] = sup[i][j].min_bound;
-      tmp[k + 1] = sup[i][j].scale_down;
-      tmp[k + 2] = sup[i][j].max_bound;
-      tmp[k + 3] = sup[i][j].scale_up;
-
       int l_t = j * (d_size) + i;
       int l = i * (x_size) + j;
+      // transposed: col major required by cuBLAS .. linear arangmenet for now
+      int k = j * (d_size * 4) + 4 * i;
+      tmp[k] = mn[l];
+      tmp[k + 1] = sd[l];
+      tmp[k + 2] = mx[l];
+      tmp[k + 3] = su[l];
+
       tmp_ds[l_t] = ds[l];
       tmp_df[l_t] = df[l];
       tmp_rb[l_t] = rb[l];
       tmp_pw[l_t] = pw[l];
+
+      if (df[l] != 0.0) {
+        with_diffusion = true;
+      }
+      if (rb[l] != 0.0) {
+        with_reset_bias = true;
+      }
     }
   }
 
@@ -143,18 +156,17 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
   dev_decay_scale_->assign(tmp_ds);
 
   // other parameters (on the fly)
-  const auto &par = getPar();
-  if (par.diffusion > 0.0) {
+  if (with_diffusion) {
     dev_diffusion_rate_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
     dev_diffusion_rate_->assign(tmp_df);
   }
 
-  if (par.needsResetBias()) {
+  if (with_reset_bias) {
     dev_reset_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
     dev_reset_bias_->assign(tmp_rb);
   }
 
-  if (par.usesPersistentWeight()) {
+  if (getPar().usesPersistentWeight()) {
     dev_persistent_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
     dev_persistent_weights_->assign(tmp_pw);
   }
@@ -186,18 +198,22 @@ void PulsedRPUDeviceCuda<T>::decayWeights(T *weights, T alpha, bool bias_no_deca
 
   RPU::math::elemscalealpha<T>(
       this->context_, w, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
-      dev_decay_scale_->getData(), dev_4params_->getData(), alpha);
+      dev_decay_scale_->getData(), dev_4params_->getData(), alpha,
+      dev_reset_bias_ != nullptr ? dev_reset_bias_->getData() : nullptr);
 
   applyUpdateWriteNoise(weights);
 }
 
 template <typename T> void PulsedRPUDeviceCuda<T>::decayWeights(T *weights, bool bias_no_decay) {
 
-  T *w = getPar().usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
+  const auto &par = getPar();
+
+  T *w = par.usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
 
   RPU::math::elemscale<T>(
       this->context_, w, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
-      dev_decay_scale_->getData(), dev_4params_->getData());
+      dev_decay_scale_->getData(), dev_4params_->getData(),
+      dev_reset_bias_ != nullptr ? dev_reset_bias_->getData() : nullptr);
 
   applyUpdateWriteNoise(weights);
 }
