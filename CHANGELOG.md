@@ -25,8 +25,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * PCM short-term weight noise. (\#312)
 * IR-drop simulation across columns during analog mat-vec. (\#312)
 * Transposed-read for ``TransferCompound``. (\#312)
-* ``BufferedTranferCompound`` and TTv2 presets. (\#???)
-* Stochastic rounding for ``MixedPrecisionCompound``. (\#???)
+* ``BufferedTranferCompound`` and TTv2 presets. (\#318)
+* Stochastic rounding for ``MixedPrecisionCompound``. (\#318)
 
 
 ### Fixed
@@ -47,7 +47,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * New fast learning rate parameter for TransferCompound, SGD learning
   rate then is applied on the slow matrix (\#312). 
 * The ``fixed_value`` of ``WeightClipParameter`` is now  applied for all clipping
-  types if set larger than zero. (\#???)
+  types if set larger than zero. (\#318)
 
 ### Deprecated
 
