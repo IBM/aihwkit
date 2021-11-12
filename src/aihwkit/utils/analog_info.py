@@ -66,10 +66,8 @@ class LayerInfo:
         return input_size, tuple(output_size)
 
     def set_kernel_size(self): 
-        try: 
+        if hasattr(self.module, 'kernel_size'): 
             self.kernel_size = self.module.kernel_size
-        except: 
-            logging.info("Not a convolution operator.")
 
     def calculate_reuse_factor(self): 
         if isinstance(self.module, AnalogLinear):
