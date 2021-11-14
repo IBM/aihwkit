@@ -1,3 +1,12 @@
+"""Analog Information utility.
+
+This module prints relevant information about the model and its analog execution.
+"""
+
+from functools import reduce
+import operator
+from typing import Optional, Any, Tuple, List
+
 # Imports from PyTorch.
 import torch
 from torch import Tensor
@@ -6,10 +15,6 @@ from torch import nn
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 from aihwkit.nn.modules.conv import _AnalogConvNd
 from aihwkit.nn import AnalogLinear
-
-from functools import reduce
-import operator
-from typing import Optional, Sequence, Union, Any, Tuple, List
 
 COLUMN_NAMES = {
     "name": "Layer Name",
@@ -30,7 +35,7 @@ class LayerInfo:
     """
     class storing layer statistics and information.
     """
-
+    # pylint: disable=too-many-instance-attributes
     module: nn.Module
     name: str
     isanalog: bool
@@ -48,6 +53,7 @@ class LayerInfo:
         self.kernel_size = None
         self.reuse_factor = 0
         self.input_size, self.output_size = None, None
+        self.rpu_config = rpu_config
 
     def __set_layer_size(self,
                          input_size: Optional[INPUT_SIZE_TYPE],
