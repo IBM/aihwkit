@@ -3,26 +3,13 @@ import torch
 from torch import Tensor
 from torch import nn
 
-from aihwkit.nn.modules.base import AnalogModuleBase
+from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 from aihwkit.nn.modules.conv import _AnalogConvNd
 from aihwkit.nn import AnalogLinear
 
-import logging
-from math import prod
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    cast,
-)
+from functools import reduce
+import operator
+from typing import Optional, Sequence, Union, Any, Tuple, List
 
 COLUMN_NAMES= {
     "name": "Layer Name", 
@@ -35,49 +22,66 @@ COLUMN_NAMES= {
     "reuse_factor" : "Reuse Factor"
 }
 
-INPUT_SIZE_TYPE = Sequence[Union[int, Sequence[Any], torch.Size]]
+INPUT_SIZE_TYPE = Any
 FORMATTING_WIDTH = 150
 
 class LayerInfo:
     """
     class storing layer statistics and information. 
     """
-    def __init__(self, module:nn.Module, rpu_config):
+
+    module: nn.Module
+    name: str
+    isanalog: bool 
+    num_tiles: int
+    input_size: INPUT_SIZE_TYPE
+    output_size: INPUT_SIZE_TYPE
+    kernel_size: INPUT_SIZE_TYPE
+    reuse_factor: int
+
+    def __init__(self, module: nn.Module, rpu_config: Optional[RPUConfigAlias] = None):
         self.module = module
         self.name = self.module.__class__.__name__
         self.isanalog = isinstance(self.module, AnalogModuleBase)
         self.num_tiles = 0 if not self.isanalog else self.module._analog_tile_counter
+        self.kernel_size = None
+        self.reuse_factor = 0 
         self.input_size, self.output_size = None, None
-        self.kernel_size = None 
-        self.reuse_factor = None
 
-    def __set_layer_size(self, input_size, output_size): 
+    def __set_layer_size(self, input_size: Optional[INPUT_SIZE_TYPE], output_size: Optional[INPUT_SIZE_TYPE]) -> None: 
+        """Private method to set layer's sizes attributes."""
         self.input_size = input_size
         self.output_size = output_size
 
-    def __set_reuse_factor(self, reuse_factor): 
+    def __set_reuse_factor(self, reuse_factor: int) -> None: 
+        """Private method to set layer's reuse factor attribute."""
         self.reuse_factor = reuse_factor
 
-    def calculate_size(self, input_size):
+    def calculate_size(self, input_size: Optional[INPUT_SIZE_TYPE]) -> Tuple[Optional[INPUT_SIZE_TYPE], Optional[INPUT_SIZE_TYPE]]:
         """Set input_size or output_size of the layer."""
         rand_tensor = torch.rand(input_size)
         output_size = self.module(rand_tensor).shape
         self.__set_layer_size(input_size, tuple(output_size))
         return input_size, tuple(output_size)
 
-    def set_kernel_size(self): 
+    def set_kernel_size(self) -> None: 
+        """Set kernel size attribute."""
         if hasattr(self.module, 'kernel_size'): 
             self.kernel_size = self.module.kernel_size
 
-    def calculate_reuse_factor(self): 
+    def calculate_reuse_factor(self) -> None: 
+        """Compute the reuse factor. 
+
+        The reuse factor is the number of vector matrix multiplication a layer computes."""
         if isinstance(self.module, AnalogLinear):
-            self.__set_reuse_factor(prod(self.input_size) // self.input_size[-1])
+            self.__set_reuse_factor(reduce(operator.mul, (self.input_size), 1) // int(self.input_size[-1]))
         elif isinstance(self.module, _AnalogConvNd): 
             # TODO: Extend the formula to ConvNd 
-            self.__set_reuse_factor(prod(self.output_size) // self.output_size[1])
+            self.__set_reuse_factor(reduce(operator.mul, (self.output_size), 1)// self.output_size[1])
     
 
-    def layer_summary_dict(self): 
+    def layer_summary_dict(self) -> dict: 
+        """Return a dictionary with all layer's information."""
         analog = "analog" if self.isanalog else "digital"
         return {"name": self.name, 
                 "isanalog":analog, 
@@ -88,16 +92,17 @@ class LayerInfo:
                 "macs": "", 
                 "reuse_factor": str(self.reuse_factor) if self.reuse_factor != None else "-"}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Print layer's information in the summary table."""
         result = ("{:<15} {:<15} {:<15} {:<15} {:<15} {:<20} {:<15} {:<15}\n".format(*self.layer_summary_dict().values()))
         return result
         
 class AnalogInfo: 
     """class for computing and storing results of the analog summary."""
     def __init__(self, 
-            model:nn.Module, 
-            input_size: Optional[INPUT_SIZE_TYPE] = None, 
-            rpu_config=None):
+                 model: nn.Module, 
+                 input_size: INPUT_SIZE_TYPE = None, 
+                 rpu_config: Optional[RPUConfigAlias] = None):
 
         self.model = model 
         self.input_size = input_size
@@ -106,7 +111,8 @@ class AnalogInfo:
         self.total_tile_number = self.calculate_num_tiles()
         self.set_layer_sizes()
 
-    def set_layer_sizes(self):
+    def set_layer_sizes(self) -> None:
+        """Set each layer input, output and kernel sizes."""
         parent_input_size = self.input_size
         for layer in self.layer_summary:
             layer.calculate_size(parent_input_size)
@@ -114,7 +120,10 @@ class AnalogInfo:
             layer.set_kernel_size()
             layer.calculate_reuse_factor()
                     
-    def create_layer_summary(self): 
+    def create_layer_summary(self) -> List[LayerInfo]: 
+        """Create the layer summary list.
+        
+        This list contains LayerInfo elements that corresponds to each layer of the model."""
         layer_summary = []
         if isinstance(self.model, tuple): 
             layer_summary.append(LayerInfo(self.model[0], self.rpu_config))
@@ -125,7 +134,8 @@ class AnalogInfo:
 
         return layer_summary
 
-    def calculate_num_tiles(self):
+    def calculate_num_tiles(self) -> int:
+        """Calculate the total number of tiles needed by the model."""
         total_tile_number = 0
         for x in self.layer_summary: 
             total_tile_number += x.num_tiles
@@ -148,7 +158,9 @@ class AnalogInfo:
         return result 
 
 
-def analog_summary(model: nn.Module, input_size: Optional[INPUT_SIZE_TYPE] = None, rpu_config=None):
+def analog_summary(model: nn.Module, 
+                   input_size: Optional[INPUT_SIZE_TYPE] = None, 
+                   rpu_config: Optional[RPUConfigAlias] = None) -> AnalogInfo:
     """
     Summarize the given PyTorch model. Summarized information includes:
         1) Layer names,

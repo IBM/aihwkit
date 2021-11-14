@@ -1,3 +1,10 @@
+"""aihwkit example 19: Analog summary on LeNet.
+
+Extracts analog information in the form of a printed table.
+The information can also be accessed via the returned AnalogInfo object.
+"""
+# pylint: disable=invalid-name
+
 # Imports from PyTorch.
 from torch import nn
 
