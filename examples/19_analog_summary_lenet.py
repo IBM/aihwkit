@@ -13,7 +13,6 @@ from aihwkit.nn import AnalogLinear, AnalogConv2d, AnalogSequential
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.utils.analog_info import analog_summary
-from aihwkit.nn.modules.base import AnalogModuleBase
 
 # Define a single-layer network, using a constant step device type.
 rpu_config = SingleRPUConfig(device=ConstantStepDevice())
