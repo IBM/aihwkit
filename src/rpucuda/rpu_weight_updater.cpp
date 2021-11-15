@@ -133,12 +133,23 @@ void PulsedRPUWeightUpdater<T>::setUpPar(const PulsedUpdateMetaParameter<T> &up)
 
 template <typename T>
 bool PulsedRPUWeightUpdater<T>::checkForFPUpdate(AbstractRPUDevice<T> *rpu_device_in) {
+
+  if (rpu_device_in == nullptr) {
+    return true;
+  }
+  if (rpu_device_in->implements() == DeviceUpdateType::FloatingPoint) {
+    return true;
+  }
+  if (rpu_device_in->isPulsedDevice() && up_.pulse_type == PulseType::None) {
+    return true;
+  }
   if (rpu_device_in->hasDirectUpdate()) {
+    // also FP has direct, but that is handled above
     return false;
   }
-  return (up_.pulse_type == PulseType::None) || (rpu_device_in == nullptr) ||
-         !rpu_device_in->isPulsedDevice() ||
-         (rpu_device_in->implements() == DeviceUpdateType::FloatingPoint);
+  // omitting !isPulsedDevice
+
+  return false;
 }
 
 template <typename T>
@@ -177,14 +188,16 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
 
   // pulsed device update
   rpu_device->initUpdateCycle(weights, up_, learning_rate, m_batch_info);
+  // potentially modify the LR from the device side
+  T pc_learning_rate = rpu_device->getPulseCountLearningRate(learning_rate);
 
   if (sblm_->supports(up_.pulse_type)) {
     // envoke sparse bit line maker to get the counts and indices
     int BL = sblm_->makeCounts(
-        x_input, x_inc, d_input, d_inc, &*rng_, learning_rate < 0 ? -learning_rate : learning_rate,
-        weight_granularity, up_);
+        x_input, x_inc, d_input, d_inc, &*rng_,
+        pc_learning_rate < 0 ? -pc_learning_rate : pc_learning_rate, weight_granularity, up_);
     // positive LR actually means that positive signs *decrease* the weight (as in SGD).
-    int lr_sign = learning_rate < 0 ? -1 : 1;
+    int lr_sign = pc_learning_rate < 0 ? -1 : 1;
 
     if (BL > 0) {
 
@@ -223,10 +236,10 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
   } else {
     // use dense update
     int *coincidences = dblm_->makeCoincidences(
-        x_input, x_inc, d_input, d_inc, &*rng_, learning_rate, weight_granularity, up_);
+        x_input, x_inc, d_input, d_inc, &*rng_, pc_learning_rate, weight_granularity, up_);
     rpu_device->doDenseUpdate(weights, coincidences, &*rng_);
   }
-
+  // always the current SGD learning rate is given here
   rpu_device->finishUpdateCycle(weights, up_, learning_rate, m_batch_info);
 }
 

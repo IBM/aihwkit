@@ -12,7 +12,7 @@
 
 """Analog Modules that contain children Modules."""
 
-from typing import Callable, Optional, Union, Any
+from typing import Callable, Optional, Union, Any, NamedTuple, TYPE_CHECKING
 from collections import OrderedDict
 
 from torch import device as torch_device
@@ -20,6 +20,9 @@ from torch.nn import Sequential
 
 from aihwkit.exceptions import ModuleError
 from aihwkit.nn.modules.base import AnalogModuleBase
+
+if TYPE_CHECKING:
+    from torch import Tensor  # pylint: disable=ungrouped-imports
 
 
 class AnalogSequential(Sequential):
@@ -103,6 +106,38 @@ class AnalogSequential(Sequential):
 
         return self
 
+    def load_state_dict(self,  # pylint: disable=arguments-differ
+                        state_dict: 'OrderedDict[str, Tensor]',
+                        strict: bool = True,
+                        load_rpu_config: bool = True) -> NamedTuple:
+        """Specializes torch's ``load_state_dict`` to add a flag whether to
+        load the RPU config from the saved state.
+
+        Args:
+            state_dict: see torch's ``load_state_dict``
+            strict: see torch's ``load_state_dict``
+            load_rpu_config: Whether to load the saved RPU
+                config or use the current RPU config of the model.
+
+                Caution:
+
+                    If ``load_rpu_config=False`` the RPU config can
+                    be changed from the stored model. However, the user has to
+                    make sure that the changed RPU config makes sense.
+
+                    For instance, changing the device type might
+                    change the expected fields in the hidden
+                    parameters and result in an error.
+        Returns:
+            see torch's ``load_state_dict``
+
+        Raises: ModuleError: in case the rpu_config class mismatches
+            for ``load_rpu_config=False``.
+        """
+        # pylint: disable=protected-access
+        self._apply_to_analog(lambda m: m._set_load_rpu_config_state(load_rpu_config))
+        return super().load_state_dict(state_dict, strict)
+
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
         """(Program) and drift all analog inference layers of a given model.
 
@@ -128,7 +163,7 @@ class AnalogSequential(Sequential):
             raise ModuleError('program_analog_weights can only be applied in '
                               'evaluation mode')
 
-        self._apply_to_analog(lambda m: m.program_weights())
+        self._apply_to_analog(lambda m: m.program_analog_weights())
 
     @classmethod
     def from_digital(cls, module: Sequential,  # pylint: disable=unused-argument

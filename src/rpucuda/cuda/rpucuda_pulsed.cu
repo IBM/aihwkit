@@ -413,11 +413,12 @@ template <typename T> void RPUCudaPulsed<T>::setDeviceParameter(const std::vecto
 
   // Note: for now setting the device just keeps the old meta parameter.
   // however weight_granularity is at least estimated.
-  rpu_device_->setDeviceParameter(data_ptrs);
-
+  this->copyWeightsToHost();
+  rpu_device_->setDeviceParameter(this->getWeightsPtr(), data_ptrs);
   rpucuda_device_->populateFrom(*rpu_device_);
 
-  this->setWeights(this->copyWeightsToHost()[0]); // might re-copy device. Ignore
+  // set device weights which might have been updated because of the hidden parameters
+  RPUCudaSimple<T>::setWeights(this->getWeightsPtr()[0]);
 };
 
 template <typename T> int RPUCudaPulsed<T>::getHiddenUpdateIdx() const {

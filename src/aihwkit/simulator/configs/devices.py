@@ -12,14 +12,13 @@
 
 """Configuration for Analog (Resistive Device) tiles."""
 
-# pylint: disable=too-many-instance-attributes,too-many-lines
+# pylint: disable=too-many-instance-attributes, too-many-lines
 
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import ClassVar, List, Type, Union
 from warnings import warn
 from numpy import exp
-
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.configs.helpers import (
@@ -1076,17 +1075,17 @@ class TransferCompound(UnitCell):
     in the list of ``unit_cell_devices``) need to be of the same spec.
 
     The rate of transfer (e.g. learning rate and how often and how
-    many columns per transfer) and the type (ie. with ADC or without,
+    many columns/rows per transfer) and the type (ie. with ADC or without,
     with noise etc.) can be adjusted.
 
     Each transfer event that is triggered by counting the update
     cycles (in units of either mini-batch or single mat-vecs),
-    ``n_cols_per_transfer`` columns are read from the left device
+    ``n_reads_per_transfer`` columns/rows are read from the left device
     using the forward pass with transfer vectors as input and
     transferred to the right (taking the order of the
     ``unit_cell_devices`` list) using the outer-product update with
     the read-out vectors and the transfer vectors. Currently, transfer
-    vectors are fixed to be one-hot vectors. The columns to take are
+    vectors are fixed to be one-hot vectors. The columns/rows to take are
     in sequential order and warped around at the edge of the
     crossbar. The learning rate and forward and update specs of the
     transfer can be user-defined.
@@ -1136,7 +1135,7 @@ class TransferCompound(UnitCell):
     If not given explicitely with ``transfer_every_vec``, then the higher
     transfer cycles are geometrically scaled, the first is set to
     transfer_every. Each next transfer cycle is multiplied by ``x_size
-    / n_cols_per_transfer``.
+    / n_reads_per_transfer``.
     """
 
     no_self_transfer: bool = True
@@ -1159,24 +1158,50 @@ class TransferCompound(UnitCell):
     weight re-use during a while mini-batch.
     """
 
-    n_cols_per_transfer: int = 1
-    """Number of consecutive columns to use during transfer events.
+    n_reads_per_transfer: int = 1
+    """Number of consecutive reads to use during transfer events.
 
-    How many consecutive columns to read (from one tile) and write (to the next
+    How many consecutive columns or rows to read (from one tile) and write (to the next
     tile) every transfer event. For read, the input is a 1-hot vector. Once the
-    final column is reached, reading starts again from the first.
+    final columns or row is reached, reading starts again from the first.
+    """
+
+    transfer_columns: bool = True
+    """Whether to read and transfer columns or rows.
+
+    If set, read is done with an additional forward pass
+    determined by the ``transfer_forward`` settings. If not set, rows
+    are transferred instead, that is, the read is done internally
+    with a backward pass instead. However, the parameters defining the
+    backward are still given by setting the ``transfer_forward`` field for
+    convenience.
     """
 
     with_reset_prob: float = 0.0
     """Whether to apply reset of the columns that were transferred with a given
-    probability."""
+    probability.
 
-    random_column: bool = False
-    """Whether to select a random starting column.
+    Note:
+        Reset is only available in case of column reads
+        (``transfer_columns==True``).
+    """
 
-    Whether to select a random starting column for each transfer event and not
-    take the next column that was previously not transferred as a starting
-    column (the default).
+    random_selection: bool = False
+    """Whether to select a random starting column or row.
+
+    Whether to select a random starting column or row for each
+    transfer event and not take the next column or row that was
+    previously not transferred as a starting column or row (the
+    default).
+    """
+
+    fast_lr: float = 0.0
+    """Whether to set the `fast` tile's learning rate.
+
+    If set, then the SGD gradient update onto the first (fast) tile is
+    set to this learning rate and is kept constant even when the SGD
+    learning rate is scheduled. The SGD learning rate is then only
+    used to scale the transfer LR (see ``scale_transfer_lr``).
     """
 
     transfer_lr: float = 1.0
@@ -1206,7 +1231,7 @@ class TransferCompound(UnitCell):
     """Input-output parameters that define the read of a transfer event.
 
     :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters` that define the read
-    (forward) of an transfer event. For instance the amount of noise
+    (forward or backward) of an transfer event. For instance the amount of noise
     or whether transfer is done using a ADC/DAC etc.
     """
 
@@ -1241,9 +1266,53 @@ class TransferCompound(UnitCell):
         return transfer_parameters
 
 
+@dataclass
+class BufferedTransferCompound(TransferCompound):
+    r"""Abstract device model that takes 2 or more devices and
+    implements a buffered transfer-based learning rule.
+
+    Different to :class:`TransferCompound`, however,  readout is done
+    first onto a digital buffer (in floating point precision), from
+    which then the second analog matrix is updated. This second step is
+    very similar to the analog update in :class:`MixedPrecisionCompound`.
+
+    Note, however, that in contrast to :class:`MixedPrecisionCompound`
+    the rank-update is still done in analog with parallel update using
+    pulse trains.
+
+    The buffer is assumed to be in floating point precision and
+    only one row/column at a time needs to be processed in one update cycle,
+    thus greatly reducing on-chip memory requirements.
+
+    For details, see `Gokmen (2021)`_.
+
+    .. _Gokmen (2021): https://www.frontiersin.org/articles/10.3389/frai.2021.699148/full
+    """
+
+    bindings_class: ClassVar[Type] = devices.BufferedTransferResistiveDeviceParameter
+
+    thres_scale: float = 1.0
+    """Threshold scale for buffer to determine whether to transfer to next
+    device. Will be multiplied by the device granularity to get the
+    threshold.
+    """
+
+    step: float = 1.0
+    """Value to fill the ``d`` vector for the update if buffered value is
+    above threshold.
+    """
+
+    momentum: float = 0.0
+    """Momentum of the buffer.
+
+    After transfer, this momentum fraction stays on the buffer instead
+    of subtracting all of what was transferred.
+    """
+
 ###############################################################################
 # Specific compound-devices with digital rank update
 ###############################################################################
+
 
 @dataclass
 class DigitalRankUpdateCell(_PrintableMixin):

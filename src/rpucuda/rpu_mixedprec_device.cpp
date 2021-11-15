@@ -32,6 +32,10 @@ void MixedPrecRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) co
   ss << n_d_bins << std::endl;
   ss << "\t transfer_lr: \t\t";
   ss << transfer_lr << std::endl;
+  if (stoc_round_x || stoc_round_d) {
+    ss << "\t stoc_round (x / d): \t";
+    ss << stoc_round_x << " / " << stoc_round_d << std::endl;
+  }
 
   MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(ss);
 }
@@ -238,6 +242,9 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
     qx_.resize(this->x_size_);
     qd_.resize(this->d_size_);
 
+    const bool stochastic_rounding_x = par.stoc_round_x;
+    T stoch_value = 0.0;
+
     PRAGMA_SIMD
     for (int i_x = 0; i_x < i_stop; i_x += x_inc) {
       i++;
@@ -245,11 +252,20 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
 
       // quantize (by abs max, thus already clipped)
       if (par.n_x_bins > 0) {
-        x = RPU_ROUNDFUN(x / x_width);
+
+        if (stochastic_rounding_x) {
+          stoch_value = this->rng_.sampleUniform() - 0.5;
+        }
+
+        x = RPU_ROUNDFUN(x / x_width + stoch_value);
         x = MIN(MAX(x, -half_x_bins), half_x_bins) * x_width;
       }
       qx_[i] = x;
     }
+
+    const bool stochastic_rounding_d = par.stoc_round_d;
+    stoch_value = 0.0;
+
     PRAGMA_SIMD
     for (int j_d = 0; j_d < j_stop; j_d += d_inc) {
       j++;
@@ -257,7 +273,12 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
 
       // quantize (by abs max, thus already clipped)
       if (par.n_d_bins > 0) {
-        d = RPU_ROUNDFUN(d / d_width);
+
+        if (stochastic_rounding_d) {
+          stoch_value = this->rng_.sampleUniform() - 0.5;
+        }
+
+        d = RPU_ROUNDFUN(d / d_width + stoch_value);
         d = MIN(MAX(d, -half_d_bins), half_d_bins) * d_width;
       }
       qd_[i] = d;
@@ -272,13 +293,20 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
 
     qx_.resize(this->x_size_);
     qx_index_.resize(this->x_size_);
+    const bool stochastic_rounding_x = par.stoc_round_x;
+    T stoch_value = 0.0;
 
     PRAGMA_SIMD
     for (int i_x = 0; i_x < i_stop; i_x += x_inc) {
       T x = x_input[i_x];
       i++;
       // quantize (by abs max, thus already clipped)
-      T qx = RPU_ROUNDFUN(x / x_width);
+
+      if (stochastic_rounding_x) {
+        stoch_value = this->rng_.sampleUniform() - 0.5;
+      }
+
+      T qx = RPU_ROUNDFUN(x / x_width + stoch_value);
 
       if (qx == (T)0.0) {
         continue;
@@ -288,12 +316,19 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
       qx_[kx++] = qx * x_width;
     }
 
+    const bool stochastic_rounding_d = par.stoc_round_d;
+    stoch_value = 0.0;
+
     for (int j_d = 0; j_d < j_stop; j_d += d_inc) {
       T d = d_input[j_d];
       j++;
 
       // quantize
-      T qd = RPU_ROUNDFUN(d / d_width);
+      if (stochastic_rounding_d) {
+        stoch_value = this->rng_.sampleUniform() - 0.5;
+      }
+
+      T qd = RPU_ROUNDFUN(d / d_width + stoch_value);
       if (qd == (T)0) {
         continue;
       }

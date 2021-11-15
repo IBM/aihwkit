@@ -65,6 +65,12 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
   ss << std::endl;
 
   // lr
+  if (fast_lr > 0) {
+    ss << "\tfast_lr:\t\t";
+    ss << fast_lr;
+    ss << std::endl;
+  }
+
   ss << "\ttransfer_lr: \t\t";
   if (this->_par_initialized)
     for (size_t k = 0; k < transfer_lr_vec.size(); k++) {
@@ -74,16 +80,23 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
     ss << transfer_lr;
   }
   if (scale_transfer_lr) {
-    ss << " [scaled with current LR]";
+    ss << "\t[scaled with current LR]";
   }
   ss << std::endl;
 
-  ss << "\tn_cols_per_transfer: \t" << n_cols_per_transfer;
+  ss << "\tn_reads_per_transfer: \t" << n_reads_per_transfer;
+  if (transfer_columns) {
+    ss << "\t[reading columns]";
+  } else {
+    ss << "\t[reading rows]";
+  }
+  ss << std::endl;
+
   if (with_reset_prob) {
     ss << "\t[with reset p=" << with_reset_prob << "]";
   }
-  if (random_column) {
-    ss << "\t[random column]";
+  if (random_selection) {
+    ss << "\t[random selection]";
   }
   ss << std::endl;
 
@@ -110,6 +123,14 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
   if (n_devices < 2) {
     // makes no sense
     RPU_FATAL("Need at least 2 devices");
+  }
+
+  if (transfer_columns) {
+    _in_size = x_size;
+    _out_size = d_size;
+  } else {
+    _in_size = d_size;
+    _out_size = x_size;
   }
 
   this->update_policy = VectorDeviceUpdatePolicy::SingleFixed;
@@ -155,10 +176,10 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     RPU_FATAL("Expect transfer_lr_vec of size n_devices.");
   }
 
-  if (n_cols_per_transfer > x_size) {
+  if (n_reads_per_transfer > _in_size) {
     // should not be needed anyway
-    n_cols_per_transfer = x_size;
-    RPU_WARNING("too many transfers in one shot. Use x_size instead.");
+    n_reads_per_transfer = _in_size;
+    RPU_WARNING("too many transfers in one shot. Using full transfer instead.");
   }
 
   // TODO: make an default value, where the value of the transfer depends on  x_size
@@ -167,7 +188,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     T n = transfer_every;
     for (size_t i = 0; i < n_devices; i++) {
       transfer_every_vec.push_back(n);
-      n *= (T)x_size / n_cols_per_transfer;
+      n *= (T)_in_size / n_reads_per_transfer;
     }
     if (no_self_transfer) {
       transfer_every_vec[n_devices - 1] = 0;
@@ -178,8 +199,16 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     RPU_FATAL("Expect transfer_every_vec to be of length n_devices");
   }
 
+  if (with_reset_prob > 0 && !transfer_columns) {
+    RPU_FATAL("Reset prob is only implemented for column-transfer so far.");
+  }
+
   // IO
-  transfer_io.initializeForForward();
+  if (transfer_columns) {
+    transfer_io.initializeForForward();
+  } else {
+    transfer_io.initializeForBackward();
+  }
 
   // we turn BM off.
   if (transfer_io.bound_management != BoundManagementType::None) {
@@ -230,10 +259,11 @@ TransferRPUDevice<T>::TransferRPUDevice(const TransferRPUDevice<T> &other)
   transfer_fb_pass_ = make_unique<ForwardBackwardPassIOManaged<T>>(*other.transfer_fb_pass_);
   transfer_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(*other.transfer_pwu_);
 
-  current_col_indices_ = other.current_col_indices_;
+  current_slice_indices_ = other.current_slice_indices_;
   transfer_vecs_ = other.transfer_vecs_;
   transfer_every_ = other.transfer_every_;
   fully_hidden_ = other.fully_hidden_;
+  last_weight_ = other.last_weight_;
 }
 
 // copy assignment
@@ -255,27 +285,30 @@ template <typename T>
 TransferRPUDevice<T> &TransferRPUDevice<T>::operator=(TransferRPUDevice<T> &&other) {
   VectorRPUDevice<T>::operator=(std::move(other));
 
-  current_col_indices_ = std::move(other.current_col_indices_);
+  current_slice_indices_ = std::move(other.current_slice_indices_);
   transfer_vecs_ = std::move(other.transfer_vecs_);
   transfer_every_ = std::move(other.transfer_every_);
   transfer_fb_pass_ = std::move(other.transfer_fb_pass_);
   transfer_pwu_ = std::move(other.transfer_pwu_);
-
+  last_weight_ = std::move(other.last_weight_);
   fully_hidden_ = other.fully_hidden_;
 
   return *this;
 }
 
 template <typename T> void TransferRPUDevice<T>::setTransferVecs(const T *transfer_vecs) {
-  transfer_vecs_.resize(this->x_size_ * this->x_size_); //!!  square matrix
+  T in_size = getPar().getInSize();
+
+  transfer_vecs_.resize(in_size * in_size); //!!  square matrix
   std::fill(transfer_vecs_.begin(), transfer_vecs_.end(), (T)0.0);
 
   if (transfer_vecs == nullptr) {
     // initialize transfer vectors with unit vectors. This might be overridden
-    for (size_t i = 0; i < transfer_vecs_.size(); i += this->x_size_ + 1) {
+    for (size_t i = 0; i < transfer_vecs_.size(); i += in_size + 1) {
       transfer_vecs_[i] = 1.0;
     }
   } else {
+    // Caution: No size check!
     for (size_t i = 0; i < transfer_vecs_.size(); i++) {
       transfer_vecs_[i] = transfer_vecs[i];
     }
@@ -284,8 +317,8 @@ template <typename T> void TransferRPUDevice<T>::setTransferVecs(const T *transf
 
 template <typename T> int TransferRPUDevice<T>::resetCounters(bool force) {
 
-  current_col_indices_.resize(this->n_devices_);
-  std::fill(current_col_indices_.begin(), current_col_indices_.end(), (int)0);
+  current_slice_indices_.resize(this->n_devices_);
+  std::fill(current_slice_indices_.begin(), current_slice_indices_.end(), (int)0);
   return VectorRPUDevice<T>::resetCounters(force);
 }
 /*********************************************************************************/
@@ -304,7 +337,6 @@ void TransferRPUDevice<T>::populate(
       RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
 
   transfer_fb_pass_->setIOPar(par.transfer_io, par.transfer_io);
-  // TODO: the OUT_SCALE might be different for the transfer!! How to account for that?!?
 
   transfer_pwu_ =
       RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
@@ -318,6 +350,22 @@ void TransferRPUDevice<T>::populate(
   setTransferVecs();
   transfer_every_ = par.transfer_every_vec; // already checked for length
   fully_hidden_ = getPar().fullyHidden();   // save
+}
+
+/*********************************************************************************/
+/* getPulseCountLearningRate */
+/* Here we compute the LR for the A matrix (the SGD update). Because
+   of the device properties it is beneficial to use a constant LR
+   here, but scale the buffer with the scheduled SGD learning rate
+   later*/
+template <typename T> T TransferRPUDevice<T>::getPulseCountLearningRate(T learning_rate) {
+  const auto &par = getPar();
+
+  if (par.fast_lr > 0) {
+    return par.fast_lr;
+  } else {
+    return learning_rate;
+  }
 }
 
 /*********************************************************************************/
@@ -342,17 +390,42 @@ int TransferRPUDevice<T>::getTransferEvery(int from_device_idx, int m_batch) con
 }
 
 template <typename T>
-void TransferRPUDevice<T>::forwardUpdate(
+void TransferRPUDevice<T>::readVector(int device_idx, const T *in_vec, T *out_vec, T alpha) {
+  T **W = getDeviceWeights(device_idx);
+  if (getPar().transfer_columns) {
+    transfer_fb_pass_->forwardVector(W, in_vec, 1, out_vec, 1, alpha, false);
+  } else {
+    transfer_fb_pass_->backwardVector(W, in_vec, 1, out_vec, 1, alpha);
+  }
+}
+
+template <typename T>
+void TransferRPUDevice<T>::writeVector(
+    int device_idx, const T *in_vec, const T *out_vec, const T lr, const int m_batch_info) {
+
+  T **W = getDeviceWeights(device_idx);
+  if (getPar().transfer_columns) {
+    // in_vec is x_input
+    transfer_pwu_->updateVectorWithDevice(
+        W, in_vec, 1, out_vec, 1, lr, m_batch_info, &*this->rpu_device_vec_[device_idx]);
+  } else {
+    // in_vec is d_input
+    transfer_pwu_->updateVectorWithDevice(
+        W, out_vec, 1, in_vec, 1, lr, m_batch_info, &*this->rpu_device_vec_[device_idx]);
+  }
+}
+
+template <typename T>
+void TransferRPUDevice<T>::readAndUpdate(
     int to_device_idx,
     int from_device_idx,
     const T lr,
-    const T *x_input,
+    const T *vec, // these are the selected transfer vecs
     const int n_vec,
-    const bool trans,
     const T reset_prob,
-    const int i_col) {
+    const int i_slice) {
 
-  if (!lr) {
+  if (lr == 0.0) {
     return;
   }
 
@@ -360,68 +433,66 @@ void TransferRPUDevice<T>::forwardUpdate(
     // self update not supported per default
     return;
   }
+  const auto &par = getPar();
 
-  if (transfer_tmp_.size() < (size_t)this->d_size_) {
-    transfer_tmp_.resize(this->d_size_);
-  }
+  int in_size = par.getInSize();
+  int out_size = par.getOutSize();
 
-  // forward / update
-  T **W;
+  transfer_tmp_.resize(out_size);
+
+  // forward or backward / update
   for (int i = 0; i < n_vec; i++) {
-    const T *x = x_input + i * this->x_size_;
+    const T *v = vec + i * in_size;
 
-    transfer_fb_pass_->forwardVector(
-        this->weights_vec_[from_device_idx], x, 1, &transfer_tmp_[0], 1, (T)1.0, false);
+    readVector(from_device_idx, v, transfer_tmp_.data(), -1.0); // scale -1 for pos update
 
-    // potentially reset here (because of possible same device to-from):
-    // NOTE that with_reset_prob is COL-wise prob (elem device prob is 1)
-    if (this->rw_rng_.sampleUniform() < reset_prob) {
-      W = getDeviceWeights(from_device_idx);
-      this->rpu_device_vec_[from_device_idx]->resetCols(W, i_col, n_vec, 1, this->rw_rng_);
+    if (this->rw_rng_.sampleUniform() < reset_prob && par.transfer_columns) {
+      // potentially reset here (because of possible same device to-from):
+      // NOTE that with_reset_prob is COL-wise prob (elem device prob is 1)
+      T **W_from = getDeviceWeights(from_device_idx);
+      this->rpu_device_vec_[from_device_idx]->resetCols(W_from, i_slice, n_vec, 1, this->rw_rng_);
     }
 
     // update according to device
-    W = getDeviceWeights(to_device_idx);
-
-    transfer_pwu_->updateVectorWithDevice(
-        W, x, 1, &transfer_tmp_[0], 1,
-        -fabs(lr), // need to be negative...
-        n_vec, &*this->rpu_device_vec_[to_device_idx]);
+    writeVector(to_device_idx, v, transfer_tmp_.data(), lr, n_vec);
   }
 }
 
 template <typename T>
 void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T current_lr) {
-  int i_col = current_col_indices_[from_device_idx];
+
+  int i_slice = current_slice_indices_[from_device_idx];
   const auto &par = getPar();
-  if (par.random_column) {
-    i_col = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->x_size_), this->x_size_ - 1), 0);
+
+  int in_size = par.getInSize();
+
+  if (par.random_selection) {
+    i_slice = MAX(MIN(floor(this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
   }
 
-  // transfer_vecs_ is always x_size-major (that is trans==false)
-  T *tvec = &transfer_vecs_[0] + i_col * this->x_size_;
-  int n_rest = this->x_size_ - i_col; // actually always x_size
+  // transfer_vecs_ is always in_size-major (that is trans==false)
+  T *tvec = &transfer_vecs_[0] + i_slice * in_size;
+  int n_rest = in_size - i_slice;
 
   T lr = par.getTransferLR(to_device_idx, from_device_idx, current_lr);
 
-  int n_transfer = MIN(par.n_cols_per_transfer, this->x_size_);
+  int n_transfer = MIN(par.n_reads_per_transfer, in_size);
 
   if (n_rest < n_transfer) {
     // rest
 
-    forwardUpdate(
-        to_device_idx, from_device_idx, lr, tvec, n_rest, false, par.with_reset_prob, i_col);
+    readAndUpdate(to_device_idx, from_device_idx, lr, tvec, n_rest, par.with_reset_prob, i_slice);
     // from beginning
-    forwardUpdate(
-        to_device_idx, from_device_idx, lr, &transfer_vecs_[0], n_transfer - n_rest, false,
+    readAndUpdate(
+        to_device_idx, from_device_idx, lr, &transfer_vecs_[0], n_transfer - n_rest,
         par.with_reset_prob, 0);
 
   } else {
-    forwardUpdate(
-        to_device_idx, from_device_idx, lr, tvec, n_transfer, false, par.with_reset_prob, i_col);
+    readAndUpdate(
+        to_device_idx, from_device_idx, lr, tvec, n_transfer, par.with_reset_prob, i_slice);
   }
 
-  current_col_indices_[from_device_idx] = (i_col + n_transfer) % this->x_size_;
+  current_slice_indices_[from_device_idx] = (i_slice + n_transfer) % in_size;
 }
 
 /*********************************************************************************/
@@ -434,6 +505,13 @@ void TransferRPUDevice<T>::doSparseUpdate(
   this->rpu_device_vec_[0]->doSparseUpdate(
       this->weights_vec_[0], i, x_signed_indices, x_count, d_sign, rng);
 
+  // we do reduce to weights in the finishUpdateCycle, because transfer is done there, too.
+}
+
+template <typename T>
+void TransferRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) {
+
+  this->rpu_device_vec_[0]->doDenseUpdate(this->weights_vec_[0], coincidences, rng);
   // we do reduce to weights in the finishUpdateCycle, because transfer is done there, too.
 }
 
@@ -554,8 +632,14 @@ void TransferRPUDevice<T>::resetCols(
 #undef LOOP_WITH_HIDDEN
 
 template <typename T>
-void TransferRPUDevice<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
-  VectorRPUDevice<T>::setDeviceParameter(data_ptrs);
+void TransferRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) {
+  VectorRPUDevice<T>::setDeviceParameter(out_weights, data_ptrs);
+
+  if (fully_hidden_) {
+    // weight might have changed because of hidden weight change
+    RPU::math::copy<T>(
+        this->size_, this->weights_vec_[this->n_devices_ - 1][0], 1, out_weights[0], 1);
+  }
 }
 
 template class TransferRPUDevice<float>;

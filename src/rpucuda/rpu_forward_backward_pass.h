@@ -23,12 +23,7 @@ template <typename T> class ForwardBackwardPass {
 public:
   explicit ForwardBackwardPass(int x_size, int d_size) : x_size_(x_size), d_size_(d_size){};
   ForwardBackwardPass(){};
-
-  friend void swap(ForwardBackwardPass<T> &a, ForwardBackwardPass<T> &b) noexcept {
-    using std::swap;
-    swap(a.x_size_, b.x_size_);
-    swap(a.d_size_, b.d_size_);
-  }
+  virtual ~ForwardBackwardPass(){};
 
   virtual void forwardVector(
       T **weights,
@@ -53,26 +48,6 @@ template <typename T> class ForwardBackwardPassIOManaged : public ForwardBackwar
 public:
   explicit ForwardBackwardPassIOManaged(int x_size, int d_size, std::shared_ptr<RNG<T>> rng);
   ForwardBackwardPassIOManaged(){};
-  virtual ~ForwardBackwardPassIOManaged();
-
-  ForwardBackwardPassIOManaged(const ForwardBackwardPassIOManaged<T> &);
-  ForwardBackwardPassIOManaged<T> &operator=(const ForwardBackwardPassIOManaged<T> &);
-  ForwardBackwardPassIOManaged(ForwardBackwardPassIOManaged<T> &&);
-  ForwardBackwardPassIOManaged<T> &operator=(ForwardBackwardPassIOManaged<T> &&);
-
-  friend void
-  swap(ForwardBackwardPassIOManaged<T> &a, ForwardBackwardPassIOManaged<T> &b) noexcept {
-    using std::swap;
-    swap(static_cast<ForwardBackwardPass<T> &>(a), static_cast<ForwardBackwardPass<T> &>(b));
-    swap(a.containers_allocated_, b.containers_allocated_);
-    swap(a.f_io_, b.f_io_);
-    swap(a.b_io_, b.b_io_);
-    swap(a.tmp_x_values_, b.tmp_x_values_);
-    swap(a.tmp_d_values_, b.tmp_d_values_);
-    swap(a.aux_nm_value_, b.aux_nm_value_);
-    swap(a.rng_, b.rng_);
-    swap(a.checked_implemented_, b.checked_implemented_);
-  }
 
   void forwardVector(
       T **weights,
@@ -89,19 +64,40 @@ public:
 
   void setIOPar(const IOMetaParameter<T> &f_io_, const IOMetaParameter<T> &b_io_);
 
+protected:
+  void applyOutputWeightNoise(
+      T **weights,
+      T *out_values,
+      const int out_size,
+      const int out_inc,
+      const T *in_values,
+      const int in_size,
+      IOMetaParameter<T> &io,
+      bool transposed);
+
+  void applyIrDrop(
+      T **weights,
+      T *out_values,
+      int out_size,
+      const int out_inc,
+      const T *in_values,
+      const int in_size,
+      IOMetaParameter<T> &io,
+      bool transposed);
+
 private:
   void ensureImplemented();
 
-  void freeContainers();
-  void allocateContainers();
+  std::vector<T> tmp_d_values_;
+  std::vector<T> tmp_x_values_;
 
-  T *tmp_x_values_ = nullptr;
-  T *tmp_d_values_ = nullptr;
+  std::vector<T> tmp_in_values_;
+  std::vector<T> tmp_out_values_;
+  std::vector<T> tmp_c_values_;
 
   T aux_nm_value_ = -1.0;
   IOMetaParameter<T> f_io_;
   IOMetaParameter<T> b_io_;
-  bool containers_allocated_ = false;
   bool checked_implemented_ = false;
   std::shared_ptr<RNG<T>> rng_ = nullptr;
 };

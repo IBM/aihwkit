@@ -18,9 +18,12 @@ from parameterized import parameterized
 from torch import ones
 from torch import Tensor
 from torch.nn.functional import mse_loss
+from torch.optim import SGD
+from torch.nn import Linear
 
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
+from aihwkit.simulator.configs import FloatingPointRPUConfig
 from aihwkit.simulator.configs.utils import (
     WeightNoiseType,
     WeightClipType,
@@ -77,6 +80,69 @@ class InferenceTileTest(ParametrizedTestCase):
             opt.step()
 
         return model, x
+
+    def test_against_fp(self):
+        """Test whether FP is same as is_perfect inference tile."""
+        # pylint: disable-msg=too-many-locals
+        # Prepare the datasets (input and expected output).
+        x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
+        y = Tensor([[1.0, 0.5], [0.7, 0.3]])
+
+        # Define a single-layer network, using a constant step device type.
+        rpu_config = self.get_rpu_config()
+        rpu_config.forward.is_perfect = True
+        model_torch = Linear(4, 2, bias=True)
+        model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
+        model.set_weights(model_torch.weight, model_torch.bias)
+        model_fp = AnalogLinear(4, 2, bias=True, rpu_config=FloatingPointRPUConfig())
+        model_fp.set_weights(model_torch.weight, model_torch.bias)
+
+        self.assertTensorAlmostEqual(model.get_weights()[0], model_torch.weight)
+        self.assertTensorAlmostEqual(model.get_weights()[0], model_fp.get_weights()[0])
+
+        # Move the model and tensors to cuda if it is available.
+        if self.use_cuda:
+            x = x.cuda()
+            y = y.cuda()
+            model.cuda()
+            model_fp.cuda()
+            model_torch.cuda()
+
+        # Define an analog-aware optimizer, preparing it for using the layers.
+        opt = AnalogSGD(model.parameters(), lr=0.1)
+        opt_fp = AnalogSGD(model_fp.parameters(), lr=0.1)
+        opt_torch = SGD(model_torch.parameters(), lr=0.1)
+
+        for _ in range(100):
+
+            # inference
+            opt.zero_grad()
+            pred = model(x)
+            loss = mse_loss(pred, y)
+            loss.backward()
+            opt.step()
+
+            # same for fp
+            opt_fp.zero_grad()
+            pred_fp = model_fp(x)
+            loss_fp = mse_loss(pred_fp, y)
+            loss_fp.backward()
+            opt_fp.step()
+
+            # same for torch
+            opt_torch.zero_grad()
+            pred_torch = model_torch(x)
+            loss_torch = mse_loss(pred_torch, y)
+            loss_torch.backward()
+            opt_torch.step()
+
+            self.assertTensorAlmostEqual(pred_torch, pred)
+            self.assertTensorAlmostEqual(loss_torch, loss)
+            self.assertTensorAlmostEqual(model.get_weights()[0], model_torch.weight)
+
+            self.assertTensorAlmostEqual(pred_fp, pred)
+            self.assertTensorAlmostEqual(loss_fp, loss)
+            self.assertTensorAlmostEqual(model.get_weights()[0], model_fp.get_weights()[0])
 
     def test_drift(self):
         """Test using realistic weights (bias)."""

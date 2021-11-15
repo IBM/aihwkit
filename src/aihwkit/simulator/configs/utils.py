@@ -353,9 +353,27 @@ class IOParameters(_PrintableMixin):
         :meth:`diffuse_weights`.
     """
 
+    ir_drop: float = 0.0
+    """Scale of IR drop along the inputs (rows of the weight matrix).
+
+    The IR-drop is calculated assuming that the first input is
+    farthest away from the output channel. The expected drop is
+    approximating the steady-state voltage distributions and depends
+    on the input current.
+    """
+
+    ir_drop_g_ratio: float = 1/(0.35*5e-6)
+    """Physical ratio of wire conductance from one cell to the next to
+    physical max conductance of a device.
+
+    Default is compute with 5mS maximal conductance set state and 0.35
+    Ohm wire resistance.
+    """
+
 
 @dataclass
 class UpdateParameters(_PrintableMixin):
+
     """Parameter that modify the update behaviour of a pulsed device."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileUpdateParameter
@@ -544,8 +562,15 @@ class WeightClipParameter(_PrintableMixin):
 
     bindings_class: ClassVar[Type] = tiles.WeightClipParameter
 
-    fixed_value: float = 1.0
-    """Clipping value in case of ``FixedValue`` type."""
+    fixed_value: float = -1.0
+    """Clipping value in case of ``FixedValue`` type.
+
+    Caution:
+
+        If ``fixed_value > 0`` it will be also applied during other
+        clipping types.
+
+    """
 
     sigma: float = 2.5
     """Sigma value for clipping for the ``LayerGaussian`` type."""

@@ -64,8 +64,7 @@ public:
       unfolded_vector2[i] = unfolded_vector[i];
     }
 
-    context_container = RPU::make_unique<CudaContext>(-1, false);
-    context = &*context_container;
+    context = &context_container;
     dev_orig_vector = RPU::make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector);
     dev_orig_vector2 = RPU::make_unique<CudaArray<T>>(context, orig_matrix_size * N, orig_vector2);
     dev_unfolded_vector =
@@ -100,7 +99,7 @@ public:
     delete[] batch_indices;
   };
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
   std::unique_ptr<CudaArray<T>> dev_orig_vector;
   std::unique_ptr<CudaArray<T>> dev_orig_vector2;

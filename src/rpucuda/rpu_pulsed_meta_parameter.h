@@ -26,10 +26,11 @@ enum class NoiseManagementType {
   Max,
   Constant,
   AverageAbsMax,
-  AverageAbsMaxSingleValue
+  AverageAbsMaxSingleValue,
+  AbsMaxSingleValue
 };
 
-enum class BoundManagementType { None, Iterative, IterativeWorstCase, Shift, SignalChannel };
+enum class BoundManagementType { None, Iterative, IterativeWorstCase, Shift };
 
 enum class OutputWeightNoiseType { None, AdditiveConstant, PCMRead };
 
@@ -48,6 +49,8 @@ template <typename T> struct IOMetaParameter {
   bool is_perfect = false; // short-cut to use pure floating point (only out_scale will be applied)
 
   OutputWeightNoiseType w_noise_type = OutputWeightNoiseType::None;
+  T ir_drop = (T)0.0;
+  T ir_drop_Gw_div_gmax = (T)5.7143e5; // physical ratio of wire conductance to physical gmax
 
   T inp_bound = (T)1.0;
   T inp_res = (T)1.0 / (pow((T)2.0, (T)7.0) - (T)2.0);
@@ -109,6 +112,10 @@ template <typename T> struct IOMetaParameter {
           ss << "\t w_noise_type:\t\t" << (int)OutputWeightNoiseType::PCMRead << " (PCMRead) "
              << std::endl;
         }
+      }
+      if (ir_drop > 0.0) {
+        ss << "\t ir_drop [scale]:\t" << ir_drop << "  (ir_drop_Gw_div_gmax is "
+           << ir_drop_Gw_div_gmax << ")" << std::endl;
       }
     }
     if (out_scale != 1.0) {

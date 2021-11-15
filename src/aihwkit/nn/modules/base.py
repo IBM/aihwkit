@@ -49,9 +49,14 @@ class AnalogModuleBase(Module):
     * the ``BaseTile`` subclass that is created is retrieved from the
       ``rpu_config.tile_class`` attribute.
     """
-    # pylint: disable=abstract-method
-    _analog_tile_counter: int = 0
-    _load_rpu_config = True
+    # pylint: disable=abstract-method, too-many-instance-attributes
+    ANALOG_CTX_PREFIX: str = 'analog_ctx_'
+    ANALOG_SHARED_WEIGHT_PREFIX: str = 'analog_shared_weights_'
+
+    def __init__(self) -> None:  # pylint: disable=super-init-not-called
+        self._analog_tile_counter = 0
+        self._registered_helper_parameter = []  # type: list
+        self._load_rpu_config = True
 
     def register_analog_tile(self, tile: 'BaseTile') -> None:
         """Register the analog context of the tile.
@@ -63,13 +68,20 @@ class AnalogModuleBase(Module):
         Args:
             tile: tile to register
         """
-        self.register_parameter('analog_ctx_' + str(self._analog_tile_counter),
-                                tile.get_analog_ctx())
+
+        ctx_name = self.ANALOG_CTX_PREFIX + str(self._analog_tile_counter)
+        if ctx_name not in self._registered_helper_parameter:
+            self._registered_helper_parameter.append(ctx_name)
+        self.register_parameter(ctx_name, tile.get_analog_ctx())
+
         if tile.shared_weights is not None:
             if not isinstance(tile.shared_weights, Parameter):
                 tile.shared_weights = Parameter(tile.shared_weights)
-            self.register_parameter('analog_shared_weights_' + str(self._analog_tile_counter),
-                                    tile.shared_weights)
+            par_name = self.ANALOG_SHARED_WEIGHT_PREFIX + str(self._analog_tile_counter)
+            self.register_parameter(par_name, tile.shared_weights)
+
+            if par_name not in self._registered_helper_parameter:
+                self._registered_helper_parameter.append(par_name)
 
         self._analog_tile_counter += 1
 
@@ -93,7 +105,8 @@ class AnalogModuleBase(Module):
             bias: bool,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0
+            weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False
     ) -> 'BaseTile':
         """Create an analog tile and setup this layer for using it.
 
@@ -125,6 +138,7 @@ class AnalogModuleBase(Module):
             weight_scaling_omega: the weight value where the max
                 weight will be scaled to. If zero, no weight scaling will
                 be performed
+            digital_bias: whether to use bias in digital
 
         Returns:
             An analog tile with the requested parameters.
@@ -136,13 +150,17 @@ class AnalogModuleBase(Module):
 
         # Setup the analog-related attributes of this instance.
         self.use_bias = bias
+        self.digital_bias = bias and digital_bias
+        self.analog_bias = bias and not digital_bias
+
         self.realistic_read_write = realistic_read_write
         self.weight_scaling_omega = weight_scaling_omega
         self.in_features = in_features
         self.out_features = out_features
 
         # Create the tile.
-        return rpu_config.tile_class(out_features, in_features, rpu_config, bias=bias)
+        return rpu_config.tile_class(out_features, in_features, rpu_config,
+                                     bias=self.analog_bias)
 
     def set_weights(
             self,
@@ -175,10 +193,15 @@ class AnalogModuleBase(Module):
         realistic = self.realistic_read_write and not force_exact
 
         if self.weight_scaling_omega > 0.0:
-            self.analog_tile.set_weights_scaled(weight, bias, realistic=realistic,
+            self.analog_tile.set_weights_scaled(weight, bias if self.analog_bias else None,
+                                                realistic=realistic,
                                                 omega=self.weight_scaling_omega)
         else:
-            self.analog_tile.set_weights(weight, bias, realistic=realistic)
+            self.analog_tile.set_weights(weight, bias if self.analog_bias else None,
+                                         realistic=realistic)
+
+        if bias is not None and self.digital_bias:
+            self.bias.data = bias
 
         self._sync_weights_from_tile()
 
@@ -210,9 +233,13 @@ class AnalogModuleBase(Module):
         realistic = self.realistic_read_write and not force_exact
 
         if self.weight_scaling_omega > 0.0:
-            return self.analog_tile.get_weights_scaled(realistic=realistic)
+            weight, bias = self.analog_tile.get_weights_scaled(realistic=realistic)
+        else:
+            weight, bias = self.analog_tile.get_weights(realistic=realistic)
 
-        return self.analog_tile.get_weights(realistic=realistic)
+        if self.digital_bias:
+            bias = self.bias.data.detach().cpu()
+        return weight, bias
 
     def _sync_weights_from_tile(self) -> None:
         """Update the layer weight and bias from the values on the analog tile.
@@ -221,8 +248,9 @@ class AnalogModuleBase(Module):
         exact copy of the internal analog tile weights.
         """
         tile_weight, tile_bias = self.get_weights(force_exact=True)  # type: Tuple[Tensor, Tensor]
+
         self.weight.data[:] = tile_weight.reshape(self.weight.shape)
-        if self.use_bias:
+        if self.analog_bias:
             self.bias.data[:] = tile_bias.reshape(self.bias.shape)
 
     def _sync_weights_to_tile(self) -> None:
@@ -231,7 +259,11 @@ class AnalogModuleBase(Module):
         Update the internal tile weights with an exact copy of the values of
         the ``self.weight`` and ``self.bias`` Parameters.
         """
-        self.set_weights(self.weight, self.bias, force_exact=True)
+        self.set_weights(self.weight, self.bias if self.analog_bias else None,
+                         force_exact=True)
+
+    def _set_load_rpu_config_state(self, load_rpu_config: bool = True) -> None:
+        self._load_rpu_config = load_rpu_config
 
     def load_state_dict(self,  # pylint: disable=arguments-differ
                         state_dict: 'OrderedDict[str, Tensor]',
@@ -261,7 +293,7 @@ class AnalogModuleBase(Module):
         Raises: ModuleError: in case the rpu_config class mismatches
             for ``load_rpu_config=False``.
         """
-        self._load_rpu_config = load_rpu_config
+        self._set_load_rpu_config_state(load_rpu_config)
         return super().load_state_dict(state_dict, strict)
 
     def _load_from_state_dict(
@@ -298,12 +330,26 @@ class AnalogModuleBase(Module):
         elif strict:
             missing_keys.append(key)
 
-        # update the weight / bias (not saved explicitly)
+        # update the weight / analog bias (not saved explicitly)
         self._sync_weights_from_tile()
+
+        # remove helper parameters. We never load context or shared
+        # weights. These will be re-generated and should not be
+        # overwritten
+        rm_keys = []
+        for par_name in self._registered_helper_parameter:
+            key = prefix + par_name
+            if key in state_dict:
+                state_dict.pop(key)
+                rm_keys.append(key)
 
         super()._load_from_state_dict(
             state_dict, prefix, local_metadata, strict, missing_keys,
             unexpected_keys, error_msgs)
+
+        # remove the missing keys of the helper parameters
+        for key in rm_keys:
+            missing_keys.remove(key)
 
     def state_dict(
             self,
@@ -361,5 +407,9 @@ class AnalogModuleBase(Module):
             output += ', realistic_read_write={}'.format(self.realistic_read_write)
         if self.weight_scaling_omega > 0:
             output += ', weight_scaling_omega={:.3f}'.format(self.weight_scaling_omega)
+        if self.analog_bias:
+            output += ', analog bias)'
+        if self.digital_bias:
+            output += ', digital bias)'
 
         return output

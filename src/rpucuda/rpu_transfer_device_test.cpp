@@ -243,6 +243,61 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransfer) {
   delete rpu_device;
 }
 
+TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransferRows) {
+  this->dp->transfer_columns = false;
+  rpu_device = this->dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
+  rpu_device->onSetWeights(this->weights); // all zero
+  rpu_device->initUpdateCycle(this->weights, this->up, 1, 1);
+
+  // last row update, net 1 (n_pos-n_neg)
+  float dx = rpu_device->getWeightGranularity() * (n_pos - n_neg);
+  int rowidx = this->d_size - 1;
+  rpu_device->doSparseUpdate(
+      this->weights, rowidx, this->x_indices, this->n_neg + this->n_pos, (num_t)-1.0, this->rng);
+  rpu_device->finishUpdateCycle(this->weights, this->up, 1, 1); // to signal the end of the update
+
+  for (int i = 0; i < this->d_size; i++) {
+    rpu_device->initUpdateCycle(this->weights, this->up, 1, 1);   // to signal the end of the update
+    rpu_device->finishUpdateCycle(this->weights, this->up, 1, 1); // to signal the end of the update
+  }
+  // should have transfered all cols once.
+
+  num_t ***w_vec = rpu_device->getWeightVec();
+
+  // update only on fast [nothing to transfer for first row]
+  for (size_t m = 0; m < this->dp->vec_par.size(); m++) {
+    for (int j = 0; j < this->d_size; j++) {
+      for (int i = 0; i < this->x_size; i++) {
+        if (j == rowidx && i == this->colidx) {
+          if (m == 1 && GetParam() == 0) {
+            // if fullyHidden (GetParam==0) then actual weight is updated directly
+            ASSERT_FLOAT_EQ(w_vec[m][j][i], 0);
+          } else {
+            // should be fully transferred, since transfer_lr = 1
+            ASSERT_FLOAT_EQ(w_vec[m][j][i], dx);
+          }
+        } else {
+          ASSERT_FLOAT_EQ(w_vec[m][j][i], 0);
+        }
+      }
+    }
+  }
+
+  // reduce to weight. Weightening does not necessarily sums to 1
+  const num_t *reduce_weightening = rpu_device->getReduceWeightening();
+  num_t sc = reduce_weightening[0] + reduce_weightening[1];
+  for (int j = 0; j < this->d_size; j++) {
+    for (int i = 0; i < this->x_size; i++) {
+      if (j == rowidx && i == this->colidx) {
+        ASSERT_FLOAT_EQ(this->weights[j][i], sc * dx);
+      } else {
+        ASSERT_FLOAT_EQ(this->weights[j][i], 0);
+      }
+    }
+  }
+  delete rpu_device;
+}
+
 TEST_P(RPUDeviceTestFixture, Decay) {
 
   for (int i = 0; i < this->x_size * this->d_size; i++) {

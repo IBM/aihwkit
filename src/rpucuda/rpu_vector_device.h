@@ -156,7 +156,7 @@ public:
 
   void getDPNames(std::vector<std::string> &names) const override;
   void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
-  void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
   int getHiddenUpdateIdx() const override;
@@ -199,6 +199,7 @@ public:
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
       override;
+  void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
 
 protected:
   void populate(const VectorRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);

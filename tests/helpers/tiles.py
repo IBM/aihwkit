@@ -27,6 +27,7 @@ from aihwkit.simulator.configs.devices import (
     OneSidedUnitCell,
     VectorUnitCell,
     TransferCompound,
+    BufferedTransferCompound,
     ReferenceUnitCell,
     MixedPrecisionCompound,
 )
@@ -248,6 +249,30 @@ class Transfer:
 
     def get_rpu_config(self):
         return UnitCellRPUConfig(device=TransferCompound(
+            unit_cell_devices=[
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
+            ],
+            transfer_forward=IOParameters(is_perfect=True),
+            transfer_every=1,
+            gamma=0.1
+
+        ))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
+class BufferedTransfer:
+    """AnalogTile with BufferedTransferCompound."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound_0'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return UnitCellRPUConfig(device=BufferedTransferCompound(
             unit_cell_devices=[
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
@@ -497,7 +522,7 @@ class OneSidedCuda:
 
 
 class TransferCuda:
-    """AnalogTile with TransferUnitCell."""
+    """AnalogTile with TransferCompound."""
 
     simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
     first_hidden_field = 'max_bound_0'
@@ -505,6 +530,29 @@ class TransferCuda:
 
     def get_rpu_config(self):
         return UnitCellRPUConfig(device=TransferCompound(
+            unit_cell_devices=[
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
+            ],
+            transfer_forward=IOParameters(is_perfect=True),
+            transfer_every=1,
+            gamma=0.1
+        ))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class BufferedTransferCuda:
+    """AnalogTile with BufferedTransferCompound."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound_0'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return UnitCellRPUConfig(device=BufferedTransferCompound(
             unit_cell_devices=[
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
                 SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)

@@ -39,12 +39,14 @@ class AnalogLinear(AnalogModuleBase, Linear):
         in_features: input vector size (number of columns).
         out_features: output vector size (number of rows).
         rpu_config: resistive processing unit configuration.
-        bias: whether to use a bias row on the analog tile or not
+        bias: whether to use a bias row on the analog tile or not.
         realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and read out of weights
+            for setting initial weights and read out of weights.
         weight_scaling_omega: the weight value where the max
             weight will be scaled to. If zero, no weight scaling will
-            be performed
+            be performed.
+        digital_bias: decide whether the bias term is handled by the analog tile
+            or kept in digital.
     """
     # pylint: disable=abstract-method
 
@@ -62,6 +64,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False
     ):
         # Create the tile.
         self.analog_tile = self._setup_tile(in_features,
@@ -69,14 +72,16 @@ class AnalogLinear(AnalogModuleBase, Linear):
                                             bias,
                                             rpu_config,
                                             realistic_read_write,
-                                            weight_scaling_omega)
+                                            weight_scaling_omega,
+                                            digital_bias)
         # Call super() after tile creation, including ``reset_parameters``.
-        super().__init__(in_features, out_features, bias=bias)
+        AnalogModuleBase.__init__(self)
+        Linear.__init__(self, in_features, out_features, bias=bias)
 
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
         self.unregister_parameter('weight')
-        if bias:
+        if self.analog_bias:
             self.unregister_parameter('bias')
 
         # Register tile instead
@@ -89,6 +94,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
+            digital_bias: bool = False,
     ) -> 'AnalogLinear':
         """Return an AnalogLinear layer from a torch Linear layer.
 
@@ -102,6 +108,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
             weight_scaling_omega: If non-zero, applied weights of analog
                 layers will be scaled by ``weight_scaling_omega`` divided by
                 the absolute maximum value of the original weight matrix.
+            digital_bias: decide whether the bias term is handled by the analog tile
+                or kept in digital.
 
                 Note:
                     Make sure that the weight max and min setting of the
@@ -115,7 +123,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
                             module.bias is not None,
                             rpu_config,
                             realistic_read_write,
-                            weight_scaling_omega)
+                            weight_scaling_omega,
+                            digital_bias)
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module
@@ -127,7 +136,12 @@ class AnalogLinear(AnalogModuleBase, Linear):
 
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
-        # pylint: disable=arguments-differ,arguments-renamed
-        return AnalogFunction.apply(
-            self.analog_tile.get_analog_ctx(), x_input,
-            self.analog_tile.shared_weights, not self.training)
+        # pylint: disable=arguments-differ, arguments-renamed
+
+        out = AnalogFunction.apply(
+                self.analog_tile.get_analog_ctx(), x_input,
+                self.analog_tile.shared_weights, not self.training)
+
+        if self.digital_bias:
+            return out + self.bias
+        return out

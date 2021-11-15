@@ -60,6 +60,7 @@ public:
       int m_batch,
       const BitLineMaker<T> *blm,
       const PulsedUpdateMetaParameter<T> &up,
+      const T lr,
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,

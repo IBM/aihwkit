@@ -71,11 +71,13 @@ private:
   std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr;     // need float here
   std::unique_ptr<CudaArray<float>> dev_ravg_scale_value_ = nullptr; // need float here
   std::unique_ptr<CudaArray<float>> dev_avgmax_value_ = nullptr;     // need float here
+  std::unique_ptr<CudaArray<float>> dev_nzeros_value_ = nullptr;     // need float here
   std::unique_ptr<Maximizer<T>> amaximizer_ = nullptr;
   std::unique_ptr<Maximizer<T>> maximizer_ = nullptr;
 
   NoiseManagementType nm_type_ = NoiseManagementType::None;
   int buffer_m_batch_ = 0;
+  int last_m_batch_ = 0;
   int size_ = 0;
   CudaContext *context_ = nullptr;
   bool const_set_if_ = false;

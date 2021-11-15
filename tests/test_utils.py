@@ -14,20 +14,25 @@
 
 from tempfile import TemporaryFile
 from copy import deepcopy
+from unittest import SkipTest
 
 from numpy import array
 from numpy.random import rand
 from numpy.testing import assert_array_almost_equal, assert_raises
-from torch import Tensor, load, save
+from torch import Tensor, load, save, device, manual_seed
 from torch.nn import Module, Sequential
+from torch.nn import Linear as torch_linear
 from torch.nn.functional import mse_loss
+from torch.optim import SGD
 
-from aihwkit.nn import AnalogConv2d
+from aihwkit.nn import AnalogConv2d, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.rpu_base import cuda
 from aihwkit.exceptions import TileError, ModuleError
+from aihwkit.nn.conversion import convert_to_analog
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv2d, Conv2dCuda, Linear, LinearCuda
@@ -38,7 +43,8 @@ from .helpers.tiles import FloatingPoint, ConstantStep, Inference
 @parametrize_over_layers(
     layers=[Linear, Conv2d, LinearCuda, Conv2dCuda],
     tiles=[FloatingPoint, ConstantStep, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class SerializationTest(ParametrizedTestCase):
     """Tests for serialization."""
@@ -154,6 +160,53 @@ class SerializationTest(ParametrizedTestCase):
         self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
         self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
                               model.analog_tile.__class__)
+        self.assertTrue(new_model.analog_tile.is_cuda == model.analog_tile.is_cuda)
+
+    def test_save_load_model_cross_device(self):
+        """Test saving and loading a model directly."""
+
+        if not cuda.is_compiled():
+            raise SkipTest('CUDA not available.')
+
+        model = self.get_layer()
+
+        map_location = 'cuda'
+        if model.analog_tile.is_cuda:
+            map_location = 'cpu'
+
+        # Keep track of the current weights and biases for comparing.
+        (model_weights, model_biases,
+         tile_weights, tile_biases) = self.get_layer_and_tile_weights(model)
+        assert_array_almost_equal(model_weights, tile_weights)
+        if self.bias:
+            assert_array_almost_equal(model_biases, tile_biases)
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file, map_location=device(map_location))
+
+        # Compare the new model weights and biases.
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(new_model)
+
+        assert_array_almost_equal(model_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(model_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
+
+        # Asserts over the AnalogContext of the new model.
+        self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
+        self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
+                              model.analog_tile.__class__)
+
+        self.assertTrue(new_model.analog_tile.is_cuda != model.analog_tile.is_cuda)
+
+        if model.analog_tile.shared_weights is not None:
+            self.assertTrue(new_model.analog_tile.shared_weights.device.type == map_location)
 
     def test_save_load_meta_parameter(self):
         """Test saving and loading a device with custom parameters."""
@@ -179,6 +232,7 @@ class SerializationTest(ParametrizedTestCase):
         self.assertAlmostEqual(parameters.forward_io.inp_noise, 0.321)
         self.assertAlmostEqual(parameters.backward_io.inp_noise, 0.456)
         self.assertAlmostEqual(parameters.update.desired_bl, 78)
+        self.assertTrue(new_model.analog_tile.is_cuda == model.analog_tile.is_cuda)
 
     def test_save_load_hidden_parameters(self):
         """Test saving and loading a device with hidden parameters."""
@@ -214,6 +268,31 @@ class SerializationTest(ParametrizedTestCase):
         # Assert over the new model tile parameters.
         alpha_new = new_model.analog_tile.tile.get_alpha_scale()
         assert_array_almost_equal(array(alpha), array(alpha_new))
+
+    def test_save_load_shared_weights(self):
+        """Test saving and loading a device with shared_weights."""
+
+        if isinstance(self.get_rpu_config(), FloatingPointRPUConfig):
+            raise SkipTest('Not available for FP')
+
+        # Create the device and the array.
+        model = self.get_layer()
+
+        shared_weights = None
+        if model.analog_tile.shared_weights is not None:
+            shared_weights = model.analog_tile.shared_weights.detach().cpu().numpy()
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model, file)
+            # Load the model.
+            file.seek(0)
+            new_model = load(file)
+
+        # Assert over the new model tile parameters.
+        if shared_weights is not None:
+            new_shared_weights = new_model.analog_tile.shared_weights
+            assert_array_almost_equal(shared_weights, new_shared_weights.detach().cpu().numpy())
 
     def test_save_load_weight_scaling_omega(self):
         """Test saving and loading a device with weight scaling omega."""
@@ -359,25 +438,29 @@ class SerializationTest(ParametrizedTestCase):
         """Test creating a new model using a state dict, while using a different RPU config."""
 
         # Create the device and the array.
-
-        model = self.get_layer()
-        state_dict = model.state_dict()
-
-        rpu_config = deepcopy(model.analog_tile.rpu_config)
+        rpu_config_org = self.get_rpu_config()
 
         # Skipped for FP
-        if isinstance(rpu_config, FloatingPointRPUConfig):
-            return
+        if isinstance(rpu_config_org, FloatingPointRPUConfig):
+            raise SkipTest('Not available for FP')
 
-        old_value = rpu_config.forward.inp_noise
-        rpu_config.forward.inp_noise = 0.51
+        rpu_config_org.forward.is_perfect = False
+        old_value = 0.11
+        rpu_config_org.forward.inp_noise = old_value
+
+        model = self.get_layer(rpu_config=rpu_config_org)
+        state_dict = model.state_dict()
+
+        rpu_config = deepcopy(rpu_config_org)
+        new_value = 0.51
+        rpu_config.forward.inp_noise = new_value
 
         # Test restore_rpu_config=False
         new_model = self.get_layer(rpu_config=rpu_config)
         new_model.load_state_dict(state_dict, load_rpu_config=False)
 
         parameters = new_model.analog_tile.tile.get_parameters()
-        self.assertAlmostEqual(parameters.forward_io.inp_noise, 0.51)
+        self.assertAlmostEqual(parameters.forward_io.inp_noise, new_value)
 
         # Test restore_rpu_config=True
         new_model = self.get_layer(rpu_config=rpu_config)
@@ -386,18 +469,136 @@ class SerializationTest(ParametrizedTestCase):
         parameters = new_model.analog_tile.tile.get_parameters()
         self.assertAlmostEqual(parameters.forward_io.inp_noise, old_value)
 
+    def test_load_state_load_rpu_config_sequential(self):
+        """Test creating a new model using a state dict, while using a different RPU config."""
+
+        # Create the device and the array.
+        rpu_config_org = self.get_rpu_config()
+
+        # Skipped for FP
+        if isinstance(rpu_config_org, FloatingPointRPUConfig):
+            raise SkipTest('Not available for FP')
+
+        rpu_config_org.forward.is_perfect = False
+        old_value = 0.11
+        rpu_config_org.forward.inp_noise = old_value
+
+        model = AnalogSequential(self.get_layer(rpu_config=rpu_config_org))
+        state_dict = model.state_dict()
+
+        rpu_config = deepcopy(rpu_config_org)
+        new_value = 0.51
+        rpu_config.forward.inp_noise = new_value
+
+        # Test restore_rpu_config=False
+        new_model = AnalogSequential(self.get_layer(rpu_config=rpu_config))
+        new_model.load_state_dict(state_dict, load_rpu_config=False)
+
+        parameters = new_model[0].analog_tile.tile.get_parameters()
+        self.assertAlmostEqual(parameters.forward_io.inp_noise, new_value)
+
+        # Test restore_rpu_config=True
+        new_model = AnalogSequential(self.get_layer(rpu_config=rpu_config))
+        new_model.load_state_dict(state_dict, load_rpu_config=True)
+
+        parameters = new_model[0].analog_tile.tile.get_parameters()
+        self.assertAlmostEqual(parameters.forward_io.inp_noise, old_value)
+
     def test_load_state_load_rpu_config_wrong(self):
         """Test creating a new model using a state dict, while using a different RPU config."""
+
+        # Skipped for FP
+        if isinstance(self.get_rpu_config(), FloatingPointRPUConfig):
+            raise SkipTest('Not available for FP')
 
         # Create the device and the array.
         model = self.get_layer()
         state_dict = model.state_dict()
 
-        # Skipped for FP
-        if isinstance(model.analog_tile.rpu_config, FloatingPointRPUConfig):
-            return
-
         rpu_config = FloatingPointRPUConfig()
 
         new_model = self.get_layer(rpu_config=rpu_config)
         assert_raises(ModuleError, new_model.load_state_dict, state_dict, load_rpu_config=False)
+
+
+@parametrize_over_layers(
+    layers=[Linear, LinearCuda],
+    tiles=[FloatingPoint],
+    biases=[False],
+    digital_biases=[False]
+)
+class SerializationTestExtended(ParametrizedTestCase):
+    """Tests for serialization."""
+
+    @staticmethod
+    def train_model_torch(model, loss_func, x_b, y_b):
+        """Train the model with torch SGD."""
+        opt = SGD(model.parameters(), lr=0.5)
+        epochs = 100
+        for _ in range(epochs):
+            opt.zero_grad()
+            pred = model(x_b)
+            loss = loss_func(pred, y_b)
+
+            loss.backward()
+            opt.step()
+
+    @staticmethod
+    def get_torch_model(use_cuda: bool):
+        """ Returns a torch model."""
+        manual_seed(4321)
+        torch_model = Sequential(
+            torch_linear(4, 3),
+            torch_linear(3, 3),
+            Sequential(
+                torch_linear(3, 1),
+                torch_linear(1, 1)
+            )
+        )
+        if use_cuda:
+            torch_model.cuda()
+        return torch_model
+
+    def test_load_state_dict_conversion(self):
+        """Test loading and setting conversion with alpha."""
+
+        # Create the device and the array.
+
+        x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
+        y_b = Tensor([[0.3], [0.6]])
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            y_b = y_b.cuda()
+
+        model = self.get_torch_model(self.use_cuda)
+
+        self.train_model_torch(model, mse_loss, x_b, y_b)
+
+        analog_model = convert_to_analog(model, self.get_rpu_config(), weight_scaling_omega=1.0)
+        analog_loss = mse_loss(analog_model(x_b), y_b)
+
+        with TemporaryFile() as file:
+            save(analog_model.state_dict(), file)
+            # Load the model.
+            file.seek(0)
+            model = self.get_torch_model(self.use_cuda)
+            new_analog_model = convert_to_analog(model, self.get_rpu_config(),
+                                                 weight_scaling_omega=1.0)
+            state_dict = load(file)
+            new_analog_model.load_state_dict(state_dict, load_rpu_config=True)
+
+        new_state_dict = new_analog_model.state_dict()
+        for key in new_state_dict.keys():
+
+            if not key.endswith('analog_tile_state'):
+                continue
+
+            state1 = new_state_dict[key]
+            state2 = state_dict[key]
+            assert_array_almost_equal(state1['analog_tile_weights'],
+                                      state2['analog_tile_weights'])
+            assert_array_almost_equal(state1['analog_alpha_scale'],
+                                      state2['analog_alpha_scale'])
+
+        new_analog_loss = mse_loss(new_analog_model(x_b), y_b)
+        self.assertTensorAlmostEqual(new_analog_loss, analog_loss)

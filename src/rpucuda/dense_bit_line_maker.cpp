@@ -282,14 +282,16 @@ int *DenseBitLineMaker<T>::makeCoincidences(
   T A = 0;
   T B = 0;
   int BL = 0;
+  // negative lr allowed in the below, thus fabs(lr)
   if (up.update_bl_management || up.update_management) {
 
     T x_abs_max = Find_Absolute_Max<T>(x_in, x_size_, x_inc);
     T d_abs_max = Find_Absolute_Max<T>(d_in, d_size_, d_inc);
 
-    up.performUpdateManagement(BL, A, B, up.desired_BL, x_abs_max, d_abs_max, lr, dw_min);
+    up.performUpdateManagement(BL, A, B, up.desired_BL, x_abs_max, d_abs_max, fabs(lr), dw_min);
   } else {
-    up.calculateBlAB(BL, A, B, lr, dw_min);
+
+    up.calculateBlAB(BL, A, B, fabs(lr), dw_min);
   }
 
   if (!containers_allocated_) {

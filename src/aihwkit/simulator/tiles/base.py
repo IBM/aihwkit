@@ -17,7 +17,7 @@ from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from numpy import concatenate, expand_dims
 from numpy import abs as numpy_abs
-from torch import Tensor, stack
+from torch import Tensor, stack, zeros
 from torch import device as torch_device
 from torch.autograd import no_grad
 
@@ -83,6 +83,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
     def ensure_shared_weights(self, shared_weights: Optional[Tensor] = None) -> None:
         """Ensure that the shared_weights is set properly.
 
+        Caution:
+           This is only called from analog function.
+
         No-op if shared weights is not used.
         """
         if shared_weights is not None:
@@ -132,8 +135,14 @@ class BaseTile(Generic[RPUConfigGeneric]):
             = self.tile.get_hidden_parameter_names()
         current_dict['analog_tile_class'] = self.__class__.__name__
         current_dict['analog_alpha_scale'] = self.tile.get_alpha_scale()
-        current_dict.pop('tile')
+        current_dict['analog_lr'] = self.tile.get_learning_rate()
+        current_dict['shared_weights'] = self.shared_weights is not None
+        current_dict.pop('tile', None)
+
+        # don't save device. Will be determined by loading object
         current_dict.pop('stream', None)
+        current_dict.pop('is_cuda', None)
+        current_dict.pop('device', None)
 
         return current_dict
 
@@ -149,14 +158,31 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Raises:
             TileError: if tile class does not match or hidden parameters do not match
         """
+
+        # Note: self here is NOT initialized! So we need to recreate
+        # attributes that were not saved in getstate
+
         current_dict = state.copy()
         weights = current_dict.pop('analog_tile_weights')
         hidden_parameters = current_dict.pop('analog_tile_hidden_parameters')
         hidden_parameters_names = current_dict.pop('analog_tile_hidden_parameter_names', [])
         alpha_scale = current_dict.pop('analog_alpha_scale')
         tile_class = current_dict.pop('analog_tile_class', self.__class__.__name__)
+        analog_lr = current_dict.pop('analog_lr', 0.01)
+        shared_weights_if = current_dict.pop('shared_weights', None)
+        if not isinstance(shared_weights_if, bool):
+            # for legacy
+            shared_weights_if = shared_weights_if is not None
+
         self.__dict__.update(current_dict)
 
+        self.device = torch_device('cpu')
+        self.is_cuda = False
+        # get the current map location from analog_ctx (which is restored)
+        to_device = self.analog_ctx.device
+
+        # recreate attributes not saved
+        # always first create on CPU
         x_size = self.in_size + 1 if self.bias else self.in_size
         d_size = self.out_size
 
@@ -178,15 +204,20 @@ class BaseTile(Generic[RPUConfigGeneric]):
         if alpha_scale is not None:
             self.tile.set_alpha_scale(alpha_scale)
 
-        # Keep the data (for future use)
+        self.tile.set_learning_rate(analog_lr)
+
+        # re-generate shared weights (CPU)
+        if shared_weights_if:
+            self.shared_weights = zeros(d_size, x_size, requires_grad=True)
+            self.ensure_shared_weights()
+
+        # Regenerate context but keep the data (for future use)
         data = self.analog_ctx.data.detach()
         self.analog_ctx = AnalogContext(self)
         self.analog_ctx.set_data(data)
 
-        if self.is_cuda:
-            self.cuda(self.device)
-
-        self.ensure_shared_weights()
+        if to_device.type.startswith('cuda'):
+            self.cuda(to_device)
 
     def _create_simulator_tile(
             self,
@@ -630,7 +661,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Usually this is ignored and fixed to 0 as only one device is
         present per cross-point. Other devices, might not allow
         explicit setting as it would interfere with the implemented
-        learning However rule. However, some tiles have internally
+        learning rule. However, some tiles have internally
         multiple devices per cross-point (eg. unit cell) that can be
         chosen depending on the update policy.
 

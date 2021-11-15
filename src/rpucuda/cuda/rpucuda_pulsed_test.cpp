@@ -24,8 +24,7 @@
 #include <numeric>
 #include <random>
 
-#define TOLERANCE 1e-5
-
+#define TOLERANCE 5e-4
 namespace {
 
 using namespace RPU;
@@ -111,8 +110,7 @@ public:
     layer_pulsed->disp();
 
     // copy-construct on GPU
-    context_container = RPU::make_unique<CudaContext>(-1, false);
-    context = &*context_container;
+    context = &context_container;
 
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
     culayer_pulsed->disp();
@@ -174,7 +172,7 @@ public:
     delete[] w_other_trans;
   }
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
 
   std::unique_ptr<RPUPulsed<T>> layer_pulsed;
@@ -212,8 +210,7 @@ public:
 
     is_test = false;
 
-    context_container = RPU::make_unique<CudaContext>(-1, false);
-    context = &*context_container;
+    context = &context_container;
 
     x_size = 41;
     d_size = 50;
@@ -242,6 +239,8 @@ public:
     p_io.inp_res = -1;
     p_io.inp_sto_round = false;
     p_io.out_res = -1;
+
+    p_io.ir_drop = 0.3;
 
     p_io.noise_management = NoiseManagementType::AbsMax;
     p_io.bound_management = BoundManagementType::Iterative;
@@ -333,7 +332,7 @@ public:
 
   void TearDown() { delete batch_indices; }
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
 
   std::unique_ptr<RPUSimple<T>> layer;
@@ -479,10 +478,10 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, ForwardMatrixBiasNoNoise) {
 
   for (int i = 0; i < this->d_size * this->m_batch; i++) {
     // std::cout << i << ": d1 " << this->d1[i] << " vs d2 " << this->d2[i] << std::endl;
-    ASSERT_NEAR(this->d1[i], this->d2[i], 1e-5);
+    ASSERT_NEAR(this->d1[i], this->d2[i], TOLERANCE);
     ASSERT_NEAR(
         this->d2[i], this->d3[i],
-        1e-5); // because of noise/bound management: in/out bound should not matter
+        TOLERANCE); // because of noise/bound management: in/out bound should not matter
   }
 }
 
@@ -701,8 +700,8 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardMatrixBiasNoNoise) {
   this->x3 = this->x_vec_batch;
 
   for (int i = 0; i < (this->x_size - 1) * this->m_batch; i++) {
-    ASSERT_NEAR(this->x1[i], this->x2[i], 1e-5);
-    ASSERT_NEAR(this->x2[i], this->x3[i], 1e-5);
+    ASSERT_NEAR(this->x1[i], this->x2[i], TOLERANCE);
+    ASSERT_NEAR(this->x2[i], this->x3[i], TOLERANCE);
   }
 }
 
@@ -1102,7 +1101,7 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
         cuavg[k] += cuweights[i][j] / nloop;                                                       \
         avg[k] += weights[i][j] / nloop;                                                           \
         if (no_noise) {                                                                            \
-          ASSERT_NEAR(cuweights[i][j], weights[i][j], 1e-5);                                       \
+          ASSERT_NEAR(cuweights[i][j], weights[i][j], TOLERANCE);                                  \
         }                                                                                          \
         cusig[k] += cuweights[i][j] * cuweights[i][j] / nloop;                                     \
         sig[k] += weights[i][j] * weights[i][j] / nloop;                                           \

@@ -63,6 +63,7 @@ private:
   void applyOutputWeightNoise(const bool out_trans);
   void applyOutputNonIdealities(const T *dev_weights, const bool out_trans);
   void applyOutputPCMReadNoise(const T *dev_weights, const bool out_trans);
+  void applyIrDrop(const T *dev_weights, const bool out_trans);
 
   void initializeBatchBuffer(int m_batch);
 
@@ -106,7 +107,6 @@ private:
   std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_bound_exceeded_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_any_exceeded_ = nullptr;
-  std::unique_ptr<CudaArray<int>> dev_channel_exceeded_ = nullptr;
   std::unique_ptr<CudaArray<char>> dev_flagged_temp_storage_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_selected_bidx_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_selected_m_batch_ = nullptr;

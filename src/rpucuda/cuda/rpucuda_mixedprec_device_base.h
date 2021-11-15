@@ -58,7 +58,7 @@ public:
     swap(a.io_, b.io_);
     swap(a.up_ptr_, b.up_ptr_);
     swap(a.up_, b.up_);
-
+    swap(a.nblocks_batch_max_, b.nblocks_batch_max_);
     swap(a.granularity_, b.granularity_);
   };
   bool hasDirectUpdate() const override { return true; };
@@ -111,6 +111,7 @@ protected:
   std::unique_ptr<CudaArray<T>> dev_transfer_d_vecs_ = nullptr;
 
   T granularity_ = 0.0;
+  int nblocks_batch_max_;
 
 private:
   void allocateContainers();

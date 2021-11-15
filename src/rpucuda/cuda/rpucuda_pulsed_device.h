@@ -80,6 +80,7 @@ public:
       int m_batch,
       const BitLineMaker<T> *blm,
       const PulsedUpdateMetaParameter<T> &up,
+      const T lr,
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
@@ -94,6 +95,7 @@ public:
   PulsedRPUDeviceCudaBase<T> *clone() const override { RPU_FATAL("Needs implementation"); };
 
   inline T getWeightGranularity() const { return weight_granularity_; };
+  virtual T getPulseCountLearningRate(T learning_rate) { return learning_rate; };
 
 protected:
   inline void setWeightGranularity(T weight_granularity) {
@@ -155,6 +157,7 @@ public:
       int m_batch,
       const BitLineMaker<T> *blm,
       const PulsedUpdateMetaParameter<T> &up,
+      const T lr,
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,

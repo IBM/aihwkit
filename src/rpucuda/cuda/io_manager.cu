@@ -495,6 +495,49 @@ __global__ void kernelElemSqrtAddNoiseBatch(
   STOCH_FINALIZE(true);
 }
 
+// compute x_j*(1-(1-j/n)^2)
+template <typename T>
+__global__ void kernelInputPositionCoding(
+    T *output,      // x' out
+    const T *input, // x in
+    const int size_in,
+    const int m_batch_in,
+    const bool trans_in) {
+  const bool trans = trans_in;
+  const int size = size_in;
+  const int m_batch = m_batch_in;
+  const int total_size = size * m_batch;
+
+  int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  int total_threads = blockDim.x * gridDim.x;
+
+  STRIDE_LOOP(total_size, value,
+
+              int xidx = trans ? (idx / m_batch) : (idx % size);
+              T z = (T)1.0 - (T)xidx / (T)size; value *= (T)1.0 - z * z;);
+}
+
+// computes c_i and y_i -= c_i*GEMM_i
+// c_i = a_i*(a_i*(0.05*a_i - 0.2) + 0.5);
+template <typename T>
+__global__ void kernelElemMulCAdd(
+    T *output,
+    const T *input,
+    const T *a_values,
+    const T *pc_gemm_values,
+    const int total_size_in) {
+  const int total_size = total_size_in;
+
+  int total_threads = blockDim.x * gridDim.x;
+  int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  const T K2 = 0.05;
+  const T K1 = 0.2;
+  const T K0 = 0.5;
+
+  STRIDE_LOOP(total_size, value, T a_i = a_values[idx]; T gemm_i = pc_gemm_values[idx];
+              T c_i = a_i * (a_i * (K2 * a_i - K1) + K0); value -= c_i * gemm_i;);
+}
+
 /*********************************************************************************/
 /*Output management: single batch */
 template <typename T, typename OutputIteratorT, bool noise_management>
@@ -1203,6 +1246,7 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
   int m_batch = temp_m_batch_;
 
   // actual bound management
+
   if (m_batch == RPU_IO_USE_SINGLE_BATCH_VERSION) {
     kernelOutputBoundManagement<<<nblocks_om_, nthreads_, 0, s>>>(
         dev_output, dev_output_applied_->getData(), out_size_, io_->out_noise,
@@ -1351,7 +1395,64 @@ void InputOutputManager<T>::applyOutputPCMReadNoise(const T *dev_weights, const 
 }
 
 template <typename T>
+void InputOutputManager<T>::applyIrDrop(const T *dev_weights, const bool out_trans) {
+  if (io_->ir_drop > 0.0) {
+    // computes for each output (row):
+    //
+    // a_i = sum_j(|w_ij|*|x_j|)*n/Gw*gmax
+    // c_i = a_i*(a_i*(0.05*a_i - 0.2) + 0.5);
+    // x'_j = x_j * (1 - (1-j/n)^2)
+    // y_i = y_i_ideal - c_i*sum_j(w_ij * x'_j)
+
+    int m_batch = temp_m_batch_;
+    int in_trans = temp_trans_;
+
+    T *in_temp = getInBuffer(); // this is in_size_ x m_batch or m_batch x in_size_ (if in_trans)
+    T *out_temp =
+        getOutBuffer(); // this is out_size_ x m_batch or m_batch x out_size_ (if out_trans)
+
+    // unfortunately needs a lot of extra buffer memory (CUTLASS will help)
+    RPU_GET_CUDA_BUFFER(context_, T, dev_extra_batch_buffer_, m_batch * MAX(in_size_, out_size_));
+    RPU_GET_CUDA_BUFFER(context_, T, dev_extra_weight_buffer_, MAX(in_size_, m_batch) * out_size_);
+    RPU_GET_CUDA_BUFFER(context_, T, dev_a_buffer_, m_batch * out_size_);
+
+    // compute thr abs weights current
+    RPU::math::elemabs(
+        context_, dev_extra_weight_buffer_->getData(), dev_weights, out_size_ * in_size_);
+
+    RPU::math::elemabs(context_, dev_extra_batch_buffer_->getData(), in_temp, in_size_ * m_batch);
+
+    // compute the a_i
+    detail::forwardMatrix(
+        context_, dev_extra_weight_buffer_->getData(), dev_extra_batch_buffer_->getData(), in_size_,
+        in_trans, dev_a_buffer_->getData(), out_size_, out_trans, m_batch,
+        in_size_ / io_->ir_drop_Gw_div_gmax);
+
+    // compute x_j*(1-(1-j/n)^2)
+    kernelInputPositionCoding<<<nblocks_om_batch_, nthreads_, 0, context_->getStream()>>>(
+        dev_extra_batch_buffer_->getData(), in_temp, in_size_, m_batch, in_trans);
+
+    // compute the position filtered GEMM
+    detail::forwardMatrix(
+        context_, dev_weights, dev_extra_batch_buffer_->getData(), in_size_, in_trans,
+        dev_extra_weight_buffer_->getData(), // re-use  buffer
+        out_size_, out_trans, m_batch, io_->ir_drop);
+
+    // computes c_i and y_i -= c_i*GEMM_i
+    kernelElemMulCAdd<<<nblocks_om_batch_, nthreads_, 0, context_->getStream()>>>(
+        out_temp,
+        out_temp,                            // in-place
+        dev_a_buffer_->getData(),            // this is the a_i
+        dev_extra_weight_buffer_->getData(), // this is GEMM_i
+        out_size_ * m_batch                  // all have same shape
+    );
+  }
+}
+
+template <typename T>
 void InputOutputManager<T>::applyOutputNonIdealities(const T *dev_weights, const bool out_trans) {
+
+  applyIrDrop(dev_weights, out_trans);
 
   switch (io_->w_noise_type) {
   case OutputWeightNoiseType::AdditiveConstant: {

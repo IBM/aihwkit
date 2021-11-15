@@ -42,6 +42,7 @@ enum DeviceUpdateType {
   Transfer,
   MixedPrec,
   PowStep,
+  BufferedTransfer
 };
 
 // inherit from Simple
@@ -119,7 +120,7 @@ public:
   };
   virtual void getDPNames(std::vector<std::string> &names) const = 0;
   virtual void getDeviceParameter(std::vector<T *> &data_ptrs) const = 0;
-  virtual void setDeviceParameter(const std::vector<T *> &data_ptrs) = 0;
+  virtual void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) = 0;
   virtual int getHiddenWeightsCount() const = 0;
   virtual void setHiddenWeights(const std::vector<T> &data) = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
@@ -205,7 +206,7 @@ public:
 
   void getDPNames(std::vector<std::string> &names) const override { names.clear(); };
   void getDeviceParameter(std::vector<T *> &data_ptrs) const override{};
-  void setDeviceParameter(const std::vector<T *> &data_ptrs) override{};
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override{};
   int getHiddenWeightsCount() const override { return 0; };
   void setHiddenWeights(const std::vector<T> &data) override{};
   void printDP(int x_count, int d_count) const override{};

@@ -94,6 +94,7 @@ public:
       uint32_t *d_counts);
 
   void setUpPar(const PulsedUpdateMetaParameter<T> &up);
+  inline const PulsedUpdateMetaParameter<T> &getUpPar() const { return up_; };
 
 private:
   void freeContainers();

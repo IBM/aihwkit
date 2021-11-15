@@ -27,6 +27,7 @@ void declare_rpu_devices(py::module &m) {
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
   using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
   using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
+  using BufferedTransferParam = RPU::BufferedTransferRPUDeviceMetaParameter<T>;
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -279,6 +280,28 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
+  class PyBufferedTransferParam : public BufferedTransferParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, BufferedTransferParam, getName, );
+    }
+    BufferedTransferParam *clone() const override {
+      PYBIND11_OVERLOAD(BufferedTransferParam *, BufferedTransferParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, BufferedTransferParam, implements, );
+    }
+    RPU::BufferedTransferRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::BufferedTransferRPUDevice<T> *, BufferedTransferParam, createDevice, x_size, d_size,
+          rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, BufferedTransferParam, calcWeightGranularity, );
+    }
+  };
+
   /*
    * Python class definitions.
    */
@@ -349,7 +372,9 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("out_scale", &RPU::IOMetaParameter<T>::out_scale)
       .def_readwrite("out_sto_round", &RPU::IOMetaParameter<T>::out_sto_round)
       .def_readwrite("w_noise", &RPU::IOMetaParameter<T>::w_noise)
-      .def_readwrite("w_noise_type", &RPU::IOMetaParameter<T>::w_noise_type);
+      .def_readwrite("w_noise_type", &RPU::IOMetaParameter<T>::w_noise_type)
+      .def_readwrite("ir_drop", &RPU::IOMetaParameter<T>::ir_drop)
+      .def_readwrite("ir_drop_g_ratio", &RPU::IOMetaParameter<T>::ir_drop_Gw_div_gmax);
 
   py::class_<RPU::DriftParameter<T>>(m, "DriftParameter")
       .def(py::init<>())
@@ -567,10 +592,12 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite(
           "transfer_every_vec", &TransferParam::transfer_every_vec) // can this be filled?
       .def_readwrite("units_in_mbatch", &TransferParam::units_in_mbatch)
-      .def_readwrite("n_cols_per_transfer", &TransferParam::n_cols_per_transfer)
+      .def_readwrite("n_reads_per_transfer", &TransferParam::n_reads_per_transfer)
       .def_readwrite("with_reset_prob", &TransferParam::with_reset_prob)
-      .def_readwrite("random_column", &TransferParam::random_column)
+      .def_readwrite("random_selection", &TransferParam::random_selection)
+      .def_readwrite("transfer_columns", &TransferParam::transfer_columns)
       .def_readwrite("transfer_lr", &TransferParam::transfer_lr)
+      .def_readwrite("fast_lr", &TransferParam::fast_lr)
       .def_readwrite("transfer_lr_vec", &TransferParam::transfer_lr_vec)
       .def_readwrite("scale_transfer_lr", &TransferParam::scale_transfer_lr)
       .def_readwrite("transfer_forward", &TransferParam::transfer_io)
@@ -632,6 +659,28 @@ void declare_rpu_devices(py::module &m) {
           })
       .def(
           "calc_weight_granularity", &PowStepParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
+
+  py::class_<BufferedTransferParam, PyBufferedTransferParam, TransferParam>(
+      m, "BufferedTransferResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("thres_scale", &BufferedTransferParam::thres_scale)
+      .def_readwrite("momentum", &BufferedTransferParam::momentum)
+      .def_readwrite("step", &BufferedTransferParam::step)
+      .def(
+          "__str__",
+          [](BufferedTransferParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &BufferedTransferParam::calcWeightGranularity,
           R"pbdoc(
         Calculates the granularity of the weights (typically ``dw_min``)
 

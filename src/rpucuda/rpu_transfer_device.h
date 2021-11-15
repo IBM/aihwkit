@@ -51,6 +51,10 @@ template <typename T> class TransferRPUDevice;
    is same for all the tranfers. However, it can be set individually
    by using the vector transfer_lr_vec (with size n_devices-1)
 
+   fast_lr: if defined, it will fix and set the first LR
+   (onto the A matrix). Otherwise the SGD learing
+   rate will be taken
+
  */
 
 template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMetaParameter<T> {
@@ -58,14 +62,17 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   T gamma = (T)0.0; // weightening factor. [gamma vec optionally inherited from vector]
   T transfer_every = (T)1.0;
   bool units_in_mbatch = false;
-  int n_cols_per_transfer = 1;
+  int n_reads_per_transfer = 1;
   T with_reset_prob = (T)0.0;
   bool no_self_transfer = true;
-  bool random_column = false;
-
+  bool random_selection = false;
+  T fast_lr = 0.0;
   T transfer_lr = (T)1.0;
   std::vector<T> transfer_lr_vec;
   bool scale_transfer_lr = true;
+  bool transfer_columns = true; // or rows
+  int _in_size = 0;
+  int _out_size = 0;
 
   std::vector<T> transfer_every_vec;
 
@@ -85,6 +92,9 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   void initialize() override{/* do nothing */};
 
   inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == 1.0); };
+
+  inline int getInSize() const { return _in_size; };
+  inline int getOutSize() const { return _out_size; };
 
   std::string getName() const override {
     std::ostringstream ss;
@@ -141,8 +151,9 @@ public:
     swap(a.transfer_fb_pass_, b.transfer_fb_pass_);
     swap(a.transfer_vecs_, b.transfer_vecs_);
     swap(a.transfer_every_, b.transfer_every_);
-    swap(a.current_col_indices_, b.current_col_indices_);
+    swap(a.current_slice_indices_, b.current_slice_indices_);
     swap(a.fully_hidden_, b.fully_hidden_);
+    swap(a.last_weight_, b.last_weight_);
   }
 
   TransferRPUDeviceMetaParameter<T> &getPar() const override {
@@ -160,29 +171,34 @@ public:
   void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
 
-  void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   void setHiddenUpdateIdx(int idx) override{};
 
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
+  T getPulseCountLearningRate(T learning_rate) override;
 
   virtual int getTransferEvery(int from_device_idx, int m_batch) const;
   virtual void setTransferVecs(const T *transfer_vecs = nullptr);
   virtual void transfer(int to_device_idx, int from_device_idx, T current_lr);
-  virtual void forwardUpdate(
+  virtual void readAndUpdate(
       int to_device_idx,
       int from_device_idx,
       const T lr,
       const T *x_input,
       const int n_vec,
-      const bool trans,
       const T reset_prob,
       const int i_col);
   virtual const T *getTransferVecs() const { return &transfer_vecs_[0]; };
+  virtual void writeVector(
+      int device_idx, const T *in_vec, const T *out_vec, const T lr, const int m_batch_info);
+  virtual void readVector(int device_idx, const T *in_vec, T *out_vec, T alpha);
 
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
       override;
+
+  void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
 
 protected:
   void populate(const TransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
@@ -194,12 +210,12 @@ protected:
   std::unique_ptr<PulsedRPUWeightUpdater<T>> transfer_pwu_ = nullptr;
   std::vector<T> transfer_vecs_;
   std::vector<T> transfer_every_;
-  std::vector<int> current_col_indices_;
+  std::vector<int> current_slice_indices_;
+  bool fully_hidden_ = false;
+  T **last_weight_ = nullptr;
 
   // no need to swap/copy.
-  T **last_weight_ = nullptr;
   std::vector<T> transfer_tmp_;
-  bool fully_hidden_ = false;
 };
 
 } // namespace RPU

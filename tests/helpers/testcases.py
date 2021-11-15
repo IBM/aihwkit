@@ -23,17 +23,17 @@ from aihwkit.simulator.rpu_base import cuda
 class AihwkitTestCase(TestCase):
     """Test case that contains common asserts and functions for aihwkit."""
 
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b):
+    def assertTensorAlmostEqual(self, tensor_a, tensor_b, decimal=6):
         """Assert that two tensors are almost equal."""
         # pylint: disable=invalid-name
         array_a = tensor_a.detach().cpu().numpy()
         array_b = tensor_b.detach().cpu().numpy()
-        assert_array_almost_equal(array_a, array_b)
+        assert_array_almost_equal(array_a, array_b, decimal=decimal)
 
-    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b):
+    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b, decimal=6):
         """Assert that two tensors are not equal."""
         # pylint: disable=invalid-name
-        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b)
+        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b, decimal)
 
 
 class ParametrizedTestCase(AihwkitTestCase):
@@ -57,6 +57,9 @@ class ParametrizedTestCase(AihwkitTestCase):
     """First of the hidden fields to check during hidden parameters."""
 
     bias: bool = False
+    """If True, the tiles and layer in this test will use bias."""
+
+    digital_bias: bool = False
     """If True, the tiles and layer in this test will use bias."""
 
     parameter: str = ''

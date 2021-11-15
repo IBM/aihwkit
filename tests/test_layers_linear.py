@@ -32,7 +32,8 @@ from .helpers.tiles import FloatingPoint, IdealizedConstantStep, Inference
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
     tiles=[FloatingPoint, IdealizedConstantStep, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class LinearLayerTest(ParametrizedTestCase):
     """Linear layer abstractions tests."""
@@ -177,8 +178,10 @@ class LinearLayerTest(ParametrizedTestCase):
 
         manual_seed(4321)
         model2 = AnalogSequential(
-            AnalogLinear(4, 3, rpu_config=FloatingPointRPUConfig(), bias=self.bias),
-            AnalogLinear(3, 1, rpu_config=FloatingPointRPUConfig(), bias=self.bias)
+            AnalogLinear(4, 3, rpu_config=FloatingPointRPUConfig(), bias=self.bias,
+                         digital_bias=self.digital_bias),
+            AnalogLinear(3, 1, rpu_config=FloatingPointRPUConfig(), bias=self.bias,
+                         digital_bias=self.digital_bias)
         )
 
         if self.use_cuda:

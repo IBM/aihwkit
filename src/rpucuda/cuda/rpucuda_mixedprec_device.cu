@@ -1,3 +1,4 @@
+
 /**
  * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
  *
@@ -38,8 +39,6 @@ MixedPrecRPUDeviceCuda<T>::MixedPrecRPUDeviceCuda(
 template <typename T> void MixedPrecRPUDeviceCuda<T>::allocateContainers() {
   this->context_->synchronizeDevice();
   dev_chi_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
-  nblocks_batch_max_ = this->context_->getSMCount() *
-                       (this->context_->maxThreadsPerBlock() / this->context_->getNThreads());
 }
 
 // copy
@@ -71,7 +70,6 @@ MixedPrecRPUDeviceCuda<T> &MixedPrecRPUDeviceCuda<T>::operator=(MixedPrecRPUDevi
   MixedPrecRPUDeviceBaseCuda<T>::operator=(std::move(other));
 
   dev_chi_ = std::move(other.dev_chi_);
-  nblocks_batch_max_ = nblocks_batch_max_;
   return *this;
 }
 
@@ -105,30 +103,62 @@ __global__ void kernelQuantizeBatch(
     const int m_batch_in,
     const bool trans_in) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
   int size = size_in;
   int m_batch = m_batch_in;
   int total_size = size * m_batch;
   bool trans = trans_in;
   T half_bins = (T)(n_bins / 2); // floor
   T res = (T)1.0 / ((T)half_bins);
-  T value;
-  int total_threads = blockDim.x * gridDim.x;
-  for (int i_stride = 0; i_stride < total_size; i_stride += total_threads) {
-    int idx = i_stride + tid;
 
-    if (idx < total_size) {
-      value = values[idx];
+  RPU_CUDA_1D_KERNEL_LOOP(idx, total_size) {
 
-      int sidx = trans ? (idx % m_batch) : (idx / size);
-      T amax = nm_values[sidx]; // amax from noise management
-      value = amax > 0.0 ? value / amax : value;
-      value = RPU_ROUNDFUN(value / res);
-      value = MIN(MAX(value, -half_bins), half_bins) * amax * res;
+    T value = values[idx];
 
-      quantized_values[idx] = value;
-    }
+    int sidx = trans ? (idx % m_batch) : (idx / size);
+    T amax = nm_values[sidx]; // amax from noise management
+    value = amax > 0.0 ? value / amax : value;
+    value = RPU_ROUNDFUN(value / res);
+    value = MIN(MAX(value, -half_bins), half_bins) * amax * res;
+
+    quantized_values[idx] = value;
   }
+}
+
+template <typename T>
+__global__ void kernelQuantizeBatchStochasticRounding(
+    T *quantized_values,
+    const T *values,
+    const T *nm_values,
+    const int n_bins,
+    const int size_in,
+    const int m_batch_in,
+    const bool trans_in,
+    curandState *random_states) {
+
+  unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  curandState local_state = random_states[tid];
+  int size = size_in;
+  int m_batch = m_batch_in;
+  int total_size = size * m_batch;
+  bool trans = trans_in;
+  T half_bins = (T)(n_bins / 2); // floor
+  T res = (T)1.0 / ((T)half_bins);
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, total_size) {
+
+    T stoch_value = curand_uniform(&local_state);
+    T value = values[idx];
+
+    int sidx = trans ? (idx % m_batch) : (idx / size);
+    T amax = nm_values[sidx]; // amax from noise management
+    value = amax > 0.0 ? value / amax : value;
+    value = RPU_ROUNDFUN(value / res + stoch_value - 0.5);
+    value = MIN(MAX(value, -half_bins), half_bins) * amax * res;
+
+    quantized_values[idx] = value;
+  }
+
+  random_states[tid] = local_state;
 }
 
 template <typename T>
@@ -139,7 +169,8 @@ const T *MixedPrecRPUDeviceCuda<T>::quantize(
     int n_bins,
     int size,
     int m_batch,
-    bool trans) {
+    bool trans,
+    bool stochastic_rounding) {
 
   if (n_bins <= 0) {
     return values;
@@ -148,12 +179,17 @@ const T *MixedPrecRPUDeviceCuda<T>::quantize(
   nm->compute(values, NoiseManagementType::AbsMax, this->io_, m_batch, trans, false);
   int nthreads = this->context_->getNThreads();
   int nblocks = this->context_->getNBlocks(m_batch * size, nthreads);
-  int nblocks_batch = MIN(nblocks_batch_max_, nblocks);
+  nblocks = MIN(this->nblocks_batch_max_, nblocks);
 
   cudaStream_t s = this->context_->getStream();
-
-  kernelQuantizeBatch<<<nblocks_batch, nthreads, 0, s>>>(
-      buffer_values, values, nm->getScaleValues(), n_bins, size, m_batch, trans);
+  if (stochastic_rounding) {
+    kernelQuantizeBatchStochasticRounding<<<nblocks, nthreads, 0, s>>>(
+        buffer_values, values, nm->getScaleValues(), n_bins, size, m_batch, trans,
+        this->context_->getRandomStates(nthreads * nblocks));
+  } else {
+    kernelQuantizeBatch<<<nblocks, nthreads, 0, s>>>(
+        buffer_values, values, nm->getScaleValues(), n_bins, size, m_batch, trans);
+  }
 
   return buffer_values;
 }
@@ -180,11 +216,13 @@ void MixedPrecRPUDeviceCuda<T>::doDirectUpdate(
   const auto &par = getPar();
 
   const T *d_val = quantize(
-      d_buffer, d_input, &*this->noise_manager_d_, par.n_d_bins, this->d_size_, m_batch, d_trans);
+      d_buffer, d_input, &*this->noise_manager_d_, par.n_d_bins, this->d_size_, m_batch, d_trans,
+      par.stoc_round_d);
 
   // % Quantize x
   const T *x_val = quantize(
-      x_buffer, x_input, &*this->noise_manager_x_, par.n_x_bins, this->x_size_, m_batch, x_trans);
+      x_buffer, x_input, &*this->noise_manager_x_, par.n_x_bins, this->x_size_, m_batch, x_trans,
+      par.stoc_round_x);
 
   // dev_chi is x-size (row) major !! (to facilitate the readout below)
 
@@ -206,15 +244,15 @@ void MixedPrecRPUDeviceCuda<T>::doDirectUpdate(
 
 template <typename T>
 __global__ void
-kernelMixedPrecTransfer(T *transfer_out, T *chi, const int size, const T granularity_) {
+kernelMixedPrecTransfer(T *transfer_out, T *chi, const int size, const T granularity) {
   volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tid < size) {
     T value = chi[tid];
-    T dw = truncf(value / granularity_);
+    T dw = truncf(value / granularity);
     transfer_out[tid] = dw;
 
-    chi[tid] = value - granularity_ * dw;
+    chi[tid] = value - granularity * dw;
   }
 }
 

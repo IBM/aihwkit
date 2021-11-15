@@ -37,7 +37,8 @@ from .helpers.tiles import ConstantStep, Inference
     layers=[Linear, Conv1d, Conv2d, Conv3d,
             LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda],
     tiles=[ConstantStep],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class AnalogLayerTest(ParametrizedTestCase):
     """Analog layers abstraction tests."""
@@ -125,7 +126,8 @@ class AnalogLayerTest(ParametrizedTestCase):
     layers=[Linear, Conv1d, Conv2d, Conv3d,
             LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda],
     tiles=[ConstantStep, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class AnalogLayerMoveTest(ParametrizedTestCase):
     """Analog layers abstraction tests."""
@@ -317,7 +319,8 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 @parametrize_over_layers(
     layers=[Linear, Conv1d, Conv2d, Conv3d],
     tiles=[ConstantStep, Inference],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class CpuAnalogLayerTest(ParametrizedTestCase):
     """Analog layers tests using CPU tiles as the source."""
@@ -388,7 +391,8 @@ class CustomTileTestHelper:
 @parametrize_over_layers(
     layers=[Linear, Conv1d, Conv2d, Conv3d],
     tiles=[CustomTileTestHelper],
-    biases=[True, False]
+    biases=[True, False],
+    digital_biases=[True, False]
 )
 class CustomTileTest(ParametrizedTestCase):
     """Test for analog layers using custom tiles."""

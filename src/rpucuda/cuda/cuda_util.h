@@ -39,13 +39,42 @@
 #undef CUB_NS_POSTFIX
 #define CUB_NS_PREFIX namespace RPU {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::RPU::cub
 
-#define CUBLAS_CALL(x)                                                                             \
-  if ((x) != CUBLAS_STATUS_SUCCESS) {                                                              \
+#define CUBLAS_CALL(X)                                                                             \
+  if (X != CUBLAS_STATUS_SUCCESS) {                                                                \
     std::ostringstream ss;                                                                         \
-    ss << "CUBLAS_CALL Error at " << __FILENAME__ << " : " << __LINE__ << "\n";                    \
+    ss << "CUBLAS_CALL Error ";                                                                    \
+    switch (X) {                                                                                   \
+    case CUBLAS_STATUS_NOT_INITIALIZED:                                                            \
+      ss << "CUBLAS_STATUS_NOT_INITIALIZED";                                                       \
+      break;                                                                                       \
+    case CUBLAS_STATUS_INVALID_VALUE:                                                              \
+      ss << "CUBLAS_STATUS_INVALID_VALUE";                                                         \
+      break;                                                                                       \
+    case CUBLAS_STATUS_ARCH_MISMATCH:                                                              \
+      ss << "CUBLAS_STATUS_ARCH_MISMATCH";                                                         \
+      break;                                                                                       \
+    case CUBLAS_STATUS_MAPPING_ERROR:                                                              \
+      ss << "CUBLAS_STATUS_MAPPING_ERROR";                                                         \
+      break;                                                                                       \
+    case CUBLAS_STATUS_EXECUTION_FAILED:                                                           \
+      ss << "CUBLAS_STATUS_EXECUTION_FAILED";                                                      \
+      break;                                                                                       \
+    case CUBLAS_STATUS_INTERNAL_ERROR:                                                             \
+      ss << "CUBLAS_STATUS_INTERNAL_ERROR";                                                        \
+      break;                                                                                       \
+    case CUBLAS_STATUS_NOT_SUPPORTED:                                                              \
+      ss << "CUBLAS_STATUS_NOT_SUPPORTED";                                                         \
+      break;                                                                                       \
+    case CUBLAS_STATUS_LICENSE_ERROR:                                                              \
+      ss << "CUBLAS_STATUS_LICENSE_ERROR";                                                         \
+      break;                                                                                       \
+    }                                                                                              \
+    ss << " at " << __FILENAME__ << ":" << __LINE__ << std::endl;                                  \
     throw std::runtime_error(ss.str());                                                            \
   }
+
 #define CUDA_CALL(x)                                                                               \
   {                                                                                                \
     cudaError_t tmpe = x;                                                                          \
@@ -63,30 +92,44 @@
     if ((x) != CURAND_STATUS_SUCCESS) {                                                            \
       std::ostringstream ss;                                                                       \
       ss << "CURAND_CALL Error ";                                                                  \
-      if (x == CURAND_STATUS_VERSION_MISMATCH)                                                     \
+      switch (x) {                                                                                 \
+      case CURAND_STATUS_VERSION_MISMATCH:                                                         \
         ss << "CURAND_STATUS_VERSION_MISMATCH";                                                    \
-      else if (x == CURAND_STATUS_NOT_INITIALIZED)                                                 \
+        break;                                                                                     \
+      case CURAND_STATUS_NOT_INITIALIZED:                                                          \
         ss << "CURAND_STATUS_NOT_INITIALIZED";                                                     \
-      else if (x == CURAND_STATUS_ALLOCATION_FAILED)                                               \
+        break;                                                                                     \
+      case CURAND_STATUS_ALLOCATION_FAILED:                                                        \
         ss << "CURAND_STATUS_ALLOCATION_FAILED";                                                   \
-      else if (x == CURAND_STATUS_TYPE_ERROR)                                                      \
+        break;                                                                                     \
+      case CURAND_STATUS_TYPE_ERROR:                                                               \
         ss << "CURAND_STATUS_TYPE_ERROR";                                                          \
-      else if (x == CURAND_STATUS_OUT_OF_RANGE)                                                    \
+        break;                                                                                     \
+      case CURAND_STATUS_OUT_OF_RANGE:                                                             \
         ss << "CURAND_STATUS_OUT_OF_RANGE";                                                        \
-      else if (x == CURAND_STATUS_LENGTH_NOT_MULTIPLE)                                             \
+        break;                                                                                     \
+      case CURAND_STATUS_LENGTH_NOT_MULTIPLE:                                                      \
         ss << "CURAND_STATUS_LENGTH_NOT_MULTIPLE";                                                 \
-      else if (x == CURAND_STATUS_DOUBLE_PRECISION_REQUIRED)                                       \
+        break;                                                                                     \
+      case CURAND_STATUS_DOUBLE_PRECISION_REQUIRED:                                                \
         ss << "CURAND_STATUS_DOUBLE_PRECISION_REQUIRED";                                           \
-      else if (x == CURAND_STATUS_LAUNCH_FAILURE)                                                  \
+        break;                                                                                     \
+      case CURAND_STATUS_LAUNCH_FAILURE:                                                           \
         ss << "CURAND_STATUS_LAUNCH_FAILURE";                                                      \
-      else if (x == CURAND_STATUS_PREEXISTING_FAILURE)                                             \
+        break;                                                                                     \
+      case CURAND_STATUS_PREEXISTING_FAILURE:                                                      \
         ss << "CURAND_STATUS_PREEXISTING_FAILURE";                                                 \
-      else if (x == CURAND_STATUS_INITIALIZATION_FAILED)                                           \
+        break;                                                                                     \
+      case CURAND_STATUS_INITIALIZATION_FAILED:                                                    \
         ss << "CURAND_STATUS_INITIALIZATION_FAILED";                                               \
-      else if (x == CURAND_STATUS_ARCH_MISMATCH)                                                   \
+        break;                                                                                     \
+      case CURAND_STATUS_ARCH_MISMATCH:                                                            \
         ss << "CURAND_STATUS_ARCH_MISMATCH";                                                       \
-      else if (x == CURAND_STATUS_INTERNAL_ERROR)                                                  \
+        break;                                                                                     \
+      case CURAND_STATUS_INTERNAL_ERROR:                                                           \
         ss << "CURAND_STATUS_INTERNAL_ERROR";                                                      \
+        break;                                                                                     \
+      }                                                                                            \
       ss << " at " << __FILENAME__ << ":" << __LINE__ << "\n";                                     \
       throw std::runtime_error(ss.str());                                                          \
     }                                                                                              \
@@ -119,9 +162,6 @@
 #ifndef MAX
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
-
-#define RPU_CUDA_1D_KERNEL_LOOP(i, n)                                                              \
-  for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i += blockDim.x * gridDim.x)
 
 #define RPU_GET_CUDA_BUFFER(CONTEXT, TYPE, BUFFER, SIZE)                                           \
   if (!BUFFER || BUFFER->getSize() < (SIZE)) {                                                     \
@@ -289,7 +329,7 @@ public:
 
   inline int64_t getAllocatedMem() { return allocated_mem_; }
 
-  int64_t getTotalMem();
+  int64_t getTotalMem() { return global_mem_counter; }
 
 private:
   int gpu_id_ = 0;

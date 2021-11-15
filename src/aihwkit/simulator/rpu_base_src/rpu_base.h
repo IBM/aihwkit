@@ -11,6 +11,7 @@
  */
 #pragma once
 #include "rpu.h"
+#include "rpu_buffered_transfer_device.h"
 #include "rpu_constantstep_device.h"
 #include "rpu_expstep_device.h"
 #include "rpu_linearstep_device.h"

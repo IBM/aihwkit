@@ -18,17 +18,36 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Load model state dict into a new model with modified `RPUConfig`. (\#276)
 * Visualization for noise models for analog inference hardware simulation. (\#278)
-* State indipendent inference noise model. (\# 284)
+* State independent inference noise model. (\# 284)
 * Transfer LR parameter for ``MixedPrecisionCompound``. (\#283)
+* The bias term can now be handled either by the analog or digital domain by controlling
+  the `digital_bias` layer parameter. (\#307)
+* PCM short-term weight noise. (\#312)
+* IR-drop simulation across columns during analog mat-vec. (\#312)
+* Transposed-read for ``TransferCompound``. (\#312)
+* ``BufferedTranferCompound`` and TTv2 presets. (\#318)
+* Stochastic rounding for ``MixedPrecisionCompound``. (\#318)
+
 
 ### Fixed
 
 * Removed GPU warning during destruction when using multiple GPUs. (\#277)
-* Fix issue in transfer counter for mixed precision in case of GPU. (\#283)
+* Fixed issue in transfer counter for mixed precision in case of GPU. (\#283)
+* Map location keyword for load / save observed. (\#293)
+* Fixed issue with CUDA buffer allocation when batch size changed. (\#294)
+* Fixed missing load statedict for AnalogSequential. (\#295) 
+* Fixed issue with hierarchical hidden parameter settings. (\#313)
 
 ### Changed
 
 * The inference noise models are now located in `aihwkit.inference`. (\#281)
+* Analog state dict structure `has changed (shared weight are not saved). (\#293)
+* Some of the parameter names of the``TransferCompound`` have
+  changed. (\#312)
+* New fast learning rate parameter for TransferCompound, SGD learning
+  rate then is applied on the slow matrix (\#312). 
+* The ``fixed_value`` of ``WeightClipParameter`` is now  applied for all clipping
+  types if set larger than zero. (\#318)
 
 ### Deprecated
 

@@ -93,8 +93,7 @@ public:
     d_size = 490;
     m_batch = 100;
 
-    context_container = RPU::make_unique<CudaContext>(-1, false); // blocking for timings
-    context = &*context_container;
+    context = &context_container;
     iom = RPU::make_unique<InputOutputManager<num_t>>(context, x_size, d_size);
 
     num_t bound = 0.8;
@@ -170,7 +169,7 @@ public:
     delete[] W;
   }
 
-  std::unique_ptr<CudaContext> context_container;
+  CudaContext context_container{-1, false};
   CudaContext *context;
 
   int x_size;
