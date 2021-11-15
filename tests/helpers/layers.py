@@ -10,11 +10,14 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-# pylint: disable=missing-function-docstring,too-few-public-methods
+# pylint: disable=missing-function-docstring, too-few-public-methods, no-member
 
 """Layer helpers for aihwkit tests."""
 
-from aihwkit.nn import AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogLinear, AnalogLSTM
+from aihwkit.nn import (
+    AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogLinear, AnalogLSTM, AnalogLinearMapped
+)
+from aihwkit.simulator.configs.utils import MappingParameter
 
 
 class Linear:
@@ -25,8 +28,26 @@ class Linear:
     def get_layer(self, in_features=3, out_features=4, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogLinear(in_features, out_features, **kwargs)
+
+
+class LinearMapped:
+    """AnalogLinearMapped."""
+
+    use_cuda = False
+
+    def get_rpu_config(self, **kwargs):
+        kwargs.setdefault('mapping', MappingParameter(max_input_size=4, max_output_size=3))
+        return super().get_rpu_config(**kwargs)
+
+    def get_layer(self, in_features=10, out_features=6, **kwargs):
+
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
+        kwargs.setdefault('bias', self.bias)
+
+        return AnalogLinearMapped(in_features, out_features, **kwargs)
 
 
 class Conv1d:
@@ -37,6 +58,7 @@ class Conv1d:
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogConv1d(in_channels, out_channels, kernel_size,
                             padding=padding,
@@ -51,6 +73,7 @@ class Conv2d:
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogConv2d(in_channels, out_channels, kernel_size,
                             padding=padding,
@@ -65,6 +88,7 @@ class Conv3d:
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogConv3d(in_channels, out_channels, kernel_size,
                             padding=padding,
@@ -91,8 +115,25 @@ class LinearCuda:
     def get_layer(self, in_features=3, out_features=4, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogLinear(in_features, out_features, **kwargs).cuda()
+
+
+class LinearMappedCuda:
+    """AnalogLinearMapped."""
+
+    use_cuda = True
+
+    def get_rpu_config(self, **kwargs):
+        kwargs.setdefault('mapping', MappingParameter(max_input_size=4, max_output_size=3))
+        return super().get_rpu_config(**kwargs)
+
+    def get_layer(self, in_features=10, out_features=6, **kwargs):
+        kwargs.setdefault('rpu_config', self.get_rpu_config())
+        kwargs.setdefault('bias', self.bias)
+
+        return AnalogLinearMapped(in_features, out_features, **kwargs).cuda()
 
 
 class Conv1dCuda:
@@ -103,6 +144,7 @@ class Conv1dCuda:
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogConv1d(in_channels, out_channels, kernel_size,
                             padding=padding,
@@ -117,6 +159,7 @@ class Conv2dCuda:
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogConv2d(in_channels, out_channels, kernel_size,
                             padding=padding,
@@ -131,6 +174,7 @@ class Conv3dCuda:
     def get_layer(self, in_channels=2, out_channels=3, kernel_size=4, padding=2, **kwargs):
         kwargs.setdefault('rpu_config', self.get_rpu_config())
         kwargs.setdefault('bias', self.bias)
+        kwargs.setdefault('digital_bias', self.digital_bias)
 
         return AnalogConv3d(in_channels, out_channels, kernel_size,
                             padding=padding,

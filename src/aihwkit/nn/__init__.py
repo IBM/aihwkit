@@ -18,3 +18,4 @@ from aihwkit.nn.modules.container import AnalogSequential
 from aihwkit.nn.modules.conv import AnalogConv1d, AnalogConv2d, AnalogConv3d
 from aihwkit.nn.modules.linear import AnalogLinear
 from aihwkit.nn.modules.lstm import AnalogLSTM
+from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped

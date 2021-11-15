@@ -25,7 +25,7 @@ def parameters_to_bindings(params: Any) -> Any:
     result = params.bindings_class()
     for field, value in params.__dict__.items():
         # Convert enums to the bindings enums.
-        if field in ('unit_cell_devices', 'device'):
+        if field in ('unit_cell_devices', 'device', 'mapping'):
             # Exclude special fields that are not present in the bindings.
             continue
 
@@ -49,7 +49,7 @@ def tile_parameters_to_bindings(params: Any) -> Any:
     field_map = {'forward': 'forward_io',
                  'backward': 'backward_io'}
     excluded_fields = ('device', 'noise_model', 'drift_compensation',
-                       'clip', 'modifier')
+                       'clip', 'modifier', 'mapping')
 
     result = params.bindings_class()
     for field, value in params.__dict__.items():

@@ -32,12 +32,13 @@ from aihwkit.experiments.runners import LocalRunner
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.rpu_base import cuda
 
 # Check device
 USE_CUDA = 0
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
+if cuda.is_compiled():
     USE_CUDA = 1
+DEVICE = torch.device('cuda' if USE_CUDA else 'cpu')
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join('data', 'DATASET')

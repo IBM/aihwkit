@@ -243,7 +243,7 @@ class VectorUnitCellUpdatePolicy(Enum):
 
 @dataclass
 class IOParameters(_PrintableMixin):
-    """Parameters that modify the IO behavior."""
+    """Parameter that modify the IO behavior."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileInputOutputParameter
 
@@ -699,3 +699,22 @@ class DriftParameter(SimpleDriftParameter):
     w_noise_std: float = 0.0
     """Additional weight noise (Gaussian diffusion) added to the weights
     after the drift is applied."""
+
+
+@dataclass
+class MappingParameter(_PrintableMixin):
+    """Parameter related to the mapping of logical weights to physical tiles.
+
+    Note:
+
+        These parameters have only an affect for modules that
+        support mappings.
+    """
+
+    max_input_size: int = 512
+    """Maximal size of the physical in the input dimension.
+    """
+
+    max_output_size: int = 512
+    """Maximal size of the physical in the output dimension.
+    """

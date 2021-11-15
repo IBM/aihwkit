@@ -70,6 +70,8 @@ class InferenceTileTest(ParametrizedTestCase):
         opt.regroup_param_groups(model)
 
         for _ in range(100):
+            opt.zero_grad()
+
             # Add the training Tensor to the model (input).
             pred = model(x)
             # Add the expected output Tensor.

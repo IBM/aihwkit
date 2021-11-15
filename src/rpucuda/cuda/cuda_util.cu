@@ -447,7 +447,7 @@ void CudaContext::enforceDeviceId() const {
   int gpu_id;
   CUDA_CALL(cudaGetDevice(&gpu_id));
   if (gpu_id != gpu_id_) {
-    std::cout << "WARNING wrong device detected: " << gpu_id << " vs. " << gpu_id_ << std::endl;
+    // std::cout << "WARNING wrong device detected: " << gpu_id << " vs. " << gpu_id_ << std::endl;
     CUDA_CALL(cudaSetDevice(gpu_id_));
   }
 #endif
