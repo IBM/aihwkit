@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Transposed-read for ``TransferCompound``. (\#312)
 * ``BufferedTranferCompound`` and TTv2 presets. (\#318)
 * Stochastic rounding for ``MixedPrecisionCompound``. (\#318)
+* Decay with arbitrary decay point (to reset bias). (\#319) 
 * Linear layer ``AnalogLinerMapped`` which mapped a large weight
   matrix onto multiple analog tiles. (\#320)
 
