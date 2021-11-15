@@ -33,7 +33,8 @@ class AihwkitTestCase(TestCase):
     def assertNotAlmostEqualTensor(self, tensor_a, tensor_b, decimal=6):
         """Assert that two tensors are not equal."""
         # pylint: disable=invalid-name
-        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b, decimal)
+        assert_raises(AssertionError, self.assertTensorAlmostEqual, tensor_a, tensor_b,
+                      decimal=decimal)
 
 
 class ParametrizedTestCase(AihwkitTestCase):

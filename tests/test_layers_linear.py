@@ -221,6 +221,7 @@ class LinearLayerTest(ParametrizedTestCase):
             model = model.cuda()
         opt = AnalogSGD(model.parameters(), lr=0.5)
         opt.regroup_param_groups(model)
+        opt.zero_grad()
 
         new_lr = 0.07
         for param_group in opt.param_groups:
@@ -244,6 +245,7 @@ class LinearLayerTest(ParametrizedTestCase):
             model = model.cuda()
         opt = AnalogSGD(model.parameters(), lr=0.5)
         opt.regroup_param_groups(model)
+        opt.zero_grad()
 
         new_lr = 0.07
 

@@ -138,6 +138,41 @@ class AnalogSequential(Sequential):
         self._apply_to_analog(lambda m: m._set_load_rpu_config_state(load_rpu_config))
         return super().load_state_dict(state_dict, strict)
 
+    def prepare_for_ddp(self) -> None:
+        """Adds ignores to avoid broadcasting the analog tile states in case of
+        distributed training.
+
+        Note:
+            Call this function before the mode is converted with DDP.
+
+        Important:
+            Only InferenceTile supports DDP.
+
+        Raises:
+
+            ModuleError: In case analog tiles are used that do not
+                support data-parallel model, ie. all analog training
+                tiles.
+        """
+        # pylint: disable=attribute-defined-outside-init
+        exclude_list = []
+        for module in self.modules():
+            if isinstance(module, AnalogModuleBase):
+                for analog_tile in module.analog_tiles():
+                    if analog_tile.shared_weights is None:
+                        raise ModuleError("DDP is only supported with shared weights"
+                                          "(e.g. InferenceTile)")
+                exclude_list += [module.ANALOG_CTX_PREFIX, module.ANALOG_STATE_PREFIX]
+        exclude_list = list(set(exclude_list))
+        params = self.state_dict().keys()
+        exclude_params = []
+        for param in params:
+            for word in exclude_list:
+                if word in param and word not in exclude_params:
+                    exclude_params.append(param)
+                    break
+        self._ddp_params_and_buffers_to_ignore = exclude_params
+
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
         """(Program) and drift all analog inference layers of a given model.
 

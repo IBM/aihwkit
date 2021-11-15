@@ -43,6 +43,7 @@ from matplotlib import animation
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.presets import MixedPrecisionEcRamMOPreset
+from aihwkit.simulator.rpu_base import cuda
 
 # Select the device model to use in the training.
 
@@ -64,9 +65,9 @@ LR = 2e-2
 
 # Check device
 USE_CUDA = 0
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
+if cuda.is_compiled():
     USE_CUDA = 1
+DEVICE = torch.device('cuda' if USE_CUDA else 'cpu')
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join('data', 'DATASET')

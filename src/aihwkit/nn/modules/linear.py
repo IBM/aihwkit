@@ -50,11 +50,15 @@ class AnalogLinear(AnalogModuleBase, Linear):
     """
     # pylint: disable=abstract-method
 
-    __constants__ = ['in_features', 'out_features']
+    __constants__ = ['in_features', 'out_features', 'realistic_read_write', 'weight_scaling_omega',
+                     'digital_bias', 'analog_bias', 'use_bias']
     in_features: int
     out_features: int
     realistic_read_write: bool
     weight_scaling_omega: float
+    digital_bias: bool
+    analog_bias: bool
+    use_bias: bool
 
     def __init__(
             self,
@@ -66,7 +70,12 @@ class AnalogLinear(AnalogModuleBase, Linear):
             weight_scaling_omega: float = 0.0,
             digital_bias: bool = False
     ):
+
+        # Call super() after tile creation, including ``reset_parameters``.
+        Linear.__init__(self, in_features, out_features, bias=bias)
+
         # Create the tile.
+        AnalogModuleBase.__init__(self)
         self.analog_tile = self._setup_tile(in_features,
                                             out_features,
                                             bias,
@@ -74,18 +83,17 @@ class AnalogLinear(AnalogModuleBase, Linear):
                                             realistic_read_write,
                                             weight_scaling_omega,
                                             digital_bias)
-        # Call super() after tile creation, including ``reset_parameters``.
-        AnalogModuleBase.__init__(self)
-        Linear.__init__(self, in_features, out_features, bias=bias)
+        # Register tile
+        self.register_analog_tile(self.analog_tile)
+        # Set weights from the reset_parameters call (since only now the
+        # analog_tiles are registered)
+        self.set_weights(self.weight, self.bias)
 
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
         self.unregister_parameter('weight')
         if self.analog_bias:
             self.unregister_parameter('bias')
-
-        # Register tile instead
-        self.register_analog_tile(self.analog_tile)
 
     @classmethod
     def from_digital(
@@ -132,7 +140,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
     def reset_parameters(self) -> None:
         """Reset the parameters (weight and bias)."""
         super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
+        if self.analog_tile_count():
+            self.set_weights(self.weight, self.bias)
 
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
