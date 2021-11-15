@@ -27,7 +27,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Transposed-read for ``TransferCompound``. (\#312)
 * ``BufferedTranferCompound`` and TTv2 presets. (\#318)
 * Stochastic rounding for ``MixedPrecisionCompound``. (\#318)
-
+* Decay with arbitrary decay point (to reset bias). (\#319)
+* Linear layer ``AnalogLinerMapped`` which mapped a large weight
+  matrix onto multiple analog tiles. (\#320)
 
 ### Fixed
 
@@ -35,8 +37,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fixed issue in transfer counter for mixed precision in case of GPU. (\#283)
 * Map location keyword for load / save observed. (\#293)
 * Fixed issue with CUDA buffer allocation when batch size changed. (\#294)
-* Fixed missing load statedict for AnalogSequential. (\#295) 
+* Fixed missing load statedict for AnalogSequential. (\#295)
 * Fixed issue with hierarchical hidden parameter settings. (\#313)
+* Fixed serious issue that loaded model would not update analog gradients. (\#320)
+* Fixed cuda import in examples. (\#320)
 
 ### Changed
 
@@ -45,9 +49,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Some of the parameter names of the``TransferCompound`` have
   changed. (\#312)
 * New fast learning rate parameter for TransferCompound, SGD learning
-  rate then is applied on the slow matrix (\#312). 
+  rate then is applied on the slow matrix (\#312).
 * The ``fixed_value`` of ``WeightClipParameter`` is now  applied for all clipping
   types if set larger than zero. (\#318)
+* Gererator for analog tiles of an AnalogModule. (\#320)
 
 ### Deprecated
 

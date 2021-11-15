@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Imports from PyTorch.
-from torch import nn, Tensor, cuda, device, no_grad, manual_seed
+from torch import nn, Tensor, device, no_grad, manual_seed
 from torch import max as torch_max
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -34,13 +34,13 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.presets.configs import GokmenVlasovPreset
-
+from aihwkit.simulator.rpu_base import cuda
 
 # Check device
 USE_CUDA = 0
-DEVICE = device('cuda' if cuda.is_available() else 'cpu')
-if cuda.is_available():
+if cuda.is_compiled():
     USE_CUDA = 1
+DEVICE = device('cuda' if USE_CUDA else 'cpu')
 
 # Path to store datasets
 PATH_DATASET = os.path.join('data', 'DATASET')

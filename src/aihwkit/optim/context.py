@@ -14,7 +14,7 @@
 
 from typing import Optional, Type, Union, Any, TYPE_CHECKING
 
-from torch import ones, dtype, Tensor
+from torch import ones, dtype, Tensor, no_grad
 from torch.nn import Parameter
 from torch import device as torch_device
 
@@ -25,23 +25,30 @@ if TYPE_CHECKING:
 class AnalogContext(Parameter):
     """Context for analog optimizer."""
 
-    def __new__(cls: Type['AnalogContext'], analog_tile: 'BaseTile') -> 'AnalogContext':
+    def __new__(cls: Type['AnalogContext'], analog_tile: 'BaseTile',
+                parameter: Optional[Parameter] = None) -> 'AnalogContext':
         # pylint: disable=signature-differs
-        return Parameter.__new__(cls, data=ones((), device=analog_tile.device),
-                                 requires_grad=True)
+        if parameter is None:
+            return Parameter.__new__(cls, data=ones((), device=analog_tile.device),
+                                     requires_grad=True)
+        parameter.__class__ = cls
+        return parameter
 
-    def __init__(self, analog_tile: 'BaseTile'):
+    def __init__(self, analog_tile: 'BaseTile',
+                 parameter: Optional[Parameter] = None):  # pylint: disable=unused-argument
         super().__init__()
         self.analog_tile = analog_tile
         self.use_torch_update = False
         self.use_indexed = False
         self.analog_input = []  # type: list
         self.analog_grad_output = []  # type: list
+        self.reset(analog_tile)
 
     def set_data(self, data: Tensor) -> None:
         """Set the data value of the Tensor."""
         # pylint: disable=attribute-defined-outside-init
-        self.data.copy_(data)
+        with no_grad():
+            self.data.copy_(data)
 
     def get_data(self) -> Tensor:
         """Get the data value of the underlying Tensor."""

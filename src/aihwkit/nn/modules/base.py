@@ -12,9 +12,12 @@
 
 """Base class for analog Modules."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union, NamedTuple, TYPE_CHECKING
+from typing import (
+    Any, Dict, List, Optional, Tuple, Union, NamedTuple,
+    Generator, TYPE_CHECKING
+)
 
-from torch import Tensor
+from torch import Tensor, no_grad
 from torch.nn import Module, Parameter
 
 from aihwkit.exceptions import ModuleError
@@ -23,6 +26,8 @@ from aihwkit.simulator.configs import (
     UnitCellRPUConfig
 )
 from aihwkit.simulator.tiles import InferenceTile
+from aihwkit.optim.context import AnalogContext
+
 if TYPE_CHECKING:
     from aihwkit.simulator.tiles import BaseTile
     from collections import OrderedDict
@@ -52,13 +57,14 @@ class AnalogModuleBase(Module):
     # pylint: disable=abstract-method, too-many-instance-attributes
     ANALOG_CTX_PREFIX: str = 'analog_ctx_'
     ANALOG_SHARED_WEIGHT_PREFIX: str = 'analog_shared_weights_'
+    ANALOG_STATE_PREFIX: str = 'analog_tile_state_'
 
     def __init__(self) -> None:  # pylint: disable=super-init-not-called
         self._analog_tile_counter = 0
         self._registered_helper_parameter = []  # type: list
         self._load_rpu_config = True
 
-    def register_analog_tile(self, tile: 'BaseTile') -> None:
+    def register_analog_tile(self, tile: 'BaseTile', name: Optional[str] = None) -> None:
         """Register the analog context of the tile.
 
         Note:
@@ -67,9 +73,14 @@ class AnalogModuleBase(Module):
 
         Args:
             tile: tile to register
+            name: Optional tile name used as the parameter name
         """
 
-        ctx_name = self.ANALOG_CTX_PREFIX + str(self._analog_tile_counter)
+        if name is None:
+            name = str(self._analog_tile_counter)
+
+        ctx_name = self.ANALOG_CTX_PREFIX + name
+
         if ctx_name not in self._registered_helper_parameter:
             self._registered_helper_parameter.append(ctx_name)
         self.register_parameter(ctx_name, tile.get_analog_ctx())
@@ -98,6 +109,28 @@ class AnalogModuleBase(Module):
         delattr(self, param_name)
         setattr(self, param_name, param_data)
 
+    def analog_tiles(self) -> Generator['BaseTile', None, None]:
+        """ Generator to loop over all registered analog tiles of the module """
+        for param in self.parameters():
+            if isinstance(param, AnalogContext):
+                yield param.analog_tile
+
+    def named_analog_tiles(self) -> Generator[Tuple[str, 'BaseTile'], None, None]:
+        """ Generator to loop over all registered analog tiles of the module with names. """
+        for name, param in self.named_parameters():
+            if isinstance(param, AnalogContext):
+                new_name = name.split(self.ANALOG_CTX_PREFIX)[-1]
+                yield (new_name, param.analog_tile)
+
+    def analog_tile_count(self) -> int:
+        """Return the number of registered tiles.
+
+        Returns:
+           Number of registered tiles
+
+        """
+        return getattr(self, '_analog_tile_counter', 0)
+
     def _setup_tile(
             self,
             in_features: int,
@@ -123,6 +156,8 @@ class AnalogModuleBase(Module):
             This method also sets the following attributes, which are assumed
             to be set by the rest of the methods:
             * ``self.use_bias``
+            * ``self.analog_bias``
+            * ``self.digital_bias``
             * ``self.realistic_read_write``
             * ``self.weight_scaling_omega``
             * ``self.in_features``
@@ -186,22 +221,32 @@ class AnalogModuleBase(Module):
             weight: weight matrix
             bias: bias vector
             force_exact: forces an exact write to the analog tiles
+
+        Raises:
+            ModuleError: in case of multiple defined analog tiles in the module
+
         """
         shape = [self.out_features, self.in_features]
         weight = weight.clone().reshape(shape)
 
         realistic = self.realistic_read_write and not force_exact
 
+        analog_tiles = list(self.analog_tiles())
+        if len(analog_tiles) != 1:
+            raise ModuleError("AnalogModuleBase.set_weights only supports a single tile.")
+        analog_tile = analog_tiles[0]
+
         if self.weight_scaling_omega > 0.0:
-            self.analog_tile.set_weights_scaled(weight, bias if self.analog_bias else None,
-                                                realistic=realistic,
-                                                omega=self.weight_scaling_omega)
+            analog_tile.set_weights_scaled(weight, bias if self.analog_bias else None,
+                                           realistic=realistic,
+                                           omega=self.weight_scaling_omega)
         else:
-            self.analog_tile.set_weights(weight, bias if self.analog_bias else None,
-                                         realistic=realistic)
+            analog_tile.set_weights(weight, bias if self.analog_bias else None,
+                                    realistic=realistic)
 
         if bias is not None and self.digital_bias:
-            self.bias.data = bias
+            with no_grad():
+                self.bias.data[:] = bias[:]
 
         self._sync_weights_from_tile()
 
@@ -229,16 +274,24 @@ class AnalogModuleBase(Module):
 
         Returns:
             tuple: weight matrix, bias vector
-        """
-        realistic = self.realistic_read_write and not force_exact
 
+        Raises:
+            ModuleError: in case of multiple defined analog tiles in the module
+        """
+        analog_tiles = list(self.analog_tiles())
+        if len(analog_tiles) != 1:
+            raise ModuleError("AnalogModuleBase.get_weights only supports a single tile.")
+        analog_tile = analog_tiles[0]
+
+        realistic = self.realistic_read_write and not force_exact
         if self.weight_scaling_omega > 0.0:
-            weight, bias = self.analog_tile.get_weights_scaled(realistic=realistic)
+            weight, bias = analog_tile.get_weights_scaled(realistic=realistic)
         else:
-            weight, bias = self.analog_tile.get_weights(realistic=realistic)
+            weight, bias = analog_tile.get_weights(realistic=realistic)
 
         if self.digital_bias:
-            bias = self.bias.data.detach().cpu()
+            with no_grad():
+                bias = self.bias.data.detach().cpu()
         return weight, bias
 
     def _sync_weights_from_tile(self) -> None:
@@ -251,7 +304,8 @@ class AnalogModuleBase(Module):
 
         self.weight.data[:] = tile_weight.reshape(self.weight.shape)
         if self.analog_bias:
-            self.bias.data[:] = tile_bias.reshape(self.bias.shape)
+            with no_grad():
+                self.bias.data[:] = tile_bias.reshape(self.bias.shape)
 
     def _sync_weights_to_tile(self) -> None:
         """Update the tile values from the layer weights and bias.
@@ -315,27 +369,31 @@ class AnalogModuleBase(Module):
         Raises:
             ModuleError: in case the rpu_config class mismatches.
         """
-        key = '{}analog_tile_state'.format(prefix)
-        if key in state_dict:
-            analog_state = state_dict.pop(key).copy()
-            if not self._load_rpu_config:
-                if self.analog_tile.rpu_config.__class__ != analog_state['rpu_config'].__class__:
-                    raise ModuleError("RPU config mismatch during loading: "
-                                      "Tried to replace "
-                                      f"{analog_state['rpu_config'].__class__.__name__} "
-                                      f"with {self.analog_tile.rpu_config.__class__.__name__}")
-                analog_state['rpu_config'] = self.analog_tile.rpu_config
 
-            self.analog_tile.__setstate__(analog_state)
-        elif strict:
-            missing_keys.append(key)
+        for name, analog_tile in list(self.named_analog_tiles()):
+            key = prefix + self.ANALOG_STATE_PREFIX + name
+            if key not in state_dict:  # legacy
+                key = prefix + 'analog_tile_state'
+
+            if key in state_dict:
+                analog_state = state_dict.pop(key).copy()
+
+                if not self._load_rpu_config:
+                    if analog_tile.rpu_config.__class__ != analog_state['rpu_config'].__class__:
+                        raise ModuleError("RPU config mismatch during loading: "
+                                          "Tried to replace "
+                                          f"{analog_state['rpu_config'].__class__.__name__} "
+                                          f"with {analog_tile.rpu_config.__class__.__name__}")
+                    analog_state['rpu_config'] = analog_tile.rpu_config
+                analog_tile.__setstate__(analog_state)
+
+            elif strict:
+                missing_keys.append(key)
 
         # update the weight / analog bias (not saved explicitly)
         self._sync_weights_from_tile()
 
-        # remove helper parameters. We never load context or shared
-        # weights. These will be re-generated and should not be
-        # overwritten
+        # remove helper parameters.
         rm_keys = []
         for par_name in self._registered_helper_parameter:
             key = prefix + par_name
@@ -344,8 +402,8 @@ class AnalogModuleBase(Module):
                 rm_keys.append(key)
 
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict, missing_keys,
-            unexpected_keys, error_msgs)
+           state_dict, prefix, local_metadata, strict, missing_keys,
+           unexpected_keys, error_msgs)
 
         # remove the missing keys of the helper parameters
         for key in rm_keys:
@@ -360,10 +418,12 @@ class AnalogModuleBase(Module):
         """Return a dictionary containing a whole state of the module."""
         self._sync_weights_from_tile()
 
-        analog_state = self.analog_tile.__getstate__()
         current_state = super().state_dict(destination, prefix, keep_vars)
-        analog_state_name = '{}analog_tile_state'.format(prefix)
-        current_state[analog_state_name] = analog_state
+
+        for name, analog_tile in self.named_analog_tiles():
+            analog_state = analog_tile.__getstate__()
+            analog_state_name = prefix + self.ANALOG_STATE_PREFIX + name
+            current_state[analog_state_name] = analog_state
 
         return current_state
 
@@ -379,9 +439,9 @@ class AnalogModuleBase(Module):
         if self.training:
             raise ModuleError('drift_analog_weights can only be applied in '
                               'evaluation mode')
-
-        if isinstance(self.analog_tile, InferenceTile):
-            self.analog_tile.drift_weights(t_inference)
+        for analog_tile in self.analog_tiles():
+            if isinstance(analog_tile, InferenceTile):
+                analog_tile.drift_weights(t_inference)
 
     def program_analog_weights(self) -> None:
         """Program the analog weights.
@@ -392,9 +452,9 @@ class AnalogModuleBase(Module):
         if self.training:
             raise ModuleError('program_analog_weights can only be applied in '
                               'evaluation mode')
-
-        if isinstance(self.analog_tile, InferenceTile):
-            self.analog_tile.program_weights()
+        for analog_tile in self.analog_tiles():
+            if isinstance(analog_tile, InferenceTile):
+                analog_tile.program_weights()
 
     def extra_repr(self) -> str:
         """Set the extra representation of the module.

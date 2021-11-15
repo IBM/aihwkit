@@ -29,7 +29,9 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
 
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
                      'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size']
+                     'out_channels', 'kernel_size', 'in_features', 'out_features',
+                     'realistic_read_write', 'weight_scaling_omega',
+                     'digital_bias', 'analog_bias', 'use_bias']
     in_channels: int
     out_channels: int
     kernel_size: Tuple[int, ...]
@@ -46,6 +48,9 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     input_size: float
     in_features: int
     out_features: int
+    digital_bias: bool
+    analog_bias: bool
+    use_bias: bool
 
     def __init__(
             self,
@@ -71,9 +76,16 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         if padding_mode != 'zeros':
             raise ValueError('Only "zeros" padding mode is supported')
 
+        # Call super() after tile creation, including ``reset_parameters``.
+        _ConvNd.__init__(self, in_channels, out_channels, kernel_size, stride,
+                         padding, dilation, transposed, output_padding, groups, bias,
+                         padding_mode)
+
         # Create the tile and set the analog.
+        AnalogModuleBase.__init__(self)
         self.in_features = self.get_tile_size(in_channels, groups, kernel_size)
         self.out_features = out_channels
+
         self.analog_tile = self._setup_tile(self.in_features,
                                             self.out_features,
                                             bias,
@@ -82,12 +94,10 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
                                             weight_scaling_omega,
                                             digital_bias)
 
-        # Call super() after tile creation, including ``reset_parameters``.
-        AnalogModuleBase.__init__(self)
-        _ConvNd.__init__(self, in_channels, out_channels, kernel_size, stride,
-                         padding, dilation, transposed, output_padding, groups, bias,
-                         padding_mode
-                         )
+        self.register_analog_tile(self.analog_tile)
+        # Set weights from the reset_parameters (since now the
+        # analog_tiles are registered)
+        self.set_weights(self.weight, self.bias)
 
         # Set the index matrices.
         self.fold_indices = Tensor().detach()
@@ -98,8 +108,6 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         self.unregister_parameter('weight')
         if self.analog_bias:
             self.unregister_parameter('bias')
-
-        self.register_analog_tile(self.analog_tile)
 
     def get_tile_size(
             self,
@@ -118,7 +126,8 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     def reset_parameters(self) -> None:
         """Reset the parameters (weight and bias)."""
         super().reset_parameters()
-        self.set_weights(self.weight, self.bias)
+        if self.analog_tile_count():
+            self.set_weights(self.weight, self.bias)
 
     def recalculate_indexes(self, x_input: Tensor) -> None:
         """Calculate and set the indexes of the analog tile.
@@ -293,7 +302,7 @@ class AnalogConv1d(_AnalogConvNd):
 
         fold_indices = fold_indices.to(dtype=int32)
 
-        if self.use_bias:
+        if self.analog_bias:
             out_image_size = fold_indices.numel() // (self.kernel_size[0])
             fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
@@ -441,7 +450,7 @@ class AnalogConv2d(_AnalogConvNd):
                         dilation=self.dilation)
         fold_indices = unfold(fold_indices).flatten().round().to(dtype=int32)
 
-        if self.use_bias:
+        if self.analog_bias:
             out_image_size = fold_indices.numel() // (self.kernel_size[0] * self.kernel_size[1])
             fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
@@ -616,7 +625,7 @@ class AnalogConv3d(_AnalogConvNd):
 
         fold_indices = fold_indices.to(dtype=int32)
 
-        if self.use_bias:
+        if self.analog_bias:
             out_image_size = fold_indices.numel() // (self.kernel_size[0] *
                                                       self.kernel_size[1] *
                                                       self.kernel_size[2])

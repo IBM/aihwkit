@@ -85,6 +85,7 @@ class AnalogOptimizerMixin:
             # Use analog_tile object.
             for param in group['params']:
                 if isinstance(param, AnalogContext):
+
                     # Handle internal analog update.
                     analog_ctx = param
                     analog_tile = analog_ctx.analog_tile

@@ -22,7 +22,7 @@ import os
 from datetime import datetime
 
 # Imports from PyTorch.
-from torch import nn, Tensor, cuda, device, no_grad, manual_seed, save
+from torch import nn, Tensor, device, no_grad, manual_seed, save
 from torch import max as torch_max
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
@@ -33,12 +33,13 @@ from torchvision import datasets, transforms
 from aihwkit.optim import AnalogSGD
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.simulator.presets import TikiTakaEcRamPreset
+from aihwkit.simulator.rpu_base import cuda
 
 # Device to use
 USE_CUDA = 0
-DEVICE = device('cuda' if cuda.is_available() else 'cpu')
-if cuda.is_available():
+if cuda.is_compiled():
     USE_CUDA = 1
+DEVICE = device('cuda' if USE_CUDA else 'cpu')
 
 # Path to store datasets
 PATH_DATASET = os.path.join(os.getcwd(), 'data', 'DATASET')

@@ -19,6 +19,7 @@ from numpy import concatenate, expand_dims
 from numpy import abs as numpy_abs
 from torch import Tensor, stack, zeros
 from torch import device as torch_device
+from torch.nn import Parameter
 from torch.autograd import no_grad
 
 from aihwkit.exceptions import TileError
@@ -56,6 +57,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.bias = bias
         self.in_trans = in_trans
         self.out_trans = out_trans
+        self.shared_weights = None  # type: Parameter
 
         # Only used for indexed.
         self.image_sizes = []  # type: List[int]
@@ -69,7 +71,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         self.device = torch_device('cpu')
         self.is_cuda = False
-        self.shared_weights = None  # type: Optional[Tensor]
 
         # create analog context
         self.analog_ctx = AnalogContext(self)
@@ -89,7 +90,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         No-op if shared weights is not used.
         """
         if shared_weights is not None:
-            self.shared_weights.data = shared_weights.data  # type: ignore[union-attr]
+            self.shared_weights.data = shared_weights.data  # type: ignore
 
         if self.shared_weights is not None:
             self.tile.set_shared_weights(self.shared_weights.data)
@@ -136,7 +137,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         current_dict['analog_tile_class'] = self.__class__.__name__
         current_dict['analog_alpha_scale'] = self.tile.get_alpha_scale()
         current_dict['analog_lr'] = self.tile.get_learning_rate()
-        current_dict['shared_weights'] = self.shared_weights is not None
+        current_dict['shared_weights'] = self.shared_weights
         current_dict.pop('tile', None)
 
         # don't save device. Will be determined by loading object
@@ -158,6 +159,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Raises:
             TileError: if tile class does not match or hidden parameters do not match
         """
+        # pylint: disable=too-many-locals
 
         # Note: self here is NOT initialized! So we need to recreate
         # attributes that were not saved in getstate
@@ -169,17 +171,16 @@ class BaseTile(Generic[RPUConfigGeneric]):
         alpha_scale = current_dict.pop('analog_alpha_scale')
         tile_class = current_dict.pop('analog_tile_class', self.__class__.__name__)
         analog_lr = current_dict.pop('analog_lr', 0.01)
-        shared_weights_if = current_dict.pop('shared_weights', None)
-        if not isinstance(shared_weights_if, bool):
-            # for legacy
-            shared_weights_if = shared_weights_if is not None
+        analog_ctx = current_dict.pop('analog_ctx')
+        shared_weights = current_dict.pop('shared_weights')
+        shared_weights_if = shared_weights is not None
 
         self.__dict__.update(current_dict)
 
         self.device = torch_device('cpu')
         self.is_cuda = False
         # get the current map location from analog_ctx (which is restored)
-        to_device = self.analog_ctx.device
+        to_device = analog_ctx.device
 
         # recreate attributes not saved
         # always first create on CPU
@@ -208,13 +209,22 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         # re-generate shared weights (CPU)
         if shared_weights_if:
-            self.shared_weights = zeros(d_size, x_size, requires_grad=True)
-            self.ensure_shared_weights()
+            if not hasattr(self, 'shared_weights'):
+                # this is needed when pkl loading
+                self.shared_weights = shared_weights
 
-        # Regenerate context but keep the data (for future use)
-        data = self.analog_ctx.data.detach()
-        self.analog_ctx = AnalogContext(self)
-        self.analog_ctx.set_data(data)
+            with no_grad():
+                # always new will be populated with set weights.
+                self.shared_weights.data = zeros(d_size, x_size, requires_grad=True)
+            self.ensure_shared_weights()
+        else:
+            self.shared_weights = None
+
+        # Regenerate context but keep the object ID
+        if not hasattr(self, 'analog_ctx'):  # when loading
+            self.analog_ctx = AnalogContext(self, parameter=analog_ctx)
+        self.analog_ctx.reset(self)
+        self.analog_ctx.set_data(analog_ctx.data)
 
         if to_device.type.startswith('cuda'):
             self.cuda(to_device)

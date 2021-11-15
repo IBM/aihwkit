@@ -35,12 +35,13 @@ from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, FloatingPointDevice
+from aihwkit.simulator.rpu_base import cuda
 
 # Check device
 USE_CUDA = 0
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
+if cuda.is_compiled():
     USE_CUDA = 1
+DEVICE = torch.device('cuda' if USE_CUDA else 'cpu')
 
 # Path to store datasets
 PATH_DATASET = os.path.join('data', 'DATASET')

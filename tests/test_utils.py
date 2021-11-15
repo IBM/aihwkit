@@ -10,6 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=too-many-locals, too-many-public-methods, no-member
 """Test for different utility functionality."""
 
 from tempfile import TemporaryFile
@@ -25,7 +26,7 @@ from torch.nn import Linear as torch_linear
 from torch.nn.functional import mse_loss
 from torch.optim import SGD
 
-from aihwkit.nn import AnalogConv2d, AnalogSequential
+from aihwkit.nn import AnalogConv2d, AnalogSequential, AnalogLinearMapped
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
@@ -35,13 +36,15 @@ from aihwkit.exceptions import TileError, ModuleError
 from aihwkit.nn.conversion import convert_to_analog
 
 from .helpers.decorators import parametrize_over_layers
-from .helpers.layers import Conv2d, Conv2dCuda, Linear, LinearCuda
+from .helpers.layers import (
+    Conv2d, Conv2dCuda, Linear, LinearCuda, LinearMapped, LinearMappedCuda
+)
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import FloatingPoint, ConstantStep, Inference
 
 
 @parametrize_over_layers(
-    layers=[Linear, Conv2d, LinearCuda, Conv2dCuda],
+    layers=[Linear, Conv2d, LinearMapped, LinearCuda, LinearMappedCuda, Conv2dCuda],
     tiles=[FloatingPoint, ConstantStep, Inference],
     biases=[True, False],
     digital_biases=[True, False]
@@ -55,18 +58,25 @@ class SerializationTest(ParametrizedTestCase):
         opt = AnalogSGD(model.parameters(), lr=0.5)
         opt.regroup_param_groups(model)
 
-        epochs = 1
+        epochs = 3
         for _ in range(epochs):
+            opt.zero_grad()
             pred = model(x_b)
             loss = loss_func(pred, y_b)
 
             loss.backward()
             opt.step()
-            opt.zero_grad()
+        return loss
 
     @staticmethod
     def get_layer_and_tile_weights(model):
-        """Return the weights and biases of the model and the tile."""
+        """Return the weights and biases of the model and the tile and whether
+        it automatically syncs"""
+
+        if isinstance(model, AnalogLinearMapped):
+            weight, bias = model.get_weights()
+            return weight, bias, weight, bias, True
+
         weight = model.weight.data.detach().cpu().numpy()
         if model.use_bias:
             bias = model.bias.data.detach().cpu().numpy()
@@ -80,7 +90,12 @@ class SerializationTest(ParametrizedTestCase):
         else:
             analog_bias = None
 
-        return weight, bias, analog_weight, analog_bias
+        return weight, bias, analog_weight, analog_bias, False
+
+    @staticmethod
+    def get_analog_tile(model):
+        """ Return a (python) analog tile of the model"""
+        return list(model.analog_tiles())[0]
 
     def test_save_load_state_dict_train(self):
         """Test saving and loading using a state dict after training."""
@@ -103,12 +118,13 @@ class SerializationTest(ParametrizedTestCase):
 
         # Keep track of the current weights and biases for comparing.
         (model_weights, model_biases,
-         tile_weights, tile_biases) = self.get_layer_and_tile_weights(model)
+         tile_weights, tile_biases, sync) = self.get_layer_and_tile_weights(model)
 
         # now the tile weights should be out of sync
-        assert_raises(AssertionError, assert_array_almost_equal, model_weights, tile_weights)
-        if self.bias:
-            assert_raises(AssertionError, assert_array_almost_equal, model_biases, tile_biases)
+        if not sync:
+            assert_raises(AssertionError, assert_array_almost_equal, model_weights, tile_weights)
+            if self.bias:
+                assert_raises(AssertionError, assert_array_almost_equal, model_biases, tile_biases)
 
         # Save the model to a file.
         with TemporaryFile() as file:
@@ -120,7 +136,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Compare the new model weights and biases. they should now be in sync
         (new_model_weights, new_model_biases,
-         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(new_model)
+         new_tile_weights, new_tile_biases, _) = self.get_layer_and_tile_weights(new_model)
 
         assert_array_almost_equal(tile_weights, new_model_weights)
         assert_array_almost_equal(tile_weights, new_tile_weights)
@@ -128,13 +144,98 @@ class SerializationTest(ParametrizedTestCase):
             assert_array_almost_equal(tile_biases, new_model_biases)
             assert_array_almost_equal(tile_biases, new_tile_biases)
 
+    def test_save_load_state_dict_train_after(self):
+        """Test saving and loading using a state dict and training after load."""
+        model = self.get_layer()
+
+        # Perform an update in order to modify tile weights and biases.
+        loss_func = mse_loss
+        if isinstance(model, AnalogConv2d):
+            input_x = Tensor(rand(2, 2, 3, 3))*0.2
+            input_y = Tensor(rand(2, 3, 4, 4))*0.2
+        else:
+            input_x = Tensor(rand(2, model.in_features))*0.2
+            input_y = Tensor(rand(2, model.out_features))*0.2
+
+        if self.use_cuda:
+            input_x = input_x.cuda()
+            input_y = input_y.cuda()
+
+        # Keep track of the current weights and biases for comparing.
+        _, _, tile_weights, tile_biases, _ = self.get_layer_and_tile_weights(model)
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model.state_dict(), file)
+            # Create a new model and load its state dict.
+            file.seek(0)
+            new_model = self.get_layer()
+            new_model.load_state_dict(load(file))
+
+        # Compare the new model weights and biases. they should now be in sync
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases, _) = self.get_layer_and_tile_weights(new_model)
+
+        assert_array_almost_equal(tile_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(tile_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
+
+        new_loss = self.train_model(new_model, loss_func, input_x, input_y)
+        loss = self.train_model(model, loss_func, input_x, input_y)
+        if self.tile_class != ConstantStep:
+            self.assertTensorAlmostEqual(loss, new_loss)
+
+    def test_save_load_train_after(self):
+        """Test saving and loading using a state dict and training after load."""
+        model = self.get_layer()
+
+        # Perform an update in order to modify tile weights and biases.
+        loss_func = mse_loss
+        if isinstance(model, AnalogConv2d):
+            input_x = Tensor(rand(2, 2, 3, 3))*0.2
+            input_y = Tensor(rand(2, 3, 4, 4))*0.2
+        else:
+            input_x = Tensor(rand(2, model.in_features))*0.2
+            input_y = Tensor(rand(2, model.out_features))*0.2
+
+        if self.use_cuda:
+            input_x = input_x.cuda()
+            input_y = input_y.cuda()
+
+        # Keep track of the current weights and biases for comparing.
+        _, _, tile_weights, tile_biases, _ = self.get_layer_and_tile_weights(model)
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model, file)
+            # Create a new model and load its state dict.
+            file.seek(0)
+            new_model = load(file)
+
+        # Compare the new model weights and biases. they should now be in sync
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases, _) = self.get_layer_and_tile_weights(new_model)
+
+        assert_array_almost_equal(tile_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(tile_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
+
+        new_loss = self.train_model(new_model, loss_func, input_x, input_y)
+        loss = self.train_model(model, loss_func, input_x, input_y)
+        if self.tile_class != ConstantStep:
+            self.assertTensorAlmostEqual(loss, new_loss)
+
     def test_save_load_model(self):
         """Test saving and loading a model directly."""
         model = self.get_layer()
 
         # Keep track of the current weights and biases for comparing.
         (model_weights, model_biases,
-         tile_weights, tile_biases) = self.get_layer_and_tile_weights(model)
+         tile_weights, tile_biases, _) = self.get_layer_and_tile_weights(model)
         assert_array_almost_equal(model_weights, tile_weights)
         if self.bias:
             assert_array_almost_equal(model_biases, tile_biases)
@@ -148,7 +249,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Compare the new model weights and biases.
         (new_model_weights, new_model_biases,
-         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(new_model)
+         new_tile_weights, new_tile_biases, _) = self.get_layer_and_tile_weights(new_model)
 
         assert_array_almost_equal(model_weights, new_model_weights)
         assert_array_almost_equal(tile_weights, new_tile_weights)
@@ -157,10 +258,12 @@ class SerializationTest(ParametrizedTestCase):
             assert_array_almost_equal(tile_biases, new_tile_biases)
 
         # Asserts over the AnalogContext of the new model.
-        self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
-        self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
-                              model.analog_tile.__class__)
-        self.assertTrue(new_model.analog_tile.is_cuda == model.analog_tile.is_cuda)
+        new_analog_tile = self.get_analog_tile(new_model)
+        analog_tile = self.get_analog_tile(model)
+        self.assertTrue(hasattr(new_analog_tile.analog_ctx, 'analog_tile'))
+        self.assertIsInstance(new_analog_tile.analog_ctx.analog_tile,
+                              analog_tile.__class__)
+        self.assertTrue(new_analog_tile.is_cuda == analog_tile.is_cuda)
 
     def test_save_load_model_cross_device(self):
         """Test saving and loading a model directly."""
@@ -171,12 +274,12 @@ class SerializationTest(ParametrizedTestCase):
         model = self.get_layer()
 
         map_location = 'cuda'
-        if model.analog_tile.is_cuda:
+        if self.use_cuda:
             map_location = 'cpu'
 
         # Keep track of the current weights and biases for comparing.
         (model_weights, model_biases,
-         tile_weights, tile_biases) = self.get_layer_and_tile_weights(model)
+         tile_weights, tile_biases, _) = self.get_layer_and_tile_weights(model)
         assert_array_almost_equal(model_weights, tile_weights)
         if self.bias:
             assert_array_almost_equal(model_biases, tile_biases)
@@ -190,7 +293,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Compare the new model weights and biases.
         (new_model_weights, new_model_biases,
-         new_tile_weights, new_tile_biases) = self.get_layer_and_tile_weights(new_model)
+         new_tile_weights, new_tile_biases, _) = self.get_layer_and_tile_weights(new_model)
 
         assert_array_almost_equal(model_weights, new_model_weights)
         assert_array_almost_equal(tile_weights, new_tile_weights)
@@ -199,14 +302,17 @@ class SerializationTest(ParametrizedTestCase):
             assert_array_almost_equal(tile_biases, new_tile_biases)
 
         # Asserts over the AnalogContext of the new model.
-        self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
-        self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
-                              model.analog_tile.__class__)
+        new_analog_tile = self.get_analog_tile(new_model)
+        analog_tile = self.get_analog_tile(model)
 
-        self.assertTrue(new_model.analog_tile.is_cuda != model.analog_tile.is_cuda)
+        self.assertTrue(hasattr(new_analog_tile.analog_ctx, 'analog_tile'))
+        self.assertIsInstance(new_analog_tile.analog_ctx.analog_tile,
+                              analog_tile.__class__)
 
-        if model.analog_tile.shared_weights is not None:
-            self.assertTrue(new_model.analog_tile.shared_weights.device.type == map_location)
+        self.assertTrue(new_analog_tile.is_cuda != analog_tile.is_cuda)
+
+        if analog_tile.shared_weights is not None:
+            self.assertTrue(new_analog_tile.shared_weights.device.type == map_location)
 
     def test_save_load_meta_parameter(self):
         """Test saving and loading a device with custom parameters."""
@@ -228,17 +334,21 @@ class SerializationTest(ParametrizedTestCase):
             new_model = load(file)
 
         # Assert over the new model tile parameters.
-        parameters = new_model.analog_tile.tile.get_parameters()
+        new_analog_tile = self.get_analog_tile(new_model)
+        analog_tile = self.get_analog_tile(model)
+
+        parameters = new_analog_tile.tile.get_parameters()
         self.assertAlmostEqual(parameters.forward_io.inp_noise, 0.321)
         self.assertAlmostEqual(parameters.backward_io.inp_noise, 0.456)
         self.assertAlmostEqual(parameters.update.desired_bl, 78)
-        self.assertTrue(new_model.analog_tile.is_cuda == model.analog_tile.is_cuda)
+        self.assertTrue(new_analog_tile.is_cuda == analog_tile.is_cuda)
 
     def test_save_load_hidden_parameters(self):
         """Test saving and loading a device with hidden parameters."""
         # Create the device and the array.
         model = self.get_layer()
-        hidden_parameters = model.analog_tile.tile.get_hidden_parameters()
+        analog_tile = self.get_analog_tile(model)
+        hidden_parameters = analog_tile.tile.get_hidden_parameters()
 
         # Save the model to a file.
         with TemporaryFile() as file:
@@ -248,7 +358,8 @@ class SerializationTest(ParametrizedTestCase):
             new_model = load(file)
 
         # Assert over the new model tile parameters.
-        new_hidden_parameters = new_model.analog_tile.tile.get_hidden_parameters()
+        new_analog_tile = self.get_analog_tile(new_model)
+        new_hidden_parameters = new_analog_tile.tile.get_hidden_parameters()
         assert_array_almost_equal(hidden_parameters, new_hidden_parameters)
 
     def test_save_load_alpha_scale(self):
@@ -256,7 +367,8 @@ class SerializationTest(ParametrizedTestCase):
         # Create the device and the array.
         model = self.get_layer()
         alpha = 2.0
-        model.analog_tile.tile.set_alpha_scale(alpha)
+        analog_tile = self.get_analog_tile(model)
+        analog_tile.tile.set_alpha_scale(alpha)
 
         # Save the model to a file.
         with TemporaryFile() as file:
@@ -266,7 +378,8 @@ class SerializationTest(ParametrizedTestCase):
             new_model = load(file)
 
         # Assert over the new model tile parameters.
-        alpha_new = new_model.analog_tile.tile.get_alpha_scale()
+        new_analog_tile = self.get_analog_tile(new_model)
+        alpha_new = new_analog_tile.tile.get_alpha_scale()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_save_load_shared_weights(self):
@@ -277,10 +390,11 @@ class SerializationTest(ParametrizedTestCase):
 
         # Create the device and the array.
         model = self.get_layer()
+        analog_tile = self.get_analog_tile(model)
 
         shared_weights = None
-        if model.analog_tile.shared_weights is not None:
-            shared_weights = model.analog_tile.shared_weights.detach().cpu().numpy()
+        if analog_tile.shared_weights is not None:
+            shared_weights = analog_tile.shared_weights.detach().cpu().numpy()
 
         # Save the model to a file.
         with TemporaryFile() as file:
@@ -290,15 +404,16 @@ class SerializationTest(ParametrizedTestCase):
             new_model = load(file)
 
         # Assert over the new model tile parameters.
+        new_analog_tile = self.get_analog_tile(new_model)
         if shared_weights is not None:
-            new_shared_weights = new_model.analog_tile.shared_weights
+            new_shared_weights = new_analog_tile.shared_weights
             assert_array_almost_equal(shared_weights, new_shared_weights.detach().cpu().numpy())
 
     def test_save_load_weight_scaling_omega(self):
         """Test saving and loading a device with weight scaling omega."""
         model = self.get_layer(weight_scaling_omega=0.5)
-
-        alpha = model.analog_tile.tile.get_alpha_scale()
+        analog_tile = self.get_analog_tile(model)
+        alpha = analog_tile.tile.get_alpha_scale()
         self.assertNotEqual(alpha, 1.0)
 
         # Save the model to a file.
@@ -309,14 +424,16 @@ class SerializationTest(ParametrizedTestCase):
             new_model = load(file)
 
         # Assert over the new model tile parameters.
-        alpha_new = new_model.analog_tile.tile.get_alpha_scale()
+        new_analog_tile = self.get_analog_tile(new_model)
+        alpha_new = new_analog_tile.tile.get_alpha_scale()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_save_load_state_dict_hidden_parameters(self):
         """Test saving and loading via state_dict with hidden parameters."""
         # Create the device and the array.
         model = self.get_layer()
-        hidden_parameters = model.analog_tile.tile.get_hidden_parameters()
+        analog_tile = self.get_analog_tile(model)
+        hidden_parameters = analog_tile.tile.get_hidden_parameters()
 
         # Save the model to a file.
         with TemporaryFile() as file:
@@ -327,7 +444,8 @@ class SerializationTest(ParametrizedTestCase):
             new_model.load_state_dict(load(file))
 
         # Assert over the new model tile parameters.
-        new_hidden_parameters = new_model.analog_tile.tile.get_hidden_parameters()
+        new_analog_tile = self.get_analog_tile(new_model)
+        new_hidden_parameters = new_analog_tile.tile.get_hidden_parameters()
         assert_array_almost_equal(hidden_parameters, new_hidden_parameters)
 
     def test_state_dict_children_layers_sequential(self):
@@ -337,9 +455,12 @@ class SerializationTest(ParametrizedTestCase):
 
         # Keep track of the current weights and biases for comparing.
         (model_weights, model_biases,
-         tile_weights, tile_biases) = self.get_layer_and_tile_weights(children_layer)
+         tile_weights, tile_biases, _) = self.get_layer_and_tile_weights(children_layer)
 
-        self.assertIn('0.analog_tile_state', model.state_dict())
+        state_dict = model.state_dict()
+        lst = [key for key in state_dict.keys() if key.startswith('0.')
+               and children_layer.ANALOG_STATE_PREFIX in key]
+        self.assertTrue(len(lst) > 0)
 
         # Update the state_dict of a new model.
         new_children_layer = self.get_layer()
@@ -347,7 +468,7 @@ class SerializationTest(ParametrizedTestCase):
         new_model.load_state_dict(model.state_dict())
 
         # Compare the new model weights and biases.
-        (new_model_weights, new_model_biases, new_tile_weights, new_tile_biases) = \
+        (new_model_weights, new_model_biases, new_tile_weights, new_tile_biases, _) = \
             self.get_layer_and_tile_weights(new_children_layer)
 
         assert_array_almost_equal(model_weights, new_model_weights)
@@ -370,10 +491,13 @@ class SerializationTest(ParametrizedTestCase):
         model = CustomModule(children_layer)
 
         # Keep track of the current weights and biases for comparing.
-        (model_weights, model_biases, tile_weights, tile_biases) = \
+        (model_weights, model_biases, tile_weights, tile_biases, _) = \
             self.get_layer_and_tile_weights(children_layer)
 
-        self.assertIn('custom_child.analog_tile_state', model.state_dict())
+        state_dict = model.state_dict()
+        lst = [key for key in state_dict.keys() if key.startswith('custom_child.')
+               and children_layer.ANALOG_STATE_PREFIX in key]
+        self.assertTrue(len(lst) > 0)
 
         # Update the state_dict of a new model.
         new_children_layer = self.get_layer()
@@ -381,7 +505,7 @@ class SerializationTest(ParametrizedTestCase):
         new_model.load_state_dict(model.state_dict())
 
         # Compare the new model weights and biases.
-        (new_model_weights, new_model_biases, new_tile_weights, new_tile_biases) = \
+        (new_model_weights, new_model_biases, new_tile_weights, new_tile_biases, _) = \
             self.get_layer_and_tile_weights(new_children_layer)
 
         assert_array_almost_equal(model_weights, new_model_weights)
@@ -396,7 +520,8 @@ class SerializationTest(ParametrizedTestCase):
         state_dict = model.state_dict()
 
         # Remove the analog key from the state dict.
-        del state_dict['analog_tile_state']
+        lst = [key for key in state_dict.keys() if key.startswith(model.ANALOG_STATE_PREFIX)]
+        del state_dict[lst[0]]
 
         # Check that it fails when using `strict`.
         with self.assertRaises(RuntimeError) as context:
@@ -410,19 +535,22 @@ class SerializationTest(ParametrizedTestCase):
         """Test creating a new model using a state dict, without saving to disk."""
         model = self.get_layer()
         state_dict = model.state_dict()
+        analog_tile = self.get_analog_tile(model)
 
         new_model = self.get_layer()
         new_model.load_state_dict(state_dict)
+        new_analog_tile = self.get_analog_tile(new_model)
 
         # Asserts over the AnalogContext of the new model.
-        self.assertTrue(hasattr(new_model.analog_tile.analog_ctx, 'analog_tile'))
-        self.assertIsInstance(new_model.analog_tile.analog_ctx.analog_tile,
-                              model.analog_tile.__class__)
+        self.assertTrue(hasattr(new_analog_tile.analog_ctx, 'analog_tile'))
+        self.assertIsInstance(new_analog_tile.analog_ctx.analog_tile,
+                              analog_tile.__class__)
 
     def test_hidden_parameter_mismatch(self):
         """Test for error if tile structure mismatches."""
         model = self.get_layer()
         state_dict = model.state_dict()
+        analog_tile = self.get_analog_tile(model)
 
         # Create the device and the array.
         rpu_config = SingleRPUConfig(
@@ -430,7 +558,8 @@ class SerializationTest(ParametrizedTestCase):
         )
 
         new_model = self.get_layer(rpu_config=rpu_config)
-        if new_model.analog_tile.__class__.__name__ != model.analog_tile.__class__.__name__:
+        new_analog_tile = self.get_analog_tile(new_model)
+        if new_analog_tile.__class__.__name__ != analog_tile.__class__.__name__:
             with self.assertRaises(TileError):
                 self.assertRaises(new_model.load_state_dict(state_dict))
 
@@ -458,15 +587,17 @@ class SerializationTest(ParametrizedTestCase):
         # Test restore_rpu_config=False
         new_model = self.get_layer(rpu_config=rpu_config)
         new_model.load_state_dict(state_dict, load_rpu_config=False)
+        new_analog_tile = self.get_analog_tile(new_model)
 
-        parameters = new_model.analog_tile.tile.get_parameters()
+        parameters = new_analog_tile.tile.get_parameters()
         self.assertAlmostEqual(parameters.forward_io.inp_noise, new_value)
 
         # Test restore_rpu_config=True
         new_model = self.get_layer(rpu_config=rpu_config)
         new_model.load_state_dict(state_dict, load_rpu_config=True)
+        new_analog_tile = self.get_analog_tile(new_model)
 
-        parameters = new_model.analog_tile.tile.get_parameters()
+        parameters = new_analog_tile.tile.get_parameters()
         self.assertAlmostEqual(parameters.forward_io.inp_noise, old_value)
 
     def test_load_state_load_rpu_config_sequential(self):
@@ -493,15 +624,17 @@ class SerializationTest(ParametrizedTestCase):
         # Test restore_rpu_config=False
         new_model = AnalogSequential(self.get_layer(rpu_config=rpu_config))
         new_model.load_state_dict(state_dict, load_rpu_config=False)
+        new_analog_tile = self.get_analog_tile(new_model[0])
 
-        parameters = new_model[0].analog_tile.tile.get_parameters()
+        parameters = new_analog_tile.tile.get_parameters()
         self.assertAlmostEqual(parameters.forward_io.inp_noise, new_value)
 
         # Test restore_rpu_config=True
         new_model = AnalogSequential(self.get_layer(rpu_config=rpu_config))
         new_model.load_state_dict(state_dict, load_rpu_config=True)
+        new_analog_tile = self.get_analog_tile(new_model[0])
 
-        parameters = new_model[0].analog_tile.tile.get_parameters()
+        parameters = new_analog_tile.tile.get_parameters()
         self.assertAlmostEqual(parameters.forward_io.inp_noise, old_value)
 
     def test_load_state_load_rpu_config_wrong(self):

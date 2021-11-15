@@ -72,6 +72,7 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List, digital_bia
         ret['get_rpu_config'] = tile.get_rpu_config
         ret['bias'] = bias
         ret['digital_bias'] = digital_bias
+        ret['tile_class'] = tile
 
         return ret
 

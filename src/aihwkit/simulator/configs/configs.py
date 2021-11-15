@@ -24,7 +24,7 @@ from aihwkit.simulator.configs.helpers import (
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, PulseType, UpdateParameters, WeightClipParameter,
-    WeightModifierParameter
+    WeightModifierParameter, MappingParameter
 )
 from aihwkit.inference import (
     BaseDriftCompensation, BaseNoiseModel, GlobalDriftCompensation,
@@ -36,18 +36,26 @@ from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
 
 
 @dataclass
-class FloatingPointRPUConfig(_PrintableMixin):
+class BaseRPUConfig(_PrintableMixin):
+    """ Base class  for RPUConfigs """
+
+    mapping: MappingParameter = field(default_factory=MappingParameter)
+    """Parameter related to mapping weights to tiles for supporting modules."""
+
+
+@dataclass
+class FloatingPointRPUConfig(BaseRPUConfig):
     """Configuration for a floating point resistive processing unit."""
 
     tile_class: ClassVar[Type] = FloatingPointTile
     """Tile class that correspond to this RPUConfig."""
 
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
-    """Parameters that modify the behavior of the pulsed device."""
+    """Parameter that modify the behavior of the pulsed device."""
 
 
 @dataclass
-class SingleRPUConfig(_PrintableMixin):
+class SingleRPUConfig(BaseRPUConfig):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -56,7 +64,7 @@ class SingleRPUConfig(_PrintableMixin):
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
     device: PulsedDevice = field(default_factory=ConstantStepDevice)
-    """Parameters that modify the behavior of the pulsed device."""
+    """Parameter that modify the behavior of the pulsed device."""
 
     forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the forward direction."""
@@ -73,7 +81,7 @@ class SingleRPUConfig(_PrintableMixin):
 
 
 @dataclass
-class UnitCellRPUConfig(_PrintableMixin):
+class UnitCellRPUConfig(BaseRPUConfig):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -82,7 +90,7 @@ class UnitCellRPUConfig(_PrintableMixin):
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
     device: UnitCell = field(default_factory=UnitCell)
-    """Parameters that modify the behavior of the pulsed device."""
+    """Parameter that modify the behavior of the pulsed device."""
 
     forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the forward direction."""
@@ -99,7 +107,7 @@ class UnitCellRPUConfig(_PrintableMixin):
 
 
 @dataclass
-class InferenceRPUConfig(_PrintableMixin):
+class InferenceRPUConfig(BaseRPUConfig):
     """Configuration for an analog tile that is used only for inference.
 
     Training is done in *hardware-aware* manner, thus using only the
@@ -126,17 +134,17 @@ class InferenceRPUConfig(_PrintableMixin):
     """For compensating the drift during inference only."""
 
     clip: WeightClipParameter = field(default_factory=WeightClipParameter)
-    """Parameters for weight clip."""
+    """Parameter for weight clip."""
 
     modifier: WeightModifierParameter = field(default_factory=WeightModifierParameter)
-    """Parameters for weight modifier."""
+    """Parameter for weight modifier."""
 
     # The following fields are not included in `__init__`, and should be
     # treated as read-only.
 
     device: IdealDevice = field(default_factory=IdealDevice,
                                 init=False)
-    """Parameters that modify the behavior of the pulsed device: ideal device."""
+    """Parameter that modify the behavior of the pulsed device: ideal device."""
 
     backward: IOParameters = field(
         default_factory=lambda: IOParameters(is_perfect=True),
@@ -156,7 +164,7 @@ class InferenceRPUConfig(_PrintableMixin):
 
 
 @dataclass
-class DigitalRankUpdateRPUConfig(_PrintableMixin):
+class DigitalRankUpdateRPUConfig(BaseRPUConfig):
     """Configuration for an analog (unit cell) resistive processing unit
     where the rank update is done in digital.
 
@@ -171,7 +179,7 @@ class DigitalRankUpdateRPUConfig(_PrintableMixin):
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
     device: DigitalRankUpdateCell = field(default_factory=DigitalRankUpdateCell)
-    """Parameters that modify the behavior of the pulsed device."""
+    """Parameter that modify the behavior of the pulsed device."""
 
     forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameter setting for the forward direction."""
