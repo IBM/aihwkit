@@ -91,13 +91,14 @@ template <typename T> void PulsedRPUDevice<T>::allocateContainers() {
   int d_sz = this->d_size_;
   int x_sz = this->x_size_;
 
-  sup_ = Array_2D_Get<PulsedDPStruc<T>>(d_sz, x_sz);
-
   w_max_bound_ = Array_2D_Get<T>(d_sz, x_sz);
   w_min_bound_ = Array_2D_Get<T>(d_sz, x_sz);
+
   w_scale_up_ = Array_2D_Get<T>(d_sz, x_sz);
   w_scale_down_ = Array_2D_Get<T>(d_sz, x_sz);
+
   w_decay_scale_ = Array_2D_Get<T>(d_sz, x_sz);
+
   w_diffusion_rate_ = Array_2D_Get<T>(d_sz, x_sz);
   w_reset_bias_ = Array_2D_Get<T>(d_sz, x_sz);
   w_persistent_ = Array_2D_Get<T>(d_sz, x_sz);
@@ -113,14 +114,6 @@ template <typename T> void PulsedRPUDevice<T>::allocateContainers() {
       w_diffusion_rate_[i][j] = (T)0.0;
       w_reset_bias_[i][j] = (T)0.0;
       w_persistent_[i][j] = (T)0.0;
-
-      sup_[i][j].max_bound = std::numeric_limits<T>::max();
-      sup_[i][j].min_bound = std::numeric_limits<T>::min();
-      sup_[i][j].scale_up = (T)0.0;
-      sup_[i][j].scale_down = (T)0.0;
-      sup_[i][j].diffusion_rate = (T)0.0;
-      sup_[i][j].decay_scale = (T)1.0;
-      sup_[i][j].reset_bias = (T)0.0;
     }
   }
   containers_allocated_ = true;
@@ -129,8 +122,6 @@ template <typename T> void PulsedRPUDevice<T>::allocateContainers() {
 template <typename T> void PulsedRPUDevice<T>::freeContainers() {
 
   if (containers_allocated_) {
-
-    Array_2D_Free<PulsedDPStruc<T>>(sup_);
 
     Array_2D_Free<T>(w_max_bound_);
     Array_2D_Free<T>(w_min_bound_);
@@ -172,7 +163,6 @@ PulsedRPUDevice<T>::PulsedRPUDevice(const PulsedRPUDevice<T> &other)
 
   for (int j = 0; j < this->x_size_; ++j) {
     for (int i = 0; i < this->d_size_; ++i) {
-      sup_[i][j] = other.sup_[i][j];
 
       w_scale_up_[i][j] = other.w_scale_up_[i][j];
       w_scale_down_[i][j] = other.w_scale_down_[i][j];
@@ -184,6 +174,8 @@ PulsedRPUDevice<T>::PulsedRPUDevice(const PulsedRPUDevice<T> &other)
       w_diffusion_rate_[i][j] = other.w_diffusion_rate_[i][j];
 
       w_reset_bias_[i][j] = other.w_reset_bias_[i][j];
+
+      w_persistent_[i][j] = other.w_persistent_[i][j];
     }
   }
 }
@@ -212,7 +204,6 @@ PulsedRPUDevice<T> &PulsedRPUDevice<T>::operator=(PulsedRPUDevice<T> &&other) {
   containers_allocated_ = other.containers_allocated_;
 
   // pointers
-  sup_ = other.sup_;
   w_scale_up_ = other.w_scale_up_;
   w_scale_down_ = other.w_scale_down_;
 
@@ -225,7 +216,6 @@ PulsedRPUDevice<T> &PulsedRPUDevice<T>::operator=(PulsedRPUDevice<T> &&other) {
   w_persistent_ = other.w_persistent_;
 
   // set pointers to null
-  other.sup_ = nullptr;
   other.w_scale_up_ = nullptr;
   other.w_scale_down_ = nullptr;
 
@@ -324,16 +314,6 @@ void PulsedRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
     }
 
     dw_min += (fabs(w_scale_up_[0][i]) + fabs(w_scale_down_[0][i])) / (T)2.0;
-
-    // copy to sup
-    sup_[0][i].max_bound = w_max_bound_[0][i];
-    sup_[0][i].min_bound = w_min_bound_[0][i];
-    sup_[0][i].scale_up = w_scale_up_[0][i];
-    sup_[0][i].scale_down = w_scale_down_[0][i];
-
-    sup_[0][i].decay_scale = w_decay_scale_[0][i];
-    sup_[0][i].diffusion_rate = w_diffusion_rate_[0][i];
-    sup_[0][i].reset_bias = w_reset_bias_[0][i];
   }
 
   if (!getPar().legacy_params && this->hasWDrifter()) {
@@ -363,11 +343,12 @@ template <typename T> void PulsedRPUDevice<T>::decayWeights(T **weights, bool bi
   T *wd = w_decay_scale_[0];
   T *max_bound = w_max_bound_[0];
   T *min_bound = w_min_bound_[0];
+  T *b = w_reset_bias_[0];
 
   if (!bias_no_decay) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
-      w[i] *= wd[i];
+      w[i] = (w[i] - b[i]) * wd[i] + b[i];
       w[i] = MIN(w[i], max_bound[i]);
       w[i] = MAX(w[i], min_bound[i]);
     }
@@ -375,7 +356,8 @@ template <typename T> void PulsedRPUDevice<T>::decayWeights(T **weights, bool bi
     const int last_col = this->x_size_ - 1; // x-major (ie row major)
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
-      w[i] *= (i % this->x_size_ == last_col) ? (T)1.0 : wd[i];
+      T s = (i % this->x_size_ == last_col) ? (T)1.0 : wd[i];
+      w[i] = (w[i] - b[i]) * s + b[i];
       w[i] = MIN(w[i], max_bound[i]);
       w[i] = MAX(w[i], min_bound[i]);
     }
@@ -391,11 +373,13 @@ void PulsedRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
   T *wd = w_decay_scale_[0];
   T *max_bound = w_max_bound_[0];
   T *min_bound = w_min_bound_[0];
+  T *b = w_reset_bias_[0];
 
   if (!bias_no_decay) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
-      w[i] *= 1 + alpha * (wd[i] - 1);
+      T s = 1 + alpha * (wd[i] - 1);
+      w[i] = (w[i] - b[i]) * s + b[i];
       w[i] = MIN(w[i], max_bound[i]);
       w[i] = MAX(w[i], min_bound[i]);
     }
@@ -403,7 +387,8 @@ void PulsedRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
     const int last_col = this->x_size_ - 1; // x-major (ie row major)
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
-      w[i] *= (i % this->x_size_ == last_col) ? (T)1.0 : (1 + alpha * (wd[i] - 1));
+      T s = (i % this->x_size_ == last_col) ? (T)1.0 : (1 + alpha * (wd[i] - 1));
+      w[i] = (w[i] - b[i]) * s + b[i];
       w[i] = MIN(w[i], max_bound[i]);
       w[i] = MAX(w[i], min_bound[i]);
     }
@@ -518,24 +503,16 @@ void PulsedRPUDevice<T>::copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> 
     RPU_FATAL("Expect RPU Pulsed device");
   }
 
-  PulsedDPStruc<T> **sup = rpu->getDPStruc();
-
   for (int j = 0; j < this->x_size_; ++j) {
     for (int i = 0; i < this->d_size_; ++i) {
 
       // scaleup/down both have same sign
-      sup_[i][j].scale_up = sup[i][j].scale_down;
-      w_scale_up_[i][j] = sup[i][j].scale_down;
-
-      sup_[i][j].scale_down = sup[i][j].scale_up;
-      w_scale_down_[i][j] = sup[i][j].scale_up;
+      std::swap(w_scale_up_[i][j], w_scale_down_[i][j]);
 
       // min max have sign. mirror
-      sup_[i][j].min_bound = -sup[i][j].max_bound;
-      sup_[i][j].max_bound = -sup[i][j].min_bound;
-
-      w_max_bound_[i][j] = -sup[i][j].min_bound;
-      w_min_bound_[i][j] = -sup[i][j].max_bound;
+      T b = w_max_bound_[i][j];
+      w_max_bound_[i][j] = -w_min_bound_[i][j];
+      w_min_bound_[i][j] = -b;
     }
   }
 }
@@ -605,89 +582,75 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
   for (int j = 0; j < this->x_size_; ++j) {
     for (int i = 0; i < this->d_size_; ++i) {
 
-      sup_[i][j].max_bound = par.w_max * (1 + par.w_max_dtod * rng->sampleGauss());
-      sup_[i][j].min_bound = par.w_min * (1 + par.w_min_dtod * rng->sampleGauss());
+      w_max_bound_[i][j] = par.w_max * (1 + par.w_max_dtod * rng->sampleGauss());
+      w_min_bound_[i][j] = par.w_min * (1 + par.w_min_dtod * rng->sampleGauss());
 
       T gain = ((T)1.0 + gain_std * rng->sampleGauss());
       T r = up_down_std * rng->sampleGauss();
 
-      sup_[i][j].scale_up = (up_bias + gain + r) * par.dw_min; // to reduce mults in updates
-      sup_[i][j].scale_down = (down_bias + gain - r) * par.dw_min;
+      w_scale_up_[i][j] = (up_bias + gain + r) * par.dw_min; // to reduce mults in updates
+      w_scale_down_[i][j] = (down_bias + gain - r) * par.dw_min;
 
       // enforce consistency
       if (par.enforce_consistency) {
-        sup_[i][j].scale_up = fabs(sup_[i][j].scale_up);
-        sup_[i][j].scale_down = fabs(sup_[i][j].scale_down);
+        w_scale_up_[i][j] = fabs(w_scale_up_[i][j]);
+        w_scale_down_[i][j] = fabs(w_scale_down_[i][j]);
 
-        if (sup_[i][j].min_bound > sup_[i][j].max_bound) {
-          std::swap(sup_[i][j].min_bound, sup_[i][j].max_bound);
+        if (w_min_bound_[i][j] > w_max_bound_[i][j]) {
+          std::swap(w_min_bound_[i][j], w_max_bound_[i][j]);
         }
-        sup_[i][j].max_bound = fabs(sup_[i][j].max_bound);
-        sup_[i][j].min_bound = -fabs(sup_[i][j].min_bound);
+        w_max_bound_[i][j] = fabs(w_max_bound_[i][j]);
+        w_min_bound_[i][j] = -fabs(w_min_bound_[i][j]);
       } else {
         // "turn off" weight if max<min
-        if (sup_[i][j].min_bound > sup_[i][j].max_bound) {
-          T m = sup_[i][j].max_bound + (sup_[i][j].min_bound - sup_[i][j].max_bound) / ((T)2.0);
-          sup_[i][j].max_bound = m;
-          sup_[i][j].min_bound = m;
+        if (w_min_bound_[i][j] > w_max_bound_[i][j]) {
+          T m = w_max_bound_[i][j] + (w_min_bound_[i][j] - w_max_bound_[i][j]) / ((T)2.0);
+          w_max_bound_[i][j] = m;
+          w_min_bound_[i][j] = m;
         }
       }
 
       // corrupt devices
       if (par.corrupt_devices_prob > rng->sampleUniform()) {
         // stuck somewhere in min_max
-        T mn =
-            MAX(MIN(sup_[i][j].max_bound, sup_[i][j].min_bound), -fabs(par.corrupt_devices_range));
-        T mx =
-            MIN(MAX(sup_[i][j].max_bound, sup_[i][j].min_bound), fabs(par.corrupt_devices_range));
+        T mn = MAX(MIN(w_max_bound_[i][j], w_min_bound_[i][j]), -fabs(par.corrupt_devices_range));
+        T mx = MIN(MAX(w_max_bound_[i][j], w_min_bound_[i][j]), fabs(par.corrupt_devices_range));
 
         T value = mn + (mx - mn) * rng->sampleUniform();
-        sup_[i][j].max_bound = value;
-        sup_[i][j].min_bound = value;
-        sup_[i][j].scale_up = (T)0.0;
-        sup_[i][j].scale_down = (T)0.0;
+        w_max_bound_[i][j] = value;
+        w_min_bound_[i][j] = value;
+        w_scale_up_[i][j] = (T)0.0;
+        w_scale_down_[i][j] = (T)0.0;
       }
 
       // perfect bias
       if ((par.perfect_bias) && (j == this->x_size_ - 1)) {
-        sup_[i][j].scale_up = par.dw_min;
-        sup_[i][j].scale_down = par.dw_min;
-        sup_[i][j].min_bound = 100 * par.w_min; // essentially no bound
-        sup_[i][j].max_bound = 100 * par.w_max; // essentially no bound
+        w_scale_up_[i][j] = par.dw_min;
+        w_scale_down_[i][j] = par.dw_min;
+        w_min_bound_[i][j] = 100 * par.w_min; // essentially no bound
+        w_max_bound_[i][j] = 100 * par.w_max; // essentially no bound
       }
 
       //--------------------
       // diffusion
       {
         T t = fabs(par.diffusion * (1 + par.diffusion_dtod * rng->sampleGauss()));
-        sup_[i][j].diffusion_rate = t;
+        w_diffusion_rate_[i][j] = t;
       }
 
       //--------------------
       // reset
       { // additive dtod
         T t = par.reset + par.reset_dtod * rng->sampleGauss();
-        sup_[i][j].reset_bias = t;
+        w_reset_bias_[i][j] = t;
       }
 
       //--------------------
       // decay
       {
         T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * rng->sampleGauss());
-        sup_[i][j].decay_scale = t > 1.0 ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
+        w_decay_scale_[i][j] = t > 1.0 ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
       }
-
-      //--------------------
-      // copy for for linear access
-      w_max_bound_[i][j] = sup_[i][j].max_bound;
-      w_min_bound_[i][j] = sup_[i][j].min_bound;
-      w_scale_up_[i][j] = sup_[i][j].scale_up;
-      w_scale_down_[i][j] = sup_[i][j].scale_down;
-
-      w_decay_scale_[i][j] = sup_[i][j].decay_scale;
-      w_diffusion_rate_[i][j] = sup_[i][j].diffusion_rate;
-
-      w_reset_bias_[i][j] = sup_[i][j].reset_bias;
     }
   }
 }
@@ -707,12 +670,12 @@ template <typename T> void PulsedRPUDevice<T>::printDP(int x_count, int d_count)
 
   for (int i = 0; i < d_count1; ++i) {
     for (int j = 0; j < x_count1; ++j) {
-      std::cout << "[<" << sup_[i][j].max_bound << ", ";
-      std::cout << sup_[i][j].min_bound << ">, <";
-      std::cout << sup_[i][j].scale_up << ", ";
-      std::cout << sup_[i][j].scale_down << "> ";
+      std::cout << "[<" << w_max_bound_[i][j] << ", ";
+      std::cout << w_min_bound_[i][j] << ">, <";
+      std::cout << w_scale_up_[i][j] << ", ";
+      std::cout << w_scale_down_[i][j] << "> ";
       std::cout.precision(10);
-      std::cout << sup_[i][j].decay_scale << ", ";
+      std::cout << w_decay_scale_[i][j] << ", ";
       std::cout.precision(6);
       std::cout << w_diffusion_rate_[i][j] << ", ";
       std::cout << w_reset_bias_[i][j];

@@ -121,15 +121,21 @@ void elemasb02(
     const T *B,
     float *dev_4params); // bounds in [0,2] // 4params and 2params always float !
 
-// sat(W *= A)
-template <typename T>
-void elemscale(const CudaContext *context, T *W, const int size, const T *A, float *dev_4params);
-
 // sat(W)
 template <typename T>
 void elemsat(const CudaContext *context, T *W, const int size, float *dev_4params);
 
-// sat(W *= 1+alpha*(A-1))
+// sat(W = (W - S) * A + S)
+template <typename T>
+void elemscale(
+    const CudaContext *context,
+    T *W,
+    const int size,
+    const T *A,
+    float *dev_4params,
+    const T *dev_shift = nullptr);
+
+// sat(W = (W - S) (1+(A-1)*alpha) + S)
 template <typename T>
 void elemscalealpha(
     const CudaContext *context,
@@ -137,7 +143,8 @@ void elemscalealpha(
     const int size,
     const T *A,
     float *dev_4params,
-    const T alpha);
+    const T alpha,
+    const T *dev_shift = nullptr);
 
 // W += A, A = W
 template <typename T> void elemaddcopy(const CudaContext *context, T *W, T *A, const int size);

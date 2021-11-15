@@ -101,7 +101,6 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   virtual bool implementsWriteNoise() const { return false; }; // needs to be activated in derived
   inline bool usesPersistentWeight() const { return write_noise_std > 0; };
   inline T getScaledWriteNoise() const { return write_noise_std * this->dw_min; };
-  inline bool needsResetBias() const { return reset > 0 || reset_dtod > 0; };
 
   void initialize() override {
     PulsedRPUDeviceMetaParameterBase<T>::initialize();
@@ -110,7 +109,6 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     }
     reset_dtod = MAX(reset_dtod, (T)0.0);
     reset_std = MAX(reset_std, (T)0.0);
-    reset = MAX(reset, (T)0.0);
   };
 };
 
@@ -176,16 +174,6 @@ private:
   T weight_granularity_ = 0.0;
 };
 
-template <typename T> struct PulsedDPStruc {
-  T max_bound = (T)0.0;
-  T min_bound = (T)0.0;
-  T scale_up = (T)0.0;
-  T scale_down = (T)0.0;
-  T decay_scale = (T)0.0;
-  T diffusion_rate = (T)0.0;
-  T reset_bias = (T)0.0;
-};
-
 template <typename T> class PulsedRPUDevice : public PulsedRPUDeviceBase<T> {
 
 public:
@@ -215,7 +203,6 @@ public:
     swap(a.w_diffusion_rate_, b.w_diffusion_rate_);
     swap(a.w_persistent_, b.w_persistent_);
     swap(a.w_reset_bias_, b.w_reset_bias_);
-    swap(a.sup_, b.sup_);
 
     swap(a.containers_allocated_, b.containers_allocated_);
   }
@@ -235,7 +222,6 @@ public:
   inline T **getResetBias() const { return w_reset_bias_; };
   inline T **getScaleUp() const { return w_scale_up_; };
   inline T **getScaleDown() const { return w_scale_down_; };
-  inline PulsedDPStruc<T> **getDPStruc() const { return sup_; };
   PulsedRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<PulsedRPUDeviceMetaParameter<T> &>(SimpleRPUDevice<T>::getPar());
   };
@@ -258,8 +244,6 @@ public:
 
 protected:
   void populate(const PulsedRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
-
-  PulsedDPStruc<T> **sup_ = nullptr;
 
   T **w_max_bound_ = nullptr;
   T **w_min_bound_ = nullptr;

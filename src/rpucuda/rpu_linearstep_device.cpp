@@ -32,8 +32,6 @@ void LinearStepRPUDevice<T>::populate(
 
   for (int i = 0; i < this->d_size_; ++i) {
 
-    PulsedDPStruc<T> *s = this->sup_[i];
-
     for (int j = 0; j < this->x_size_; ++j) {
 
       T diff_slope_at_bound_up = par.ls_decrease_up + par.ls_decrease_up_dtod * rng->sampleGauss();
@@ -52,12 +50,14 @@ void LinearStepRPUDevice<T>::populate(
            bound, which does not make sense both slopes are negative
            (sign of scale_up/scale_down here both positive and later
            corrected in update rule) */
-        w_slope_up_[i][j] = -diff_slope_at_bound_up * s[j].scale_up / par.w_max;
-        w_slope_down_[i][j] = -diff_slope_at_bound_down * s[j].scale_down / par.w_min;
+        w_slope_up_[i][j] = -diff_slope_at_bound_up * this->w_scale_up_[i][j] / par.w_max;
+        w_slope_down_[i][j] = -diff_slope_at_bound_down * this->w_scale_down_[i][j] / par.w_min;
       } else {
         /* In this case slope depends on the bound*/
-        w_slope_up_[i][j] = -diff_slope_at_bound_up * s[j].scale_up / s[j].max_bound;
-        w_slope_down_[i][j] = -diff_slope_at_bound_down * s[j].scale_down / s[j].min_bound;
+        w_slope_up_[i][j] =
+            -diff_slope_at_bound_up * this->w_scale_up_[i][j] / this->w_max_bound_[i][j];
+        w_slope_down_[i][j] =
+            -diff_slope_at_bound_down * this->w_scale_down_[i][j] / this->w_min_bound_[i][j];
       }
     }
   }
@@ -78,14 +78,14 @@ template <typename T> void LinearStepRPUDevice<T>::printDP(int x_count, int d_co
     for (int j = 0; j < x_count; ++j) {
       std::cout.precision(5);
       std::cout << i << "," << j << ": ";
-      std::cout << "[<" << this->sup_[i][j].max_bound << ",";
-      std::cout << this->sup_[i][j].min_bound << ">,<";
-      std::cout << this->sup_[i][j].scale_up << ",";
-      std::cout << this->sup_[i][j].scale_down << ">,<";
+      std::cout << "[<" << this->w_max_bound_[i][j] << ",";
+      std::cout << this->w_min_bound_[i][j] << ">,<";
+      std::cout << this->w_scale_up_[i][j] << ",";
+      std::cout << this->w_scale_down_[i][j] << ">,<";
       std::cout << w_slope_up_[i][j] << ",";
       std::cout << w_slope_down_[i][j] << ">]";
       std::cout.precision(10);
-      std::cout << this->sup_[i][j].decay_scale << ", ";
+      std::cout << this->w_decay_scale_[i][j] << ", ";
       std::cout.precision(6);
       std::cout << this->w_diffusion_rate_[i][j] << ", ";
       std::cout << this->w_reset_bias_[i][j];
