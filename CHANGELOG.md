@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Transposed-read for ``TransferCompound``. (\#312)
 * ``BufferedTranferCompound`` and TTv2 presets. (\#318)
 * Stochastic rounding for ``MixedPrecisionCompound``. (\#318)
-* Decay with arbitrary decay point (to reset bias). (\#319) 
+* Decay with arbitrary decay point (to reset bias). (\#319)
 * Linear layer ``AnalogLinerMapped`` which mapped a large weight
   matrix onto multiple analog tiles. (\#320)
 
@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fixed missing load statedict for AnalogSequential. (\#295)
 * Fixed issue with hierarchical hidden parameter settings. (\#313)
 * Fixed serious issue that loaded model would not update analog gradients. (\#320)
+* Fixed cuda import in examples. (\#320)
 
 ### Changed
 
