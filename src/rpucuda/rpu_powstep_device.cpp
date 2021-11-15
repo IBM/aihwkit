@@ -70,14 +70,14 @@ template <typename T> void PowStepRPUDevice<T>::printDP(int x_count, int d_count
     for (int j = 0; j < x_count; ++j) {
       std::cout.precision(5);
       std::cout << i << "," << j << ": ";
-      std::cout << "[<" << this->sup_[i][j].max_bound << ",";
-      std::cout << this->sup_[i][j].min_bound << ">,<";
-      std::cout << this->sup_[i][j].scale_up << ",";
-      std::cout << this->sup_[i][j].scale_down << ">,<";
+      std::cout << "[<" << this->w_max_bound_[i][j] << ",";
+      std::cout << this->w_min_bound_[i][j] << ">,<";
+      std::cout << this->w_scale_up_[i][j] << ",";
+      std::cout << this->w_scale_down_[i][j] << ">,<";
       std::cout << w_gamma_up_[i][j] << ",";
       std::cout << w_gamma_down_[i][j] << ">]";
       std::cout.precision(10);
-      std::cout << this->sup_[i][j].decay_scale << ", ";
+      std::cout << this->w_decay_scale_[i][j] << ", ";
       std::cout.precision(6);
       std::cout << this->w_diffusion_rate_[i][j] << ", ";
       std::cout << this->w_reset_bias_[i][j];

@@ -201,9 +201,6 @@ protected:
 private:
   PulsedMetaParameter<T> par_;
 
-  std::unique_ptr<CudaArray<T>> dev_decay_scale_ = nullptr;
-  std::unique_ptr<CudaArray<T>> dev_diffusion_rate_ = nullptr;
-
   // forward
   std::unique_ptr<CudaArray<T>> dev_f_x_vector_inc1_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_f_d_vector_inc1_ = nullptr;

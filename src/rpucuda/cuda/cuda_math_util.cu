@@ -243,11 +243,7 @@ void ger<double>(
 // W += A
 template <typename T> __global__ void kernelElemAdd(T *dev_W, const int size, const T *dev_A) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    dev_W[tid] += dev_A[tid];
-  }
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_W[idx] += dev_A[idx]; }
 }
 template <typename T>
 void elemadd(const CudaContext *context, T *dev_W, const int size, const T *dev_A) {
@@ -264,11 +260,9 @@ template void elemadd<double>(const CudaContext *, double *, const int, const do
 // W = W.*W
 template <typename T> __global__ void kernelElemPow2(T *dev_W, const int size) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    T x = dev_W[tid];
-    dev_W[tid] = x * x;
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T x = dev_W[idx];
+    dev_W[idx] = x * x;
   }
 }
 template <typename T> void elempow2(const CudaContext *context, T *dev_W, const int size) {
@@ -285,11 +279,7 @@ template void elempow2<double>(const CudaContext *, double *, const int);
 // V = abs(W )
 template <typename T> __global__ void kernelElemAbs(T *dev_V, const T *dev_W, const int size) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    dev_V[tid] = fabs(dev_W[tid]);
-  }
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_V[idx] = fabs(dev_W[idx]); }
 }
 template <typename T>
 void elemabs(const CudaContext *context, T *dev_V, const T *dev_W, const int size) {
@@ -307,16 +297,13 @@ template void elemabs<double>(const CudaContext *, double *, const double *, con
 template <typename T, typename T_A>
 __global__ void kernelElemAddScale(T *dev_W, const int size, const T_A *dev_A, const T beta) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
   T b = beta;
-
-  if (tid < size) {
-    T w = dev_W[tid];
-    T a = dev_A[tid];
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    T a = dev_A[idx];
 
     w += a * b;
-    dev_W[tid] = w;
+    dev_W[idx] = w;
   }
 }
 template <typename T, typename T_A>
@@ -340,15 +327,13 @@ elemaddscale<double, float>(const CudaContext *, double *, const int, const floa
 template <typename T>
 __global__ void kernelElemAddScale(T *dev_W, const int size, const T *dev_A, const T *dev_B) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    T w = dev_W[tid];
-    T a = dev_A[tid];
-    T b = dev_B[tid];
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    T a = dev_A[idx];
+    T b = dev_B[idx];
 
     w += a * b;
-    dev_W[tid] = w;
+    dev_W[idx] = w;
   }
 }
 template <typename T>
@@ -371,20 +356,18 @@ template <typename T, typename T_A>
 __global__ void
 kernelElemASB02(T *dev_W, const int size, const T_A *dev_A, const T *dev_B, float *dev_4params) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    T w = dev_W[tid];
-    T a = dev_A[tid];
-    T b = dev_B[tid];
-    float4 parij = reinterpret_cast<float4 *>(dev_4params)[tid];
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    T a = dev_A[idx];
+    T b = dev_B[idx];
+    float4 parij = reinterpret_cast<float4 *>(dev_4params)[idx];
 
     w += a * b;
     // check bounds
     w = (w > parij.z) ? parij.z : w;
     w = (w < parij.x) ? parij.x : w;
 
-    dev_W[tid] = w;
+    dev_W[idx] = w;
   }
 }
 template <typename T, typename T_A>
@@ -411,49 +394,55 @@ template void elemasb02<double, float>(
 
 // sat(W *= A)
 template <typename T>
-__global__ void kernelElemScale(T *dev_W, const int size, const T *dev_A, float *dev_4params) {
+__global__ void
+kernelElemScale(T *dev_W, const int size, const T *dev_A, float *dev_4params, const T *dev_shift) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  bool with_shift = dev_shift != nullptr;
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    T a = dev_A[idx];
+    T s = with_shift ? dev_shift[idx] : 0.0;
+    float4 parij = reinterpret_cast<float4 *>(dev_4params)[idx];
 
-  if (tid < size) {
-    T w = dev_W[tid];
-    T a = dev_A[tid];
-    float4 parij = reinterpret_cast<float4 *>(dev_4params)[tid];
-
-    w *= a;
+    w = (w - s) * a + s;
     // check bounds
     w = (w > parij.z) ? parij.z : w;
     w = (w < parij.x) ? parij.x : w;
 
-    dev_W[tid] = w;
+    dev_W[idx] = w;
   }
 }
 template <typename T>
 void elemscale(
-    const CudaContext *context, T *dev_W, const int size, const T *dev_A, float *dev_4params) {
+    const CudaContext *context,
+    T *dev_W,
+    const int size,
+    const T *dev_A,
+    float *dev_4params,
+    const T *dev_shift) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemScale<T>
-      <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_4params);
+      <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_4params, dev_shift);
 }
-template void elemscale<float>(const CudaContext *, float *, const int, const float *, float *);
+template void
+elemscale<float>(const CudaContext *, float *, const int, const float *, float *, const float *);
 #ifdef RPU_USE_DOUBLE
-template void elemscale<double>(const CudaContext *, double *, const int, const double *, float *);
+template void elemscale<double>(
+    const CudaContext *, double *, const int, const double *, float *, const double *);
 #endif
 
 // sat(W)
 template <typename T> __global__ void kernelElemSat(T *dev_W, const int size, float *dev_4params) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    T w = dev_W[tid];
-    float4 parij = reinterpret_cast<float4 *>(dev_4params)[tid];
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    float4 parij = reinterpret_cast<float4 *>(dev_4params)[idx];
     // check bounds
     w = (w > parij.z) ? parij.z : w;
     w = (w < parij.x) ? parij.x : w;
-    dev_W[tid] = w;
+    dev_W[idx] = w;
   }
 }
 template <typename T>
@@ -471,22 +460,29 @@ template void elemsat<double>(const CudaContext *, double *, const int, float *)
 // sat(W *= 1+(A-1)*alpha)
 template <typename T>
 __global__ void kernelElemScaleAlpha(
-    T *dev_W, const int size, const T *dev_A, float *dev_4params, const T alpha_in) {
+    T *dev_W,
+    const int size,
+    const T *dev_A,
+    float *dev_4params,
+    const T alpha_in,
+    const T *dev_shift) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
   volatile T alpha = alpha_in;
+  bool with_shift = dev_shift != nullptr;
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    T a = dev_A[idx];
+    T s = with_shift ? dev_shift[idx] : 0.0;
+    float4 parij = reinterpret_cast<float4 *>(dev_4params)[idx];
 
-  if (tid < size) {
-    T w = dev_W[tid];
-    T a = dev_A[tid];
-    float4 parij = reinterpret_cast<float4 *>(dev_4params)[tid];
+    T scale = 1.0 + alpha * (a - 1.0);
+    w = (w - s) * scale + s;
 
-    w *= 1.0 + alpha * (a - 1.0);
     // check bounds
     w = (w > parij.z) ? parij.z : w;
     w = (w < parij.x) ? parij.x : w;
 
-    dev_W[tid] = w;
+    dev_W[idx] = w;
   }
 }
 template <typename T>
@@ -496,30 +492,35 @@ void elemscalealpha(
     const int size,
     const T *dev_A,
     float *dev_4params,
-    const T alpha) {
+    const T alpha,
+    const T *dev_shift) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
-  kernelElemScaleAlpha<T>
-      <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_4params, alpha);
+  kernelElemScaleAlpha<T><<<nblocks, nthreads, 0, context->getStream()>>>(
+      dev_W, size, dev_A, dev_4params, alpha, dev_shift);
 }
-template void
-elemscalealpha<float>(const CudaContext *, float *, const int, const float *, float *, const float);
+template void elemscalealpha<float>(
+    const CudaContext *, float *, const int, const float *, float *, const float, const float *);
 #ifdef RPU_USE_DOUBLE
 template void elemscalealpha<double>(
-    const CudaContext *, double *, const int, const double *, float *, const double);
+    const CudaContext *,
+    double *,
+    const int,
+    const double *,
+    float *,
+    const double,
+    const double *);
 #endif
 
 // W += A, A = W
 template <typename T> __global__ void kernelElemAddCopy(T *dev_W, T *dev_A, const int size) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    T w = dev_W[tid];
-    w += dev_A[tid];
-    dev_W[tid] = w;
-    dev_A[tid] = w;
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    w += dev_A[idx];
+    dev_W[idx] = w;
+    dev_A[idx] = w;
   }
 }
 template <typename T>
@@ -538,19 +539,17 @@ template void elemaddcopy<double>(const CudaContext *, double *, double *, const
 template <typename T>
 __global__ void kernelElemAddCopySat(T *dev_W, T *dev_A, const int size, const float *dev_4params) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    T w = dev_W[tid];
-    T a = dev_A[tid];
-    const float4 parij = reinterpret_cast<const float4 *>(dev_4params)[tid];
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    T a = dev_A[idx];
+    const float4 parij = reinterpret_cast<const float4 *>(dev_4params)[idx];
     w += a;
     // check bounds
     w = (w > parij.z) ? parij.z : w;
     w = (w < parij.x) ? parij.x : w;
     a = w;
-    dev_W[tid] = w;
-    dev_A[tid] = a;
+    dev_W[idx] = w;
+    dev_A[idx] = a;
   }
 }
 template <typename T>
@@ -581,22 +580,20 @@ __global__ void kernelElemResetSat(
     const T thres,
     const float *dev_4params) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
     T th = thres;
-    T p = dev_P[tid];
-    T a = dev_A[tid]; // load a bit more ?
-    T b = dev_B[tid];
-    T w = dev_W[tid];
-    const float4 parij = reinterpret_cast<const float4 *>(dev_4params)[tid];
+    T p = dev_P[idx];
+    T a = dev_A[idx]; // load a bit more ?
+    T b = dev_B[idx];
+    T w = dev_W[idx];
+    const float4 parij = reinterpret_cast<const float4 *>(dev_4params)[idx];
 
     if (p < th) {
       w = a + b;
       // check bounds [only those that changed]
       w = (w > parij.z) ? parij.z : w;
       w = (w < parij.x) ? parij.x : w;
-      dev_W[tid] = w;
+      dev_W[idx] = w;
     }
   }
 }
@@ -713,13 +710,11 @@ template void elemresetsatmsk<double>(
 template <typename T>
 __global__ void kernelElemSubCopy(T *dev_W, T *dev_A, const int size, const T scale) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
-    T new_w = dev_W[tid];
-    T old_w = dev_A[tid];
-    dev_W[tid] = old_w;
-    dev_A[tid] = scale * (new_w - old_w); // dw
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T new_w = dev_W[idx];
+    T old_w = dev_A[idx];
+    dev_W[idx] = old_w;
+    dev_A[idx] = scale * (new_w - old_w); // dw
   }
 }
 template <typename T>
@@ -736,10 +731,8 @@ template void elemsubcopy<double>(const CudaContext *, double *, double *, const
 
 // set all elements to a
 template <typename T> __global__ void kernelSetConstAlpha(T *values, int size, T alpha) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tid < size) {
-    values[tid] = alpha;
-  }
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = alpha; }
 }
 
 template <typename T>
@@ -759,10 +752,8 @@ template void elemconst<char>(const CudaContext *, char *, const int, const char
 
 // w = max(min(w,|a|),-|a|)
 template <typename T> __global__ void kernelAClip(T *values, int size, T abs_a) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tid < size) {
-    values[tid] = MIN(MAX(values[tid], -abs_a), abs_a);
-  }
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MIN(MAX(values[idx], -abs_a), abs_a); }
 }
 
 template <typename T> void aclip(const CudaContext *context, T *W, const int size, const T a) {
@@ -778,10 +769,8 @@ template void aclip<double>(const CudaContext *, double *, const int, const doub
 
 // w = max(w,a)
 template <typename T> __global__ void kernelElemmax(T *values, int size, T a) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tid < size) {
-    values[tid] = MAX(values[tid], a);
-  }
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MAX(values[idx], a); }
 }
 
 template <typename T> void elemmax(const CudaContext *context, T *W, const int size, const T a) {
@@ -797,10 +786,8 @@ template void elemmax<double>(const CudaContext *, double *, const int, const do
 
 // w = min(w,a)
 template <typename T> __global__ void kernelElemmin(T *values, int size, T a) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tid < size) {
-    values[tid] = MIN(values[tid], a);
-  }
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MIN(values[idx], a); }
 }
 
 template <typename T> void elemmin(const CudaContext *context, T *W, const int size, const T a) {
@@ -816,10 +803,10 @@ template void elemmin<double>(const CudaContext *, double *, const int, const do
 
 // w = w<a?0:w elementwise
 template <typename T> __global__ void kernelElemSetBelowZero(T *values, int size, T a) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tid < size) {
-    T v = values[tid];
-    values[tid] = v < a ? (T)0.0 : v;
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T v = values[idx];
+    values[idx] = v < a ? (T)0.0 : v;
   }
 }
 
@@ -840,30 +827,21 @@ template void elemsetbelowzero<double>(const CudaContext *, double *, const int,
 template <typename T>
 __global__ void kernelElemAdd(T *dev_W, const int size, const T *dev_A, const T *dev_B) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tid < size) {
-    dev_W[tid] = dev_A[tid] + dev_B[tid];
-  }
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_W[idx] = dev_A[idx] + dev_B[idx]; }
 }
 template <typename T>
 __global__ void kernelElemSub(T *dev_W, const int size, const T *dev_A, const T *dev_B) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tid < size) {
-    dev_W[tid] = dev_A[tid] - dev_B[tid];
-  }
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_W[idx] = dev_A[idx] - dev_B[idx]; }
 }
 
 template <typename T>
 __global__ void kernelElemWeightedSum(
     T *dev_W, const int size, const T *dev_A, const T a_in, const T *dev_B, const T b_in) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
   T a = a_in;
   T b = b_in;
-  if (tid < size) {
-    dev_W[tid] = a * dev_A[tid] + b * dev_B[tid];
-  }
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_W[idx] = a * dev_A[idx] + b * dev_B[idx]; }
 }
 
 template <typename T>
@@ -912,16 +890,14 @@ template void elemweightedsum<double>(
 template <typename T>
 __global__ void kernelElemAverage(T *dev_W, const int size, T **dev_Ms, const int m) {
 
-  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tid < size) {
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
     T w = 0;
 
     for (int i = 0; i < m; i++) {
       const T *w1 = dev_Ms[i];
-      w += w1[tid];
+      w += w1[idx];
     }
-    dev_W[tid] = w / (T)m;
+    dev_W[idx] = w / (T)m;
   }
 }
 
@@ -1098,11 +1074,8 @@ template void copyWithoutBias<double>(
 template <typename OutputIteratorT, typename InputIteratorT>
 __global__ void kernelCopyWithIterator(
     OutputIteratorT out_tensor, const InputIteratorT in_tensor, const int sz_all) {
-  int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-  if (tid < sz_all) {
-    out_tensor[tid] = in_tensor[tid];
-  }
+  RPU_CUDA_1D_KERNEL_LOOP(idx, sz_all) { out_tensor[idx] = in_tensor[idx]; }
 }
 
 template <typename OutputIteratorT, typename InputIteratorT>

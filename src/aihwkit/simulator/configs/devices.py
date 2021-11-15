@@ -86,7 +86,7 @@ class PulsedDevice(_PrintableMixin):
 
     **Decay**:
 
-    .. math:: w_{ij} \leftarrow w_{ij}\,(1-\alpha_\text{decay}\delta_{ij})
+    .. math:: w_{ij} \leftarrow (w_{ij} - b_{ij})\,(1-\alpha_\text{decay}\delta_{ij}) + b_{ij}
 
     Weight decay is only activated by inserting a specific call to
     :meth:`~aihwkit.simulator.tiles.base.Base.decay_weights`, which is
@@ -96,6 +96,16 @@ class PulsedDevice(_PrintableMixin):
     are thus set and fixed during RPU
     initialization. :math:`\alpha_\text{decay}` is a scaling factor
     that can be given during run-time.
+
+    The bias :math:`b_{ij}` is given by the reset bias and which is
+    determined by the parameter ``reset`` (mean value) and
+    ``reset_dtod``  (device-to-device variability). Thus
+
+    .. math:: b_{ij} = \mu_\text{reset} \left(1 + \sigma_\text{reset-dtod}\xi\right)
+
+    Note that the reset bias is also applied in case the device is
+    reset (see above).
+
 
     **Diffusion**:
 
@@ -125,6 +135,7 @@ class PulsedDevice(_PrintableMixin):
         mini-batch but requires an explicit call to
         :meth:`~aihwkit.simulator.tiles.base.Base.drift_weights` each
         time the drift should be applied.
+
     """
 
     bindings_class: ClassVar[Type] = devices.PulsedResistiveDeviceParameter
@@ -186,7 +197,7 @@ class PulsedDevice(_PrintableMixin):
     """No up-down differences and device-to-device variability in the bounds
     for the devices in the bias row."""
 
-    reset: float = 0.01
+    reset: float = 0.0
     """The reset values and spread per cross-point ``ij`` when using reset
     functionality of the device."""
 
