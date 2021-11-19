@@ -239,14 +239,14 @@ def main(rank, size):
 
 if __name__ == '__main__':
     # Execute only if run as the entry point into the program
-    p_size = 2
-    print("Device count: ", p_size)
+    world_size = 2
+    print("Device count: ", world_size)
     processes = []
     ctx = mp.get_context("spawn")
 
-    for p_rank in range(p_size):
-        print("Process: ", p_rank)
-        p = ctx.Process(target=init_process, args=(p_rank, p_size, main))
+    for world_rank in range(world_size):
+        print("Process: ", world_rank)
+        p = ctx.Process(target=init_process, args=(world_rank, world_size, main))
         p.start()
         processes.append(p)
 
