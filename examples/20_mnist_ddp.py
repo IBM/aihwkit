@@ -22,26 +22,25 @@ for epochs 0–10, 11–20, and 21–30, respectively.
 
 import os
 from time import time
-import sys
 
 # Imports from PyTorch.
 import torch
 from torch import nn
-from torch.optim.lr_scheduler import StepLR
-from torchvision import datasets, transforms
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.optim.lr_scheduler import StepLR
+
+from torchvision import datasets, transforms
+
 
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear, AnalogLinearMapped, AnalogSequential
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig, InferenceRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs import InferenceRPUConfig
 
 # Check device
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join('data', 'DATASET')
@@ -66,7 +65,9 @@ def init_process(rank, size, fn, backend='nccl'):
 
 
 def cleanup():
+    """ Destroy distributed processes once they are complete. """
     dist.destroy_process_group()
+
 
 def load_images(rank, size):
     """Load images for train from the torchvision datasets."""
@@ -78,10 +79,21 @@ def load_images(rank, size):
     val_set = datasets.MNIST(PATH_DATASET,
                              download=True, train=False, transform=transform)
 
-    train_sampler = torch.utils.data.DistributedSampler(train_set, num_replicas=size, rank=rank, shuffle=True, seed=42)
+    train_sampler = torch.utils.data.DistributedSampler(train_set, num_replicas=size, rank=rank,
+                                                        shuffle=True, seed=42)
 
-    train_data = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=size, sampler=train_sampler, pin_memory=True)
-    validation_data = torch.utils.data.DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=size, pin_memory=True)
+    train_data = torch.utils.data.DataLoader(train_set,
+                                             batch_size=BATCH_SIZE,
+                                             shuffle=False,
+                                             num_workers=size,
+                                             sampler=train_sampler,
+                                             pin_memory=True)
+
+    validation_data = torch.utils.data.DataLoader(val_set,
+                                                  batch_size=BATCH_SIZE,
+                                                  shuffle=True,
+                                                  num_workers=size,
+                                                  pin_memory=True)
 
     return train_data, validation_data
 
@@ -160,9 +172,10 @@ def train(model, train_set, rank):
             optimizer.step()
 
             total_loss += loss.item()
-        
+
         if rank == 0:
-            print('Epoch {} - Training loss: {:.16f}'.format(epoch_number, total_loss / len(train_set)))
+            print('Epoch {} - Training loss: {:.16f}'.format(epoch_number,
+                                                             total_loss / len(train_set)))
 
         # Decay learning rate if needed.
         scheduler.step()
@@ -221,17 +234,19 @@ def main(rank, size):
     if rank == 0:
         test_evaluation(model, validation_dataset)
 
+    cleanup()
+
 
 if __name__ == '__main__':
     # Execute only if run as the entry point into the program
-    size = 2
-    print("Device count: ", size)
+    p_size = 2
+    print("Device count: ", p_size)
     processes = []
     ctx = mp.get_context("spawn")
 
-    for rank in range(size):
-        print("Process: ", rank)
-        p = ctx.Process(target=init_process, args=(rank, size, main))
+    for p_rank in range(p_size):
+        print("Process: ", p_rank)
+        p = ctx.Process(target=init_process, args=(p_rank, p_size, main))
         p.start()
         processes.append(p)
 
