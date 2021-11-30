@@ -31,8 +31,7 @@ from .helpers.tiles import FloatingPoint, Inference
 @parametrize_over_layers(
     layers=[LSTM, LSTMCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[False, True],
-    digital_biases=[False]
+    biases=['analog', 'digital', None]
 )
 class LSTMLayerTest(ParametrizedTestCase):
     """Tests for AnalogLSTM layer."""
@@ -104,11 +103,9 @@ class LSTMLayerTest(ParametrizedTestCase):
 
     def test_layer_training(self):
         """Test AnalogLSTM layer training."""
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals, too-many-statements
         def get_parameters(model, analog_if) -> dict:
             """Returns the parameter in an dict."""
-            if not analog_if:
-                return dict(model.named_parameters())
 
             dic = {}
             for name, param in model.named_parameters():
@@ -120,6 +117,12 @@ class LSTMLayerTest(ParametrizedTestCase):
                     dic['weight' + add_on] = weight
                     if bias is not None:
                         dic['bias' + add_on] = bias
+                elif analog_if and name.endswith('bias'):  # digital bias
+                    splits = name.split('.')
+                    add_on = '_' + splits[-2].split('_')[-1] + '_l' + splits[2]
+                    dic['bias' + add_on] = param
+                else:
+                    dic[name] = param
 
             return dic
 

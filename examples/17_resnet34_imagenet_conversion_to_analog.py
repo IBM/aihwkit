@@ -21,25 +21,30 @@ https://arxiv.org/abs/1512.03385
 from torchvision.models import resnet34
 
 # Imports from aihwkit.
-from aihwkit.nn.conversion import convert_to_analog
+from aihwkit.nn.conversion import convert_to_analog_mapped
 from aihwkit.simulator.presets import TikiTakaReRamSBPreset
+from aihwkit.simulator.configs.utils import MappingParameter
 
-# Device used in the RPU tile
-RPU_CONFIG = TikiTakaReRamSBPreset()
+# Example: Load a predefined model from pytorch library and convert to
+#          its analog version.
+
+# Load a pytorch model.
+model = resnet34()
+print(model)
+
+# Define device and chip configuration used in the RPU tile
+mapping = MappingParameter(max_input_size=512,  # analog tile size
+                           max_output_size=512,
+                           digital_bias=True)  # whether to use analog or digital bias
+# Choose any preset or RPU configuration here
+rpu_config = TikiTakaReRamSBPreset(mapping=mapping)
+
+# Convert the model to its analog version.
+# this will replace ``Linear`` layers with ``AnalogLinearMapped``
+model = convert_to_analog_mapped(model, rpu_config, weight_scaling_omega=0.6)
+
+# Note: One can also use ``convert_to_analog`` instead to convert
+# ``Linear`` to ``AnalogLinear`` (without mapping to multiple tiles)
 
 
-def main():
-    """Load a predefined model from pytorch library and convert to its analog version."""
-    # Load the pytorch model.
-    model = resnet34()
-    print(model)
-
-    # Convert the model to its analog version.
-    model = convert_to_analog(model, RPU_CONFIG, weight_scaling_omega=0.6, digital_bias=True)
-
-    print(model)
-
-
-if __name__ == '__main__':
-    # Execute only if run as the entry point into the program
-    main()
+print(model)

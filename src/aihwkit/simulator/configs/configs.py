@@ -31,20 +31,11 @@ from aihwkit.inference import (
     PCMLikeNoiseModel
 )
 from aihwkit.simulator.rpu_base import devices
-
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
 
 
 @dataclass
-class BaseRPUConfig(_PrintableMixin):
-    """ Base class  for RPUConfigs """
-
-    mapping: MappingParameter = field(default_factory=MappingParameter)
-    """Parameter related to mapping weights to tiles for supporting modules."""
-
-
-@dataclass
-class FloatingPointRPUConfig(BaseRPUConfig):
+class FloatingPointRPUConfig(_PrintableMixin):
     """Configuration for a floating point resistive processing unit."""
 
     tile_class: ClassVar[Type] = FloatingPointTile
@@ -53,9 +44,12 @@ class FloatingPointRPUConfig(BaseRPUConfig):
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
     """Parameter that modify the behavior of the pulsed device."""
 
+    mapping: MappingParameter = field(default_factory=MappingParameter)
+    """Parameter related to mapping weights to tiles for supporting modules."""
+
 
 @dataclass
-class SingleRPUConfig(BaseRPUConfig):
+class SingleRPUConfig(_PrintableMixin):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -75,13 +69,16 @@ class SingleRPUConfig(BaseRPUConfig):
     update: UpdateParameters = field(default_factory=UpdateParameters)
     """Parameter for the update behavior."""
 
+    mapping: MappingParameter = field(default_factory=MappingParameter)
+    """Parameter related to mapping weights to tiles for supporting modules."""
+
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
 
 
 @dataclass
-class UnitCellRPUConfig(BaseRPUConfig):
+class UnitCellRPUConfig(_PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -101,13 +98,16 @@ class UnitCellRPUConfig(BaseRPUConfig):
     update: UpdateParameters = field(default_factory=UpdateParameters)
     """Parameter for the parallel analog update behavior."""
 
+    mapping: MappingParameter = field(default_factory=MappingParameter)
+    """Parameter related to mapping weights to tiles for supporting modules."""
+
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
 
 
 @dataclass
-class InferenceRPUConfig(BaseRPUConfig):
+class InferenceRPUConfig(_PrintableMixin):
     """Configuration for an analog tile that is used only for inference.
 
     Training is done in *hardware-aware* manner, thus using only the
@@ -158,13 +158,16 @@ class InferenceRPUConfig(BaseRPUConfig):
     )
     """Parameter for the update behavior: ``NONE`` pulse type."""
 
+    mapping: MappingParameter = field(default_factory=MappingParameter)
+    """Parameter related to mapping weights to tiles for supporting modules."""
+
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return tile_parameters_to_bindings(self)
 
 
 @dataclass
-class DigitalRankUpdateRPUConfig(BaseRPUConfig):
+class DigitalRankUpdateRPUConfig(_PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit
     where the rank update is done in digital.
 
@@ -190,6 +193,9 @@ class DigitalRankUpdateRPUConfig(BaseRPUConfig):
     update: UpdateParameters = field(default_factory=UpdateParameters)
     """Parameter for the analog part of the update, that is the transfer
     from the digital buffer to the devices."""
+
+    mapping: MappingParameter = field(default_factory=MappingParameter)
+    """Parameter related to mapping weights to tiles for supporting modules."""
 
     def as_bindings(self) -> devices.AnalogTileParameter:
         """Return a representation of this instance as a simulator bindings object."""

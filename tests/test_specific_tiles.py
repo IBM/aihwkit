@@ -32,8 +32,7 @@ from .helpers.tiles import FloatingPoint
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
     tiles=[FloatingPoint],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None]
 )
 class TransferCompoundTest(ParametrizedTestCase):
     """Tests for transfer compound."""

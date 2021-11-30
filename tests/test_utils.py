@@ -26,7 +26,9 @@ from torch.nn import Linear as torch_linear
 from torch.nn.functional import mse_loss
 from torch.optim import SGD
 
-from aihwkit.nn import AnalogConv2d, AnalogSequential, AnalogLinearMapped
+from aihwkit.nn import (
+    AnalogConv2d, AnalogConv2dMapped, AnalogSequential, AnalogLinearMapped
+)
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
@@ -37,17 +39,18 @@ from aihwkit.nn.conversion import convert_to_analog
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import (
-    Conv2d, Conv2dCuda, Linear, LinearCuda, LinearMapped, LinearMappedCuda
+    Conv2d, Conv2dCuda, Linear, LinearCuda, LinearMapped,
+    LinearMappedCuda, Conv2dMapped, Conv2dMappedCuda
 )
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import FloatingPoint, ConstantStep, Inference
 
 
 @parametrize_over_layers(
-    layers=[Linear, Conv2d, LinearMapped, LinearCuda, LinearMappedCuda, Conv2dCuda],
+    layers=[Linear, Conv2d, LinearMapped, LinearCuda, LinearMappedCuda,
+            Conv2dCuda, Conv2dMapped, Conv2dMappedCuda],
     tiles=[FloatingPoint, ConstantStep, Inference],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None],
 )
 class SerializationTest(ParametrizedTestCase):
     """Tests for serialization."""
@@ -77,6 +80,10 @@ class SerializationTest(ParametrizedTestCase):
             weight, bias = model.get_weights()
             return weight, bias, weight, bias, True
 
+        if isinstance(model, AnalogConv2dMapped):
+            weight, bias = model.get_weights()
+            return weight, bias, weight, bias, True
+
         weight = model.weight.data.detach().cpu().numpy()
         if model.use_bias:
             bias = model.bias.data.detach().cpu().numpy()
@@ -85,12 +92,14 @@ class SerializationTest(ParametrizedTestCase):
 
         analog_weight, analog_bias = model.analog_tile.get_weights()
         analog_weight = analog_weight.detach().cpu().numpy().reshape(weight.shape)
-        if model.use_bias:
+        if model.analog_bias:
             analog_bias = analog_bias.detach().cpu().numpy()
+        elif model.digital_bias:
+            analog_bias = model.bias.detach().cpu().numpy()
         else:
             analog_bias = None
 
-        return weight, bias, analog_weight, analog_bias, False
+        return weight, bias, analog_weight, analog_bias, model.digital_bias
 
     @staticmethod
     def get_analog_tile(model):
@@ -103,9 +112,9 @@ class SerializationTest(ParametrizedTestCase):
 
         # Perform an update in order to modify tile weights and biases.
         loss_func = mse_loss
-        if isinstance(model, AnalogConv2d):
+        if isinstance(model, (AnalogConv2d, AnalogConv2dMapped)):
             input_x = Tensor(rand(2, 2, 3, 3))*0.2
-            input_y = Tensor(rand(2, 3, 4, 4))*0.2
+            input_y = Tensor(rand(2, 3, 5, 5))*0.2
         else:
             input_x = Tensor(rand(2, model.in_features))*0.2
             input_y = Tensor(rand(2, model.out_features))*0.2
@@ -150,9 +159,9 @@ class SerializationTest(ParametrizedTestCase):
 
         # Perform an update in order to modify tile weights and biases.
         loss_func = mse_loss
-        if isinstance(model, AnalogConv2d):
+        if isinstance(model, (AnalogConv2d, AnalogConv2dMapped)):
             input_x = Tensor(rand(2, 2, 3, 3))*0.2
-            input_y = Tensor(rand(2, 3, 4, 4))*0.2
+            input_y = Tensor(rand(2, 3, 5, 5))*0.2
         else:
             input_x = Tensor(rand(2, model.in_features))*0.2
             input_y = Tensor(rand(2, model.out_features))*0.2
@@ -193,9 +202,9 @@ class SerializationTest(ParametrizedTestCase):
 
         # Perform an update in order to modify tile weights and biases.
         loss_func = mse_loss
-        if isinstance(model, AnalogConv2d):
+        if isinstance(model, (AnalogConv2d, AnalogConv2dMapped)):
             input_x = Tensor(rand(2, 2, 3, 3))*0.2
-            input_y = Tensor(rand(2, 3, 4, 4))*0.2
+            input_y = Tensor(rand(2, 3, 5, 5))*0.2
         else:
             input_x = Tensor(rand(2, model.in_features))*0.2
             input_y = Tensor(rand(2, model.out_features))*0.2
@@ -657,8 +666,7 @@ class SerializationTest(ParametrizedTestCase):
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
     tiles=[FloatingPoint],
-    biases=[False],
-    digital_biases=[False]
+    biases=[None],
 )
 class SerializationTestExtended(ParametrizedTestCase):
     """Tests for serialization."""
