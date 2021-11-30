@@ -21,6 +21,7 @@ from torch.optim import SGD
 
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig, FloatingPointRPUConfig
+from aihwkit.simulator.configs.utils import MappingParameter
 from aihwkit.nn import AnalogSequential, AnalogLinear
 
 from .helpers.decorators import parametrize_over_layers
@@ -32,8 +33,7 @@ from .helpers.tiles import FloatingPoint, IdealizedConstantStep, Inference
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
     tiles=[FloatingPoint, IdealizedConstantStep, Inference],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None]
 )
 class LinearLayerTest(ParametrizedTestCase):
     """Linear layer abstractions tests."""
@@ -177,11 +177,12 @@ class LinearLayerTest(ParametrizedTestCase):
             return
 
         manual_seed(4321)
+        rpu_config = FloatingPointRPUConfig(
+            mapping=MappingParameter(digital_bias=self.digital_bias)
+        )
         model2 = AnalogSequential(
-            AnalogLinear(4, 3, rpu_config=FloatingPointRPUConfig(), bias=self.bias,
-                         digital_bias=self.digital_bias),
-            AnalogLinear(3, 1, rpu_config=FloatingPointRPUConfig(), bias=self.bias,
-                         digital_bias=self.digital_bias)
+            AnalogLinear(4, 3, rpu_config=rpu_config, bias=self.bias),
+            AnalogLinear(3, 1, rpu_config=rpu_config, bias=self.bias)
         )
 
         if self.use_cuda:

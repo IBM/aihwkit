@@ -13,6 +13,7 @@
 """Decorators for aihwkit tests."""
 
 from itertools import product
+from functools import partial
 from typing import List, Callable
 
 from parameterized import parameterized_class
@@ -45,7 +46,7 @@ def parametrize_over_tiles(tiles: List) -> Callable:
                                class_name_func=class_name)
 
 
-def parametrize_over_layers(layers: List, tiles: List, biases: List, digital_biases: List) \
+def parametrize_over_layers(layers: List, tiles: List, biases: List) \
         -> Callable:
     """Parametrize a TestCase over different kind of layers.
 
@@ -55,23 +56,30 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List, digital_bia
     Args:
         layers: list of layer descriptions.
         tiles: list of tile descriptions.
-        biases: list of bias values.
-        digital_biases: list of digital_biases values.
+        biases: list of bias values: 'analog', 'digital' or None
 
     Returns:
         The decorated TestCase.
     """
 
-    def object_to_dict(layer, tile, bias, digital_bias):
+    def get_rpu_config(tile, digital_bias, *args, **kwargs):
+        rpu_config = tile.get_rpu_config(tile, *args, **kwargs)
+        rpu_config.mapping.digital_bias = digital_bias
+        return rpu_config
+
+    def object_to_dict(layer, tile, bias):
         """Convert the public members of an object to a dictionary."""
         ret = {key: value for key, value in vars(layer).items()
                if not key.startswith('_')}
-        ret['parameter'] = '{}_{}_{}'.format(layer.__name__,
-                                             tile.__name__,
-                                             'Bias' if bias else 'NoBias')
-        ret['get_rpu_config'] = tile.get_rpu_config
-        ret['bias'] = bias
+        ret['parameter'] = '{}_{}_{}Bias'.format(layer.__name__,
+                                                 tile.__name__,
+                                                 'No' if bias is None else bias.capitalize())
+        digital_bias = bias == 'digital'
+        analog_bias = bias == 'analog'
+        ret['get_rpu_config'] = partial(get_rpu_config, tile=tile, digital_bias=digital_bias)
+        ret['bias'] = bias is not None
         ret['digital_bias'] = digital_bias
+        ret['analog_bias'] = analog_bias
         ret['tile_class'] = tile
 
         return ret
@@ -81,8 +89,8 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List, digital_bia
         return '{}_{}'.format(cls.__name__, params_dict['parameter'])
 
     return parameterized_class(
-        [object_to_dict(layer, tile, bias, digital_bias) for
-         layer, tile, bias, digital_bias in product(layers, tiles, biases, digital_biases)],
+        [object_to_dict(layer, tile, bias) for
+         layer, tile, bias in product(layers, tiles, biases)],
         class_name_func=class_name)
 
 

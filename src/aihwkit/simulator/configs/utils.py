@@ -687,10 +687,10 @@ class DriftParameter(SimpleDriftParameter):
     """``w(g_min)``, i.e. to what value ``g_min`` is mapped to in w-space."""
 
     nu_k: float = 0.0
-    r"""Variation of "math:`nu` with :math:`W`.
+    r"""Variation of math:`nu` with :math:`W`.
 
-    ie. :math:`\nu(R) = nu_0 - k \log(G/G_0)`.
-    See Oh et al.
+    That is :math:`\nu(R) = nu_0 - k \log(G/G_0)`.  See Oh et al. for
+    details.
     """
 
     log_g0: float = 0.0
@@ -705,16 +705,39 @@ class DriftParameter(SimpleDriftParameter):
 class MappingParameter(_PrintableMixin):
     """Parameter related to the mapping of logical weights to physical tiles.
 
-    Note:
+    Caution:
 
-        These parameters have only an affect for modules that
+        Some of these parameters have only an affect for modules that
         support mappings.
+    """
+
+    digital_bias: bool = True
+    """Whether the bias term is handled by the analog tile or kept in
+    digital.
+
+    Note:
+        Default is having a *digital* bias so that bias values are
+        *not* stored onto the analog crossbar. This needs to be
+        supported by the chip design. Set to False if the analog bias
+        is instead situated on the the crossbar itself (as an extra
+        column)
+
+    Caution:
+        ``digital_bias`` is supported by *all* analog modules.
     """
 
     max_input_size: int = 512
     """Maximal size of the physical in the input dimension.
+
+    Caution:
+        Only relevant for ``Mapped`` modules such as
+        :class:`aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`.
     """
 
     max_output_size: int = 512
     """Maximal size of the physical in the output dimension.
+
+    Caution:
+        Only relevant for ``Mapped`` modules such as
+        :class:`aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`.
     """
