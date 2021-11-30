@@ -36,7 +36,7 @@ print(model)
 mapping = MappingParameter(max_input_size=512,  # analog tile size
                            max_output_size=512,
                            digital_bias=True)  # whether to use analog or digital bias
-# choose any preset or RPU configuration or preset, here with custom mapping
+# Choose any preset or RPU configuration here
 rpu_config = TikiTakaReRamSBPreset(mapping=mapping)
 
 # Convert the model to its analog version.
