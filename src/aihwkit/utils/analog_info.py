@@ -18,17 +18,47 @@ from aihwkit.nn import AnalogLinear
 
 COLUMN_NAMES = {
     "name": "Layer Name",
-    "isanalog": "Analog/Digital",
-    "input_size": "Input Shape",
-    "output_size": "Output Shape",
+    "isanalog": "Is Analog",
+    "input_size": "In Shape",
+    "output_size": "Out Shape",
     "kernel_size": "Kernel Shape",
-    "num_tiles": "Number of Tiles",
-    "macs": "Multi_Adds",
+    "num_tiles": "# of Tiles",
+    #"macs": "Multi_Adds",
+    "log_in_size": "in_size (log)", 
+    "log_out_size": "out_size (log)", 
+    "utilization" : "utilization", 
     "reuse_factor": "Reuse Factor"
 }
 
 INPUT_SIZE_TYPE = Any
 FORMATTING_WIDTH = 150
+
+class TileInfo: 
+    """
+    class storing tile statistics and information.
+    """
+    log_in_size: INPUT_SIZE_TYPE
+    log_out_size: INPUT_SIZE_TYPE
+    phy_in_size: INPUT_SIZE_TYPE
+    phy_out_size: INPUT_SIZE_TYPE
+    utilization: float 
+
+    def __init__(self, tile):
+        self.log_in_size = tile.in_size
+        self.log_out_size = tile.out_size
+        self.phy_in_size = tile.rpu_config.mapping.max_input_size
+        self.phy_out_size = tile.rpu_config.mapping.max_output_size
+        self.utilization = self.phy_in_size*self.phy_out_size - self.log_in_size*self.log_out_size
+
+    def tile_summary_dict(self):
+        """ return a dictionary with the tile info.""" 
+        return {"log_in_size" : self.log_in_size, 
+                "log_out_size": self.log_in_size, 
+                #"phy_in_size": self.phy_in_size, 
+                #"phy_out_size": self.phy_out_size, 
+                "utilization": self.utilization
+                }
+
 
 
 class LayerInfo:
@@ -40,6 +70,7 @@ class LayerInfo:
     name: str
     isanalog: bool
     num_tiles: int
+    tiles_info: List[TileInfo]
     input_size: INPUT_SIZE_TYPE
     output_size: INPUT_SIZE_TYPE
     kernel_size: INPUT_SIZE_TYPE
@@ -50,6 +81,7 @@ class LayerInfo:
         self.name = self.module.__class__.__name__
         self.isanalog = isinstance(self.module, AnalogModuleBase)
         self.num_tiles = 0 if not self.isanalog else self.module._analog_tile_counter
+        self.tiles_info = self.set_tiles_info()
         self.kernel_size = None
         self.reuse_factor = 0
         self.input_size, self.output_size = None, None
@@ -75,6 +107,14 @@ class LayerInfo:
         self.__set_layer_size(input_size, tuple(output_size))
         return input_size, tuple(output_size)
 
+    def set_tiles_info(self): 
+        tiles_info = []
+        if isinstance(self.module, AnalogModuleBase):
+            for tile in self.module.analog_tiles():
+                tiles_info.append(TileInfo(tile))
+                print(tiles_info[0].log_in_size, tiles_info[0].log_out_size )
+        return tiles_info
+
     def set_kernel_size(self) -> None:
         """Set kernel size attribute."""
         if hasattr(self.module, 'kernel_size'):
@@ -92,6 +132,13 @@ class LayerInfo:
             ruf = reduce(operator.mul, (self.output_size), 1) // self.output_size[1]
             self.__set_reuse_factor(ruf)
 
+    def tiles_summary_dict(self) -> dict:
+        """Return a dictionary with all tiles information."""
+        tiles_summary = {}
+        for tile in self.tiles_info: 
+            tiles_summary.update(tile.tile_summary_dict())
+        return tiles_summary
+
     def layer_summary_dict(self) -> dict:
         """Return a dictionary with all layer's information."""
 
@@ -102,13 +149,19 @@ class LayerInfo:
                 "output_size": str(self.output_size) if self.output_size is not None else "-",
                 "kernel_size": str(self.kernel_size) if self.kernel_size is not None else "-",
                 "num_tiles": self.num_tiles,
-                "macs": "",
+                "log_in_size": "",
+                "log_out_size":"", 
+                "utilization": "",
                 "reuse_factor": str(self.reuse_factor) if self.reuse_factor is not None else "-"}
 
     def __repr__(self) -> str:
         """Print layer's information in the summary table."""
         stats = self.layer_summary_dict().values()
-        result = ("{:<15} {:<15} {:<15} {:<15} {:<15} {:<20} {:<15} {:<15}\n".format(*stats))
+        result = ("{:<15} {:<10} {:<15} {:<15} {:<15} {:<10} {:<15} {:<15} {:<15} {:<15}\n".format(*stats))
+        for tile in self.tiles_info: 
+            tile_info = tile.tile_summary_dict().values()
+            print(tile_info)
+            result += ("{:>88} {:>15} {:>20}\n".format(*tile_info))
         return result
 
 
@@ -165,7 +218,7 @@ class AnalogInfo:
 
         # Add header
         header = COLUMN_NAMES.values()
-        result += ("{:<15} {:<15} {:<15} {:<15} {:<15} {:<20} {:<15} {:<15}\n".format(*header))
+        result += ("{:<15} {:<10} {:<15} {:<15} {:<15} {:<10} {:<15} {:<15} {:<15} {:<15}\n".format(*header))
 
         for x in self.layer_summary:
             result += repr(x)
