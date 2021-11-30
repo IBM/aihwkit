@@ -28,8 +28,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 * ``BufferedTranferCompound`` and TTv2 presets. (\#318)
 * Stochastic rounding for ``MixedPrecisionCompound``. (\#318)
 * Decay with arbitrary decay point (to reset bias). (\#319)
-* Linear layer ``AnalogLinerMapped`` which mapped a large weight
+* Linear layer ``AnalogLinearMapped`` which maps a large weight
   matrix onto multiple analog tiles. (\#320)
+* Convolution layers ``AnalogConv?dMapped`` which maps large weight matrix
+  onto multiple tiles if necessary. (\#331)
+* In the new ``mapping`` field of ``RPUConfig`` the max tile input and
+  output sizes can be configured for the ``*Mapped`` layers. (\#331)
 
 ### Fixed
 
@@ -37,7 +41,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fixed issue in transfer counter for mixed precision in case of GPU. (\#283)
 * Map location keyword for load / save observed. (\#293)
 * Fixed issue with CUDA buffer allocation when batch size changed. (\#294)
-* Fixed missing load statedict for AnalogSequential. (\#295)
+* Fixed missing load statedict for ``AnalogSequential``. (\#295)
 * Fixed issue with hierarchical hidden parameter settings. (\#313)
 * Fixed serious issue that loaded model would not update analog gradients. (\#320)
 * Fixed cuda import in examples. (\#320)
@@ -52,7 +56,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   rate then is applied on the slow matrix (\#312).
 * The ``fixed_value`` of ``WeightClipParameter`` is now  applied for all clipping
   types if set larger than zero. (\#318)
-* Gererator for analog tiles of an AnalogModule. (\#320)
+* The use of generators for analog tiles of an ``AnalogModuleBase``. (\#320)
+* Digital bias is now accessable through ``MappingParameter``. (\#331)
 
 ### Deprecated
 
