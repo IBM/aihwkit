@@ -703,12 +703,14 @@ class DriftParameter(SimpleDriftParameter):
 
 @dataclass
 class MappingParameter(_PrintableMixin):
-    """Parameter related to the mapping of logical weights to physical tiles.
+    """Parameter related to hardware design and the mapping of logical
+    weight matrices to physical tiles.
 
     Caution:
 
         Some of these parameters have only an affect for modules that
-        support mappings.
+        support tile mappings.
+
     """
 
     digital_bias: bool = True
@@ -722,12 +724,16 @@ class MappingParameter(_PrintableMixin):
         is instead situated on the the crossbar itself (as an extra
         column)
 
-    Caution:
+    Note:
         ``digital_bias`` is supported by *all* analog modules.
     """
 
     max_input_size: int = 512
-    """Maximal size of the physical in the input dimension.
+    """Maximal input size (number of columns) of the weight matrix
+    that is handled on a single analog tile.
+
+    If the logical weight matrix size exceeds this size it will be
+    split and mapped onto multiple analog tiles.
 
     Caution:
         Only relevant for ``Mapped`` modules such as
@@ -735,7 +741,11 @@ class MappingParameter(_PrintableMixin):
     """
 
     max_output_size: int = 512
-    """Maximal size of the physical in the output dimension.
+    """Maximal output size (number of rows) of the weight matrix
+    that is handled on a single analog tile.
+
+    If the logical weight matrix size exceeds this size it will be
+    split and mapped onto multiple analog tiles.
 
     Caution:
         Only relevant for ``Mapped`` modules such as

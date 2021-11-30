@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Decay with arbitrary decay point (to reset bias). (\#319)
 * Linear layer ``AnalogLinearMapped`` which maps a large weight
   matrix onto multiple analog tiles. (\#320)
-* Convolution layers ``AnalogConv?dMapped`` which maps large weight matrix
+* Convolution layers ``AnalogConvNdMapped`` which maps large weight matrix
   onto multiple tiles if necessary. (\#331)
 * In the new ``mapping`` field of ``RPUConfig`` the max tile input and
   output sizes can be configured for the ``*Mapped`` layers. (\#331)

@@ -62,11 +62,11 @@ class AnalogModuleBase(Module):
         out_features: output vector size (number of rows).
         bias: whether to use a bias row on the analog tile or not.
         realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and read out of weights.
-        weight_scaling_omega: the weight value where the max
-            weight will be scaled to. If zero, no weight scaling will
-            be performed
-        mapping: Configuration of the HW architecture (e.g. tile size).
+            for setting initial weights and during reading of the weights.
+        weight_scaling_omega: the weight value that the current max
+            weight value will be scaled to. If zero, no weight scaling will
+            be performed.
+        mapping: Configuration of the hardware architecture (e.g. tile size).
     """
     # pylint: disable=abstract-method, too-many-instance-attributes
     ANALOG_CTX_PREFIX: str = 'analog_ctx_'
@@ -170,7 +170,7 @@ class AnalogModuleBase(Module):
             self,
             rpu_config: RPUConfigAlias,
     ) -> 'BaseTile':
-        """Create a single analog tile and with the setup of this layer it.
+        """Create a single analog tile with the given RPU configuration.
 
         Create an analog tile to be used for the basis of this layer
         operations, while using the attributes ``(in_features,
@@ -198,7 +198,7 @@ class AnalogModuleBase(Module):
             bias: Optional[Tensor] = None,
             force_exact: bool = False
     ) -> None:
-        """Set the weight (and bias) with given Tensors.
+        """Set the weight (and bias) values with given tensors.
 
         This uses an realistic write if the property ``realistic_read_write``
         of the layer is set, unless it is overwritten by ``force_exact``.

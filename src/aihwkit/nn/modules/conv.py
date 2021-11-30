@@ -199,10 +199,11 @@ class AnalogConv1d(_AnalogConvNd):
         bias: whether to use a bias row on the analog tile or not.
         padding_mode: padding strategy. Only ``'zeros'`` is supported.
         rpu_config: resistive processing unit configuration.
-        realistic_read_write: whether to enable realistic read/write for
-            setting initial weights and read out of weights.
-        weight_scaling_omega: the weight value where the max weight will be
-            scaled to. If zero, no weight scaling will be performed.
+        realistic_read_write: whether to enable realistic read/write
+            for setting initial weights and during reading of the weights.
+        weight_scaling_omega: the weight value that the current max
+            weight value will be scaled to. If zero, no weight scaling will
+            be performed.
     """
     # pylint: disable=abstract-method
 
@@ -253,12 +254,12 @@ class AnalogConv1d(_AnalogConvNd):
                 Applied to all converted tiles.
             realistic_read_write: Whether to use closed-loop programming
                 when setting the weights. Applied to all converted tiles.
-            weight_scaling_omega: If non-zero, applied weights of analog
-                layers will be scaled by ``weight_scaling_omega`` divided by
-                the absolute maximum value of the original weight matrix.
+            weight_scaling_omega: If non-zero, the analog weights will be
+                scaled by ``weight_scaling_omega`` divided by the absolute
+                maximum value of the original weight matrix.
 
                 Note:
-                    Make sure that the weight max and min setting of the
+                    Make sure that the weight max and min settings of the
                     device support the desired analog weight range.
 
         Returns:
@@ -423,12 +424,12 @@ class AnalogConv2d(_AnalogConvNd):
                 Applied to all converted tiles.
             realistic_read_write: Whether to use closed-loop programming
                 when setting the weights. Applied to all converted tiles.
-            weight_scaling_omega: If non-zero, applied weights of analog
-                layers will be scaled by ``weight_scaling_omega`` divided by
-                the absolute maximum value of the original weight matrix.
+            weight_scaling_omega: If non-zero, the analog weights will be
+                scaled by ``weight_scaling_omega`` divided by the absolute
+                maximum value of the original weight matrix.
 
                 Note:
-                    Make sure that the weight max and min setting of the
+                    Make sure that the weight max and min settings of the
                     device support the desired analog weight range.
 
         Returns:
@@ -585,12 +586,12 @@ class AnalogConv3d(_AnalogConvNd):
                 Applied to all converted tiles.
             realistic_read_write: Whether to use closed-loop programming
                 when setting the weights. Applied to all converted tiles.
-            weight_scaling_omega: If non-zero, applied weights of analog
-                layers will be scaled by ``weight_scaling_omega`` divided by
-                the absolute maximum value of the original weight matrix.
+            weight_scaling_omega: If non-zero, the analog weights will be
+                scaled by ``weight_scaling_omega`` divided by the absolute
+                maximum value of the original weight matrix.
 
                 Note:
-                    Make sure that the weight max and min setting of the
+                    Make sure that the weight max and min settings of the
                     device support the desired analog weight range.
 
         Returns:

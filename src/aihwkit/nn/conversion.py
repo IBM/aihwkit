@@ -63,12 +63,12 @@ def convert_to_analog(
             Applied to all converted tiles.
         realistic_read_write: Whether to use closed-loop programming
             when setting the weights. Applied to all converted tiles.
-        weight_scaling_omega: If non-zero, applied weights of analog
-            layers will be scaled by ``weight_scaling_omega`` divided by
-            the absolute maximum value of the original weight matrix.
+        weight_scaling_omega: If non-zero, the analog weights will be
+            scaled by ``weight_scaling_omega`` divided by the absolute
+            maximum value of the original weight matrix.
 
             Note:
-                Make sure that the weight max and min setting of the
+                Make sure that the weight max and min settings of the
                 device support the desired analog weight range.
 
         conversion_map: Dictionary of module classes to be replaced in
@@ -81,7 +81,8 @@ def convert_to_analog(
                 conversion.
 
     Returns:
-        module with replaced digital layers with analog layers.
+        Module where all the digital layers are replaced with analog
+        mapped layers.
     """
     module = copy.deepcopy(module)
 
@@ -126,8 +127,8 @@ def convert_to_analog_mapped(
         realistic_read_write: bool = False,
         weight_scaling_omega: float = 0.0,
 ) -> Module:
-    """Convert a given digital model to analog counter parts with tile
-    mapping.
+    """Convert a given digital model to its analog counterpart with tile
+    mapping support.
 
     Note:
         The torch device (cuda/cpu) is inferred from the original
@@ -139,19 +140,19 @@ def convert_to_analog_mapped(
         module: The torch module to convert. All layers that are
             defined in the ``conversion_map``.
         rpu_config: RPU config to apply to all converted tiles.
-            Applied to all converted tiles.
         realistic_read_write: Whether to use closed-loop programming
             when setting the weights. Applied to all converted tiles.
-        weight_scaling_omega: If non-zero, applied weights of analog
-            layers will be scaled by ``weight_scaling_omega`` divided by
-            the absolute maximum value of the original weight matrix.
+        weight_scaling_omega: If non-zero, the analog weights will be
+            scaled by ``weight_scaling_omega`` divided by the absolute
+            maximum value of the original weight matrix.
 
             Note:
-                Make sure that the weight max and min setting of the
+                Make sure that the weight max and min settings of the
                 device support the desired analog weight range.
 
     Returns:
-        module with replaced digital layers with analog mapped layers.
+        Module where all the digital layers are replaced with analog
+        mapped layers.
 
     """
     return convert_to_analog(
