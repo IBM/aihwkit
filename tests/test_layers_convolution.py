@@ -45,7 +45,7 @@ class ConvolutionLayerTest(ParametrizedTestCase):
     def set_weights_from_digital_model(self, analog_model, digital_model):
         """Set the analog model weights based on the digital model."""
         weights, biases = self.get_weights_from_digital_model(analog_model, digital_model)
-        analog_model.analog_tile.set_weights(weights, biases, realistic=False)
+        analog_model.set_weights(weights, biases, force_exact=True)
 
     @staticmethod
     def get_weights_from_digital_model(analog_model, digital_model):
@@ -56,6 +56,12 @@ class ConvolutionLayerTest(ParametrizedTestCase):
         if digital_model.bias is not None:
             biases = digital_model.bias.data.detach().cpu()
 
+        return weights, biases
+
+    @staticmethod
+    def get_weights_from_analog_model(analog_model):
+        """Set the analog model weights based on the digital model."""
+        weights, biases = analog_model.get_weights(force_exact=True)
         return weights, biases
 
     @staticmethod
@@ -76,8 +82,7 @@ class ConvolutionLayerTest(ParametrizedTestCase):
 @parametrize_over_layers(
     layers=[Conv1d, Conv1dCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None]
 )
 class Convolution1dLayerTest(ConvolutionLayerTest):
     """Tests for AnalogConv1d layer."""
@@ -120,10 +125,10 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
 
         weight, bias = self.get_weights_from_digital_model(analog_model, model)
 
-        weight_analog, bias_analog = analog_model.analog_tile.get_weights(realistic=False)
+        weight_analog, bias_analog = self.get_weights_from_analog_model(analog_model)
 
         self.assertTensorAlmostEqual(weight_analog, weight)
-        if analog_model.use_bias:
+        if self.bias:
             self.assertTensorAlmostEqual(bias_analog, bias)
 
     def test_torch_train_original_layer_multiple(self):
@@ -154,11 +159,10 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
 
         for analog_layer, layer in zip(analog_model.children(), model.children()):
             weight, bias = self.get_weights_from_digital_model(analog_layer, layer)
-
-            weight_analog, bias_analog = analog_layer.analog_tile.get_weights(realistic=False)
+            weight_analog, bias_analog = self.get_weights_from_analog_model(analog_layer)
 
             self.assertTensorAlmostEqual(weight_analog, weight)
-            if analog_layer.use_bias:
+            if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
     def test_layer_instantiation(self):
@@ -169,15 +173,14 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
         tile_weights, tile_biases = model.analog_tile.get_weights()
 
         self.assertEqual(tile_weights.numel(), 2*3*4)
-        if model.use_bias:
+        if model.analog_bias:
             self.assertEqual(tile_biases.numel(), 3)
 
 
 @parametrize_over_layers(
     layers=[Conv2d, Conv2dCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None]
 )
 class Convolution2dLayerTest(ConvolutionLayerTest):
     """Tests for AnalogConv2d layer."""
@@ -219,11 +222,10 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         self.train_model(analog_model, loss_func, x_b, y_b)
 
         weight, bias = self.get_weights_from_digital_model(analog_model, model)
-
-        weight_analog, bias_analog = analog_model.analog_tile.get_weights(realistic=False)
+        weight_analog, bias_analog = self.get_weights_from_analog_model(analog_model)
 
         self.assertTensorAlmostEqual(weight_analog, weight)
-        if analog_model.use_bias:
+        if self.bias:
             self.assertTensorAlmostEqual(bias_analog, bias)
 
     def test_torch_train_original_layer_multiple(self):
@@ -255,10 +257,10 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         for analog_layer, layer in zip(analog_model.children(), model.children()):
             weight, bias = self.get_weights_from_digital_model(analog_layer, layer)
 
-            weight_analog, bias_analog = analog_layer.analog_tile.get_weights(realistic=False)
+            weight_analog, bias_analog = self.get_weights_from_analog_model(analog_layer)
 
             self.assertTensorAlmostEqual(weight_analog, weight)
-            if analog_layer.use_bias:
+            if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
     def test_layer_instantiation(self):
@@ -269,15 +271,14 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         tile_weights, tile_biases = model.analog_tile.get_weights()
 
         self.assertEqual(tile_weights.numel(), 2*3*4*4)
-        if model.use_bias:
+        if model.analog_bias:
             self.assertEqual(tile_biases.numel(), 3)
 
 
 @parametrize_over_layers(
     layers=[Conv3d, Conv3dCuda],
     tiles=[FloatingPoint, Inference],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None]
 )
 class Convolution3dLayerTest(ConvolutionLayerTest):
     """Tests for AnalogConv3d layer."""
@@ -319,11 +320,10 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
         self.train_model(analog_model, loss_func, x_b, y_b)
 
         weight, bias = self.get_weights_from_digital_model(analog_model, model)
-
-        weight_analog, bias_analog = analog_model.analog_tile.get_weights(realistic=False)
+        weight_analog, bias_analog = self.get_weights_from_analog_model(analog_model)
 
         self.assertTensorAlmostEqual(weight_analog, weight)
-        if analog_model.use_bias:
+        if self.bias:
             self.assertTensorAlmostEqual(bias_analog, bias)
 
     def test_torch_train_original_layer_multiple(self):
@@ -354,11 +354,10 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
 
         for analog_layer, layer in zip(analog_model.children(), model.children()):
             weight, bias = self.get_weights_from_digital_model(analog_layer, layer)
-
-            weight_analog, bias_analog = analog_layer.analog_tile.get_weights(realistic=False)
+            weight_analog, bias_analog = self.get_weights_from_analog_model(analog_layer)
 
             self.assertTensorAlmostEqual(weight_analog, weight)
-            if analog_layer.use_bias:
+            if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
     def test_layer_instantiation(self):
@@ -369,5 +368,5 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
         tile_weights, tile_biases = model.analog_tile.get_weights()
 
         self.assertEqual(tile_weights.numel(), 2*3*4*4*4)
-        if model.use_bias:
+        if model.analog_bias:
             self.assertEqual(tile_biases.numel(), 3)

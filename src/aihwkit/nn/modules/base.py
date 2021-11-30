@@ -13,7 +13,7 @@
 """Base class for analog Modules."""
 
 from typing import (
-    Any, Dict, List, Optional, Tuple, Union, NamedTuple,
+    Any, Dict, List, Optional, Tuple, NamedTuple, Union,
     Generator, TYPE_CHECKING
 )
 
@@ -21,10 +21,11 @@ from torch import Tensor, no_grad
 from torch.nn import Module, Parameter
 
 from aihwkit.exceptions import ModuleError
-from aihwkit.simulator.configs import (
+from aihwkit.simulator.configs.configs import (
     FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
-    UnitCellRPUConfig
+    UnitCellRPUConfig, DigitalRankUpdateRPUConfig
 )
+from aihwkit.simulator.configs.utils import MappingParameter
 from aihwkit.simulator.tiles import InferenceTile
 from aihwkit.optim.context import AnalogContext
 
@@ -33,7 +34,8 @@ if TYPE_CHECKING:
     from collections import OrderedDict
 
 RPUConfigAlias = Union[FloatingPointRPUConfig, SingleRPUConfig,
-                       UnitCellRPUConfig, InferenceRPUConfig]
+                       UnitCellRPUConfig, InferenceRPUConfig,
+                       DigitalRankUpdateRPUConfig]
 
 
 class AnalogModuleBase(Module):
@@ -42,27 +44,60 @@ class AnalogModuleBase(Module):
     Base ``Module`` for analog layers that use analog tiles. When subclassing,
     please note:
 
-    * the ``_setup_tile()`` method is expected to be called by the subclass
-      constructor, and it does not only create a tile, but also sets some
-      instance attributes that are needed by the analog features (optimizer
-      and others).
+    * the :meth:`_setup_tile()` method is expected to be called by the subclass
+      constructor, and it does not only create a tile.
+    * :meth:`register_analog_tile` needs to be called for each created analog tile
+    * this module does *not* call torch's ``Module`` init as the child is
+      likely again derived from Module
     * the ``weight`` and ``bias`` Parameters are not guaranteed to be in
       sync with the tile weights and biases during the lifetime of the instance,
       for performance reasons. The canonical way of reading and writing
-      weights is via the ``set_weights()`` and ``get_weights()`` as opposed
+      weights is via the :meth:`set_weights()` and :meth:`get_weights()` as opposed
       to using the attributes directly.
     * the ``BaseTile`` subclass that is created is retrieved from the
       ``rpu_config.tile_class`` attribute.
+
+    Args:
+        in_features: input vector size (number of columns).
+        out_features: output vector size (number of rows).
+        bias: whether to use a bias row on the analog tile or not.
+        realistic_read_write: whether to enable realistic read/write
+            for setting initial weights and during reading of the weights.
+        weight_scaling_omega: the weight value that the current max
+            weight value will be scaled to. If zero, no weight scaling will
+            be performed.
+        mapping: Configuration of the hardware architecture (e.g. tile size).
     """
     # pylint: disable=abstract-method, too-many-instance-attributes
     ANALOG_CTX_PREFIX: str = 'analog_ctx_'
     ANALOG_SHARED_WEIGHT_PREFIX: str = 'analog_shared_weights_'
     ANALOG_STATE_PREFIX: str = 'analog_tile_state_'
 
-    def __init__(self) -> None:  # pylint: disable=super-init-not-called
+    def __init__(
+            self,
+            in_features: int,
+            out_features: int,
+            bias: bool,
+            realistic_read_write: bool = False,
+            weight_scaling_omega: float = 0.0,
+            mapping: Optional[MappingParameter] = None,
+    ) -> None:
+        # pylint: disable=super-init-not-called
         self._analog_tile_counter = 0
         self._registered_helper_parameter = []  # type: list
         self._load_rpu_config = True
+
+        if mapping is None:
+            mapping = MappingParameter()
+
+        self.use_bias = bias
+        self.digital_bias = bias and mapping.digital_bias
+        self.analog_bias = bias and not mapping.digital_bias
+
+        self.realistic_read_write = realistic_read_write
+        self.weight_scaling_omega = weight_scaling_omega
+        self.in_features = in_features
+        self.out_features = out_features
 
     def register_analog_tile(self, tile: 'BaseTile', name: Optional[str] = None) -> None:
         """Register the analog context of the tile.
@@ -133,68 +168,28 @@ class AnalogModuleBase(Module):
 
     def _setup_tile(
             self,
-            in_features: int,
-            out_features: int,
-            bias: bool,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0,
-            digital_bias: bool = False
+            rpu_config: RPUConfigAlias,
     ) -> 'BaseTile':
-        """Create an analog tile and setup this layer for using it.
+        """Create a single analog tile with the given RPU configuration.
 
-        Create an analog tile to be used for the basis of this layer operations,
-        and setup additional attributes of this instance that are needed for
-        using the analog tile.
+        Create an analog tile to be used for the basis of this layer
+        operations, while using the attributes ``(in_features,
+        out_features, bias)`` given to this instance during init.
 
-        If ``weight_scaling_omega`` is larger than 0, the weights are set in a
-        scaled manner (assuming a digital output scale). See
-        :meth:`~aihwkit.simulator.tiles.base.BaseTile.set_weights_scaled`
-        for details.
-
-        Note:
-            This method also sets the following attributes, which are assumed
-            to be set by the rest of the methods:
-            * ``self.use_bias``
-            * ``self.analog_bias``
-            * ``self.digital_bias``
-            * ``self.realistic_read_write``
-            * ``self.weight_scaling_omega``
-            * ``self.in_features``
-            * ``self.out_features``
+        After tile creation, the tile needs to be registered using
+        :meth:`register_analog_tile`.
 
         Args:
-            in_features: input vector size (number of columns).
-            out_features: output vector size (number of rows).
             rpu_config: resistive processing unit configuration.
-            bias: whether to use a bias row on the analog tile or not.
-            realistic_read_write: whether to enable realistic read/write
-                for setting initial weights and read out of weights.
-            weight_scaling_omega: the weight value where the max
-                weight will be scaled to. If zero, no weight scaling will
-                be performed
-            digital_bias: whether to use bias in digital
 
         Returns:
             An analog tile with the requested parameters.
+
         """
-        # pylint: disable=attribute-defined-outside-init, protected-access
-        # Default to constant step device if not provided.
-        if not rpu_config:
-            rpu_config = SingleRPUConfig()
-
-        # Setup the analog-related attributes of this instance.
-        self.use_bias = bias
-        self.digital_bias = bias and digital_bias
-        self.analog_bias = bias and not digital_bias
-
-        self.realistic_read_write = realistic_read_write
-        self.weight_scaling_omega = weight_scaling_omega
-        self.in_features = in_features
-        self.out_features = out_features
+        # pylint: disable=protected-access
 
         # Create the tile.
-        return rpu_config.tile_class(out_features, in_features, rpu_config,
+        return rpu_config.tile_class(self.out_features, self.in_features, rpu_config,
                                      bias=self.analog_bias)
 
     def set_weights(
@@ -203,12 +198,15 @@ class AnalogModuleBase(Module):
             bias: Optional[Tensor] = None,
             force_exact: bool = False
     ) -> None:
-        """Set the weight (and bias) with given Tensors.
+        """Set the weight (and bias) values with given tensors.
 
         This uses an realistic write if the property ``realistic_read_write``
-        of the layer is set, unless it is overwritten by ``force_exact``. It
-        uses a scaled write if ``weight_scaling_omega`` is positive (see
-        :meth:`~aihwkit.simulator.tiles.base.BaseTile.set_weights_scaled`).
+        of the layer is set, unless it is overwritten by ``force_exact``.
+
+        If ``weight_scaling_omega`` is larger than 0, the weights are set in a
+        scaled manner (assuming a digital output scale). See
+        :meth:`~aihwkit.simulator.tiles.base.BaseTile.set_weights_scaled`
+        for details.
 
         Note:
             This is the recommended way for setting the weight/bias matrix of
@@ -468,8 +466,8 @@ class AnalogModuleBase(Module):
         if self.weight_scaling_omega > 0:
             output += ', weight_scaling_omega={:.3f}'.format(self.weight_scaling_omega)
         if self.analog_bias:
-            output += ', analog bias)'
+            output += ', analog bias'
         if self.digital_bias:
-            output += ', digital bias)'
+            output += ', digital bias'
 
         return output

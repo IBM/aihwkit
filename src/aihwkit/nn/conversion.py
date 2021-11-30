@@ -22,7 +22,8 @@ import copy
 from torch.nn import Module, Linear, Conv1d, Conv2d, Conv3d, Sequential
 
 from aihwkit.nn import (
-    AnalogLinear, AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogSequential
+    AnalogLinear, AnalogConv1d, AnalogConv2d, AnalogConv3d,
+    AnalogLinearMapped, AnalogConv1dMapped, AnalogConv2dMapped, AnalogConv3dMapped, AnalogSequential
 )
 
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
@@ -33,13 +34,18 @@ _DEFAULT_CONVERSION_MAP = {Linear: AnalogLinear,
                            Conv3d: AnalogConv3d,
                            Sequential: AnalogSequential}
 
+_DEFAULT_MAPPED_CONVERSION_MAP = {Linear: AnalogLinearMapped,
+                                  Conv1d: AnalogConv1dMapped,
+                                  Conv2d: AnalogConv2dMapped,
+                                  Conv3d: AnalogConv3dMapped,
+                                  Sequential: AnalogSequential}
+
 
 def convert_to_analog(
         module: Module,
         rpu_config: RPUConfigGeneric,
         realistic_read_write: bool = False,
         weight_scaling_omega: float = 0.0,
-        digital_bias: bool = False,
         conversion_map: Optional[Dict] = None
 ) -> Module:
     """Convert a given digital model to analog counter parts.
@@ -57,15 +63,14 @@ def convert_to_analog(
             Applied to all converted tiles.
         realistic_read_write: Whether to use closed-loop programming
             when setting the weights. Applied to all converted tiles.
-        weight_scaling_omega: If non-zero, applied weights of analog
-            layers will be scaled by ``weight_scaling_omega`` divided by
-            the absolute maximum value of the original weight matrix.
-        digital_bias: decide whether the bias term is handled by the analog tile
-                or kept in digital.
+        weight_scaling_omega: If non-zero, the analog weights will be
+            scaled by ``weight_scaling_omega`` divided by the absolute
+            maximum value of the original weight matrix.
 
             Note:
-                Make sure that the weight max and min setting of the
+                Make sure that the weight max and min settings of the
                 device support the desired analog weight range.
+
         conversion_map: Dictionary of module classes to be replaced in
             case of custom replacement rules. By default all ``Conv`` and ``Linear``
             layers are replaced with their analog counterparts.
@@ -76,7 +81,8 @@ def convert_to_analog(
                 conversion.
 
     Returns:
-        module with replaced digital layers with analog layers.
+        Module where all the digital layers are replaced with analog
+        mapped layers.
     """
     module = copy.deepcopy(module)
 
@@ -86,7 +92,7 @@ def convert_to_analog(
     # Convert parent.
     if module.__class__ in conversion_map:
         module = conversion_map[module.__class__].from_digital(  # type: ignore
-            module, rpu_config, realistic_read_write, weight_scaling_omega, digital_bias)
+            module, rpu_config, realistic_read_write, weight_scaling_omega)
 
     # Convert children.
     convert_dic = {}
@@ -95,11 +101,11 @@ def convert_to_analog(
         n_grand_children = len(list(mod.named_children()))
         if n_grand_children > 0:
             new_mod = convert_to_analog(mod, rpu_config, realistic_read_write,
-                                        weight_scaling_omega, digital_bias, conversion_map)
+                                        weight_scaling_omega, conversion_map)
 
         elif mod.__class__ in conversion_map:
             new_mod = conversion_map[mod.__class__].from_digital(   # type: ignore
-                mod, rpu_config, realistic_read_write, weight_scaling_omega, digital_bias)
+                mod, rpu_config, realistic_read_write, weight_scaling_omega)
         else:
             continue
 
@@ -113,3 +119,46 @@ def convert_to_analog(
         module._modules[name] = new_mod  # pylint: disable=protected-access
 
     return module
+
+
+def convert_to_analog_mapped(
+        module: Module,
+        rpu_config: RPUConfigGeneric,
+        realistic_read_write: bool = False,
+        weight_scaling_omega: float = 0.0,
+) -> Module:
+    """Convert a given digital model to its analog counterpart with tile
+    mapping support.
+
+    Note:
+        The torch device (cuda/cpu) is inferred from the original
+        models parameters, however, if multiple torch
+        devices are used in a given module, the corresponding analog
+        module is not moved to any device.
+
+    Args:
+        module: The torch module to convert. All layers that are
+            defined in the ``conversion_map``.
+        rpu_config: RPU config to apply to all converted tiles.
+        realistic_read_write: Whether to use closed-loop programming
+            when setting the weights. Applied to all converted tiles.
+        weight_scaling_omega: If non-zero, the analog weights will be
+            scaled by ``weight_scaling_omega`` divided by the absolute
+            maximum value of the original weight matrix.
+
+            Note:
+                Make sure that the weight max and min settings of the
+                device support the desired analog weight range.
+
+    Returns:
+        Module where all the digital layers are replaced with analog
+        mapped layers.
+
+    """
+    return convert_to_analog(
+        module,
+        rpu_config,
+        realistic_read_write,
+        weight_scaling_omega,
+        _DEFAULT_MAPPED_CONVERSION_MAP
+    )
