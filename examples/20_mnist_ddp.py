@@ -61,7 +61,7 @@ def init_process(rank, size, fn, backend='nccl'):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '29411'
     dist.init_process_group(backend, rank=rank, world_size=size)
-    fn(rank, size)
+    fn()
 
 
 def cleanup():
@@ -69,13 +69,16 @@ def cleanup():
     dist.destroy_process_group()
 
 
-def load_images(rank, size):
+def load_images():
     """Load images for train from the torchvision datasets."""
+    rank = dist.get_rank()
+    size = dist.get_world_size()
     transform = transforms.Compose([transforms.ToTensor()])
 
     # Load the images.
     train_set = datasets.MNIST(PATH_DATASET,
                                download=True, train=True, transform=transform)
+
     val_set = datasets.MNIST(PATH_DATASET,
                              download=True, train=False, transform=transform)
 
@@ -121,7 +124,6 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         nn.LogSoftmax(dim=1)
     )
 
-    print(model)
     return model
 
 
@@ -139,24 +141,29 @@ def create_sgd_optimizer(model):
     return optimizer
 
 
-def train(model, train_set, rank):
+def train(model, train_set):
     """Train the network.
 
     Args:
         model (nn.Module): model to be trained.
         train_set (DataLoader): dataset of elements to use as input for training.
-        rank (int): rank of the current GPU device
     """
+    rank = dist.get_rank()
+    size = dist.get_world_size()
+    device = torch.device('cuda', rank)
+
     classifier = nn.NLLLoss()
     optimizer = create_sgd_optimizer(model)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
     time_init = time()
+    total_time = [torch.zeros(1, dtype=torch.float).to(device) for _ in range(size)]
     for epoch_number in range(EPOCHS):
-        total_loss = 0
+        total_loss = torch.zeros(1, dtype=torch.float).to(device)
+        total_images = torch.zeros(1, dtype=torch.int).to(device)
         for images, labels in train_set:
-            images = images.to(DEVICE, non_blocking=True)
-            labels = labels.to(DEVICE, non_blocking=True)
+            images = images.to(device)
+            labels = labels.to(device)
             # Flatten MNIST images into a 784 vector.
             images = images.view(images.shape[0], -1)
 
@@ -171,17 +178,24 @@ def train(model, train_set, rank):
             # Optimize weights.
             optimizer.step()
 
-            total_loss += loss.item()
+            total_images += labels.size(0)
+            total_loss += loss.item() * labels.size(0)
+
+        dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
+        dist.all_reduce(total_images, op=dist.ReduceOp.SUM)
 
         if rank == 0:
-            print('Epoch {} - Training loss: {:.16f}'.format(epoch_number,
-                                                             total_loss / len(train_set)))
+            train_loss = total_loss.item() / total_images.item()
+            print('Epoch {} - Training loss: {:.16f}'.format(epoch_number, train_loss))
 
         # Decay learning rate if needed.
         scheduler.step()
 
+    dist.all_gather(total_time, torch.tensor(time()-time_init).to(device))
+
     if rank == 0:
-        print('\nTraining Time (s) = {}'.format(time()-time_init))
+        avg_train_time = torch.mean(torch.cat(total_time, 0))
+        print('\nAverage Training Time (s) = {}'.format(avg_train_time))
 
 
 def test_evaluation(model, val_set):
@@ -191,16 +205,23 @@ def test_evaluation(model, val_set):
         model (nn.Model): Trained model to be evaluated
         val_set (DataLoader): Validation set to perform the evaluation
     """
+    rank = dist.get_rank()
+    size = dist.get_world_size()
+    device = torch.device('cuda', rank)
+
     # Setup counter of images predicted to 0.
     predicted_ok = 0
     total_images = 0
+
+    # make list to collect test ccuracies for each gpu
+    acc_list = [torch.zeros(1, dtype=torch.float).to(device) for _ in range(size)]
 
     model.eval()
 
     for images, labels in val_set:
         # Predict image.
-        images = images.to(DEVICE, non_blocking=True)
-        labels = labels.to(DEVICE, non_blocking=True)
+        images = images.to(device)
+        labels = labels.to(device)
 
         images = images.view(images.shape[0], -1)
         pred = model(images)
@@ -209,30 +230,39 @@ def test_evaluation(model, val_set):
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
 
-    print('\nNumber Of Images Tested = {}'.format(total_images))
-    print('Model Accuracy = {}'.format(predicted_ok/total_images))
+    dist.all_gather(acc_list, torch.tensor(predicted_ok/total_images).to(device))
+
+    if rank == 0:
+        acc = torch.mean(torch.cat(acc_list, 0))
+        print('\nNumber Of Images Tested = {}'.format(total_images))
+        print('Model Accuracy = {}'.format(acc))
 
 
-def main(rank, size):
+def main():
     """Train a PyTorch analog model with the MNIST dataset."""
+    rank = dist.get_rank()
+    device = torch.device('cuda', rank)
+
     # Load datasets.
-    train_dataset, validation_dataset = load_images(rank, size)
+    train_dataset, validation_dataset = load_images()
 
     # Prepare the model.
     model = create_analog_network(INPUT_SIZE, HIDDEN_SIZES, OUTPUT_SIZE)
 
+    if rank == 0:
+        print(model)
+
     model.prepare_for_ddp()
-    model.to(torch.device('cuda', rank))
+    model.to(device)
 
     # enable parallel training
     model = DDP(model, device_ids=[rank], output_device=rank)
 
     # Train the model.
-    train(model, train_dataset, rank)
+    train(model, train_dataset)
 
-    # Evaluate the trained model for one gpu only.
-    if rank == 0:
-        test_evaluation(model, validation_dataset)
+    # Evaluate the trained model.
+    test_evaluation(model, validation_dataset)
 
     cleanup()
 
