@@ -37,11 +37,11 @@ from .helpers.tiles import ConstantStep, Inference
     layers=[Linear, Conv1d, Conv2d, Conv3d,
             LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda],
     tiles=[ConstantStep],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', None]
 )
 class AnalogLayerTest(ParametrizedTestCase):
     """Analog layers abstraction tests."""
+    # pylint: disable=no-member
 
     def test_realistic_weights(self):
         """Test using realistic weights."""
@@ -52,7 +52,7 @@ class AnalogLayerTest(ParametrizedTestCase):
         # the weights are synced after being set.
         tile_weights, tile_biases = layer.analog_tile.get_weights()
         self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.bias:
+        if self.analog_bias:
             self.assertTensorAlmostEqual(layer.bias, tile_biases)
 
         # 1. Set the layer weights and biases.
@@ -64,13 +64,13 @@ class AnalogLayerTest(ParametrizedTestCase):
         # the weights are synced after being set.
         tile_weights, tile_biases = layer.analog_tile.get_weights()
         self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.bias:
+        if self.analog_bias:
             self.assertTensorAlmostEqual(layer.bias, tile_biases)
 
         # Check that the tile weights are different than the user-specified
         # weights, as it is realistic.
         self.assertNotAlmostEqualTensor(user_weights, tile_weights.reshape(shape))
-        if self.bias:
+        if self.analog_bias:
             self.assertNotAlmostEqualTensor(user_biases, tile_biases)
 
         # 2. Get the layer weights and biases.
@@ -79,7 +79,7 @@ class AnalogLayerTest(ParametrizedTestCase):
         # Check that the tile weights are different than the gotten
         # weights, as it is realistic.
         self.assertNotAlmostEqualTensor(gotten_weights, tile_weights.reshape(shape))
-        if self.bias:
+        if self.analog_bias:
             self.assertNotAlmostEqualTensor(gotten_biases, tile_biases)
 
     def test_not_realistic_weights(self):
@@ -91,7 +91,7 @@ class AnalogLayerTest(ParametrizedTestCase):
         # the weights are synced after being set.
         tile_weights, tile_biases = layer.analog_tile.get_weights()
         self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.bias:
+        if self.analog_bias:
             self.assertTensorAlmostEqual(layer.bias, tile_biases)
 
         # 1. Set the layer weights and biases.
@@ -103,13 +103,13 @@ class AnalogLayerTest(ParametrizedTestCase):
         # the weights are synced after being set.
         tile_weights, tile_biases = layer.analog_tile.get_weights()
         self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.bias:
+        if self.analog_bias:
             self.assertTensorAlmostEqual(layer.bias, tile_biases)
 
         # Check that the tile weights are equal to the user-specified
         # weights, as it is not realistic.
         self.assertTensorAlmostEqual(user_weights, tile_weights)
-        if self.bias:
+        if self.analog_bias:
             self.assertTensorAlmostEqual(user_biases, tile_biases)
 
         # 2. Get the layer weights and biases.
@@ -118,7 +118,7 @@ class AnalogLayerTest(ParametrizedTestCase):
         # Check that the tile weights are equal than the gotten
         # weights, as it is not realistic.
         self.assertTensorAlmostEqual(gotten_weights, tile_weights)
-        if self.bias:
+        if self.analog_bias:
             self.assertTensorAlmostEqual(gotten_biases, tile_biases)
 
 
@@ -126,8 +126,7 @@ class AnalogLayerTest(ParametrizedTestCase):
     layers=[Linear, Conv1d, Conv2d, Conv3d,
             LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda],
     tiles=[ConstantStep, Inference],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', None]
 )
 class AnalogLayerMoveTest(ParametrizedTestCase):
     """Analog layers abstraction tests."""
@@ -319,8 +318,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 @parametrize_over_layers(
     layers=[Linear, Conv1d, Conv2d, Conv3d],
     tiles=[ConstantStep, Inference],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None]
 )
 class CpuAnalogLayerTest(ParametrizedTestCase):
     """Analog layers tests using CPU tiles as the source."""
@@ -391,8 +389,7 @@ class CustomTileTestHelper:
 @parametrize_over_layers(
     layers=[Linear, Conv1d, Conv2d, Conv3d],
     tiles=[CustomTileTestHelper],
-    biases=[True, False],
-    digital_biases=[True, False]
+    biases=['analog', 'digital', None]
 )
 class CustomTileTest(ParametrizedTestCase):
     """Test for analog layers using custom tiles."""
