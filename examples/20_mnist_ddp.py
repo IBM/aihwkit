@@ -19,6 +19,7 @@ Uses learning rates of η = 0.01, 0.005, and 0.0025
 for epochs 0–10, 11–20, and 21–30, respectively.
 """
 # pylint: disable=invalid-name
+# pylint: disable=too-many-locals
 
 import os
 from time import time
