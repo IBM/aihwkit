@@ -19,6 +19,7 @@ from torch.nn import Linear
 
 from aihwkit.nn.functions import AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
+from aihwkit.simulator.configs import SingleRPUConfig
 
 
 class AnalogLinear(AnalogModuleBase, Linear):
@@ -41,12 +42,10 @@ class AnalogLinear(AnalogModuleBase, Linear):
         rpu_config: resistive processing unit configuration.
         bias: whether to use a bias row on the analog tile or not.
         realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and read out of weights.
-        weight_scaling_omega: the weight value where the max
-            weight will be scaled to. If zero, no weight scaling will
+            for setting initial weights and during reading of the weights.
+        weight_scaling_omega: the weight value that the current max
+            weight value will be scaled to. If zero, no weight scaling will
             be performed.
-        digital_bias: decide whether the bias term is handled by the analog tile
-            or kept in digital.
     """
     # pylint: disable=abstract-method
 
@@ -68,25 +67,29 @@ class AnalogLinear(AnalogModuleBase, Linear):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
-            digital_bias: bool = False
-    ):
-
+              ):
         # Call super() after tile creation, including ``reset_parameters``.
         Linear.__init__(self, in_features, out_features, bias=bias)
 
-        # Create the tile.
-        AnalogModuleBase.__init__(self)
-        self.analog_tile = self._setup_tile(in_features,
-                                            out_features,
-                                            bias,
-                                            rpu_config,
-                                            realistic_read_write,
-                                            weight_scaling_omega,
-                                            digital_bias)
+        # Create tile
+        if rpu_config is None:
+            rpu_config = SingleRPUConfig()
+
+        AnalogModuleBase.__init__(
+            self,
+            in_features,
+            out_features,
+            bias,
+            realistic_read_write,
+            weight_scaling_omega,
+            rpu_config.mapping
+        )
+        self.analog_tile = self._setup_tile(rpu_config)
+
         # Register tile
         self.register_analog_tile(self.analog_tile)
-        # Set weights from the reset_parameters call (since only now the
-        # analog_tiles are registered)
+
+        # Set weights from the reset_parameters call
         self.set_weights(self.weight, self.bias)
 
         # Unregister weight/bias as a parameter but keep it as a
@@ -102,7 +105,6 @@ class AnalogLinear(AnalogModuleBase, Linear):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: float = 0.0,
-            digital_bias: bool = False,
     ) -> 'AnalogLinear':
         """Return an AnalogLinear layer from a torch Linear layer.
 
@@ -113,14 +115,12 @@ class AnalogLinear(AnalogModuleBase, Linear):
                 Applied to all converted tiles.
             realistic_read_write: Whether to use closed-loop programming
                 when setting the weights. Applied to all converted tiles.
-            weight_scaling_omega: If non-zero, applied weights of analog
-                layers will be scaled by ``weight_scaling_omega`` divided by
-                the absolute maximum value of the original weight matrix.
-            digital_bias: decide whether the bias term is handled by the analog tile
-                or kept in digital.
+            weight_scaling_omega: If non-zero, the analog weights will be
+                scaled by ``weight_scaling_omega`` divided by the absolute
+                maximum value of the original weight matrix.
 
                 Note:
-                    Make sure that the weight max and min setting of the
+                    Make sure that the weight max and min settings of the
                     device support the desired analog weight range.
 
         Returns:
@@ -131,8 +131,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
                             module.bias is not None,
                             rpu_config,
                             realistic_read_write,
-                            weight_scaling_omega,
-                            digital_bias)
+                            weight_scaling_omega)
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module

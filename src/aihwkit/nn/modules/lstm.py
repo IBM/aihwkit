@@ -100,11 +100,9 @@ from torch import Tensor, sigmoid, stack, tanh, jit, zeros
 from torch.nn import Dropout, ModuleList, init
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
-from aihwkit.nn.modules.base import RPUConfigAlias
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
-from aihwkit.nn.modules.base import AnalogModuleBase
-
+from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
 LSTMState = namedtuple('LSTMState', ['hx', 'cx'])
 
