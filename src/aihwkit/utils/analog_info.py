@@ -11,29 +11,34 @@ from typing import Optional, Any, Tuple, List
 import torch
 from torch import Tensor
 from torch import nn
+import numpy as np
 
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 from aihwkit.nn.modules.conv import _AnalogConvNd
 from aihwkit.nn import AnalogLinear
 
+COLUMN_DEFINITIONS = ["Layer Information", "Tile Information"]
+
 COLUMN_NAMES = {
-    "name": "Layer Name",
-    "isanalog": "Is Analog",
-    "input_size": "In Shape",
-    "output_size": "Out Shape",
-    "kernel_size": "Kernel Shape",
-    "num_tiles": "# of Tiles",
+    "name": (0,"Layer Name"),
+    "isanalog": (0,"Is Analog"),
+    "input_size": (0,"In Shape"),
+    "output_size": (0,"Out Shape"),
+    "kernel_size": (0,"Kernel Shape"),
+    "num_tiles": (0,"# of Tiles"),
     #"macs": "Multi_Adds",
-    "log_in_size": "in_size (log)", 
-    "log_out_size": "out_size (log)", 
-    "utilization" : "utilization", 
-    "reuse_factor": "Reuse Factor"
+    "log_in_size": (1,"in_size (log)"), 
+    "log_out_size": (1,"out_size (log)"), 
+    "utilization" : (1,"utilization (%)"), 
+    "reuse_factor": (0,"Reuse Factor")
 }
 
 INPUT_SIZE_TYPE = Any
-FORMATTING_WIDTH = 150
+FORMATTING_WIDTH = 200
+COLUMN_WIDTH = 20
+FLOAT_FORMAT = "{0:.2f}"
 
-class TileInfo: 
+class TileInfo:
     """
     class storing tile statistics and information.
     """
@@ -41,24 +46,23 @@ class TileInfo:
     log_out_size: INPUT_SIZE_TYPE
     phy_in_size: INPUT_SIZE_TYPE
     phy_out_size: INPUT_SIZE_TYPE
-    utilization: float 
+    utilization: float
 
     def __init__(self, tile):
         self.log_in_size = tile.in_size
         self.log_out_size = tile.out_size
         self.phy_in_size = tile.rpu_config.mapping.max_input_size
         self.phy_out_size = tile.rpu_config.mapping.max_output_size
-        self.utilization = self.phy_in_size*self.phy_out_size - self.log_in_size*self.log_out_size
+        self.utilization = (self.log_in_size*self.log_out_size) / (self.phy_in_size*self.phy_out_size)
 
     def tile_summary_dict(self):
-        """ return a dictionary with the tile info.""" 
-        return {"log_in_size" : self.log_in_size, 
-                "log_out_size": self.log_in_size, 
-                #"phy_in_size": self.phy_in_size, 
-                #"phy_out_size": self.phy_out_size, 
-                "utilization": self.utilization
+        """return a dictionary with the tile info."""
+        return {"log_in_size" : self.log_in_size,
+                "log_out_size": self.log_out_size,
+                "utilization": self.utilization,
+                "phy_in_size": self.phy_in_size,
+                "phy_out_size": self.phy_out_size
                 }
-
 
 
 class LayerInfo:
@@ -107,12 +111,12 @@ class LayerInfo:
         self.__set_layer_size(input_size, tuple(output_size))
         return input_size, tuple(output_size)
 
-    def set_tiles_info(self): 
+    def set_tiles_info(self) -> List[TileInfo]:
+        """Create TileInfo objects for each tile of the layer."""
         tiles_info = []
         if isinstance(self.module, AnalogModuleBase):
             for tile in self.module.analog_tiles():
                 tiles_info.append(TileInfo(tile))
-                print(tiles_info[0].log_in_size, tiles_info[0].log_out_size )
         return tiles_info
 
     def set_kernel_size(self) -> None:
@@ -135,7 +139,7 @@ class LayerInfo:
     def tiles_summary_dict(self) -> dict:
         """Return a dictionary with all tiles information."""
         tiles_summary = {}
-        for tile in self.tiles_info: 
+        for tile in self.tiles_info:
             tiles_summary.update(tile.tile_summary_dict())
         return tiles_summary
 
@@ -149,19 +153,21 @@ class LayerInfo:
                 "output_size": str(self.output_size) if self.output_size is not None else "-",
                 "kernel_size": str(self.kernel_size) if self.kernel_size is not None else "-",
                 "num_tiles": self.num_tiles,
-                "log_in_size": "",
-                "log_out_size":"", 
-                "utilization": "",
-                "reuse_factor": str(self.reuse_factor) if self.reuse_factor is not None else "-"}
+                "reuse_factor": str(self.reuse_factor) if self.reuse_factor is not None else "-",
+                "log_in_size": "-",
+                "log_out_size":"-",
+                "utilization": "-"}
 
     def __repr__(self) -> str:
         """Print layer's information in the summary table."""
         stats = self.layer_summary_dict().values()
-        result = ("{:<15} {:<10} {:<15} {:<15} {:<15} {:<10} {:<15} {:<15} {:<15} {:<15}\n".format(*stats))
-        for tile in self.tiles_info: 
-            tile_info = tile.tile_summary_dict().values()
-            print(tile_info)
-            result += ("{:>88} {:>15} {:>20}\n".format(*tile_info))
+        result = (("{:<20}"*len(stats)).format(*stats))
+        result += "\n"
+        for tile in self.tiles_info:
+            tile_info = tile.tile_summary_dict()
+            tile_info["utilization"] = FLOAT_FORMAT.format(tile_info["utilization"])
+            result += (" "*20*(len(stats)-3))
+            result += ("{:<20}{:<20}{:<20}\n".format(*(tile_info.values())))
         return result
 
 
@@ -217,9 +223,22 @@ class AnalogInfo:
         result += "Per-layer Information\n" + divider
 
         # Add header
-        header = COLUMN_NAMES.values()
-        result += ("{:<15} {:<10} {:<15} {:<15} {:<15} {:<10} {:<15} {:<15} {:<15} {:<15}\n".format(*header))
-
+        header = [*COLUMN_NAMES.values()]
+        index, column_names = zip(*header)
+        index, column_names = list(index), list(column_names)
+        for i in range(len(COLUMN_DEFINITIONS)):
+            header_i = [ v for x,v in header if x == i]
+            result += COLUMN_DEFINITIONS[i] + " "*(COLUMN_WIDTH*len(header_i) - len(COLUMN_DEFINITIONS[i]))
+            if i == len(COLUMN_DEFINITIONS)-1:
+                break
+            result += '| '
+        result += "\n"+divider
+        for i in range(len(COLUMN_DEFINITIONS)):
+            header_i = [ v for x,v in header if x == i]
+            result += (("{:<20}"*len(header_i)).format(*header_i))
+            
+        result += "\n"
+  
         for x in self.layer_summary:
             result += repr(x)
 
