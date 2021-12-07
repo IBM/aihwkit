@@ -11,32 +11,33 @@ from typing import Optional, Any, Tuple, List
 import torch
 from torch import Tensor
 from torch import nn
-import numpy as np
 
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 from aihwkit.nn.modules.conv import _AnalogConvNd
 from aihwkit.nn import AnalogLinear
+from aihwkit.simulator.tiles import BaseTile
 
 COLUMN_DEFINITIONS = ["Layer Information", "Tile Information"]
 
 COLUMN_NAMES = {
-    "name": (0,"Layer Name"),
-    "isanalog": (0,"Is Analog"),
-    "input_size": (0,"In Shape"),
-    "output_size": (0,"Out Shape"),
-    "kernel_size": (0,"Kernel Shape"),
-    "num_tiles": (0,"# of Tiles"),
-    #"macs": "Multi_Adds",
-    "log_in_size": (1,"in_size (log)"), 
-    "log_out_size": (1,"out_size (log)"), 
-    "utilization" : (1,"utilization (%)"), 
-    "reuse_factor": (0,"Reuse Factor")
+    "name": (0, "Layer Name"),
+    "isanalog": (0, "Is Analog"),
+    "input_size": (0, "In Shape"),
+    "output_size": (0, "Out Shape"),
+    "kernel_size": (0, "Kernel Shape"),
+    "num_tiles": (0, "# of Tiles"),
+    # "macs": "Multi_Adds",
+    "log_in_size": (1, "in_size (log)"),
+    "log_out_size": (1, "out_size (log)"),
+    "utilization": (1, "utilization (%)"),
+    "reuse_factor": (0, "Reuse Factor")
 }
 
 INPUT_SIZE_TYPE = Any
 FORMATTING_WIDTH = 200
 COLUMN_WIDTH = 20
 FLOAT_FORMAT = "{0:.2f}"
+
 
 class TileInfo:
     """
@@ -48,21 +49,27 @@ class TileInfo:
     phy_out_size: INPUT_SIZE_TYPE
     utilization: float
 
-    def __init__(self, tile):
+    def __init__(self, tile: BaseTile):
         self.log_in_size = tile.in_size
         self.log_out_size = tile.out_size
         self.phy_in_size = tile.rpu_config.mapping.max_input_size
         self.phy_out_size = tile.rpu_config.mapping.max_output_size
-        self.utilization = (self.log_in_size*self.log_out_size) / (self.phy_in_size*self.phy_out_size)
+        max_space = (self.phy_in_size*self.phy_out_size)
+        self.utilization = (self.log_in_size*self.log_out_size) / max_space
 
-    def tile_summary_dict(self):
+    def tile_summary_dict(self) -> dict:
         """return a dictionary with the tile info."""
-        return {"log_in_size" : self.log_in_size,
+        return {"log_in_size": self.log_in_size,
                 "log_out_size": self.log_out_size,
                 "utilization": self.utilization,
                 "phy_in_size": self.phy_in_size,
                 "phy_out_size": self.phy_out_size
                 }
+
+    def __repr__(self) -> str:
+        """Print Tile's information."""
+        tile_info = self.tile_summary_dict().values()
+        return "{:<20}{:<20}{:<20}\n".format(*(tile_info))
 
 
 class LayerInfo:
@@ -126,7 +133,6 @@ class LayerInfo:
 
     def calculate_reuse_factor(self) -> None:
         """Compute the reuse factor.
-
         The reuse factor is the number of vector matrix multiplication a layer computes."""
         if isinstance(self.module, AnalogLinear):
             ruf = reduce(operator.mul, (self.input_size), 1) // int(self.input_size[-1])
@@ -155,7 +161,7 @@ class LayerInfo:
                 "num_tiles": self.num_tiles,
                 "reuse_factor": str(self.reuse_factor) if self.reuse_factor is not None else "-",
                 "log_in_size": "-",
-                "log_out_size":"-",
+                "log_out_size": "-",
                 "utilization": "-"}
 
     def __repr__(self) -> str:
@@ -224,21 +230,19 @@ class AnalogInfo:
 
         # Add header
         header = [*COLUMN_NAMES.values()]
-        index, column_names = zip(*header)
-        index, column_names = list(index), list(column_names)
-        for i in range(len(COLUMN_DEFINITIONS)):
-            header_i = [ v for x,v in header if x == i]
-            result += COLUMN_DEFINITIONS[i] + " "*(COLUMN_WIDTH*len(header_i) - len(COLUMN_DEFINITIONS[i]))
+        for i, category in enumerate(COLUMN_DEFINITIONS):
+            header_i = [v for x, v in header if x == i]
+            trim_length = (COLUMN_WIDTH*len(header_i) - len(category))
+            result += category + " "*trim_length
             if i == len(COLUMN_DEFINITIONS)-1:
                 break
             result += '| '
         result += "\n"+divider
-        for i in range(len(COLUMN_DEFINITIONS)):
-            header_i = [ v for x,v in header if x == i]
+        for i, category in enumerate(COLUMN_DEFINITIONS):
+            header_i = [v for x, v in header if x == i]
             result += (("{:<20}"*len(header_i)).format(*header_i))
-            
         result += "\n"
-  
+
         for x in self.layer_summary:
             result += repr(x)
 

@@ -34,5 +34,7 @@ model = AnalogSequential(
         AnalogLinear(in_features=channel[3], out_features=10, rpu_config=rpu_config),
         nn.LogSoftmax(dim=1)
     )
+# TODO: add mapped examples
+
 # print(model.__class__.__name__)
 analog_summary(model, (1, 1, 28, 28))
