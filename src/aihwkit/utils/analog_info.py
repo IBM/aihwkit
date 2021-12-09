@@ -105,13 +105,6 @@ class LayerInfo:
         self.input_size, self.output_size = input_size, output_size
         self.rpu_config = rpu_config
 
-    def __set_layer_size(self,
-                         input_size: Optional[INPUT_SIZE_TYPE],
-                         output_size: Optional[INPUT_SIZE_TYPE]) -> None:
-        """Private method to set layer's sizes attributes."""
-        self.input_size = input_size
-        self.output_size = output_size
-
     def __set_reuse_factor(self, reuse_factor: int) -> None:
         """Private method to set layer's reuse factor attribute."""
         self.reuse_factor = reuse_factor
@@ -189,6 +182,7 @@ class AnalogInfo:
         self.rpu_config = rpu_config
         self.layer_summary = self.create_layer_summary()
         self.total_tile_number = self.calculate_num_tiles()
+        self.total_nb_analog = self.calculate_num_analog()
         self.set_layer_sizes()
 
     def set_layer_sizes(self) -> None:
@@ -229,6 +223,13 @@ class AnalogInfo:
             total_tile_number += x.num_tiles
         return total_tile_number
 
+    def calculate_num_analog(self) -> int:
+        """Calculate the number of analog layers."""
+        total_nb_analog = 0
+        for x in self.layer_summary:
+            total_nb_analog += 1 if x.isanalog else 0
+        return total_nb_analog
+
     def __repr__(self) -> str:
         """Print summary results."""
         divider = "=" * FORMATTING_WIDTH + "\n"
@@ -254,6 +255,10 @@ class AnalogInfo:
         for x in self.layer_summary:
             result += repr(x)
 
+        result += divider
+        result += "General Information\n" + divider
+        result += "Total number of tiles: " + str(self.total_tile_number) + "\n"
+        result += "Total number of analog layers: " + str(self.total_nb_analog) + "\n"
         return result
 
 
