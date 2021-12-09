@@ -5,15 +5,16 @@ This module prints relevant information about the model and its analog execution
 
 from functools import reduce
 import operator
-from typing import Optional, Any, Tuple, List
+from typing import Optional, Any, List
 
 # Imports from PyTorch.
 import torch
 from torch import Tensor
 from torch import nn
-import re 
 
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
+from aihwkit.nn.modules.conv_mapped import _AnalogConvNdMapped
+from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
 from aihwkit.nn.modules.conv import _AnalogConvNd
 from aihwkit.nn import AnalogLinear
 from aihwkit.simulator.tiles import BaseTile
@@ -50,13 +51,14 @@ class TileInfo:
     phy_out_size: INPUT_SIZE_TYPE
     utilization: float
 
-    def __init__(self, tile: BaseTile):
+    def __init__(self, tile: BaseTile, compute_utilization: bool):
         self.log_in_size = tile.in_size
         self.log_out_size = tile.out_size
         self.phy_in_size = tile.rpu_config.mapping.max_input_size
         self.phy_out_size = tile.rpu_config.mapping.max_output_size
         max_space = (self.phy_in_size*self.phy_out_size)
-        self.utilization = (self.log_in_size*self.log_out_size) *100 / max_space
+        log_space = (self.log_in_size * self.log_out_size)
+        self.utilization = log_space * 100 / max_space if compute_utilization else 100
 
     def tile_summary_dict(self) -> dict:
         """return a dictionary with the tile info."""
@@ -88,8 +90,8 @@ class LayerInfo:
     kernel_size: INPUT_SIZE_TYPE
     reuse_factor: int
 
-    def __init__(self, 
-                 module: nn.Module, 
+    def __init__(self,
+                 module: nn.Module,
                  rpu_config: Optional[RPUConfigAlias] = None,
                  input_size: INPUT_SIZE_TYPE = None,
                  output_size: INPUT_SIZE_TYPE = None):
@@ -117,9 +119,11 @@ class LayerInfo:
     def set_tiles_info(self) -> List[TileInfo]:
         """Create TileInfo objects for each tile of the layer."""
         tiles_info = []
+        is_mapped = isinstance(self.module, AnalogLinearMapped)
+        is_mapped = is_mapped or isinstance(self.module, _AnalogConvNdMapped)
         if isinstance(self.module, AnalogModuleBase):
             for tile in self.module.analog_tiles():
-                tiles_info.append(TileInfo(tile))
+                tiles_info.append(TileInfo(tile, is_mapped))
         return tiles_info
 
     def set_kernel_size(self) -> None:
@@ -193,11 +197,12 @@ class AnalogInfo:
             layer.set_kernel_size()
             layer.calculate_reuse_factor()
 
-    def register_hooks_recursively(self, module, hook): 
+    def register_hooks_recursively(self, module: nn.Module, hook: Any) -> None:
+        """Hooks the function into all layers with no children."""
         if list(module.children()) == []:
-            module.register_forward_hook(hook)  
+            module.register_forward_hook(hook)
         else:
-            for name, layer in module.named_children(): 
+            for _, layer in module.named_children():
                 self.register_hooks_recursively(layer, hook)
 
     def create_layer_summary(self) -> List[LayerInfo]:
@@ -205,13 +210,14 @@ class AnalogInfo:
 
         This list contains LayerInfo elements that corresponds to each layer of the model."""
         layer_summary = []
-        def _local_hook(_, _input, _output):
+
+        def get_size_hook(_: nn.Module, _input: INPUT_SIZE_TYPE, _output: INPUT_SIZE_TYPE) -> None:
             nonlocal layer_summary
             input_size = list(_input[0].size())
             output_size = list(_output.size())
             layer_summary.append(LayerInfo(_, self.rpu_config, input_size, output_size))
 
-        self.register_hooks_recursively(self.model, _local_hook)
+        self.register_hooks_recursively(self.model, get_size_hook)
         dummy_var = torch.zeros(self.input_size)
         self.model(dummy_var)
         return layer_summary
