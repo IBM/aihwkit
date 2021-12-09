@@ -11,6 +11,7 @@ from typing import Optional, Any, Tuple, List
 import torch
 from torch import Tensor
 from torch import nn
+import re 
 
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 from aihwkit.nn.modules.conv import _AnalogConvNd
@@ -55,7 +56,7 @@ class TileInfo:
         self.phy_in_size = tile.rpu_config.mapping.max_input_size
         self.phy_out_size = tile.rpu_config.mapping.max_output_size
         max_space = (self.phy_in_size*self.phy_out_size)
-        self.utilization = (self.log_in_size*self.log_out_size) / max_space
+        self.utilization = (self.log_in_size*self.log_out_size) *100 / max_space
 
     def tile_summary_dict(self) -> dict:
         """return a dictionary with the tile info."""
@@ -87,7 +88,11 @@ class LayerInfo:
     kernel_size: INPUT_SIZE_TYPE
     reuse_factor: int
 
-    def __init__(self, module: nn.Module, rpu_config: Optional[RPUConfigAlias] = None):
+    def __init__(self, 
+                 module: nn.Module, 
+                 rpu_config: Optional[RPUConfigAlias] = None,
+                 input_size: INPUT_SIZE_TYPE = None,
+                 output_size: INPUT_SIZE_TYPE = None):
         self.module = module
         self.name = self.module.__class__.__name__
         self.isanalog = isinstance(self.module, AnalogModuleBase)
@@ -95,7 +100,7 @@ class LayerInfo:
         self.tiles_info = self.set_tiles_info()
         self.kernel_size = None
         self.reuse_factor = 0
-        self.input_size, self.output_size = None, None
+        self.input_size, self.output_size = input_size, output_size
         self.rpu_config = rpu_config
 
     def __set_layer_size(self,
@@ -108,15 +113,6 @@ class LayerInfo:
     def __set_reuse_factor(self, reuse_factor: int) -> None:
         """Private method to set layer's reuse factor attribute."""
         self.reuse_factor = reuse_factor
-
-    def calculate_size(self,
-                       input_size: Optional[INPUT_SIZE_TYPE]
-                       ) -> Tuple[INPUT_SIZE_TYPE, INPUT_SIZE_TYPE]:
-        """Set input_size or output_size of the layer."""
-        rand_tensor = torch.rand(input_size)
-        output_size = self.module(rand_tensor).shape
-        self.__set_layer_size(input_size, tuple(output_size))
-        return input_size, tuple(output_size)
 
     def set_tiles_info(self) -> List[TileInfo]:
         """Create TileInfo objects for each tile of the layer."""
@@ -193,25 +189,31 @@ class AnalogInfo:
 
     def set_layer_sizes(self) -> None:
         """Set each layer input, output and kernel sizes."""
-        parent_input_size = self.input_size
         for layer in self.layer_summary:
-            layer.calculate_size(parent_input_size)
-            parent_input_size = layer.output_size
             layer.set_kernel_size()
             layer.calculate_reuse_factor()
+
+    def register_hooks_recursively(self, module, hook): 
+        if list(module.children()) == []:
+            module.register_forward_hook(hook)  
+        else:
+            for name, layer in module.named_children(): 
+                self.register_hooks_recursively(layer, hook)
 
     def create_layer_summary(self) -> List[LayerInfo]:
         """Create the layer summary list.
 
         This list contains LayerInfo elements that corresponds to each layer of the model."""
         layer_summary = []
-        if isinstance(self.model, tuple):
-            layer_summary.append(LayerInfo(self.model[0], self.rpu_config))
-        else:
-            for module in self.model.modules():
-                if not isinstance(module, nn.Sequential):
-                    layer_summary.append(LayerInfo(module, self.rpu_config))
+        def _local_hook(_, _input, _output):
+            nonlocal layer_summary
+            input_size = list(_input[0].size())
+            output_size = list(_output.size())
+            layer_summary.append(LayerInfo(_, self.rpu_config, input_size, output_size))
 
+        self.register_hooks_recursively(self.model, _local_hook)
+        dummy_var = torch.zeros(self.input_size)
+        self.model(dummy_var)
         return layer_summary
 
     def calculate_num_tiles(self) -> int:
