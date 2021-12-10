@@ -129,7 +129,7 @@ class LayerInfo:
     def calculate_reuse_factor(self) -> None:
         """Compute the reuse factor.
         The reuse factor is the number of vector matrix multiplication a layer computes."""
-        if isinstance(self.module, AnalogLinear):
+        if isinstance(self.module, (AnalogLinear, AnalogLinearMapped)):
             ruf = reduce(operator.mul, (self.input_size), 1) // int(self.input_size[-1])
             self.__set_reuse_factor(ruf)
         elif isinstance(self.module, (_AnalogConvNd, _AnalogConvNdMapped)):
