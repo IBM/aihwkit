@@ -467,6 +467,13 @@ The model is defined using the various digital layer and then the `convert_to_an
 is called to convert the model to its analog version. The CIFAR10 dataset is then used to train the
 model and the weights are then saved so that these can be used for additional training or inference.
 
+## Example 20: [`20_mnist_ddp.py`]
+
+In this example we define a linear model that is trained using the MNIST dataset. The model is an 
+analog sequential model that is defined using both the analog linear and analog linear mapped layers. 
+The model also uses PyTorch's Distributed Data Parallel (DDP) for training, which efficiently uses 
+multiple GPUs for parallel training in order to significantly decrease the training time.
+
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
@@ -505,3 +512,4 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`16_mnist_gan.py`]: 16_mnist_gan.py
 [`17_resnet34_digital_to_analog.py`]: 17_resnet34_imagenet_conversion_to_analog.py
 [`18_cifar10_on_resnet.py`]: 18_cifar10_on_resnet.py
+[`20_mnist_ddp.py`]: 20_mnist_ddp.py
