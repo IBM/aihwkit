@@ -104,6 +104,8 @@ class LayerInfo:
         self.reuse_factor = 0
         self.input_size, self.output_size = input_size, output_size
         self.rpu_config = rpu_config
+        self.set_kernel_size()
+        self.calculate_reuse_factor()
 
     def __set_reuse_factor(self, reuse_factor: int) -> None:
         """Private method to set layer's reuse factor attribute."""
@@ -130,7 +132,7 @@ class LayerInfo:
         if isinstance(self.module, AnalogLinear):
             ruf = reduce(operator.mul, (self.input_size), 1) // int(self.input_size[-1])
             self.__set_reuse_factor(ruf)
-        elif isinstance(self.module, _AnalogConvNd):
+        elif isinstance(self.module, (_AnalogConvNd, _AnalogConvNdMapped)):
             # TODO: Extend the formula to ConvNd
             ruf = reduce(operator.mul, (self.output_size), 1) // self.output_size[1]
             self.__set_reuse_factor(ruf)
@@ -183,13 +185,6 @@ class AnalogInfo:
         self.layer_summary = self.create_layer_summary()
         self.total_tile_number = self.calculate_num_tiles()
         self.total_nb_analog = self.calculate_num_analog()
-        self.set_layer_sizes()
-
-    def set_layer_sizes(self) -> None:
-        """Set each layer input, output and kernel sizes."""
-        for layer in self.layer_summary:
-            layer.set_kernel_size()
-            layer.calculate_reuse_factor()
 
     def register_hooks_recursively(self, module: nn.Module, hook: Any) -> None:
         """Hooks the function into all layers with no children."""
