@@ -29,8 +29,8 @@ COLUMN_NAMES = {
     "kernel_size": (0, "Kernel Shape"),
     "num_tiles": (0, "# of Tiles"),
     # "macs": "Multi_Adds",
-    "log_in_size": (1, "in_size (log)"),
-    "log_out_size": (1, "out_size (log)"),
+    "log_shape": (1, "Log. tile shape"),
+    "phy_shape": (1, "Phys. tile shape"),
     "utilization": (1, "utilization (%)"),
     "reuse_factor": (0, "Reuse Factor")
 }
@@ -51,22 +51,22 @@ class TileInfo:
     phy_out_size: INPUT_SIZE_TYPE
     utilization: float
 
-    def __init__(self, tile: BaseTile, compute_utilization: bool):
+    def __init__(self, tile: BaseTile, is_mapped: bool):
         self.log_in_size = tile.in_size
         self.log_out_size = tile.out_size
         self.phy_in_size = tile.rpu_config.mapping.max_input_size
         self.phy_out_size = tile.rpu_config.mapping.max_output_size
+        self.is_mapped = is_mapped
         max_space = (self.phy_in_size*self.phy_out_size)
         log_space = (self.log_in_size * self.log_out_size)
-        self.utilization = log_space * 100 / max_space if compute_utilization else 100
+        self.utilization = log_space * 100 / max_space if is_mapped else 100
 
     def tile_summary_dict(self) -> dict:
         """return a dictionary with the tile info."""
-        return {"log_in_size": self.log_in_size,
-                "log_out_size": self.log_out_size,
-                "utilization": self.utilization,
-                "phy_in_size": self.phy_in_size,
-                "phy_out_size": self.phy_out_size
+        phys_shape = 'N/A' if not self.is_mapped else (self.phy_out_size, self.phy_in_size)
+        return {"log_shape": str((self.log_out_size, self.log_in_size)),
+                "phys_shape": str(phys_shape),
+                "utilization": self.utilization
                 }
 
     def __repr__(self) -> str:
@@ -133,7 +133,6 @@ class LayerInfo:
             ruf = reduce(operator.mul, (self.input_size), 1) // int(self.input_size[-1])
             self.__set_reuse_factor(ruf)
         elif isinstance(self.module, (_AnalogConvNd, _AnalogConvNdMapped)):
-            # TODO: Extend the formula to ConvNd
             ruf = reduce(operator.mul, (self.output_size), 1) // self.output_size[1]
             self.__set_reuse_factor(ruf)
 
@@ -155,8 +154,8 @@ class LayerInfo:
                 "kernel_size": str(self.kernel_size) if self.kernel_size is not None else "-",
                 "num_tiles": self.num_tiles,
                 "reuse_factor": str(self.reuse_factor) if self.reuse_factor is not None else "-",
-                "log_in_size": "-",
-                "log_out_size": "-",
+                "log_shape": "-",
+                "phy_shape": "-",
                 "utilization": "-"}
 
     def __repr__(self) -> str:
