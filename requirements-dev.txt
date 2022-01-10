@@ -1,5 +1,5 @@
 mypy==0.910
-types-dataclasses
+types-dataclasses==0.6.3
 types-requests
 pycodestyle==2.7.0
 pylint==2.9.0
