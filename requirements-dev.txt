@@ -1,6 +1,6 @@
 mypy==0.910
 types-dataclasses
-types-requests
+types-requests==2.26.3
 pycodestyle==2.7.0
 pylint==2.9.0
 pytest==6.2.4
