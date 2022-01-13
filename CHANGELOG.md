@@ -16,8 +16,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-* Notebooks directory and readme file which links to the public notebooks repository 
-  that has several notebook examples (https://github.com/IBM-AI-Hardware-Center)
 * Load model state dict into a new model with modified `RPUConfig`. (\#276)
 * Visualization for noise models for analog inference hardware simulation. (\#278)
 * State independent inference noise model. (\# 284)
@@ -36,6 +34,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   onto multiple tiles if necessary. (\#331)
 * In the new ``mapping`` field of ``RPUConfig`` the max tile input and
   output sizes can be configured for the ``*Mapped`` layers. (\#331)
+* Notebooks directory with several notebook examples (#333, \#334)
 * Analog information summary function. (\#316)
 
 ### Fixed
