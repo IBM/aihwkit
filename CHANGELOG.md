@@ -34,7 +34,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   onto multiple tiles if necessary. (\#331)
 * In the new ``mapping`` field of ``RPUConfig`` the max tile input and
   output sizes can be configured for the ``*Mapped`` layers. (\#331)
-* Notebooks with several notebook examples (#333, \#334)
+* Notebooks directory with several notebook examples (#333, \#334)
 * Analog information summary function. (\#316)
 
 ### Fixed
