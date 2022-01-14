@@ -130,15 +130,23 @@ Installing and compiling
 Once the dependencies are in place, the following command can be used for
 compiling and installing the Python package::
 
-    $ pip install -v aihwkit
+Without GPU support:
 
-This command will:
+    $ python setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace -DRPU_BLAS=MKL -j16
+    $ pip install matplotlib
+    $ PYTHONPATH=./src  python3 examples/01_simple_layer.py
 
-* download the source tarball for the library.
-* invoke ``scikit-build``
-* which in turn will invoke ``cmake`` for the compilation.
-* execute the commands in verbose mode, for helping troubleshooting issues.
-* install the Python package.
+With GPU support:
+
+    $ git clone https://github.com/IBM/aihwkit.git
+    $ cd aihwkit
+    $ export CUDA_HOME=/usr/lib/cuda
+    $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/cuda/lib64:/usr/lib/cuda/extras/CUPTI/lib64
+    $ export PATH=$PATH:$CUDA_HOME/bin
+    $ python3 setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace -DRPU_BLAS=MKL -j16 -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="60;70"
+    $ pip install matplotlib
+    $ PYTHONPATH=./src  python3 examples/01_simple_layer.py
+
 
 If there are any issue with the dependencies or the compilation, the output
 of the command will help diagnosing the issue.
