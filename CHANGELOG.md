@@ -50,6 +50,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
+* The aihwkit documentation. New content around analog ai concepts, training presets, analog ai 
+  optimizers, new references, and examples. (\#348)
 * The inference noise models are now located in `aihwkit.inference`. (\#281)
 * Analog state dict structure `has changed (shared weight are not saved). (\#293)
 * Some of the parameter names of the``TransferCompound`` have
