@@ -1,5 +1,5 @@
-Using analog tiles
-==================
+Using aihwkit Simulator
+========================
 
 The core functionality of the package is provided by the ``rpucuda`` simulator.
 The simulator contains the primitives and functionality written in C++ and with
@@ -18,8 +18,8 @@ Module                                  Notes
 :py:mod:`aihwkit.simulator.rpu_base`    Low-level bindings of the C++ simulator members
 ======================================  ========
 
-Analog tiles
-------------
+Analog Tiles Overview
+----------------------
 
 The basic primitives involved in the simulation are **analog tiles**. An
 analog tile is a two-dimensional array of **resistive devices** that determine
@@ -37,7 +37,7 @@ Tile class                                           Description
 :class:`~aihwkit.simulator.tiles.InferenceTile`      implements an analog tile for inference and hardware-aware training.
 ===================================================  ========
 
-Creating an analog tile
+Creating an Analog Tile
 """""""""""""""""""""""
 
 The simplest way of constructing a tile is by instantiating its class. For
@@ -49,7 +49,7 @@ specified dimensions (``10x20``)::
     tile = FloatingPointTile(10, 20)
 
 
-GPU-stored tiles
+GPU-stored Tiles
 """"""""""""""""
 
 By default, the ``Tiles`` will be set to perform their computations in the
@@ -74,7 +74,7 @@ methods can be used in the same manner.
 
 .. _using-simulator-analog-tiles:
 
-Using analog tiles
+Using Analog Tiles
 """"""""""""""""""
 
 Analog arrays are low-level constructs that contain a number of functions that
@@ -88,7 +88,7 @@ Resistive processing units
 A **resistive processing unit** is each of the elements on the crossbar array.
 The following types of resistive devices are available:
 
-Floating point devices
+Floating Point Devices
 """"""""""""""""""""""
 
 ================================================================  ========
@@ -97,7 +97,7 @@ Resistive device class                                            Description
 :class:`~aihwkit.simulator.configs.devices.FloatingPointDevice`   floating point reference, that implements ideal devices forward/backward/update behavior.
 ================================================================  ========
 
-Single resistive devices
+Single Resistive Devices
 """"""""""""""""""""""""
 
 ================================================================  ========
@@ -113,7 +113,7 @@ Resistive device class                                            Description
 :class:`~aihwkit.simulator.configs.devices.PowStepDevice`         update step using a power exponent non-linearity.
 ================================================================  ========
 
-Unit cell devices
+Unit Cell Devices
 """""""""""""""""
 
 ====================================================================  ========
@@ -124,7 +124,7 @@ Resistive device class                                                Descriptio
 :class:`~aihwkit.simulator.configs.devices.ReferenceUnitCell`         abstract device model takes two arbitrary device per cross-point and implements an device with reference pair.
 ====================================================================  ========
 
-Compound devices
+Compound Devices
 """"""""""""""""
 
 ====================================================================  ========
@@ -141,7 +141,7 @@ The combination of the parameters that affect the behavior of a tile and the
 parameters that determine the characteristic of a resistive processing unit
 are referred to as **RPU configurations**.
 
-Creating a RPU configuration
+Creating a RPU Configuration
 """"""""""""""""""""""""""""
 
 A configuration can be created by instantiating the class that corresponds to
@@ -165,7 +165,7 @@ that uses a ``ConstantStep`` device::
 
     config = SingleRPUConfig(device=ConstantStepDevice())
 
-Device parameters
+Device Parameters
 """""""""""""""""
 
 The parameters of the resistive devices that are part of a tile can be set by
@@ -337,7 +337,7 @@ of this complex analog tile for testing or training from the user
 point of view is however the same as for other tiles.
 
 Mixed Precision Compound
--------------------------
+""""""""""""""""""""""""
 
 This abstract device implements an analog SGD optimizer suggested by
 `Nandakumar et al. 2020`_ where the update is not done in analog
@@ -377,10 +377,10 @@ To enable mixed-precision one defines for example the following ``rpu_config``::
 Now this analog tile will use the mixed-precision optimizer with a
 soft bounds device model.
 
-Analog presets
+Analog Presets
 --------------
 
-Other than the building blocks for analog tiles described in the sections
+In addition to the building blocks for analog tiles described in the sections
 above, the toolkit includes:
 
 * a library of device presets that are calibrated to real hardware data and/or
