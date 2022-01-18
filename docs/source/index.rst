@@ -2,23 +2,70 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
 ================================================================
 
 .. toctree::
+    :maxdepth: 3
+    :caption: Get started
+    :hidden:
+
+    install
+    advanced_install
+    using_pytorch
+    glossary
+
+.. toctree::
+    :maxdepth: 3
+    :caption: Analog AI Concepts
+    :hidden:
+
+    analog_ai
+    analog_ai_hw
+    pros_cons
+     
+
+.. toctree::
+    :maxdepth: 3
+    :caption: Using the Simulator
+    :hidden:
+
+    using_simulator
+    using_experiments
+
+     
+.. toctree::
    :maxdepth: 3
-   :caption: Contents:
+   :caption: Analog DNN Training
    :hidden:
 
-   install
-   advanced_install
-   analog_ai
-   using_pytorch
-   using_simulator
+   analog_update.rst
+   analog_training_presets.rst
+  
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Analog DNN Inference
+   :hidden:
+
    pcm_inference
-   using_experiments
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Advanced Guides
+   :hidden:
+
    design
    developer_install
    development_conventions
    roadmap
    changelog.md
+
+.. toctree::
+   :maxdepth: 3
+   :caption: References
+   :hidden:
+
    api_reference
+   paper_references
+
+
 
 *IBM Analog Hardware Acceleration Kit* is an open source Python toolkit for
 exploring and using the capabilities of in-memory computing devices in the
@@ -119,14 +166,14 @@ How to cite
 -----------
 
 In case you are using the *IBM Analog Hardware Acceleration Kit* for
-your research, please cite the `arXiv paper`_ that describes the toolkit:
+your research, please cite the `AICAS21 paper`_ that describes the toolkit:
 
 .. note::
 
     Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
     Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
     "A flexible and fast PyTorch toolkit for simulating training and inference on
-    analog crossbar arrays" (2021)
+    analog crossbar arrays", 2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems
 
     https://arxiv.org/abs/2104.02184
 
@@ -138,3 +185,4 @@ Reference
 
 .. _AIHW Composer: https://aihw-composer.draco.res.ibm.com
 .. _arXiv paper: https://arxiv.org/abs/2104.02184
+.. _AICAS21 paper: https://ieeexplore.ieee.org/abstract/document/9458494
