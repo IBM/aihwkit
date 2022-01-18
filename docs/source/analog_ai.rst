@@ -85,30 +85,3 @@ applying suitable electrical pulses to the devices which will increase their
 conductance in proportion to the desired weight update. See references
 :ref:`[1, 3, 4, 5] <references>` for details on different techniques that
 have been proposed to perform weight updates with in-memory computing chips.
-
-
-.. _references:
-
-References
-----------
-
-* [1] 2020 Nature Nanotechnology,
-  `Memory devices and applications for in-memory computing`_
-
-* [2] 2020 Nature Communications.
-  `Accurate deep neural network inference using computational phase-change memory`_
-
-* [3] Frontiers in Neuroscience,
-  `Acceleration of deep neural network training with resistive cross-point devices: Design considerations`_
-
-* [4] Frontiers in Neuroscience,
-  `Mixed-precision deep learning based on computational memory`_
-
-* [5] Nature,
-  `Equivalent-accuracy accelerated neural-network training using analogue memory`_
-
-.. _`Memory devices and applications for in-memory computing`: https://www.nature.com/articles/s41565-020-0655-z
-.. _`Accurate deep neural network inference using computational phase-change memory`: https://www.nature.com/articles/s41467-020-16108-9
-.. _`Acceleration of deep neural network training with resistive cross-point devices: Design considerations`: https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
-.. _`Mixed-precision deep learning based on computational memory`: https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full
-.. _`Equivalent-accuracy accelerated neural-network training using analogue memory`: https://www.nature.com/articles/s41586-018-0180-5
