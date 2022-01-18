@@ -60,6 +60,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   types if set larger than zero. (\#318)
 * The use of generators for analog tiles of an ``AnalogModuleBase``. (\#320)
 * Digital bias is now accessable through ``MappingParameter``. (\#331)
+* The aihwkit documentation. New content around analog ai concepts, training presets, analog ai 
+  optimizers, new references, and examples. (\#348)
 
 ### Deprecated
 
