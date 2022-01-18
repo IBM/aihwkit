@@ -143,14 +143,14 @@ learning models at reduced energy consumption.
 ## How to cite?
 
 In case you are using the _IBM Analog Hardware Acceleration Kit_ for
-your research, please cite the arXiv paper that describes the toolkit:
+your research, please cite the AICAS21 paper that describes the toolkit:
 
 > Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
 > Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
 > "A flexible and fast PyTorch toolkit for simulating training and inference on
-> analog crossbar arrays" (2021)
+> analog crossbar arrays" (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
 >
-> https://arxiv.org/abs/2104.02184
+> https://ieeexplore.ieee.org/abstract/document/9458494
 
 ## Installation
 

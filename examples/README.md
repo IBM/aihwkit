@@ -467,6 +467,32 @@ The model is defined using the various digital layer and then the `convert_to_an
 is called to convert the model to its analog version. The CIFAR10 dataset is then used to train the
 model and the weights are then saved so that these can be used for additional training or inference.
 
+## Example 19: [`19_analog_summary_lenet.py`]
+
+In this example, we define a Lenet model and apply the analog_summary function. 
+The `analog_summary(model, input_size)` function provides a per-layer analog information and statistics. 
+Given the model and the input size, it prints a table containing the following per-layer information: 
+* Layer Name 
+* Layer type (Analog or Digital)
+* Input Shape 
+* Output Shape 
+* Kernel Shape
+* Number of analog tiles used by the layer 
+* The re-use factor (the number of computed operations using the same tile)
+* Per-tile information : 
+  * Logical tile shape (out, in)
+  * Physical tile shape (out, in)
+  * Utilization (%)
+
+The function also prints some general information, such as the total number of tiles or analog layers. 
+
+## Example 20: [`20_mnist_ddp.py`]
+
+In this example we define a linear model that is trained using the MNIST dataset. The model is an 
+analog sequential model that is defined using both the analog linear and analog linear mapped layers. 
+The model also uses PyTorch's Distributed Data Parallel (DDP) for training, which efficiently uses 
+multiple GPUs for parallel training in order to significantly decrease the training time.
+
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
@@ -505,3 +531,5 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`16_mnist_gan.py`]: 16_mnist_gan.py
 [`17_resnet34_digital_to_analog.py`]: 17_resnet34_imagenet_conversion_to_analog.py
 [`18_cifar10_on_resnet.py`]: 18_cifar10_on_resnet.py
+[`19_analog_summary_lenet.py`]: 19_analog_summary_lenet.py
+[`20_mnist_ddp.py`]: 20_mnist_ddp.py
