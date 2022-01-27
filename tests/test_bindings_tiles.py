@@ -260,7 +260,7 @@ class BindingsTilesTest(ParametrizedTestCase):
         # Get weights with alpha.
         python_tile.set_weights_scaled(from_numpy(init_weights), omega=omega)
 
-        alpha = cpp_tile.get_alpha_scale()
+        alpha = python_tile.out_scaling_alpha.numpy()
         self.assertEqual(alpha, numpy_abs(init_weights).max()/omega)
 
         init_weights_scaled = cpp_tile.get_weights()
