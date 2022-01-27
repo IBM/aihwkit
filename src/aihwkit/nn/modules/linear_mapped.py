@@ -80,7 +80,7 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             bias: bool = True,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0,
+            weight_scaling_omega: Optional[float] = None,
     ):
 
         # Call super() after tile creation, including ``reset_parameters``.
@@ -179,7 +179,6 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         weight = weight.clone().reshape(shape)
 
         realistic = self.realistic_read_write and not force_exact
-
         in_start = in_end = 0
         for in_size, in_tiles in zip(self.in_sizes, self.analog_tile_array):
             in_end += in_size
@@ -190,9 +189,13 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                 tile_weight = weight[out_start:out_end, in_start:in_end]
 
                 if self.weight_scaling_omega > 0.0:
-                    analog_tile.set_weights_scaled(tile_weight, None,
-                                                   realistic=realistic,
-                                                   omega=self.weight_scaling_omega)
+                    analog_tile.set_weights_scaled(
+                        tile_weight, None,
+                        realistic=realistic,
+                        omega=self.weight_scaling_omega,
+                        weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise,
+                        learn_out_scaling_alpha=self.learn_out_scaling_alpha
+                    )
                 else:
                     analog_tile.set_weights(tile_weight, None, realistic=realistic)
 
@@ -236,7 +239,10 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             in_tile_weight = []
             for analog_tile in in_tiles:
                 if self.weight_scaling_omega > 0.0:
-                    tile_weight, _ = analog_tile.get_weights_scaled(realistic=realistic)
+                    tile_weight, _ = analog_tile.get_weights_scaled(
+                        realistic=realistic,
+                        weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise
+                    )
                 else:
                     tile_weight, _ = analog_tile.get_weights(realistic=realistic)
                 in_tile_weight.append(tile_weight)
@@ -264,6 +270,9 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                 self.analog_tile_array[0][0].get_analog_ctx(), x_input,
                 self.analog_tile_array[0][0].shared_weights, not self.training)
 
+            if self.weight_scaling_omega:
+                out = out * self.analog_tile_array[0][0].out_scaling_alpha
+
             if self.digital_bias:
                 return out + self.bias
             return out
@@ -279,6 +288,10 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                 output = AnalogFunction.apply(
                     analog_tile.get_analog_ctx(), x,
                     analog_tile.shared_weights, not self.training)
+
+                if self.weight_scaling_omega:
+                    output = output * analog_tile.out_scaling_alpha
+
                 out_result.append(output)
 
             if idx == 0:
@@ -308,7 +321,6 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             module: Linear,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0,
     ) -> 'AnalogLinearMapped':
         """Return an AnalogLinearMapped layer from a torch Linear layer.
 
@@ -319,9 +331,6 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                 Applied to all converted tiles.
             realistic_read_write: Whether to use closed-loop programming
                 when setting the weights. Applied to all converted tiles.
-            weight_scaling_omega: If non-zero, the analog weights will be
-                scaled by ``weight_scaling_omega`` divided by the absolute
-                maximum value of the original weight matrix.
 
                 Note:
                     Make sure that the weight max and min settings of the
@@ -335,7 +344,6 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                             module.bias is not None,
                             rpu_config,
                             realistic_read_write,
-                            weight_scaling_omega,
                             )
 
         analog_module.set_weights(module.weight, module.bias)

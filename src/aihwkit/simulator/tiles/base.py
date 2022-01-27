@@ -15,10 +15,9 @@
 from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
-from numpy import concatenate, expand_dims
-from numpy import abs as numpy_abs
-from torch import Tensor, stack, zeros
+from torch import Tensor, stack, zeros, as_tensor, cat, unsqueeze, squeeze
 from torch import device as torch_device
+from torch import max as torch_max
 from torch.nn import Parameter
 from torch.autograd import no_grad
 
@@ -58,6 +57,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.in_trans = in_trans
         self.out_trans = out_trans
         self.shared_weights = None  # type: Parameter
+        self.out_scaling_alpha = None  # type: Parameter
 
         # Only used for indexed.
         self.image_sizes = []  # type: List[int]
@@ -285,23 +285,23 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         # Prepare the array expected by the pybind function, appending the
         # biases row if needed.
-        weights_numpy = weights.clone().detach().cpu().numpy()
+        weights_torch = weights.clone().detach().cpu()
 
         if self.bias:
             # Create a ``[out_size, in_size (+ 1)]`` matrix.
             if biases is None:
                 raise ValueError('Analog tile has a bias, but no bias given')
 
-            biases_numpy = expand_dims(biases.clone().detach().cpu().numpy(), 1)
-            combined_weights = concatenate([weights_numpy, biases_numpy], axis=1)
+            biases_torch = unsqueeze(biases.clone().detach().cpu(), 1)
+            combined_weights = cat((weights_torch, biases_torch), dim=1)
         else:
             # Use only the ``[out_size, in_size]`` matrix.
-            combined_weights = weights_numpy
+            combined_weights = weights_torch
 
         if realistic:
-            return self.tile.set_weights_realistic(combined_weights, n_loops)
+            return self.tile.set_weights_realistic(combined_weights.numpy(), n_loops)
 
-        return self.tile.set_weights(combined_weights)
+        return self.tile.set_weights(combined_weights.numpy())
 
     def get_weights(
             self,
@@ -350,7 +350,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
             biases: Optional[Tensor] = None,
             realistic: bool = False,
             n_loops: int = 10,
-            omega: float = 1.0
+            omega: float = 1.0,
+            weight_scaling_omega_columnwise: bool = False,
+            learn_out_scaling_alpha: bool = False,
     ) -> None:
         r"""Set the tile weights (and biases) in a scaled fashion.
 
@@ -385,6 +387,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
             omega: where the weight max should be mapped in terms of the weight
                 range. Note that for ``omega`` larger than the maximal weight of
                 the device, weights will get clipped for most devices.
+            weight_scaling_omega_columnwise: whether the weight matrix will be
+                remapped column-wise over the maximum device value allowed.
+            learn_out_scaling_alpha: whether the alpha scaling are learnable.
 
         Returns:
             None.
@@ -397,33 +402,40 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         # Prepare the array expected by the pybind function, appending the
         # biases row if needed.
-        weights_numpy = weights.clone().detach().cpu().numpy()
+        weights_torch = weights.clone().detach().cpu()
 
         if self.bias:
             # Create a ``[out_size, in_size (+ 1)]`` matrix.
             if biases is None:
                 raise ValueError('Analog tile has a bias, but no bias given')
 
-            biases_numpy = expand_dims(biases.clone().detach().cpu().numpy(), 1)
-            combined_weights = concatenate([weights_numpy, biases_numpy], axis=1)
+            biases_torch = unsqueeze(biases.clone().detach().cpu(), 1)
+            combined_weights = cat((weights_torch, biases_torch), dim=1)
         else:
             # Use only the ``[out_size, in_size]`` matrix.
-            combined_weights = weights_numpy
-
+            combined_weights = weights_torch
         # Scale the weights.
-        weight_max = numpy_abs(combined_weights).max()
-        combined_weights = combined_weights/weight_max*omega
-        alpha = weight_max/omega
-        self.tile.set_alpha_scale(alpha)
+        if weight_scaling_omega_columnwise:
+            weight_max, _ = torch_max(abs(combined_weights), 1, keepdim=True)
+        else:
+            weight_max = torch_max(abs(combined_weights)).view(1)
+
+        combined_weights = combined_weights / weight_max * omega
+        alpha = weight_max / omega
+
+        if learn_out_scaling_alpha:
+            self.out_scaling_alpha.data = squeeze(as_tensor(alpha))
+        else:
+            self.out_scaling_alpha = squeeze(as_tensor(alpha))
 
         if realistic:
-            return self.tile.set_weights_realistic(combined_weights, n_loops)
-
-        return self.tile.set_weights(combined_weights)
+            return self.tile.set_weights_realistic(combined_weights.numpy(), n_loops)
+        return self.tile.set_weights(combined_weights.numpy())
 
     def get_weights_scaled(
             self,
-            realistic: bool = False
+            realistic: bool = False,
+            weight_scaling_omega_columnwise: bool = False,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases) and applies the current alpha
         scale to it.
@@ -439,20 +451,34 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             realistic: Whether to use the forward pass to read out the tile
                 weights iteratively, using :meth:`get_weights_realistic`.
+            weight_scaling_omega_columnwise: whether the weight matrix will be
+                remapped column-wise over the maximum device value allowed.
 
         Returns:
-            a tuple where the first item is the ``[out_size, in_size]`` weight
-            matrix; and the second item is either the ``[out_size]`` bias vector
-            or ``None`` if the tile is set not to use bias. Both have the alpha
-            scale applied.
+            tuple: where the first item is the ``[out_size, in_size]`` weight
+                matrix; and the second item is either the ``[out_size]`` bias vector
+                or ``None`` if the tile is set not to use bias. Both have the alpha
+                scale applied.
         """
         weights, biases = self.get_weights(realistic=realistic)
-        alpha = self.tile.get_alpha_scale()
+        alpha = self.out_scaling_alpha.clone().detach().cpu()
 
         if self.bias:
+            if weight_scaling_omega_columnwise:
+                return weights*alpha.view(weights.size(0), 1), biases*alpha
             return weights*alpha, biases*alpha
 
+        if weight_scaling_omega_columnwise:
+            return weights*alpha.view(weights.size(0), 1), None
         return weights*alpha, None
+
+    def get_out_scaling_alpha(self) -> Tensor:
+        """Get the out_scaling_alpha used to scale the weights
+
+        Returns:
+            tensor: out_scaling_alpha
+            """
+        return self.out_scaling_alpha
 
     def set_learning_rate(self, learning_rate: float) -> None:
         """Set the tile learning rate.

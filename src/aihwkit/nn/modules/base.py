@@ -11,6 +11,7 @@
 # that they have been altered from the originals.
 
 """Base class for analog Modules."""
+import warnings
 
 from typing import (
     Any, Dict, List, Optional, Tuple, NamedTuple, Union,
@@ -72,6 +73,7 @@ class AnalogModuleBase(Module):
     ANALOG_CTX_PREFIX: str = 'analog_ctx_'
     ANALOG_SHARED_WEIGHT_PREFIX: str = 'analog_shared_weights_'
     ANALOG_STATE_PREFIX: str = 'analog_tile_state_'
+    ANALOG_OUT_SCALING_ALPHA_PREFIX: str = 'analog_out_scaling_alpha_'
 
     def __init__(
             self,
@@ -79,7 +81,7 @@ class AnalogModuleBase(Module):
             out_features: int,
             bias: bool,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0,
+            weight_scaling_omega: Optional[float] = None,
             mapping: Optional[MappingParameter] = None,
     ) -> None:
         # pylint: disable=super-init-not-called
@@ -93,9 +95,21 @@ class AnalogModuleBase(Module):
         self.use_bias = bias
         self.digital_bias = bias and mapping.digital_bias
         self.analog_bias = bias and not mapping.digital_bias
+        self.weight_scaling_omega = mapping.weight_scaling_omega if weight_scaling_omega is None \
+            else weight_scaling_omega
+        if weight_scaling_omega is not None:
+            warnings.warn(DeprecationWarning('\nSetting the weight_scaling_omega through the '
+                                             'layers input parameters will be deprecated in the '
+                                             'future. Please set it through the MappingParameter '
+                                             'of the rpu_config.\n'))
+
+        self.weight_scaling_omega_columnwise = mapping.weight_scaling_omega_columnwise
+        self.learn_out_scaling_alpha = mapping.learn_out_scaling_alpha
+
+        if self.learn_out_scaling_alpha and self.weight_scaling_omega == 0:
+            raise ValueError('out_scaling_alpha can only be learned if weight_scaling_omega > 0')
 
         self.realistic_read_write = realistic_read_write
-        self.weight_scaling_omega = weight_scaling_omega
         self.in_features = in_features
         self.out_features = out_features
 
@@ -125,6 +139,15 @@ class AnalogModuleBase(Module):
                 tile.shared_weights = Parameter(tile.shared_weights)
             par_name = self.ANALOG_SHARED_WEIGHT_PREFIX + str(self._analog_tile_counter)
             self.register_parameter(par_name, tile.shared_weights)
+
+            if par_name not in self._registered_helper_parameter:
+                self._registered_helper_parameter.append(par_name)
+
+        if self.learn_out_scaling_alpha:
+            if not isinstance(tile.out_scaling_alpha, Parameter):
+                tile.out_scaling_alpha = Parameter(tile.out_scaling_alpha)
+            par_name = self.ANALOG_OUT_SCALING_ALPHA_PREFIX + str(self._analog_tile_counter)
+            self.register_parameter(par_name, tile.out_scaling_alpha)
 
             if par_name not in self._registered_helper_parameter:
                 self._registered_helper_parameter.append(par_name)
@@ -235,9 +258,12 @@ class AnalogModuleBase(Module):
         analog_tile = analog_tiles[0]
 
         if self.weight_scaling_omega > 0.0:
-            analog_tile.set_weights_scaled(weight, bias if self.analog_bias else None,
-                                           realistic=realistic,
-                                           omega=self.weight_scaling_omega)
+            analog_tile.set_weights_scaled(
+                weight, bias if self.analog_bias else None,
+                realistic=realistic,
+                omega=self.weight_scaling_omega,
+                weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise,
+                learn_out_scaling_alpha=self.learn_out_scaling_alpha)
         else:
             analog_tile.set_weights(weight, bias if self.analog_bias else None,
                                     realistic=realistic)
@@ -283,7 +309,9 @@ class AnalogModuleBase(Module):
 
         realistic = self.realistic_read_write and not force_exact
         if self.weight_scaling_omega > 0.0:
-            weight, bias = analog_tile.get_weights_scaled(realistic=realistic)
+            weight, bias = analog_tile.get_weights_scaled(
+                realistic=realistic,
+                weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise)
         else:
             weight, bias = analog_tile.get_weights(realistic=realistic)
 

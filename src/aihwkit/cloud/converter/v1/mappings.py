@@ -169,15 +169,13 @@ class Mappings:
             'padding': [int],
             'dilation': [int],
             'bias': bool,
-            'rpu_config': str,
-            'weight_scaling_omega': float
+            'rpu_config': str
         }),
         AnalogLinear: LayerFunction('AnalogLinear', {
             'in_features': int,
             'out_features': int,
             'bias': bool,
-            'rpu_config': str,
-            'weight_scaling_omega': float
+            'rpu_config': str
         }),
         BatchNorm2d: LayerFunction('BatchNorm2d', {
             'num_features': int

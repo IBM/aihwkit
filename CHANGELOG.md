@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [0.5.0] - 2022/01/19
+## [0.5.0] - 2022/01/27
 
 ### Added
 
@@ -36,6 +36,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   output sizes can be configured for the ``*Mapped`` layers. (\#331)
 * Notebooks directory with several notebook examples (#333, \#334)
 * Analog information summary function. (\#316)
+* The `alpha` weight scaling factor can now be defined as learnable parameter by switching
+  `learn_out_scaling_alpha` in the `rpu_config.mapping` parameters. (\#352)
 
 ### Fixed
 
@@ -62,6 +64,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Digital bias is now accessable through ``MappingParameter``. (\#331)
 * The aihwkit documentation. New content around analog ai concepts, training presets, analog ai 
   optimizers, new references, and examples. (\#348)
+* The `weight_scaling_omega` can now be defined in the `rpu_config.mapping`. (\#352)
 
 ### Deprecated
 
