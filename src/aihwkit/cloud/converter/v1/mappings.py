@@ -171,7 +171,6 @@ class Mappings:
             'bias': bool,
             'rpu_config': str,
             'weight_scaling_omega': float
-
         }),
         AnalogLinear: LayerFunction('AnalogLinear', {
             'in_features': int,
