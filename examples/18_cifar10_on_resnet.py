@@ -58,7 +58,7 @@ N_CLASSES = 10
 
 # Device used in the RPU tile
 mapping = MappingParameter(weight_scaling_omega=0.6)
-RPU_CONFIG = TikiTakaEcRamPreset()
+RPU_CONFIG = TikiTakaEcRamPreset(mapping=mapping)
 
 
 class ResidualBlock(nn.Module):

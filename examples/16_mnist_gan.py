@@ -54,7 +54,7 @@ from aihwkit.simulator.rpu_base import cuda
 # As an example we use a mixed precision preset using an ECRAM device model
 from aihwkit.simulator.configs.utils import MappingParameter
 mapping = MappingParameter(weight_scaling_omega=0.8)
-RPU_CONFIG = MixedPrecisionEcRamMOPreset()
+RPU_CONFIG = MixedPrecisionEcRamMOPreset(mapping=mapping)
 
 # Set your parameters
 SEED = 1
