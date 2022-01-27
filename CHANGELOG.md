@@ -37,7 +37,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Notebooks directory with several notebook examples (#333, \#334)
 * Analog information summary function. (\#316)
 * The `alpha` weight scaling factor can now be defined as learnable parameter by switching
-  `learn_out_scaling_alpha` in the `rpu_config.mapping` parameters. (\#352)
+  `learn_out_scaling_alpha` in the `rpu_config.mapping` parameters. (\#353)
 
 ### Fixed
 
@@ -64,7 +64,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Digital bias is now accessable through ``MappingParameter``. (\#331)
 * The aihwkit documentation. New content around analog ai concepts, training presets, analog ai 
   optimizers, new references, and examples. (\#348)
-* The `weight_scaling_omega` can now be defined in the `rpu_config.mapping`. (\#352)
+* The `weight_scaling_omega` can now be defined in the `rpu_config.mapping`. (\#353)
 
 ### Deprecated
 
