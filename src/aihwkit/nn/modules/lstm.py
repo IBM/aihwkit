@@ -117,9 +117,6 @@ class AnalogLSTMCell(AnalogSequential):
         rpu_config: configuration for an analog resistive processing unit
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and read out of weights
-        weight_scaling_omega: the weight value where the max
-            weight will be scaled to. If zero, no weight scaling will
-            be performed
     """
     # pylint: disable=abstract-method
 
@@ -130,19 +127,16 @@ class AnalogLSTMCell(AnalogSequential):
             bias: bool,
             rpu_config: Optional[RPUConfigAlias],
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0
     ):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.weight_ih = AnalogLinear(input_size, 4 * hidden_size, bias=bias,
                                       rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write,
-                                      weight_scaling_omega=weight_scaling_omega)
+                                      realistic_read_write=realistic_read_write)
         self.weight_hh = AnalogLinear(hidden_size, 4 * hidden_size, bias=bias,
                                       rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write,
-                                      weight_scaling_omega=weight_scaling_omega)
+                                      realistic_read_write=realistic_read_write)
 
     def forward(
             self,
@@ -259,9 +253,6 @@ class AnalogLSTM(AnalogSequential):
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and read out of weights
-        weight_scaling_omega: the weight value where the max
-            weight will be scaled to. If zero, no weight scaling will
-            be performed
         xavier: whether standard PyTorch LSTM weight
             initialization (default) or Xavier initialization
     """
@@ -276,7 +267,6 @@ class AnalogLSTM(AnalogSequential):
             bias: bool = True,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0,
             xavier: bool = False):
         super().__init__()
 
@@ -287,9 +277,9 @@ class AnalogLSTM(AnalogSequential):
         self.lstm = ModularAnalogLSTMWithDropout(
             num_layers, AnalogLSTMLayer, dropout,
             first_layer_args=[AnalogLSTMCell, input_size, hidden_size, bias,
-                              rpu_config, realistic_read_write, weight_scaling_omega],
+                              rpu_config, realistic_read_write],
             other_layer_args=[AnalogLSTMCell, hidden_size, hidden_size, bias,
-                              rpu_config, realistic_read_write, weight_scaling_omega])
+                              rpu_config, realistic_read_write])
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.reset_parameters(xavier)
