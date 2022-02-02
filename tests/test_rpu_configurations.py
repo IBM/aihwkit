@@ -20,7 +20,7 @@ from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
     FloatingPoint, Ideal, ConstantStep, LinearStep,
-    ExpStep, SoftBounds, SoftBoundsPmax, PowStep, Vector, OneSided,
+    ExpStep, SoftBounds, SoftBoundsPmax, PowStep, SelfDefine, Vector, OneSided,
     Transfer, MixedPrecision,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
     ExpStepCuda, SoftBoundsCuda, SoftBoundsPmaxCuda, PowStepCuda,
@@ -67,6 +67,7 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
     SoftBounds,
     SoftBoundsPmax,
     PowStep,
+    SelfDefine,
     Vector,
     OneSided,
     Transfer,
