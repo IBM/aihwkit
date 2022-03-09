@@ -10,9 +10,9 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example 15: hardware-aware training of analog LSTM model.
+"""aihwkit example 15: hardware-aware training of analog RNN model.
 
-This experiment performs hardware-aware training of an analog LSTM on
+This experiment performs hardware-aware training of an analog RNN on
 a simple temporal sequence. The experiment plots training perplexity,
 inference results on the test dataset using analog hardware, and inference
 results over time using analog hardware and drift compensation.
@@ -30,7 +30,7 @@ import torch
 from torch import nn
 
 # Imports from aihwkit.
-from aihwkit.nn import AnalogLSTM
+from aihwkit.nn import AnalogRNN, AnalogLSTMCell, AnalogGRUCell, AnalogVanillaRNNCell
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs import InferenceRPUConfig
@@ -52,7 +52,9 @@ NOISE = 0.0
 EPOCHS = 100
 BATCH_SIZE = 5
 SEQ_LEN = 501
-WITH_EMBEDDING = False  # LSTM with embedding
+RNN_CELL = AnalogVanillaRNNCell #type of RNN cell
+WITH_EMBEDDING = True  # RNN with embedding
+WITH_BIDIR = True
 USE_ANALOG_TRAINING = False  # or hardware-aware training
 
 if USE_ANALOG_TRAINING:
@@ -81,7 +83,7 @@ else:
 
 
 # Path to store results
-RESULTS = os.path.join(os.getcwd(), 'results', 'LSTM')
+RESULTS = os.path.join(os.getcwd(), 'results', 'RNN')
 os.makedirs(RESULTS, exist_ok=True)
 
 # Make dataset
@@ -98,58 +100,91 @@ y_in = torch.stack(y_in_2d, dim=0).transpose(0, 1).unsqueeze(2)
 y_out = torch.stack(y_out_2d, dim=0).transpose(0, 1).unsqueeze(2)
 
 
-# Various LSTM Network definitions
-class AnalogLSTMNetwork(AnalogSequential):
-    """Analog LSTM Network definition using AnalogLinear for embedding and decoder."""
+# Various RNN Network definitions
+
+class AnalogBidirRNNNetwork(AnalogSequential):
+    """Analog Bidirectional RNN Network definition using AnalogLinear for embedding and decoder."""
 
     def __init__(self):
         super().__init__()
         self.dropout = nn.Dropout(DROPOUT_RATIO)
         self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
-        self.lstm = AnalogLSTM(EMBED_SIZE, HIDDEN_SIZE, num_layers=1,
+        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
                                dropout=DROPOUT_RATIO, bias=True,
                                rpu_config=rpu_config)
-        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
+        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
 
-    def forward(self, x_in, in_states):  # pylint: disable=arguments-differ
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
         embed = self.dropout(self.embedding(x_in))
-        out, out_states = self.lstm(embed, in_states)
+        out, out_states = self.rnn(embed, in_states)
         out = self.dropout(self.decoder(out))
         return out, out_states
 
-
-class AnalogLSTMNetwork_noEmbedding(AnalogSequential):
-    """Analog LSTM Network definition without embedding layer and using AnalogLinear for decoder."""
+class AnalogBidirRNNNetwork_noEmbedding(AnalogSequential):
+    """Analog Bidirectional RNN Network definition without embedding layer and using AnalogLinear for decoder."""
 
     def __init__(self):
         super().__init__()
         self.dropout = nn.Dropout(DROPOUT_RATIO)
-        self.lstm = AnalogLSTM(INPUT_SIZE, HIDDEN_SIZE, num_layers=1,
+        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
+                               dropout=DROPOUT_RATIO, bias=True,
+                               rpu_config=rpu_config)
+        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
+                                    rpu_config=rpu_config)
+
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+        """ Forward pass """
+        out, out_states = self.rnn(x_in, in_states)
+        out = self.dropout(self.decoder(out))
+        return out, out_states
+
+class AnalogRNNNetwork(AnalogSequential):
+    """Analog RNN Network definition using AnalogLinear for embedding and decoder."""
+
+    def __init__(self):
+        super().__init__()
+        self.dropout = nn.Dropout(DROPOUT_RATIO)
+        self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
+        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
+                               dropout=DROPOUT_RATIO, bias=True,
+                               rpu_config=rpu_config)
+        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
+
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+        embed = self.dropout(self.embedding(x_in))
+        out, out_states = self.rnn(embed, in_states)
+        out = self.dropout(self.decoder(out))
+        return out, out_states
+
+
+class AnalogRNNNetwork_noEmbedding(AnalogSequential):
+    """Analog RNN Network definition without embedding layer and using AnalogLinear for decoder."""
+
+    def __init__(self):
+        super().__init__()
+        self.dropout = nn.Dropout(DROPOUT_RATIO)
+        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
                                dropout=DROPOUT_RATIO, bias=True,
                                rpu_config=rpu_config)
         self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
                                     rpu_config=rpu_config)
 
-    def forward(self, x_in, in_states):  # pylint: disable=arguments-differ
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
         """ Forward pass """
-        out, out_states = self.lstm(x_in, in_states)
+        out, out_states = self.rnn(x_in, in_states)
         out = self.dropout(self.decoder(out))
         return out, out_states
 
-
-def reset_states():
-    """Reset the LSTM states."""
-    LSTMState = namedtuple('LSTMState', ['hx', 'cx'])
-    out_states = [LSTMState(torch.zeros(BATCH_SIZE, HIDDEN_SIZE),
-                            torch.zeros(BATCH_SIZE, HIDDEN_SIZE))
-                  for _ in range(NUM_LAYERS)]
-    return out_states
-
-
 if WITH_EMBEDDING:
-    model = AnalogLSTMNetwork()
+    if WITH_BIDIR:
+        model = AnalogBidirRNNNetwork()
+    else:
+        model = AnalogRNNNetwork()
 else:
-    model = AnalogLSTMNetwork_noEmbedding()
+    if WITH_BIDIR:
+        model = AnalogBidirRNNNetwork_noEmbedding()
+    else:
+        model = AnalogRNNNetwork_noEmbedding()
 
 optimizer = AnalogSGD(model.parameters(), lr=LEARNING_RATE)
 optimizer.regroup_param_groups(model)
@@ -158,9 +193,8 @@ criterion = nn.MSELoss()
 # train
 losses = []
 for i in range(EPOCHS):
-    states = reset_states()
     optimizer.zero_grad()
-    pred, states = model(y_in, states)
+    pred, states = model(y_in)
 
     loss = criterion(pred, y_out)
     print('Epoch = %d: Train Perplexity = %f' % (i, np.exp(loss.detach().numpy())))
@@ -180,8 +214,7 @@ plt.close()
 
 # Test.
 model.eval()
-states = reset_states()
-pred, states = model(y_in, states)
+pred, states = model(y_in)
 loss = criterion(pred, y_out)
 print("Test Perplexity = %f" % (np.exp(loss.detach().numpy())))
 
@@ -197,8 +230,7 @@ plt.figure()
 plt.plot(y_out[:, 0, 0], '-b', label='truth')
 for t_inference in [0., 1., 20., 1000., 1e5]:
     model.drift_analog_weights(t_inference)
-    states = reset_states()
-    pred_drift, states = model(y_in, states)
+    pred_drift, states = model(y_in)
     plt.plot(pred_drift[:, 0, 0].detach().cpu().numpy(), label='t = ' + str(t_inference) + ' s')
 plt.legend()
 plt.savefig(os.path.join(RESULTS, 'drift'))
