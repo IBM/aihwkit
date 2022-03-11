@@ -17,6 +17,8 @@ option(USE_CUDA "Build with CUDA support" OFF)
 option(RPU_DEBUG "Enable debug printing" OFF)
 option(RPU_USE_FASTMOD "Use fast mod" ON)
 option(RPU_USE_FASTRAND "Use fastrand" OFF)
+option(USE_ABI_ZERO "Whether to set _GLIBCXX_USE_CXX11_ABI=0" ON)
+
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
 set(RPU_CUDA_ARCHITECTURES "60" CACHE STRING "Target CUDA architectures")
 
@@ -49,7 +51,10 @@ else()
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ftree-vectorize")
 endif()
 
-add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
+if (USE_ABI_ZERO)
+  add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
+endif()
+
 if (APPLE)
   string(APPEND CMAKE_CXX_FLAGS " -fvisibility=hidden")
 endif()
