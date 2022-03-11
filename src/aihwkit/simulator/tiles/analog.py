@@ -250,7 +250,6 @@ class AnalogTile(BaseTile):
                 self.analog_ctx.cuda(device)
                 if self.out_scaling_alpha is not None:
                     self.out_scaling_alpha.data = self.out_scaling_alpha.data.cuda(device)
-
         return self
 
     def _create_simulator_tile(

@@ -371,26 +371,6 @@ class SerializationTest(ParametrizedTestCase):
         new_hidden_parameters = new_analog_tile.tile.get_hidden_parameters()
         assert_array_almost_equal(hidden_parameters, new_hidden_parameters)
 
-    def test_save_load_alpha_scale(self):
-        """Test saving and loading a device with alpha_scale."""
-        # Create the device and the array.
-        model = self.get_layer()
-        alpha = 2.0
-        analog_tile = self.get_analog_tile(model)
-        analog_tile.tile.set_alpha_scale(alpha)
-
-        # Save the model to a file.
-        with TemporaryFile() as file:
-            save(model, file)
-            # Load the model.
-            file.seek(0)
-            new_model = load(file)
-
-        # Assert over the new model tile parameters.
-        new_analog_tile = self.get_analog_tile(new_model)
-        alpha_new = new_analog_tile.tile.get_alpha_scale()
-        assert_array_almost_equal(array(alpha), array(alpha_new))
-
     def test_save_load_out_scaling_alpha(self):
         """Test saving and loading a device with out_scaling_alpha."""
         # Create the device and the array.
