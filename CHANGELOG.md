@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Set weights can be used to re-apply the weight scaling omega. (\#360)
 * Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
+* Reverse up / down option for ``LinearStepDevice``. (\#361)
 
 ### Fixed
 

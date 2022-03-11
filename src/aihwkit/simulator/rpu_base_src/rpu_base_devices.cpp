@@ -465,6 +465,9 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("mean_bound_reference", &LinearStepParam::ls_mean_bound_reference)
       .def_readwrite("write_noise_std", &LinearStepParam::write_noise_std)
       .def_readwrite("mult_noise", &LinearStepParam::ls_mult_noise)
+      .def_readwrite("reverse_up", &LinearStepParam::ls_reverse_up)
+      .def_readwrite("reverse_down", &LinearStepParam::ls_reverse_down)
+      .def_readwrite("reverse_offset", &LinearStepParam::ls_reverse_offset)
       .def(
           "__str__",
           [](LinearStepParam &self) {
@@ -481,10 +484,13 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<SoftBoundsParam, PySoftBoundsParam, PulsedParam>(
+  py::class_<SoftBoundsParam, PySoftBoundsParam, LinearStepParam>(
       m, "SoftBoundsResistiveDeviceParameter")
       .def_readwrite("mult_noise", &SoftBoundsParam::ls_mult_noise)
       .def_readwrite("write_noise_std", &SoftBoundsParam::write_noise_std)
+      .def_readwrite("reverse_up", &SoftBoundsParam::ls_reverse_up)
+      .def_readwrite("reverse_down", &SoftBoundsParam::ls_reverse_down)
+      .def_readwrite("reverse_offset", &SoftBoundsParam::ls_reverse_offset)
       .def(py::init<>())
       .def(
           "__str__",
