@@ -815,28 +815,28 @@ class PowStepDevice(PulsedDevice):
 
 @dataclass
 class SelfDefineDevice(PulsedDevice):
+    r"""Self defined device characteristics.
 
+    This model is derived from ``PulsedDevice`` and uses all its
+    parameters. ''SelfDefineDevice'' implements a new functionality
+    where the device characteristics are defined by the user. 
+
+    Up and down pulse values are stored in selfdefine.csv and the 
+    number of points can be decreased to 2 and increased indefinitely. 
+    """
     bindings_class: ClassVar[Type] = devices.SelfDefineResistiveDeviceParameter
 
-    pow_gamma: float = 1.0
+    n_points: int = 0
+    r"""The number of points in the up_pulse and down_pulse arrays.
+    """
 
-    pow_gamma_dtod: float = 0.1
-
-    pow_up_down: float = 0.0
-
-    pow_up_down_dtod: float = 0.0
-
-    write_noise_std: float = 0.0
-
-    def_up_pulse: List[float] = field(default_factory=list, metadata={'hide_if': []})
-
-    def_up_weight: List[float] = field(default_factory=list, metadata={'hide_if': []})
-
-    def_down_pulse: List[float] = field(default_factory=list, metadata={'hide_if': []})
-
-    def_down_weight: List[float] = field(default_factory=list, metadata={'hide_if': []})
-
-    def_n_points: float=0.0
+    up_pulse: List[float] = field(default_factory=list, metadata={'hide_if': []})
+    r"""Array of values that characterize the up_pulse.
+    """
+    
+    down_pulse: List[float] = field(default_factory=list, metadata={'hide_if': []})
+    r"""Array of values that characterize the down_pulse.
+    """
 
 ###############################################################################
 # Specific devices based on ``unit cell``.

@@ -65,7 +65,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         x_size = in_size + 1 if self.bias else in_size
         d_size = out_size
 
+        print("base.py init 1")
+        # print(rpu_config)
         self.tile = self._create_simulator_tile(x_size, d_size, rpu_config)
+        print("base.py init 2")
         self.tile.set_learning_rate(0.01)
         self.tile.set_weights_uniform_random(-0.01, 0.01)
 

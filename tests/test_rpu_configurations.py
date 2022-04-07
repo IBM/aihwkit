@@ -23,7 +23,7 @@ from .helpers.tiles import (
     ExpStep, SoftBounds, SoftBoundsPmax, PowStep, SelfDefine, Vector, OneSided,
     Transfer, MixedPrecision,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    ExpStepCuda, SoftBoundsCuda, SoftBoundsPmaxCuda, PowStepCuda,
+    ExpStepCuda, SoftBoundsCuda, SoftBoundsPmaxCuda, PowStepCuda, SelfDefineCuda,
     VectorCuda, OneSidedCuda, TransferCuda, MixedPrecisionCuda
 
 )
@@ -79,6 +79,7 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
     SoftBoundsCuda,
     SoftBoundsPmaxCuda,
     PowStepCuda,
+    SelfDefineCuda,
     VectorCuda,
     OneSidedCuda,
     TransferCuda,

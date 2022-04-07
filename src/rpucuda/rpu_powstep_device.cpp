@@ -110,8 +110,10 @@ inline void update_once(
     return;
   }
   if (sign > 0) {
+    printf("\nw: %f\n", w);
     w -= scale_down * pow((w - min_bound) / range, gamma_down) *
          ((T)1.0 + dw_min_std * rng->sampleGauss());
+    printf("w: %f\n", w);
   } else {
     w += scale_up * pow((max_bound - w) / range, gamma_up) *
          ((T)1.0 + dw_min_std * rng->sampleGauss());
