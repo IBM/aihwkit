@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -15,7 +15,6 @@
 from unittest import SkipTest
 
 from numpy import array, std, dot, reshape
-from numpy import abs as numpy_abs
 from numpy.random import uniform
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 
@@ -189,86 +188,6 @@ class BindingsTilesTest(ParametrizedTestCase):
         cuda_python_tile = python_tile.cuda()
         init_weights_cuda = cuda_python_tile.tile.get_weights()
         assert_array_almost_equal(init_weights, init_weights_cuda)
-
-    def test_alpha_scale(self):
-        """Test the alpha scaling."""
-        n_rows = 6  # out_size aka d_size.
-        n_cols = 5  # in_size aka x_size.
-        alpha = 4.0
-        m_batch = 4
-        lr = 0.1
-
-        python_tile = self.get_noisefree_tile(n_rows, n_cols)
-        cpp_tile = python_tile.tile
-
-        init_weights = cpp_tile.get_weights().copy()
-        cpp_tile.set_learning_rate(lr)
-
-        cpp_tile.set_alpha_scale(alpha)
-        self.assertEqual(alpha, cpp_tile.get_alpha_scale())
-
-        x_t = from_numpy(uniform(-1.2, 1.2, size=(m_batch, n_cols)).astype('float32'))
-        d_t = from_numpy(uniform(-0.1, 0.1, size=(m_batch, n_rows)).astype('float32'))
-
-        if python_tile.is_cuda:
-            x_t = x_t.cuda()
-            d_t = d_t.cuda()
-
-        # Perform forward.
-        y = cpp_tile.forward(x_t).cpu()
-        self.assertIsInstance(y, Tensor)
-        assert_array_almost_equal(y.numpy(), dot(x_t.cpu(), alpha*init_weights.T))
-
-        # Perform backward.
-        z = cpp_tile.backward(d_t).cpu()
-        self.assertIsInstance(y, Tensor)
-        assert_array_almost_equal(z.numpy(), dot(d_t.cpu(), alpha*init_weights))
-
-        # Perform update.
-        cpp_tile.update(x_t, d_t, bias=False)
-        post_rank_weights = cpp_tile.get_weights().copy()
-        ref_weights = init_weights - lr/alpha*dot(d_t.cpu().T, x_t.cpu())
-
-        assert_array_almost_equal(post_rank_weights, ref_weights)
-
-    def test_alpha_get_set_weights(self):
-        """Tests that ``alpha`` does not affect ``get_weights()``."""
-        alpha = 2.0
-
-        python_tile = self.get_noisefree_tile(5, 4)
-        cpp_tile = python_tile.tile
-        init_weights = cpp_tile.get_weights().copy()
-        cpp_tile.set_alpha_scale(alpha)
-        self.assertEqual(alpha, cpp_tile.get_alpha_scale())
-
-        # Get weights with alpha.
-        init_weights2 = cpp_tile.get_weights().copy()
-        assert_array_almost_equal(init_weights, init_weights2)
-
-        # Set the weights (with alpha).
-        cpp_tile.set_weights(init_weights)
-        init_weights2 = cpp_tile.get_weights().copy()
-        assert_array_almost_equal(init_weights, init_weights2)
-
-    def test_get_set_weights_scaled(self):
-        """Test that ``alpha`` affects the ``get_weights()`` scaled."""
-        omega = 0.5
-        python_tile = self.get_noisefree_tile(5, 4)
-        cpp_tile = python_tile.tile
-        init_weights = cpp_tile.get_weights().copy()
-
-        # Get weights with alpha.
-        python_tile.set_weights_scaled(from_numpy(init_weights), omega=omega)
-
-        alpha = python_tile.out_scaling_alpha.numpy()
-        self.assertEqual(alpha, numpy_abs(init_weights).max()/omega)
-
-        init_weights_scaled = cpp_tile.get_weights()
-
-        assert_array_almost_equal(init_weights, init_weights_scaled*alpha)
-
-        init_weights2 = python_tile.get_weights_scaled()[0].cpu().numpy()
-        assert_array_almost_equal(init_weights, init_weights2)
 
 
 @parametrize_over_tiles([

@@ -504,6 +504,28 @@ class LinearStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    reverse_up: bool = False
+    """Whether to increase the step size in up direction with increasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+    """
+
+    reverse_down: bool = False
+    """Whether to increase the step size in down direction with decreasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+
+    """
+
+    reverse_offset: float = 0.01
+    """Offset to add to the step size for reverse up or down to avoid
+    zero step size at weight min or max.
+    """
+
 
 @dataclass
 class SoftBoundsDevice(PulsedDevice):
@@ -522,6 +544,44 @@ class SoftBoundsDevice(PulsedDevice):
     mult_noise: bool = True
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
     noise."""
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled anew when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise} \Delta w_\text{min}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
+    reverse_up: bool = False
+    """Whether to increase the step size in up direction with increasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+    """
+
+    reverse_down: bool = False
+    """Whether to increase the step size in down direction with decreasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+    """
+
+    reverse_offset: float = 0.01
+    """Offset to add to the step size for reverse up or down to avoid
+    zero step size at weight min or max.
+    """
 
 
 @dataclass

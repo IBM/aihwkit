@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -58,7 +58,6 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
 
     def __init__(
             self,
-
             in_channels: int,
             out_channels: int,
             kernel_size: Tuple[int, ...],
@@ -95,7 +94,6 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             out_channels,
             bias,
             realistic_read_write,
-            weight_scaling_omega,
             rpu_config.mapping
         )
 
@@ -125,11 +123,13 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
 
         # Set weights from the reset_parameters (since now the
         # analog_tiles are registered)
-        self.set_weights(self.weight, self.bias)
+        self.set_weights(self.weight, self.bias, remap_weights=True,
+                         weight_scaling_omega=weight_scaling_omega)
 
         # Set the index matrices.
         self.input_size = 0
         self.fold_indices_lst = []  # type: List[Tensor]
+        self.tensor_view = (-1,)  # type: Tuple[int, ...]
 
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
@@ -226,19 +226,6 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             for analog_tile in in_tiles:
                 analog_tile.set_indexed(fold_indices, image_sizes)
 
-    def get_tensor_view(self, dim: int, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            dim: dimension to use to modify tensor view
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-
-        raise NotImplementedError
-
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
         # pylint: disable=arguments-differ,arguments-renamed
@@ -253,15 +240,10 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
                 analog_tile.get_analog_ctx(), x_input,
                 analog_tile.shared_weights, not self.training)
 
-            if self.weight_scaling_omega:
-                alpha = analog_tile.out_scaling_alpha
-                if self.weight_scaling_omega_columnwise:
-                    alpha = self.get_tensor_view(self.out_channels, alpha)
-                output = output * alpha
+            output = analog_tile.apply_out_scaling(output, self.tensor_view)
 
             if self.digital_bias:
-                digital_bias = self.get_tensor_view(self.out_channels, self.bias)
-                return output + digital_bias
+                return output + self.bias.view(*self.tensor_view)
             return output
 
         # mapped version
@@ -277,12 +259,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
                     analog_tile.get_analog_ctx(), x,
                     analog_tile.shared_weights, not self.training)
 
-                if self.weight_scaling_omega:
-                    alpha = analog_tile.out_scaling_alpha
-                    if self.weight_scaling_omega_columnwise:
-                        alpha = self.get_tensor_view(output.size(1), alpha)
-                    output = output * alpha
-
+                output = analog_tile.apply_out_scaling(output, self.tensor_view)
                 out_result.append(output)
 
             if idx == 0:
@@ -292,15 +269,16 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
 
         # add bias to final result
         if self.digital_bias:
-            digital_bias = self.get_tensor_view(self.out_channels, self.bias)
-            return result + digital_bias
+            return result + self.bias.view(*self.tensor_view)
         return result
 
     def set_weights(
             self,
             weight: Tensor,
             bias: Optional[Tensor] = None,
-            force_exact: bool = False
+            force_exact: bool = False,
+            remap_weights: bool = True,
+            weight_scaling_omega: float = None
     ) -> None:
         """Set the weight (and bias) with given Tensors.
 
@@ -320,7 +298,23 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             weight: weight matrix
             bias: bias vector
             force_exact: forces an exact write to the analog tiles
+            remap_weights: Whether to rescale the given weight matrix
+                and populate the digital output scaling factors as
+                specified in the configuration
+                :class:`~aihwkit.configs.utils.MappingParameter`. A
+                new ``weight_scaling_omega`` can be given. Note that
+                this will overwrite the existing digital out scaling
+                factors.
+
+                Note that each tile (in case of multiple mapped tiles)
+                has it separate out scaling factors.
+
+            weight_scaling_omega: The weight scaling omega factor (see
+                :class:`~aihwkit.configs.utils.MappingParameter`). If
+                given explicitly here, it will overwrite the value in
+                the mapping field.
         """
+        # pylint: disable=too-many-locals
         realistic = self.realistic_read_write and not force_exact
 
         shape = [self.out_features, self.in_channels, self.in_features // self.in_channels]
@@ -336,13 +330,15 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
                 tile_weight = in_weight[out_start:out_end, :]
                 out_start = out_end
 
-                if self.weight_scaling_omega > 0.0:
+                if remap_weights:
+                    omega = weight_scaling_omega
+                    if omega is None:
+                        omega = analog_tile.rpu_config.mapping.weight_scaling_omega
+
                     analog_tile.set_weights_scaled(
                         tile_weight, None,
                         realistic=realistic,
-                        omega=self.weight_scaling_omega,
-                        weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise,
-                        learn_out_scaling_alpha=self.learn_out_scaling_alpha
+                        weight_scaling_omega=omega
                     )
                 else:
                     analog_tile.set_weights(tile_weight, None, realistic=realistic)
@@ -353,7 +349,8 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             with no_grad():
                 self.bias.data[:] = bias[:]
 
-    def get_weights(self, force_exact: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
+    def get_weights(self, force_exact: bool = False,
+                    apply_out_scales: bool = True) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the weight (and bias) tensors.
 
         This uses an realistic read if the property ``realistic_read_write`` of
@@ -371,6 +368,14 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
 
         Args:
             force_exact: forces an exact read to the analog tiles
+            apply_out_scales: Whether to return the weights with the
+                (digital) output scaling factors applied. Note the
+                "logical" weights of the layer which the DNN is
+                effectively using are those with the output scales
+                applied. If ``apply_out_scales`` is set to False, then
+                only the weight values that is programmed onto the
+                crossbar array are returned, without applying the
+                digital scales.
 
         Returns:
             tuple: weight matrix, bias vector
@@ -383,10 +388,8 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
         for in_tiles in self.analog_tile_array:
             in_tile_weight = []
             for analog_tile in in_tiles:
-                if self.weight_scaling_omega > 0.0:
-                    tile_weight, _ = analog_tile.get_weights_scaled(
-                        realistic=realistic,
-                        weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise)
+                if apply_out_scales:
+                    tile_weight, _ = analog_tile.get_weights_scaled(realistic=realistic)
                 else:
                     tile_weight, _ = analog_tile.get_weights(realistic=realistic)
                 in_tile_weight.append(tile_weight)
@@ -396,7 +399,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
 
         if self.digital_bias:
             with no_grad():
-                return weight, self.bias.data.detach().cpu()
+                return weight, self.bias.data.clone().detach().cpu()
         return weight, None
 
     def extra_repr(self) -> str:
@@ -479,6 +482,8 @@ class AnalogConv1dMapped(_AnalogConvNdMapped):
             False, _single(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
+
+        self.tensor_view = (-1, 1)
 
     @classmethod
     def from_digital(
@@ -579,19 +584,6 @@ class AnalogConv1dMapped(_AnalogConvNdMapped):
         image_sizes = [in_channels, x_height, d_height]
         return (fold_indices, image_sizes, input_size)
 
-    def get_tensor_view(self, dim: int, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            dim: dimension to use to modify tensor view
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-
-        return tensor_to_view.view(dim, 1)
-
 
 class AnalogConv2dMapped(_AnalogConvNdMapped):
     """2D convolution layer that maps to analog tiles.
@@ -658,6 +650,8 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
             False, _pair(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
+
+        self.tensor_view = (-1, 1, 1)
 
     @classmethod
     def from_digital(
@@ -747,18 +741,6 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
         image_sizes = [in_channels, x_height, x_width, d_height, d_width]
         return (fold_indices, image_sizes, input_size)
 
-    def get_tensor_view(self, dim: int, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            dim: dimension to use to modify tensor view
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-        return tensor_to_view.view(dim, 1, 1)
-
 
 class AnalogConv3dMapped(_AnalogConvNdMapped):
     """3D convolution layer that maps to analog tiles.
@@ -834,6 +816,8 @@ class AnalogConv3dMapped(_AnalogConvNdMapped):
             False, _triple(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
+
+        self.tensor_view = (-1, 1, 1, 1)
 
     @classmethod
     def from_digital(
@@ -947,15 +931,3 @@ class AnalogConv3dMapped(_AnalogConvNdMapped):
 
         image_sizes = [in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
         return (fold_indices, image_sizes, input_size)
-
-    def get_tensor_view(self, dim: int, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            dim: dimension to use to modify tensor view
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-        return tensor_to_view.view(dim, 1, 1, 1)
