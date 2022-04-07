@@ -51,4 +51,3 @@ plot_device_compact(
                                                                      down_pulse = down_pulse), n_steps=1000)
 
 plt.show()
-plt.savefig('my_figure.png')
