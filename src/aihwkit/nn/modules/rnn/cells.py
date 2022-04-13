@@ -5,6 +5,7 @@ from collections import namedtuple
 
 from torch import Tensor, sigmoid, stack, relu, tanh, jit, zeros, cat
 from torch.nn import Dropout, ModuleList, init
+import torch.jit as jit
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.simulator.configs import SingleRPUConfig

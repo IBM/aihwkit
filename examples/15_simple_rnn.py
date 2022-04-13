@@ -49,12 +49,12 @@ OUTPUT_SIZE = 1
 DROPOUT_RATIO = 0.0
 NOISE = 0.0
 
-EPOCHS = 100
+EPOCHS = 50
 BATCH_SIZE = 5
 SEQ_LEN = 501
 RNN_CELL = AnalogVanillaRNNCell #type of RNN cell
 WITH_EMBEDDING = True  # RNN with embedding
-WITH_BIDIR = True
+WITH_BIDIR = False
 USE_ANALOG_TRAINING = False  # or hardware-aware training
 
 if USE_ANALOG_TRAINING:
@@ -101,7 +101,6 @@ y_out = torch.stack(y_out_2d, dim=0).transpose(0, 1).unsqueeze(2)
 
 
 # Various RNN Network definitions
-
 class AnalogBidirRNNNetwork(AnalogSequential):
     """Analog Bidirectional RNN Network definition using AnalogLinear for embedding and decoder."""
 
@@ -118,7 +117,7 @@ class AnalogBidirRNNNetwork(AnalogSequential):
         embed = self.dropout(self.embedding(x_in))
         out, out_states = self.rnn(embed, in_states)
         out = self.dropout(self.decoder(out))
-        return out, out_states
+        return [out, out_states]
 
 class AnalogBidirRNNNetwork_noEmbedding(AnalogSequential):
     """Analog Bidirectional RNN Network definition without embedding layer and using AnalogLinear for decoder."""
@@ -136,7 +135,7 @@ class AnalogBidirRNNNetwork_noEmbedding(AnalogSequential):
         """ Forward pass """
         out, out_states = self.rnn(x_in, in_states)
         out = self.dropout(self.decoder(out))
-        return out, out_states
+        return [out, out_states]
 
 class AnalogRNNNetwork(AnalogSequential):
     """Analog RNN Network definition using AnalogLinear for embedding and decoder."""
@@ -154,7 +153,7 @@ class AnalogRNNNetwork(AnalogSequential):
         embed = self.dropout(self.embedding(x_in))
         out, out_states = self.rnn(embed, in_states)
         out = self.dropout(self.decoder(out))
-        return out, out_states
+        return [out, out_states]
 
 
 class AnalogRNNNetwork_noEmbedding(AnalogSequential):
@@ -173,7 +172,7 @@ class AnalogRNNNetwork_noEmbedding(AnalogSequential):
         """ Forward pass """
         out, out_states = self.rnn(x_in, in_states)
         out = self.dropout(self.decoder(out))
-        return out, out_states
+        return [out, out_states]
 
 if WITH_EMBEDDING:
     if WITH_BIDIR:
@@ -194,7 +193,8 @@ criterion = nn.MSELoss()
 losses = []
 for i in range(EPOCHS):
     optimizer.zero_grad()
-    pred, states = model(y_in)
+
+    pred, states = model(y_in, None)
 
     loss = criterion(pred, y_out)
     print('Epoch = %d: Train Perplexity = %f' % (i, np.exp(loss.detach().numpy())))
@@ -221,7 +221,10 @@ print("Test Perplexity = %f" % (np.exp(loss.detach().numpy())))
 plt.figure()
 plt.plot(y_out[:, 0, 0], '-b')
 plt.plot(pred.detach().numpy()[:, 0, 0], '-g')
-plt.legend(['truth', 'prediction'])
+plt.xlabel('x')
+plt.ylabel('y')
+plt.plot()
+plt.legend(['truth', 'analog prediction'])
 plt.savefig(os.path.join(RESULTS, 'test'))
 plt.close()
 
@@ -232,6 +235,8 @@ for t_inference in [0., 1., 20., 1000., 1e5]:
     model.drift_analog_weights(t_inference)
     pred_drift, states = model(y_in)
     plt.plot(pred_drift[:, 0, 0].detach().cpu().numpy(), label='t = ' + str(t_inference) + ' s')
+plt.xlabel('x')
+plt.ylabel('y')
 plt.legend()
 plt.savefig(os.path.join(RESULTS, 'drift'))
 plt.close()
