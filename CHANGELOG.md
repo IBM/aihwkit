@@ -28,7 +28,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Changed
 
 * The ``set_alpha_scale`` and ``get_alpha_scale`` methods of the C++ tiles are removed. (\#360)
-
+* The lowest supported Python version is now `3.7`, as `3.6` has reached
+  end-of-life. Additionally, the library now officially supports Python
+  `3.10`. (\#368)
 
 ## [0.5.1] - 2022/01/27
 
