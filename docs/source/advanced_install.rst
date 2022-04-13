@@ -33,7 +33,7 @@ C++11 compatible compiler
 `cmake`_                         3.18+
 `pybind11`_                      2.6.2+    Versions 2.6.0+ can be installed using ``pip`` (recommended)
 `scikit-build`_                  0.11.0+
-`Python 3 development headers`_  3.6+
+`Python 3 development headers`_  3.7+
 BLAS implementation                        `OpenBLAS`_ or `Intel MKL`_
 `PyTorch`_                       1.7+      The libtorch library and headers are needed [#f1]_
 `OpenMP`_                        11.0.0+   Optional, OpenMP library and headers [#f2]_
