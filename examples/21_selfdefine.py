@@ -15,14 +15,14 @@
 Plot the step response of a user defined device
 """
 
+import csv
+import os
+import matplotlib.pyplot as plt
+
 # Imports from aihwkit.
 from aihwkit.utils.visualization import plot_device_compact
 from aihwkit.simulator.configs.devices import SelfDefineDevice
 
-# Other imports.
-import matplotlib.pyplot as plt
-import csv
-import os
 
 # Declare variables and .csv path
 n_points = 0
@@ -32,7 +32,7 @@ path = os.getcwd() + '/' + os.path.dirname(__file__) + '/csv/selfdefine.csv'
 
 # Import .csv file to determine up_pulse, down_pulse, and n_points.
 try:
-    with open(path, newline = '') as csvfile:
+    with open(path, newline='') as csvfile:
         fieldnames = ['up_pulse', 'down_pulse']
         reader = csv.DictReader(csvfile, fieldnames=fieldnames)
         for i, row in enumerate(reader):
@@ -40,14 +40,14 @@ try:
                 up_pulse.append(float(row['up_pulse']))
                 down_pulse.append(float(row['down_pulse']))
             n_points = i
-except:
+except BaseException:
     print("ERROR: Could not read .csv file")
 
 plt.ion()
 plot_device_compact(
-    SelfDefineDevice(w_min=-1, w_max=1, dw_min=0.01, w_min_dtod=0.0, w_max_dtod=0.0, 
-                                                                     n_points = n_points,
-                                                                     up_pulse = up_pulse,
-                                                                     down_pulse = down_pulse), n_steps=1000)
+    SelfDefineDevice(w_min=-1, w_max=1, dw_min=0.01, w_min_dtod=0.0, w_max_dtod=0.0,
+                     n_points=n_points,
+                     up_pulse=up_pulse,
+                     down_pulse=down_pulse), n_steps=1000)
 
 plt.show()

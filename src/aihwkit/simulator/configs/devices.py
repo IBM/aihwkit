@@ -879,10 +879,10 @@ class SelfDefineDevice(PulsedDevice):
 
     This model is derived from ``PulsedDevice`` and uses all its
     parameters. ''SelfDefineDevice'' implements a new functionality
-    where the device characteristics are defined by the user. 
+    where the device characteristics are defined by the user.
 
-    Up and down pulse values are stored in selfdefine.csv and the 
-    number of points can be decreased to 2 and increased indefinitely. 
+    Up and down pulse values are stored in selfdefine.csv and the
+    number of points can be decreased to 2 and increased indefinitely.
     """
     bindings_class: ClassVar[Type] = devices.SelfDefineResistiveDeviceParameter
 
@@ -893,7 +893,7 @@ class SelfDefineDevice(PulsedDevice):
     up_pulse: List[float] = field(default_factory=list, metadata={'hide_if': []})
     r"""Array of values that characterize the up_pulse.
     """
-    
+
     down_pulse: List[float] = field(default_factory=list, metadata={'hide_if': []})
     r"""Array of values that characterize the down_pulse.
     """
