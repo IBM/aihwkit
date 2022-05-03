@@ -76,7 +76,6 @@ class ConversionLayerTest(ParametrizedTestCase):
         self.assertEqual(analog_model.__class__, AnalogSequential)
         self.assertTensorAlmostEqual(loss_func(analog_model(x_b), y_b), digital_loss)
 
-
     def test_conversion_torchvision_resnet(self):
         """Test converting resnet model from torchvision."""
         model = resnet18()
