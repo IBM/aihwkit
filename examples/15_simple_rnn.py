@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,7 +20,6 @@ results over time using analog hardware and drift compensation.
 # pylint: disable=invalid-name
 
 import os
-from collections import namedtuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,7 +29,8 @@ import torch
 from torch import nn
 
 # Imports from aihwkit.
-from aihwkit.nn import AnalogRNN, AnalogLSTMCell, AnalogGRUCell, AnalogVanillaRNNCell
+from aihwkit.nn import AnalogRNN
+from aihwkit.nn import AnalogLSTMCell  # or one of AnalogGRUCell, AnalogVanillaRNNCell
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs import InferenceRPUConfig
@@ -52,7 +52,7 @@ NOISE = 0.0
 EPOCHS = 50
 BATCH_SIZE = 5
 SEQ_LEN = 501
-RNN_CELL = AnalogVanillaRNNCell #type of RNN cell
+RNN_CELL = AnalogLSTMCell  # type of RNN cell
 WITH_EMBEDDING = True  # RNN with embedding
 WITH_BIDIR = False
 USE_ANALOG_TRAINING = False  # or hardware-aware training
@@ -82,6 +82,86 @@ else:
     rpu_config.drift_compensation = GlobalDriftCompensation()
 
 
+# Various RNN Network definitions
+class AnalogBidirRNNNetwork(AnalogSequential):
+    """Analog Bidirectional RNN Network definition using AnalogLinear for
+       embedding and decoder."""
+
+    def __init__(self):
+        super().__init__()
+        self.dropout = nn.Dropout(DROPOUT_RATIO)
+        self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
+        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
+                             dropout=DROPOUT_RATIO, bias=True,
+                             rpu_config=rpu_config)
+        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
+
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+        embed = self.dropout(self.embedding(x_in))
+        out, out_states = self.rnn(embed, in_states)
+        out = self.dropout(self.decoder(out))
+        return [out, out_states]
+
+
+class AnalogBidirRNNNetwork_noEmbedding(AnalogSequential):
+    """Analog Bidirectional RNN Network definition without embedding layer
+       and using AnalogLinear for decoder."""
+
+    def __init__(self):
+        super().__init__()
+        self.dropout = nn.Dropout(DROPOUT_RATIO)
+        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
+                             dropout=DROPOUT_RATIO, bias=True,
+                             rpu_config=rpu_config)
+        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
+                                    rpu_config=rpu_config)
+
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+        """ Forward pass """
+        out, out_states = self.rnn(x_in, in_states)
+        out = self.dropout(self.decoder(out))
+        return [out, out_states]
+
+
+class AnalogRNNNetwork(AnalogSequential):
+    """Analog RNN Network definition using AnalogLinear for embedding and
+       decoder."""
+
+    def __init__(self):
+        super().__init__()
+        self.dropout = nn.Dropout(DROPOUT_RATIO)
+        self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
+        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
+                             dropout=DROPOUT_RATIO, bias=True,
+                             rpu_config=rpu_config)
+        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
+
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+        embed = self.dropout(self.embedding(x_in))
+        out, out_states = self.rnn(embed, in_states)
+        out = self.dropout(self.decoder(out))
+        return [out, out_states]
+
+
+class AnalogRNNNetwork_noEmbedding(AnalogSequential):
+    """Analog RNN Network definition without embedding layer and using AnalogLinear for decoder."""
+
+    def __init__(self):
+        super().__init__()
+        self.dropout = nn.Dropout(DROPOUT_RATIO)
+        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
+                             dropout=DROPOUT_RATIO, bias=True,
+                             rpu_config=rpu_config)
+        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
+                                    rpu_config=rpu_config)
+
+    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+        """ Forward pass """
+        out, out_states = self.rnn(x_in, in_states)
+        out = self.dropout(self.decoder(out))
+        return [out, out_states]
+
+
 # Path to store results
 RESULTS = os.path.join(os.getcwd(), 'results', 'RNN')
 os.makedirs(RESULTS, exist_ok=True)
@@ -99,80 +179,6 @@ for i in range(BATCH_SIZE):
 y_in = torch.stack(y_in_2d, dim=0).transpose(0, 1).unsqueeze(2)
 y_out = torch.stack(y_out_2d, dim=0).transpose(0, 1).unsqueeze(2)
 
-
-# Various RNN Network definitions
-class AnalogBidirRNNNetwork(AnalogSequential):
-    """Analog Bidirectional RNN Network definition using AnalogLinear for embedding and decoder."""
-
-    def __init__(self):
-        super().__init__()
-        self.dropout = nn.Dropout(DROPOUT_RATIO)
-        self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
-        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
-                               dropout=DROPOUT_RATIO, bias=True,
-                               rpu_config=rpu_config)
-        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
-
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        embed = self.dropout(self.embedding(x_in))
-        out, out_states = self.rnn(embed, in_states)
-        out = self.dropout(self.decoder(out))
-        return [out, out_states]
-
-class AnalogBidirRNNNetwork_noEmbedding(AnalogSequential):
-    """Analog Bidirectional RNN Network definition without embedding layer and using AnalogLinear for decoder."""
-
-    def __init__(self):
-        super().__init__()
-        self.dropout = nn.Dropout(DROPOUT_RATIO)
-        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
-                               dropout=DROPOUT_RATIO, bias=True,
-                               rpu_config=rpu_config)
-        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
-                                    rpu_config=rpu_config)
-
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        """ Forward pass """
-        out, out_states = self.rnn(x_in, in_states)
-        out = self.dropout(self.decoder(out))
-        return [out, out_states]
-
-class AnalogRNNNetwork(AnalogSequential):
-    """Analog RNN Network definition using AnalogLinear for embedding and decoder."""
-
-    def __init__(self):
-        super().__init__()
-        self.dropout = nn.Dropout(DROPOUT_RATIO)
-        self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
-        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
-                               dropout=DROPOUT_RATIO, bias=True,
-                               rpu_config=rpu_config)
-        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
-
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        embed = self.dropout(self.embedding(x_in))
-        out, out_states = self.rnn(embed, in_states)
-        out = self.dropout(self.decoder(out))
-        return [out, out_states]
-
-
-class AnalogRNNNetwork_noEmbedding(AnalogSequential):
-    """Analog RNN Network definition without embedding layer and using AnalogLinear for decoder."""
-
-    def __init__(self):
-        super().__init__()
-        self.dropout = nn.Dropout(DROPOUT_RATIO)
-        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
-                               dropout=DROPOUT_RATIO, bias=True,
-                               rpu_config=rpu_config)
-        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
-                                    rpu_config=rpu_config)
-
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        """ Forward pass """
-        out, out_states = self.rnn(x_in, in_states)
-        out = self.dropout(self.decoder(out))
-        return [out, out_states]
 
 if WITH_EMBEDDING:
     if WITH_BIDIR:

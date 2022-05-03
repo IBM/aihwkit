@@ -1,18 +1,28 @@
-import warnings
-import math
-from typing import Any, List, Optional, Tuple, Type, Callable, Union
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+""" Analog cells for RNNs. """
+
+from typing import Optional, Tuple
 from collections import namedtuple
 
-from torch import Tensor, sigmoid, stack, relu, tanh, jit, zeros, cat
-from torch.nn import Dropout, ModuleList, init
-import torch.jit as jit
+from torch import Tensor, sigmoid, tanh, zeros
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
-from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
+from aihwkit.simulator.configs import InferenceRPUConfig
+from aihwkit.nn.modules.base import RPUConfigAlias
 
 LSTMState = namedtuple('LSTMState', ['hx', 'cx'])
+
 
 class AnalogVanillaRNNCell(AnalogSequential):
     """Analog Vanilla RNN Cell.
@@ -36,9 +46,9 @@ class AnalogVanillaRNNCell(AnalogSequential):
     ):
         super().__init__()
 
-        # Default to SingleRPUConfig with ConstantStepDevice.
+        # Default to InferenceRPUConfig
         if not rpu_config:
-            rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+            rpu_config = InferenceRPUConfig()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -49,14 +59,17 @@ class AnalogVanillaRNNCell(AnalogSequential):
                                       rpu_config=rpu_config,
                                       realistic_read_write=realistic_read_write)
 
-    def zero_state(self, batch_size):
-        """Returns a zeroed Vanilla RNN state
+    def get_zero_state(self, batch_size: int) -> Tensor:
+        """Returns a zeroed state.
 
         Args:
             batch_size: batch size of the input
 
+        Returns:
+           Zeroed state tensor
         """
-        return zeros(batch_size, self.hidden_size)
+        device = self.weight_ih.get_analog_tile_devices()[0]
+        return zeros(batch_size, self.hidden_size, device=device)
 
     def forward(
             self,
@@ -69,7 +82,8 @@ class AnalogVanillaRNNCell(AnalogSequential):
 
         out = tanh(igates + hgates)
 
-        return out, out #output will also be hidden state
+        return out, out  # output will also be hidden state
+
 
 class AnalogLSTMCell(AnalogSequential):
     """Analog LSTM Cell.
@@ -94,9 +108,9 @@ class AnalogLSTMCell(AnalogSequential):
     ):
         super().__init__()
 
-        # Default to SingleRPUConfig with ConstantStepDevice.
+        # Default to InferenceRPUConfig
         if not rpu_config:
-            rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+            rpu_config = InferenceRPUConfig()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -107,21 +121,22 @@ class AnalogLSTMCell(AnalogSequential):
                                       rpu_config=rpu_config,
                                       realistic_read_write=realistic_read_write)
 
-    def zero_state(self, batch_size):
-        """Returns a zeroed LSTM state
+    def get_zero_state(self, batch_size: int) -> Tensor:
+        """Returns a zeroed state.
 
         Args:
             batch_size: batch size of the input
 
+        Returns:
+           Zeroed state tensor
         """
-        return LSTMState(zeros(batch_size, self.hidden_size),
-                         zeros(batch_size, self.hidden_size))
+        device = self.weight_ih.get_analog_tile_devices()[0]
+        return LSTMState(zeros(batch_size, self.hidden_size, device=device),
+                         zeros(batch_size, self.hidden_size, device=device))
 
-    def forward(
-            self,
-            input_: Tensor,
-            state: Tuple[Tensor, Tensor]
-    ) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
+    def forward(self, input_: Tensor,
+                state: Tuple[Tensor, Tensor]) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
+
         # pylint: disable=arguments-differ
         h_x, c_x = state
         gates = self.weight_ih(input_) + self.weight_hh(h_x)
@@ -134,7 +149,9 @@ class AnalogLSTMCell(AnalogSequential):
 
         c_y = (forget_gate * c_x) + (in_gate * cell_gate)
         h_y = out_gate * tanh(c_y)
+
         return h_y, (h_y, c_y)
+
 
 class AnalogGRUCell(AnalogSequential):
     """Analog GRU Cell.
@@ -159,9 +176,9 @@ class AnalogGRUCell(AnalogSequential):
     ):
         super().__init__()
 
-        # Default to SingleRPUConfig with ConstantStepDevice.
+        # Default to InferenceRPUConfig
         if not rpu_config:
-            rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+            rpu_config = InferenceRPUConfig()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -172,29 +189,30 @@ class AnalogGRUCell(AnalogSequential):
                                       rpu_config=rpu_config,
                                       realistic_read_write=realistic_read_write)
 
-    def zero_state(self, batch_size):
-        """Returns a zeroed GRU RNN state
+    def get_zero_state(self, batch_size: int) -> Tensor:
+        """Returns a zeroed state.
 
         Args:
             batch_size: batch size of the input
 
+        Returns:
+           Zeroed state tensor
         """
-        return zeros(batch_size, self.hidden_size)
+        device = self.weight_ih.get_analog_tile_devices()[0]
+        return zeros(batch_size, self.hidden_size, device=device)
 
-    def forward(
-            self,
-            input_: Tensor,
-            state: Tensor
-    ) -> Tuple[Tensor, Tensor]:
+    def forward(self, input_: Tensor, state: Tensor) -> Tuple[Tensor, Tensor]:
+
         # pylint: disable=arguments-differ
-        gi = self.weight_ih(input_)
-        gh = self.weight_hh(state)
-        i_r, i_i, i_n = gi.chunk(3, 1)
-        h_r, h_i, h_n = gh.chunk(3, 1)
 
-        resetgate = sigmoid(i_r + h_r)
-        inputgate = sigmoid(i_i + h_i)
-        newgate = tanh(i_n + resetgate * h_n)
-        hy = newgate + inputgate * (state - newgate)
+        g_i = self.weight_ih(input_)
+        g_h = self.weight_hh(state)
+        i_r, i_i, i_n = g_i.chunk(3, 1)
+        h_r, h_i, h_n = g_h.chunk(3, 1)
 
-        return hy, hy #output will also be hidden state
+        reset_gate = sigmoid(i_r + h_r)
+        input_gate = sigmoid(i_i + h_i)
+        new_gate = tanh(i_n + reset_gate * h_n)
+        hidden_y = new_gate + input_gate * (state - new_gate)
+
+        return hidden_y, hidden_y  # output will also be hidden state

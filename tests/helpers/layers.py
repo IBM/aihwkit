@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,9 +16,16 @@
 
 from unittest import SkipTest
 
+from torch.nn import LSTM as LSTM_nn
+from torch.nn import GRU as GRU_nn
+from torch.nn import RNN as RNN_nn
+
 from aihwkit.nn import (
-    AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogLinear, AnalogRNN, AnalogLSTMCell, AnalogGRUCell, AnalogVanillaRNNCell,
-    AnalogLinearMapped, AnalogConv1dMapped, AnalogConv2dMapped, AnalogConv3dMapped
+    AnalogConv1d, AnalogConv2d, AnalogConv3d, AnalogLinear,
+    AnalogRNN, AnalogLSTMCell,
+    AnalogGRUCell, AnalogVanillaRNNCell,
+    AnalogLinearMapped, AnalogConv1dMapped,
+    AnalogConv2dMapped, AnalogConv3dMapped
 )
 from aihwkit.simulator.configs.utils import MappingParameter
 
@@ -172,6 +179,10 @@ class LSTM:
         kwargs['rpu_config'].mapping.digital_bias = self.digital_bias
         return AnalogRNN(AnalogLSTMCell, input_size, hidden_size, **kwargs)
 
+    def get_native_layer_comparison(self, *args, **kwargs):
+        return LSTM_nn(*args, **kwargs)
+
+
 class GRU:
     """AnalogGRU."""
 
@@ -182,6 +193,10 @@ class GRU:
         kwargs.setdefault('bias', self.bias)
         kwargs['rpu_config'].mapping.digital_bias = self.digital_bias
         return AnalogRNN(AnalogGRUCell, input_size, hidden_size, **kwargs)
+
+    def get_native_layer_comparison(self, *args, **kwargs):
+        return GRU_nn(*args, **kwargs)
+
 
 class VanillaRNN:
     """AnalogVanillaRNN."""
@@ -194,6 +209,8 @@ class VanillaRNN:
         kwargs['rpu_config'].mapping.digital_bias = self.digital_bias
         return AnalogRNN(AnalogVanillaRNNCell, input_size, hidden_size, **kwargs)
 
+    def get_native_layer_comparison(self, *args, **kwargs):
+        return RNN_nn(*args, **kwargs)
 
 
 class LinearCuda(Linear):
@@ -276,6 +293,10 @@ class LSTMCuda(LSTM):
     def get_layer(self, *args, **kwargs):
         return LSTM.get_layer(self, *args, **kwargs).cuda()
 
+    def get_native_layer_comparison(self, *args, **kwargs):
+        return LSTM.get_native_layer_comparison(self, *args, **kwargs).cuda()
+
+
 class GRUCuda(GRU):
     """AnalogGRUCuda."""
 
@@ -284,10 +305,17 @@ class GRUCuda(GRU):
     def get_layer(self, *args, **kwargs):
         return GRU.get_layer(self, *args, **kwargs).cuda()
 
+    def get_native_layer_comparison(self, *args, **kwargs):
+        return GRU.get_native_layer_comparison(self, *args, **kwargs).cuda()
+
+
 class VanillaRNNCuda(GRU):
     """AnalogVanillaRNNCuda."""
 
     use_cuda = True
 
     def get_layer(self, *args, **kwargs):
-        return VanillaRNNCuda.get_layer(self, *args, **kwargs).cuda()
+        return VanillaRNN.get_layer(self, *args, **kwargs).cuda()
+
+    def get_native_layer_comparison(self, *args, **kwargs):
+        return VanillaRNN.get_native_layer_comparison(self, *args, **kwargs).cuda()

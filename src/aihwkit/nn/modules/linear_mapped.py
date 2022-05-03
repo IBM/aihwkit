@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -96,7 +96,6 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             out_features,
             bias,
             realistic_read_write,
-            weight_scaling_omega,
             rpu_config.mapping
         )
         if self.analog_bias:
@@ -124,7 +123,8 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             self.analog_tile_array.append(in_tiles)
 
         # Set weights from the reset_parameters
-        self.set_weights(self.weight, self.bias)
+        self.set_weights(self.weight, self.bias, remap_weights=True,
+                         weight_scaling_omega=weight_scaling_omega)
 
         # Unregister weight/bias as a parameter but keep for sync
         self.unregister_parameter('weight')
@@ -153,7 +153,9 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             self,
             weight: Tensor,
             bias: Optional[Tensor] = None,
-            force_exact: bool = False
+            force_exact: bool = False,
+            remap_weights: bool = True,
+            weight_scaling_omega: float = None
     ) -> None:
         """Set the weight (and bias) with given Tensors.
 
@@ -173,6 +175,21 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             weight: weight matrix
             bias: bias vector
             force_exact: forces an exact write to the analog tiles
+            remap_weights: Whether to rescale the given weight matrix
+                and populate the digital output scaling factors as
+                specified in the configuration
+                :class:`~aihwkit.configs.utils.MappingParameter`. A
+                new ``weight_scaling_omega`` can be given. Note that
+                this will overwrite the existing digital out scaling
+                factors.
+
+                Note that each tile (in case of multiple mapped tiles)
+                has it separate out scaling factors.
+
+            weight_scaling_omega: The weight scaling omega factor (see
+                :class:`~aihwkit.configs.utils.MappingParameter`). If
+                given explicitly here, it will overwrite the value in
+                the mapping field.
 
         """
         shape = [self.out_features, self.in_features]
@@ -188,13 +205,16 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
 
                 tile_weight = weight[out_start:out_end, in_start:in_end]
 
-                if self.weight_scaling_omega > 0.0:
+                if remap_weights:
+
+                    omega = weight_scaling_omega
+                    if omega is None:
+                        omega = analog_tile.rpu_config.mapping.weight_scaling_omega
+
                     analog_tile.set_weights_scaled(
                         tile_weight, None,
                         realistic=realistic,
-                        omega=self.weight_scaling_omega,
-                        weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise,
-                        learn_out_scaling_alpha=self.learn_out_scaling_alpha
+                        weight_scaling_omega=omega
                     )
                 else:
                     analog_tile.set_weights(tile_weight, None, realistic=realistic)
@@ -208,7 +228,8 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
 
         self._sync_weights_from_tile()
 
-    def get_weights(self, force_exact: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
+    def get_weights(self, force_exact: bool = False,
+                    apply_out_scales: bool = True) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the weight (and bias) tensors.
 
         This uses an realistic read if the property ``realistic_read_write`` of
@@ -226,6 +247,14 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
 
         Args:
             force_exact: forces an exact read to the analog tiles
+            apply_out_scales: Whether to return the weights with the
+                (digital) output scaling factors applied. Note the
+                "logical" weights of the layer which the DNN is
+                effectively using are those with the output scales
+                applied. If ``apply_out_scales`` is set to False, then
+                only the weight values that is programmed onto the
+                crossbar array are returned, without applying the
+                digital scales.
 
         Returns:
             tuple: weight matrix, bias vector
@@ -238,11 +267,8 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         for in_tiles in self.analog_tile_array:
             in_tile_weight = []
             for analog_tile in in_tiles:
-                if self.weight_scaling_omega > 0.0:
-                    tile_weight, _ = analog_tile.get_weights_scaled(
-                        realistic=realistic,
-                        weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise
-                    )
+                if apply_out_scales:
+                    tile_weight, _ = analog_tile.get_weights_scaled(realistic=realistic)
                 else:
                     tile_weight, _ = analog_tile.get_weights(realistic=realistic)
                 in_tile_weight.append(tile_weight)
@@ -252,7 +278,7 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
 
         if self.digital_bias:
             with no_grad():
-                return weight, self.bias.data.detach().cpu()
+                return weight, self.bias.data.clone().detach().cpu()
         return weight, None
 
     def reset_parameters(self) -> None:
@@ -266,12 +292,12 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         # pylint: disable=arguments-differ,arguments-renamed
 
         if self.analog_tile_count() == 1:
+            analog_tile = self.analog_tile_array[0][0]
             out = AnalogFunction.apply(
-                self.analog_tile_array[0][0].get_analog_ctx(), x_input,
-                self.analog_tile_array[0][0].shared_weights, not self.training)
+                analog_tile.get_analog_ctx(), x_input,
+                analog_tile.shared_weights, not self.training)
 
-            if self.weight_scaling_omega:
-                out = out * self.analog_tile_array[0][0].out_scaling_alpha
+            out = analog_tile.apply_out_scaling(out, (-1, ))
 
             if self.digital_bias:
                 return out + self.bias
@@ -289,9 +315,7 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                     analog_tile.get_analog_ctx(), x,
                     analog_tile.shared_weights, not self.training)
 
-                if self.weight_scaling_omega:
-                    output = output * analog_tile.out_scaling_alpha
-
+                output = analog_tile.apply_out_scaling(output, (-1, ))
                 out_result.append(output)
 
             if idx == 0:

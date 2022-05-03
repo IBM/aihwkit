@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -33,6 +33,9 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     bool ls_allow_increasing_slope = false;
     bool ls_mean_bound_reference = true;
     bool ls_mult_noise = true;
+    bool ls_reverse_up = false;
+    bool ls_reverse_down = false;
+    T ls_reverse_offset = 0.01;
     ,
     /*print body*/
 
@@ -44,9 +47,21 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
        << " (dtod=" << ls_decrease_down_dtod << ")" << std::endl;
 
     ss << "\t ls_decrease_down_dtod:\t\t" << ls_decrease_down_dtod << std::endl;
+    if (ls_allow_increasing_slope) {
+      ss << "\t ls_allow_increasing_slope:\t" << std::boolalpha << ls_allow_increasing_slope
+         << std::endl;
+      ;
+    } if (ls_reverse_up) {
+      ss << "\t ls_reverse_up:\t" << std::boolalpha << ls_reverse_up << std::endl;
+      ;
+    } if (ls_reverse_down) {
+      ss << "\t ls_reverse_down:\t" << std::boolalpha << ls_reverse_down << std::endl;
+      ;
+    } if (ls_reverse_up || ls_reverse_down) {
+      ss << "\t ls_reverse_offset:\t" << ls_reverse_offset << std::endl;
+      ;
+    }
 
-    ss << "\t ls_allow_increasing_slope:\t" << std::boolalpha << ls_allow_increasing_slope
-       << std::endl;
     ,
     /* calc weight granularity body */
     return this->dw_min;
@@ -93,6 +108,18 @@ struct SoftBoundsRPUDeviceMetaParameter : LinearStepRPUDeviceMetaParameter<T> {
     // ss << "   ";
     // ss << getName() << " parameter:" << std::endl;
     ss << "\t ls_mult_noise:\t\t" << std::boolalpha << this->ls_mult_noise << std::endl;
+    if (this->ls_reverse_up) {
+      ss << "\t ls_reverse_up:\t" << std::boolalpha << this->ls_reverse_up << std::endl;
+      ;
+    }
+    if (this->ls_reverse_down) {
+      ss << "\t ls_reverse_down:\t" << std::boolalpha << this->ls_reverse_down << std::endl;
+      ;
+    }
+    if (this->ls_reverse_up || this->ls_reverse_down) {
+      ss << "\t ls_reverse_offset:\t" << this->ls_reverse_offset << std::endl;
+      ;
+    }
   };
 };
 

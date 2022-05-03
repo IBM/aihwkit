@@ -12,6 +12,26 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## Unreleased
+
+### Added
+
+* Set weights can be used to re-apply the weight scaling omega. (\#360)
+* Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
+* Reverse up / down option for ``LinearStepDevice``. (\#361)
+
+### Fixed
+
+* Legacy checkpoint load with alpha scaling. (\#360)
+* Re-application of weight scaling omega when loading checkpoints. (\#360) 
+
+### Changed
+
+* The ``set_alpha_scale`` and ``get_alpha_scale`` methods of the C++ tiles are removed. (\#360)
+* The lowest supported Python version is now `3.7`, as `3.6` has reached
+  end-of-life. Additionally, the library now officially supports Python
+  `3.10`. (\#368)
+
 ## [0.5.1] - 2022/01/27
 
 ### Added

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -81,7 +81,6 @@ class AnalogLinear(AnalogModuleBase, Linear):
             out_features,
             bias,
             realistic_read_write,
-            weight_scaling_omega,
             rpu_config.mapping
         )
         self.analog_tile = self._setup_tile(rpu_config)
@@ -90,7 +89,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
         self.register_analog_tile(self.analog_tile)
 
         # Set weights from the reset_parameters call
-        self.set_weights(self.weight, self.bias)
+        self.set_weights(self.weight, self.bias, remap_weights=True,
+                         weight_scaling_omega=weight_scaling_omega)
 
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
@@ -145,8 +145,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
                 self.analog_tile.get_analog_ctx(), x_input,
                 self.analog_tile.shared_weights, not self.training)
 
-        if self.weight_scaling_omega:
-            out = out * self.analog_tile.out_scaling_alpha
+        out = self.analog_tile.apply_out_scaling(out, (-1, ))
 
         if self.digital_bias:
             return out + self.bias

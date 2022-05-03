@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -250,7 +250,6 @@ class AnalogTile(BaseTile):
                 self.analog_ctx.cuda(device)
                 if self.out_scaling_alpha is not None:
                     self.out_scaling_alpha.data = self.out_scaling_alpha.data.cuda(device)
-
         return self
 
     def _create_simulator_tile(

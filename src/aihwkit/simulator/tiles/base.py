@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -14,8 +14,11 @@
 
 from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from copy import deepcopy
 
-from torch import Tensor, stack, zeros, as_tensor, cat, unsqueeze, squeeze
+from torch import (
+    Tensor, stack, zeros, as_tensor, cat, unsqueeze, squeeze, ones_like
+)
 from torch import device as torch_device
 from torch import max as torch_max
 from torch.nn import Parameter
@@ -52,7 +55,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
     ):
         self.out_size = out_size
         self.in_size = in_size
-        self.rpu_config = rpu_config
+        self.rpu_config = deepcopy(rpu_config)
         self.bias = bias
         self.in_trans = in_trans
         self.out_trans = out_trans
@@ -135,7 +138,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
         current_dict['analog_tile_hidden_parameter_names'] \
             = self.tile.get_hidden_parameter_names()
         current_dict['analog_tile_class'] = self.__class__.__name__
-        current_dict['analog_alpha_scale'] = self.tile.get_alpha_scale()
         current_dict['analog_lr'] = self.tile.get_learning_rate()
         current_dict['shared_weights'] = self.shared_weights
         current_dict.pop('tile', None)
@@ -168,7 +170,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         weights = current_dict.pop('analog_tile_weights')
         hidden_parameters = current_dict.pop('analog_tile_hidden_parameters')
         hidden_parameters_names = current_dict.pop('analog_tile_hidden_parameter_names', [])
-        alpha_scale = current_dict.pop('analog_alpha_scale')
+        alpha_scale = current_dict.pop('analog_alpha_scale', None)
         tile_class = current_dict.pop('analog_tile_class', self.__class__.__name__)
         analog_lr = current_dict.pop('analog_lr', 0.01)
         analog_ctx = current_dict.pop('analog_ctx')
@@ -202,8 +204,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
                             'Hidden parameter structure is unexpected.')
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
         self.tile.set_weights(weights)
-        if alpha_scale is not None:
-            self.tile.set_alpha_scale(alpha_scale)
 
         self.tile.set_learning_rate(analog_lr)
 
@@ -228,6 +228,16 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         if to_device.type.startswith('cuda'):
             self.cuda(to_device)
+
+        if alpha_scale is not None:
+            # legacy. We apply the alpha scale instaed of the
+            # out_scaling_alpha when loading. The alpha_scale
+            # mechansim is now replaced with the out scaling factors
+            #
+            # Caution: will overwrite the loaded out_scaling_alphas
+            # if they would exist also (should not be for old checkpoints)
+
+            self.set_out_scaling_alpha(alpha_scale)
 
     def _create_simulator_tile(
             self,
@@ -303,10 +313,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         return self.tile.set_weights(combined_weights.numpy())
 
-    def get_weights(
-            self,
-            realistic: bool = False
-    ) -> Tuple[Tensor, Optional[Tensor]]:
+    def get_weights(self, realistic: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases).
 
         Gets the tile weights and extracts the mathematical weight
@@ -350,9 +357,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             biases: Optional[Tensor] = None,
             realistic: bool = False,
             n_loops: int = 10,
-            omega: float = 1.0,
-            weight_scaling_omega_columnwise: bool = False,
-            learn_out_scaling_alpha: bool = False,
+            weight_scaling_omega: Optional[float] = None
     ) -> None:
         r"""Set the tile weights (and biases) in a scaled fashion.
 
@@ -384,12 +389,14 @@ class BaseTile(Generic[RPUConfigGeneric]):
                 closed-loop manner.
                 A value of ``1`` means that all columns in principle receive
                 enough pulses to change from ``w_min`` to ``w_max``.
-            omega: where the weight max should be mapped in terms of the weight
-                range. Note that for ``omega`` larger than the maximal weight of
-                the device, weights will get clipped for most devices.
-            weight_scaling_omega_columnwise: whether the weight matrix will be
-                remapped column-wise over the maximum device value allowed.
-            learn_out_scaling_alpha: whether the alpha scaling are learnable.
+            weight_scaling_omega: where the weight max should be mapped in terms of
+                the weight range. Note that for ``omega`` larger than
+                the maximal weight of the device, weights will get
+                clipped for most devices. If this parameter is not
+                given, it will default to the ``weight_scaling_omega``
+                value set in the
+                :class:`~aihwkit.configs.utils.MappingParameter` of the
+                ``rpu_config``
 
         Returns:
             None.
@@ -399,6 +406,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
                 specified.
 
         .. _`Rasch, Gokmen & Haensch (2019)`: https://arxiv.org/abs/1906.02698
+
         """
         # Prepare the array expected by the pybind function, appending the
         # biases row if needed.
@@ -414,29 +422,38 @@ class BaseTile(Generic[RPUConfigGeneric]):
         else:
             # Use only the ``[out_size, in_size]`` matrix.
             combined_weights = weights_torch
-        # Scale the weights.
-        if weight_scaling_omega_columnwise:
+
+        mapping = self.rpu_config.mapping  # type: ignore
+        omega = weight_scaling_omega
+        if omega is None:
+            omega = mapping.weight_scaling_omega
+
+        # Apply the scaling
+        if mapping.weight_scaling_omega_columnwise:
             weight_max, _ = torch_max(abs(combined_weights), 1, keepdim=True)
         else:
             weight_max = torch_max(abs(combined_weights)).view(1)
 
-        combined_weights = combined_weights / weight_max * omega
-        alpha = weight_max / omega
-
-        if learn_out_scaling_alpha:
-            self.out_scaling_alpha.data = squeeze(as_tensor(alpha))
+        if omega > 0:
+            alpha = weight_max / omega
+        elif mapping.learn_out_scaling_alpha:
+            alpha = ones_like(weight_max)
         else:
-            self.out_scaling_alpha = squeeze(as_tensor(alpha))
+            alpha = None
+
+        if alpha is not None:
+            combined_weights = combined_weights / alpha
+
+        self.set_out_scaling_alpha(alpha)
+
+        # update the mapping field
+        self.rpu_config.mapping.weight_scaling_omega = omega  # type: ignore
 
         if realistic:
             return self.tile.set_weights_realistic(combined_weights.numpy(), n_loops)
         return self.tile.set_weights(combined_weights.numpy())
 
-    def get_weights_scaled(
-            self,
-            realistic: bool = False,
-            weight_scaling_omega_columnwise: bool = False,
-    ) -> Tuple[Tensor, Optional[Tensor]]:
+    def get_weights_scaled(self, realistic: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases) and applies the current alpha
         scale to it.
 
@@ -451,8 +468,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             realistic: Whether to use the forward pass to read out the tile
                 weights iteratively, using :meth:`get_weights_realistic`.
-            weight_scaling_omega_columnwise: whether the weight matrix will be
-                remapped column-wise over the maximum device value allowed.
 
         Returns:
             tuple: where the first item is the ``[out_size, in_size]`` weight
@@ -461,16 +476,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
                 scale applied.
         """
         weights, biases = self.get_weights(realistic=realistic)
+
+        if self.out_scaling_alpha is None:
+            return weights, biases
+
         alpha = self.out_scaling_alpha.clone().detach().cpu()
-
-        if self.bias:
-            if weight_scaling_omega_columnwise:
-                return weights*alpha.view(weights.size(0), 1), biases*alpha
-            return weights*alpha, biases*alpha
-
-        if weight_scaling_omega_columnwise:
-            return weights*alpha.view(weights.size(0), 1), None
-        return weights*alpha, None
+        return weights * alpha.view(-1, 1), biases * alpha if self.bias else None
 
     def get_out_scaling_alpha(self) -> Tensor:
         """Get the out_scaling_alpha used to scale the weights
@@ -479,6 +490,40 @@ class BaseTile(Generic[RPUConfigGeneric]):
             tensor: out_scaling_alpha
             """
         return self.out_scaling_alpha
+
+    def set_out_scaling_alpha(self, alpha: Union[Tensor, float]) -> None:
+        """Helper function to set the out scaling alpha used to scale the
+        weights in digital.
+
+        Args:
+            alpha: out scaling alpha scale as a tensor or float
+                value (depending on the property set by in the
+                :class:`~aihwkit.configs.utils.MappingParameter`
+                configurations
+
+        Caution:
+            Will not check the correct size of the given alpha.
+        """
+        if alpha is None:
+            self.out_scaling_alpha = None
+        elif isinstance(self.out_scaling_alpha, Parameter):
+            self.out_scaling_alpha.data = squeeze(as_tensor(alpha)).to(self.device)
+        else:
+            self.out_scaling_alpha = squeeze(as_tensor(alpha)).to(self.device)
+
+    def apply_out_scaling(self, values: Tensor, tensor_view: Tuple[int, ...] = (-1, )) -> Tensor:
+        """Apply the out scaling to the given tensor.
+
+        Args:
+            values: tensor to apply the out scaling alphas to.
+            tensor_view: view to cast the out scaling alphas before multiplication
+
+        Returns:
+            output tensor with applied out scaling factors
+        """
+        if self.out_scaling_alpha is not None:
+            return values * self.out_scaling_alpha.view(*tensor_view)
+        return values
 
     def set_learning_rate(self, learning_rate: float) -> None:
         """Set the tile learning rate.

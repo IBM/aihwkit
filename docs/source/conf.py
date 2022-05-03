@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../../src'))
 # -- Project information -----------------------------------------------------
 
 project = 'IBM Analog Hardware Acceleration Kit'
-copyright = '2020, 2021 IBM Research'
+copyright = '2020, 2021, 2022 IBM Research'
 author = 'IBM Research'
 
 

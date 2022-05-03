@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -806,23 +806,6 @@ void declare_rpu_tiles(py::module &m) {
 
            Args:
                idx: index of the (unit cell) devices, returns 0 in all other cases.
-           )pbdoc")
-      .def(
-          "set_alpha_scale", &Class::setAlphaScale,
-          R"pbdoc( Set a global scale on the forward and backward computation,
-           which is applied in digital at the output.
-
-           Args:
-               scale: the scalar scale value (default is 1.0)
-           )pbdoc")
-      .def(
-          "get_alpha_scale", &Class::getFwdAlpha, // only allow the setting of forward/backward
-          R"pbdoc( Get the global scale for forward computation. Backward computation will use
-          the same if set by without noise.
-           )pbdoc")
-      .def(
-          "get_backward_alpha_scale", &Class::getBwdAlpha,
-          R"pbdoc( Get the global scale for backward computation.
            )pbdoc");
 
   py::class_<ClassPulsed, Class>(

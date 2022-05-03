@@ -1,16 +1,27 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+""" Analog RNN modules. """
+
 import warnings
 import math
 from typing import Any, List, Optional, Tuple, Type, Callable
-from collections import namedtuple
-
-from torch import Tensor, sigmoid, stack, tanh, jit, zeros, cat
+from torch import Tensor, jit
 from torch.nn import Dropout, ModuleList, init
 
-from aihwkit.nn import AnalogLinear, AnalogSequential
+from aihwkit.nn import AnalogSequential
 from aihwkit.nn.modules.rnn.layers import AnalogRNNLayer, AnalogBidirRNNLayer
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
+
 
 class ModularRNN(AnalogSequential):
     """Helper class to create a Modular RNN
@@ -35,8 +46,8 @@ class ModularRNN(AnalogSequential):
             first_layer_args: Any,
             other_layer_args: Any):
         super().__init__()
-        self.layers = init_stacked_analog_lstm(num_layers, layer, first_layer_args,
-                                               other_layer_args)
+        self.layers = self.init_stacked_analog_lstm(num_layers, layer, first_layer_args,
+                                                    other_layer_args)
 
         # Introduce a Dropout layer on the outputs of each RNN layer except
         # the last layer.
@@ -47,14 +58,39 @@ class ModularRNN(AnalogSequential):
                           '1, but got num_layers = 1')
         self.dropout_layer = Dropout(dropout) if dropout else None
 
-    def zero_state(self, batch_size):
-        """Returns a zeroed RNN state based on cell type
+    @staticmethod
+    def init_stacked_analog_lstm(
+            num_layers: int,
+            layer: Type,
+            first_layer_args: Any,
+            other_layer_args: Any
+    ) -> ModuleList:
+        """Construct a list of LSTMLayers over which to iterate.
+
+        Args:
+            num_layers: number of serially connected LSTM layers
+            layer: RNN layer type (e.g. AnalogLSTMLayer)
+            first_layer_args: RNNCell type, input_size, hidden_size, rpu_config, etc.
+            other_layer_args: RNNCell type, hidden_size, hidden_size, rpu_config, etc.
+
+        Returns:
+            torch.nn.ModuleList, which is similar to a regular Python list,
+            but where torch.nn.Module methods can be applied
+        """
+        layers = [layer(*first_layer_args)] \
+            + [layer(*other_layer_args) for _ in range(num_layers - 1)]
+        return ModuleList(layers)
+
+    def get_zero_state(self, batch_size: int) -> List[Tensor]:
+        """Returns a zeroed state.
 
         Args:
             batch_size: batch size of the input
 
+        Returns:
+           List of zeroed state tensors for each layer
         """
-        return self.layers[0].zero_state(batch_size)
+        return [lay.get_zero_state(batch_size) for lay in self.layers]
 
     def forward(
             self,
@@ -76,6 +112,7 @@ class ModularRNN(AnalogSequential):
 
         return output, output_states
 
+
 class AnalogRNN(AnalogSequential):
     """Modular RNN that uses analog tiles.
 
@@ -83,17 +120,17 @@ class AnalogRNN(AnalogSequential):
         cell: type of RNN (LSTM/GRU/VanillaRNN)
         input_size: in_features to W_{ih} matrix of first layer
         hidden_size: in_features and out_features for W_{hh} matrices
-        num_layers: number of serially connected RNN layers
-        dropout: dropout applied to output of all RNN layers except last
         bias: whether to use a bias row on the analog tile or not
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and read out of weights
         xavier: whether standard PyTorch LSTM weight
             initialization (default) or Xavier initialization
+        num_layers: number of serially connected RNN layers
         bidir: if True, becomes a bidirectional RNN
+        dropout: dropout applied to output of all RNN layers except last
     """
-    # pylint: disable=abstract-method
+    # pylint: disable=abstract-method, too-many-arguments
 
     def __init__(
             self,
@@ -170,14 +207,17 @@ class AnalogRNN(AnalogSequential):
             stdv = 1. / math.sqrt(self.hidden_size)
             self.init_layers(lambda x: x.uniform_(-stdv, stdv))
 
-    def zero_state(self, batch_size: int) -> List:
+    def get_zero_state(self, batch_size: int) -> List[Tensor]:
         """Returns a zeroed RNN state based on cell type and layer type
 
         Args:
             batch_size: batch size of the input
 
+        Returns:
+           List of zeroed state tensors for each layer
+
         """
-        return [self.rnn.zero_state(batch_size) for _ in range(self.num_layers)]
+        return self.rnn.get_zero_state(batch_size)
 
     def forward(
             self,
@@ -187,28 +227,6 @@ class AnalogRNN(AnalogSequential):
         # pylint: disable=arguments-differ
         if states is None:
             # TODO: batch_first.
-            states = self.zero_state(x.shape[1])
+            states = self.get_zero_state(x.shape[1])
 
         return self.rnn(x, states)
-
-def init_stacked_analog_lstm(
-        num_layers: int,
-        layer: Type,
-        first_layer_args: Any,
-        other_layer_args: Any
-) -> ModuleList:
-    """Construct a list of LSTMLayers over which to iterate.
-
-    Args:
-        num_layers: number of serially connected LSTM layers
-        layer: RNN layer type (e.g. AnalogLSTMLayer)
-        first_layer_args: RNNCell type, input_size, hidden_size, rpu_config, etc.
-        other_layer_args: RNNCell type, hidden_size, hidden_size, rpu_config, etc.
-
-    Returns:
-        torch.nn.ModuleList, which is similar to a regular Python list,
-        but where torch.nn.Module methods can be applied
-    """
-    layers = [layer(*first_layer_args)] \
-        + [layer(*other_layer_args) for _ in range(num_layers - 1)]
-    return ModuleList(layers)

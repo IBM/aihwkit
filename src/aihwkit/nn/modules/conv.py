@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -91,7 +91,6 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             out_channels,
             bias,
             realistic_read_write,
-            weight_scaling_omega,
             rpu_config.mapping
         )
         self.analog_tile = self._setup_tile(rpu_config)
@@ -100,11 +99,13 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         self.register_analog_tile(self.analog_tile)
 
         # Set weights from the reset_parameters
-        self.set_weights(self.weight, self.bias)
+        self.set_weights(self.weight, self.bias, remap_weights=True,
+                         weight_scaling_omega=weight_scaling_omega)
 
         # Set the index matrices.
         self.fold_indices = Tensor().detach()
         self.input_size = 0
+        self.tensor_view = (-1,)  # type: Tuple[int, ...]
 
         # Unregister weight/bias as a parameter but keep it for syncs
         self.unregister_parameter('weight')
@@ -153,18 +154,6 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         """
         raise NotImplementedError
 
-    def get_tensor_view(self, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-
-        raise NotImplementedError
-
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
         input_size = x_input.numel() / x_input.size(0)
@@ -175,15 +164,10 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             self.analog_tile.get_analog_ctx(), x_input,
             self.analog_tile.shared_weights, not self.training)
 
-        if self.weight_scaling_omega:
-            alpha = self.analog_tile.out_scaling_alpha
-            if self.weight_scaling_omega_columnwise:
-                alpha = self.get_tensor_view(alpha)
-            out = out * alpha
+        out = self.analog_tile.apply_out_scaling(out, self.tensor_view)
 
         if self.digital_bias:
-            digital_bias = self.get_tensor_view(self.bias)
-            return out + digital_bias
+            return out + self.bias.view(*self.tensor_view)
         return out
 
 
@@ -250,6 +234,8 @@ class AnalogConv1d(_AnalogConvNd):
             False, _single(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
+
+        self.tensor_view = (-1, 1)
 
     @classmethod
     def from_digital(
@@ -350,18 +336,6 @@ class AnalogConv1d(_AnalogConvNd):
         image_sizes = [in_channels, x_height, d_height]
         return (fold_indices, image_sizes, input_size)
 
-    def get_tensor_view(self, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-
-        return tensor_to_view.view(self.out_channels, 1)
-
 
 class AnalogConv2d(_AnalogConvNd):
     """2D convolution layer that uses an analog tile.
@@ -423,6 +397,8 @@ class AnalogConv2d(_AnalogConvNd):
             False, _pair(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
+
+        self.tensor_view = (-1, 1, 1)
 
     @classmethod
     def from_digital(
@@ -513,17 +489,6 @@ class AnalogConv2d(_AnalogConvNd):
         image_sizes = [in_channels, x_height, x_width, d_height, d_width]
         return (fold_indices, image_sizes, input_size)
 
-    def get_tensor_view(self, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-        return tensor_to_view.view(self.out_channels, 1, 1)
-
 
 class AnalogConv3d(_AnalogConvNd):
     """3D convolution layer that uses an analog tile.
@@ -588,6 +553,8 @@ class AnalogConv3d(_AnalogConvNd):
             False, _triple(0), groups, bias, padding_mode,
             rpu_config, realistic_read_write, weight_scaling_omega
         )
+
+        self.tensor_view = (-1, 1, 1, 1)
 
     @classmethod
     def from_digital(
@@ -702,14 +669,3 @@ class AnalogConv3d(_AnalogConvNd):
 
         image_sizes = [in_channels, x_depth, x_height, x_width, d_depth, d_height, d_width]
         return (fold_indices, image_sizes, input_size)
-
-    def get_tensor_view(self, tensor_to_view: Tensor) -> Tensor:
-        """Return the correct view to the input tensor.
-
-        Args:
-            tensor_to_view: tensor to modify view of
-
-        Returns:
-            tensor: tensor_to_view with correct view
-        """
-        return tensor_to_view.view(self.out_channels, 1, 1, 1)
