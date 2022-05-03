@@ -12,6 +12,8 @@
 
 """Tests for model conversions."""
 
+from unittest import SkipTest
+
 from torch import Tensor, manual_seed
 from torch.nn import Sequential, Linear
 from torch.nn.functional import mse_loss
@@ -27,8 +29,8 @@ from .helpers.testcases import ParametrizedTestCase
 
 
 @parameterized_class([
-    {'use_cuda': False, 'name': 'Cuda'},
-    {'use_cuda': True, 'name': 'Cpu'},
+    {'use_cuda': False, 'name': 'CPU'},
+    {'use_cuda': True, 'name': 'CUDA'},
 ], class_name_func=lambda cls, _, params_dict: '%s%s' % (cls.__name__, params_dict['name']))
 class ConversionLayerTest(ParametrizedTestCase):
     """Linear layer abstractions tests."""
@@ -74,11 +76,12 @@ class ConversionLayerTest(ParametrizedTestCase):
         self.assertEqual(analog_model.__class__, AnalogSequential)
         self.assertTensorAlmostEqual(loss_func(analog_model(x_b), y_b), digital_loss)
 
+
     def test_conversion_torchvision_resnet(self):
         """Test converting resnet model from torchvision."""
         model = resnet18()
         if self.use_cuda:
-            model = model.cuda()
+            raise SkipTest('Skipping for CUDA.')
 
         analog_model = convert_to_analog(model, FloatingPointRPUConfig())
         self.assertEqual(analog_model.conv1.__class__, AnalogConv2d)
@@ -89,7 +92,7 @@ class ConversionLayerTest(ParametrizedTestCase):
         """Test converting resnet model from torchvision"""
         model = alexnet()
         if self.use_cuda:
-            model = model.cuda()
+            raise SkipTest('Skipping for CUDA.')
 
         analog_model = convert_to_analog(model, FloatingPointRPUConfig())
         self.assertEqual(analog_model.features[0].__class__, AnalogConv2d)
