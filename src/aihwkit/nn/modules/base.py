@@ -18,6 +18,7 @@ from typing import (
 
 from torch import Tensor, no_grad, ones, float32
 from torch.nn import Module, Parameter
+from torch import device as torch_device
 
 from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.configs.configs import (
@@ -162,6 +163,14 @@ class AnalogModuleBase(Module):
             if isinstance(param, AnalogContext):
                 new_name = name.split(self.ANALOG_CTX_PREFIX)[-1]
                 yield (new_name, param.analog_tile)
+
+    def get_analog_tile_devices(self) -> List[Optional[Union[torch_device, str, int]]]:
+        """ Return a list of the devices used by the analog tiles.
+
+        Returns:
+            List of torch devices
+        """
+        return [d.device for d in self.analog_tiles()]
 
     def analog_tile_count(self) -> int:
         """Return the number of registered tiles.
