@@ -25,23 +25,22 @@ from aihwkit.simulator.configs.devices import SelfDefineDevice
 
 
 # Declare variables and .csv path
-n_points = 0
 up_pulse = []
 down_pulse = []
-path = os.getcwd() + '/' + os.path.dirname(__file__) + '/csv/selfdefine.csv'
+FILE_NAME = os.getcwd() + '/' + os.path.dirname(__file__) + '/csv/selfdefine.csv'
 
 # Import .csv file to determine up_pulse, down_pulse, and n_points.
-try:
-    with open(path, newline='') as csvfile:
-        fieldnames = ['up_pulse', 'down_pulse']
-        reader = csv.DictReader(csvfile, fieldnames=fieldnames)
-        for i, row in enumerate(reader):
-            if i != 0:
-                up_pulse.append(float(row['up_pulse']))
-                down_pulse.append(float(row['down_pulse']))
-            n_points = i
-except BaseException:
-    print("ERROR: Could not read .csv file")
+if not os.path.exists(FILE_NAME):
+    raise RuntimeError
+
+with open(FILE_NAME, newline='', encoding="utf8") as csvfile:
+    fieldnames = ['up_pulse', 'down_pulse']
+    reader = csv.DictReader(csvfile, fieldnames=fieldnames)
+    for i, row in enumerate(reader):
+        if i != 0:
+            up_pulse.append(float(row['up_pulse']))
+            down_pulse.append(float(row['down_pulse']))
+        n_points = i
 
 plt.ion()
 plot_device_compact(

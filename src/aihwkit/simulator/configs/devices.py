@@ -873,6 +873,7 @@ class PowStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+
 @dataclass
 class SelfDefineDevice(PulsedDevice):
     r"""Self defined device characteristics.
@@ -897,6 +898,7 @@ class SelfDefineDevice(PulsedDevice):
     down_pulse: List[float] = field(default_factory=list, metadata={'hide_if': []})
     r"""Array of values that characterize the down_pulse.
     """
+
 
 ###############################################################################
 # Specific devices based on ``unit cell``.
