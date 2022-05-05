@@ -27,7 +27,7 @@ void declare_rpu_devices(py::module &m) {
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
   using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
   using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
-  using SelfDefineParam = RPU::SelfDefineRPUDeviceMetaParameter<T>;
+  using PiecewiseStepParam = RPU::PiecewiseStepRPUDeviceMetaParameter<T>;
   using BufferedTransferParam = RPU::BufferedTransferRPUDeviceMetaParameter<T>;
 
   /*
@@ -281,24 +281,25 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
-  class PySelfDefineParam : public SelfDefineParam {
+  class PyPiecewiseStepParam : public PiecewiseStepParam {
   public:
     std::string getName() const override {
-      PYBIND11_OVERLOAD(std::string, SelfDefineParam, getName, );
+      PYBIND11_OVERLOAD(std::string, PiecewiseStepParam, getName, );
     }
-    SelfDefineParam *clone() const override {
-      PYBIND11_OVERLOAD(SelfDefineParam *, SelfDefineParam, clone, );
+    PiecewiseStepParam *clone() const override {
+      PYBIND11_OVERLOAD(PiecewiseStepParam *, PiecewiseStepParam, clone, );
     }
     RPU::DeviceUpdateType implements() const override {
-      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, SelfDefineParam, implements, );
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, PiecewiseStepParam, implements, );
     }
-    RPU::SelfDefineRPUDevice<T> *
+    RPU::PiecewiseStepRPUDevice<T> *
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(
-          RPU::SelfDefineRPUDevice<T> *, SelfDefineParam, createDevice, x_size, d_size, rng);
+          RPU::PiecewiseStepRPUDevice<T> *, PiecewiseStepParam, createDevice, x_size,
+          d_size, rng);
     }
     T calcWeightGranularity() const override {
-      PYBIND11_OVERLOAD(T, SelfDefineParam, calcWeightGranularity, );
+      PYBIND11_OVERLOAD(T, PiecewiseStepParam, calcWeightGranularity, );
     }
   };
 
@@ -694,20 +695,21 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<SelfDefineParam, PySelfDefineParam, PulsedParam>(m, "SelfDefineResistiveDeviceParameter")
+  py::class_<PiecewiseStepParam, PyPiecewiseStepParam, PulsedParam>(
+      m, "PiecewiseStepResistiveDeviceParameter")
       .def(py::init<>())
-      .def_readwrite("n_points", &SelfDefineParam::sd_n_points)
-      .def_readwrite("up_pulse", &SelfDefineParam::sd_up_pulse)
-      .def_readwrite("down_pulse", &SelfDefineParam::sd_down_pulse)
+      .def_readwrite("piecewise_up", &PiecewiseStepParam::piecewise_up_vec)
+      .def_readwrite("piecewise_down", &PiecewiseStepParam::piecewise_down_vec)
+      .def_readwrite("write_noise_std", &PiecewiseStepParam::write_noise_std)
       .def(
           "__str__",
-          [](SelfDefineParam &self) {
+          [](PiecewiseStepParam &self) {
             std::stringstream ss;
             self.printToStream(ss);
             return ss.str();
           })
       .def(
-          "calc_weight_granularity", &SelfDefineParam::calcWeightGranularity,
+          "calc_weight_granularity", &PiecewiseStepParam::calcWeightGranularity,
           R"pbdoc(
         Calculates the granularity of the weights (typically ``dw_min``)
 
