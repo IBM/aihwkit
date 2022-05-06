@@ -295,8 +295,7 @@ void declare_rpu_devices(py::module &m) {
     RPU::PiecewiseStepRPUDevice<T> *
     createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
       PYBIND11_OVERLOAD(
-          RPU::PiecewiseStepRPUDevice<T> *, PiecewiseStepParam, createDevice, x_size,
-          d_size, rng);
+          RPU::PiecewiseStepRPUDevice<T> *, PiecewiseStepParam, createDevice, x_size, d_size, rng);
     }
     T calcWeightGranularity() const override {
       PYBIND11_OVERLOAD(T, PiecewiseStepParam, calcWeightGranularity, );

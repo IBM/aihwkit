@@ -908,7 +908,7 @@ class PiecewiseStepDevice(PulsedDevice):
     piecewise_down: List[float] = field(default_factory=list, metadata={'hide_if': []})
     r"""Array of values that characterize the update steps in downwards direction.
 
-    Analogous to ``piecewise_up`` but for the downwards direction. 
+    Analogous to ``piecewise_up`` but for the downwards direction.
     """
 
     write_noise_std: float = 0.0
