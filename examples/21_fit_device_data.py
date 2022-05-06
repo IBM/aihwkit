@@ -141,6 +141,8 @@ my_device = PiecewiseStepDevice(w_min=-1, w_max=1, w_min_dtod=0.0, w_max_dtod=0.
                                 piecewise_up=piecewise_up,
                                 piecewise_down=piecewise_down
                                 )
+print(my_device)
+
 # plot the pulse response
 plt.ion()
 fig = plot_device_compact(my_device, n_steps=1000, use_cuda=USE_CUDA)

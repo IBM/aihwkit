@@ -26,8 +26,8 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     DeviceUpdateType::PiecewiseStep,
 
     /*parameter def*/
-    std::vector<T> piecewise_up_vec;
-    std::vector<T> piecewise_down_vec;
+    std::vector<T> piecewise_up_vec{1};
+    std::vector<T> piecewise_down_vec{1};
     ,
     /*print body*/
     if (piecewise_up_vec.size() > 0) {
@@ -40,20 +40,17 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     /* calc weight granularity body */
     if (piecewise_up_vec.size() > 0 && piecewise_down_vec.size() > 0) {
       size_t middle = piecewise_up_vec.size() / 2;
-      return (this->dw_min * piecewise_up_vec[middle] + this->dw_min * piecewise_down_vec[middle]) /
-             (T)2.0;
-    },
+      return this->dw_min * piecewise_up_vec[middle];
+    } else { return this->dw_min; },
     /*Add*/
     bool implementsWriteNoise() const override { return true; };
     void initialize() override {
       PulsedRPUDeviceMetaParameter<T>::initialize();
-      if ((piecewise_up_vec.size() > 0) && (piecewise_down_vec.size() == 0)) {
-        piecewise_down_vec = piecewise_up_vec;
-      } else if ((piecewise_up_vec.size() == 0) && (piecewise_down_vec.size() >= 0)) {
-        piecewise_up_vec = piecewise_down_vec;
+      if ((piecewise_up_vec.size() == 0) || (piecewise_down_vec.size() == 0)) {
+        RPU_FATAL("piecewise_up_vec and piecewise_down_vec needs to have some contents.");
       }
       if (piecewise_up_vec.size() != piecewise_down_vec.size()) {
-        RPU_FATAL("piecewise_up_vec and piecewise_down_vec needs to have some size");
+        RPU_FATAL("piecewise_up_vec and piecewise_down_vec needs to have some size.");
       }
     };);
 

@@ -887,7 +887,7 @@ class PiecewiseStepDevice(PulsedDevice):
     """
     bindings_class: ClassVar[Type] = devices.PiecewiseStepResistiveDeviceParameter
 
-    piecewise_up: List[float] = field(default_factory=list, metadata={'hide_if': []})
+    piecewise_up: List[float] = field(default_factory=lambda: [1])
     r"""Array of values that characterize the update steps in upwards direction.
 
     The values are equally spaced in ``w_min`` and `w_max``, where the
@@ -905,7 +905,7 @@ class PiecewiseStepDevice(PulsedDevice):
     weight values.
     """
 
-    piecewise_down: List[float] = field(default_factory=list, metadata={'hide_if': []})
+    piecewise_down: List[float] = field(default_factory=lambda: [1])
     r"""Array of values that characterize the update steps in downwards direction.
 
     Analogous to ``piecewise_up`` but for the downwards direction.
