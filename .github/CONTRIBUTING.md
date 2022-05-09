@@ -37,20 +37,26 @@ from the core team and contributions:
    > In order to ensure that the changes work as expected, we have a number of
    > helper tools and tests that you can make use of while developing.
 
-4. Create your pull request based on you branch.
+4. Include tests along with your changes.
+
+   > Tests help ensuring that the new features are working as intended - and
+   > that other contributors have confidence when modifying existing features.
+   > Please ensure to add tests that exercise the new functionality adequately.
+
+5. Create your pull request based on you branch.
 
    > Once you are happy with your changes, opening a pull request is the way
    > to propose your contribution to the project and have direct feedback about
    > the implementation.
 
-5. Follow up on the code review and feedback on your pull request.
+6. Follow up on the code review and feedback on your pull request.
 
    > After the pull request is submitted, the maintainers will review your
    > contribution. This is a two-way conversation as well, with mutual feedback
    > and help in the hopes of getting the contribution ready to
    > be merged.
 
-6. Merging your contribution into the project.
+7. Merging your contribution into the project.
 
    > Success! Once the pull request is completed, it will be merged into the
    > project and be part of the next release.
