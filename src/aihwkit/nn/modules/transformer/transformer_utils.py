@@ -1,11 +1,17 @@
+"""Utilities for transformer modules"""
 import inspect
 
 from typing import List, Set, Tuple, Callable
+
+from logging import Logger, WARNING
 
 import torch
 from torch import Tensor, LongTensor
 
 from aihwkit.nn import AnalogLinear
+
+# For now, going with a simple logger
+logger = Logger("Bert Log", WARNING)
 
 def prune_linear_layer(layer: AnalogLinear, index: LongTensor, dim: int = 0) -> AnalogLinear:
     """Prune a linear layer to keep only entries in index.
@@ -73,7 +79,6 @@ def apply_chunking_to_forward(
         return apply_chunking_to_forward(self.forward_chunk,
                                 self.chunk_size_lm_head, self.seq_len_dim, hidden_states)```
     """
-
     assert len(input_tensors) > 0, f"{input_tensors} has to be a tuple/list of tensors"
 
     # inspect.signature exist since python 3.5 and is a python method 
@@ -126,7 +131,7 @@ def find_pruneable_heads_and_indices(
         already_pruned_heads (`Set[int]`): A set of already pruned heads.
 
     Returns:
-        `Tuple[Set[int], torch.LongTensor]`: A tuple with the remaining heads 
+        `Tuple[Set[int], torch.LongTensor]`: A tuple with the remaining heads
         and their corresponding indices.
     """
     mask = torch.ones(n_heads, head_size)
