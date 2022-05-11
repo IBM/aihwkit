@@ -83,11 +83,12 @@ else()
 endif()
 
 # Python and pybind11
+find_package(PythonInterp REQUIRED)
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS})  # order matters (before pybind)
 
 # Find pybind11Config.cmake
-execute_process(COMMAND ${Python_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
+execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
     OUTPUT_VARIABLE CUSTOM_PYTHON_PYBIND11_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET)
@@ -103,7 +104,7 @@ link_directories(${TORCH_LIB_DIR})
 
 if (CMAKE_COMPILER_IS_GNUCXX)
   # check for pytorch's ABI
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import torch; print('1' if torch._C._GLIBCXX_USE_CXX11_ABI else '0')"
+  execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import torch; print('1' if torch._C._GLIBCXX_USE_CXX11_ABI else '0')"
     OUTPUT_VARIABLE OUTPUT_GNU_ABI
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET)
