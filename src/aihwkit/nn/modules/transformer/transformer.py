@@ -3,19 +3,16 @@ Adapted from:
 https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py
 """
 
-import inspect
-from optparse import Option
+from math import sqrt
+
+from typing import List, Optional, Tuple, Union
 
 from packaging import version
 
-from typing import List, Optional, Set, Tuple, Union, Callable
-
-from math import sqrt
-
 import torch
-from torch import Tensor, FloatTensor, LongTensor
+from torch import Tensor, FloatTensor
 from torch import concat, arange, matmul, einsum, zeros, ones
-from torch import long
+from torch import long, utils
 
 from torch.nn import ReLU, SiLU, GELU, Tanh, Sigmoid
 from torch.nn import Module, ModuleList, Embedding, Linear, LayerNorm, Dropout
@@ -25,9 +22,12 @@ from torch.nn.functional import softmax
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.nn.modules.base import RPUConfigAlias
 
-from .transformer_utils import (apply_chunking_to_forward, 
-                                prune_linear_layer, 
-                                find_pruneable_heads_and_indices)
+from .transformer_utils import (apply_chunking_to_forward,
+                                prune_linear_layer,
+                                find_pruneable_heads_and_indices,
+                                logger)
+from .transformer_output import (BaseModelOutputWithPastAndCrossAttentions,
+                                 BaseModelOutputWithPoolingAndCrossAttentions)
 
 ACT2FN = {
     "relu": ReLU(),
@@ -41,7 +41,7 @@ ACT2FN = {
 class AnalogBertSelfAttention(AnalogSequential):
     """Analog Bert Self Attention Module"""
 
-    def __init__(self, 
+    def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False,
@@ -59,8 +59,8 @@ class AnalogBertSelfAttention(AnalogSequential):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = AnalogLinear(config.hidden_size, self.all_head_size, 
-                                  rpu_config=rpu_config, 
+        self.query = AnalogLinear(config.hidden_size, self.all_head_size,
+                                  rpu_config=rpu_config,
                                   realistic_read_write=realistic_read_write)
         self.key = AnalogLinear(config.hidden_size, self.all_head_size,
                                 rpu_config=rpu_config,
@@ -211,9 +211,9 @@ class AnalogBertSelfAttention(AnalogSequential):
 class AnalogBertSelfOutput(AnalogSequential):
     """Output from Self Attention. Applies a Linear, Dropout and LayerNorm to the layers"""
 
-    def __init__(self, 
-                 config, 
-                 rpu_config: Optional[RPUConfigAlias], 
+    def __init__(self,
+                 config,
+                 rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False):
         super().__init__()
         self.dense = AnalogLinear(config.hidden_size, config.hidden_size,
@@ -233,14 +233,14 @@ class AnalogBertSelfOutput(AnalogSequential):
 class AnalogBertAttention(AnalogSequential):
     """The full Self Attention Module with Self Output modules"""
 
-    def __init__(self, 
-                 config, 
-                 rpu_config: Optional[RPUConfigAlias], 
+    def __init__(self,
+                 config,
+                 rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False,
                  position_embedding_type = None):
         super().__init__()
         self.self = AnalogBertSelfAttention(
-                            config, 
+                            config,
                             rpu_config,
                             realistic_read_write=realistic_read_write,
                             position_embedding_type=position_embedding_type)
@@ -278,6 +278,7 @@ class AnalogBertAttention(AnalogSequential):
         past_key_value: Optional[Tuple[Tuple[FloatTensor]]] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[Tensor]:
+        """Forward pass of Bert Attention Modules"""
         self_outputs = self.self(
             hidden_states,
             attention_mask,
@@ -295,13 +296,13 @@ class AnalogBertAttention(AnalogSequential):
 class AnalogBertIntermediate(AnalogSequential):
     """Analog Bert Intermediate block"""
 
-    def __init__(self, 
+    def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False):
         super().__init__()
         self.dense = AnalogLinear(
-                        config.hidden_size, 
+                        config.hidden_size,
                         config.intermediate_size,
                         rpu_config=rpu_config,
                         realistic_read_write=realistic_read_write)
@@ -313,7 +314,6 @@ class AnalogBertIntermediate(AnalogSequential):
 
     def forward(self, hidden_states: Tensor) -> Tensor:
         """Forward pass of Intermediate"""
-
         hidden_states = self.dense(hidden_states)
         hidden_states = self.intermediate_act_fn(hidden_states)
         return hidden_states
@@ -322,13 +322,13 @@ class AnalogBertIntermediate(AnalogSequential):
 class AnalogBertOutput(AnalogSequential):
     """Analog Bert Output block"""
 
-    def __init__(self, 
+    def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False):
         super().__init__()
         self.dense = AnalogLinear(
-                            config.intermediate_size, 
+                            config.intermediate_size,
                             config.hidden_size,
                             rpu_config=rpu_config,
                             realistic_read_write=realistic_read_write)
@@ -338,7 +338,6 @@ class AnalogBertOutput(AnalogSequential):
 
     def forward(self, hidden_states: Tensor, input_tensor: Tensor) -> Tensor:
         """Forward pass of Bert Output"""
-
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.layer_norm(hidden_states + input_tensor)
@@ -350,12 +349,23 @@ class AnalogBertEmbeddings(Module):
 
     def __init__(self, config):
         super().__init__()
-        self.word_embeddings = Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
-        self.position_embeddings = Embedding(config.max_position_embeddings, config.hidden_size)
-        self.token_type_embeddings = Embedding(config.type_vocab_size, config.hidden_size)
+        self.word_embeddings = Embedding(
+                                    config.vocab_size,
+                                    config.hidden_size,
+                                    padding_idx=config.pad_token_id)
+
+        self.position_embeddings = Embedding(
+                                    config.max_position_embeddings,
+                                    config.hidden_size)
+
+        self.token_type_embeddings = Embedding(
+                                    config.type_vocab_size,
+                                    config.hidden_size)
 
         self.layer_norm = LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+
         self.dropout = Dropout(config.hidden_dropout_prob)
+
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.position_embedding_type = getattr(config, "position_embedding_type", "absolute")
         self.register_buffer("position_ids", arange(config.max_position_embeddings).expand((1, -1)))
@@ -367,8 +377,14 @@ class AnalogBertEmbeddings(Module):
             )
 
     def forward(
-        self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None, past_key_values_length=0
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        past_key_values_length=0
     ):
+        """Forward pass of the embeddings module"""
         if input_ids is not None:
             input_shape = input_ids.size()
         else:
@@ -377,15 +393,19 @@ class AnalogBertEmbeddings(Module):
         seq_length = input_shape[1]
 
         if position_ids is None:
-            position_ids = self.position_ids[:, past_key_values_length : seq_length + past_key_values_length]
+            position_ids = self.position_ids[:, past_key_values_length
+                                             : seq_length + past_key_values_length]
 
-        # Setting the token_type_ids to the registered buffer in constructor where it is all zeros, which usually occurs
-        # when its auto-generated, registered buffer helps users when tracing the model without passing token_type_ids, solves
+        # Setting the token_type_ids to the registered buffer in constructor where it is all zeros,
+        # which usually occurs
+        # when its auto-generated, registered buffer helps users when tracing the model
+        # without passing token_type_ids, solves
         # issue #5664
         if token_type_ids is None:
             if hasattr(self, "token_type_ids"):
                 buffered_token_type_ids = self.token_type_ids[:, :seq_length]
-                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(input_shape[0], seq_length)
+                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(input_shape[0],
+                                                                                  seq_length)
                 token_type_ids = buffered_token_type_ids_expanded
             else:
                 token_type_ids = zeros(input_shape, dtype=long, device=self.position_ids.device)
@@ -404,7 +424,9 @@ class AnalogBertEmbeddings(Module):
 
 
 class AnalogBertLayer(AnalogSequential):
-    def __init__(self, 
+    """Analog Bert Layer"""
+
+    def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False):
@@ -412,22 +434,23 @@ class AnalogBertLayer(AnalogSequential):
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
         self.attention = AnalogBertAttention(
-                                config, 
-                                rpu_config, 
+                                config,
+                                rpu_config,
                                 realistic_read_write=realistic_read_write)
 
         self.is_decoder = config.is_decoder
         self.add_cross_attention = config.add_cross_attention
         if self.add_cross_attention:
             if not self.is_decoder:
-                raise ValueError(f"{self} should be used as a decoder model if cross attention is added")
+                raise ValueError(f"{self} should be used as a decoder model "
+                                 "if cross attention is added")
             self.crossattention = AnalogBertAttention(
-                                        config, 
+                                        config,
                                         rpu_config,
                                         realistic_read_write=realistic_read_write,
                                         position_embedding_type="absolute")
-        self.intermediate = AnalogBertIntermediate(config, 
-                                                   rpu_config, 
+        self.intermediate = AnalogBertIntermediate(config,
+                                                   rpu_config,
                                                    realistic_read_write=realistic_read_write)
         self.output = AnalogBertOutput(config,
                                        rpu_config,
@@ -443,6 +466,7 @@ class AnalogBertLayer(AnalogSequential):
         past_key_value: Optional[Tuple[Tuple[FloatTensor]]] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[Tensor]:
+        """Forward pass of Analog Bert Layer"""
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
         self_attention_outputs = self.attention(
@@ -459,13 +483,16 @@ class AnalogBertLayer(AnalogSequential):
             outputs = self_attention_outputs[1:-1]
             present_key_value = self_attention_outputs[-1]
         else:
-            outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
+            # add self attentions if we output attention weights
+            outputs = self_attention_outputs[1:]
 
         cross_attn_present_key_value = None
         if self.is_decoder and encoder_hidden_states is not None:
             if not hasattr(self, "crossattention"):
                 raise ValueError(
-                    f"If `encoder_hidden_states` are passed, {self} has to be instantiated with cross-attention layers by setting `config.add_cross_attention=True`"
+                    f"If `encoder_hidden_states` are passed, "
+                    f"{self} has to be instantiated with cross-attention "
+                    f"layers by setting `config.add_cross_attention=True`"
                 )
 
             # cross_attn cached key/values tuple is at positions 3,4 of past_key_value tuple
@@ -479,16 +506,21 @@ class AnalogBertLayer(AnalogSequential):
                 cross_attn_past_key_value,
                 output_attentions,
             )
+
             attention_output = cross_attention_outputs[0]
-            outputs = outputs + cross_attention_outputs[1:-1]  # add cross attentions if we output attention weights
+            # add cross attentions if we output attention weights
+            outputs = outputs + cross_attention_outputs[1:-1]
 
             # add cross-attn cache to positions 3,4 of present_key_value tuple
             cross_attn_present_key_value = cross_attention_outputs[-1]
             present_key_value = present_key_value + cross_attn_present_key_value
 
         layer_output = apply_chunking_to_forward(
-            self.feed_forward_chunk, self.chunk_size_feed_forward, self.seq_len_dim, attention_output
+            self.feed_forward_chunk,
+            self.chunk_size_feed_forward,
+            self.seq_len_dim, attention_output
         )
+
         outputs = (layer_output,) + outputs
 
         # if decoder, return the attn key/values as the last output
@@ -498,13 +530,16 @@ class AnalogBertLayer(AnalogSequential):
         return outputs
 
     def feed_forward_chunk(self, attention_output):
+        """Chunk feed forward, shrink to intermediate size and back"""
         intermediate_output = self.intermediate(attention_output)
         layer_output = self.output(intermediate_output, attention_output)
         return layer_output
 
 
 class AnalogBertEncoder(AnalogSequential):
-    def __init__(self, 
+    """Analog Bert Encoder"""
+
+    def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False):
@@ -531,7 +566,8 @@ class AnalogBertEncoder(AnalogSequential):
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
         return_dict: Optional[bool] = True,
-    ) -> Union[Tuple[Tensor], BaseModelOutputWithPastAndCrossAttentions]: # TODO: Add necessary ModelOutput classes
+    ) -> Union[Tuple[Tensor], BaseModelOutputWithPastAndCrossAttentions]:
+        """Forward pass of Encoder/(Decoder) Block"""
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
@@ -544,41 +580,42 @@ class AnalogBertEncoder(AnalogSequential):
             layer_head_mask = head_mask[i] if head_mask is not None else None
             past_key_value = past_key_values[i] if past_key_values is not None else None
 
-            # if self.gradient_checkpointing and self.training:
-            #     Checkpointing
-            #     if use_cache:
-            #         Log Warning
-            #         logger.warning(
-            #             "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-            #         )
-            #         use_cache = False
+            if self.gradient_checkpointing and self.training:
+                # Checkpointing
+                if use_cache:
+                    # Log Warning
+                    logger.warning(
+                        "`use_cache=True` is incompatible with gradient checkpointing."
+                        "Setting `use_cache=False`..."
+                    )
+                    use_cache = False
 
-            #     def create_custom_forward(module):
-            #         def custom_forward(*inputs):
-            #             return module(*inputs, past_key_value, output_attentions)
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        return module(*inputs, past_key_value, output_attentions)
 
-            #         return custom_forward
+                    return custom_forward
 
 
-            #     Checkpointing
-            #     layer_outputs = utils.checkpoint.checkpoint(
-            #         create_custom_forward(layer_module),
-            #         hidden_states,
-            #         attention_mask,
-            #         layer_head_mask,
-            #         encoder_hidden_states,
-            #          encoder_attention_mask,
-            #     )
-            # else:
-            layer_outputs = layer_module(
-                hidden_states,
-                attention_mask,
-                layer_head_mask,
-                encoder_hidden_states,
-                encoder_attention_mask,
-                past_key_value,
-                output_attentions,
-            )
+                # Checkpointing
+                layer_outputs = utils.checkpoint.checkpoint(
+                    create_custom_forward(layer_module),
+                    hidden_states,
+                    attention_mask,
+                    layer_head_mask,
+                    encoder_hidden_states,
+                     encoder_attention_mask,
+                )
+            else:
+                layer_outputs = layer_module(
+                    hidden_states,
+                    attention_mask,
+                    layer_head_mask,
+                    encoder_hidden_states,
+                    encoder_attention_mask,
+                    past_key_value,
+                    output_attentions,
+                )
 
             hidden_states = layer_outputs[0]
             if use_cache:
@@ -603,8 +640,7 @@ class AnalogBertEncoder(AnalogSequential):
                 ]
                 if v is not None
             )
-        
-        # TODO: Add ModuleOutput classes
+
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
             past_key_values=next_decoder_cache,
@@ -615,12 +651,15 @@ class AnalogBertEncoder(AnalogSequential):
 
 
 class AnalogBertPooler(Module):
+    """Bert Pooler"""
+
     def __init__(self, config):
         super().__init__()
         self.dense = Linear(config.hidden_size, config.hidden_size)
         self.activation = Tanh()
 
     def forward(self, hidden_states: Tensor) -> Tensor:
+        """Forward pass of pooler"""
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
@@ -628,19 +667,56 @@ class AnalogBertPooler(Module):
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
+# TODO: Implement PretrainedModel
+# class BertPreTrainedModel(PreTrainedModel):
+#     """An abstract class to handle weights initialization and a
+#     simple interface for downloading and loading pretrained
+#     models.
+#     """
+
+#     config_class = BertConfig
+#     load_tf_weights = load_tf_weights_in_bert
+#     base_model_prefix = "bert"
+#     supports_gradient_checkpointing = True
+#     _keys_to_ignore_on_load_missing = [r"position_ids"]
+
+#     def _init_weights(self, module):
+#         """Initialize the weights"""
+#         if isinstance(module, Linear):
+#             # Slightly different from the TF version which uses truncated_normal for initialization
+#             # cf https://github.com/pytorch/pytorch/pull/5617
+#             module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+#             if module.bias is not None:
+#                 module.bias.data.zero_()
+#         elif isinstance(module, Embedding):
+#             module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+#             if module.padding_idx is not None:
+#                 module.weight.data[module.padding_idx].zero_()
+#         elif isinstance(module, LayerNorm):
+#             module.bias.data.zero_()
+#             module.weight.data.fill_(1.0)
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, AnalogBertEncoder):
+            module.gradient_checkpointing = value
+
 class AnalogBertModel(AnalogSequential):
-    """
-    The model can behave as an encoder (with only self-attention) as well as a decoder, in which case a layer of
-    cross-attention is added between the self-attention layers, following the architecture described in [Attention is
-    all you need](https://arxiv.org/abs/1706.03762) by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
+    """The model can behave as an encoder (with only self-attention) as well as a decoder,
+    in which case a layer of cross-attention is added between the self-attention layers,
+    following the architecture described in [Attention is
+    all you need](https://arxiv.org/abs/1706.03762)
+    by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
     Llion Jones, Aidan N. Gomez, Lukasz Kaiser and Illia Polosukhin.
 
-    To behave as an decoder the model needs to be initialized with the `is_decoder` argument of the configuration set
-    to `True`. To be used in a Seq2Seq model, the model needs to initialized with both `is_decoder` argument and
-    `add_cross_attention` set to `True`; an `encoder_hidden_states` is then expected as an input to the forward pass.
+    To behave as an decoder the model needs to be initialized with the
+    `is_decoder` argument of the configuration set
+    to `True`. To be used in a Seq2Seq model, the model needs to initialized with both
+    `is_decoder` argument and
+    `add_cross_attention` set to `True`; an `encoder_hidden_states` is then expected as an input to
+    the forward pass.
     """
 
-    def __init__(self, 
+    def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool = False,
@@ -654,14 +730,16 @@ class AnalogBertModel(AnalogSequential):
         self.pooler = AnalogBertPooler(config) if add_pooling_layer else None
 
     def get_input_embeddings(self):
+        """Get the input embeddings"""
         return self.embeddings.word_embeddings
 
     def set_input_embeddings(self, value):
+        """Set embeddings to particular value"""
         self.embeddings.word_embeddings = value
 
     def _prune_heads(self, heads_to_prune):
-        """
-        Prunes heads of the model. heads_to_prune: dict of {layer_num: list of heads to prune in this layer} See base
+        """Prunes heads of the model.
+        heads_to_prune: dict of {layer_num: list of heads to prune in this layer} See base
         class PreTrainedModel
         """
         for layer, heads in heads_to_prune.items():
@@ -682,32 +760,40 @@ class AnalogBertModel(AnalogSequential):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple[Tensor], BaseModelOutputWithPoolingAndCrossAttentions]: # TODO: Add ModuleOutput classes
-        r"""
-        encoder_hidden_states  (`FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
-            Sequence of hidden-states at the output of the last layer of the encoder. Used in the cross-attention if
-            the model is configured as a decoder.
+    ) -> Union[Tuple[Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
+        r"""encoder_hidden_states
+        (`FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
+        Sequence of hidden-states at the output of the last layer of the encoder.
+        Used in the cross-attention if
+        the model is configured as a decoder.
         encoder_attention_mask (`FloatTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Mask to avoid performing attention on the padding token indices of the encoder input. This mask is used in
-            the cross-attention if the model is configured as a decoder. Mask values selected in `[0, 1]`:
-
-            - 1 for tokens that are **not masked**,
-            - 0 for tokens that are **masked**.
-        past_key_values (`tuple(tuple(FloatTensor))` of length `config.n_layers` with each tuple having 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`):
-            Contains precomputed key and value hidden states of the attention blocks. Can be used to speed up decoding.
-
-            If `past_key_values` are used, the user can optionally input only the last `decoder_input_ids` (those that
-            don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
-            `decoder_input_ids` of shape `(batch_size, sequence_length)`.
+            Mask to avoid performing attention on the padding token indices of the encoder input.
+            This mask is used in the cross-attention if the model is configured as a decoder.
+            Mask values selected in `[0, 1]`:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+        past_key_values (`tuple(tuple(FloatTensor))` of length `config.n_layers`
+            with each tuple having 4 tensors of
+            shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`):
+            Contains precomputed key and value hidden states of the attention blocks.
+            Can be used to speed up decoding.
+            If `past_key_values` are used, the user can optionally input only the
+            last `decoder_input_ids` (those that
+            don't have their past key value states given to this model) of shape `(batch_size, 1)`
+            instead of all `decoder_input_ids` of shape `(batch_size, sequence_length)`.
         use_cache (`bool`, *optional*):
-            If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding (see
+            If set to `True`, `past_key_values` key value states are returned and can be
+            used to speed up decoding (see
             `past_key_values`).
         """
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_attentions = (output_attentions
+                                if output_attentions is not None else self.config.output_attentions)
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+            output_hidden_states
+            if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (return_dict
+                            if return_dict is not None else self.config.use_return_dict)
 
         if self.config.is_decoder:
             use_cache = use_cache if use_cache is not None else self.config.use_cache
@@ -727,22 +813,28 @@ class AnalogBertModel(AnalogSequential):
         device = input_ids.device if input_ids is not None else inputs_embeds.device
 
         # past_key_values_length
-        past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
+        past_key_values_length = (past_key_values[0][0].shape[2]
+                                        if past_key_values is not None else 0)
 
         if attention_mask is None:
-            attention_mask = ones(((batch_size, seq_length + past_key_values_length)), device=device)
+            attention_mask = ones(((batch_size, seq_length + past_key_values_length)),
+                                 device=device)
 
         if token_type_ids is None:
             if hasattr(self.embeddings, "token_type_ids"):
                 buffered_token_type_ids = self.embeddings.token_type_ids[:, :seq_length]
-                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size, seq_length)
+                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size,
+                                                                                  seq_length)
                 token_type_ids = buffered_token_type_ids_expanded
             else:
                 token_type_ids = zeros(input_shape, dtype=long, device=device)
 
-        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # We can provide a self-attention mask of
+        # dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
-        extended_attention_mask: Tensor = self.get_extended_attention_mask(attention_mask, input_shape, device)
+        extended_attention_mask: Tensor = self.get_extended_attention_mask(attention_mask,
+                                                                           input_shape,
+                                                                           device)
 
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
@@ -759,7 +851,8 @@ class AnalogBertModel(AnalogSequential):
         # 1.0 in head_mask indicate we keep the head
         # attention_probs has shape bsz x n_heads x N x N
         # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
-        # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
+        # and head_mask is converted to
+        # shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
         embedding_output = self.embeddings(
@@ -787,7 +880,6 @@ class AnalogBertModel(AnalogSequential):
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
 
-        # TODO: Add ModuleOutput classes
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
