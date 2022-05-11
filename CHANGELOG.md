@@ -20,11 +20,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
 * Reverse up / down option for ``LinearStepDevice``. (\#361)
 * Generic Analog RNN classes (LSTM, RNN, GRU) uni or bidirectional. (\#358)
+* Added new ``PiecewiseStepDevice`` that can be conviniently used for experimental
+  device data fitting. (\#356)
 
 ### Fixed
 
 * Legacy checkpoint load with alpha scaling. (\#360)
 * Re-application of weight scaling omega when loading checkpoints. (\#360)
+* Write noise was not correctly applied for CUDA if ``dw_min_std=0``. (\#356)
 
 ### Changed
 

@@ -18,6 +18,7 @@
 #include "rpu_mixedprec_device.h"
 #include "rpu_mixedprec_device_base.h"
 #include "rpu_onesided_device.h"
+#include "rpu_piecewisestep_device.h"
 #include "rpu_powstep_device.h"
 #include "rpu_pulsed.h"
 #include "rpu_simple_device.h"
