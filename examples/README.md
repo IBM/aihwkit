@@ -1,23 +1,7 @@
 # IBM Analog Hardware Acceleration Kit: Examples
 
 We have many different examples to explore the many features of the IBM Analog Hardware
-Acceleration Kit.
-
-All the tests do not have a main.py file. We use Pytest for unit testing, which does not need any main.py file. A number of common developmental tools can be installed with pip install -r requirements-dev.txt
-
-To run the full test suite simply do (from the command line):
-```
-make pytest
-```
-
-To run individual test files, you can use, e.g.
-```
-pytest -v -s tests/test_presets.py
-```
-
-Individual tests can be run by giving the name, e.g.:
-pytest -v -s tests/test_presets.py::PresetTest_TTv2IdealizedPreset::test_tile_preset
-
+Acceleration Kit:
 
 ## Example 1: [`01_simple_layer.py`]
 
