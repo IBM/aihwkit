@@ -168,6 +168,7 @@ public:
   virtual T *get1ParamsData() { return nullptr; };
   virtual float *get2ParamsData() { return nullptr; };
   virtual float *get4ParamsData() { return dev_4params_->getData(); }
+  virtual T getWeightGranularityNoise() const { return getPar().dw_min_std; };
 
 protected:
   virtual void applyUpdateWriteNoise(T *dev_weights);
