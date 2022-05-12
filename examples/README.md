@@ -1,7 +1,23 @@
 # IBM Analog Hardware Acceleration Kit: Examples
 
 We have many different examples to explore the many features of the IBM Analog Hardware
-Acceleration Kit:
+Acceleration Kit.
+
+All the tests do not have a main.py file. We use Pytest for unit testing, which does not need any main.py file. A number of common developmental tools can be installed with pip install -r requirements-dev.txt
+
+To run the full test suite simply do (from the command line):
+```
+make pytest
+```
+
+To run individual test files, you can use, e.g.
+```
+pytest -v -s tests/test_presets.py
+```
+
+Individual tests can be run by giving the name, e.g.:
+pytest -v -s tests/test_presets.py::PresetTest_TTv2IdealizedPreset::test_tile_preset
+
 
 ## Example 1: [`01_simple_layer.py`]
 
@@ -291,8 +307,8 @@ Descent optimizer and the loss is printed for every epoch.
 
 ## Example 10: [`10_plot_presets.py`]
 
-This examples print 5 of the different [`preset devices`] and [`preset configs`] available.
-Using this presets makes easy testing the different memory element that can be used to train a
+This example prints 5 of the different [`preset devices`] and [`preset configs`] available.
+Using these presets makes easy to test the different memory elements that can be used to train a
 neural network. The presets (except for the "Idealized analog device") are calibrated on the
 measured characteristics of real hardware devices that have been fabricated at IBM. Device non-ideal
 characteristics, noise, and variability are accurately simulated in all presets.
