@@ -41,7 +41,10 @@ Convolution layers
 +--------------------------------------------------------------+-----------------------------------------------------+---------------------+
 | :class:`~aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`| | Similar to AnalogLinearMapped but constrains the  | `nn.Linear`_        |
 |                                                              | | the maximal in and/or out dimension of an analog  |                     |
-|                                                              | | tile.                                             |                     |
+|                                                              | | tile and will construct multiple tiles (as many   |                     |
+|                                                              | | as necessary to cover the weight matrix).         |                     |
+|                                                              | | Splitting, concatenation, and partial sum addition|                     |
+|                                                              | | are done in digital.                               |                     |
 +--------------------------------------------------------------+-----------------------------------------------------+---------------------+
 | :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv1dMapped`  | | Applies a 1D convolution over an input signal     | `nn.Conv1d`_        |
 |                                                              | | composed of several inputplanes, using an analog  |                     | 

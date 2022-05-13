@@ -67,7 +67,7 @@ aihwkit via:
 pip install -r requirements-dev.txt 
 ```
 
-All the tests and example do not have a main.py file. To run the full test suite simply run from the command line:
+To run the full test suite simply run from the command line:
 ```
 make pytest
 ```
