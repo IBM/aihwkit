@@ -1,4 +1,6 @@
-Inference and PCM statistical model
+.. _PCM-target:
+
+Inference and PCM Statistical Model
 ===================================
 
 The analog AI hardware kit provides a state-of-the-art statistical model of a
@@ -197,80 +199,16 @@ Note that the drift compensation class
 extendable, so that new drift compensation methods can be added
 easily.
 
-Example of how to use the PCM noise model for inference
--------------------------------------------------------
+PCM model in aihwkit
+--------------------
+We constructed statistical noise models for phase change materials to realistically simulate the expected programming error and 
+conductance drift over time for such inference hardware using PCM. Here the experimental data is compared against the model 
+implemented noise models which show a great correspondence. We also implemented a drift compensation that increasingly scales 
+the output of the Analog tiles in digital to compensate for the reduction of the conductance. (See figure below)
 
-The above noise model for inference can be used in our package
-in the following way. Instead of using a regular analog tile, that is catered
-to doing training on analog with pulsed update and others (see Section
-:ref:`using-simulator-analog-tiles`), you can use an _inference_ tile that
-only has non-idealities in the forward pass, but a perfect update and
-backward pass. Moreover, for inference, weights can be subject to
-realistic weight noise and drift as described above. To enable this
-inference features, one has to build an model using our
-:class:`~aihwkit.simulator.tiles.inference.InferenceTile` (see also
-`example 5 <https://github.com/IBM/aihwkit/blob/master/examples/05_simple_layer_hardware_aware.py>`_)::
+.. image:: ../img/pcm_drift_model.png
+   :alt:
 
-    from aihwkit.simulator.configs import InferenceRPUConfig
-    from aihwkit.simulator.configs.utils import WeightNoiseType
-    from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
-
-    # Define a single-layer network, using inference/hardware-aware training tile
-    rpu_config = InferenceRPUConfig()
-
-    # specify additional options of the non-idealities in forward to your liking
-    rpu_config.forward.inp_res = 1/64.  # 6-bit DAC discretization.
-    rpu_config.forward.out_res = 1/256. # 8-bit ADC discretization.
-    rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
-    rpu_config.forward.w_noise = 0.02   # Some short-term w-noise.
-    rpu_config.forward.out_noise = 0.02 # Some output noise.
-
-    # specify the noise model to be used for inference only
-    rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0) # the model described
-
-    # specify the drift compensation
-    rpu_config.drift_compensation = GlobalDriftCompensation()
-
-    # build the model (here just one simple linear layer)
-    model = AnalogLinear(4, 2, rpu_config=rpu_config)
-
-
-Once the DNN is trained (automatically using hardware-aware training, if the forward
-pass has some non-idealities and noise included), then the inference
-with drift and drift compensation is done in the following manner::
-
-    model.eval()        # model needs to be in inference mode
-    t_inference = 3600. # time of inference in seconds (after programming)
-
-    program_analog_weights(model) # can also omitted as it is called below in any case
-    drift_analog_weights(model, t_inference) # modifies weights according to noise model
-
-    # now the model can be evaluated with programmed/drifted/compensated weights
-
-
-Note that we here have two types of non-linearities included.  For the
-first, longer-term weight noise and drift (as described above), we assume
-that during the evaluation the weight related PCM noise and the drift
-is done once and then weights are kept constant. Thus, a subsequent
-test error calculation over the full test set would signify the
-`expected` test error for the model at a given time. Ideally, one would
-want to repeat this for different weight noise and drift instance and
-or different inference times to access the accuracy degradation
-properly.
-
-The second type of non-idealities are short-term and on the level of
-a single analog MACC (Multiply and Accumulate). Noise on that level vary
-with each usage of the analog tile and are specified in the
-``rpu_config.forward``.
-
-For details on the implementation of our inference noise model, please
-consult :class:`~aihwkit.inference.noise.pcm.PCMLikeNoiseModel`. In
-particular, we use a
-:class:`~aihwkit.inference.converter.conductance.SinglePairConductanceConverter`
-to convert weights into conductance paris and then apply the noise pn
-both of these pairs. More elaborate mapping schemes can be
-incorporated by extending
-:class:`~aihwkit.inference.converter.base.BaseConductanceConverter`.
 
 .. _references_pcm:
 

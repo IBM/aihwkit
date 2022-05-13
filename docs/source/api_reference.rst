@@ -28,7 +28,10 @@ API Reference
    aihwkit.nn.modules.container
    aihwkit.nn.modules.conv
    aihwkit.nn.modules.linear
-   aihwkit.nn.modules.lstm
+   aihwkit.nn.modules.rnn
+   aihwkit.nn.modules.rnn.cells
+   aihwkit.nn.modules.rnn.layers
+   aihwkit.nn.modules.rnn.rnn
    aihwkit.optim
    aihwkit.optim.analog_optimizer
    aihwkit.optim.context
