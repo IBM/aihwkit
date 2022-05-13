@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -52,8 +52,9 @@ from aihwkit.simulator.rpu_base import cuda
 # optimizer used (e.g. mixed precision or full analog update)
 
 # As an example we use a mixed precision preset using an ECRAM device model
-RPU_CONFIG = MixedPrecisionEcRamMOPreset()
-WS_OMEGA = 0.8
+from aihwkit.simulator.configs.utils import MappingParameter
+mapping = MappingParameter(weight_scaling_omega=0.8)
+RPU_CONFIG = MixedPrecisionEcRamMOPreset(mapping=mapping)
 
 # Set your parameters
 SEED = 1
@@ -129,8 +130,7 @@ def get_generator_block(input_dim, output_dim):
             input_dim,
             output_dim,
             bias=True,
-            rpu_config=RPU_CONFIG,
-            weight_scaling_omega=WS_OMEGA,
+            rpu_config=RPU_CONFIG
         ),
         nn.BatchNorm1d(output_dim),
         nn.ReLU(inplace=True),
@@ -159,8 +159,7 @@ class Generator(nn.Module):
                 hidden_dim * 8,
                 im_dim,
                 bias=True,
-                rpu_config=RPU_CONFIG,
-                weight_scaling_omega=WS_OMEGA,
+                rpu_config=RPU_CONFIG
             ),
             nn.Sigmoid(),
         )

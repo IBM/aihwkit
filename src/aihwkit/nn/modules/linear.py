@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -66,7 +66,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
             bias: bool = True,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0,
+            weight_scaling_omega: Optional[float] = None,
               ):
         # Call super() after tile creation, including ``reset_parameters``.
         Linear.__init__(self, in_features, out_features, bias=bias)
@@ -81,7 +81,6 @@ class AnalogLinear(AnalogModuleBase, Linear):
             out_features,
             bias,
             realistic_read_write,
-            weight_scaling_omega,
             rpu_config.mapping
         )
         self.analog_tile = self._setup_tile(rpu_config)
@@ -90,7 +89,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
         self.register_analog_tile(self.analog_tile)
 
         # Set weights from the reset_parameters call
-        self.set_weights(self.weight, self.bias)
+        self.set_weights(self.weight, self.bias, remap_weights=True,
+                         weight_scaling_omega=weight_scaling_omega)
 
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
@@ -104,7 +104,6 @@ class AnalogLinear(AnalogModuleBase, Linear):
             module: Linear,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: float = 0.0,
     ) -> 'AnalogLinear':
         """Return an AnalogLinear layer from a torch Linear layer.
 
@@ -115,9 +114,6 @@ class AnalogLinear(AnalogModuleBase, Linear):
                 Applied to all converted tiles.
             realistic_read_write: Whether to use closed-loop programming
                 when setting the weights. Applied to all converted tiles.
-            weight_scaling_omega: If non-zero, the analog weights will be
-                scaled by ``weight_scaling_omega`` divided by the absolute
-                maximum value of the original weight matrix.
 
                 Note:
                     Make sure that the weight max and min settings of the
@@ -130,8 +126,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
                             module.out_features,
                             module.bias is not None,
                             rpu_config,
-                            realistic_read_write,
-                            weight_scaling_omega)
+                            realistic_read_write)
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module
@@ -149,6 +144,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
         out = AnalogFunction.apply(
                 self.analog_tile.get_analog_ctx(), x_input,
                 self.analog_tile.shared_weights, not self.training)
+
+        out = self.analog_tile.apply_out_scaling(out, (-1, ))
 
         if self.digital_bias:
             return out + self.bias

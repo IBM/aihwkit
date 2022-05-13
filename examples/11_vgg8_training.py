@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -35,6 +35,7 @@ from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.presets.configs import GokmenVlasovPreset
 from aihwkit.simulator.rpu_base import cuda
+from aihwkit.simulator.configs.utils import MappingParameter
 
 # Check device
 USE_CUDA = 0
@@ -59,7 +60,8 @@ WEIGHT_SCALING_OMEGA = 0.6  # Should not be larger than max weight.
 
 # Select the device model to use in the training. In this case we are using one of the preset,
 # but it can be changed to a number of preset to explore possible different analog devices
-RPU_CONFIG = GokmenVlasovPreset()
+mapping = MappingParameter(weight_scaling_omega=WEIGHT_SCALING_OMEGA)
+RPU_CONFIG = GokmenVlasovPreset(mapping=mapping)
 
 
 def load_images():
@@ -93,33 +95,33 @@ def create_analog_network():
         nn.ReLU(),
         AnalogConv2d(in_channels=channel[0], out_channels=channel[0], kernel_size=3, stride=1,
                      padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+                     rpu_config=RPU_CONFIG),
         nn.BatchNorm2d(channel[0]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
         AnalogConv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=3, stride=1,
                      padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+                     rpu_config=RPU_CONFIG),
         nn.ReLU(),
         AnalogConv2d(in_channels=channel[1], out_channels=channel[1], kernel_size=3, stride=1,
                      padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+                     rpu_config=RPU_CONFIG),
         nn.BatchNorm2d(channel[1]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
         AnalogConv2d(in_channels=channel[1], out_channels=channel[2], kernel_size=3, stride=1,
                      padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+                     rpu_config=RPU_CONFIG),
         nn.ReLU(),
         AnalogConv2d(in_channels=channel[2], out_channels=channel[2], kernel_size=3, stride=1,
                      padding=1,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+                     rpu_config=RPU_CONFIG),
         nn.BatchNorm2d(channel[2]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
         nn.Flatten(),
         AnalogLinear(in_features=16 * channel[2], out_features=fc_size,
-                     rpu_config=RPU_CONFIG, weight_scaling_omega=WEIGHT_SCALING_OMEGA),
+                     rpu_config=RPU_CONFIG),
         nn.ReLU(),
         nn.Linear(in_features=fc_size, out_features=N_CLASSES),
         nn.LogSoftmax(dim=1)

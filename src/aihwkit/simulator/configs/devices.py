@@ -504,6 +504,28 @@ class LinearStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    reverse_up: bool = False
+    """Whether to increase the step size in up direction with increasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+    """
+
+    reverse_down: bool = False
+    """Whether to increase the step size in down direction with decreasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+
+    """
+
+    reverse_offset: float = 0.01
+    """Offset to add to the step size for reverse up or down to avoid
+    zero step size at weight min or max.
+    """
+
 
 @dataclass
 class SoftBoundsDevice(PulsedDevice):
@@ -522,6 +544,44 @@ class SoftBoundsDevice(PulsedDevice):
     mult_noise: bool = True
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
     noise."""
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled anew when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise} \Delta w_\text{min}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
+    reverse_up: bool = False
+    """Whether to increase the step size in up direction with increasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+    """
+
+    reverse_down: bool = False
+    """Whether to increase the step size in down direction with decreasing
+    weights (default decreases).
+
+    Note:
+        If set, ``mult_noise`` needs to be also set.
+    """
+
+    reverse_offset: float = 0.01
+    """Offset to add to the step size for reverse up or down to avoid
+    zero step size at weight min or max.
+    """
 
 
 @dataclass
@@ -794,6 +854,61 @@ class PowStepDevice(PulsedDevice):
     :math:`\gamma` as descibed above.
 
     In units of ``pow_gamma``.
+    """
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled a new when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
+
+@dataclass
+class PiecewiseStepDevice(PulsedDevice):
+    r"""Self defined device characteristics.
+
+    This model is derived from ``PulsedDevice`` and uses all its
+    parameters. ''PiecewiseStepDevice'' implements a new functionality
+    where the device characteristics are defined by the user.
+
+    Up and down pulse values are stored in selfdefine.csv and the
+    number of points can be decreased to 2 and increased indefinitely.
+    """
+    bindings_class: ClassVar[Type] = devices.PiecewiseStepResistiveDeviceParameter
+
+    piecewise_up: List[float] = field(default_factory=lambda: [1])
+    r"""Array of values that characterize the update steps in upwards direction.
+
+    The values are equally spaced in ``w_min`` and `w_max``, where the
+    first and the last value is set at the boundary. The update will
+    be computed by linear interpolation of the adjacent values,
+    depending on where the weight is currently within the range.
+
+    The values are given as relative numbers: the final update size
+    will be computed by multiplying the value with the current
+    ``dw_min`` of the device.
+
+    E.g.  ``[1.5, 1, 1.5]`` and ``dw_min=0.1`` means that the update
+    (in up direction) is ``dw_min`` around zero weight value and
+    linearly increasing to ``1.5 * dw_min`` for larger or smaller
+    weight values.
+    """
+
+    piecewise_down: List[float] = field(default_factory=lambda: [1])
+    r"""Array of values that characterize the update steps in downwards direction.
+
+    Analogous to ``piecewise_up`` but for the downwards direction.
     """
 
     write_noise_std: float = 0.0

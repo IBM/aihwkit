@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,10 +20,10 @@ from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
     FloatingPoint, Ideal, ConstantStep, LinearStep,
-    ExpStep, SoftBounds, SoftBoundsPmax, PowStep, Vector, OneSided,
+    ExpStep, SoftBounds, SoftBoundsPmax, PowStep, PiecewiseStep, Vector, OneSided,
     Transfer, MixedPrecision,
     FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    ExpStepCuda, SoftBoundsCuda, SoftBoundsPmaxCuda, PowStepCuda,
+    ExpStepCuda, SoftBoundsCuda, SoftBoundsPmaxCuda, PowStepCuda, PiecewiseStepCuda,
     VectorCuda, OneSidedCuda, TransferCuda, MixedPrecisionCuda
 
 )
@@ -67,6 +67,7 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
     SoftBounds,
     SoftBoundsPmax,
     PowStep,
+    PiecewiseStep,
     Vector,
     OneSided,
     Transfer,
@@ -78,6 +79,7 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
     SoftBoundsCuda,
     SoftBoundsPmaxCuda,
     PowStepCuda,
+    PiecewiseStepCuda,
     VectorCuda,
     OneSidedCuda,
     TransferCuda,

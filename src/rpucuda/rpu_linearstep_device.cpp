@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -30,6 +30,10 @@ void LinearStepRPUDevice<T>::populate(
   PulsedRPUDevice<T>::populate(p, rng); // will clone par
   auto &par = getPar();
 
+  if ((par.ls_reverse_up || par.ls_reverse_down) && !par.ls_mult_noise) {
+    RPU_FATAL("Only mulitplicative noise supported with reverse up/down!");
+  }
+
   for (int i = 0; i < this->d_size_; ++i) {
 
     for (int j = 0; j < this->x_size_; ++j) {
@@ -43,21 +47,33 @@ void LinearStepRPUDevice<T>::populate(
         diff_slope_at_bound_up = fabs(diff_slope_at_bound_up);
         diff_slope_at_bound_down = fabs(diff_slope_at_bound_down);
       }
+      T w_ref_up, w_ref_down;
 
       if (par.ls_mean_bound_reference) {
-
         /* divide by mean bound, otherwise slope depends on device
            bound, which does not make sense both slopes are negative
            (sign of scale_up/scale_down here both positive and later
            corrected in update rule) */
-        w_slope_up_[i][j] = -diff_slope_at_bound_up * this->w_scale_up_[i][j] / par.w_max;
-        w_slope_down_[i][j] = -diff_slope_at_bound_down * this->w_scale_down_[i][j] / par.w_min;
+
+        w_ref_up = par.ls_reverse_up ? par.w_min - par.ls_reverse_offset : par.w_max;
+        w_ref_down = par.ls_reverse_down ? par.w_max + par.ls_reverse_offset : par.w_min;
       } else {
-        /* In this case slope depends on the bound*/
-        w_slope_up_[i][j] =
-            -diff_slope_at_bound_up * this->w_scale_up_[i][j] / this->w_max_bound_[i][j];
-        w_slope_down_[i][j] =
-            -diff_slope_at_bound_down * this->w_scale_down_[i][j] / this->w_min_bound_[i][j];
+        w_ref_up = par.ls_reverse_up ? this->w_min_bound_[i][j] - par.ls_reverse_offset
+                                     : this->w_max_bound_[i][j];
+        w_ref_down = par.ls_reverse_down ? this->w_max_bound_[i][j] + par.ls_reverse_offset
+                                         : this->w_min_bound_[i][j];
+      }
+
+      // slope should be correct because of sign of reference
+      if (w_ref_up != 0.0) {
+        w_slope_up_[i][j] = -diff_slope_at_bound_up * this->w_scale_up_[i][j] / w_ref_up;
+      } else {
+        w_slope_up_[i][j] = 0.0;
+      }
+      if (w_ref_down != 0.0) {
+        w_slope_down_[i][j] = -diff_slope_at_bound_down * this->w_scale_down_[i][j] / w_ref_down;
+      } else {
+        w_slope_down_[i][j] = 0.0;
       }
     }
   }

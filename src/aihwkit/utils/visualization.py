@@ -19,6 +19,10 @@ extras mechanism::
     pip install aihwkit[visualization]
 """
 
+# Allow untyped calls for `np.*`, as proper support for numpy typing requires
+# 1.20+ (https://numpy.org/devdocs/reference/typing.html).
+# mypy: disallow-untyped-calls=False
+
 from copy import deepcopy
 from typing import Any, Tuple, Union
 

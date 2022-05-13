@@ -111,6 +111,7 @@ Resistive device class                                            Description
 :class:`~aihwkit.simulator.configs.devices.SoftBoundsPmaxDevice`  same model as in :class:`~aihwkit.simulator.configs.devices.SoftBoundsDevice` but using a more convenient parameterization for easier fits to experimentally measured update response curves.
 :class:`~aihwkit.simulator.configs.devices.ExpStepDevice`         exponential update step or CMOS-like update behavior.
 :class:`~aihwkit.simulator.configs.devices.PowStepDevice`         update step using a power exponent non-linearity.
+:class:`~aihwkit.simulator.configs.devices.PiecewiseStepDevice`      user defined device
 ================================================================  ========
 
 Unit Cell Devices

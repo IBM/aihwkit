@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,8 +27,12 @@ template <typename T> struct UpdateFunctorLinearStepMult {
       const float2 lin_slope,
       T &persistent_weight,
       const T *write_noise_std,
+      const int global_params_count,
       T noise_std_dw,
       curandState &local_state) {
+
+    UNUSED(global_params_count); // fixed
+
     T uw_std = *write_noise_std;
     T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        //[3], [1]
     T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); // [1],[0]
@@ -86,8 +90,12 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
       const float2 lin_slope,
       T &persistent_weight,
       const T *write_noise_std,
+      const int global_params_count,
       T noise_std_dw,
       curandState &local_state) {
+
+    UNUSED(global_params_count); // fixed
+
     T uw_std = *write_noise_std;
     T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        // [3] [1]
     T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); //[1],[0]

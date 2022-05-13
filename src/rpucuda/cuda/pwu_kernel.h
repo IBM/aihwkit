@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -223,11 +223,10 @@ DEFINE_GETNFROMCOUNT64(1, data &= neg; neg = ~0;);
   T par_1 = 0;                                                                                     \
   bool use_par_1 = params_1 != nullptr;                                                            \
   UpdateFunctor up_fun;                                                                            \
-  static_assert(global_params_count <= 32, "global params count exceeds warpsize");                \
   __shared__ T global_par[global_params_count];                                                    \
   if (global_params != nullptr) {                                                                  \
-    if (threadIdx.x < global_params_count) {                                                       \
-      global_par[threadIdx.x] = global_params[threadIdx.x];                                        \
+    for (int gidx = threadIdx.x; gidx < global_params_count; gidx += blockDim.x) {                 \
+      global_par[gidx] = global_params[gidx];                                                      \
     }                                                                                              \
     __syncthreads();                                                                               \
   }
@@ -261,12 +260,17 @@ template <typename T> struct UpdateFunctorConstantStep {
       const float2 par_2,
       T &par_1,
       const T *global_par,
+      const int global_params_count,
       T noise_std_dw,
       curandState &local_state) {
 
     // note that only w and par_1 will be written back when used. Thus it can be a "hidden_weights"
     // type note that we here assume that stoch_value is < 1, or if larger, then it did not hit the
     // bound.
+    UNUSED(global_params_count);
+    UNUSED(global_par);
+    UNUSED(par_1);
+    UNUSED(par_2);
 
     float dw = (negative > 0) ? (par_4.w) : (-par_4.y);
     T wmax = par_4.z;
@@ -363,7 +367,9 @@ __global__ void kernelUpdateWFunctor(
           n, negative, mixed, &x_counts[xIdx], &d_counts[dIdx], nK32, xsz, dsz);
 
       if (n > 0) {
-        up_fun(w, n, negative, par_4, par_2, par_1, global_par, noise_std_dw, local_state);
+        up_fun(
+            w, n, negative, par_4, par_2, par_1, global_par, global_params_count, noise_std_dw,
+            local_state);
         weights[idx] = w;
         if (use_par_1) {
           params_1[idx] = par_1;
@@ -393,7 +399,7 @@ __global__ void kernelUpdateWFunctor(
           } else {                                                                                 \
             if (sum_n > 0) {                                                                       \
               up_fun(                                                                              \
-                  w, sum_n, last_negative, par_4, par_2, par_1, nullptr, noise_std_dw,             \
+                  w, sum_n, last_negative, par_4, par_2, par_1, nullptr, 0, noise_std_dw,          \
                   local_state);                                                                    \
             }                                                                                      \
             sum_n = 1;                                                                             \
@@ -407,7 +413,8 @@ __global__ void kernelUpdateWFunctor(
       sum_n += n;                                                                                  \
     } else {                                                                                       \
       if (sum_n > 0) {                                                                             \
-        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, noise_std_dw, local_state);  \
+        up_fun(                                                                                    \
+            w, sum_n, last_negative, par_4, par_2, par_1, nullptr, 0, noise_std_dw, local_state);  \
       }                                                                                            \
       sum_n = n;                                                                                   \
       last_negative = negative;                                                                    \
@@ -417,7 +424,8 @@ __global__ void kernelUpdateWFunctor(
 #define RPU_UPDATE_WITH_SUM_N_INNER_BOUND_CHECK                                                    \
   RPU_UPDATE_WITH_SUM_N_INNER(                                                                     \
       if (sum_n > 0) {                                                                             \
-        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, noise_std_dw, local_state);  \
+        up_fun(                                                                                    \
+            w, sum_n, last_negative, par_4, par_2, par_1, nullptr, 0, noise_std_dw, local_state);  \
       } sum_n = 0;                                                                                 \
       last_negative = 0;                                                                           \
                                                                                                    \
@@ -510,7 +518,7 @@ __global__ void kernelUpdateWBatchSum(
       } // batch
       // last update
       if (sum_n > 0) {
-        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, noise_std_dw, local_state);
+        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, 0, noise_std_dw, local_state);
       }
 
       weights[idx] = w;
@@ -592,7 +600,7 @@ __global__ void kernelUpdateWBatchSumBoundCheck(
       } // batch
       // last update
       if (sum_n > 0) {
-        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, noise_std_dw, local_state);
+        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, 0, noise_std_dw, local_state);
       }
 
       weights[idx] = w;
@@ -681,14 +689,18 @@ __global__ void kernelUpdateWBatchFunctor(
             uint32_t bit_n = testBit(n, i_bit) ? 1 : 0;
             if (bit_n != 0) {
               uint32_t bit_neg = testBit(negative, i_bit) ? 1 : 0;
-              up_fun(w, 1, bit_neg, par_4, par_2, par_1, global_par, noise_std_dw, local_state);
+              up_fun(
+                  w, 1, bit_neg, par_4, par_2, par_1, global_par, global_params_count, noise_std_dw,
+                  local_state);
             }
           }
 
         } else {
           // now n is count
           if (n > 0) {
-            up_fun(w, n, negative, par_4, par_2, par_1, global_par, noise_std_dw, local_state);
+            up_fun(
+                w, n, negative, par_4, par_2, par_1, global_par, global_params_count, noise_std_dw,
+                local_state);
           }
         }
       }
@@ -912,7 +924,7 @@ __global__ void kernelUpdateWBatchSharedSum(
       } // batch
       // last update
       if (sum_n > 0) {
-        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, noise_std_dw, local_state);
+        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, 0, noise_std_dw, local_state);
       }
 
     } // within range
@@ -984,7 +996,7 @@ __global__ void kernelUpdateWBatchSharedSumBoundCheck(
       } // batch
       // last update
       if (sum_n > 0) {
-        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, noise_std_dw, local_state);
+        up_fun(w, sum_n, last_negative, par_4, par_2, par_1, nullptr, 0, noise_std_dw, local_state);
       }
 
     } // within range
@@ -1072,14 +1084,18 @@ __global__ void kernelUpdateWBatchSharedFunctor(
             uint32_t bit_n = testBit(n, i_bit) ? 1 : 0;
             if (bit_n != 0) {
               uint32_t bit_neg = testBit(negative, i_bit) ? 1 : 0;
-              up_fun(w, 1, bit_neg, par_4, par_2, par_1, global_par, noise_std_dw, local_state);
+              up_fun(
+                  w, 1, bit_neg, par_4, par_2, par_1, global_par, global_params_count, noise_std_dw,
+                  local_state);
             }
           }
         } else { // not mixed
           // now n is already the number n
 
           if (n > 0) {
-            up_fun(w, n, negative, par_4, par_2, par_1, global_par, noise_std_dw, local_state);
+            up_fun(
+                w, n, negative, par_4, par_2, par_1, global_par, global_params_count, noise_std_dw,
+                local_state);
           }
         }
       } // batch

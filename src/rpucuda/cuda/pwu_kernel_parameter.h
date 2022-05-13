@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -190,9 +190,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
           float, (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(),
                   this->d_size, rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
                   rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1,
-                  static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-                      .dw_min_std,
-                  dev_states));
+                  rpucuda_device->getWeightGranularityNoise(), dev_states));
     } else {
       START_SINGLE_FUNCTOR(
           uint32_t,
@@ -200,9 +198,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
            this->x_size, d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
            rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), this->nK32,
-           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-               .dw_min_std,
-           dev_states));
+           rpucuda_device->getWeightGranularityNoise(), dev_states));
     });
 #undef START_SINGLE_FUNCTOR
 
@@ -237,9 +233,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
           (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
            rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
-           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-               .dw_min_std,
-           dev_states));
+           rpucuda_device->getWeightGranularityNoise(), dev_states));
     } else if (this->use_bo64) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
           T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,
@@ -248,9 +242,8 @@ DEFINE_PWU_KERNEL_PARAMETER(
            blm->getDCountsBo64Data(), this->d_size, rpucuda_device->get4ParamsData(),
            rpucuda_device->get2ParamsData(), rpucuda_device->get1ParamsData(),
            rpucuda_device->getGlobalParamsData(), this->nK32, blm->getBo64Batch(m_batch),
-           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-               .dw_min_std,
-           dev_states, blm->getKnData(up.update_bl_management)));
+           rpucuda_device->getWeightGranularityNoise(), dev_states,
+           blm->getKnData(up.update_bl_management)));
     } else { // standard
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
           T, one_sided, uint32_t, this->out_trans, this->out_trans, s, this->nblocks,
@@ -259,10 +252,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
            this->x_size, d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
            rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), this->nK32,
-           m_batch,
-           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-               .dw_min_std,
-           dev_states));
+           m_batch, rpucuda_device->getWeightGranularityNoise(), dev_states));
     });
 
 /********************************************************************************
@@ -276,19 +266,15 @@ DEFINE_PWU_KERNEL_PARAMETER(
         this->shared_mem, KNAME,                                                                   \
         (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,    \
          rpucuda_device->get4ParamsData(), 1, m_batch,                                             \
-         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
-             .dw_min_std,                                                                          \
-         dev_states));                                                                             \
+         rpucuda_device->getWeightGranularityNoise(), dev_states));                                \
   } else if (this->use_bo64) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
         T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,                \
         this->nthreads, this->shared_mem, KNAME,                                                   \
         (dev_weights, this->size, blm->getXCountsBo64Data(), this->x_size,                         \
          blm->getDCountsBo64Data(), this->d_size, rpucuda_device->get4ParamsData(), this->nK32,    \
-         blm->getBo64Batch(m_batch),                                                               \
-         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
-             .dw_min_std,                                                                          \
-         dev_states, blm->getKnData(up.update_bl_management)));                                    \
+         blm->getBo64Batch(m_batch), rpucuda_device->getWeightGranularityNoise(), dev_states,      \
+         blm->getKnData(up.update_bl_management)));                                                \
   } else {                                                                                         \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
         T, one_sided, uint32_t, this->out_trans, this->out_trans, s, this->nblocks,                \
@@ -296,9 +282,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
         (dev_weights, this->size, x_counts_chunk ? x_counts_chunk : blm->getXCountsData(),         \
          this->x_size, d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size,      \
          rpucuda_device->get4ParamsData(), this->nK32, m_batch,                                    \
-         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
-             .dw_min_std,                                                                          \
-         dev_states));                                                                             \
+         rpucuda_device->getWeightGranularityNoise(), dev_states));                                \
   }
 
 template <typename T>
@@ -327,14 +311,15 @@ DEFINE_PWU_KERNEL_BASE(
     }
 
     int nK32_shared = this->implicit_pulses ? 1 : nK32;
-
+    int reserved_shared_mem = 128 * sizeof(T); // for global pars
     int sz = (d_size + 31) / 32 * 32 * (x_size + 15) / 16 * 16;
     this->nthreads = MIN(RPU_THREADS_PER_BLOCK_UPDATE, sz);
     this->nthreads = (this->nthreads + 31) / 32 * 32;
     this->nblocks =
         MIN(this->max_block_count, construction_context->getNBlocks(sz, this->nthreads));
     this->shared_mem_per_batch = (this->nthreads / 32 + 32) * this->sizeof_count * nK32_shared;
-    int max_shared_mem = construction_context->getSharedMemPerBlock() / RPU_UPDATE_BLOCKS_PER_SM;
+    int max_shared_mem = (construction_context->getSharedMemPerBlock() - reserved_shared_mem) /
+                         RPU_UPDATE_BLOCKS_PER_SM;
     this->batch_load_stride = max_shared_mem / this->shared_mem_per_batch;
     this->batch_load_stride = MIN(this->batch_load_stride, m_batch);
     this->shared_mem = this->shared_mem_per_batch * this->batch_load_stride;
@@ -366,10 +351,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
           (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
            rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
-           batch_load_stride,
-           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-               .dw_min_std,
-           dev_states));
+           batch_load_stride, rpucuda_device->getWeightGranularityNoise(), dev_states));
     } else if (this->use_bo64) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
           T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,
@@ -378,10 +360,8 @@ DEFINE_PWU_KERNEL_PARAMETER(
            blm->getDCountsBo64Data(), this->d_size, rpucuda_device->get4ParamsData(),
            rpucuda_device->get2ParamsData(), rpucuda_device->get1ParamsData(),
            rpucuda_device->getGlobalParamsData(), this->nK32, blm->getBo64Batch(m_batch),
-           batch_load_stride,
-           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-               .dw_min_std,
-           dev_states, blm->getKnData(up.update_bl_management)));
+           batch_load_stride, rpucuda_device->getWeightGranularityNoise(), dev_states,
+           blm->getKnData(up.update_bl_management)));
     } else {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
           T, one_sided, uint32_t, this->out_trans, this->out_trans, s, this->nblocks,
@@ -390,10 +370,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
            this->x_size, d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
            rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), this->nK32,
-           m_batch, batch_load_stride,
-           static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())
-               .dw_min_std,
-           dev_states));
+           m_batch, batch_load_stride, rpucuda_device->getWeightGranularityNoise(), dev_states));
     });
 
 /********************************************************************************
@@ -407,9 +384,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
         shared_mem, KNAME,                                                                         \
         (dev_weights, this->size, blm->getXData(), this->x_size, blm->getDData(), this->d_size,    \
          rpucuda_device->get4ParamsData(), 1, m_batch, batch_load_stride,                          \
-         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
-             .dw_min_std,                                                                          \
-         dev_states));                                                                             \
+         rpucuda_device->getWeightGranularityNoise(), dev_states));                                \
   } else if (this->use_bo64) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
         T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,                \
@@ -417,9 +392,8 @@ DEFINE_PWU_KERNEL_PARAMETER(
         (dev_weights, this->size, blm->getXCountsBo64Data(), this->x_size,                         \
          blm->getDCountsBo64Data(), this->d_size, rpucuda_device->get4ParamsData(), this->nK32,    \
          blm->getBo64Batch(m_batch), batch_load_stride,                                            \
-         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
-             .dw_min_std,                                                                          \
-         dev_states, blm->getKnData(up.update_bl_management)));                                    \
+         rpucuda_device->getWeightGranularityNoise(), dev_states,                                  \
+         blm->getKnData(up.update_bl_management)));                                                \
   } else {                                                                                         \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
         T, one_sided, uint32_t, this->out_trans, this->out_trans, s, this->nblocks,                \
@@ -427,9 +401,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
         (dev_weights, this->size, x_counts_chunk ? x_counts_chunk : blm->getXCountsData(),         \
          this->x_size, d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size,      \
          rpucuda_device->get4ParamsData(), this->nK32, m_batch, batch_load_stride,                 \
-         static_cast<const PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device->getPar())            \
-             .dw_min_std,                                                                          \
-         dev_states));                                                                             \
+         rpucuda_device->getWeightGranularityNoise(), dev_states));                                \
   }
 
 template <typename T>

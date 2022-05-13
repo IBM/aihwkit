@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -26,8 +26,14 @@ template <typename T> struct UpdateFunctorConstantStepLargeNoise {
       const float2 par_2,
       T &par_1,
       const T *global_par,
+      const int global_params_count,
       T noise_std_dw,
       curandState &local_state) {
+
+    UNUSED(global_params_count);
+    UNUSED(global_par);
+    UNUSED(par_1);
+    UNUSED(par_2);
 
     // here we assume that noise_std_dw>0 at least
     T wmax = par_4.z;                                   // [2];

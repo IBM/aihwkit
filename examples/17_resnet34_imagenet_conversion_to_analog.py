@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -35,13 +35,14 @@ print(model)
 # Define device and chip configuration used in the RPU tile
 mapping = MappingParameter(max_input_size=512,  # analog tile size
                            max_output_size=512,
-                           digital_bias=True)  # whether to use analog or digital bias
+                           digital_bias=True,
+                           weight_scaling_omega=0.6)  # whether to use analog or digital bias
 # Choose any preset or RPU configuration here
 rpu_config = TikiTakaReRamSBPreset(mapping=mapping)
 
 # Convert the model to its analog version.
 # this will replace ``Linear`` layers with ``AnalogLinearMapped``
-model = convert_to_analog_mapped(model, rpu_config, weight_scaling_omega=0.6)
+model = convert_to_analog_mapped(model, rpu_config)
 
 # Note: One can also use ``convert_to_analog`` instead to convert
 # ``Linear`` to ``AnalogLinear`` (without mapping to multiple tiles)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,7 +17,8 @@
 from aihwkit.nn.modules.container import AnalogSequential
 from aihwkit.nn.modules.conv import AnalogConv1d, AnalogConv2d, AnalogConv3d
 from aihwkit.nn.modules.linear import AnalogLinear
-from aihwkit.nn.modules.lstm import AnalogLSTM
+from aihwkit.nn.modules.rnn.rnn import AnalogRNN
+from aihwkit.nn.modules.rnn.cells import AnalogGRUCell, AnalogLSTMCell, AnalogVanillaRNNCell
 from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
 from aihwkit.nn.modules.conv_mapped import (
     AnalogConv1dMapped, AnalogConv2dMapped, AnalogConv3dMapped

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -192,7 +192,7 @@ def train(model, train_set):
         # Decay learning rate if needed.
         scheduler.step()
 
-    dist.all_gather(total_time, torch.tensor(time()-time_init).to(device))
+    dist.all_gather(total_time, torch.Tensor(time()-time_init).to(device))
 
     if rank == 0:
         avg_train_time = torch.mean(torch.cat(total_time, 0))
@@ -231,7 +231,7 @@ def test_evaluation(model, val_set):
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
 
-    dist.all_gather(acc_list, torch.tensor(predicted_ok/total_images).to(device))
+    dist.all_gather(acc_list, torch.Tensor(predicted_ok/total_images).to(device))
 
     if rank == 0:
         acc = torch.mean(torch.cat(acc_list, 0))

@@ -728,6 +728,18 @@ class MappingParameter(_PrintableMixin):
         ``digital_bias`` is supported by *all* analog modules.
     """
 
+    weight_scaling_omega: float = 0.0
+    """omega_scale is a user defined parameter used to scale the weights
+    while remapping these to cover the full range of values allowed"""
+
+    weight_scaling_omega_columnwise: bool = False
+    """Whether the weight matrix will be remapped column-wise over
+    the maximum device allowed value"""
+
+    learn_out_scaling_alpha: bool = False
+    """define the out_scaling_alpha as a learnable parameter
+    used to scale the output"""
+
     max_input_size: int = 512
     """Maximal input size (number of columns) of the weight matrix
     that is handled on a single analog tile.

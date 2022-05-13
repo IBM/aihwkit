@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -168,6 +168,7 @@ public:
   virtual T *get1ParamsData() { return nullptr; };
   virtual float *get2ParamsData() { return nullptr; };
   virtual float *get4ParamsData() { return dev_4params_->getData(); }
+  virtual T getWeightGranularityNoise() const { return getPar().dw_min_std; };
 
 protected:
   virtual void applyUpdateWriteNoise(T *dev_weights);

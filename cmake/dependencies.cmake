@@ -1,4 +1,4 @@
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -83,11 +83,12 @@ else()
 endif()
 
 # Python and pybind11
+find_package(PythonInterp REQUIRED)
 find_package(PythonLibs REQUIRED)
 include_directories(${PYTHON_INCLUDE_DIRS})  # order matters (before pybind)
 
 # Find pybind11Config.cmake
-execute_process(COMMAND python -c "import pybind11; print(pybind11.get_cmake_dir())"
+execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
     OUTPUT_VARIABLE CUSTOM_PYTHON_PYBIND11_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET)
@@ -100,6 +101,16 @@ include_directories(${pybind11_INCLUDE_DIR})
 find_package(Torch REQUIRED)
 include_directories(${TORCH_INCLUDE_DIRS})
 link_directories(${TORCH_LIB_DIR})
+
+if (CMAKE_COMPILER_IS_GNUCXX)
+  # check for pytorch's ABI
+  execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import torch; print('1' if torch._C._GLIBCXX_USE_CXX11_ABI else '0')"
+    OUTPUT_VARIABLE OUTPUT_GNU_ABI
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+  add_compile_definitions("_GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI}")
+  message(STATUS "Set _GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI}")
+endif()
 
 # Set compile definitions
 if(RPU_USE_FASTRAND)

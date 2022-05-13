@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -254,3 +254,81 @@ class LinearLayerTest(ParametrizedTestCase):
 
         self.assertAlmostEqual(layer1.analog_tile.get_learning_rate(), new_lr)
         self.assertAlmostEqual(layer2.analog_tile.get_learning_rate(), new_lr)
+
+    def test_out_scaling_alpha_learning(self):
+        """Check if out scaling alpha are learning."""
+        loss_func = mse_loss
+
+        x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
+        y_b = Tensor([[0.3], [0.6]])
+
+        manual_seed(4321)
+
+        rpu_config = InferenceRPUConfig(mapping=MappingParameter(
+            weight_scaling_omega=0.6,
+            learn_out_scaling_alpha=True))
+
+        model = Sequential(
+            self.get_layer(4, 2, rpu_config=rpu_config),
+            self.get_layer(2, 1, rpu_config=rpu_config)
+        )
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            y_b = y_b.cuda()
+            model = model.cuda()
+
+        initial_out_scaling_alpha_0 = model[0].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_alpha_1 = model[1].analog_tile.get_out_scaling_alpha().clone()
+
+        self.train_model(model, loss_func, x_b, y_b)
+
+        learned_out_scaling_alpha_0 = model[0].analog_tile.get_out_scaling_alpha().data.clone()
+        learned_out_scaling_alpha_1 = model[1].analog_tile.get_out_scaling_alpha().data.clone()
+
+        self.assertEqual(initial_out_scaling_alpha_0.numel(), 1)
+        self.assertIsNotNone(model[0].analog_tile.get_out_scaling_alpha().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
+
+        self.assertEqual(initial_out_scaling_alpha_0.numel(), 1)
+        self.assertIsNotNone(model[1].analog_tile.get_out_scaling_alpha().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+        self.assertEqual(initial_out_scaling_alpha_0.numel(), 1)
+
+    def test_out_scaling_alpha_learning_columnwise(self):
+        """Check if out scaling alpha are learning when columnwise is True."""
+        loss_func = mse_loss
+
+        x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
+        y_b = Tensor([[0.3], [0.6]])
+
+        manual_seed(4321)
+
+        rpu_config = InferenceRPUConfig(mapping=MappingParameter(
+            weight_scaling_omega=0.6,
+            learn_out_scaling_alpha=True,
+            weight_scaling_omega_columnwise=True))
+
+        model = Sequential(
+            self.get_layer(4, 2, rpu_config=rpu_config),
+            self.get_layer(2, 1, rpu_config=rpu_config)
+        )
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            y_b = y_b.cuda()
+            model = model.cuda()
+
+        initial_out_scaling_alpha_0 = model[0].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_alpha_1 = model[1].analog_tile.get_out_scaling_alpha().clone()
+
+        self.train_model(model, loss_func, x_b, y_b)
+
+        learned_out_scaling_alpha_0 = model[0].analog_tile.get_out_scaling_alpha().clone()
+        learned_out_scaling_alpha_1 = model[1].analog_tile.get_out_scaling_alpha().clone()
+
+        self.assertGreaterEqual(initial_out_scaling_alpha_0.numel(), 1)
+        self.assertIsNotNone(model[0].analog_tile.get_out_scaling_alpha().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
+
+        self.assertGreaterEqual(initial_out_scaling_alpha_1.numel(), 1)
+        self.assertIsNotNone(model[1].analog_tile.get_out_scaling_alpha().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)

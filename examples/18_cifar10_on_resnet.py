@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -34,6 +34,7 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.simulator.presets import TikiTakaEcRamPreset
 from aihwkit.simulator.rpu_base import cuda
+from aihwkit.simulator.configs.utils import MappingParameter
 
 # Device to use
 USE_CUDA = 0
@@ -56,7 +57,8 @@ LEARNING_RATE = 0.1
 N_CLASSES = 10
 
 # Device used in the RPU tile
-RPU_CONFIG = TikiTakaEcRamPreset()
+mapping = MappingParameter(weight_scaling_omega=0.6)
+RPU_CONFIG = TikiTakaEcRamPreset(mapping=mapping)
 
 
 class ResidualBlock(nn.Module):
@@ -295,7 +297,7 @@ def main():
     model = create_model()
 
     # Convert the model to its analog version
-    model = convert_to_analog(model, RPU_CONFIG, weight_scaling_omega=0.6)
+    model = convert_to_analog(model, RPU_CONFIG)
     # Load saved weights if previously saved
     # model.load_state_dict(load(WEIGHT_PATH))
 

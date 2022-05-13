@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -73,6 +73,12 @@ public:
   T *get1ParamsData() override {
     return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
   };
+  T getWeightGranularityNoise() const override {
+    // need to make sure that random states are enabled
+    return getPar().usesPersistentWeight()
+               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + 1e-6
+               : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
+  }
 
 private:
   std::unique_ptr<CudaArray<float>> dev_gamma_ = nullptr;

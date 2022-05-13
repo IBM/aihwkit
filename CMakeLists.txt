@@ -1,4 +1,4 @@
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,6 +17,7 @@ option(USE_CUDA "Build with CUDA support" OFF)
 option(RPU_DEBUG "Enable debug printing" OFF)
 option(RPU_USE_FASTMOD "Use fast mod" ON)
 option(RPU_USE_FASTRAND "Use fastrand" OFF)
+
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
 set(RPU_CUDA_ARCHITECTURES "60" CACHE STRING "Target CUDA architectures")
 
@@ -49,7 +50,6 @@ else()
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ftree-vectorize")
 endif()
 
-add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 if (APPLE)
   string(APPEND CMAKE_CXX_FLAGS " -fvisibility=hidden")
 endif()

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -45,7 +45,6 @@ def convert_to_analog(
         module: Module,
         rpu_config: RPUConfigGeneric,
         realistic_read_write: bool = False,
-        weight_scaling_omega: float = 0.0,
         conversion_map: Optional[Dict] = None
 ) -> Module:
     """Convert a given digital model to analog counter parts.
@@ -63,9 +62,6 @@ def convert_to_analog(
             Applied to all converted tiles.
         realistic_read_write: Whether to use closed-loop programming
             when setting the weights. Applied to all converted tiles.
-        weight_scaling_omega: If non-zero, the analog weights will be
-            scaled by ``weight_scaling_omega`` divided by the absolute
-            maximum value of the original weight matrix.
 
             Note:
                 Make sure that the weight max and min settings of the
@@ -92,7 +88,7 @@ def convert_to_analog(
     # Convert parent.
     if module.__class__ in conversion_map:
         module = conversion_map[module.__class__].from_digital(  # type: ignore
-            module, rpu_config, realistic_read_write, weight_scaling_omega)
+            module, rpu_config, realistic_read_write)
 
     # Convert children.
     convert_dic = {}
@@ -101,11 +97,11 @@ def convert_to_analog(
         n_grand_children = len(list(mod.named_children()))
         if n_grand_children > 0:
             new_mod = convert_to_analog(mod, rpu_config, realistic_read_write,
-                                        weight_scaling_omega, conversion_map)
+                                        conversion_map)
 
         elif mod.__class__ in conversion_map:
             new_mod = conversion_map[mod.__class__].from_digital(   # type: ignore
-                mod, rpu_config, realistic_read_write, weight_scaling_omega)
+                mod, rpu_config, realistic_read_write)
         else:
             continue
 
@@ -125,7 +121,6 @@ def convert_to_analog_mapped(
         module: Module,
         rpu_config: RPUConfigGeneric,
         realistic_read_write: bool = False,
-        weight_scaling_omega: float = 0.0,
 ) -> Module:
     """Convert a given digital model to its analog counterpart with tile
     mapping support.
@@ -142,9 +137,6 @@ def convert_to_analog_mapped(
         rpu_config: RPU config to apply to all converted tiles.
         realistic_read_write: Whether to use closed-loop programming
             when setting the weights. Applied to all converted tiles.
-        weight_scaling_omega: If non-zero, the analog weights will be
-            scaled by ``weight_scaling_omega`` divided by the absolute
-            maximum value of the original weight matrix.
 
             Note:
                 Make sure that the weight max and min settings of the
@@ -159,6 +151,5 @@ def convert_to_analog_mapped(
         module,
         rpu_config,
         realistic_read_write,
-        weight_scaling_omega,
         _DEFAULT_MAPPED_CONVERSION_MAP
     )

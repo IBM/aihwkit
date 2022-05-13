@@ -27,6 +27,7 @@ void declare_rpu_devices(py::module &m) {
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
   using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
   using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
+  using PiecewiseStepParam = RPU::PiecewiseStepRPUDeviceMetaParameter<T>;
   using BufferedTransferParam = RPU::BufferedTransferRPUDeviceMetaParameter<T>;
 
   /*
@@ -280,6 +281,27 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
+  class PyPiecewiseStepParam : public PiecewiseStepParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, PiecewiseStepParam, getName, );
+    }
+    PiecewiseStepParam *clone() const override {
+      PYBIND11_OVERLOAD(PiecewiseStepParam *, PiecewiseStepParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, PiecewiseStepParam, implements, );
+    }
+    RPU::PiecewiseStepRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::PiecewiseStepRPUDevice<T> *, PiecewiseStepParam, createDevice, x_size, d_size, rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, PiecewiseStepParam, calcWeightGranularity, );
+    }
+  };
+
   class PyBufferedTransferParam : public BufferedTransferParam {
   public:
     std::string getName() const override {
@@ -465,6 +487,9 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("mean_bound_reference", &LinearStepParam::ls_mean_bound_reference)
       .def_readwrite("write_noise_std", &LinearStepParam::write_noise_std)
       .def_readwrite("mult_noise", &LinearStepParam::ls_mult_noise)
+      .def_readwrite("reverse_up", &LinearStepParam::ls_reverse_up)
+      .def_readwrite("reverse_down", &LinearStepParam::ls_reverse_down)
+      .def_readwrite("reverse_offset", &LinearStepParam::ls_reverse_offset)
       .def(
           "__str__",
           [](LinearStepParam &self) {
@@ -481,10 +506,13 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<SoftBoundsParam, PySoftBoundsParam, PulsedParam>(
+  py::class_<SoftBoundsParam, PySoftBoundsParam, LinearStepParam>(
       m, "SoftBoundsResistiveDeviceParameter")
       .def_readwrite("mult_noise", &SoftBoundsParam::ls_mult_noise)
       .def_readwrite("write_noise_std", &SoftBoundsParam::write_noise_std)
+      .def_readwrite("reverse_up", &SoftBoundsParam::ls_reverse_up)
+      .def_readwrite("reverse_down", &SoftBoundsParam::ls_reverse_down)
+      .def_readwrite("reverse_offset", &SoftBoundsParam::ls_reverse_offset)
       .def(py::init<>())
       .def(
           "__str__",
@@ -659,6 +687,28 @@ void declare_rpu_devices(py::module &m) {
           })
       .def(
           "calc_weight_granularity", &PowStepParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
+
+  py::class_<PiecewiseStepParam, PyPiecewiseStepParam, PulsedParam>(
+      m, "PiecewiseStepResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("piecewise_up", &PiecewiseStepParam::piecewise_up_vec)
+      .def_readwrite("piecewise_down", &PiecewiseStepParam::piecewise_down_vec)
+      .def_readwrite("write_noise_std", &PiecewiseStepParam::write_noise_std)
+      .def(
+          "__str__",
+          [](PiecewiseStepParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &PiecewiseStepParam::calcWeightGranularity,
           R"pbdoc(
         Calculates the granularity of the weights (typically ``dw_min``)
 

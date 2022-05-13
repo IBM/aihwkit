@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,8 +27,11 @@ template <typename T> struct UpdateFunctorPowStep {
       const float2 gamma_down_up, // gamma_down, gamma_up
       T &persistent_weight,
       const T *write_noise_std,
+      const int global_params_count,
       T noise_std_dw,
       curandState &local_state) {
+
+    UNUSED(global_params_count); // fixed
 
     T wmin = par_4.x; // [0]
     T wmax = par_4.z; // [2]

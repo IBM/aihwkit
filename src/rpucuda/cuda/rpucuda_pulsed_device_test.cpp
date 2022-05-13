@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,6 +18,7 @@
 #include "rpucuda_constantstep_device.h"
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_linearstep_device.h"
+#include "rpucuda_piecewisestep_device.h"
 #include "rpucuda_powstep_device.h"
 #include "rpucuda_pulsed.h"
 #include "rpucuda_pulsed_device.h"
@@ -39,6 +40,13 @@ typedef float num_t;
 namespace {
 
 using namespace RPU;
+
+template <typename DeviceParT> void specific_settings(DeviceParT &par){};
+
+template <> void specific_settings(PiecewiseStepRPUDeviceMetaParameter<num_t> &par) {
+  par.piecewise_up_vec = std::vector<num_t>{0.1, 0.5, 1.0, 0.3, 0.1};
+  par.piecewise_down_vec = std::vector<num_t>{0.5, 0.3, 2.0, 0.6, 0.3};
+};
 
 template <typename DeviceParT> class RPUDeviceTestFixture : public ::testing::Test {
 public:
@@ -79,6 +87,8 @@ public:
     dp.w_max_dtod = 0.1;
 
     dp.dw_min = 0.01;
+
+    specific_settings(dp);
 
     // peripheral circuits specs
     p_io.inp_res = -1;
@@ -248,7 +258,8 @@ typedef ::testing::Types<
     LinearStepRPUDeviceMetaParameter<num_t>,
     ExpStepRPUDeviceMetaParameter<num_t>,
     PowStepRPUDeviceMetaParameter<num_t>,
-    ConstantStepRPUDeviceMetaParameter<num_t>>
+    ConstantStepRPUDeviceMetaParameter<num_t>,
+    PiecewiseStepRPUDeviceMetaParameter<num_t>>
 
     MetaPar;
 

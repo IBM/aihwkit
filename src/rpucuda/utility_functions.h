@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -15,6 +15,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string.h>
+
+#define UNUSED(X) (void)X
 
 #ifdef _MSC_VER
 #define PRAGMA(DIRECTIVE) __pragma(DIRECTIVE)
@@ -40,6 +42,12 @@
     ss << "Error in " << __FILENAME__ << ":" << __LINE__ << "  ";                                  \
     ss << MSG;                                                                                     \
     throw std::runtime_error(ss.str());                                                            \
+  }
+
+#define RPU_INFO(MSG)                                                                              \
+  {                                                                                                \
+    std::cout << "Info in " << __FILENAME__ << ":" << __LINE__ << "  ";                            \
+    std::cout << MSG << std::endl;                                                                 \
   }
 
 #define RPU_NOT_IMPLEMENTED RPU_FATAL("Feature not yet implemented!");

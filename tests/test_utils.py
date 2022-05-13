@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -32,7 +32,7 @@ from aihwkit.nn import (
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
-from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters, MappingParameter
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.exceptions import TileError, ModuleError
 from aihwkit.nn.conversion import convert_to_analog
@@ -371,13 +371,13 @@ class SerializationTest(ParametrizedTestCase):
         new_hidden_parameters = new_analog_tile.tile.get_hidden_parameters()
         assert_array_almost_equal(hidden_parameters, new_hidden_parameters)
 
-    def test_save_load_alpha_scale(self):
-        """Test saving and loading a device with alpha_scale."""
+    def test_save_load_out_scaling_alpha(self):
+        """Test saving and loading a device with out_scaling_alpha."""
         # Create the device and the array.
         model = self.get_layer()
         alpha = 2.0
         analog_tile = self.get_analog_tile(model)
-        analog_tile.tile.set_alpha_scale(alpha)
+        analog_tile.out_scaling_alpha = Tensor([alpha])
 
         # Save the model to a file.
         with TemporaryFile() as file:
@@ -388,7 +388,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
-        alpha_new = new_analog_tile.tile.get_alpha_scale()
+        alpha_new = new_analog_tile.get_out_scaling_alpha().detach().cpu()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_save_load_shared_weights(self):
@@ -420,9 +420,11 @@ class SerializationTest(ParametrizedTestCase):
 
     def test_save_load_weight_scaling_omega(self):
         """Test saving and loading a device with weight scaling omega."""
-        model = self.get_layer(weight_scaling_omega=0.5)
+        # Create the device and the array.
+        rpu_config = SingleRPUConfig(mapping=MappingParameter(weight_scaling_omega=0.4))
+        model = self.get_layer(rpu_config=rpu_config)
         analog_tile = self.get_analog_tile(model)
-        alpha = analog_tile.tile.get_alpha_scale()
+        alpha = analog_tile.get_out_scaling_alpha().detach().cpu()
         self.assertNotEqual(alpha, 1.0)
 
         # Save the model to a file.
@@ -434,7 +436,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
-        alpha_new = new_analog_tile.tile.get_alpha_scale()
+        alpha_new = new_analog_tile.get_out_scaling_alpha().detach().cpu()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_save_load_state_dict_hidden_parameters(self):
@@ -715,7 +717,7 @@ class SerializationTestExtended(ParametrizedTestCase):
 
         self.train_model_torch(model, mse_loss, x_b, y_b)
 
-        analog_model = convert_to_analog(model, self.get_rpu_config(), weight_scaling_omega=1.0)
+        analog_model = convert_to_analog(model, self.get_rpu_config())
         analog_loss = mse_loss(analog_model(x_b), y_b)
 
         with TemporaryFile() as file:
@@ -723,8 +725,7 @@ class SerializationTestExtended(ParametrizedTestCase):
             # Load the model.
             file.seek(0)
             model = self.get_torch_model(self.use_cuda)
-            new_analog_model = convert_to_analog(model, self.get_rpu_config(),
-                                                 weight_scaling_omega=1.0)
+            new_analog_model = convert_to_analog(model, self.get_rpu_config())
             state_dict = load(file)
             new_analog_model.load_state_dict(state_dict, load_rpu_config=True)
 

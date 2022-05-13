@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,7 +23,6 @@ INSTALL_REQUIRES = [
     'scipy',
     'requests>=2.25,<3',
     'numpy>=1.18',
-    'dataclasses==0.7; python_version < "3.7"',
     'protobuf>=3.13.0,<4'
 ]
 
@@ -74,7 +73,7 @@ setup(
         'aihwkit': ['VERSION.txt']
     },
     install_requires=INSTALL_REQUIRES,
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     zip_safe=False,
     extras_require={
         'visualization': ['matplotlib>=3.0']

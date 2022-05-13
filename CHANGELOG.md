@@ -12,7 +12,31 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [UNRELEASED]
+## Unreleased
+
+### Added
+
+* Set weights can be used to re-apply the weight scaling omega. (\#360)
+* Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
+* Reverse up / down option for ``LinearStepDevice``. (\#361)
+* Generic Analog RNN classes (LSTM, RNN, GRU) uni or bidirectional. (\#358)
+* Added new ``PiecewiseStepDevice`` that can be conviniently used for experimental
+  device data fitting. (\#356)
+
+### Fixed
+
+* Legacy checkpoint load with alpha scaling. (\#360)
+* Re-application of weight scaling omega when loading checkpoints. (\#360)
+* Write noise was not correctly applied for CUDA if ``dw_min_std=0``. (\#356)
+
+### Changed
+
+* The ``set_alpha_scale`` and ``get_alpha_scale`` methods of the C++ tiles are removed. (\#360)
+* The lowest supported Python version is now `3.7`, as `3.6` has reached
+  end-of-life. Additionally, the library now officially supports Python
+  `3.10`. (\#368)
+
+## [0.5.1] - 2022/01/27
 
 ### Added
 
@@ -36,6 +60,8 @@ The format is based on [Keep a Changelog], and this project adheres to
   output sizes can be configured for the ``*Mapped`` layers. (\#331)
 * Notebooks directory with several notebook examples (#333, \#334)
 * Analog information summary function. (\#316)
+* The `alpha` weight scaling factor can now be defined as learnable parameter by switching
+  `learn_out_scaling_alpha` in the `rpu_config.mapping` parameters. (\#353)
 
 ### Fixed
 
@@ -60,8 +86,9 @@ The format is based on [Keep a Changelog], and this project adheres to
   types if set larger than zero. (\#318)
 * The use of generators for analog tiles of an ``AnalogModuleBase``. (\#320)
 * Digital bias is now accessable through ``MappingParameter``. (\#331)
-* The aihwkit documentation. New content around analog ai concepts, training presets, analog ai 
+* The aihwkit documentation. New content around analog ai concepts, training presets, analog ai
   optimizers, new references, and examples. (\#348)
+* The `weight_scaling_omega` can now be defined in the `rpu_config.mapping`. (\#353)
 
 ### Deprecated
 
