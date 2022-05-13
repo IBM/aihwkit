@@ -1,4 +1,6 @@
-Inference and PCM statistical model
+.. _PCM-target:
+
+Inference and PCM Statistical Model
 ===================================
 
 The analog AI hardware kit provides a state-of-the-art statistical model of a
@@ -196,6 +198,16 @@ Note that the drift compensation class
 :class:`~aihwkit.inference.compensation.base.BaseDriftCompensation` is user
 extendable, so that new drift compensation methods can be added
 easily.
+
+PCM model in aihwkit
+--------------------
+We constructed statistical noise models for phase change materials to realistically simulate the expected programming error and 
+conductance drift over time for such inference hardware using PCM. Here the experimental data is compared against the model 
+implemented noise models which show a great correspondence. We also implemented a drift compensation that increasingly scales 
+the output of the Analog tiles in digital to compensate for the reduction of the conductance. (See figure below)
+
+.. image:: ../img/pcm_drift_model.png
+   :alt:
 
 Example of how to use the PCM noise model for inference
 -------------------------------------------------------

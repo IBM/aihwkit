@@ -24,21 +24,43 @@ analog tile. The library current includes the following analog layers:
 Convolution layers
 ~~~~~~~~~~~~~~~~~~
 
-+---------------------------------------------------+-----------------------------------------------------+---------------------+
-| Analog Layer                                      | Description                                         | PyTorch Counterpart |
-+===================================================+=====================================================+=====================+
-| :class:`~aihwkit.nn.modules.linear.AnalogLinear`  | | Applies a linear transformation to the input data | `nn.Linear`_        |
-|                                                   | | (layers) and Functions.                           |                     |
-+---------------------------------------------------+-----------------------------------------------------+---------------------+
-| :class:`~aihwkit.nn.modules.conv.AnalogConv1d`    | | Applies a 1D convolution over an input signal     | `nn.Conv1d`_        |
-|                                                   | | composed of several input planes.                 |                     |
-+---------------------------------------------------+-----------------------------------------------------+---------------------+
-| :class:`~aihwkit.nn.modules.conv.AnalogConv2d`    | | Applies a 2D convolution over an input signal     | `nn.Conv2d`_        |
-|                                                   | | composed of several input planes                  |                     |
-+---------------------------------------------------+-----------------------------------------------------+---------------------+
-| :class:`~aihwkit.nn.modules.conv.AnalogConv3d`    | | Applies a 3D convolution over an input signal     | `nn.Conv3d`_        |
-|                                                   | | composed of several input planes                  |                     |
-+---------------------------------------------------+-----------------------------------------------------+---------------------+
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| Analog Layer                                                 | Description                                         | PyTorch Counterpart |
++==============================================================+=====================================================+=====================+
+| :class:`~aihwkit.nn.modules.linear.AnalogLinear`             | | Applies a linear transformation to the input data | `nn.Linear`_        |
+|                                                              | | (layers) and Functions.                           |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv.AnalogConv1d`               | | Applies a 1D convolution over an input signal     | `nn.Conv1d`_        |
+|                                                              | | composed of several input planes.                 |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv.AnalogConv2d`               | | Applies a 2D convolution over an input signal     | `nn.Conv2d`_        |
+|                                                              | | composed of several input planes                  |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv.AnalogConv3d`               | | Applies a 3D convolution over an input signal     | `nn.Conv3d`_        |
+|                                                              | | composed of several input planes                  |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`| | Similar to AnalogLinearMapped but constrains the  | `nn.Linear`_        |
+|                                                              | | the maximal in and/or out dimension of an analog  |                     |
+|                                                              | | tile.                                             |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv1dMapped`  | | Applies a 1D convolution over an input signal     | `nn.Conv1d`_        |
+|                                                              | | composed of several inputplanes, using an analog  |                     | 
+|                                                              | | tile for its forward, backward and update passes. |                     |  
+|                                                              | | The module will The module will split the weight  |                     | 
+|                                                              | | matrix onto multiple tiles if necessary.          |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv2dMapped`  | | Applies a 2D convolution over an input signal     | `nn.Conv2d`_        |
+|                                                              | | composed of several inputplanes, using an analog  |                     | 
+|                                                              | | tile for its forward, backward and update passes. |                     |  
+|                                                              | | The module will The module will split the weight  |                     | 
+|                                                              | | matrix onto multiple tiles if necessary.          |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv3dMapped`  | | Applies a 3D convolution over an input signal     | `nn.Conv3d`_        |
+|                                                              | | composed of several inputplanes, using an analog  |                     | 
+|                                                              | | tile for its forward, backward and update passes. |                     |  
+|                                                              | | The module will The module will split the weight  |                     | 
+|                                                              | | matrix onto multiple tiles if necessary.          |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
 
 Recurrent layers
 ~~~~~~~~~~~~~~~~
