@@ -44,7 +44,7 @@ Convolution layers
 |                                                              | | tile and will construct multiple tiles (as many   |                     |
 |                                                              | | as necessary to cover the weight matrix).         |                     |
 |                                                              | | Splitting, concatenation, and partial sum addition|                     |
-|                                                              | | are done in digital.                               |                     |
+|                                                              | | are done in digital.                              |                     |
 +--------------------------------------------------------------+-----------------------------------------------------+---------------------+
 | :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv1dMapped`  | | Applies a 1D convolution over an input signal     | `nn.Conv1d`_        |
 |                                                              | | composed of several inputplanes, using an analog  |                     | 
