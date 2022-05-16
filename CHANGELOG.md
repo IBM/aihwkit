@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## Unreleased
+## [0.6.0] - 2022/05/16
 
 ### Added
 
@@ -20,8 +20,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
 * Reverse up / down option for ``LinearStepDevice``. (\#361)
 * Generic Analog RNN classes (LSTM, RNN, GRU) uni or bidirectional. (\#358)
-* Added new ``PiecewiseStepDevice`` that can be conviniently used for experimental
-  device data fitting. (\#356)
+* Added new ``PiecewiseStepDevice`` where the update-step response function can be arbitrarily defined by the user
+  in a piece-wise linear manner. It can be conveniently used to fit any experimental device data. (\#356)
+* Several enhancements to the public documentations: added a new section for hw-aware training, refreshed the reference API doc, 
+  and added the newly supported LSTM layers and the mapped conv layers. (\#374)
 
 ### Fixed
 
