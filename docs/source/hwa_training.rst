@@ -122,3 +122,8 @@ to convert weights into conductance paris and then apply the noise pn
 both of these pairs. More elaborate mapping schemes can be
 incorporated by extending
 :class:`~aihwkit.inference.converter.base.BaseConductanceConverter`.
+
+An example AI model factsheet using the Natural Language Processing BERT (Bidirectional Encoder Representations from Transformers) model can be found in this link: :download:`Analog AI BERT Factsheet <./analog_ai_bert_factsheet.pdf>`. 
+This example documents the patameter and inference attributes that were used. It also illustrates how hardware-aware was crucial to get high accuracy, close to digital accuracy, for the GLUE task. 
+For instance, this hardware-aware training produced a model with a validation accuracy of 80.6% (GLUE average) 
+compared to state-of-the-art at 81.2% from BERT paper.
