@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -127,6 +127,10 @@ class LayerFunction(Function):
         """Get the value of a field."""
         if field == 'bias':
             return getattr(source, 'bias', None) is not None
+
+        if field == 'weight_scaling_omega':
+            return list(source.analog_tiles())[0].rpu_config.mapping.weight_scaling_omega
+
         if field == 'rpu_config':
             preset_cls = type(source.analog_tile.rpu_config)
             try:

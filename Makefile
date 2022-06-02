@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-.PHONY: build_inplace clean clean-doc clang-format mypy pycodestyle pylint pytest build_inplace_mkl build_inplace_cuda build_cuda
+.PHONY: build_inplace clean clean-doc clang-format mypy pycodestyle pylint pytest build_inplace_mkl build_inplace_cuda build_cuda build_inplace_cuda_abi
 
 build_inplace:
 	python setup.py build_ext -j8 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace ${flags}
@@ -29,6 +29,9 @@ build_cuda:
 
 build_inplace_cuda:
 	make build_inplace_mkl flags="-DUSE_CUDA=ON ${flags}"
+
+build_inplace_cuda_abi:
+	make build_inplace_mkl flags="-DUSE_CUDA=ON -DUSE_ABI_ZERO=OFF ${flags}"
 
 clean:
 	python setup.py clean

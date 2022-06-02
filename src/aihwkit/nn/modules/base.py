@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -11,15 +11,14 @@
 # that they have been altered from the originals.
 
 """Base class for analog Modules."""
-import warnings
-
 from typing import (
     Any, Dict, List, Optional, Tuple, NamedTuple, Union,
     Generator, TYPE_CHECKING
 )
 
-from torch import Tensor, no_grad
+from torch import Tensor, no_grad, ones, float32
 from torch.nn import Module, Parameter
+from torch import device as torch_device
 
 from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.configs.configs import (
@@ -64,9 +63,6 @@ class AnalogModuleBase(Module):
         bias: whether to use a bias row on the analog tile or not.
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and during reading of the weights.
-        weight_scaling_omega: the weight value that the current max
-            weight value will be scaled to. If zero, no weight scaling will
-            be performed.
         mapping: Configuration of the hardware architecture (e.g. tile size).
     """
     # pylint: disable=abstract-method, too-many-instance-attributes
@@ -81,7 +77,6 @@ class AnalogModuleBase(Module):
             out_features: int,
             bias: bool,
             realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[float] = None,
             mapping: Optional[MappingParameter] = None,
     ) -> None:
         # pylint: disable=super-init-not-called
@@ -95,20 +90,6 @@ class AnalogModuleBase(Module):
         self.use_bias = bias
         self.digital_bias = bias and mapping.digital_bias
         self.analog_bias = bias and not mapping.digital_bias
-        self.weight_scaling_omega = mapping.weight_scaling_omega if weight_scaling_omega is None \
-            else weight_scaling_omega
-        if weight_scaling_omega is not None:
-            warnings.warn(DeprecationWarning('\nSetting the weight_scaling_omega through the '
-                                             'layers input parameters will be deprecated in the '
-                                             'future. Please set it through the MappingParameter '
-                                             'of the rpu_config.\n'))
-
-        self.weight_scaling_omega_columnwise = mapping.weight_scaling_omega_columnwise
-        self.learn_out_scaling_alpha = mapping.learn_out_scaling_alpha
-
-        if self.learn_out_scaling_alpha and self.weight_scaling_omega == 0:
-            raise ValueError('out_scaling_alpha can only be learned if weight_scaling_omega > 0')
-
         self.realistic_read_write = realistic_read_write
         self.in_features = in_features
         self.out_features = out_features
@@ -143,8 +124,11 @@ class AnalogModuleBase(Module):
             if par_name not in self._registered_helper_parameter:
                 self._registered_helper_parameter.append(par_name)
 
-        if self.learn_out_scaling_alpha:
-            if not isinstance(tile.out_scaling_alpha, Parameter):
+        mapping = tile.rpu_config.mapping
+        if mapping.learn_out_scaling_alpha:
+            if tile.out_scaling_alpha is None:
+                tile.out_scaling_alpha = Parameter(ones([1], device=tile.device, dtype=float32))
+            elif not isinstance(tile.out_scaling_alpha, Parameter):
                 tile.out_scaling_alpha = Parameter(tile.out_scaling_alpha)
             par_name = self.ANALOG_OUT_SCALING_ALPHA_PREFIX + str(self._analog_tile_counter)
             self.register_parameter(par_name, tile.out_scaling_alpha)
@@ -179,6 +163,14 @@ class AnalogModuleBase(Module):
             if isinstance(param, AnalogContext):
                 new_name = name.split(self.ANALOG_CTX_PREFIX)[-1]
                 yield (new_name, param.analog_tile)
+
+    def get_analog_tile_devices(self) -> List[Optional[Union[torch_device, str, int]]]:
+        """ Return a list of the devices used by the analog tiles.
+
+        Returns:
+            List of torch devices
+        """
+        return [d.device for d in self.analog_tiles()]
 
     def analog_tile_count(self) -> int:
         """Return the number of registered tiles.
@@ -219,7 +211,9 @@ class AnalogModuleBase(Module):
             self,
             weight: Tensor,
             bias: Optional[Tensor] = None,
-            force_exact: bool = False
+            force_exact: bool = False,
+            remap_weights: bool = True,
+            weight_scaling_omega: float = None
     ) -> None:
         """Set the weight (and bias) values with given tensors.
 
@@ -242,6 +236,17 @@ class AnalogModuleBase(Module):
             weight: weight matrix
             bias: bias vector
             force_exact: forces an exact write to the analog tiles
+            remap_weights: Whether to rescale the given weight matrix
+                and populate the digital output scaling factors as
+                specified in the configuration
+                :class:`~aihwkit.configs.utils.MappingParameter`. A
+                new ``weight_scaling_omega`` can be given. Note that
+                this will overwrite the existing digital out scaling
+                factors.
+            weight_scaling_omega: The weight scaling omega factor (see
+                :class:`~aihwkit.configs.utils.MappingParameter`). If
+                given explicitly here, it will overwrite the value in
+                the mapping field.
 
         Raises:
             ModuleError: in case of multiple defined analog tiles in the module
@@ -257,13 +262,15 @@ class AnalogModuleBase(Module):
             raise ModuleError("AnalogModuleBase.set_weights only supports a single tile.")
         analog_tile = analog_tiles[0]
 
-        if self.weight_scaling_omega > 0.0:
+        if remap_weights:
+            omega = weight_scaling_omega
+            if omega is None:
+                omega = analog_tile.rpu_config.mapping.weight_scaling_omega
+
             analog_tile.set_weights_scaled(
                 weight, bias if self.analog_bias else None,
                 realistic=realistic,
-                omega=self.weight_scaling_omega,
-                weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise,
-                learn_out_scaling_alpha=self.learn_out_scaling_alpha)
+                weight_scaling_omega=omega)
         else:
             analog_tile.set_weights(weight, bias if self.analog_bias else None,
                                     realistic=realistic)
@@ -276,7 +283,8 @@ class AnalogModuleBase(Module):
 
     def get_weights(
             self,
-            force_exact: bool = False
+            force_exact: bool = False,
+            apply_out_scales: bool = True,
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the weight (and bias) tensors.
 
@@ -294,13 +302,23 @@ class AnalogModuleBase(Module):
             analog tile library, for performance reasons.
 
         Args:
-            force_exact: forces an exact read to the analog tiles
+            force_exact: Forces an exact read to the analog tiles
+
+            apply_out_scales: Whether to return the weights with the
+                (digital) output scaling factors applied. Note the
+                "logical" weights of the layer which the DNN is
+                effectively using are those with the output scales
+                applied. If ``apply_out_scales`` is set to False, then
+                only the weight values that is programmed onto the
+                crossbar array are returned, without applying the
+                digital scales.
 
         Returns:
             tuple: weight matrix, bias vector
 
         Raises:
             ModuleError: in case of multiple defined analog tiles in the module
+
         """
         analog_tiles = list(self.analog_tiles())
         if len(analog_tiles) != 1:
@@ -308,16 +326,22 @@ class AnalogModuleBase(Module):
         analog_tile = analog_tiles[0]
 
         realistic = self.realistic_read_write and not force_exact
-        if self.weight_scaling_omega > 0.0:
-            weight, bias = analog_tile.get_weights_scaled(
-                realistic=realistic,
-                weight_scaling_omega_columnwise=self.weight_scaling_omega_columnwise)
+        if apply_out_scales:
+            weight, analog_bias = analog_tile.get_weights_scaled(realistic=realistic)
         else:
-            weight, bias = analog_tile.get_weights(realistic=realistic)
+            weight, analog_bias = analog_tile.get_weights(realistic=realistic)
 
+        digital_bias = None
         if self.digital_bias:
             with no_grad():
-                bias = self.bias.data.detach().cpu()
+                digital_bias = self.bias.data.clone().detach().cpu()
+
+        if (digital_bias is not None) and (analog_bias is not None):
+            bias = digital_bias + analog_bias
+        elif digital_bias is not None:
+            bias = digital_bias
+        else:
+            bias = analog_bias
         return weight, bias
 
     def _sync_weights_from_tile(self) -> None:
@@ -491,8 +515,6 @@ class AnalogModuleBase(Module):
         output = super().extra_repr()
         if self.realistic_read_write:
             output += ', realistic_read_write={}'.format(self.realistic_read_write)
-        if self.weight_scaling_omega > 0:
-            output += ', weight_scaling_omega={:.3f}'.format(self.weight_scaling_omega)
         if self.analog_bias:
             output += ', analog bias'
         if self.digital_bias:
