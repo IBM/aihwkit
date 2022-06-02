@@ -298,11 +298,6 @@ class LSTMLayerTest(ParametrizedTestCase):
         lstm_pars0 = get_parameters(lstm, False)
         lstm_analog_pars0 = get_parameters(lstm_analog, True)
 
-        print(lstm_pars0.keys())
-        print('\n\n')
-        print(lstm_analog_pars0.keys())
-        # exit()
-
         for par_name, par_item in lstm_pars0.items():
             par_item.data = lstm_analog_pars0[par_name].detach().clone()
 
