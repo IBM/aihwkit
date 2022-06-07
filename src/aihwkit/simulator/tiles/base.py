@@ -147,6 +147,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         current_dict.pop('is_cuda', None)
         current_dict.pop('device', None)
 
+        # this is should not be saved.
+        current_dict.pop('image_sizes', None)
+
         return current_dict
 
     def __setstate__(self, state: Dict) -> None:
@@ -167,6 +170,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # attributes that were not saved in getstate
 
         current_dict = state.copy()
+        current_dict.pop('image_sizes', None)  # should not be saved
         weights = current_dict.pop('analog_tile_weights')
         hidden_parameters = current_dict.pop('analog_tile_hidden_parameters')
         hidden_parameters_names = current_dict.pop('analog_tile_hidden_parameter_names', [])
