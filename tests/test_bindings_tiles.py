@@ -19,6 +19,7 @@ from numpy.random import uniform
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 
 from torch import Tensor, from_numpy
+from torch.cuda import init
 
 from aihwkit.simulator.rpu_base import tiles, cuda
 
@@ -31,6 +32,8 @@ from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (FloatingPoint, ConstantStep,
                             FloatingPointCuda, ConstantStepCuda)
 
+if cuda.is_compiled():
+    init()
 
 @parametrize_over_tiles([
     FloatingPoint,
