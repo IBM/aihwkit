@@ -35,6 +35,7 @@ from .helpers.tiles import (FloatingPoint, ConstantStep,
 if cuda.is_compiled():
     init()
 
+
 @parametrize_over_tiles([
     FloatingPoint,
     ConstantStep,
