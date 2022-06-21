@@ -99,7 +99,7 @@ class AnalogModuleBase(Module):
 
         if name not in self._registered_helper_parameter:
             self._registered_helper_parameter.append(name)
-        
+
     def register_analog_tile(self, tile: 'BaseTile', name: Optional[str] = None) -> None:
         """Register the analog context of the tile.
 
