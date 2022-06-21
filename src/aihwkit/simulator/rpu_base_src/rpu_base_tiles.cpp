@@ -713,6 +713,21 @@ void declare_rpu_tiles(py::module &m) {
                indices: int torch::Tensor
           )pbdoc")
       .def(
+          "has_matrix_indices",
+          [](Class &self) {
+            return self.hasMatrixIndices();
+          },
+          R"pbdoc(
+           Returns whether the index matrix necessary for the  ``*_indexed`` functionality 
+           has been set.
+
+           Caution:
+               Internal use only.
+
+           Returns:
+               bool: whether it was set or not.
+          )pbdoc")
+      .def(
           "get_hidden_parameter_names",
           [](Class &self) {
             std::vector<std::string> v;

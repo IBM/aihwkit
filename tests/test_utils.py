@@ -170,6 +170,8 @@ class SerializationTest(ParametrizedTestCase):
             input_x = input_x.cuda()
             input_y = input_y.cuda()
 
+        self.train_model(model, loss_func, input_x, input_y)
+
         # Keep track of the current weights and biases for comparing.
         _, _, tile_weights, tile_biases, _ = self.get_layer_and_tile_weights(model)
 
@@ -195,6 +197,47 @@ class SerializationTest(ParametrizedTestCase):
         loss = self.train_model(model, loss_func, input_x, input_y)
         if self.tile_class != ConstantStep:
             self.assertTensorAlmostEqual(loss, new_loss)
+
+    def test_save_load_state_dict_train_after_old_model(self):
+        """Test saving and loading using a state dict and training after load with old model."""
+        model = self.get_layer()
+
+        # Perform an update in order to modify tile weights and biases.
+        loss_func = mse_loss
+        if isinstance(model, (AnalogConv2d, AnalogConv2dMapped)):
+            input_x = Tensor(rand(2, 2, 3, 3))*0.2
+            input_y = Tensor(rand(2, 3, 5, 5))*0.2
+        else:
+            input_x = Tensor(rand(2, model.in_features))*0.2
+            input_y = Tensor(rand(2, model.out_features))*0.2
+
+        if self.use_cuda:
+            input_x = input_x.cuda()
+            input_y = input_y.cuda()
+
+        self.train_model(model, loss_func, input_x, input_y)
+
+        # Keep track of the current weights and biases for comparing.
+        _, _, tile_weights, tile_biases, _ = self.get_layer_and_tile_weights(model)
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model.state_dict(), file)
+            # Create a new model and load its state dict.
+            file.seek(0)
+            model.load_state_dict(load(file))
+
+        # Compare the new model weights and biases. they should now be in sync
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases, _) = self.get_layer_and_tile_weights(model)
+
+        assert_array_almost_equal(tile_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(tile_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
+
+        self.train_model(model, loss_func, input_x, input_y)
 
     def test_save_load_train_after(self):
         """Test saving and loading using a state dict and training after load."""

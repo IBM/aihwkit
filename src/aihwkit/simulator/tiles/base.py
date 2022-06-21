@@ -760,8 +760,16 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         self.tile.set_hidden_update_index(index)
 
+    def is_indexed(self) -> bool:
+        """Returns whether index matrix for convolutions has been set.
+
+        Returns:
+           Whether index matrix has been set
+        """
+        return self.tile.has_matrix_indices()
+
     def set_indexed(self, indices: Tensor, image_sizes: List) -> None:
-        """Set the index matrix for convolutions ans switches to
+        """Set the index matrix for convolutions and switches to
         indexed forward/backward/update versions.
 
         Args:
