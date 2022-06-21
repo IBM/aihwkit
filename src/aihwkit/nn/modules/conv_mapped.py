@@ -128,7 +128,9 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
 
         # Set the index matrices.
         self.input_size = 0
+        self.register_helper('input_size')
         self.fold_indices_lst = []  # type: List[Tensor]
+        self.register_helper('fold_indices_lst')
         self.tensor_view = (-1,)  # type: Tuple[int, ...]
 
         # Unregister weight/bias as a parameter but keep it as a

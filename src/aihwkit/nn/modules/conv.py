@@ -104,9 +104,10 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
 
         # Set the index matrices.
         self.fold_indices = Tensor().detach()
-        self.input_size = 0
-        self.tensor_view = (-1,)  # type: Tuple[int, ...]
         self.register_helper('fold_indices')
+        self.input_size = 0
+        self.register_helper('input_size')
+        self.tensor_view = (-1,)  # type: Tuple[int, ...]
 
         # Unregister weight/bias as a parameter but keep it for syncs
         self.unregister_parameter('weight')
