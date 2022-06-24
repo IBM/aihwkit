@@ -15,7 +15,9 @@
 from types import new_class
 from typing import Any, Callable, Dict, Optional, Type
 
+from torch import cat
 from torch.optim import Optimizer, SGD
+from torch.autograd import no_grad
 
 from aihwkit.optim.context import AnalogContext
 
@@ -60,6 +62,7 @@ class AnalogOptimizerMixin:
         for group in analog_param_groups:
             self.add_param_group(group)  # type: ignore[attr-defined]
 
+    @no_grad()
     def step(self, closure: Optional[Callable] = None) -> Optional[float]:
         """Perform an analog-aware single optimization step.
 
@@ -108,9 +111,11 @@ class AnalogOptimizerMixin:
                                                     analog_ctx.analog_grad_output):
                             analog_tile.update_indexed(x_input, d_input)
                     else:
-                        for x_input, d_input in zip(analog_ctx.analog_input,
-                                                    analog_ctx.analog_grad_output):
-                            analog_tile.update(x_input, d_input)
+                        x_input = cat(analog_ctx.analog_input,
+                                      axis=-1 if analog_tile.in_trans else 0)
+                        d_input = cat(analog_ctx.analog_grad_output,
+                                      axis=-1 if analog_tile.out_trans else 0)
+                        analog_tile.update(x_input, d_input)
 
                     analog_ctx.reset()
         # Apply post-update step operations (diffuse, decay, etc).
