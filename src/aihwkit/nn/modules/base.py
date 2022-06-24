@@ -345,6 +345,29 @@ class AnalogModuleBase(Module):
             bias = analog_bias
         return weight, bias
 
+    def remap_weights(self, weight_scaling_omega: Optional[float] = None) -> None:
+        """Remap the out-scaling alpha to analog weight conversion.
+
+        Note:
+
+            This remapping is most useful for hardware-aware training
+            for inference.  For analog training it should not be
+            applied. If the realistic write/read setting is turned on
+            (which should be the case of analog training), then it
+            will do a full refresh read-write of the array.
+
+        Args:
+            weight_scaling_omega: The optional value to remap the
+                weight max to. Will take the previous value used otherwise
+                (typically the one from ``RPUConfig.mapping``)
+
+        """
+
+        weights_and_bias = self.get_weights(apply_out_scales=True)
+        self.set_weights(*weights_and_bias,
+                         weight_scaling_omega=weight_scaling_omega,
+                         remap_weights=True)
+
     def _sync_weights_from_tile(self) -> None:
         """Update the layer weight and bias from the values on the analog tile.
 
