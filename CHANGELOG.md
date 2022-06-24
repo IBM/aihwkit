@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 * Index error when loading the state dict with a model use previously. (\#387)
+* Weights that were not contiguous could have set wrongly. (\#388) 
 
 ### Changed
 
