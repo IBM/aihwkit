@@ -206,7 +206,8 @@ class AnalogInfo:
             layer_summary.append(LayerInfo(_, self.rpu_config, input_size, output_size))
 
         self.register_hooks_recursively(self.model, get_size_hook)
-        dummy_var = torch.zeros(self.input_size)
+        device = next(self.model.parameters()).device
+        dummy_var = torch.zeros(self.input_size).to(device)
         self.model(dummy_var)
         return layer_summary
 

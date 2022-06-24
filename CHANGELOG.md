@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
 
 ### Fixed
+* Analog_summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have set wrongly. (\#388)
 * Programming noise would not be applied if drift compensation was not
