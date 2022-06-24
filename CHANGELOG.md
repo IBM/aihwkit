@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 * Notebook for exploring analog sensitivities. (\#380)
-* Added generic interface to the RNN layer (\# 384)
+* Notebook example for the RNN layers (\# 384)
 
 ### Fixed
 * Index error when loading the state dict with a model use previously. (\#387)

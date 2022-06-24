@@ -28,8 +28,8 @@ class AnalogVanillaRNNCell(AnalogSequential):
     """Analog Vanilla RNN Cell.
 
     Args:
-        input_size: in_features size for :math:`W_{ih}` matrix
-        hidden_size: in_features and out_features size for :math:`W_{hh}` matrix
+        input_size: ``in_features`` size for :math:`W_{ih}` matrix
+        hidden_size: ``in_features`` and out_features size for :math:`W_{hh}` matrix
         bias: whether to use a bias row on the analog tile or not
         rpu_config: configuration for an analog resistive processing unit
         realistic_read_write: whether to enable realistic read/write
