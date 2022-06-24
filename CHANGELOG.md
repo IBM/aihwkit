@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+* Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
 * Notebook for exploring analog sensitivities. (\#380)
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
 
