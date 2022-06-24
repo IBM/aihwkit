@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+* Notebook for exploring analog sensitivities. (\#380)
 
 ### Fixed
 * Index error when loading the state dict with a model use previously. (\#387)
