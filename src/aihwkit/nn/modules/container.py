@@ -18,7 +18,7 @@ from collections import OrderedDict
 from torch import device as torch_device
 from torch.nn import Sequential
 
-from aihwkit.exceptions import ModuleError
+from aihwkit.exceptions import ModuleError, TileError
 from aihwkit.nn.modules.base import AnalogModuleBase
 
 if TYPE_CHECKING:
@@ -105,6 +105,32 @@ class AnalogSequential(Sequential):
             self._apply_to_analog(lambda m: m.cpu())
 
         return self
+
+    def get_analog_tile_device(self) -> Union[torch_device, str, int]:
+        """ Return the devices used by the analog tiles.
+
+        Returns:
+            device: torch device
+
+        Raises:
+            TileError: in case the model is on non-unique devices
+        """
+
+        devices = []
+        dev_name = []
+
+        self._apply_to_analog(
+            lambda mod: devices.extend(mod.get_analog_tile_devices()))
+
+        for name in devices:
+            dev_name.append(str(name))
+
+        if len(set(dev_name)) > 1:
+            raise TileError("Torch device is not unique")
+
+        device = devices[0]
+
+        return device
 
     def load_state_dict(self,  # pylint: disable=arguments-differ
                         state_dict: 'OrderedDict[str, Tensor]',
