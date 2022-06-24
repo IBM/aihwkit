@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 * Notebook for exploring analog sensitivities. (\#380)
+* Remapping functionality for ``InferenceRPUConfig``. (\#388)
 
 ### Fixed
 * Index error when loading the state dict with a model use previously. (\#387)
