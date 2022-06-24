@@ -1,4 +1,4 @@
-Using the pytorch integration
+Using the PyTorch integration
 =============================
 
 This library exposes most of its higher-level features as `PyTorch`_ primitives,
@@ -21,21 +21,66 @@ Analog layers
 An **analog layer** is a neural network module that stores its weights in an
 analog tile. The library current includes the following analog layers:
 
-* :class:`~aihwkit.nn.modules.linear.AnalogLinear`:
-  applies a linear transformation to the input data. It is the counterpart
-  of PyTorch `nn.Linear`_ layer.
+Convolution layers
+~~~~~~~~~~~~~~~~~~
 
-* :class:`~aihwkit.nn.modules.conv.AnalogConv1d`:
-  applies a 1D convolution over an input signal composed of several input
-  planes. It is the counterpart of PyTorch `nn.Conv1d`_ layer.
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| Analog Layer                                                 | Description                                         | PyTorch Counterpart |
++==============================================================+=====================================================+=====================+
+| :class:`~aihwkit.nn.modules.linear.AnalogLinear`             | | Applies a linear transformation to the input data | `nn.Linear`_        |
+|                                                              | | (layers) and Functions.                           |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv.AnalogConv1d`               | | Applies a 1D convolution over an input signal     | `nn.Conv1d`_        |
+|                                                              | | composed of several input planes.                 |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv.AnalogConv2d`               | | Applies a 2D convolution over an input signal     | `nn.Conv2d`_        |
+|                                                              | | composed of several input planes                  |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv.AnalogConv3d`               | | Applies a 3D convolution over an input signal     | `nn.Conv3d`_        |
+|                                                              | | composed of several input planes                  |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`| | Similar to AnalogLinearMapped but constrains the  | `nn.Linear`_        |
+|                                                              | | the maximal in and/or out dimension of an analog  |                     |
+|                                                              | | tile and will construct multiple tiles (as many   |                     |
+|                                                              | | as necessary to cover the weight matrix).         |                     |
+|                                                              | | Splitting, concatenation, and partial sum addition|                     |
+|                                                              | | are done in digital.                              |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv1dMapped`  | | Applies a 1D convolution over an input signal     | `nn.Conv1d`_        |
+|                                                              | | composed of several inputplanes, using an analog  |                     | 
+|                                                              | | tile for its forward, backward and update passes. |                     |  
+|                                                              | | The module will The module will split the weight  |                     | 
+|                                                              | | matrix onto multiple tiles if necessary.          |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv2dMapped`  | | Applies a 2D convolution over an input signal     | `nn.Conv2d`_        |
+|                                                              | | composed of several inputplanes, using an analog  |                     | 
+|                                                              | | tile for its forward, backward and update passes. |                     |  
+|                                                              | | The module will The module will split the weight  |                     | 
+|                                                              | | matrix onto multiple tiles if necessary.          |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.conv_mapped.AnalogConv3dMapped`  | | Applies a 3D convolution over an input signal     | `nn.Conv3d`_        |
+|                                                              | | composed of several inputplanes, using an analog  |                     | 
+|                                                              | | tile for its forward, backward and update passes. |                     |  
+|                                                              | | The module will The module will split the weight  |                     | 
+|                                                              | | matrix onto multiple tiles if necessary.          |                     |
++--------------------------------------------------------------+-----------------------------------------------------+---------------------+
 
-* :class:`~aihwkit.nn.modules.conv.AnalogConv2d`:
-  applies a 2D convolution over an input signal composed of several input
-  planes. It is the counterpart of PyTorch `nn.Conv2d`_ layer.
+Recurrent layers
+~~~~~~~~~~~~~~~~
 
-* :class:`~aihwkit.nn.modules.conv.AnalogConv3d`:
-  applies a 3D convolution over an input signal composed of several input
-  planes. It is the counterpart of PyTorch `nn.Conv3d`_ layer.
++-------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| Analog Layer                                                | Description                                         | PyTorch Counterpart |
++=============================================================+=====================================================+=====================+
+| :class:`~aihwkit.nn.modules.rnn.rnn.AnalogRNN`              | | A modular RNN that uses analog tiles. Can take    |  | `nn.RNN`_        |
+|                                                             | | one of three types: AnalogLSTM, AnalogGRU, or     |  | `nn.LSTM`_       |
+|                                                             | | AnalogVanillaRNN                                  |  | `nn.GRU`_        |
++-------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.rnn.cells.AnalogVanillaRNNCell` | An Elman RNN cell with tanh or ReLU non-linearity.  | `nn.RNNCell`_       |
++-------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.rnn.cells.AnalogGRUCell`        | A gated recurrent unit (GRU) cell.                  | `nn.GRUCell`_       |
++-------------------------------------------------------------+-----------------------------------------------------+---------------------+
+| :class:`~aihwkit.nn.modules.rnn.cells.AnalogLSTMCell`       | A long short-term memory (LSTM) cell.               | `nn.LSTMCell`_      |
++-------------------------------------------------------------+-----------------------------------------------------+---------------------+
 
 Using analog layers
 ~~~~~~~~~~~~~~~~~~~
@@ -222,9 +267,15 @@ Or in the case of custom classes::
             )
 
 
-.. _PyTorch: https://pytorch.org
-.. _nn.Linear: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-.. _nn.Conv1d: https://pytorch.org/docs/stable/generated/torch.nn.Conv1d.html
-.. _nn.Conv2d: https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
-.. _nn.Conv3d: https://pytorch.org/docs/stable/generated/torch.nn.Conv3d.html
-.. _optim.SGD: https://pytorch.org/docs/stable/optim.html#torch.optim.SGD
+.. _PyTorch:     https://pytorch.org
+.. _nn.Linear:   https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+.. _nn.Conv1d:   https://pytorch.org/docs/stable/generated/torch.nn.Conv1d.html
+.. _nn.Conv2d:   https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
+.. _nn.Conv3d:   https://pytorch.org/docs/stable/generated/torch.nn.Conv3d.html
+.. _optim.SGD:   https://pytorch.org/docs/stable/optim.html#torch.optim.SGD
+.. _nn.RNN:      https://pytorch.org/docs/stable/generated/torch.nn.RNN.html#torch.nn.RNN
+.. _nn.LSTM:     https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html#torch.nn.LSTM
+.. _nn.GRU:      https://pytorch.org/docs/stable/generated/torch.nn.GRU.html#torch.nn.GRU
+.. _nn.RNNCell:  https://pytorch.org/docs/stable/generated/torch.nn.RNNCell.html#torch.nn.RNNCell
+.. _nn.GRUCell:  https://pytorch.org/docs/stable/generated/torch.nn.GRUCell.html#torch.nn.GRUCell
+.. _nn.LSTMCell: https://pytorch.org/docs/stable/generated/torch.nn.LSTMCell.html#torch.nn.LSTMCell

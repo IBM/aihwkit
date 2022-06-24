@@ -23,5 +23,5 @@ PCM devices are considered the most mature among storage-class memory types, how
 .. image:: ../img/analog_ai_hw.png
    :alt: Various Candidates for Resistive Memory Devices
 
-This is one of the ket motivations behind building a simulator like the aihwkit to allow the exploration of various device and a multitude of charateristics on the 
+This is one of the key motivations behind building a simulator like the aihwkit to allow the exploration of various device and a multitude of charateristics on the 
 performance of AI models. 

@@ -291,8 +291,8 @@ Descent optimizer and the loss is printed for every epoch.
 
 ## Example 10: [`10_plot_presets.py`]
 
-This examples print 5 of the different [`preset devices`] and [`preset configs`] available.
-Using this presets makes easy testing the different memory element that can be used to train a
+This example prints 5 of the different [`preset devices`] and [`preset configs`] available.
+Using these presets makes easy to test the different memory elements that can be used to train a
 neural network. The presets (except for the "Idealized analog device") are calibrated on the
 measured characteristics of real hardware devices that have been fabricated at IBM. Device non-ideal
 characteristics, noise, and variability are accurately simulated in all presets.

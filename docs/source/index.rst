@@ -45,6 +45,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
    :hidden:
 
    pcm_inference
+   hwa_training
 
 .. toctree::
    :maxdepth: 3

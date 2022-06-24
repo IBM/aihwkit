@@ -28,7 +28,7 @@ class ModularRNN(AnalogSequential):
 
     Args:
         num_layers: number of serially connected RNN layers
-        layer: RNN layer type (e.g. AnalogLSTMLayer)
+        layer: RNN layer type (e.g. :class:`AnalogLSTMLayer`)
         dropout: dropout applied to output of all RNN layers except last
         first_layer_args: RNNCell type, input_size, hidden_size, rpu_config, etc.
         other_layer_args: RNNCell type, hidden_size, hidden_size, rpu_config, etc.
@@ -55,7 +55,7 @@ class ModularRNN(AnalogSequential):
         if num_layers == 1 and dropout > 0:
             warnings.warn('dropout lstm adds dropout layers after all but last '
                           'recurrent layer, it expects num_layers greater than '
-                          '1, but got num_layers = 1')
+                          '1, but got ``num_layers = 1``')
         self.dropout_layer = Dropout(dropout) if dropout else None
 
     @staticmethod
@@ -69,7 +69,7 @@ class ModularRNN(AnalogSequential):
 
         Args:
             num_layers: number of serially connected LSTM layers
-            layer: RNN layer type (e.g. AnalogLSTMLayer)
+            layer: RNN layer type (e.g. :class:`AnalogLSTMLayer`)
             first_layer_args: RNNCell type, input_size, hidden_size, rpu_config, etc.
             other_layer_args: RNNCell type, hidden_size, hidden_size, rpu_config, etc.
 
@@ -117,9 +117,9 @@ class AnalogRNN(AnalogSequential):
     """Modular RNN that uses analog tiles.
 
     Args:
-        cell: type of RNN (LSTM/GRU/VanillaRNN)
-        input_size: in_features to W_{ih} matrix of first layer
-        hidden_size: in_features and out_features for W_{hh} matrices
+        cell: type of Analog RNN cell (e.g. :class:`AnalogLSTMCell`)
+        input_size: in_features to :math:`W_{ih}` matrix of first layer
+        hidden_size: in_features and out_features for :math:`W_{hh}` matrices
         bias: whether to use a bias row on the analog tile or not
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write

@@ -43,13 +43,16 @@ template <typename T> struct UpdateFunctorExpStep {
       const float2 par_2,
       T &persistent_weight,
       const T *global_pars,
+      const int global_params_count,
       T noise_std_dw,
       curandState &local_state)
 
   {
-    (void)par_2; // no used here
+    UNUSED(par_2);               // no used here
+    UNUSED(global_params_count); // fixed anyway
 
     // par_4 order (min_bound, scale_down, max_bound, scale_up )
+
     // global_pars see below
     T uw_std = global_pars[6];
     T wmax = par_4.z; //[2];
@@ -108,11 +111,13 @@ template <typename T> struct UpdateFunctorExpStepComplexNoise {
       const float2 par_2,
       T &persistent_weight,
       const T *global_pars,
+      const int global_params_count,
       T noise_std_dw,
       curandState &local_state)
 
   {
-    (void)par_2; // no used here
+    UNUSED(par_2);               // no used here
+    UNUSED(global_params_count); // fixed anyway
 
     // par_4 order (min_bound, scale_down, max_bound, scale_up )
     // global_pars see below

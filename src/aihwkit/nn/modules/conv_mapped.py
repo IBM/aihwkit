@@ -128,7 +128,9 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
 
         # Set the index matrices.
         self.input_size = 0
+        self.register_helper('input_size')
         self.fold_indices_lst = []  # type: List[Tensor]
+        self.register_helper('fold_indices_lst')
         self.tensor_view = (-1,)  # type: Tuple[int, ...]
 
         # Unregister weight/bias as a parameter but keep it as a
@@ -231,7 +233,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
         # pylint: disable=arguments-differ,arguments-renamed
 
         input_size = x_input.numel() / x_input.size(0)
-        if self.input_size != input_size:
+        if self.input_size != input_size or not self.analog_tile_array[0][0].is_indexed():
             self.recalculate_indexes(x_input)
 
         if self.analog_tile_count() == 1:
