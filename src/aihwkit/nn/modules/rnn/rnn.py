@@ -117,7 +117,7 @@ class AnalogRNN(AnalogSequential):
     """Modular RNN that uses analog tiles.
 
     Args:
-        cell: type of RNN (LSTM/GRU/VanillaRNN)
+        cell: type of Analog RNN cell (AnalogLSTMCell/AnalogGRUCell/AnalogVanillaRNNCell)
         input_size: in_features to W_{ih} matrix of first layer
         hidden_size: in_features and out_features for W_{hh} matrices
         bias: whether to use a bias row on the analog tile or not
