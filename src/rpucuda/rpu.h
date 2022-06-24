@@ -418,9 +418,7 @@ public:
       RPU_FATAL("Matrix indices not set yet!");
     }
   };
-  FORCE_INLINE bool hasMatrixIndices() {
-    return this->matrix_indices_set_;
-  };
+  FORCE_INLINE bool hasMatrixIndices() { return this->matrix_indices_set_; };
 
   virtual void forwardIndexed(
       const T *X_input,

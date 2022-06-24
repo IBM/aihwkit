@@ -713,10 +713,7 @@ void declare_rpu_tiles(py::module &m) {
                indices: int torch::Tensor
           )pbdoc")
       .def(
-          "has_matrix_indices",
-          [](Class &self) {
-            return self.hasMatrixIndices();
-          },
+          "has_matrix_indices", [](Class &self) { return self.hasMatrixIndices(); },
           R"pbdoc(
            Returns whether the index matrix necessary for the  ``*_indexed`` functionality 
            has been set.
