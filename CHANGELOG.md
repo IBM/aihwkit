@@ -12,6 +12,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## Unreleased
+
+### Added
+
+### Fixed
+* Index error when loading the state dict with a model use previously. (\#387)
+
+### Changed
+
+
 ## [0.6.0] - 2022/05/16
 
 ### Added
@@ -22,8 +32,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Generic Analog RNN classes (LSTM, RNN, GRU) uni or bidirectional. (\#358)
 * Added new ``PiecewiseStepDevice`` where the update-step response function can be arbitrarily defined by the user
   in a piece-wise linear manner. It can be conveniently used to fit any experimental device data. (\#356)
-* Several enhancements to the public documentations: added a new section for hw-aware training, refreshed the reference API doc, 
-  and added the newly supported LSTM layers and the mapped conv layers. (\#374)
+* Several enhancements to the public documentations: added a new
+  section for hw-aware training, refreshed the reference API doc, and
+  added the newly supported LSTM layers and the mapped conv
+  layers. (\#374)
 
 ### Fixed
 
@@ -37,6 +49,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * The lowest supported Python version is now `3.7`, as `3.6` has reached
   end-of-life. Additionally, the library now officially supports Python
   `3.10`. (\#368)
+
 
 ## [0.5.1] - 2022/01/27
 
