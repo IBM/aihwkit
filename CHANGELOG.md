@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Changed
 * Weight noise visualization now shows the programming noise and drift
   noise difference. (\#389)
+* Concatenate the gradients before applying to the tile update
+  function (some speedup for CUDA expected). (\#390)
 
 ## [0.6.0] - 2022/05/16
 
