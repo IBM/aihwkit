@@ -15,9 +15,10 @@
 from typing import Optional, Tuple
 from collections import namedtuple
 
-from torch import Tensor, sigmoid, tanh, zeros
+from torch import Tensor, sigmoid, tanh, zeros, cat
 
-from aihwkit.nn import AnalogLinear, AnalogSequential
+from aihwkit.nn.modules.container import AnalogSequential
+
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.nn.modules.base import RPUConfigAlias
 
@@ -52,12 +53,12 @@ class AnalogVanillaRNNCell(AnalogSequential):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = AnalogLinear(input_size, hidden_size, bias=bias,
-                                      rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write)
-        self.weight_hh = AnalogLinear(hidden_size, hidden_size, bias=bias,
-                                      rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write)
+        self.weight_ih = rpu_config.get_linear()(input_size, hidden_size, bias=bias,
+                                                 rpu_config=rpu_config,
+                                                 realistic_read_write=realistic_read_write)
+        self.weight_hh = rpu_config.get_linear()(hidden_size, hidden_size, bias=bias,
+                                                 rpu_config=rpu_config,
+                                                 realistic_read_write=realistic_read_write)
 
     def get_zero_state(self, batch_size: int) -> Tensor:
         """Returns a zeroed state.
@@ -114,12 +115,12 @@ class AnalogLSTMCell(AnalogSequential):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = AnalogLinear(input_size, 4 * hidden_size, bias=bias,
-                                      rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write)
-        self.weight_hh = AnalogLinear(hidden_size, 4 * hidden_size, bias=bias,
-                                      rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write)
+        self.weight_ih = rpu_config.get_linear()(input_size, 4 * hidden_size, bias=bias,
+                                                 rpu_config=rpu_config,
+                                                 realistic_read_write=realistic_read_write)
+        self.weight_hh = rpu_config.get_linear()(hidden_size, 4 * hidden_size, bias=bias,
+                                                 rpu_config=rpu_config,
+                                                 realistic_read_write=realistic_read_write)
 
     def get_zero_state(self, batch_size: int) -> Tensor:
         """Returns a zeroed state.
@@ -140,6 +141,74 @@ class AnalogLSTMCell(AnalogSequential):
         # pylint: disable=arguments-differ
         h_x, c_x = state
         gates = self.weight_ih(input_) + self.weight_hh(h_x)
+        in_gate, forget_gate, cell_gate, out_gate = gates.chunk(4, 1)
+
+        in_gate = sigmoid(in_gate)
+        forget_gate = sigmoid(forget_gate)
+        cell_gate = tanh(cell_gate)
+        out_gate = sigmoid(out_gate)
+
+        c_y = (forget_gate * c_x) + (in_gate * cell_gate)
+        h_y = out_gate * tanh(c_y)
+
+        return h_y, (h_y, c_y)
+
+
+class AnalogLSTMCellCombinedWeight(AnalogSequential):
+    """Analog LSTM Cell that use a combined weight for storing gates and inputs.
+
+    Args:
+        input_size: The number of expected features in the input `x`
+        hidden_size: The number of features in the hidden state `h`
+        bias: whether to use a bias row on the analog tile or not.
+        rpu_config: resistive processing unit configuration.
+        realistic_read_write: whether to enable realistic read/write
+            for setting initial weights and during reading of the weights.
+    """
+    # pylint: disable=abstract-method
+
+    def __init__(
+            self,
+            input_size: int,
+            hidden_size: int,
+            bias: bool,
+            rpu_config: Optional[RPUConfigAlias] = None,
+            realistic_read_write: bool = False,
+    ):
+        super().__init__()
+
+        # Default to InferenceRPUConfig
+        if not rpu_config:
+            rpu_config = InferenceRPUConfig()
+
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.weight = rpu_config.get_linear()(input_size + hidden_size,
+                                              4 * hidden_size,
+                                              bias=bias,
+                                              rpu_config=rpu_config,
+                                              realistic_read_write=realistic_read_write)
+
+    def get_zero_state(self, batch_size: int) -> Tensor:
+        """Returns a zeroed state.
+
+        Args:
+            batch_size: batch size of the input
+
+        Returns:
+           Zeroed state tensor
+        """
+        device = self.weight.get_analog_tile_devices()[0]
+        return LSTMState(zeros(batch_size, self.hidden_size, device=device),
+                         zeros(batch_size, self.hidden_size, device=device))
+
+    def forward(self, input_: Tensor,
+                state: Tuple[Tensor, Tensor]) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
+
+        # pylint: disable=arguments-differ
+        h_x, c_x = state
+        x_input = cat((input_, h_x), 1)
+        gates = self.weight(x_input)
         in_gate, forget_gate, cell_gate, out_gate = gates.chunk(4, 1)
 
         in_gate = sigmoid(in_gate)
@@ -182,12 +251,12 @@ class AnalogGRUCell(AnalogSequential):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = AnalogLinear(input_size, 3 * hidden_size, bias=bias,
-                                      rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write)
-        self.weight_hh = AnalogLinear(hidden_size, 3 * hidden_size, bias=bias,
-                                      rpu_config=rpu_config,
-                                      realistic_read_write=realistic_read_write)
+        self.weight_ih = rpu_config.get_linear()(input_size, 3 * hidden_size, bias=bias,
+                                                 rpu_config=rpu_config,
+                                                 realistic_read_write=realistic_read_write)
+        self.weight_hh = rpu_config.get_linear()(hidden_size, 3 * hidden_size, bias=bias,
+                                                 rpu_config=rpu_config,
+                                                 realistic_read_write=realistic_read_write)
 
     def get_zero_state(self, batch_size: int) -> Tensor:
         """Returns a zeroed state.

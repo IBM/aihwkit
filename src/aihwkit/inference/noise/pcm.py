@@ -82,9 +82,11 @@ class PCMLikeNoiseModel(BaseNoiseModel):
 
     def __str__(self) -> str:
         return ('{}(prog_coeff={}, g_converter={}, g_max={:1.2f}, t_read={}, '
-                't_0={:1.2f})').format(
+                't_0={:1.2f}, prog_noise_scale={}, '
+                'read_noise_scale={}, drift_scale={})').format(
                     self.__class__.__name__, self.prog_coeff, self.g_converter,
-                    self.g_max, self.t_read, self.t_0)
+                    self.g_max, self.t_read, self.t_0, self.prog_noise_scale,
+                    self.read_noise_scale, self.drift_scale)
 
     @no_grad()
     def apply_programming_noise_to_conductance(self, g_target: Tensor) -> Tensor:

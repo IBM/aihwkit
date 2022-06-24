@@ -117,10 +117,10 @@ class InferenceTile(AnalogTile):
         self.programmed_weights, self.nu_drift_list = self.noise_model.apply_programming_noise(
             self.reference_combined_weights)
 
-        if self.drift_compensation is not None:
-            self.tile.set_weights(self.programmed_weights.numpy())
-            forward_output = self._forward_drift_readout_tensor()
+        self.tile.set_weights(self.programmed_weights.numpy())
 
+        if self.drift_compensation is not None:
+            forward_output = self._forward_drift_readout_tensor()
             self.drift_baseline = self.drift_compensation.init_baseline(forward_output)
 
     @no_grad()
@@ -142,6 +142,7 @@ class InferenceTile(AnalogTile):
                 noise model used for details.
         """
         # pylint: disable=arguments-differ,arguments-renamed
+
         if self.programmed_weights is None:
             self.program_weights()
 
