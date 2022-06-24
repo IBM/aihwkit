@@ -173,6 +173,18 @@ class AnalogSequential(Sequential):
                     break
         self._ddp_params_and_buffers_to_ignore = exclude_params
 
+    def remap_analog_weights(self, weight_scaling_omega: Optional[float] = None) -> None:
+        """Remap the out-scaling alpha to analog weight conversion.
+
+        Args:
+            weight_scaling_omega: The optional value to remap the
+                weight max to. Will take the previous value used
+                (typically the one from ``RPUConfig.mapping``)
+        """
+
+        self._apply_to_analog(lambda m: m.remap_weights(
+            weight_scaling_omega=weight_scaling_omega))
+
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
         """(Program) and drift all analog inference layers of a given model.
 
