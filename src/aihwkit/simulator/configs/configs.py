@@ -13,7 +13,7 @@
 """Configurations for resistive processing units."""
 
 from dataclasses import dataclass, field
-from typing import ClassVar, Type
+from typing import ClassVar, Type, Optional
 
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice, FloatingPointDevice, IdealDevice, PulsedDevice,
@@ -130,7 +130,8 @@ class InferenceRPUConfig(_PrintableMixin):
     noise_model: BaseNoiseModel = field(default_factory=PCMLikeNoiseModel)
     """Statistical noise model to be used during (realistic) inference."""
 
-    drift_compensation: BaseDriftCompensation = field(default_factory=GlobalDriftCompensation)
+    drift_compensation: Optional[BaseDriftCompensation] = field(
+        default_factory=GlobalDriftCompensation)
     """For compensating the drift during inference only."""
 
     clip: WeightClipParameter = field(default_factory=WeightClipParameter)
