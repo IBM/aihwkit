@@ -22,7 +22,8 @@ class AnalogRNNLayer(AnalogSequential):
     """Analog RNN Layer.
 
     Args:
-        cell: RNNCell type (AnalogLSTMCell/AnalogGRUCell/AnalogVanillaRNNCell)
+        cell: RNNCell type (AnalogLSTMCell/AnalogGRUCell/AnalogVanillaRNNCell/
+              AnalogLSTMCellSingleRPU)
         cell_args: arguments to RNNCell (e.g. input_size, hidden_size, rpu_configs)
     """
     # pylint: disable=abstract-method
