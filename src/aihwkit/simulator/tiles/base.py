@@ -15,6 +15,7 @@
 from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 from copy import deepcopy
+from numpy import ascontiguousarray
 
 from torch import (
     Tensor, stack, zeros, as_tensor, cat, unsqueeze, squeeze, ones_like
@@ -207,7 +208,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             raise TileError('Mismatch with loaded analog state: '
                             'Hidden parameter structure is unexpected.')
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
-        self.tile.set_weights(weights)
+        self.tile.set_weights(ascontiguousarray(weights))
 
         self.tile.set_learning_rate(analog_lr)
 
@@ -312,10 +313,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
             # Use only the ``[out_size, in_size]`` matrix.
             combined_weights = weights_torch
 
-        if realistic:
-            return self.tile.set_weights_realistic(combined_weights.numpy(), n_loops)
+        numpy_weights = ascontiguousarray(combined_weights.numpy())
 
-        return self.tile.set_weights(combined_weights.numpy())
+        if realistic:
+            return self.tile.set_weights_realistic(numpy_weights, n_loops)
+
+        return self.tile.set_weights(numpy_weights)
 
     def get_weights(self, realistic: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases).
@@ -453,9 +456,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # update the mapping field
         self.rpu_config.mapping.weight_scaling_omega = omega  # type: ignore
 
+        numpy_weights = ascontiguousarray(combined_weights.numpy())
         if realistic:
-            return self.tile.set_weights_realistic(combined_weights.numpy(), n_loops)
-        return self.tile.set_weights(combined_weights.numpy())
+            return self.tile.set_weights_realistic(numpy_weights, n_loops)
+        return self.tile.set_weights(numpy_weights)
 
     def get_weights_scaled(self, realistic: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases) and applies the current alpha
