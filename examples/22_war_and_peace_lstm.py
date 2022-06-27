@@ -17,6 +17,7 @@ https://www.frontiersin.org/articles/10.3389/fnins.2018.00745/full
 """
 
 # pylint: disable=redefined-outer-name, too-many-locals, invalid-name, too-many-statements
+# pylint: disable=not-callable
 
 # Imports from PyTorch.
 import os
@@ -52,6 +53,11 @@ HIDDEN_DIM = 64
 P_DROP = 0.0
 TEST_FREQ = 1
 
+# needs to be downloaded, e.g. from Gutenberg
+WP_TRAIN_FNAME = 'wp_train.txt'
+WP_TEST_FNAME = 'wp_test.txt'
+DATASET_PATH = os.path.join(os.getcwd(), 'data', 'DATASET', 'war_and_peace')
+
 
 def parse_args():
     """Parse arguments for the experiment."""
@@ -86,7 +92,7 @@ class WarAndPeaceDataset(Dataset):
         self.seq_length = seq_length
 
         # Read the text file
-        file_path = os.path.join(path, 'wp_train.txt')
+        file_path = os.path.join(path, WP_TRAIN_FNAME)
         with open(file_path, 'r', encoding='iso-8859-1') as file:
             text = file.read()
         chars = sorted(list(set(text)))
@@ -102,7 +108,7 @@ class WarAndPeaceDataset(Dataset):
                   '\nTotal character: ', len(text),
                   '\nTotal vocabulary: ', len(chars))
         else:
-            file_path = os.path.join(path, 'wp_test.txt')
+            file_path = os.path.join(path, WP_TEST_FNAME)
             with open(file_path, 'r', encoding='iso-8859-1') as file:
                 text = file.read()
             print('Loaded test dataset: ', file_path,
@@ -349,7 +355,7 @@ def main():
     momentum = 0
     rpu_conf = args.rpu_conf
 
-    path_dataset = os.path.join(os.getcwd(), 'data', 'DATASET', 'war_and_peace')
+    path_dataset = DATASET_PATH
     results = os.path.join(os.getcwd(), 'results', 'LSTM')
 
     # Set the file name
