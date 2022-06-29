@@ -13,7 +13,7 @@ from torch import Tensor, FloatTensor
 from torch import concat, arange, matmul, einsum, zeros, ones
 from torch import long, utils
 
-from torch.nn import ModuleList, Embedding, Linear, LayerNorm, Dropout, Tanh
+from torch.nn import ModuleList, Embedding, LayerNorm, Dropout, Tanh
 
 from torch.nn.functional import softmax
 
@@ -227,7 +227,7 @@ class AnalogBertSelfOutput(AnalogSequential):
     def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
-                 realistic_read_write: bool = False):
+                 realistic_read_write: bool):
         super().__init__()
         self.dense = AnalogLinear(config.hidden_size, config.hidden_size,
                                   rpu_config=rpu_config,
@@ -250,7 +250,7 @@ class AnalogBertAttention(AnalogSequential):
     def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
-                 realistic_read_write: bool = False,
+                 realistic_read_write: bool,
                  position_embedding_type = None):
         super().__init__()
         self.self = AnalogBertSelfAttention(
@@ -343,7 +343,7 @@ class AnalogBertOutput(AnalogSequential):
     def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
-                 realistic_read_write: bool = False):
+                 realistic_read_write: bool):
         super().__init__()
         self.dense = AnalogLinear(
                             config.intermediate_size,
@@ -485,7 +485,7 @@ class AnalogBertEncoder(AnalogSequential):
     def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
-                 realistic_read_write: bool = False):
+                 realistic_read_write: bool):
         super().__init__()
         self.config = config
         self.layer = ModuleList([
@@ -495,6 +495,7 @@ class AnalogBertEncoder(AnalogSequential):
 
                                             for _ in range(config.num_hidden_layers)
                         ])
+
         self.gradient_checkpointing = False
 
     def forward(
@@ -597,9 +598,17 @@ class AnalogBertEncoder(AnalogSequential):
 class AnalogBertPooler(AnalogSequential):
     """Bert Pooler"""
 
-    def __init__(self, config):
+    def __init__(self,
+                 config,
+                 rpu_config: Optional[RPUConfigAlias],
+                 realistic_read_write: bool):
         super().__init__()
-        self.dense = Linear(config.hidden_size, config.hidden_size)
+        self.dense = AnalogLinear(
+                        config.hidden_size,
+                        config.hidden_size,
+                        rpu_config=rpu_config,
+                        realistic_read_write=realistic_read_write)
+
         self.activation = Tanh()
 
     def forward(self, hidden_states: Tensor) -> Tensor:
@@ -614,8 +623,7 @@ class AnalogBertPooler(AnalogSequential):
         return pooled_output
 
 class AnalogBertPreTrainedModel(PreTrainedModel):
-    """
-    An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
+    """An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
     """
 
@@ -754,10 +762,8 @@ BERT_INPUTS_DOCSTRING = r"""
     "The bare Bert Model transformer outputting raw hidden-states without any specific head on top.",
     BERT_START_DOCSTRING,
 )
-class AnalogBertModel(AnalogSequential, AnalogBertPreTrainedModel):
-    """
-
-    The model can behave as an encoder (with only self-attention) as well as a decoder, in which case a layer of
+class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
+    """The model can behave as an encoder (with only self-attention) as well as a decoder, in which case a layer of
     cross-attention is added between the self-attention layers, following the architecture described in [Attention is
     all you need](https://arxiv.org/abs/1706.03762) by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
     Llion Jones, Aidan N. Gomez, Lukasz Kaiser and Illia Polosukhin.
@@ -769,10 +775,12 @@ class AnalogBertModel(AnalogSequential, AnalogBertPreTrainedModel):
 
     def __init__(self,
                  config,
-                 rpu_config: Optional[RPUConfigAlias],
+                 rpu_config: Optional[RPUConfigAlias] = None,
                  realistic_read_write: bool = False,
-                 add_pooling_layer=True):
-        super().__init__(config)
+                 add_pooling_layer = True):
+        AnalogBertPreTrainedModel.__init__(self, config)
+        AnalogSequential.__init__(self)
+
         self.config = config
 
         if rpu_config is None:
@@ -781,20 +789,21 @@ class AnalogBertModel(AnalogSequential, AnalogBertPreTrainedModel):
         self.embeddings = BertEmbeddings(config)
         self.encoder = AnalogBertEncoder(config, rpu_config, realistic_read_write)
 
-        self.pooler = AnalogBertPooler(config) if add_pooling_layer else None
+        self.pooler = AnalogBertPooler(config, rpu_config, realistic_read_write) if add_pooling_layer else None
 
         # Initialize weights and apply final processing
         self.post_init()
 
     def get_input_embeddings(self):
+        """Get input embeddings"""
         return self.embeddings.word_embeddings
 
     def set_input_embeddings(self, value):
+        """Set input embeddings"""
         self.embeddings.word_embeddings = value
 
     def _prune_heads(self, heads_to_prune):
-        """
-        Prunes heads of the model. heads_to_prune: dict of {layer_num: list of heads to prune in this layer} See base
+        """Prunes heads of the model. heads_to_prune: dict of {layer_num: list of heads to prune in this layer} See base
         class PreTrainedModel
         """
         for layer, heads in heads_to_prune.items():
