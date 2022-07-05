@@ -19,6 +19,10 @@ extras mechanism::
     pip install aihwkit[visualization]
 """
 
+# Allow untyped calls for `np.*`, as proper support for numpy typing requires
+# 1.20+ (https://numpy.org/devdocs/reference/typing.html).
+# mypy: disallow-untyped-calls=False
+
 from copy import deepcopy
 from typing import Any, Tuple, Union
 
@@ -29,16 +33,18 @@ from matplotlib import ticker
 from matplotlib.figure import Figure
 from numpy import ndarray
 from torch import device as torch_device
-from torch import eye, from_numpy, ones
+from torch import eye, from_numpy, ones, stack
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig
+from aihwkit.simulator.configs import (
+    SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
+)
 from aihwkit.simulator.configs.devices import PulsedDevice, UnitCell
 from aihwkit.simulator.configs.utils import (
     BoundManagementType, IOParameters, NoiseManagementType, PulseType,
     UpdateParameters, WeightNoiseType
 )
-from aihwkit.simulator.tiles import AnalogTile, BaseTile
+from aihwkit.simulator.tiles import AnalogTile, BaseTile, InferenceTile
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
@@ -604,6 +610,7 @@ def plot_weight_drift(noise_model: BaseNoiseModel = None,
         w_inits: Numpy array of target weights to program
         n_repeats: How many repeats to estimate the standard deviation
     """
+    # pylint: disable=too-many-locals
 
     plt.figure(figsize=[10, 5])
     if noise_model is None:
@@ -613,19 +620,29 @@ def plot_weight_drift(noise_model: BaseNoiseModel = None,
     if w_inits is None:
         w_inits = np.linspace(-1., 1., 9)
 
+    rpu_config = InferenceRPUConfig(noise_model=noise_model, drift_compensation=None)
+
     weights = w_inits.flatten()
     weights.sort()
     weights = np.tile(weights, [n_repeats, 1])
 
+    analog_tile = InferenceTile(weights.shape[0], weights.shape[1], rpu_config)
+    analog_tile.set_weights(from_numpy(weights))
+    analog_tile.program_weights()
+    programmed_weights, _ = analog_tile.get_weights()
+
     m_list = []
     s_list = []
-    for t_inference in t_inference_list:
-        noisy_weights = noise_model.apply_noise(from_numpy(weights), t_inference).numpy()
-        m_list.append(noisy_weights.mean(axis=0))
-        s_list.append(noisy_weights.std(axis=0))
 
-    m_array = np.stack(m_list, axis=1)
-    s_array = np.stack(s_list, axis=1)
+    for t_inference in t_inference_list:
+        analog_tile.drift_weights(t_inference=t_inference)
+        noisy_weights, _ = analog_tile.get_weights()
+
+        m_list.append(noisy_weights.mean(axis=0))
+        s_list.append((programmed_weights - noisy_weights).std(axis=0))
+
+    m_array = stack(m_list, axis=1)
+    s_array = stack(s_list, axis=1)
 
     for i in range(w_inits.size):
         curve = plt.plot(t_inference_list, m_array[i])

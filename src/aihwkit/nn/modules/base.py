@@ -18,6 +18,7 @@ from typing import (
 
 from torch import Tensor, no_grad, ones, float32
 from torch.nn import Module, Parameter
+from torch import device as torch_device
 
 from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.configs.configs import (
@@ -93,6 +94,12 @@ class AnalogModuleBase(Module):
         self.in_features = in_features
         self.out_features = out_features
 
+    def register_helper(self, name: str) -> None:
+        """Register a helper name that is not saved to the state dict """
+
+        if name not in self._registered_helper_parameter:
+            self._registered_helper_parameter.append(name)
+
     def register_analog_tile(self, tile: 'BaseTile', name: Optional[str] = None) -> None:
         """Register the analog context of the tile.
 
@@ -110,8 +117,7 @@ class AnalogModuleBase(Module):
 
         ctx_name = self.ANALOG_CTX_PREFIX + name
 
-        if ctx_name not in self._registered_helper_parameter:
-            self._registered_helper_parameter.append(ctx_name)
+        self.register_helper(ctx_name)
         self.register_parameter(ctx_name, tile.get_analog_ctx())
 
         if tile.shared_weights is not None:
@@ -119,9 +125,7 @@ class AnalogModuleBase(Module):
                 tile.shared_weights = Parameter(tile.shared_weights)
             par_name = self.ANALOG_SHARED_WEIGHT_PREFIX + str(self._analog_tile_counter)
             self.register_parameter(par_name, tile.shared_weights)
-
-            if par_name not in self._registered_helper_parameter:
-                self._registered_helper_parameter.append(par_name)
+            self.register_helper(par_name)
 
         mapping = tile.rpu_config.mapping
         if mapping.learn_out_scaling_alpha:
@@ -131,9 +135,7 @@ class AnalogModuleBase(Module):
                 tile.out_scaling_alpha = Parameter(tile.out_scaling_alpha)
             par_name = self.ANALOG_OUT_SCALING_ALPHA_PREFIX + str(self._analog_tile_counter)
             self.register_parameter(par_name, tile.out_scaling_alpha)
-
-            if par_name not in self._registered_helper_parameter:
-                self._registered_helper_parameter.append(par_name)
+            self.register_helper(par_name)
 
         self._analog_tile_counter += 1
 
@@ -162,6 +164,14 @@ class AnalogModuleBase(Module):
             if isinstance(param, AnalogContext):
                 new_name = name.split(self.ANALOG_CTX_PREFIX)[-1]
                 yield (new_name, param.analog_tile)
+
+    def get_analog_tile_devices(self) -> List[Optional[Union[torch_device, str, int]]]:
+        """ Return a list of the devices used by the analog tiles.
+
+        Returns:
+            List of torch devices
+        """
+        return [d.device for d in self.analog_tiles()]
 
     def analog_tile_count(self) -> int:
         """Return the number of registered tiles.
@@ -334,6 +344,29 @@ class AnalogModuleBase(Module):
         else:
             bias = analog_bias
         return weight, bias
+
+    def remap_weights(self, weight_scaling_omega: Optional[float] = None) -> None:
+        """Remap the out-scaling alpha to analog weight conversion.
+
+        Note:
+
+            This remapping is most useful for hardware-aware training
+            for inference.  For analog training it should not be
+            applied. If the realistic write/read setting is turned on
+            (which should be the case of analog training), then it
+            will do a full refresh read-write of the array.
+
+        Args:
+            weight_scaling_omega: The optional value to remap the
+                weight max to. Will take the previous value used otherwise
+                (typically the one from ``RPUConfig.mapping``)
+
+        """
+
+        weights_and_bias = self.get_weights(apply_out_scales=True)
+        self.set_weights(*weights_and_bias,
+                         weight_scaling_omega=weight_scaling_omega,
+                         remap_weights=True)
 
     def _sync_weights_from_tile(self) -> None:
         """Update the layer weight and bias from the values on the analog tile.

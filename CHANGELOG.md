@@ -15,19 +15,52 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+* Example 23: how to use ``AnalogTile`` directly to implement an
+  analog matrix-vector product without using pytorch modules. (\#393)
+* Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
+* Notebook for exploring analog sensitivities. (\#380)
+* Remapping functionality for ``InferenceRPUConfig``. (\#388)
+
+### Fixed
+* Analog_summary error when model is on cuda device. (\#392)
+* Index error when loading the state dict with a model use previously. (\#387)
+* Weights that were not contiguous could have set wrongly. (\#388)
+* Programming noise would not be applied if drift compensation was not
+  used. (\#389)
+
+### Changed
+* Weight noise visualization now shows the programming noise and drift
+  noise difference. (\#389)
+* Concatenate the gradients before applying to the tile update
+  function (some speedup for CUDA expected). (\#390)
+
+## [0.6.0] - 2022/05/16
+
+### Added
 
 * Set weights can be used to re-apply the weight scaling omega. (\#360)
 * Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
 * Reverse up / down option for ``LinearStepDevice``. (\#361)
+* Generic Analog RNN classes (LSTM, RNN, GRU) uni or bidirectional. (\#358)
+* Added new ``PiecewiseStepDevice`` where the update-step response function can be arbitrarily defined by the user
+  in a piece-wise linear manner. It can be conveniently used to fit any experimental device data. (\#356)
+* Several enhancements to the public documentations: added a new
+  section for hw-aware training, refreshed the reference API doc, and
+  added the newly supported LSTM layers and the mapped conv
+  layers. (\#374)
 
 ### Fixed
 
 * Legacy checkpoint load with alpha scaling. (\#360)
-* Re-application of weight scaling omega when loading checkpoints. (\#360) 
+* Re-application of weight scaling omega when loading checkpoints. (\#360)
+* Write noise was not correctly applied for CUDA if ``dw_min_std=0``. (\#356)
 
 ### Changed
 
 * The ``set_alpha_scale`` and ``get_alpha_scale`` methods of the C++ tiles are removed. (\#360)
+* The lowest supported Python version is now `3.7`, as `3.6` has reached
+  end-of-life. Additionally, the library now officially supports Python
+  `3.10`. (\#368)
 
 
 ## [0.5.1] - 2022/01/27
@@ -80,7 +113,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   types if set larger than zero. (\#318)
 * The use of generators for analog tiles of an ``AnalogModuleBase``. (\#320)
 * Digital bias is now accessable through ``MappingParameter``. (\#331)
-* The aihwkit documentation. New content around analog ai concepts, training presets, analog ai 
+* The aihwkit documentation. New content around analog ai concepts, training presets, analog ai
   optimizers, new references, and examples. (\#348)
 * The `weight_scaling_omega` can now be defined in the `rpu_config.mapping`. (\#353)
 

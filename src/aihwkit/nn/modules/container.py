@@ -18,7 +18,7 @@ from collections import OrderedDict
 from torch import device as torch_device
 from torch.nn import Sequential
 
-from aihwkit.exceptions import ModuleError
+from aihwkit.exceptions import ModuleError, TileError
 from aihwkit.nn.modules.base import AnalogModuleBase
 
 if TYPE_CHECKING:
@@ -106,6 +106,32 @@ class AnalogSequential(Sequential):
 
         return self
 
+    def get_analog_tile_device(self) -> Union[torch_device, str, int]:
+        """ Return the devices used by the analog tiles.
+
+        Returns:
+            device: torch device
+
+        Raises:
+            TileError: in case the model is on non-unique devices
+        """
+
+        devices = []
+        dev_name = []
+
+        self._apply_to_analog(
+            lambda mod: devices.extend(mod.get_analog_tile_devices()))
+
+        for name in devices:
+            dev_name.append(str(name))
+
+        if len(set(dev_name)) > 1:
+            raise TileError("Torch device is not unique")
+
+        device = devices[0]
+
+        return device
+
     def load_state_dict(self,  # pylint: disable=arguments-differ
                         state_dict: 'OrderedDict[str, Tensor]',
                         strict: bool = True,
@@ -172,6 +198,18 @@ class AnalogSequential(Sequential):
                     exclude_params.append(param)
                     break
         self._ddp_params_and_buffers_to_ignore = exclude_params
+
+    def remap_analog_weights(self, weight_scaling_omega: Optional[float] = None) -> None:
+        """Remap the out-scaling alpha to analog weight conversion.
+
+        Args:
+            weight_scaling_omega: The optional value to remap the
+                weight max to. Will take the previous value used
+                (typically the one from ``RPUConfig.mapping``)
+        """
+
+        self._apply_to_analog(lambda m: m.remap_weights(
+            weight_scaling_omega=weight_scaling_omega))
 
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
         """(Program) and drift all analog inference layers of a given model.

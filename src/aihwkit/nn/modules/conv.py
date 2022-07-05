@@ -104,7 +104,9 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
 
         # Set the index matrices.
         self.fold_indices = Tensor().detach()
+        self.register_helper('fold_indices')
         self.input_size = 0
+        self.register_helper('input_size')
         self.tensor_view = (-1,)  # type: Tuple[int, ...]
 
         # Unregister weight/bias as a parameter but keep it for syncs
@@ -157,7 +159,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
         input_size = x_input.numel() / x_input.size(0)
-        if not self.fold_indices.numel() or self.input_size != input_size:
+        if self.input_size != input_size or not self.analog_tile.is_indexed():
             self.recalculate_indexes(x_input)
 
         out = AnalogIndexedFunction.apply(

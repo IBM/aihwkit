@@ -64,6 +64,12 @@ public:
   T *get1ParamsData() override {
     return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
   };
+  T getWeightGranularityNoise() const override {
+    // need to make sure that random states are enabled
+    return getPar().usesPersistentWeight()
+               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + 1e-6
+               : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
+  }
 
 private:
   std::unique_ptr<CudaArray<T>> dev_es_par_ = nullptr;

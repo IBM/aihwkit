@@ -28,7 +28,8 @@ job_compile_common: &job_compile_common
   dist: bionic
   language: python
   before_install:
-    - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+    - sudo apt-get -qq install -y ca-certificates
+    - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y 
     - sudo apt-get update
     - sudo apt-get install -y libopenblas-dev gcc-8 g++-8
     - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-8
@@ -56,27 +57,22 @@ build_deploy_common: &build_deploy_common
 
 jobs:
   include:
-  - name: "Compile and test. Python 3.6"
+  - name: "Compile and test. Python 3.7"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.6"
+    python: "3.7"
     env:
       - TEST_DATASET=true
 
-  - name: "Compile and lint. Python 3.6"
+  - name: "Compile and lint. Python 3.7"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.6"
+    python: "3.7"
     script:
       - pip install -r requirements-dev.txt
       - make pycodestyle
       - make pylint
       - make mypy
-
-  - name: "Compile and test. Python 3.7"
-    <<: *job_compile_common
-    stage: Test multiple python versions
-    python: "3.7"
 
   - name: "Compile and test. Python 3.8"
     <<: *job_compile_common
@@ -88,10 +84,15 @@ jobs:
     stage: Test multiple python versions
     python: "3.9"
 
-  - name: "Compile and test. Python 3.6, Torch 1.7.1"
+  - name: "Compile and test. Python 3.10"
     <<: *job_compile_common
     stage: Test multiple python versions
-    python: "3.6"
+    python: "3.10"
+
+  - name: "Compile and test. Python 3.7, Torch 1.7.1"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.7"
     install:
       # Set the python executable, to force cmake picking the right one.
       - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
@@ -102,7 +103,7 @@ jobs:
     env:
       - TORCH_VERSION_SPECIFIER="==1.7.1"
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on Linux x86_64"
+  - name: "Build wheel for Python 3.7, 3.8, 3.9, 3.10 on Linux x86_64"
     os: linux
     dist: bionic
     language: python
@@ -114,7 +115,7 @@ jobs:
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
       - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
-      - CIBW_BUILD="cp36-manylinux_x86_64 cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp39-manylinux_x86_64"
+      - CIBW_BUILD="cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
     before_install:
       - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
@@ -124,7 +125,7 @@ jobs:
       - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on OS X"
+  - name: "Build wheel for Python 3.7, 3.8, 3.9, 3.10 on OS X"
     os: osx
     osx_image: xcode12.2
     stage: Build wheels
@@ -138,7 +139,7 @@ jobs:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
       - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install ./delocate && pip install -r requirements.txt"
-      - CIBW_BUILD="cp36-macosx_x86_64 cp37-macosx_x86_64 cp38-macosx_x86_64 cp39-macosx_x86_64"
+      - CIBW_BUILD="cp37-macosx_x86_64 cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
     install:
@@ -148,7 +149,7 @@ jobs:
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.6, 3.7, 3.8, 3.9 on win64"
+  - name: "Build wheel for Python 3.7, 3.8, 3.9, 3.10 on win64"
     os: windows
     language: shell
     stage: Build wheels
@@ -157,7 +158,7 @@ jobs:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
       - CIBW_BEFORE_BUILD="pip install torch==1.8.1+cpu -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
-      - CIBW_BUILD="cp36-win_amd64 cp37-win_amd64 cp38-win_amd64 cp39-win_amd64"
+      - CIBW_BUILD="cp37-win_amd64 cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
       # Use unzipped OpenBLAS.
       - OPENBLAS_ROOT=C:\\BLAS
       - OPENBLAS_ROOT_DIR=C:\\BLAS

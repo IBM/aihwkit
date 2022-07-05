@@ -21,8 +21,8 @@ from typing import ClassVar, Type
 from aihwkit.simulator.configs.helpers import _PrintableMixin
 from aihwkit.simulator.rpu_base import devices, tiles
 
-
 # Helper enums.
+
 
 class BoundManagementType(Enum):
     """Bound management type.
@@ -710,7 +710,6 @@ class MappingParameter(_PrintableMixin):
 
         Some of these parameters have only an affect for modules that
         support tile mappings.
-
     """
 
     digital_bias: bool = True

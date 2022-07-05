@@ -15,6 +15,7 @@
 from collections import OrderedDict
 from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 from copy import deepcopy
+from numpy import ascontiguousarray
 
 from torch import (
     Tensor, stack, zeros, as_tensor, cat, unsqueeze, squeeze, ones_like
@@ -147,6 +148,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         current_dict.pop('is_cuda', None)
         current_dict.pop('device', None)
 
+        # this is should not be saved.
+        current_dict.pop('image_sizes', None)
+
         return current_dict
 
     def __setstate__(self, state: Dict) -> None:
@@ -167,6 +171,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # attributes that were not saved in getstate
 
         current_dict = state.copy()
+        current_dict.pop('image_sizes', None)  # should not be saved
         weights = current_dict.pop('analog_tile_weights')
         hidden_parameters = current_dict.pop('analog_tile_hidden_parameters')
         hidden_parameters_names = current_dict.pop('analog_tile_hidden_parameter_names', [])
@@ -203,7 +208,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             raise TileError('Mismatch with loaded analog state: '
                             'Hidden parameter structure is unexpected.')
         self.tile.set_hidden_parameters(Tensor(hidden_parameters))
-        self.tile.set_weights(weights)
+        self.tile.set_weights(ascontiguousarray(weights))
 
         self.tile.set_learning_rate(analog_lr)
 
@@ -308,10 +313,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
             # Use only the ``[out_size, in_size]`` matrix.
             combined_weights = weights_torch
 
-        if realistic:
-            return self.tile.set_weights_realistic(combined_weights.numpy(), n_loops)
+        numpy_weights = ascontiguousarray(combined_weights.numpy())
 
-        return self.tile.set_weights(combined_weights.numpy())
+        if realistic:
+            return self.tile.set_weights_realistic(numpy_weights, n_loops)
+
+        return self.tile.set_weights(numpy_weights)
 
     def get_weights(self, realistic: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases).
@@ -449,9 +456,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # update the mapping field
         self.rpu_config.mapping.weight_scaling_omega = omega  # type: ignore
 
+        numpy_weights = ascontiguousarray(combined_weights.numpy())
         if realistic:
-            return self.tile.set_weights_realistic(combined_weights.numpy(), n_loops)
-        return self.tile.set_weights(combined_weights.numpy())
+            return self.tile.set_weights_realistic(numpy_weights, n_loops)
+        return self.tile.set_weights(numpy_weights)
 
     def get_weights_scaled(self, realistic: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases) and applies the current alpha
@@ -756,8 +764,16 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         self.tile.set_hidden_update_index(index)
 
+    def is_indexed(self) -> bool:
+        """Returns whether index matrix for convolutions has been set.
+
+        Returns:
+           Whether index matrix has been set
+        """
+        return self.tile.has_matrix_indices()
+
     def set_indexed(self, indices: Tensor, image_sizes: List) -> None:
-        """Set the index matrix for convolutions ans switches to
+        """Set the index matrix for convolutions and switches to
         indexed forward/backward/update versions.
 
         Args:

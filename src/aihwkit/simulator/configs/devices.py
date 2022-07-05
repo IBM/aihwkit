@@ -874,6 +874,94 @@ class PowStepDevice(PulsedDevice):
     """
 
 
+@dataclass
+class PiecewiseStepDevice(PulsedDevice):
+    r"""Piece-wise interpolated device update characteristics.
+
+    This model is derived from :class:`~PulsedDevice` and uses all its
+    parameters. :class:`~PiecewiseStepDevice` implements a new
+    functionality where the device's update response curve is given
+    explicitly on nodes over the weight range. The device will
+    automatically interpolate the update step size using the given node
+    values.
+
+    In detail, the update in down direction of the device is given as:
+
+    .. math::
+        w_{ij} \leftarrow w_{ij} + \Delta w_{ij}^d \left((1 - q) v^d(i_w)
+        + q \, v^d(i_w + 1)\right) (1 + \sigma_\text{c-to-c}\,\xi)
+
+    where :math:`i_w` is the index of the given vector :math:`v^d`
+    (``piecewise_down``) where the current weight value would fall
+    into if scaled to the current min and max values of that device
+    (first and last value are set at weight min and max, respectively,
+    the other values are equally distributed in the range).
+
+    The scalar :math:`q` is the relative position of the weight in the
+    current segment between the two selected nodes :math:`v^d(i_w)`
+    and :math:`v^d(i_w + 1)`.
+
+    The update in up direction is computed analogously using the
+    ``piecewise_up`` vector.
+
+    Note:
+
+        The piecewise up and down vectors need to have the same number
+        of elements.
+
+    Note:
+
+        In case of GPUs the maximal number of nodes in the vectors
+        is limited to below 64 due to performance reasons.
+
+    """
+
+    bindings_class: ClassVar[Type] = devices.PiecewiseStepResistiveDeviceParameter
+
+    piecewise_up: List[float] = field(default_factory=lambda: [1])
+    r"""Array of values that characterize the update steps in upwards direction.
+
+    The values are equally spaced in ``w_min`` and `w_max`` (which
+    could vary from device-to-device), where the first and the last
+    value is set at the boundary. The update will be computed by
+    linear interpolation of the adjacent values, depending on where
+    the weight is currently within the range.
+
+    The values are given as relative numbers: the final update size
+    will be computed by multiplying the value with the current
+    ``dw_min`` of the device.
+
+    E.g.  ``[1.5, 1, 1.5]`` and ``dw_min=0.1`` means that the update
+    (in up direction) is ``dw_min`` around zero weight value and
+    linearly increasing to ``1.5 * dw_min`` for larger or smaller
+    weight values.
+
+    """
+
+    piecewise_down: List[float] = field(default_factory=lambda: [1])
+    r"""Array of values that characterize the update steps in downwards direction.
+
+    Analogous to ``piecewise_up`` but for the downwards direction.
+    """
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled a new when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
+
 ###############################################################################
 # Specific devices based on ``unit cell``.
 ###############################################################################
