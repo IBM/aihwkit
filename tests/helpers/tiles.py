@@ -23,6 +23,7 @@ from aihwkit.simulator.configs.devices import (
     SoftBoundsDevice,
     SoftBoundsPmaxDevice,
     PowStepDevice,
+    JARTv1bStaticDevice,
     IOParameters,
     OneSidedUnitCell,
     VectorUnitCell,

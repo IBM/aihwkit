@@ -42,7 +42,8 @@ enum DeviceUpdateType {
   Transfer,
   MixedPrec,
   PowStep,
-  BufferedTransfer
+  BufferedTransfer,
+  JARTv1bstatic
 };
 
 // inherit from Simple

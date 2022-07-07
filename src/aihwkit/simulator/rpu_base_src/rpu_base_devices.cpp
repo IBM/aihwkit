@@ -28,6 +28,7 @@ void declare_rpu_devices(py::module &m) {
   using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
   using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
   using BufferedTransferParam = RPU::BufferedTransferRPUDeviceMetaParameter<T>;
+  using JARTv1bStaticParam = RPU::JARTv1bStaticRPUDeviceMetaParameter<T>;
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -302,6 +303,27 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
+  class PyJARTv1bStaticParam : public JARTv1bStaticParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, JARTv1bStaticParam, getName, );
+    }
+    JARTv1bStaticParam *clone() const override {
+      PYBIND11_OVERLOAD(JARTv1bStaticParam *, JARTv1bStaticParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, JARTv1bStaticParam, implements, );
+    }
+    RPU::JARTv1bStaticRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::JARTv1bStaticRPUDevice<T> *, JARTv1bStaticParam, createDevice, x_size, d_size, rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, JARTv1bStaticParam, calcWeightGranularity, );
+    }
+  };
+
   /*
    * Python class definitions.
    */
@@ -528,6 +550,82 @@ void declare_rpu_devices(py::module &m) {
           })
       .def(
           "calc_weight_granularity", &ExpStepParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
+
+  py::class_<JARTv1bStaticParam, PyJARTv1bStaticParam, PulsedParam>(m, "JARTv1bStaticResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("alpha0", &JARTv1bStaticParam::alpha0)
+      .def_readwrite("alpha1", &JARTv1bStaticParam::alpha1)
+      .def_readwrite("alpha2", &JARTv1bStaticParam::alpha2)
+      .def_readwrite("alpha3", &JARTv1bStaticParam::alpha3)
+      .def_readwrite("beta0", &JARTv1bStaticParam::beta0)
+      .def_readwrite("beta1", &JARTv1bStaticParam::beta1)
+      .def_readwrite("c0", &JARTv1bStaticParam::c0)
+      .def_readwrite("c1", &JARTv1bStaticParam::c1)
+      .def_readwrite("c2", &JARTv1bStaticParam::c2)
+      .def_readwrite("c3", &JARTv1bStaticParam::c3)
+      .def_readwrite("d0", &JARTv1bStaticParam::d0)
+      .def_readwrite("d1", &JARTv1bStaticParam::d1)
+      .def_readwrite("d2", &JARTv1bStaticParam::d2)
+      .def_readwrite("d3", &JARTv1bStaticParam::d3)
+      .def_readwrite("f0", &JARTv1bStaticParam::f0)
+      .def_readwrite("f1", &JARTv1bStaticParam::f1)
+      .def_readwrite("f2", &JARTv1bStaticParam::f2)
+      .def_readwrite("f3", &JARTv1bStaticParam::f3)
+      .def_readwrite("g0", &JARTv1bStaticParam::g0)
+      .def_readwrite("g1", &JARTv1bStaticParam::g1)
+      .def_readwrite("h0", &JARTv1bStaticParam::h0)
+      .def_readwrite("h1", &JARTv1bStaticParam::h1)
+      .def_readwrite("h2", &JARTv1bStaticParam::h2)
+      .def_readwrite("h3", &JARTv1bStaticParam::h3)
+      .def_readwrite("j0", &JARTv1bStaticParam::j_0)
+      .def_readwrite("k0", &JARTv1bStaticParam::k0)
+      .def_readwrite("eps", &JARTv1bStaticParam::eps)
+      .def_readwrite("epsphib", &JARTv1bStaticParam::epsphib)
+      .def_readwrite("phiBn0", &JARTv1bStaticParam::phiBn0)
+      .def_readwrite("phin", &JARTv1bStaticParam::phin)
+      .def_readwrite("un", &JARTv1bStaticParam::un)
+      .def_readwrite("Ndiscmax", &JARTv1bStaticParam::Ndiscmax)
+      .def_readwrite("Ndiscmin", &JARTv1bStaticParam::Ndiscmin)
+      .def_readwrite("Ninit", &JARTv1bStaticParam::Ninit)
+      .def_readwrite("Nplug", &JARTv1bStaticParam::Nplug)
+      .def_readwrite("a", &JARTv1bStaticParam::a)
+      .def_readwrite("ny0", &JARTv1bStaticParam::ny0)
+      .def_readwrite("dWa", &JARTv1bStaticParam::dWa)
+      .def_readwrite("Rth0", &JARTv1bStaticParam::Rth0)
+      .def_readwrite("rdet", &JARTv1bStaticParam::rdet)
+      .def_readwrite("lcell", &JARTv1bStaticParam::lcell)
+      .def_readwrite("ldet", &JARTv1bStaticParam::ldet)
+      .def_readwrite("Rtheff_scaling", &JARTv1bStaticParam::Rtheff_scaling)
+      .def_readwrite("RseriesTiOx", &JARTv1bStaticParam::RseriesTiOx)
+      .def_readwrite("R0", &JARTv1bStaticParam::R0)
+      .def_readwrite("Rthline", &JARTv1bStaticParam::Rthline)
+      .def_readwrite("alphaline", &JARTv1bStaticParam::alphaline)
+      .def_readwrite("read_voltage", &JARTv1bStaticParam::read_voltage)
+      .def_readwrite("pulse_voltage_SET", &JARTv1bStaticParam::pulse_voltage_SET)
+      .def_readwrite("pulse_voltage_RESET", &JARTv1bStaticParam::pulse_voltage_RESET)
+      .def_readwrite("pulse_length", &JARTv1bStaticParam::pulse_length)
+      .def_readwrite("base_time_step", &JARTv1bStaticParam::base_time_step)
+      .def_readwrite("Ndisc_min_bound", &JARTv1bStaticParam::Ndisc_min_bound)
+      .def_readwrite("Ndisc_max_bound", &JARTv1bStaticParam::Ndisc_max_bound)
+      .def_readwrite("Ndiscmax_dtod", &JARTv1bStaticParam::Ndiscmax_dtod)
+      .def_readwrite("Ndiscmin_dtod", &JARTv1bStaticParam::Ndiscmin_dtod)
+      .def_readwrite("ldet_dtod", &JARTv1bStaticParam::ldet_dtod)
+      .def_readwrite("rdet_dtod", &JARTv1bStaticParam::rdet_dtod)
+      .def(
+          "__str__",
+          [](JARTv1bStaticParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &JARTv1bStaticParam::calcWeightGranularity,
           R"pbdoc(
         Calculates the granularity of the weights (typically ``dw_min``)
 
