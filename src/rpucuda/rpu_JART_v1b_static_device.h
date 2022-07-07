@@ -166,8 +166,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ,
     /*Add*/
     // bool implementsWriteNoise() const override { return true; };);
-    bool implementsWriteNoise() const override { return true; };
-    bool usesPersistentWeight() const override { return true; };);
+    bool implementsWriteNoise() const override { return true; };);
     // Use hidden weight w as Ndisk, and the write noised weight w_apprent as true w mapped from conductance
 
 template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
@@ -250,14 +249,14 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
         device_specific_A[0][i] = data_ptrs[n_prev + 3][i];
       }
 
-      T *w = out_weights[0];
-      T *max_bound = &(w_max_bound_[0][0]);
-      T *min_bound = &(w_min_bound_[0][0]);
-      PRAGMA_SIMD
-      for (int i = 0; i < this->size_; ++i) {
-        w[i] = MIN(w[i], max_bound[i]);
-        w[i] = MAX(w[i], min_bound[i]);
-      }
+      // T *w = out_weights[0];
+      // T *max_bound = &(w_max_bound_[0][0]);
+      // T *min_bound = &(w_min_bound_[0][0]);
+      // PRAGMA_SIMD
+      // for (int i = 0; i < this->size_; ++i) {
+      //   w[i] = MIN(w[i], max_bound[i]);
+      //   w[i] = MAX(w[i], min_bound[i]);
+      // }
 
       // if (getPar().usesPersistentWeight()) {
       //   PRAGMA_SIMD
@@ -276,6 +275,8 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
   );
 
 
+  void printDP(int x_count, int d_count) const override;
+
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
   void driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) override;
@@ -292,6 +293,8 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
       override;
   void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
+  
+  bool usesPersistentWeight() const override { return true; };
   
 private:
   T **device_specific_Ndiscmax = nullptr;
