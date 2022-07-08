@@ -1,7 +1,21 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+
 """Analog Bert Transformer Module
 Adapted from:
 https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py
 """
+
 
 from math import sqrt
 
@@ -13,23 +27,34 @@ from torch import Tensor, FloatTensor
 from torch import concat, arange, matmul, einsum, zeros, ones
 from torch import long, utils
 
-from torch.nn import ModuleList, Embedding, LayerNorm, Dropout, Tanh
+from torch.nn import ModuleList, Embedding, LayerNorm, Dropout, Tanh, CrossEntropyLoss
 
 from torch.nn.functional import softmax
 
 from transformers.activations import ACT2FN
 from transformers.models.bert.modeling_bert import (
     BertEmbeddings,
+
     logger,
+
     load_tf_weights_in_bert,
+
     add_code_sample_docstrings,
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
+
     BERT_INPUTS_DOCSTRING,
     BERT_START_DOCSTRING,
+
     _TOKENIZER_FOR_DOC,
     _CONFIG_FOR_DOC,
-    _CHECKPOINT_FOR_DOC
+    _CHECKPOINT_FOR_DOC,
+
+    _CHECKPOINT_FOR_QA,
+    _QA_TARGET_START_INDEX,
+    _QA_TARGET_END_INDEX,
+    _QA_EXPECTED_LOSS,
+    _QA_EXPECTED_OUTPUT,
 )
 from transformers.models.bert.configuration_bert import BertConfig
 from transformers.pytorch_utils import (
@@ -40,6 +65,7 @@ from transformers.pytorch_utils import (
 from transformers.modeling_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
+    QuestionAnsweringModelOutput,
 )
 from transformers.utils.generic import ModelOutput
 from transformers.modeling_utils import PreTrainedModel
@@ -538,6 +564,7 @@ class AnalogBertEncoder(AnalogSequential):
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
+                        # pylint: disable=cell-var-from-loop
                         return module(*inputs, past_key_value, output_attentions)
 
                     return custom_forward
@@ -623,9 +650,12 @@ class AnalogBertPooler(AnalogSequential):
         return pooled_output
 
 class AnalogBertPreTrainedModel(PreTrainedModel):
-    """An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
+    """An abstract class to handle weights initialization and
+    a simple interface for downloading and loading pretrained
     models.
     """
+
+    # pylint: disable=abstract-method
 
     config_class = BertConfig
     load_tf_weights = load_tf_weights_in_bert
@@ -660,28 +690,39 @@ class AnalogBertPreTrainedModel(PreTrainedModel):
 
 @dataclass
 class BertForPreTrainingOutput(ModelOutput):
-    """
-    Output type of [`BertForPreTraining`].
+    """Output type of [`BertForPreTraining`].
 
     Args:
-        loss (*optional*, returned when `labels` is provided, `torch.FloatTensor` of shape `(1,)`):
-            Total loss as the sum of the masked language modeling loss and the next sequence prediction
+        loss (*optional*, returned when `labels` is provided,
+        `torch.FloatTensor` of shape `(1,)`):
+            Total loss as the sum of the masked language modeling
+            loss and the next sequence prediction
             (classification) loss.
-        prediction_logits (`torch.FloatTensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
-            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+        prediction_logits (`torch.FloatTensor` of shape
+        `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head
+            (scores for each vocabulary token before SoftMax).
         seq_relationship_logits (`torch.FloatTensor` of shape `(batch_size, 2)`):
-            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
+            Prediction scores of the next sequence prediction (classification)
+            head (scores of True/False continuation
             before SoftMax).
-        hidden_states (`tuple(torch.FloatTensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
-            Tuple of `torch.FloatTensor` (one for the output of the embeddings + one for the output of each layer) of
+        hidden_states (`tuple(torch.FloatTensor)`, *optional*,
+        returned when `output_hidden_states=True` is passed or
+        when `config.output_hidden_states=True`):
+            Tuple of `torch.FloatTensor` (one for the output of the embeddings +
+            one for the output of each layer) of
             shape `(batch_size, sequence_length, hidden_size)`.
 
-            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (`tuple(torch.FloatTensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
-            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            Hidden-states of the model at the output of each layer plus
+            the initial embedding outputs.
+        attentions (`tuple(torch.FloatTensor)`, *optional*,
+        returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `torch.FloatTensor` (one for each layer) of shape
+            `(batch_size, num_heads, sequence_length,
             sequence_length)`.
 
-            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            Attentions weights after the attention softmax,
+            used to compute the weighted average in the self-attention
             heads.
     """
 
@@ -692,86 +733,29 @@ class BertForPreTrainingOutput(ModelOutput):
     attentions: Optional[Tuple[FloatTensor]] = None
 
 
-BERT_START_DOCSTRING = r"""
-
-    This model inherits from [`PreTrainedModel`]. Check the superclass documentation for the generic methods the
-    library implements for all its model (such as downloading or saving, resizing the input embeddings, pruning heads
-    etc.)
-
-    This model is also a PyTorch [torch.nn.Module](https://pytorch.org/docs/stable/nn.html#torch.nn.Module) subclass.
-    Use it as a regular PyTorch Module and refer to the PyTorch documentation for all matter related to general usage
-    and behavior.
-
-    Parameters:
-        config ([`BertConfig`]): Model configuration class with all the parameters of the model.
-            Initializing with a config file does not load the weights associated with the model, only the
-            configuration. Check out the [`~PreTrainedModel.from_pretrained`] method to load the model weights.
-"""
-
-BERT_INPUTS_DOCSTRING = r"""
-    Args:
-        input_ids (`torch.LongTensor` of shape `({0})`):
-            Indices of input sequence tokens in the vocabulary.
-
-            Indices can be obtained using [`BertTokenizer`]. See [`PreTrainedTokenizer.encode`] and
-            [`PreTrainedTokenizer.__call__`] for details.
-
-            [What are input IDs?](../glossary#input-ids)
-        attention_mask (`torch.FloatTensor` of shape `({0})`, *optional*):
-            Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
-
-            - 1 for tokens that are **not masked**,
-            - 0 for tokens that are **masked**.
-
-            [What are attention masks?](../glossary#attention-mask)
-        token_type_ids (`torch.LongTensor` of shape `({0})`, *optional*):
-            Segment token indices to indicate first and second portions of the inputs. Indices are selected in `[0,
-            1]`:
-
-            - 0 corresponds to a *sentence A* token,
-            - 1 corresponds to a *sentence B* token.
-
-            [What are token type IDs?](../glossary#token-type-ids)
-        position_ids (`torch.LongTensor` of shape `({0})`, *optional*):
-            Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
-            config.max_position_embeddings - 1]`.
-
-            [What are position IDs?](../glossary#position-ids)
-        head_mask (`torch.FloatTensor` of shape `(num_heads,)` or `(num_layers, num_heads)`, *optional*):
-            Mask to nullify selected heads of the self-attention modules. Mask values selected in `[0, 1]`:
-
-            - 1 indicates the head is **not masked**,
-            - 0 indicates the head is **masked**.
-
-        inputs_embeds (`torch.FloatTensor` of shape `({0}, hidden_size)`, *optional*):
-            Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation. This
-            is useful if you want more control over how to convert `input_ids` indices into associated vectors than the
-            model's internal embedding lookup matrix.
-        output_attentions (`bool`, *optional*):
-            Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
-            tensors for more detail.
-        output_hidden_states (`bool`, *optional*):
-            Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
-            more detail.
-        return_dict (`bool`, *optional*):
-            Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
-"""
-
-
 @add_start_docstrings(
-    "The bare Bert Model transformer outputting raw hidden-states without any specific head on top.",
+    "The bare Bert Model transformer outputting"
+    "raw hidden-states without any specific head on top.",
     BERT_START_DOCSTRING,
 )
 class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
-    """The model can behave as an encoder (with only self-attention) as well as a decoder, in which case a layer of
-    cross-attention is added between the self-attention layers, following the architecture described in [Attention is
-    all you need](https://arxiv.org/abs/1706.03762) by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
+    """The model can behave as an encoder (with only self-attention)
+    as well as a decoder, in which case a layer of
+    cross-attention is added between the self-attention layers,
+    following the architecture described in [Attention is
+    all you need](https://arxiv.org/abs/1706.03762)
+    by Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit,
     Llion Jones, Aidan N. Gomez, Lukasz Kaiser and Illia Polosukhin.
 
-    To behave as an decoder the model needs to be initialized with the `is_decoder` argument of the configuration set
-    to `True`. To be used in a Seq2Seq model, the model needs to initialized with both `is_decoder` argument and
-    `add_cross_attention` set to `True`; an `encoder_hidden_states` is then expected as an input to the forward pass.
+    To behave as an decoder the model needs to be initialized with
+    the `is_decoder` argument of the configuration set
+    to `True`. To be used in a Seq2Seq model, the model needs to
+    initialized with both `is_decoder` argument and
+    `add_cross_attention` set to `True`; an `encoder_hidden_states`
+    is then expected as an input to the forward pass.
     """
+
+    # pylint: disable=abstract-method
 
     def __init__(self,
                  config,
@@ -789,7 +773,8 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
         self.embeddings = BertEmbeddings(config)
         self.encoder = AnalogBertEncoder(config, rpu_config, realistic_read_write)
 
-        self.pooler = AnalogBertPooler(config, rpu_config, realistic_read_write) if add_pooling_layer else None
+        self.pooler = (AnalogBertPooler(config, rpu_config, realistic_read_write)
+                        if add_pooling_layer else None)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -803,13 +788,15 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
         self.embeddings.word_embeddings = value
 
     def _prune_heads(self, heads_to_prune):
-        """Prunes heads of the model. heads_to_prune: dict of {layer_num: list of heads to prune in this layer} See base
+        """Prunes heads of the model. heads_to_prune:
+        dict of {layer_num: list of heads to prune in this layer} See base
         class PreTrainedModel
         """
         for layer, heads in heads_to_prune.items():
             self.encoder.layer[layer].attention.prune_heads(heads)
 
-    @add_start_docstrings_to_model_forward(BERT_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
+    @add_start_docstrings_to_model_forward(BERT_INPUTS_DOCSTRING.format(
+                                                            "batch_size, sequence_length"))
     @add_code_sample_docstrings(
         processor_class=_TOKENIZER_FOR_DOC,
         checkpoint=_CHECKPOINT_FOR_DOC,
@@ -832,29 +819,47 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
-        r"""
-        encoder_hidden_states  (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
-            Sequence of hidden-states at the output of the last layer of the encoder. Used in the cross-attention if
+        r"""encoder_hidden_states
+        (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
+            Sequence of hidden-states at the output of the last layer of the encoder.
+            Used in the cross-attention if
             the model is configured as a decoder.
-        encoder_attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Mask to avoid performing attention on the padding token indices of the encoder input. This mask is used in
-            the cross-attention if the model is configured as a decoder. Mask values selected in `[0, 1]`:
+        encoder_attention_mask
+        (`torch.FloatTensor` of shape `(batch_size, sequence_length)`, *optional*):
+            Mask to avoid performing attention on the padding token indices of the encoder input.
+            This mask is used in
+            the cross-attention if the model is configured as a decoder.
+            Mask values selected in `[0, 1]`:
 
             - 1 for tokens that are **not masked**,
             - 0 for tokens that are **masked**.
-        past_key_values (`tuple(tuple(torch.FloatTensor))` of length `config.n_layers` with each tuple having 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`):
-            Contains precomputed key and value hidden states of the attention blocks. Can be used to speed up decoding.
+        past_key_values (`tuple(tuple(torch.FloatTensor))` of length
+        `config.n_layers` with each tuple having 4 tensors of shape
+        `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`):
+            Contains precomputed key and value hidden states of the attention blocks.
+            Can be used to speed up decoding.
 
-            If `past_key_values` are used, the user can optionally input only the last `decoder_input_ids` (those that
-            don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+            If `past_key_values` are used, the user can optionally input only the last
+            `decoder_input_ids` (those that
+            don't have their past key value states given to this model) of shape
+            `(batch_size, 1)` instead of all
             `decoder_input_ids` of shape `(batch_size, sequence_length)`.
         use_cache (`bool`, *optional*):
-            If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding (see
+            If set to `True`, `past_key_values` key value states are
+            returned and can be used to speed up decoding (see
             `past_key_values`).
         """
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        # pylint: disable=arguments-differ, arguments-renamed
+
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -876,7 +881,11 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
         device = input_ids.device if input_ids is not None else inputs_embeds.device
 
         # past_key_values_length
-        past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
+        past_key_values_length = (
+            past_key_values[0][0].shape[2]
+            if past_key_values is not None
+            else 0
+        )
 
         if attention_mask is None:
             attention_mask = ones(((batch_size, seq_length + past_key_values_length)))
@@ -884,14 +893,17 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
         if token_type_ids is None:
             if hasattr(self.embeddings, "token_type_ids"):
                 buffered_token_type_ids = self.embeddings.token_type_ids[:, :seq_length]
-                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size, seq_length)
+                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(batch_size,
+                                                                                  seq_length)
                 token_type_ids = buffered_token_type_ids_expanded
             else:
                 token_type_ids = zeros(input_shape, dtype=long)
 
-        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # We can provide a self-attention mask of dimensions
+        # [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
-        extended_attention_mask: Tensor = self.get_extended_attention_mask(attention_mask, input_shape)
+        extended_attention_mask: Tensor = self.get_extended_attention_mask(attention_mask,
+                                                                           input_shape)
 
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
@@ -906,9 +918,12 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
 
         # Prepare head mask if needed
         # 1.0 in head_mask indicate we keep the head
-        # attention_probs has shape bsz x n_heads x N x N
-        # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
-        # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
+        # attention_probs has
+        #   shape bsz x n_heads x N x N
+        # input head_mask has
+        #   shape [num_heads] or [num_hidden_layers x num_heads]
+        # and head_mask is converted to
+        #   shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
         embedding_output = self.embeddings(
@@ -943,4 +958,138 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
             cross_attentions=encoder_outputs.cross_attentions,
+        )
+
+
+@add_start_docstrings(
+    """
+    Bert Model with a span classification head on top for extractive question-answering tasks
+    like SQuAD (a linear
+    layers on top of the hidden-states output to compute `span start logits` and `span end logits`).
+    """,
+    BERT_START_DOCSTRING,
+)
+class AnalogBertForQuestionAnswering(AnalogBertPreTrainedModel, AnalogSequential):
+    """Bert model with Q&A head"""
+
+    # pylint: disable=abstract-method
+
+    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+
+    def __init__(
+        self,
+        config,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False):
+
+        AnalogBertPreTrainedModel.__init__(self, config)
+        AnalogSequential.__init__(self)
+
+        self.num_labels = config.num_labels
+
+        self.bert = AnalogBertModel(
+                            config,
+                            rpu_config=rpu_config,
+                            realistic_read_write=realistic_read_write,
+                            add_pooling_layer=False)
+
+        self.qa_outputs = AnalogLinear(
+                            config.hidden_size,
+                            config.num_labels,
+                            rpu_config=rpu_config,
+                            realistic_read_write=realistic_read_write)
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    @add_start_docstrings_to_model_forward(
+        BERT_INPUTS_DOCSTRING.format("batch_size, sequence_length")
+    )
+    @add_code_sample_docstrings(
+        processor_class=_TOKENIZER_FOR_DOC,
+        checkpoint=_CHECKPOINT_FOR_QA,
+        output_type=QuestionAnsweringModelOutput,
+        config_class=_CONFIG_FOR_DOC,
+        qa_target_start_index=_QA_TARGET_START_INDEX,
+        qa_target_end_index=_QA_TARGET_END_INDEX,
+        expected_output=_QA_EXPECTED_OUTPUT,
+        expected_loss=_QA_EXPECTED_LOSS,
+    )
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        head_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple[Tensor], QuestionAnsweringModelOutput]:
+        r"""start_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
+            Labels for position (index) of the start of the
+            labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (`sequence_length`).
+            Position outside of the sequence
+            are not taken into account for computing the loss.
+        end_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
+            Labels for position (index) of the end of the labelled
+            span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (`sequence_length`).
+            Position outside of the sequence
+            are not taken into account for computing the loss.
+        """
+        # pylint: disable=arguments-differ, arguments-renamed
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        outputs = self.bert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        sequence_output = outputs[0]
+
+        logits = self.qa_outputs(sequence_output)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1).contiguous()
+        end_logits = end_logits.squeeze(-1).contiguous()
+
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions = start_positions.clamp(0, ignored_index)
+            end_positions = end_positions.clamp(0, ignored_index)
+
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return ((total_loss,) + output) if total_loss is not None else output
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
         )
