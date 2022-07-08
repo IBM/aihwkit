@@ -585,6 +585,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("h3", &JARTv1bStaticParam::h3)
       .def_readwrite("j0", &JARTv1bStaticParam::j_0)
       .def_readwrite("k0", &JARTv1bStaticParam::k0)
+      .def_readwrite("T0", &JARTv1bStaticParam::T0)
       .def_readwrite("eps", &JARTv1bStaticParam::eps)
       .def_readwrite("epsphib", &JARTv1bStaticParam::epsphib)
       .def_readwrite("phiBn0", &JARTv1bStaticParam::phiBn0)

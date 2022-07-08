@@ -922,6 +922,20 @@ class JARTv1bStaticDevice(PulsedDevice):
     write_noise_std: float = 0.0
     r"""Whether to use update write noise.
 
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled a new when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
     alpha0: float = 4.81951e-5
     """See ``reset``."""
 

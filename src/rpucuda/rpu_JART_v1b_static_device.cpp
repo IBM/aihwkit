@@ -42,40 +42,42 @@ void JARTv1bStaticRPUDevice<T>::populate(
   }
 }
 
-// template <typename T> void JARTv1bStaticRPUDevice<T>::printDP(int x_count, int d_count) const {
+template <typename T> void JARTv1bStaticRPUDevice<T>::printDP(int x_count, int d_count) const {
 
-//   if (x_count < 0 || x_count > this->x_size_) {
-//     x_count = this->x_size_;
-//   }
+  if (x_count < 0 || x_count > this->x_size_) {
+    x_count = this->x_size_;
+  }
 
-//   if (d_count < 0 || d_count > this->d_size_) {
-//     d_count = this->d_size_;
-//   }
-//   bool persist_if = getPar().usesPersistentWeight();
+  if (d_count < 0 || d_count > this->d_size_) {
+    d_count = this->d_size_;
+  }
+  bool persist_if = getPar().usesPersistentWeight();
 
-//   for (int i = 0; i < d_count; ++i) {
-//     for (int j = 0; j < x_count; ++j) {
-//       std::cout.precision(5);
-//       std::cout << i << "," << j << ": ";
-//       std::cout << "[<" << this->w_max_bound_[i][j] << ",";
-//       std::cout << this->w_min_bound_[i][j] << ">,<";
-//       std::cout << this->w_scale_up_[i][j] << ",";
-//       std::cout << this->w_scale_down_[i][j] << ">,<";
-//       std::cout << w_slope_up_[i][j] << ",";
-//       std::cout << w_slope_down_[i][j] << ">]";
-//       std::cout.precision(10);
-//       std::cout << this->w_decay_scale_[i][j] << ", ";
-//       std::cout.precision(6);
-//       std::cout << this->w_diffusion_rate_[i][j] << ", ";
-//       std::cout << this->w_reset_bias_[i][j];
-//       if (persist_if) {
-//         std::cout << ", " << this->w_persistent_[i][j];
-//       }
-//       std::cout << "]";
-//     }
-//     std::cout << std::endl;
-//   }
-// }
+  for (int i = 0; i < d_count; ++i) {
+    for (int j = 0; j < x_count; ++j) {
+      std::cout.precision(5);
+      std::cout << i << "," << j << ": ";
+      std::cout << "[<" << this->w_max_bound_[i][j] << ",";
+      std::cout << this->w_min_bound_[i][j] << ">,<";
+      std::cout << this->w_scale_up_[i][j] << ",";
+      std::cout << this->w_scale_down_[i][j] << ">,<";
+      std::cout << device_specific_Ndiscmax[i][j] << ",";
+      std::cout << device_specific_Ndiscmin[i][j] << ",";
+      std::cout << device_specific_ldet[i][j] << ",";
+      std::cout << device_specific_A[i][j] << ">]";
+      std::cout.precision(10);
+      std::cout << this->w_decay_scale_[i][j] << ", ";
+      std::cout.precision(6);
+      std::cout << this->w_diffusion_rate_[i][j] << ", ";
+      std::cout << this->w_reset_bias_[i][j];
+      if (persist_if) {
+        std::cout << ", " << this->w_persistent_[i][j];
+      }
+      std::cout << "]";
+    }
+    std::cout << std::endl;
+  }
+}
 
 
 template <typename T>
