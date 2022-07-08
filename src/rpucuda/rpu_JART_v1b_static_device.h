@@ -167,7 +167,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     /*Add*/
     // bool implementsWriteNoise() const override { return true; };);
     bool implementsWriteNoise() const override { return true; };);
-    // Use hidden weight w as Ndisk, and the write noised weight w_apprent as true w mapped from conductance
 
 template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
 
@@ -294,7 +293,6 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
       override;
   void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
   
-  bool usesPersistentWeight() const override { return true; };
   
 private:
   T **device_specific_Ndiscmax = nullptr;

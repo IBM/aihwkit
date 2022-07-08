@@ -919,6 +919,9 @@ class JARTv1bStaticDevice(PulsedDevice):
     respectively.
     """
 
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
     alpha0: float = 4.81951e-5
     """See ``reset``."""
 

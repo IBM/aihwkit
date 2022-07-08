@@ -26,6 +26,10 @@ void JARTv1bStaticRPUDevice<T>::populate(
   PulsedRPUDevice<T>::populate(p, rng); // will clone par
   auto &par = getPar();
 
+  // We use hidden weight w as Ndisk, and the write noised weight w_apprent as true w mapped from conductance.
+  // So we need to force usesPersistentWeight() = True 
+  // this->write_noise_std = 1;
+
   for (int i = 0; i < this->d_size_; ++i) {
 
     for (int j = 0; j < this->x_size_; ++j) {
@@ -38,40 +42,40 @@ void JARTv1bStaticRPUDevice<T>::populate(
   }
 }
 
-template <typename T> void JARTv1bStaticRPUDevice<T>::printDP(int x_count, int d_count) const {
+// template <typename T> void JARTv1bStaticRPUDevice<T>::printDP(int x_count, int d_count) const {
 
-  if (x_count < 0 || x_count > this->x_size_) {
-    x_count = this->x_size_;
-  }
+//   if (x_count < 0 || x_count > this->x_size_) {
+//     x_count = this->x_size_;
+//   }
 
-  if (d_count < 0 || d_count > this->d_size_) {
-    d_count = this->d_size_;
-  }
-  bool persist_if = getPar().usesPersistentWeight();
+//   if (d_count < 0 || d_count > this->d_size_) {
+//     d_count = this->d_size_;
+//   }
+//   bool persist_if = getPar().usesPersistentWeight();
 
-  for (int i = 0; i < d_count; ++i) {
-    for (int j = 0; j < x_count; ++j) {
-      std::cout.precision(5);
-      std::cout << i << "," << j << ": ";
-      std::cout << "[<" << this->w_max_bound_[i][j] << ",";
-      std::cout << this->w_min_bound_[i][j] << ">,<";
-      std::cout << this->w_scale_up_[i][j] << ",";
-      std::cout << this->w_scale_down_[i][j] << ">,<";
-      std::cout << w_slope_up_[i][j] << ",";
-      std::cout << w_slope_down_[i][j] << ">]";
-      std::cout.precision(10);
-      std::cout << this->w_decay_scale_[i][j] << ", ";
-      std::cout.precision(6);
-      std::cout << this->w_diffusion_rate_[i][j] << ", ";
-      std::cout << this->w_reset_bias_[i][j];
-      if (persist_if) {
-        std::cout << ", " << this->w_persistent_[i][j];
-      }
-      std::cout << "]";
-    }
-    std::cout << std::endl;
-  }
-}
+//   for (int i = 0; i < d_count; ++i) {
+//     for (int j = 0; j < x_count; ++j) {
+//       std::cout.precision(5);
+//       std::cout << i << "," << j << ": ";
+//       std::cout << "[<" << this->w_max_bound_[i][j] << ",";
+//       std::cout << this->w_min_bound_[i][j] << ">,<";
+//       std::cout << this->w_scale_up_[i][j] << ",";
+//       std::cout << this->w_scale_down_[i][j] << ">,<";
+//       std::cout << w_slope_up_[i][j] << ",";
+//       std::cout << w_slope_down_[i][j] << ">]";
+//       std::cout.precision(10);
+//       std::cout << this->w_decay_scale_[i][j] << ", ";
+//       std::cout.precision(6);
+//       std::cout << this->w_diffusion_rate_[i][j] << ", ";
+//       std::cout << this->w_reset_bias_[i][j];
+//       if (persist_if) {
+//         std::cout << ", " << this->w_persistent_[i][j];
+//       }
+//       std::cout << "]";
+//     }
+//     std::cout << std::endl;
+//   }
+// }
 
 
 template <typename T>
@@ -651,9 +655,9 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::diffuseWeights(T **weights
 
   // T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
   T *w = weights[0];
-  T *diffusion_rate = &(w_diffusion_rate_[0][0]);
-  T *max_bound = &(w_max_bound_[0][0]);
-  T *min_bound = &(w_min_bound_[0][0]);
+  T *diffusion_rate = &(this->w_diffusion_rate_[0][0]);
+  T *max_bound = &(this->w_max_bound_[0][0]);
+  T *min_bound = &(this->w_min_bound_[0][0]);
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; ++i) {
@@ -670,8 +674,8 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::clipWeights(T **weights, T
   // apply hard bounds
   // T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
   T *w = weights[0];
-  T *max_bound = &(w_max_bound_[0][0]);
-  T *min_bound = &(w_min_bound_[0][0]);
+  T *max_bound = &(this->w_max_bound_[0][0]);
+  T *min_bound = &(this->w_min_bound_[0][0]);
   if (clip < 0.0) { // only apply bounds
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
@@ -705,11 +709,11 @@ void JARTv1bStaticRPUDevice<T>::resetCols(
         for (int i = 0; i < this->d_size_; ++i) {
           if (reset_prob == 1 || rng.sampleUniform() < reset_prob) {
             weights[i][j] =
-                w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
-            weights[i][j] = MIN(weights[i][j], w_max_bound_[i][j]);
-            weights[i][j] = MAX(weights[i][j], w_min_bound_[i][j]);
-            T current = (((weights[i][j]-w_min_bound_[i][j])/(w_max_bound_[i][j]-w_min_bound_[i][j]))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
-            w_persistent_[i][j] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+                this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+            weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
+            weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
+            T current = (((weights[i][j]-this->w_min_bound_[i][j])/(this->w_max_bound_[i][j]-this->w_min_bound_[i][j]))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+            this->w_persistent_[i][j] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
           }
         }
       }
@@ -725,9 +729,9 @@ void JARTv1bStaticRPUDevice<T>::resetCols(
       for (int i = 0; i < this->d_size_; ++i) {
         if (reset_prob == 1 || rng.sampleUniform() < reset_prob) {
           weights[i][j] =
-              w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
-          weights[i][j] = MIN(weights[i][j], w_max_bound_[i][j]);
-          weights[i][j] = MAX(weights[i][j], w_min_bound_[i][j]);
+              this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+          weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
+          weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
         }
       }
     }
@@ -746,11 +750,11 @@ void JARTv1bStaticRPUDevice<T>::resetAtIndices(
       int i = index / this->x_size_;
       int j = index % this->x_size_;
 
-      weights[i][j] = w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
-      weights[i][j] = MIN(weights[i][j], w_max_bound_[i][j]);
-      weights[i][j] = MAX(weights[i][j], w_min_bound_[i][j]);
-      T current = (((weights[i][j]-w_min_bound_[i][j])/(w_max_bound_[i][j]-w_min_bound_[i][j]))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
-      w_persistent_[i][j] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+      weights[i][j] = this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+      weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
+      weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
+      T current = (((weights[i][j]-this->w_min_bound_[i][j])/(this->w_max_bound_[i][j]-this->w_min_bound_[i][j]))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      this->w_persistent_[i][j] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
 
     }
   }
@@ -761,9 +765,9 @@ void JARTv1bStaticRPUDevice<T>::resetAtIndices(
     int i = index / this->x_size_;
     int j = index % this->x_size_;
 
-    weights[i][j] = w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
-    weights[i][j] = MIN(weights[i][j], w_max_bound_[i][j]);
-    weights[i][j] = MAX(weights[i][j], w_min_bound_[i][j]);
+    weights[i][j] = this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+    weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
+    weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
   }
 }
 
@@ -773,8 +777,8 @@ template <typename T> bool JARTv1bStaticRPUDevice<T>::onSetWeights(T **weights) 
 
   // apply hard bounds to given weights
   T *w = weights[0];
-  T *max_bound = &(w_max_bound_[0][0]);
-  T *min_bound = &(w_min_bound_[0][0]);
+  T *max_bound = &(this->w_max_bound_[0][0]);
+  T *min_bound = &(this->w_min_bound_[0][0]);
   // T *max_bound = &(this->w_max_bound_[0][0]);
   // T *min_bound = &(this->w_min_bound_[0][0]);
   PRAGMA_SIMD
@@ -787,7 +791,7 @@ template <typename T> bool JARTv1bStaticRPUDevice<T>::onSetWeights(T **weights) 
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
       T current = (((w[i]-min_bound[i])/(max_bound[i]-min_bound[i]))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
-      w_persistent_[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+      this->w_persistent_[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
     // applyUpdateWriteNoise(weights);
     return true; // modified device thus true
@@ -800,12 +804,12 @@ template <typename T> bool JARTv1bStaticRPUDevice<T>::onSetWeights(T **weights) 
 template <typename T> void JARTv1bStaticRPUDevice<T>::applyUpdateWriteNoise(T **weights) {
 
   const auto &par = getPar();
-  T *max_bound = &(w_max_bound_[0][0]);
-  T *min_bound = &(w_min_bound_[0][0]);
+  T *max_bound = &(this->w_max_bound_[0][0]);
+  T *min_bound = &(this->w_min_bound_[0][0]);
   
   for (int i = 0; i < this->size_; i++) {
-      T current = (((w[i]-min_bound[i])/(max_bound[i]-min_bound[i]))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
-      w_persistent_[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+      T current = (((weights[0][i]-min_bound[i])/(max_bound[i]-min_bound[i]))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      this->w_persistent_[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
