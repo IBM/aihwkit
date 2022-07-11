@@ -25,23 +25,23 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import JARTv1bStaticDevice
-# from aihwkit.simulator.rpu_base import cuda
+from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
 x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
 y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 # Define a single-layer network, using a constant step device type.
-rpu_config = SingleRPUConfig(device=JARTv1bStaticDevice())
+rpu_config = SingleRPUConfig(device=ConstantStepDevice())
 model = AnalogLinear(4, 2, bias=True,
                      rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
-# if cuda.is_compiled():
-#     x = x.cuda()
-#     y = y.cuda()
-#     model.cuda()
+if cuda.is_compiled():
+    x = x.cuda()
+    y = y.cuda()
+    model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
 opt = AnalogSGD(model.parameters(), lr=0.1)

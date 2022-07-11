@@ -873,7 +873,6 @@ class PowStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
-
 @dataclass
 class JARTv1bStaticDevice(PulsedDevice):
     """Ideal update behavior (using floating point), but forward/backward
@@ -884,16 +883,6 @@ class JARTv1bStaticDevice(PulsedDevice):
     """
 
     bindings_class: ClassVar[Type] = devices.JARTv1bStaticResistiveDeviceParameter
-
-    reset: float = 0.0
-    """The reset values and spread per cross-point ``ij`` when using reset
-    functionality of the device."""
-
-    reset_dtod: float = 0.0
-    """See ``reset``."""
-
-    reset_std: float = 0.0
-    """See ``reset``."""
 
     w_max: float = 0.6
     """See ``w_min``."""
@@ -917,23 +906,6 @@ class JARTv1bStaticDevice(PulsedDevice):
     Device-to-device variation of the hard bounds, of min and max value,
     respectively. All are given in relative units to ``w_min``, or ``w_max``,
     respectively.
-    """
-
-    write_noise_std: float = 0.0
-    r"""Whether to use update write noise.
-
-    Whether to use update write noise that is added to the updated
-    devices weight, while the update is done on a hidden persistent weight. The
-    update write noise is then sampled a new when the device is touched
-    again.
-
-    Thus it is:
-
-    .. math::
-        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise}\xi
-
-    and the update is done on :math:`w_{ij}` but the forward sees the
-    :math:`w_\text{apparent}`.
     """
 
     alpha0: float = 4.81951e-5

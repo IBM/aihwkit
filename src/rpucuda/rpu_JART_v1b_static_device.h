@@ -54,13 +54,13 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T j_0 = (T) 1.054;
     T k0 = (T) 1.0526;
     // physical constants do not change!
-    const float e = 1.602e-19; 								// elementary charge [C]
-    const float kb = 1.3807e-23;								// Boltzman's constant  [VAs/K]		
-    const float Arichardson = 6.01e5;								// Richardson's constant [A/m^2K^2] 
-    const float mdiel = 9.10938e-31;			  				// electron rest mass [kg]
-    const float h = 6.626e-34; 							// Planck's constant [Js]
+    const T e = 1.602e-19; 								// elementary charge [C]
+    const T kb = 1.3807e-23;								// Boltzman's constant  [VAs/K]		
+    const T Arichardson = 6.01e5;								// Richardson's constant [A/m^2K^2] 
+    const T mdiel = 9.10938e-31;			  				// electron rest mass [kg]
+    const T h = 6.626e-34; 							// Planck's constant [Js]
     const int zvo = 2;									// oxygen vacancy charge number
-    const float eps_0 = 8.854e-12;				      				// vacuum permittivity [As/Vm]
+    const T eps_0 = 8.854e-12;				      				// vacuum permittivity [As/Vm]
     // Fitting Parameters for original model
     T T0 = (T) 293;								 	// ambient temperature [K] 
     T eps = (T) 17; // from [10:25]; 						// static hafnium oxide permittivity 
@@ -91,12 +91,15 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T base_time_step = (T) 1e-8;
     T Ndisc_min_bound = (T) 0.06*1e26;
     T Ndisc_max_bound = (T) 1.9897452127440086504e26;
-    T conductance_min =  ((-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0))))/read_voltage;
-    T conductance_max =  ((-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0))))/read_voltage;
+    T conductance_min =  (T) ((-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0))))/read_voltage;
+    T conductance_max =  (T) ((-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0))))/read_voltage;
     T Ndiscmax_dtod = (T) 0;							// 
     T Ndiscmin_dtod = (T) 0;							//
     T ldet_dtod = (T) 0;							//
     T rdet_dtod = (T) 0;							//
+    T write_noise_std = (T) 1;
+    bool dw_min_valid = false;
+
     ,
     /*print body*/
 
@@ -162,7 +165,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ,
     /* calc weight granularity body */
     return this->dw_min;
-    // TODO(Zhenming) change this to calculate the minimum update
     ,
     /*Add*/
     // bool implementsWriteNoise() const override { return true; };);
