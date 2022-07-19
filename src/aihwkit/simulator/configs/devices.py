@@ -900,6 +900,9 @@ class JARTv1bStaticDevice(PulsedDevice):
         as a difference of two resistive elements.
     """
 
+    w_max_dtod: float = 0
+    """See ``w_min_dtod``."""
+
     w_min_dtod: float = 0
     """Device-to-device variation of the hard bounds.
 

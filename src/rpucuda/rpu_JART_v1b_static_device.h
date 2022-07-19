@@ -70,7 +70,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T un = (T) 4e-6; // from [1e-6:1e-5];				// electron mobility [m^2/Vs]
     T Ndiscmax = (T) 20*1e26; // from [0.001:1100];				// maximum oxygen vacancy concentration in the disc[10^26/m^3]
     T Ndiscmin = (T) 0.008*1e26; // from [0.0001:100];			// minimum oxygen vacancy concentration in the disc [10^26/m^3]
-    T Ninit = (T) 0.008*1e26; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
+    T Ninit = (T) 0.06*1e26; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T Nplug = (T) 20*1e26; // from [0.001:100];					// oxygen vacancy concentration in the plug [10^26/m^3]
     T a = (T) 0.25e-9; // from [0.1e-9:1e-9];					// ion hopping distance [m]
     T ny0 = (T) 2e13; // from [1e10:1e14];					// attemp frequenzy [Hz]
@@ -97,7 +97,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T Ndiscmin_dtod = (T) 0;							//
     T ldet_dtod = (T) 0;							//
     T rdet_dtod = (T) 0;							//
-    T write_noise_std = (T) 1;
 
     ,
     /*print body*/
@@ -166,8 +165,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     return this->dw_min;
     ,
     /*Add*/
-    // bool implementsWriteNoise() const override { return true; };);
-    bool implementsWriteNoise() const override { return true; };);
+    );
 
 template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
 
@@ -181,6 +179,7 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmin = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_ldet = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_A = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_Ndisc = Array_2D_Get<double>(d_sz, x_sz);
 
       for (int j = 0; j < x_sz; ++j) {
         for (int i = 0; i < d_sz; ++i) {
@@ -188,6 +187,7 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = (T)0.0;
           device_specific_ldet[i][j] = (T)0.0;
           device_specific_A[i][j] = (T)0.0;
+          device_specific_Ndisc[i][j] = (double)0.0;
         }
       },
       /* dtor*/
@@ -195,6 +195,7 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
       Array_2D_Free<T>(device_specific_Ndiscmin);
       Array_2D_Free<T>(device_specific_ldet);
       Array_2D_Free<T>(device_specific_A);
+      Array_2D_Free<double>(device_specific_Ndisc);
       ,
       /* copy */
       for (int j = 0; j < other.x_size_; ++j) {
@@ -203,6 +204,7 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = other.device_specific_Ndiscmin[i][j];
           device_specific_ldet[i][j] = other.device_specific_ldet[i][j];
           device_specific_A[i][j] = other.device_specific_A[i][j];
+          device_specific_Ndisc[i][j] = other.device_specific_Ndisc[i][j];
         }
       },
       /* move assignment */
@@ -210,23 +212,27 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmax = other.device_specific_Ndiscmax;
       device_specific_ldet = other.device_specific_ldet;
       device_specific_A = other.device_specific_A;
+      device_specific_Ndisc = other.device_specific_Ndisc;
 
       other.device_specific_Ndiscmax = nullptr;
       other.device_specific_Ndiscmin = nullptr;
       other.device_specific_ldet = nullptr;
       other.device_specific_A = nullptr;
+      other.device_specific_Ndisc = nullptr;
       ,
       /* swap*/
       swap(a.device_specific_Ndiscmax, b.device_specific_Ndiscmax);
       swap(a.device_specific_Ndiscmin, b.device_specific_Ndiscmin);
       swap(a.device_specific_ldet, b.device_specific_ldet);
       swap(a.device_specific_A, b.device_specific_A);
+      swap(a.device_specific_Ndisc, b.device_specific_Ndisc);
       ,
       /* dp names*/
       names.push_back(std::string("device_specific_Ndiscmax"));
       names.push_back(std::string("device_specific_Ndiscmin"));
       names.push_back(std::string("device_specific_ldet"));
       names.push_back(std::string("device_specific_A"));
+      names.push_back(std::string("device_specific_Ndisc"));
       ,
       /* dp2vec body*/
       int n_prev = (int)names.size();
@@ -237,6 +243,7 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
         data_ptrs[n_prev + 1][i] = device_specific_Ndiscmin[0][i];
         data_ptrs[n_prev + 2][i] = device_specific_ldet[0][i];
         data_ptrs[n_prev + 3][i] = device_specific_A[0][i];
+        data_ptrs[n_prev + 4][i] = device_specific_Ndisc[0][i];
       },
       /* vec2dp body*/
       int n_prev = (int)names.size();
@@ -247,28 +254,10 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
         device_specific_Ndiscmin[0][i] = data_ptrs[n_prev + 1][i];
         device_specific_ldet[0][i] = data_ptrs[n_prev + 2][i];
         device_specific_A[0][i] = data_ptrs[n_prev + 3][i];
+        device_specific_Ndisc[0][i] = data_ptrs[n_prev + 4][i];
       }
 
-      // T *w = out_weights[0];
-      // T *max_bound = &(w_max_bound_[0][0]);
-      // T *min_bound = &(w_min_bound_[0][0]);
-      // PRAGMA_SIMD
-      // for (int i = 0; i < this->size_; ++i) {
-      //   w[i] = MIN(w[i], max_bound[i]);
-      //   w[i] = MAX(w[i], min_bound[i]);
-      // }
 
-      // if (getPar().usesPersistentWeight()) {
-      //   PRAGMA_SIMD
-      //   for (int i = 0; i < this->size_; i++) {
-      //     w_persistent_[0][i] = w[i];
-      //   }
-      //   applyUpdateWriteNoise(weights);
-      //   return true; // modified device thus true
-      // } else {
-      //   return false; // whether device was changed
-      // }
-      // return
       ,
       /*invert copy DP */
 
@@ -285,9 +274,8 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
   bool onSetWeights(T **weights) override;
   void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
-  virtual void resetAtIndices(T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng);
+  void resetAtIndices(T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng) override;
   
-  void applyUpdateWriteNoise(T **weights) override;
   
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
@@ -300,6 +288,7 @@ private:
   T **device_specific_Ndiscmin = nullptr;
   T **device_specific_ldet = nullptr;
   T **device_specific_A = nullptr;
+  double **device_specific_Ndisc = nullptr;
 };
 
 } // namespace RPU

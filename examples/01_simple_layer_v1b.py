@@ -26,6 +26,7 @@ from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import JARTv1bStaticDevice, SoftBoundsDevice, ConstantStepDevice, LinearStepDevice
+from aihwkit.simulator.configs.utils import PulseType
 # from aihwkit.simulator.rpu_base import cuda
 
 # # Prepare the datasets (input and expected output).
@@ -38,11 +39,16 @@ from aihwkit.simulator.configs.devices import JARTv1bStaticDevice, SoftBoundsDev
 #                      rpu_config=rpu_config)
 
 # Prepare the datasets (input and expected output).
-x = Tensor([[0.0], [1.0]])
-y = Tensor([[0.0], [0.5]])
+slope = 0.5
+x = Tensor([[0.0], [1.0], [2.0], [3.0], [4.0]])
+y = Tensor([[0.0], [slope], [2*slope], [3*slope], [4*slope]])
 
 # Define a single-layer network, using a constant step device type.
 rpu_config = SingleRPUConfig(device=JARTv1bStaticDevice())
+# rpu_config = SingleRPUConfig(device=SoftBoundsDevice())
+
+rpu_config.update.pulse_type = PulseType.DETERMINISTIC_IMPLICIT
+rpu_config.update.desired_bl = 1  # max number in this case
 model = AnalogLinear(1, 1, bias=False,
                      rpu_config=rpu_config)
 
@@ -53,11 +59,11 @@ model = AnalogLinear(1, 1, bias=False,
 #     model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
-opt = AnalogSGD(model.parameters(), lr=0.0001)
+opt = AnalogSGD(model.parameters(), lr=0.01)
 opt.regroup_param_groups(model)
 
 print('weights: {:.24f}'.format(model.get_weights()[0][0][0]))
-for epoch in range(50):
+for epoch in range(100):
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.

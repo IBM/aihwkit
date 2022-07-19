@@ -618,7 +618,6 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("Ndiscmin_dtod", &JARTv1bStaticParam::Ndiscmin_dtod)
       .def_readwrite("ldet_dtod", &JARTv1bStaticParam::ldet_dtod)
       .def_readwrite("rdet_dtod", &JARTv1bStaticParam::rdet_dtod)
-      .def_readwrite("write_noise_std", &JARTv1bStaticParam::write_noise_std)
       .def(
           "__str__",
           [](JARTv1bStaticParam &self) {
