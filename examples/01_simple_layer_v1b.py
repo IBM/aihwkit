@@ -25,17 +25,25 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import JARTv1bStaticDevice
-from aihwkit.simulator.configs.devices import SoftBoundsDevice
+from aihwkit.simulator.configs.devices import JARTv1bStaticDevice, SoftBoundsDevice, ConstantStepDevice, LinearStepDevice
 # from aihwkit.simulator.rpu_base import cuda
 
+# # Prepare the datasets (input and expected output).
+# x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
+# y = Tensor([[1.0, 0.5], [0.7, 0.3]])
+
+# # Define a single-layer network, using a constant step device type.
+# rpu_config = SingleRPUConfig(device=JARTv1bStaticDevice())
+# model = AnalogLinear(4, 2, bias=True,
+#                      rpu_config=rpu_config)
+
 # Prepare the datasets (input and expected output).
-x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
-y = Tensor([[1.0, 0.5], [0.7, 0.3]])
+x = Tensor([[0.0], [1.0]])
+y = Tensor([[0.0], [0.5]])
 
 # Define a single-layer network, using a constant step device type.
 rpu_config = SingleRPUConfig(device=JARTv1bStaticDevice())
-model = AnalogLinear(4, 2, bias=True,
+model = AnalogLinear(1, 1, bias=False,
                      rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
@@ -45,10 +53,11 @@ model = AnalogLinear(4, 2, bias=True,
 #     model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
-opt = AnalogSGD(model.parameters(), lr=0.1)
+opt = AnalogSGD(model.parameters(), lr=0.0001)
 opt.regroup_param_groups(model)
 
-for epoch in range(100):
+print('weights: {:.24f}'.format(model.get_weights()[0][0][0]))
+for epoch in range(50):
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.
@@ -57,4 +66,5 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
-    print('Loss error: {:.16f}'.format(loss))
+    # print('Loss error: {:.16f}'.format(loss))
+    print('weights: {:.24f}'.format(model.get_weights()[0][0][0]))
