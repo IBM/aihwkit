@@ -22,17 +22,8 @@ template <typename T>
 void JARTv1bStaticRPUDevice<T>::populate(
     const JARTv1bStaticRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng) {
 
-    // fix weight granularity
-    // int *dw_min_ptr;
-    // dw_min_ptr = (int*)(&p.dw_min);
-    // *dw_min_ptr = fix_weight_granularity(p.w_min, p.w_max, p);
-
   PulsedRPUDevice<T>::populate(p, rng); // will clone par
   auto &par = getPar();
-
-  // We use hidden weight w as Ndisk, and the write noised weight w_apprent as true w mapped from conductance.
-  // So we need to force usesPersistentWeight() = True 
-  // this->write_noise_std = 1;
 
   for (int i = 0; i < this->d_size_; ++i) {
 
@@ -396,8 +387,8 @@ template <typename T>
 inline T map_Ndisc_to_weight(
     const T &read_voltage,
     double &Ndisc,
-    const T &conductance_min,
-    const T &conductance_max,
+    const T &current_min,
+    const T &current_max,
     const T &weight_min_bound,
     const T &weight_max_bound,
     const T &g0,
@@ -409,8 +400,8 @@ inline T map_Ndisc_to_weight(
     const T &j_0,
     const T &k0,
     const T &Original_Ndiscmin) {
-  T conductance = calculate_current_positive(Ndisc, read_voltage, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
-  T weight = ((conductance-conductance_min)/(conductance_max-conductance_min))*(weight_max_bound-weight_min_bound)+weight_min_bound;
+  T read_current = calculate_current_positive(Ndisc, read_voltage, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
+  T weight = ((read_current-current_min)/(current_max-current_min))*(weight_max_bound-weight_min_bound)+weight_min_bound;
   return weight;
 }
 
@@ -480,8 +471,8 @@ inline void update_once(
     T &w,
     T &w_apparent,
     int &sign,
-    const T &conductance_min,
-    const T &conductance_max,
+    const T &current_min,
+    const T &current_max,
     const T &weight_min_bound,
     const T &weight_max_bound,
     const T &Ndisc_min_bound,
@@ -506,7 +497,7 @@ inline void update_once(
     }
   } 
 
-  w = map_Ndisc_to_weight(read_voltage, Ndisc, conductance_min, conductance_max, weight_min_bound, weight_max_bound, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
+  w = map_Ndisc_to_weight(read_voltage, Ndisc, current_min, current_max, weight_min_bound, weight_max_bound, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
   
   if (write_noise_std > (T)0.0) {
     w_apparent = w + write_noise_std * rng->sampleGauss();
@@ -525,7 +516,6 @@ void JARTv1bStaticRPUDevice<T>::doSparseUpdate(
   T *Ndiscmin = device_specific_Ndiscmin[i];
   T *ldet = device_specific_ldet[i];
   T *A = device_specific_A[i];
-  double *Ndisc = device_specific_Ndisc[i];
   T *min_bound = this->w_min_bound_[i];
   T *max_bound = this->w_max_bound_[i];
   
@@ -541,8 +531,8 @@ void JARTv1bStaticRPUDevice<T>::doSparseUpdate(
                                    par.Nplug, par.a, par.ny0, par.dWa, par.Rth0, par.lcell,
                                    ldet[j],
                                    par.Rtheff_scaling, par.RseriesTiOx, par.R0, par.Rthline, par.alphaline,
-                                   A[j], Ndisc[j], w[j], w_apparent[j], sign,
-                                   par.conductance_min, par.conductance_max,
+                                   A[j], device_specific_Ndisc[i][j], w[j], w_apparent[j], sign,
+                                   par.current_min, par.current_max,
                                    min_bound[j], max_bound[j],
                                   //  par.w_min, par.w_max,
                                    par.Ndisc_min_bound, par.Ndisc_max_bound,
@@ -560,7 +550,6 @@ void JARTv1bStaticRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RN
   T *Ndiscmin = device_specific_Ndiscmin[0];
   T *ldet = device_specific_ldet[0];
   T *A = device_specific_A[0];
-  double *Ndisc = device_specific_Ndisc[0];
   T *min_bound = this->w_min_bound_[0];
   T *max_bound = this->w_max_bound_[0];
   
@@ -576,8 +565,8 @@ void JARTv1bStaticRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RN
                                    par.Nplug, par.a, par.ny0, par.dWa, par.Rth0, par.lcell,
                                    ldet[j],
                                    par.Rtheff_scaling, par.RseriesTiOx, par.R0, par.Rthline, par.alphaline,
-                                   A[j], Ndisc[j], w[j], w_apparent[j], sign,
-                                   par.conductance_min, par.conductance_max,
+                                   A[j], device_specific_Ndisc[0][j], w[j], w_apparent[j], sign,
+                                   par.current_min, par.current_max,
                                    min_bound[j], max_bound[j],
                                   //  par.w_min, par.w_max,
                                    par.Ndisc_min_bound, par.Ndisc_max_bound,
@@ -595,14 +584,14 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::decayWeights(T **weights, 
   if (uw_std <= 0) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
   else{
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
@@ -619,14 +608,14 @@ void JARTv1bStaticRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_
   if (uw_std <= 0) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
   else{
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
@@ -643,14 +632,14 @@ void JARTv1bStaticRPUDevice<T>::driftWeights(T **weights, T time_since_last_call
     if (uw_std <= 0) {
       PRAGMA_SIMD
       for (int i = 0; i < this->size_; i++) {
-        T current = (((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+        T current = ((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
         device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
       }
     }
     else{
       PRAGMA_SIMD
       for (int i = 0; i < this->size_; i++) {
-        T current = (((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+        T current = ((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
         device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
       }
     }
@@ -666,14 +655,14 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::diffuseWeights(T **weights
   if (uw_std <= 0) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
   else{
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
@@ -688,14 +677,14 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::clipWeights(T **weights, T
   if (uw_std <= 0) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
   else{
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
@@ -711,7 +700,7 @@ void JARTv1bStaticRPUDevice<T>::resetCols(
   for (int j = 0; j < this->x_size_; ++j) {
     PRAGMA_SIMD
     for (int i = 0; i < this->d_size_; ++i) {
-      T current = (((weights[i][j]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((weights[i][j]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[i][j] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
@@ -727,7 +716,7 @@ void JARTv1bStaticRPUDevice<T>::resetAtIndices(
   for (int j = 0; j < this->x_size_; ++j) {
     PRAGMA_SIMD
     for (int i = 0; i < this->d_size_; ++i) {
-      T current = (((weights[i][j]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((weights[i][j]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[i][j] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
@@ -742,14 +731,14 @@ template <typename T> bool JARTv1bStaticRPUDevice<T>::onSetWeights(T **weights) 
   if (uw_std <= 0) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((weights[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }
   else{
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      T current = (((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.conductance_max-par.conductance_min)+par.conductance_min)*par.read_voltage;
+      T current = ((this->w_persistent_[0][i]-par.w_min)/(par.w_max-par.w_min))*(par.current_max-par.current_min)+par.current_min;
       device_specific_Ndisc[0][i] = invert_positive_current(current,par.read_voltage, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
     }
   }

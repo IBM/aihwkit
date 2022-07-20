@@ -91,8 +91,8 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T base_time_step = (T) 1e-8;
     T Ndisc_min_bound = (T) 0.06*1e26;
     T Ndisc_max_bound = (T) 1.9897452127440086504e26;
-    T conductance_min =  (T) ((-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0))))/read_voltage;
-    T conductance_max =  (T) ((-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0))))/read_voltage;
+    T current_min =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0)));
+    T current_max =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0)));
     T Ndiscmax_dtod = (T) 0;							// 
     T Ndiscmin_dtod = (T) 0;							//
     T ldet_dtod = (T) 0;							//
@@ -154,8 +154,8 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t base_time_step:\t" << base_time_step << std::endl;
     ss << "\t Ndisc_min_bound:\t" << Ndisc_min_bound << std::endl;
     ss << "\t Ndisc_max_bound:\t" << Ndisc_max_bound << std::endl;
-    ss << "\t conductance_min:\t" << conductance_min << std::endl;
-    ss << "\t conductance_max:\t" << conductance_max << std::endl;
+    ss << "\t current_min:\t" << current_min << std::endl;
+    ss << "\t current_max:\t" << current_max << std::endl;
     ss << "\t Ndiscmax_dtod:\t\t" << Ndiscmax_dtod << std::endl;
     ss << "\t Ndiscmin_dtod:\t\t" << Ndiscmin_dtod << std::endl;
     ss << "\t ldet_dtod:\t\t" << ldet_dtod << std::endl;

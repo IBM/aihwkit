@@ -44,11 +44,11 @@ x = Tensor([[0.0], [1.0], [2.0], [3.0], [4.0]])
 y = Tensor([[0.0], [slope], [2*slope], [3*slope], [4*slope]])
 
 # Define a single-layer network, using a constant step device type.
-rpu_config = SingleRPUConfig(device=JARTv1bStaticDevice())
+rpu_config = SingleRPUConfig(device=JARTv1bStaticDevice(pulse_length=1, base_time_step=1e-2, pulse_voltage_SET=-20, pulse_voltage_RESET=20))
 # rpu_config = SingleRPUConfig(device=SoftBoundsDevice())
 
-rpu_config.update.pulse_type = PulseType.DETERMINISTIC_IMPLICIT
-rpu_config.update.desired_bl = 1  # max number in this case
+# rpu_config.update.pulse_type = PulseType.DETERMINISTIC_IMPLICIT
+rpu_config.update.desired_bl = 100  # max number in this case
 model = AnalogLinear(1, 1, bias=False,
                      rpu_config=rpu_config)
 
@@ -62,8 +62,11 @@ model = AnalogLinear(1, 1, bias=False,
 opt = AnalogSGD(model.parameters(), lr=0.01)
 opt.regroup_param_groups(model)
 
-print('weights: {:.24f}'.format(model.get_weights()[0][0][0]))
-for epoch in range(100):
+weights = model.get_weights()[0][0][0]
+count = 0
+print('Epoch%s:weights: {:.24f}'.format(weights)%count)
+
+for epoch in range(10):
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.
@@ -73,4 +76,10 @@ for epoch in range(100):
 
     opt.step()
     # print('Loss error: {:.16f}'.format(loss))
-    print('weights: {:.24f}'.format(model.get_weights()[0][0][0]))
+    weights = model.get_weights()[0][0][0]
+    count = count + 1
+    print('Epoch%s:weights: {:.24f}'.format(weights)%count)
+    # if model.get_weights()[0][0][0] != weights:
+    #     weights = model.get_weights()[0][0][0]
+    #     count = count + 1
+    #     print('Epoch%s:weights: {:.24f}'.format(weights)%count)
