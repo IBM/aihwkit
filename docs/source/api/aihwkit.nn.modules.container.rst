@@ -5,3 +5,4 @@ aihwkit.nn.modules.container module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: randn, zeros, from_numpy

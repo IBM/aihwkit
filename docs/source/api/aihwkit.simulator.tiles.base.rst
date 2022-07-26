@@ -5,3 +5,5 @@ aihwkit.simulator.tiles.base module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: stack, torch_max
+   :noindex: torch_max

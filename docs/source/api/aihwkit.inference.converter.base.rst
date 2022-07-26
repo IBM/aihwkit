@@ -5,3 +5,4 @@ aihwkit.inference.converter.base module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members:

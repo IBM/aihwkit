@@ -5,3 +5,4 @@ aihwkit.experiments.experiments.training module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: torch_max

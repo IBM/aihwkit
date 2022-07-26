@@ -5,3 +5,4 @@ aihwkit.nn.modules.linear module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: randn, zeros

@@ -5,3 +5,4 @@ aihwkit.simulator.configs.configs module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: bindings_class

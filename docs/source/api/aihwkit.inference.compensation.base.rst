@@ -5,3 +5,4 @@ aihwkit.inference.compensation.base module
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members:
