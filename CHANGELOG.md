@@ -15,13 +15,24 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+* Example 23: how to use ``AnalogTile`` directly to implement an
+  analog matrix-vector product without using pytorch modules. (\#393)
+* Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
 * Notebook for exploring analog sensitivities. (\#380)
+* Remapping functionality for ``InferenceRPUConfig``. (\#388)
 
 ### Fixed
+* Analog_summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
+* Weights that were not contiguous could have set wrongly. (\#388)
+* Programming noise would not be applied if drift compensation was not
+  used. (\#389)
 
 ### Changed
-
+* Weight noise visualization now shows the programming noise and drift
+  noise difference. (\#389)
+* Concatenate the gradients before applying to the tile update
+  function (some speedup for CUDA expected). (\#390)
 
 ## [0.6.0] - 2022/05/16
 
