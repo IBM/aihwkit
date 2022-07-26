@@ -74,6 +74,11 @@ jobs:
       - make pylint
       - make mypy
 
+  - name: "Compile and test. Python 3.7"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.7"
+
   - name: "Compile and test. Python 3.8"
     <<: *job_compile_common
     stage: Test multiple python versions
