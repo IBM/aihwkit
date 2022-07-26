@@ -5,4 +5,3 @@ aihwkit.optim.analog\_optimizer module
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: clone

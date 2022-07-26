@@ -5,4 +5,3 @@ aihwkit.optim.context module
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: clone

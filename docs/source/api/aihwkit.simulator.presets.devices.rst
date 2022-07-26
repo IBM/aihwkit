@@ -5,5 +5,3 @@ aihwkit.simulator.presets.devices module
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: bindings_class
-   :inherited-members:
