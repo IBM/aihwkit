@@ -37,7 +37,7 @@ job_compile_common: &job_compile_common
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
     - $PYTHON_EXECUTABLE -m pip install -r requirements.txt pytest
-    - python2.7 -m pip uninstall setuptools
+    - python2.7 -m pip uninstall setuptools -y
     - $PYTHON_EXECUTABLE -m pip install setuptools
     # Install the package in editable mode.
     - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization]"
@@ -59,27 +59,22 @@ build_deploy_common: &build_deploy_common
 
 jobs:
   include:
-  - name: "Compile and test. Python 3.9"
+  - name: "Compile and test. Python 3.7"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.9"
+    python: "3.7"
     env:
       - TEST_DATASET=true
 
-  - name: "Compile and lint. Python 3.9"
+  - name: "Compile and lint. Python 3.7"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.9"
+    python: "3.7"
     script:
       - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
       - make pycodestyle
       - make pylint
       - make mypy
-
-  - name: "Compile and test. Python 3.7"
-    <<: *job_compile_common
-    stage: Test multiple python versions
-    python: "3.7"
 
   - name: "Compile and test. Python 3.8"
     <<: *job_compile_common
