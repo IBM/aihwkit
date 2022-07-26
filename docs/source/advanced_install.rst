@@ -155,20 +155,22 @@ specific details)::
     $ pip install -r requirements-examples.txt
 
 
-Without GPU support (with OpenBLAS)::
+Without GPU support (with OpenBLAS):
+  This uses the OpenBLAS library for fast numerical computations::
 
-     $ make build
+    $ make build
 
-.. note::
+  .. note::
 
-   Note that openblas needs to be installed (e.g. with ``conda
-   install openblas``)
+    Note that openblas needs to be installed, e.g. with::
+        $ conda install openblas
 
-Without GPU support (with MKL)::
+Without GPU support (with MKL):
+  This uses the Intel MKL library instead of the OpenBlas library::
 
     $ make build_mkl
 
-.. note::
+  .. note::
      Note that MKL needs to be installed and environment variable
      ``MKLROOT`` set if not in standard folders. E.g. with::
 
