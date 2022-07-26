@@ -25,7 +25,7 @@ INSTALL_REQUIRES = [
     'numpy>=1.18',
     'protobuf>=3.13.0,<4'
 ]
-
+SETUPTOOLS = "setuptools~=46.0.0"
 
 def get_version() -> str:
     """Get the package version."""
