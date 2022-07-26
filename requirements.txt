@@ -1,7 +1,6 @@
 # Build dependencies.
 cmake>=3.18
-setuptools>=46.0.0
-scikit-build>=0.11.1
+scikit-build>=0.15.0
 pybind11>=2.6.2
 # Runtime dependencies.
 torch>=1.7
