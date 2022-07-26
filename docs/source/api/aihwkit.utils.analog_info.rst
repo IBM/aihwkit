@@ -1,7 +1,7 @@
-aihwkit.nn.modules.rnn.rnn module
+aihwkit.utils.analog\_info module
 =================================
 
-.. automodule:: aihwkit.nn.modules.rnn.rnn
+.. automodule:: aihwkit.utils.analog_info
    :members:
    :undoc-members:
    :show-inheritance:

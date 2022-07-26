@@ -1,7 +1,7 @@
-aihwkit.nn.modules.conv\_mapped module
+aihwkit.simulator.noise\_models module
 ======================================
 
-.. automodule:: aihwkit.nn.modules.conv_mapped
+.. automodule:: aihwkit.simulator.noise_models
    :members:
    :undoc-members:
    :show-inheritance:

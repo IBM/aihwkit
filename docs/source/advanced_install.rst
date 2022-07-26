@@ -64,8 +64,8 @@ minimal dependencies (note that ``Xcode`` needs to be installed)::
     $ brew install openblas
     $ pip install cmake scikit-build torch pybind11
 
-miniconda
-"""""""""
+miniconda (e.g. linux)
+""""""""""""""""""""""
 
 On a miniconda-based system, the following commands can be used for installing
 the minimal dependencies [#f3]_::
@@ -73,6 +73,18 @@ the minimal dependencies [#f3]_::
     $ conda install cmake openblas pybind11
     $ conda install -c conda-forge scikit-build
     $ conda install -c pytorch pytorch
+
+.. note::
+    You can also install all the requirements by::
+
+        $ pip install -r requirements.txt
+        $ pip install -r requirements-dev.txt
+        $ pip install -r requirements-examples.txt
+
+.. note::
+    If you are using CUDA (see below) then you need to have a
+    CUDA-enabled pytorch installed. Please refer to the torch website
+    how to install that
 
 
 Windows using conda (Experimental)
@@ -121,35 +133,79 @@ Prompt for VS 2019.
     If you want to use ``pip`` instead of ``conda``, the following commands can
     be used::
 
-    $ pip install cmake scikit-build pybind11
-    $ pip install torch -f https://download.pytorch.org/whl/torch_stable.html
+        $ pip install cmake scikit-build pybind11
+        $ pip install torch -f https://download.pytorch.org/whl/torch_stable.html
+
 
 Installing and compiling
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once the dependencies are in place, the following command can be used for
-compiling and installing the Python package::
-
-Without GPU support:
-
-    $ python setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace -DRPU_BLAS=MKL -j16
-    $ pip install matplotlib
-    $ PYTHONPATH=./src  python3 examples/01_simple_layer.py
-
-With GPU support:
+compiling. Here we assume that you have already cloned the directory
+and changed into it::
 
     $ git clone https://github.com/IBM/aihwkit.git
     $ cd aihwkit
-    $ export CUDA_HOME=/usr/lib/cuda
-    $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/cuda/lib64:/usr/lib/cuda/extras/CUPTI/lib64
-    $ export PATH=$PATH:$CUDA_HOME/bin
-    $ python3 setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace -DRPU_BLAS=MKL -j16 -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="60;70"
-    $ pip install matplotlib
-    $ PYTHONPATH=./src  python3 examples/01_simple_layer.py
+
+You can typically install requirements by (but see above for more
+specific details)::
+
+    $ pip install -r requirements.txt
+    $ pip install -r requirements-dev.txt
+    $ pip install -r requirements-examples.txt
+
+
+Without GPU support (with OpenBLAS)::
+
+     $ make build
+
+.. note::
+
+   Note that openblas needs to be installed (e.g. with ``conda
+   install openblas``)
+
+Without GPU support (with MKL)::
+
+    $ make build_mkl
+
+.. note::
+     Note that MKL needs to be installed and environment variable
+     ``MKLROOT`` set if not in standard folders. E.g. with::
+
+         $ conda install -c intel mkl mkl-devel mkl-static mkl-include
+
+With GPU support:
+  The CUDA library needs to be set up properly so that the compiler
+  can find it (you may need to set ``CUDA_HOME``). Please refer to the
+  installation instructions. This also uses MKL
+  as default, whihc thus needs to be installed (see above). Then::
+
+      $ make build_cuda
+
+  If you know your CUDA architecture, then you can give it directly
+  (which will result typically in a much quicker initially loading time)::
+
+      $ make build_cuda flags='-DRPU_CUDA_ARCHITECTURES="60"'
 
 
 If there are any issue with the dependencies or the compilation, the output
 of the command will help diagnosing the issue.
+
+In-place installation
+~~~~~~~~~~~~~~~~~~~~~
+
+If you want install the library inside the cloned directory (see also
+:doc:`developer_install`), it is more convineint for developers. For
+that simply replace the above make commands with ``build_inplace``,
+e.g.::
+
+    $ make build_inplace_cuda
+
+Here you need to make sure that the ``PYTHONPATH`` is set to the ``src``
+sub-directory of the cloned directory, e.g. by (when being in the cloned directory)::
+
+    $ export PYTHONPATH=`pwd`/src:$PYTHONPATH
+
 
 .. note::
 

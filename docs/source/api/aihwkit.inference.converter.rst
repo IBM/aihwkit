@@ -1,4 +1,3 @@
-
 aihwkit.inference.converter package
 ===================================
 
