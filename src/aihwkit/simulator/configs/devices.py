@@ -874,7 +874,7 @@ class PowStepDevice(PulsedDevice):
     """
 
 @dataclass
-class JARTv1bStaticDevice(PulsedDevice):
+class JARTv1bDevice(PulsedDevice):
     """Ideal update behavior (using floating point), but forward/backward
     might be non-ideal.
 
@@ -882,7 +882,7 @@ class JARTv1bStaticDevice(PulsedDevice):
     forward/backward might still have a non-ideal ADC or noise added.
     """
 
-    bindings_class: ClassVar[Type] = devices.JARTv1bStaticResistiveDeviceParameter
+    bindings_class: ClassVar[Type] = devices.JARTv1bResistiveDeviceParameter
 
     w_max: float = 0.6
     """See ``w_min``."""
@@ -1031,9 +1031,6 @@ class JARTv1bStaticDevice(PulsedDevice):
     Ndiscmin: float = 0.008*1e26
     """See ``reset``."""
 
-    Ninit: float = 0.008*1e26
-    """See ``reset``."""
-
     Nplug: float = 20*1e26
     """See ``reset``."""
 
@@ -1094,6 +1091,9 @@ class JARTv1bStaticDevice(PulsedDevice):
     Ndisc_max_bound: float = 1.9897452127440086504e26
     """See ``reset``."""
 
+    Ninit: float = Ndisc_min_bound
+    """See ``reset``."""
+
     Ndiscmax_dtod: float = 0
     """See ``reset``."""
 
@@ -1104,6 +1104,18 @@ class JARTv1bStaticDevice(PulsedDevice):
     """See ``reset``."""
 
     rdet_dtod: float = 0
+    """See ``reset``."""
+
+    Ndiscmax_std: float = 0
+    """See ``reset``."""
+
+    Ndiscmin_std: float = 0
+    """See ``reset``."""
+
+    ldet_std: float = 0
+    """See ``reset``."""
+
+    rdet_std: float = 0
     """See ``reset``."""
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:

@@ -16,15 +16,17 @@
 #include "rpu_pulsed_device.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
+// #include "logger.h"
+#include <stdio.h>
 
 namespace RPU {
 
-template <typename T> class JARTv1bStaticRPUDevice;
+template <typename T> class JARTv1bRPUDevice;
 
 BUILD_PULSED_DEVICE_META_PARAMETER(
-    JARTv1bStatic,
+    JARTv1b,
     /*implements*/
-    DeviceUpdateType::JARTv1bStatic,
+    DeviceUpdateType::JARTv1b,
     /*parameter def*/ 
     T alpha0 = (T) 4.81951e-5;
     // T alpha1 = (T) 2.4006e-6;
@@ -70,7 +72,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T un = (T) 4e-6; // from [1e-6:1e-5];				// electron mobility [m^2/Vs]
     T Ndiscmax = (T) 20*1e26; // from [0.001:1100];				// maximum oxygen vacancy concentration in the disc[10^26/m^3]
     T Ndiscmin = (T) 0.008*1e26; // from [0.0001:100];			// minimum oxygen vacancy concentration in the disc [10^26/m^3]
-    T Ninit = (T) 0.06*1e26; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T Nplug = (T) 20*1e26; // from [0.001:100];					// oxygen vacancy concentration in the plug [10^26/m^3]
     T a = (T) 0.25e-9; // from [0.1e-9:1e-9];					// ion hopping distance [m]
     T ny0 = (T) 2e13; // from [1e10:1e14];					// attemp frequenzy [Hz]
@@ -91,12 +92,17 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T base_time_step = (T) 1e-8;
     T Ndisc_min_bound = (T) 0.06*1e26;
     T Ndisc_max_bound = (T) 1.9897452127440086504e26;
+    T Ninit = Ndisc_min_bound; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T current_min =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0)));
     T current_max =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0)));
     T Ndiscmax_dtod = (T) 0;							// 
     T Ndiscmin_dtod = (T) 0;							//
     T ldet_dtod = (T) 0;							//
     T rdet_dtod = (T) 0;							//
+    T Ndiscmax_std = (T) 0;							// 
+    T Ndiscmin_std = (T) 0;							//
+    T ldet_std = (T) 0;							//
+    T rdet_std = (T) 0;							//
 
     ,
     /*print body*/
@@ -160,6 +166,10 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t Ndiscmin_dtod:\t\t" << Ndiscmin_dtod << std::endl;
     ss << "\t ldet_dtod:\t\t" << ldet_dtod << std::endl;
     ss << "\t rdet_dtod:\t\t" << rdet_dtod << std::endl;
+    ss << "\t Ndiscmax_std:\t\t" << Ndiscmax_std << std::endl;
+    ss << "\t Ndiscmin_std:\t\t" << Ndiscmin_std << std::endl;
+    ss << "\t ldet_std:\t\t" << ldet_std << std::endl;
+    ss << "\t rdet_std:\t\t" << rdet_std << std::endl;
     ,
     /* calc weight granularity body */
     return this->dw_min;
@@ -167,10 +177,10 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     /*Add*/
     );
 
-template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
+template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
 
   BUILD_PULSED_DEVICE_CONSTRUCTORS(
-      JARTv1bStaticRPUDevice,
+      JARTv1bRPUDevice,
       /* ctor*/
       int x_sz = this->x_size_;
       int d_sz = this->d_size_;
@@ -282,7 +292,7 @@ template <typename T> class JARTv1bStaticRPUDevice : public PulsedRPUDevice<T> {
       override;
   void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
   
-  
+
 private:
   T **device_specific_Ndiscmax = nullptr;
   T **device_specific_Ndiscmin = nullptr;

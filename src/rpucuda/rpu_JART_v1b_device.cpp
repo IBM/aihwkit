@@ -10,17 +10,33 @@
  * that they have been altered from the originals.
  */
 
-#include "rpu_JART_v1b_static_device.h"
+#include "rpu_JART_v1b_device.h"
 
 namespace RPU {
 
 /********************************************************************************
- * JART v1b Static RPU Device
+ * JART v1b RPU Device
  *********************************************************************************/
 
+	template<typename... Args>
+	void zhenming_log(const char* message, Args... args)
+	{
+    FILE* file = fopen("log.txt", "a");
+		std::time_t current_time = std::time(0);
+		std::tm* timestamp = std::localtime(&current_time);
+		char buffer[80];
+		strftime(buffer, 80, "%c", timestamp);
+
+    fprintf(file, "%s\t", buffer);
+    fprintf(file, message, args...);
+    fprintf(file, "\n");
+    
+    fclose(file);
+	}
+
 template <typename T>
-void JARTv1bStaticRPUDevice<T>::populate(
-    const JARTv1bStaticRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng) {
+void JARTv1bRPUDevice<T>::populate(
+    const JARTv1bRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng) {
 
   PulsedRPUDevice<T>::populate(p, rng); // will clone par
   auto &par = getPar();
@@ -38,7 +54,7 @@ void JARTv1bStaticRPUDevice<T>::populate(
   }
 }
 
-template <typename T> void JARTv1bStaticRPUDevice<T>::printDP(int x_count, int d_count) const {
+template <typename T> void JARTv1bRPUDevice<T>::printDP(int x_count, int d_count) const {
 
   if (x_count < 0 || x_count > this->x_size_) {
     x_count = this->x_size_;
@@ -406,6 +422,32 @@ inline T map_Ndisc_to_weight(
 }
 
 template <typename T>
+inline void apply_cycle_to_cycle_noise(
+    T &Ndiscmax,
+    T &Ndiscmin,
+    T &ldet,
+    T &A,
+    const T &Ndiscmax_std,
+    const T &Ndiscmin_std,
+    const T &ldet_std,
+    const T &rdet_std,
+    RNG<T> *rng) {
+  if (Ndiscmax_std > (T)0.0) {
+    Ndiscmax = Ndiscmax + Ndiscmax_std * rng->sampleGauss();
+  }
+  if (Ndiscmin_std > (T)0.0) {
+    Ndiscmin = Ndiscmin + Ndiscmin_std * rng->sampleGauss();
+  }
+  if (ldet_std > (T)0.0) {
+    ldet = ldet + ldet_std * rng->sampleGauss();
+  }
+  if (rdet_std > (T)0.0) {
+    T rdet = pow(A/M_PI, 1/2) + rdet_std * rng->sampleGauss();
+    A = M_PI*pow(rdet,2);
+  }
+}
+
+template <typename T>
 inline void update_once(
     const T &read_voltage,
     const T &pulse_voltage_SET,
@@ -478,9 +520,13 @@ inline void update_once(
     const T &Ndisc_min_bound,
     const T &Ndisc_max_bound, 
     const T &write_noise_std,
+    const T &Ndiscmax_std,
+    const T &Ndiscmin_std,
+    const T &ldet_std,
+    const T &rdet_std,
     RNG<T> *rng) {
-  int pulse_counter = (int) pulse_length/base_time_step;
-  
+  int pulse_counter = int (pulse_length/base_time_step);
+
   if (sign < 0) {
     for (int i = 0; i < pulse_counter; i++) {
       step(pulse_voltage_SET, base_time_step, Ndisc, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, e, kb, Arichardson, mdiel, h, zvo, eps_0, T0, eps, epsphib, phiBn0, phin, un, Original_Ndiscmin,  Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
@@ -502,10 +548,12 @@ inline void update_once(
   if (write_noise_std > (T)0.0) {
     w_apparent = w + write_noise_std * rng->sampleGauss();
   }
+
+  apply_cycle_to_cycle_noise(Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, rng);
 }
 
 template <typename T>
-void JARTv1bStaticRPUDevice<T>::doSparseUpdate(
+void JARTv1bRPUDevice<T>::doSparseUpdate(
     T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
 
   const auto &par = getPar();
@@ -536,11 +584,13 @@ void JARTv1bStaticRPUDevice<T>::doSparseUpdate(
                                    min_bound[j], max_bound[j],
                                   //  par.w_min, par.w_max,
                                    par.Ndisc_min_bound, par.Ndisc_max_bound,
-                                   write_noise_std, rng););
+                                   write_noise_std,
+                                   par.Ndiscmax_std, par.Ndiscmin_std,par.ldet_std, par.rdet_std,
+                                   rng););
 }
 
 template <typename T>
-void JARTv1bStaticRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) {
+void JARTv1bRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) {
 
   const auto &par = getPar();
 
@@ -570,12 +620,14 @@ void JARTv1bStaticRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RN
                                    min_bound[j], max_bound[j],
                                   //  par.w_min, par.w_max,
                                    par.Ndisc_min_bound, par.Ndisc_max_bound,
-                                   write_noise_std, rng););
+                                   write_noise_std,
+                                   par.Ndiscmax_std, par.Ndiscmin_std,par.ldet_std, par.rdet_std,
+                                   rng););
 }
 
 
 
-template <typename T> void JARTv1bStaticRPUDevice<T>::decayWeights(T **weights, bool bias_no_decay) {
+template <typename T> void JARTv1bRPUDevice<T>::decayWeights(T **weights, bool bias_no_decay) {
   PulsedRPUDevice<T>::decayWeights(weights, bias_no_decay);
 
   const auto &par = getPar();
@@ -599,7 +651,7 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::decayWeights(T **weights, 
 }
 
 template <typename T>
-void JARTv1bStaticRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
+void JARTv1bRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
   PulsedRPUDevice<T>::decayWeights(weights, alpha, bias_no_decay);
 
   const auto &par = getPar();
@@ -622,7 +674,7 @@ void JARTv1bStaticRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_
 }
 
 template <typename T>
-void JARTv1bStaticRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
+void JARTv1bRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
   if (this->hasWDrifter()) {
     PulsedRPUDevice<T>::driftWeights(weights, time_since_last_call, rng);
 
@@ -646,7 +698,7 @@ void JARTv1bStaticRPUDevice<T>::driftWeights(T **weights, T time_since_last_call
   }
 }
 
-template <typename T> void JARTv1bStaticRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
+template <typename T> void JARTv1bRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
   PulsedRPUDevice<T>::diffuseWeights(weights, rng);
 
   const auto &par = getPar();
@@ -668,7 +720,7 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::diffuseWeights(T **weights
   }
 }
 
-template <typename T> void JARTv1bStaticRPUDevice<T>::clipWeights(T **weights, T clip) {
+template <typename T> void JARTv1bRPUDevice<T>::clipWeights(T **weights, T clip) {
   PulsedRPUDevice<T>::clipWeights(weights, clip);
 
   const auto &par = getPar();
@@ -691,7 +743,7 @@ template <typename T> void JARTv1bStaticRPUDevice<T>::clipWeights(T **weights, T
 }
 
 template <typename T>
-void JARTv1bStaticRPUDevice<T>::resetCols(
+void JARTv1bRPUDevice<T>::resetCols(
     T **weights, int start_col, int n_col, T reset_prob, RealWorldRNG<T> &rng) {
   PulsedRPUDevice<T>::resetCols(weights, start_col, n_col, reset_prob, rng);
 
@@ -707,7 +759,7 @@ void JARTv1bStaticRPUDevice<T>::resetCols(
 }
 
 template <typename T>
-void JARTv1bStaticRPUDevice<T>::resetAtIndices(
+void JARTv1bRPUDevice<T>::resetAtIndices(
     T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng) {
   PulsedRPUDevice<T>::resetAtIndices(weights, x_major_indices, rng);
 
@@ -722,7 +774,7 @@ void JARTv1bStaticRPUDevice<T>::resetAtIndices(
   }
 }
 
-template <typename T> bool JARTv1bStaticRPUDevice<T>::onSetWeights(T **weights) {
+template <typename T> bool JARTv1bRPUDevice<T>::onSetWeights(T **weights) {
   bool return_value = PulsedRPUDevice<T>::onSetWeights(weights);
 
   const auto &par = getPar();
@@ -745,9 +797,9 @@ template <typename T> bool JARTv1bStaticRPUDevice<T>::onSetWeights(T **weights) 
   return return_value;
 }
 
-template class JARTv1bStaticRPUDevice<float>;
+template class JARTv1bRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
-template class JARTv1bStaticRPUDevice<double>;
+template class JARTv1bRPUDevice<double>;
 #endif
 
 } // namespace RPU
