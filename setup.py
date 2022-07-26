@@ -25,7 +25,7 @@ INSTALL_REQUIRES = [
     'numpy>=1.18',
     'protobuf>=3.13.0,<4'
 ]
-SETUPTOOLS = "setuptools~=46.0.0"
+SETUP_REQUIRES = ["setuptools~=46.0.0"]
 
 def get_version() -> str:
     """Get the package version."""
@@ -73,6 +73,7 @@ setup(
         'aihwkit': ['VERSION.txt']
     },
     install_requires=INSTALL_REQUIRES,
+    setup_requires=SETUP_REQUIRES,
     python_requires='>=3.7',
     zip_safe=False,
     extras_require={
