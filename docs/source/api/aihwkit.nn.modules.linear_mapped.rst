@@ -1,5 +1,5 @@
 
-aihwkit.nn.modules.linear_mapped module
+aihwkit.nn.modules.linear\_mapped module
 =======================================
 
 .. automodule:: aihwkit.nn.modules.linear_mapped
