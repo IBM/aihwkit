@@ -12,4 +12,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   aihwkit.utils.analog_info
    aihwkit.utils.visualization
