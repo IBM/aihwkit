@@ -197,21 +197,21 @@ In-place installation
 ~~~~~~~~~~~~~~~~~~~~~
 
 If you want install the library inside the cloned directory (see also
-:doc:`developer_install`), it is more convineint for developers. For
+:doc:`developer_install`), it is more convenient for developers. For
 that simply replace the above make commands with ``build_inplace``,
 e.g.::
 
     $ make build_inplace_cuda
 
-Here you need to make sure that the ``PYTHONPATH`` is set to the ``src``
-sub-directory of the cloned directory, e.g. by (when being in the cloned directory)::
+Here, you need to make sure that the ``PYTHONPATH`` is set to the ``src``
+sub-directory of the ahwkit base directory, e.g. by (when being in the base directory)::
 
     $ export PYTHONPATH=`pwd`/src:$PYTHONPATH
 
 
 .. note::
 
-    Please note that the instruction on this page refer to installing as an
+    Please note that the instructions on this page refer to installing as an
     end user. If you are planning to contribute to the project, an alternative
     setup and tips can be found at the :doc:`developer_install` section that
     is more tuned towards the needs of a development cycle.
