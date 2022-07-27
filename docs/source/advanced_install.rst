@@ -187,7 +187,7 @@ With GPU support:
   If you know your CUDA architecture, then you can give it directly
   (which will result typically in a much quicker initially loading time)::
 
-      $ make build_cuda flags='-DRPU_CUDA_ARCHITECTURES="60"'
+      $ make build_cuda flags="-DRPU_CUDA_ARCHITECTURES='60'"
 
 
 If there are any issue with the dependencies or the compilation, the output
