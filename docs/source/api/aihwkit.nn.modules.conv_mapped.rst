@@ -1,4 +1,4 @@
-aihwkit.nn.modules.conv_mapped module
+aihwkit.nn.modules.conv\_mapped module
 =====================================
 
 .. automodule:: aihwkit.nn.modules.conv_mapped
