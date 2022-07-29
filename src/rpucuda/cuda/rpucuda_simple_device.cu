@@ -22,6 +22,7 @@
 #include "rpucuda_mixedprec_device.h"
 #include "rpucuda_onesided_device.h"
 #include "rpucuda_piecewisestep_device.h"
+#include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_powstep_device.h"
 #include "rpucuda_transfer_device.h"
 #include "rpucuda_vector_device.h"
@@ -63,6 +64,8 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> 
   case DeviceUpdateType::PiecewiseStep:
     return new PiecewiseStepRPUDeviceCuda<T>(
         c, static_cast<const PiecewiseStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::JARTv1b:
+    return new JARTv1bRPUDeviceCuda<T>(c, static_cast<const JARTv1bRPUDevice<T> &>(rpu_device));
   default:
     RPU_FATAL("Pulsed device type not implemented in CUDA. Maybe not added to createFrom in "
               "rpucuda_simple_device.cu?");
