@@ -1001,21 +1001,6 @@ class JARTv1bDevice(PulsedDevice):
 
     dw_min: float = 0.0001
     """Mean of the minimal update step sizes across devices and directions."""
-
-    dw_min_dtod: float = 0
-    """Device-to-device std deviation of dw_min (in relative units to
-    ``dw_min``)."""
-
-    dw_min_std: float = 0
-    r"""Cycle-to-cycle variation size of the update step (related to
-    :math:`\sigma_\text{c-to-c}` above) in relative units to ``dw_min``.
-
-    Note:
-        Many spread (device-to-device variation) parameters are given in
-        relative units. For instance e.g. a setting of ``dw_min_std`` of 0.1
-        would mean 10% spread around the mean and thus a resulting standard
-        deviation (:math:`\sigma_\text{c-to-c}`) of ``dw_min`` * ``dw_min_std``.
-    """
     
     alpha0: float = 4.81951e-5
     """See ``reset``."""
@@ -1177,9 +1162,6 @@ class JARTv1bDevice(PulsedDevice):
     """See ``reset``."""
 
     Ndisc_max_bound: float = 1.9897452127440086504e26
-    """See ``reset``."""
-
-    Ninit: float = Ndisc_min_bound
     """See ``reset``."""
 
     Ndiscmax_dtod: float = 0

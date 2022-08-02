@@ -92,9 +92,13 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T base_time_step = (T) 1e-8;
     T Ndisc_min_bound = (T) 0.06*1e26;
     T Ndisc_max_bound = (T) 1.9897452127440086504e26;
-    T Ninit = Ndisc_min_bound; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T current_min =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0)));
     T current_max =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0)));
+    T w_min = (T)-0.6;
+    T w_min_dtod = (T)0.3;
+    T w_max = (T)0.6;
+    T w_max_dtod = (T)0.3;
+    T Ninit = pow(((pow(((-g0*(exp(-g1*read_voltage)-1))/(((0-w_min)/(w_max-w_min))*(current_max-current_min)+current_min)), k0)-1)/(h0+h1*read_voltage+h2*exp(-h3*read_voltage))),(1/-j_0))*Ndiscmin; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T Ndiscmax_dtod = (T) 0;							// 
     T Ndiscmin_dtod = (T) 0;							//
     T ldet_dtod = (T) 0;							//
@@ -104,6 +108,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T ldet_std = (T) 0;							//
     T rdet_std = (T) 0;							//
 
+    T write_noise_std = (T)1.0;
     ,
     /*print body*/
 
@@ -189,7 +194,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmin = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_ldet = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_A = Array_2D_Get<T>(d_sz, x_sz);
-      device_specific_Ndisc = Array_2D_Get<double>(d_sz, x_sz);
 
       for (int j = 0; j < x_sz; ++j) {
         for (int i = 0; i < d_sz; ++i) {
@@ -197,7 +201,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = (T)0.0;
           device_specific_ldet[i][j] = (T)0.0;
           device_specific_A[i][j] = (T)0.0;
-          device_specific_Ndisc[i][j] = (double)0.0;
         }
       },
       /* dtor*/
@@ -205,7 +208,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       Array_2D_Free<T>(device_specific_Ndiscmin);
       Array_2D_Free<T>(device_specific_ldet);
       Array_2D_Free<T>(device_specific_A);
-      Array_2D_Free<double>(device_specific_Ndisc);
       ,
       /* copy */
       for (int j = 0; j < other.x_size_; ++j) {
@@ -214,7 +216,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = other.device_specific_Ndiscmin[i][j];
           device_specific_ldet[i][j] = other.device_specific_ldet[i][j];
           device_specific_A[i][j] = other.device_specific_A[i][j];
-          device_specific_Ndisc[i][j] = other.device_specific_Ndisc[i][j];
         }
       },
       /* move assignment */
@@ -222,27 +223,23 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmax = other.device_specific_Ndiscmax;
       device_specific_ldet = other.device_specific_ldet;
       device_specific_A = other.device_specific_A;
-      device_specific_Ndisc = other.device_specific_Ndisc;
 
       other.device_specific_Ndiscmax = nullptr;
       other.device_specific_Ndiscmin = nullptr;
       other.device_specific_ldet = nullptr;
       other.device_specific_A = nullptr;
-      other.device_specific_Ndisc = nullptr;
       ,
       /* swap*/
       swap(a.device_specific_Ndiscmax, b.device_specific_Ndiscmax);
       swap(a.device_specific_Ndiscmin, b.device_specific_Ndiscmin);
       swap(a.device_specific_ldet, b.device_specific_ldet);
       swap(a.device_specific_A, b.device_specific_A);
-      swap(a.device_specific_Ndisc, b.device_specific_Ndisc);
       ,
       /* dp names*/
       names.push_back(std::string("device_specific_Ndiscmax"));
       names.push_back(std::string("device_specific_Ndiscmin"));
       names.push_back(std::string("device_specific_ldet"));
       names.push_back(std::string("device_specific_A"));
-      names.push_back(std::string("device_specific_Ndisc"));
       ,
       /* dp2vec body*/
       int n_prev = (int)names.size();
@@ -253,7 +250,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
         data_ptrs[n_prev + 1][i] = device_specific_Ndiscmin[0][i];
         data_ptrs[n_prev + 2][i] = device_specific_ldet[0][i];
         data_ptrs[n_prev + 3][i] = device_specific_A[0][i];
-        data_ptrs[n_prev + 4][i] = device_specific_Ndisc[0][i];
       },
       /* vec2dp body*/
       int n_prev = (int)names.size();
@@ -264,12 +260,17 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
         device_specific_Ndiscmin[0][i] = data_ptrs[n_prev + 1][i];
         device_specific_ldet[0][i] = data_ptrs[n_prev + 2][i];
         device_specific_A[0][i] = data_ptrs[n_prev + 3][i];
-        device_specific_Ndisc[0][i] = data_ptrs[n_prev + 4][i];
       }
 
 
       ,
       /*invert copy DP */
+      for (int j = 0; j < this->x_size_; ++j) {
+        for (int i = 0; i < this->d_size_; ++i) {
+          std::swap(device_specific_Ndiscmax[i][j], device_specific_Ndiscmin[i][j]);
+        }
+      }
+      // Todo: if device specific Ndisc bounds: Remap wmax&wmin to Ndisc max_bound&min_bound 
 
   );
 
@@ -298,7 +299,6 @@ private:
   T **device_specific_Ndiscmin = nullptr;
   T **device_specific_ldet = nullptr;
   T **device_specific_A = nullptr;
-  double **device_specific_Ndisc = nullptr;
 };
 
 } // namespace RPU

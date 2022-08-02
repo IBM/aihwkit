@@ -615,7 +615,6 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("un", &JARTv1bParam::un)
       .def_readwrite("Ndiscmax", &JARTv1bParam::Ndiscmax)
       .def_readwrite("Ndiscmin", &JARTv1bParam::Ndiscmin)
-      .def_readwrite("Ninit", &JARTv1bParam::Ninit)
       .def_readwrite("Nplug", &JARTv1bParam::Nplug)
       .def_readwrite("a", &JARTv1bParam::a)
       .def_readwrite("ny0", &JARTv1bParam::ny0)
