@@ -817,8 +817,7 @@ class AnalogBertPreTrainedModel(PreTrainedModel):
             # cf https://github.com/pytorch/pytorch/pull/5617
             weight, bias = module.get_weights()
             weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-            bias = None
-            if module.bias is not None:
+            if bias is not None:
                 bias.data.zero_()
 
             module.set_weights(weight, bias)
