@@ -109,8 +109,8 @@ class AnalogBertSelfAttention(AnalogSequential):
     def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
-                 realistic_read_write: bool = False,
-                 position_embedding_type=None):
+                 realistic_read_write: bool,
+                 position_embedding_type: str = None):
         super().__init__()
         if (config.hidden_size % config.num_attention_heads != 0
                 and not hasattr(config, "embedding_size")):
@@ -305,7 +305,7 @@ class AnalogBertAttention(AnalogSequential):
                  config,
                  rpu_config: Optional[RPUConfigAlias],
                  realistic_read_write: bool,
-                 position_embedding_type=None):
+                 position_embedding_type: str = None):
         super().__init__()
         self.self = AnalogBertSelfAttention(
             config,
@@ -370,7 +370,7 @@ class AnalogBertIntermediate(AnalogSequential):
     def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
-                 realistic_read_write: bool = False):
+                 realistic_read_write: bool):
         super().__init__()
         self.dense = AnalogLinear(
             config.hidden_size,
@@ -425,13 +425,13 @@ class AnalogBertLayer(AnalogSequential):
     def __init__(self,
                  config,
                  rpu_config: Optional[RPUConfigAlias],
-                 realistic_read_write: bool = False):
+                 realistic_read_write: bool):
         super().__init__()
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
         self.attention = AnalogBertAttention(
             config,
-            rpu_config,
+            rpu_config=rpu_config,
             realistic_read_write=realistic_read_write)
 
         self.is_decoder = config.is_decoder
@@ -442,14 +442,14 @@ class AnalogBertLayer(AnalogSequential):
                                  "if cross attention is added")
             self.crossattention = AnalogBertAttention(
                 config,
-                rpu_config,
+                rpu_config=rpu_config,
                 realistic_read_write=realistic_read_write,
                 position_embedding_type="absolute")
         self.intermediate = AnalogBertIntermediate(config,
-                                                   rpu_config,
+                                                   rpu_config=rpu_config,
                                                    realistic_read_write=realistic_read_write)
         self.output = AnalogBertOutput(config,
-                                       rpu_config,
+                                       rpu_config=rpu_config,
                                        realistic_read_write=realistic_read_write)
 
     def forward(
