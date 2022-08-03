@@ -25,7 +25,7 @@ from typing import List, Optional, Tuple, Union
 import warnings
 
 from torch import Tensor, FloatTensor
-from torch import cat, arange, matmul, einsum, zeros, ones, full
+from torch import cat, arange, matmul, einsum, zeros, ones, full, normal
 from torch import long, utils
 
 from torch.nn import (
@@ -815,10 +815,11 @@ class AnalogBertPreTrainedModel(PreTrainedModel):
         if isinstance(module, AnalogLinear):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
-            weight = Tensor.data.normal_(mean=0.0, std=self.config.intializer_range)
+            weight, bias = module.get_weights()
+            weight.data.normal_(mean=0.0, std=self.config.intializer_range)
             bias = None
             if module.bias is not None:
-                bias = Tensor.data.zero_()
+                bias.data.zero_()
 
             module.set_weights(weight, bias)
 
