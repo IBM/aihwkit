@@ -25,7 +25,7 @@ from typing import List, Optional, Tuple, Union
 import warnings
 
 from torch import Tensor, FloatTensor
-from torch import cat, arange, matmul, einsum, zeros, ones, full, normal
+from torch import cat, arange, matmul, einsum, zeros, ones, full
 from torch import long, utils
 
 from torch.nn import (
