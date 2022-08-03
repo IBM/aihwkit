@@ -815,12 +815,12 @@ class AnalogBertPreTrainedModel(PreTrainedModel):
         if isinstance(module, AnalogLinear):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
-            module.weight.normal_(mean=0.0, std=self.config.initializer_range)
+            weight = Tensor.data.normal_(mean=0.0, std=self.config.intializer_range)
+            bias = None
             if module.bias is not None:
-                module.bias.data.zero_()
+                bias = Tensor.data.zero_()
 
-            # Analog: sync digital parameters with analog tile
-            module.reset_parameters()
+            module.set_weights(weight, bias)
 
         elif isinstance(module, Embedding):
             module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
@@ -881,7 +881,7 @@ class BertForPreTrainingOutput(ModelOutput):
 
 
 @add_start_docstrings(
-    "The bare Bert Model transformer outputting"
+    "The bare Analog Bert Model transformer outputting"
     "raw hidden-states without any specific head on top.",
     BERT_START_DOCSTRING,
 )
@@ -1109,7 +1109,7 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
 
 
 @add_start_docstrings(
-    """Bert Model with a `language modeling` head on top for CLM fine-tuning.""",
+    """Analog Bert Model with a `language modeling` head on top for CLM fine-tuning.""",
     BERT_START_DOCSTRING
 )
 class AnalogBertLMHeadModel(AnalogBertPreTrainedModel, AnalogSequential):
@@ -1287,7 +1287,7 @@ class AnalogBertLMHeadModel(AnalogBertPreTrainedModel, AnalogSequential):
 
 
 @add_start_docstrings(
-    """Bert Model with a `language modeling` head on top.""",
+    """Analog Bert Model with a `language modeling` head on top.""",
     BERT_START_DOCSTRING
 )
 class AnalogBertForMaskedLM(AnalogBertPreTrainedModel, AnalogSequential):
@@ -1422,11 +1422,11 @@ class AnalogBertForMaskedLM(AnalogBertPreTrainedModel, AnalogSequential):
 
 
 @add_start_docstrings(
-    """Bert Model with a `next sentence prediction (classification)` head on top.""",
+    """Analog Bert Model with a `next sentence prediction (classification)` head on top.""",
     BERT_START_DOCSTRING,
 )
 class AnalogBertForNextSentencePrediction(AnalogBertPreTrainedModel, AnalogSequential):
-    """Bert for Next Sentence Prediction"""
+    """Analog Bert for Next Sentence Prediction"""
 
     # pylint: disable=abstract-method
 
@@ -1539,7 +1539,7 @@ class AnalogBertForNextSentencePrediction(AnalogBertPreTrainedModel, AnalogSeque
 
 @add_start_docstrings(
     """
-    Bert Model transformer with a sequence classification/regression head on top
+    Analog Bert Model transformer with a sequence classification/regression head on top
     (a linear layer on top of the pooled
     output) e.g. for GLUE tasks.
     """,
@@ -1667,7 +1667,7 @@ class AnalogBertForSequenceClassification(AnalogBertPreTrainedModel, AnalogSeque
 
 @add_start_docstrings(
     """
-    Bert Model with a multiple choice classification head on top
+    Analog Bert Model with a multiple choice classification head on top
     (a linear layer on top of the pooled output and a
     softmax) e.g. for RocStories/SWAG tasks.
     """,
@@ -1789,7 +1789,7 @@ class AnalogBertForMultipleChoice(AnalogBertPreTrainedModel, AnalogSequential):
 
 @add_start_docstrings(
     """
-    Bert Model with a token classification head on top
+    Analog Bert Model with a token classification head on top
     (a linear layer on top of the hidden-states output) e.g. for
     Named-Entity-Recognition (NER) tasks.
     """,
@@ -1906,7 +1906,7 @@ class AnalogBertForTokenClassification(AnalogBertPreTrainedModel, AnalogSequenti
     BERT_START_DOCSTRING,
 )
 class AnalogBertForQuestionAnswering(AnalogBertPreTrainedModel, AnalogSequential):
-    """Bert model with Q&A head"""
+    """Analog Bert model with Q&A head"""
 
     # pylint: disable=abstract-method
 
