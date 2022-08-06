@@ -19,10 +19,6 @@ https://github.com/huggingface/transformers/blob/main/src/transformers/models/be
 from math import sqrt
 
 from dataclasses import dataclass
-import gc
-import re
-import shutil
-import tempfile
 
 from typing import List, Optional, Tuple, Union
 import warnings
@@ -38,10 +34,9 @@ from torch import (
     zeros,
     ones,
     full,
-    device,
-    empty,
 
     long,
+
     utils
 )
 
@@ -114,25 +109,12 @@ from transformers.modeling_outputs import (
 from transformers.utils.generic import ModelOutput
 from transformers.modeling_utils import (
     PreTrainedModel,
-
-    load_state_dict,
-    is_accelerate_available,
-
-    _load_state_dict_into_model,
-    _load_state_dict_into_meta_model
 )
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.nn.modules.base import RPUConfigAlias
 from aihwkit.simulator.configs.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
-
-if is_accelerate_available():
-    from accelerate.utils import (
-        load_offloaded_weights,
-        save_offload_index,
-        set_module_tensor_to_device,
-    )
 
 
 def _add_weights_to_state_dict(module):
@@ -144,13 +126,15 @@ def _add_weights_to_state_dict(module):
             module.bias = Parameter(bias)
 
 def _sync_analog_digital_weights(module):
-    """Set the Analog tile weights to the loaded digital weights"""
+    """Set the Analog tile weights to the loaded digital weights
+    and unregister digital parameters
+    """
     if isinstance(module, AnalogLinear):
         weight = module.weight.data
         bias = module.bias.data
 
         if module.analog_bias:
-            module.bias = None
+            module.unregister_parameter('bias')
         else:
             module.unregister_parameter('bias')
 
