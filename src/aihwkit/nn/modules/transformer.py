@@ -16,12 +16,11 @@ Adapted from:
 https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py
 """
 
-import gc
-import re
-
 from math import sqrt
 
 from dataclasses import dataclass
+import gc
+import re
 import shutil
 import tempfile
 
@@ -145,21 +144,19 @@ def _add_weights_to_state_dict(module):
             module.bias = Parameter(bias)
 
 def _sync_analog_digital_weights(module):
-    """Set the Analog tile weights to the loaded digital weights
-    and turn the parameters into tensors
-    """
+    """Set the Analog tile weights to the loaded digital weights"""
     if isinstance(module, AnalogLinear):
         weight = module.weight.data
         bias = module.bias.data
 
         if module.analog_bias:
-            module.bias = bias
+            module.bias = None
         else:
             bias = None
 
         module.set_weights(weight, bias)
 
-        module.weight = weight
+        module.weight = None
 
 
 class AnalogBertSelfAttention(AnalogSequential):
@@ -345,7 +342,7 @@ class AnalogBertSelfOutput(AnalogSequential):
         self.dense = AnalogLinear(config.hidden_size, config.hidden_size,
                                   rpu_config=rpu_config,
                                   realistic_read_write=realistic_read_write)
-        self.layer_norm = LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.LayerNorm = LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states: Tensor, input_tensor: Tensor) -> Tensor:
@@ -353,7 +350,7 @@ class AnalogBertSelfOutput(AnalogSequential):
         # pylint: disable=arguments-differ, arguments-renamed
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
-        hidden_states = self.layer_norm(hidden_states + input_tensor)
+        hidden_states = self.LayerNorm(hidden_states + input_tensor)
         return hidden_states
 
 
@@ -465,7 +462,7 @@ class AnalogBertOutput(AnalogSequential):
             rpu_config=rpu_config,
             realistic_read_write=realistic_read_write)
 
-        self.layer_norm = LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.LayerNorm = LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states: Tensor, input_tensor: Tensor) -> Tensor:
@@ -474,7 +471,7 @@ class AnalogBertOutput(AnalogSequential):
 
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
-        hidden_states = self.layer_norm(hidden_states + input_tensor)
+        hidden_states = self.LayerNorm(hidden_states + input_tensor)
         return hidden_states
 
 
@@ -752,7 +749,7 @@ class AnalogBertPredictionHeadTransform(AnalogSequential):
             self.transform_act_fn = ACT2FN[config.hidden_act]
         else:
             self.transform_act_fn = config.hidden_act
-        self.layer_norm = LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.LayerNorm = LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
     def forward(self, hidden_states: Tensor) -> Tensor:
         """Forward pass for AnalogBertPredictionHeadTransform
@@ -762,7 +759,7 @@ class AnalogBertPredictionHeadTransform(AnalogSequential):
 
         hidden_states = self.dense(hidden_states)
         hidden_states = self.transform_act_fn(hidden_states)
-        hidden_states = self.layer_norm(hidden_states)
+        hidden_states = self.LayerNorm(hidden_states)
         return hidden_states
 
 
