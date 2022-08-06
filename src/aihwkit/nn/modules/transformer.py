@@ -152,11 +152,11 @@ def _sync_analog_digital_weights(module):
         if module.analog_bias:
             module.bias = None
         else:
-            bias = None
+            module.unregister_parameter('bias')
 
         module.set_weights(weight, bias)
 
-        module.weight = None
+        module.unregister_parameter('weight')
 
 
 class AnalogBertSelfAttention(AnalogSequential):
@@ -1126,6 +1126,15 @@ class AnalogBertPreTrainedModel(PreTrainedModel):
             raise RuntimeError(
                 f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}"
             )
+
+        # Analog: Remove missing keys with `analog_ctx` and `analog_tile_state`
+        # Since these are generally not going to exist in loaded state_dict's,
+        # there is no reason to notify the user that they are not being loaded
+        missing_keys = [
+            key
+            for key in missing_keys
+            if 'analog_ctx' not in key and 'analog_tile_state' not in key
+        ]
 
         # pylint: disable=logging-fstring-interpolation
         if len(unexpected_keys) > 0:
