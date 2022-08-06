@@ -16,17 +16,35 @@ Adapted from:
 https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py
 """
 
+import gc
+import re
 
 from math import sqrt
 
 from dataclasses import dataclass
+import shutil
+import tempfile
 
 from typing import List, Optional, Tuple, Union
 import warnings
 
-from torch import Tensor, FloatTensor
-from torch import cat, arange, matmul, einsum, zeros, ones, full
-from torch import long, utils
+from torch import (
+    Tensor,
+    FloatTensor,
+
+    cat,
+    arange,
+    matmul,
+    einsum,
+    zeros,
+    ones,
+    full,
+    device,
+    empty,
+
+    long,
+    utils
+)
 
 from torch.nn import (
     Parameter,
@@ -95,12 +113,53 @@ from transformers.modeling_outputs import (
     SequenceClassifierOutput,
 )
 from transformers.utils.generic import ModelOutput
-from transformers.modeling_utils import PreTrainedModel
+from transformers.modeling_utils import (
+    PreTrainedModel,
+
+    load_state_dict,
+    is_accelerate_available,
+
+    _load_state_dict_into_model,
+    _load_state_dict_into_meta_model
+)
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.nn.modules.base import RPUConfigAlias
 from aihwkit.simulator.configs.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
+
+if is_accelerate_available():
+    from accelerate.utils import (
+        load_offloaded_weights,
+        save_offload_index,
+        set_module_tensor_to_device,
+    )
+
+
+def _add_weights_to_state_dict(module):
+    """Register weights for model loading"""
+    if isinstance(module, AnalogLinear):
+        weight, bias = module.get_weights()
+        module.weight = Parameter(weight)
+        if module.analog_bias:
+            module.bias = Parameter(bias)
+
+def _sync_analog_digital_weights(module):
+    """Set the Analog tile weights to the loaded digital weights
+    and turn the parameters into tensors
+    """
+    if isinstance(module, AnalogLinear):
+        weight = module.weight.data
+        bias = module.bias.data
+
+        if module.analog_bias:
+            module.bias = bias
+        else:
+            bias = None
+
+        module.set_weights(weight, bias)
+
+        module.weight = weight
 
 
 class AnalogBertSelfAttention(AnalogSequential):
@@ -834,6 +893,307 @@ class AnalogBertPreTrainedModel(PreTrainedModel):
         if isinstance(module, AnalogBertEncoder):
             module.gradient_checkpointing = value
 
+    @classmethod
+    def _load_pretrained_model(
+        cls,
+        model,
+        state_dict,
+        loaded_keys,
+        resolved_archive_file,
+        pretrained_model_name_or_path,
+        ignore_mismatched_sizes=False,
+        sharded_metadata=None,
+        _fast_init=True,
+        low_cpu_mem_usage=False,
+        device_map=None,
+        offload_folder=None,
+        offload_state_dict=False,
+        dtype=None,
+    ):
+        # Analog: add `weight` entry into state_dict() for model loading
+        model.apply(_add_weights_to_state_dict)
+
+        if device_map is not None and "disk" in device_map.values() and offload_folder is None:
+            raise ValueError(
+                "The current `device_map` had weights offloaded to the disk. "
+                "Please provide an `offload_folder` for"
+                " them."
+            )
+        # Retrieve missing & unexpected_keys
+        model_state_dict = model.state_dict()
+        expected_keys = list(model_state_dict.keys())
+        prefix = model.base_model_prefix
+
+        def _fix_key(key):
+            if "beta" in key:
+                return key.replace("beta", "bias")
+            if "gamma" in key:
+                return key.replace("gamma", "weight")
+            return key
+
+        original_loaded_keys = loaded_keys
+        loaded_keys = [_fix_key(key) for key in loaded_keys]
+
+        if len(prefix) > 0:
+            has_prefix_module = any(s.startswith(prefix) for s in loaded_keys)
+            expects_prefix_module = any(s.startswith(prefix) for s in expected_keys)
+        else:
+            has_prefix_module = False
+            expects_prefix_module = False
+
+        # key re-naming operations are never done on the keys
+        # that are loaded, but always on the keys of the newly initialized model
+        remove_prefix_from_model = not has_prefix_module and expects_prefix_module
+        add_prefix_to_model = has_prefix_module and not expects_prefix_module
+
+        if remove_prefix_from_model:
+            expected_keys_not_prefixed = [s for s in expected_keys if not s.startswith(prefix)]
+            expected_keys = [".".join(s.split(".")[1:]) if s.startswith(
+                prefix) else s for s in expected_keys]
+        elif add_prefix_to_model:
+            expected_keys = [".".join([prefix, s]) for s in expected_keys]
+
+        missing_keys = list(set(expected_keys) - set(loaded_keys))
+        unexpected_keys = list(set(loaded_keys) - set(expected_keys))
+
+        # Some models may have keys that are not in the state by design,
+        # removing them before needlessly warning
+        # the user.
+        if cls._keys_to_ignore_on_load_missing is not None:
+            for pat in cls._keys_to_ignore_on_load_missing:
+                missing_keys = [k for k in missing_keys if re.search(pat, k) is None]
+
+        if cls._keys_to_ignore_on_load_unexpected is not None:
+            # pylint: disable=not-an-iterable
+            for pat in cls._keys_to_ignore_on_load_unexpected:
+                unexpected_keys = [k for k in unexpected_keys if re.search(pat, k) is None]
+
+        # retrieve weights on meta device and put them back on CPU.
+        # This is not ideal in terms of memory, but if we don't do that not,
+        # we can't initialize them in the next step
+        if low_cpu_mem_usage:
+            for key in missing_keys:
+                if key.startswith(prefix):
+                    key = ".".join(key.split(".")[1:])
+                param = model_state_dict[key]
+                if param.device == device("meta"):
+                    set_module_tensor_to_device(model, key, "cpu", empty(*param.size()))
+
+        # retrieve unintialized modules and initialize
+        # before maybe overriding that with the pretrained weights.
+        if _fast_init:
+            uninitialized_modules = model.retrieve_modules_from_names(
+                missing_keys, add_prefix=add_prefix_to_model, remove_prefix=remove_prefix_from_model
+            )
+            for module in uninitialized_modules:
+                # pylint: disable=protected-access
+                model._init_weights(module)
+
+        # Make sure we are able to load base models as well as derived models (with heads)
+        start_prefix = ""
+        model_to_load = model
+        if (len(cls.base_model_prefix) > 0 and
+            not hasattr(model, cls.base_model_prefix) and has_prefix_module):
+            start_prefix = cls.base_model_prefix + "."
+        if (len(cls.base_model_prefix) > 0 and
+            hasattr(model, cls.base_model_prefix) and not has_prefix_module):
+            model_to_load = getattr(model, cls.base_model_prefix)
+            if any(key in expected_keys_not_prefixed for key in loaded_keys):
+                raise ValueError(
+                    "The state dictionary of the model you are trying to load is corrupted. "
+                    "Are you sure it was "
+                    "properly saved?"
+                )
+            if device_map is not None:
+                device_map = {k.replace(f"{cls.base_model_prefix}.", "")
+                                        : v for k, v in device_map.items()}
+
+        def _find_mismatched_keys(
+            state_dict,
+            model_state_dict,
+            loaded_keys,
+            add_prefix_to_model,
+            remove_prefix_from_model,
+            ignore_mismatched_sizes,
+        ):
+            mismatched_keys = []
+            if ignore_mismatched_sizes:
+                for checkpoint_key in loaded_keys:
+                    model_key = checkpoint_key
+                    if remove_prefix_from_model:
+                        # The model key starts with `prefix`
+                        # but `checkpoint_key` doesn't so we add it.
+                        model_key = f"{prefix}.{checkpoint_key}"
+                    elif add_prefix_to_model:
+                        # The model key doesn't start with `prefix`
+                        # but `checkpoint_key` does so we remove it.
+                        model_key = ".".join(checkpoint_key.split(".")[1:])
+
+                    if (
+                        model_key in model_state_dict
+                        and state_dict[checkpoint_key].shape != model_state_dict[model_key].shape
+                    ):
+                        mismatched_keys.append(
+                            (checkpoint_key, state_dict[checkpoint_key].shape,
+                             model_state_dict[model_key].shape)
+                        )
+                        del state_dict[checkpoint_key]
+            return mismatched_keys
+
+        if state_dict is not None:
+            # Whole checkpoint
+            mismatched_keys = _find_mismatched_keys(
+                state_dict,
+                model_state_dict,
+                original_loaded_keys,
+                add_prefix_to_model,
+                remove_prefix_from_model,
+                ignore_mismatched_sizes,
+            )
+            error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+        else:
+            # Sharded checkpoint or whole but low_cpu_mem_usage==True
+
+            # This should always be a list but, just to be sure.
+            if not isinstance(resolved_archive_file, list):
+                resolved_archive_file = [resolved_archive_file]
+
+            error_msgs = []
+            mismatched_keys = []
+            offload_index = {} if device_map is not None and "disk" in device_map.values() else None
+            if offload_state_dict:
+                state_dict_folder = tempfile.mkdtemp()
+                state_dict_index = {}
+            else:
+                state_dict_folder = None
+                state_dict_index = None
+
+            for shard_file in resolved_archive_file:
+                state_dict = load_state_dict(shard_file)
+
+                # Mistmatched keys contains tuples key/shape1/shape2 of
+                # weights in the checkpoint that have a shape not
+                # matching the weights in the model.
+                mismatched_keys += _find_mismatched_keys(
+                    state_dict,
+                    model_state_dict,
+                    original_loaded_keys,
+                    add_prefix_to_model,
+                    remove_prefix_from_model,
+                    ignore_mismatched_sizes,
+                )
+
+                if low_cpu_mem_usage:
+                    new_error_msgs, offload_index, state_dict_index = (
+                        _load_state_dict_into_meta_model(
+                            model_to_load,
+                            state_dict,
+                            loaded_keys,
+                            start_prefix,
+                            expected_keys,
+                            device_map=device_map,
+                            offload_folder=offload_folder,
+                            offload_index=offload_index,
+                            state_dict_folder=state_dict_folder,
+                            state_dict_index=state_dict_index,
+                            dtype=dtype,
+                        )
+                    )
+                    error_msgs += new_error_msgs
+                else:
+                    error_msgs += _load_state_dict_into_model(
+                        model_to_load,
+                        state_dict,
+                        start_prefix
+                    )
+
+                # force memory release
+                del state_dict
+                gc.collect()
+
+            if offload_index is not None and len(offload_index) > 0:
+                save_offload_index(offload_index, offload_folder)
+
+            if offload_state_dict:
+                # Load back temporarily offloaded state dict
+                load_offloaded_weights(model, state_dict_index, state_dict_folder)
+                shutil.rmtree(state_dict_folder)
+
+        if len(error_msgs) > 0:
+            error_msg = "\n\t".join(error_msgs)
+            if "size mismatch" in error_msg:
+                error_msg += (
+                    "\n\tYou may consider adding `ignore_mismatched_sizes=True` "
+                    "in the model `from_pretrained` method."
+                )
+            raise RuntimeError(
+                f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}"
+            )
+
+        # pylint: disable=logging-fstring-interpolation
+        if len(unexpected_keys) > 0:
+            logger.warning(
+                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were "
+                "not used when"
+                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- "
+                "This IS expected if you are"
+                f" initializing {model.__class__.__name__} from the checkpoint of a model "
+                "trained on another task or"
+                " with another architecture (e.g. initializing a BertForSequenceClassification "
+                "model from a"
+                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
+                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be "
+                "exactly identical"
+                " (initializing a BertForSequenceClassification model from a "
+                "BertForSequenceClassification model)."
+            )
+        else:
+            logger.info(
+                "All model checkpoint weights were used when "
+                f"initializing {model.__class__.__name__}.\n"
+            )
+        if len(missing_keys) > 0:
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized "
+                "from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\n"
+                "You should probably"
+                " TRAIN this model on a down-stream task to be "
+                "able to use it for predictions and inference."
+            )
+        elif len(mismatched_keys) == 0:
+            logger.info(
+                f"All the weights of {model.__class__.__name__} were "
+                "initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path}.\nIf your task is "
+                "similar to the task the model of the checkpoint"
+                f" was trained on, you can already use {model.__class__.__name__} "
+                "for predictions without further"
+                " training."
+            )
+        if len(mismatched_keys) > 0:
+            mismatched_warning = "\n".join(
+                [
+                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the "
+                    "model instantiated"
+                    for key, shape1, shape2 in mismatched_keys
+                ]
+            )
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model "
+                "checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized "
+                "because the shapes did not"
+                f" match:\n{mismatched_warning}\n"
+                "You should probably TRAIN this model on a down-stream task to be able"
+                " to use it for predictions and inference."
+            )
+
+        # Analog: set the analog tile weights to the digital weights
+        model.apply(_sync_analog_digital_weights)
+
+        return model, missing_keys, unexpected_keys, mismatched_keys, error_msgs
+
 
 @dataclass
 class BertForPreTrainingOutput(ModelOutput):
@@ -1025,7 +1385,7 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         batch_size, seq_length = input_shape
-        device = input_ids.device if input_ids is not None else inputs_embeds.device
+        input_device = input_ids.device if input_ids is not None else inputs_embeds.device
 
         # past_key_values_length
         past_key_values_length = (
@@ -1058,7 +1418,7 @@ class AnalogBertModel(AnalogBertPreTrainedModel, AnalogSequential):
             encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states.size()
             encoder_hidden_shape = (encoder_batch_size, encoder_sequence_length)
             if encoder_attention_mask is None:
-                encoder_attention_mask = ones(encoder_hidden_shape, device=device)
+                encoder_attention_mask = ones(encoder_hidden_shape, device=input_device)
             encoder_extended_attention_mask = self.invert_attention_mask(encoder_attention_mask)
         else:
             encoder_extended_attention_mask = None
