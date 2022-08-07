@@ -138,10 +138,8 @@ if is_accelerate_available():
 def _add_weights_to_state_dict(module):
     """Register weights for model loading"""
     if isinstance(module, AnalogLinear):
-        weight, bias = module.get_weights()
+        weight, _ = module.get_weights()
         module.weight = Parameter(weight)
-        if module.analog_bias:
-            module.bias = Parameter(bias)
 
 def _sync_analog_digital_weights(module):
     """Set the Analog tile weights to the loaded digital weights
@@ -154,7 +152,7 @@ def _sync_analog_digital_weights(module):
         if module.analog_bias:
             module.unregister_parameter('bias')
         else:
-            module.unregister_parameter('bias')
+            bias = None
 
         module.set_weights(weight, bias)
 
