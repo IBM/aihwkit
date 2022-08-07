@@ -16,9 +16,13 @@ Adapted from:
 https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py
 """
 
+import gc
 from math import sqrt
 
 from dataclasses import dataclass
+import re
+import shutil
+import tempfile
 
 from typing import List, Optional, Tuple, Union
 import warnings
@@ -34,10 +38,12 @@ from torch import (
     zeros,
     ones,
     full,
+    empty,
 
     long,
 
-    utils
+    utils,
+    device,
 )
 
 from torch.nn import (
@@ -109,12 +115,24 @@ from transformers.modeling_outputs import (
 from transformers.utils.generic import ModelOutput
 from transformers.modeling_utils import (
     PreTrainedModel,
+    is_accelerate_available,
+    load_state_dict,
+    _load_state_dict_into_model,
+    _load_state_dict_into_meta_model,
 )
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.nn.modules.base import RPUConfigAlias
 from aihwkit.simulator.configs.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice
+
+
+if is_accelerate_available():
+    from accelerate.utils import (
+        load_offloaded_weights,
+        save_offload_index,
+        set_module_tensor_to_device,
+    )
 
 
 def _add_weights_to_state_dict(module):
