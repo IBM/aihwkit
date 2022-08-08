@@ -483,7 +483,7 @@ class AnalogModuleBase(Module):
         for key in rm_keys:
             missing_keys.remove(key)
 
-    def state_dict(
+    def state_dict(  # pylint: disable=arguments-differ
             self,
             destination: Any = None,
             prefix: str = '',

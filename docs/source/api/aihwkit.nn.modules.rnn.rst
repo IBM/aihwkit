@@ -1,11 +1,10 @@
-aihwkit.nn.modules.rnn module
-=============================
+aihwkit.nn.modules.rnn package
+==============================
 
 .. automodule:: aihwkit.nn.modules.rnn
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: randn, zeros
 
 Submodules
 ----------
