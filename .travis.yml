@@ -114,7 +114,7 @@ jobs:
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="python3 -m pip install torch==1.8.1 torchvision==0.9.1 && python3 -m pip install -r requirements.txt"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_BUILD="cp37-manylinux_x86_64 cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
     before_install:
@@ -139,7 +139,7 @@ jobs:
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="python3 -m pip install torch==1.8.1 torchvision==0.9.1 && python3 -m pip install ./delocate && python3 -m pip install -r requirements.txt"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install ./delocate && pip install -r requirements.txt"
       - CIBW_BUILD="cp37-macosx_x86_64 cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
@@ -158,7 +158,7 @@ jobs:
     env:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="python3 -m pip install torch==1.8.1+cpu -f https://download.pytorch.org/whl/torch_stable.html && python3 -m pip install -r requirements.txt"
+      - CIBW_BEFORE_BUILD="pip install torch==1.8.1+cpu -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
       - CIBW_BUILD="cp37-win_amd64 cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
       # Use unzipped OpenBLAS.
       - OPENBLAS_ROOT=C:\\BLAS
