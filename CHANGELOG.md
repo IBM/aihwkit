@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
 * Notebook for exploring analog sensitivities. (\#380)
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
+* Inference experiment and runners. (\#410)
+* Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
+* Added ``CUDA_TEST`` switch to manually switch off the CUDA tests
+* Enabling comparisons of ``RPUConfig`` instances. (\#410)
 
 ### Fixed
 * Analog_summary error when model is on cuda device. (\#392)
@@ -27,6 +31,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Weights that were not contiguous could have set wrongly. (\#388)
 * Programming noise would not be applied if drift compensation was not
   used. (\#389)
+* Loading a new model state dict for inference does not overwrite the
+  noise model setting. (\#410)
+* Avoid ``AnalogContext`` copying of self pointers. (\#410)
 
 ### Changed
 * Weight noise visualization now shows the programming noise and drift
