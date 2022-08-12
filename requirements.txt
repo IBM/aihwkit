@@ -1,5 +1,5 @@
 # Build dependencies.
-setuptools<=46.0; python_version < '3.9'
+setuptools==60.8.2
 cmake>=3.18
 scikit-build>=0.11.1
 pybind11>=2.6.2
