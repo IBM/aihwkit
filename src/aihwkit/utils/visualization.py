@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -163,20 +163,21 @@ def compute_pulse_statistics(
         alpha = np.exp(-0.5*(node - w_values)**2/lam**2)
         beta = alpha.sum(axis=0)
         alpha[:, beta < 0.1] = np.nan
-        alpha /= np.expand_dims(beta, axis=0)
+        alpha /= np.expand_dims(beta, axis=0)  # type: ignore
         mean = np.sum(alpha*delta_w, axis=0)
-        std = np.sqrt(np.sum(alpha*(delta_w - np.expand_dims(mean, axis=0))**2, axis=0))
+        std = np.sqrt(np.sum(alpha*(delta_w - np.expand_dims(mean, axis=0))**2,  # type: ignore
+                             axis=0))
         return (mean, std)
 
     # dw statistics.
-    delta_w = np.diff(w_trace, axis=0)
+    delta_w = np.diff(w_trace, axis=0)  # type: ignore
     w_trace_s = w_trace[:-1, :, :]
     if up_direction:
-        msk = np.logical_and(direction[:-1] > 0, np.diff(direction) == 0)
+        msk = np.logical_and(direction[:-1] > 0, np.diff(direction) == 0)  # type: ignore
         w_values = w_trace_s[msk, :, :]
         delta_w_values = delta_w[msk, :, :]
     else:
-        msk = np.logical_and(direction[:-1] < 0, np.diff(direction) == 0)
+        msk = np.logical_and(direction[:-1] < 0, np.diff(direction) == 0)  # type: ignore
         w_values = w_trace_s[msk, :, :]
         delta_w_values = delta_w[msk, :, :]
 
@@ -340,7 +341,7 @@ def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> i
     w_min = device_binding.w_min
     w_max = device_binding.w_max
 
-    n_steps = int(np.round((w_max - w_min) / weight_granularity))
+    n_steps = int(np.round((w_max - w_min) / weight_granularity))  # type: ignore
     return n_steps
 
 
@@ -539,8 +540,8 @@ def plot_device_compact(
     axis_right.set_ylim(-limit, limit)
 
     # Set xlim's.
-    limit = np.maximum(np.nanmax(np.abs(dw_mean_down)),
-                       np.nanmax(np.abs(dw_mean_up))) * 1.2
+    limit = np.maximum(np.nanmax(np.abs(dw_mean_down)),  # type: ignore
+                       np.nanmax(np.abs(dw_mean_up))) * 1.2  # type: ignore
     axis_left.set_xlim(0.0, limit)
     axis_right.set_xlim(0.0, limit)
 
@@ -624,7 +625,7 @@ def plot_weight_drift(noise_model: BaseNoiseModel = None,
 
     weights = w_inits.flatten()
     weights.sort()
-    weights = np.tile(weights, [n_repeats, 1])
+    weights = np.tile(weights, [n_repeats, 1])  # type: ignore
 
     analog_tile = InferenceTile(weights.shape[0], weights.shape[1], rpu_config)
     analog_tile.set_weights(from_numpy(weights))

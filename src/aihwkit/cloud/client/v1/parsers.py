@@ -46,8 +46,12 @@ class ExperimentParser:
             job=None
         )
 
-        if api_response.get('input', {}).get('id'):
-            experiment.input_id = api_response['input']['id']
+        # debug
+        # print('api_response: ', api_response)
+
+        if api_response.get('input'):
+            if api_response.get('input', {}).get('id'):
+                experiment.input_id = api_response['input']['id']
 
         if api_response.get('job', None):
             experiment.job = ExperimentParser.parse_job(api_response['job'])
@@ -121,6 +125,9 @@ class ExperimentParser:
 
         if job_category in ('train', 'trainweb'):
             return CloudExperimentCategory.BASIC_TRAINING
+
+        if job_category in ('inference', 'inferenceweb'):
+            return CloudExperimentCategory.BASIC_INFERENCE
 
         raise InvalidResponseFieldError(
             'Unsupported experiment category: {}'.format(job_category))

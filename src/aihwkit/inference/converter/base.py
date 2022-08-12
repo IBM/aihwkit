@@ -52,3 +52,6 @@ class BaseConductanceConverter:
             weight matrix
         """
         raise NotImplementedError
+
+    def __eq__(self, other: object) -> bool:
+        return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
