@@ -5,4 +5,3 @@ pycodestyle==2.7.0
 pylint==2.9.0
 pytest==6.2.4
 parameterized==0.8.1
-wget==3.2
