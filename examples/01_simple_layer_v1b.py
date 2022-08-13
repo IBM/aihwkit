@@ -47,6 +47,9 @@ if cuda.is_compiled():
 opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
+weights = model.get_weights()[0][0][0]
+count = 0
+print('Epoch%s:weights: {:.20f}'.format(weights)%count)
 for epoch in range(100):
     # Add the training Tensor to the model (input).
     pred = model(x)
@@ -56,4 +59,7 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
+    weights = model.get_weights()[0][0][0]
+    count = count + 1
+    print('Epoch%s:weights: {:.20f}'.format(weights)%count)
     print('Loss error: {:.16f}'.format(loss))

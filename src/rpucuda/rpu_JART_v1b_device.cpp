@@ -18,22 +18,6 @@ namespace RPU {
  * JART v1b RPU Device
  *********************************************************************************/
 
-	template<typename... Args>
-	void zhenming_log(const char* message, Args... args)
-	{
-    FILE* file = fopen("log.txt", "a");
-		std::time_t current_time = std::time(0);
-		std::tm* timestamp = std::localtime(&current_time);
-		char buffer[80];
-		strftime(buffer, 80, "%c", timestamp);
-
-    fprintf(file, "%s\t", buffer);
-    fprintf(file, message, args...);
-    fprintf(file, "\n");
-    
-    fclose(file);
-	}
-
 template <typename T>
 void JARTv1bRPUDevice<T>::populate(
     const JARTv1bRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng) {
@@ -521,6 +505,9 @@ inline void update_once(
     RNG<T> *rng) {
   int pulse_counter = int (pulse_length/base_time_step);
   double Ndisc_double = Ndisc;
+  // printf("w before update %.20f\n", w);
+  // printf("Ndisc before update %.20e\n", Ndisc);
+  // printf("Ndisc_double before update %.20e\n", Ndisc_double);
 
   if (sign < 0) {
     for (int i = 0; i < pulse_counter; i++) {
@@ -541,6 +528,9 @@ inline void update_once(
   w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, current_max, weight_min_bound, weight_max_bound, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
   Ndisc = Ndisc_double;
   apply_cycle_to_cycle_noise(Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, rng);
+  // printf("w after update %.20f\n", w);
+  // printf("Ndisc after update %.20e\n", Ndisc);
+  // printf("Ndisc_double after update %.20e\n", Ndisc_double);
 }
 
 template <typename T>
@@ -595,7 +585,7 @@ void JARTv1bRPUDevice<T>::doSparseUpdate(
                                    min_bound[j], max_bound[j],
                                   //  par.w_min, par.w_max,
                                    par.Ndisc_min_bound, par.Ndisc_max_bound,
-                                   par.Ndiscmax_std, par.Ndiscmin_std,par.ldet_std, par.rdet_std,
+                                   par.Ndiscmax_std, par.Ndiscmin_std, par.ldet_std, par.rdet_std,
                                    rng););
 }
 

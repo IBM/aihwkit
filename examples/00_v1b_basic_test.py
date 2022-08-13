@@ -27,7 +27,7 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import JARTv1bDevice, SoftBoundsDevice, ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import PulseType
-# from aihwkit.simulator.rpu_base import cuda
+from aihwkit.simulator.rpu_base import cuda
 
 # # Prepare the datasets (input and expected output).
 # x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
@@ -44,19 +44,21 @@ x = Tensor([[0.0], [1.0], [2.0], [3.0], [4.0]])
 y = Tensor([[0.0], [slope], [2*slope], [3*slope], [4*slope]])
 
 # Define a single-layer network, using a constant step device type.
-rpu_config = SingleRPUConfig(device=JARTv1bDevice(pulse_length=1, base_time_step=1e-2, pulse_voltage_SET=-20, pulse_voltage_RESET=20))
+rpu_config = SingleRPUConfig(device=JARTv1bDevice(dw_min=0.0001))
 # rpu_config = SingleRPUConfig(device=SoftBoundsDevice())
 
 # rpu_config.update.pulse_type = PulseType.DETERMINISTIC_IMPLICIT
-rpu_config.update.desired_bl = 100  # max number in this case
+# rpu_config.update.desired_bl = 100  # max number in this case
 model = AnalogLinear(1, 1, bias=False,
                      rpu_config=rpu_config)
 
+model.set_weights(Tensor([[0.0]]))
+
 # Move the model and tensors to cuda if it is available.
-# if cuda.is_compiled():
-#     x = x.cuda()
-#     y = y.cuda()
-#     model.cuda()
+if cuda.is_compiled():
+    x = x.cuda()
+    y = y.cuda()
+    model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
 opt = AnalogSGD(model.parameters(), lr=0.01)
@@ -64,7 +66,7 @@ opt.regroup_param_groups(model)
 
 weights = model.get_weights()[0][0][0]
 count = 0
-print('Epoch%s:weights: {:.24f}'.format(weights)%count)
+print('Epoch%s:weights: {:.20f}'.format(weights)%count)
 
 for epoch in range(10):
     # Add the training Tensor to the model (input).
@@ -75,10 +77,10 @@ for epoch in range(10):
     loss.backward()
 
     opt.step()
-    # print('Loss error: {:.16f}'.format(loss))
+    print('pred: {:.16f}'.format(pred[1][0]))
     weights = model.get_weights()[0][0][0]
     count = count + 1
-    print('Epoch%s:weights: {:.24f}'.format(weights)%count)
+    print('Epoch%s:weights: {:.20f}'.format(weights)%count)
     # if model.get_weights()[0][0][0] != weights:
     #     weights = model.get_weights()[0][0][0]
     #     count = count + 1

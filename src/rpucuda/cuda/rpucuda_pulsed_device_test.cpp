@@ -260,7 +260,7 @@ typedef ::testing::Types<
     ExpStepRPUDeviceMetaParameter<num_t>,
     PowStepRPUDeviceMetaParameter<num_t>,
     ConstantStepRPUDeviceMetaParameter<num_t>,
-    PiecewiseStepRPUDeviceMetaParameter<num_t>>,
+    PiecewiseStepRPUDeviceMetaParameter<num_t>,
     JARTv1bRPUDeviceMetaParameter<num_t>>
 
     MetaPar;

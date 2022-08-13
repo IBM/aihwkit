@@ -14,7 +14,7 @@
 #include "cuda_util.h"
 #include "io_manager.h"
 #include "rng.h"
-#include "rpucuda_linearstep_device.h"
+#include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_pulsed.h"
 #include "utility_functions.h"
 #include "gtest/gtest.h"
@@ -34,7 +34,7 @@ namespace {
 
 using namespace RPU;
 
-class RPUCudaLinearStepTestFixture : public ::testing::TestWithParam<bool> {
+class RPUCudaJARTv1bTestFixture : public ::testing::TestWithParam<bool> {
 public:
   void SetUp() {
 
@@ -51,7 +51,7 @@ public:
     num_t bmax = 0.7;
 
     PulsedMetaParameter<num_t> p;
-    LinearStepRPUDeviceMetaParameter<num_t> dp;
+    JARTv1bRPUDeviceMetaParameter<num_t> dp;
     IOMetaParameter<num_t> p_io;
 
     p_io.out_noise = 0.0; // no noise in output;
@@ -64,7 +64,7 @@ public:
     dp.w_min_dtod = 0.0;
     dp.w_max_dtod = 0.0;
 
-    dp.dw_min = 0.01;
+    dp.dw_min = 0.0001;
 
     // peripheral circuits specs
     p_io.inp_res = -1;
@@ -85,14 +85,6 @@ public:
 
     dp.diffusion = 0.01;
     dp.diffusion_dtod = 0.01;
-
-    // slope
-    dp.ls_decrease_up = 1;
-    dp.ls_decrease_down = 1;
-    dp.ls_decrease_up_dtod = 0.2;
-    dp.ls_decrease_down_dtod = 0.2;
-    dp.ls_mean_bound_reference = false;
-    dp.ls_mult_noise = this->GetParam();
 
     dp.print();
 
@@ -157,7 +149,7 @@ public:
 };
 
 // types
-INSTANTIATE_TEST_CASE_P(MultAddTest, RPUCudaLinearStepTestFixture, ::testing::Bool());
+INSTANTIATE_TEST_CASE_P(MultAddTest, RPUCudaJARTv1bTestFixture, ::testing::Bool());
 
 #define RPU_TEST_UPDATE(CUFUN, FUN, NLOOP)                                                         \
   this->context->synchronizeDevice();                                                              \
@@ -246,7 +238,7 @@ INSTANTIATE_TEST_CASE_P(MultAddTest, RPUCudaLinearStepTestFixture, ::testing::Bo
                                                                                                    \
   Array_2D_Free(refweights);
 
-TEST_P(RPUCudaLinearStepTestFixture, UpdateVector) {
+TEST_P(RPUCudaJARTv1bTestFixture, UpdateVector) {
 
   this->x_cuvec->assign(this->rx.data());
   this->x_vec = this->rx;
@@ -261,7 +253,7 @@ TEST_P(RPUCudaLinearStepTestFixture, UpdateVector) {
       update(this->x_vec.data(), this->d_vec.data(), false, 1), this->repeats);
 }
 
-TEST_P(RPUCudaLinearStepTestFixture, UpdateMatrixBatch) {
+TEST_P(RPUCudaJARTv1bTestFixture, UpdateMatrixBatch) {
 
   this->x_cuvec_batch->assign(this->rx.data());
   this->x_vec_batch = this->rx;
@@ -271,7 +263,7 @@ TEST_P(RPUCudaLinearStepTestFixture, UpdateMatrixBatch) {
 
   RPU_TEST_UPDATE(
       update(this->x_cuvec_batch->getData(), this->d_cuvec_batch->getData(), false, this->m_batch),
-      update(this->x_vec_batch.data(), this->d_vec_batch.data(), false, this->m_batch), 100);
+      update(this->x_vec_batch.data(), this->d_vec_batch.data(), false, this->m_batch), this->repeats);
 }
 
 } // namespace

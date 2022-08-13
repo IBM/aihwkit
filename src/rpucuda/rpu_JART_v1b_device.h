@@ -16,8 +16,6 @@
 #include "rpu_pulsed_device.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
-// #include "logger.h"
-#include <stdio.h>
 
 namespace RPU {
 
@@ -276,6 +274,11 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
 
 
   void printDP(int x_count, int d_count) const override;
+
+  inline T **getNdiscmax() const { return device_specific_Ndiscmax; };
+  inline T **getNdiscmin() const { return device_specific_Ndiscmin; };
+  inline T **getldet() const { return device_specific_ldet; };
+  inline T **getA() const { return device_specific_A; };
 
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
