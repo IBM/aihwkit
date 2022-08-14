@@ -153,8 +153,6 @@ __device__ __forceinline__ Voltages_holder<T> calculate_voltages(
     const T &RseriesTiOx,
     const T &lcell,
     T &ldet,
-    const int &zvo,
-    const T &e,
     T &A,
     const T &Nplug,
     double &Ndisc,
@@ -163,9 +161,9 @@ __device__ __forceinline__ Voltages_holder<T> calculate_voltages(
   // V_series
   Voltages.V_series = I_mem*(RseriesTiOx + (R0*(1+alphaline*R0*pow(I_mem,2)*Rthline)));
   // V_disk
-  Voltages.V_disk =  I_mem*(ldet/(zvo*e*A*Ndisc*un));
+  Voltages.V_disk =  I_mem*(ldet/(PHYSICAL_PARAMETER_zvo*PHYSICAL_PARAMETER_e*A*Ndisc*un));
   // V_plug
-  Voltages.V_plug =  I_mem*((lcell-ldet)/(zvo*e*A*Nplug*un));
+  Voltages.V_plug =  I_mem*((lcell-ldet)/(PHYSICAL_PARAMETER_zvo*PHYSICAL_PARAMETER_e*A*Nplug*un));
   // V_Schottky
   Voltages.V_Schottky =  applied_voltage-Voltages.V_series-Voltages.V_disk-Voltages.V_plug;
   return Voltages;
@@ -202,18 +200,7 @@ __device__ __forceinline__ T calculate_dNdt(
     const T &applied_voltage,
     T &I_mem,
     double &Ndisc,
-    const T &e,
-    const T &kb,	
-    const T &Arichardson,
-    const T &mdiel,
-    const T &h,
-    const int &zvo,
-    const T &eps_0,
     const T &T0,
-    const T &eps,
-    const T &epsphib,
-    const T &phiBn0,
-    const T &phin,
     const T &un,
     T &Ndiscmax,
     T &Ndiscmin,
@@ -235,11 +222,11 @@ __device__ __forceinline__ T calculate_dNdt(
 
   T F1 = calculate_F1(applied_voltage, Ndisc, Ndiscmin, Ndiscmax);
 
-  Voltages_holder<T> Voltages = calculate_voltages(applied_voltage, I_mem, R0, alphaline, Rthline, RseriesTiOx, lcell, ldet, zvo, e, A, Nplug, Ndisc, un);
+  Voltages_holder<T> Voltages = calculate_voltages(applied_voltage, I_mem, R0, alphaline, Rthline, RseriesTiOx, lcell, ldet, A, Nplug, Ndisc, un);
 
   T Eion = calculate_Eion(applied_voltage, Voltages, lcell, ldet);
 
-  T gamma = zvo*a*Eion/(dWa*M_PI);
+  T gamma = PHYSICAL_PARAMETER_zvo*a*Eion/(dWa*M_PI);
 
   T Treal = calculate_T(applied_voltage, I_mem, T0, Rth0, Rtheff_scaling, Voltages);
   
@@ -247,7 +234,7 @@ __device__ __forceinline__ T calculate_dNdt(
   T dWa_f = dWa*(sqrt(1-pow(gamma,2))-(gamma*M_PI)/2+gamma*asin(gamma));
   // dWamax
   T dWa_r = dWa*(sqrt(1-pow(gamma,2))+(gamma*M_PI)/2+gamma*asin(gamma));
-  T denominator = kb*Treal/e;
+  T denominator = PHYSICAL_PARAMETER_kb*Treal/PHYSICAL_PARAMETER_e;
   T dNdt = -(c_v0*a*ny0*F1*(exp(-dWa_f/denominator)-exp(-dWa_r/denominator)))/ldet;
   return dNdt;
 }
@@ -283,18 +270,7 @@ __device__ __forceinline__ void step(
     const T &h3,
     const T &j_0,
     const T &k0, 
-    const T &e,
-    const T &kb,	
-    const T &Arichardson,
-    const T &mdiel,
-    const T &h,
-    const int &zvo,
-    const T &eps_0,
     const T &T0,
-    const T &eps,
-    const T &epsphib,
-    const T &phiBn0,
-    const T &phin,
     const T &un,
     const T &Original_Ndiscmin,
     T &Ndiscmax,
@@ -317,7 +293,7 @@ __device__ __forceinline__ void step(
 
 
   T I_mem = calculate_current(Ndisc, applied_voltage, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
-  T dNdt = calculate_dNdt(applied_voltage, I_mem, Ndisc, e, kb, Arichardson, mdiel, h, zvo, eps_0, T0, eps, epsphib, phiBn0, phin, un, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A);
+  T dNdt = calculate_dNdt(applied_voltage, I_mem, Ndisc, T0, un, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A);
   Ndisc = Ndisc + dNdt*time_step;
 
   if (Ndisc>Ndiscmax){
@@ -413,18 +389,7 @@ __device__ __forceinline__ void update_once(
     const T &h3,
     const T &j_0,
     const T &k0, 
-    const T &e,
-    const T &kb,	
-    const T &Arichardson,
-    const T &mdiel,
-    const T &h,
-    const int &zvo,
-    const T &eps_0,
     const T &T0,
-    const T &eps,
-    const T &epsphib,
-    const T &phiBn0,
-    const T &phin,
     const T &un,
     const T &Original_Ndiscmin,
     T &Ndiscmax,
@@ -464,14 +429,14 @@ __device__ __forceinline__ void update_once(
 
   if (negative > 0) {
     for (int i = 0; i < pulse_counter; i++) {
-      step(pulse_voltage_SET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, e, kb, Arichardson, mdiel, h, zvo, eps_0, T0, eps, epsphib, phiBn0, phin, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
+      step(pulse_voltage_SET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, T0, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
     }
     if (Ndisc_double>Ndisc_max_bound){
       Ndisc_double = Ndisc_max_bound;
     }
   }else{
     for (int i = 0; i < pulse_counter; i++) {
-      step(pulse_voltage_RESET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, e, kb, Arichardson, mdiel, h, zvo, eps_0, T0, eps, epsphib, phiBn0, phin, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
+      step(pulse_voltage_RESET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, T0, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
     }
     if (Ndisc_double<Ndisc_min_bound){
       Ndisc_double = Ndisc_min_bound;
@@ -535,39 +500,28 @@ template <typename T> struct UpdateFunctorJARTv1b {
     const T h3                  = global_pars[28];
     const T j_0                 = global_pars[29];
     const T k0                  = global_pars[30];
-    const T e                   = global_pars[31];
-    const T kb                  = global_pars[32];
-    const T Arichardson         = global_pars[33];
-    const T mdiel               = global_pars[34];
-    const T h                   = global_pars[35];
-    const int zvo               = global_pars[36];
-    const T eps_0               = global_pars[37];
-    const T T0                  = global_pars[38];
-    const T eps                 = global_pars[39];
-    const T epsphib             = global_pars[40];
-    const T phiBn0              = global_pars[41];
-    const T phin                = global_pars[42];
-    const T un                  = global_pars[43];
-    const T Ndiscmin            = global_pars[44];
-    const T Nplug               = global_pars[45];
-    const T a                   = global_pars[46];
-    const T ny0                 = global_pars[47];
-    const T dWa                 = global_pars[48];
-    const T Rth0                = global_pars[49];
-    const T lcell               = global_pars[50];
-    const T Rtheff_scaling      = global_pars[51];
-    const T RseriesTiOx         = global_pars[52];
-    const T R0                  = global_pars[53];
-    const T Rthline             = global_pars[54];
-    const T alphaline           = global_pars[55];
-    const T current_min         = global_pars[56];
-    const T current_max         = global_pars[57];
-    const T Ndisc_min_bound     = global_pars[58];
-    const T Ndisc_max_bound     = global_pars[59];
-    const T Ndiscmax_std        = global_pars[60];
-    const T Ndiscmin_std        = global_pars[61];
-    const T ldet_std            = global_pars[62];
-    const T rdet_std            = global_pars[63];
+    const T T0                  = global_pars[31];
+    const T un                  = global_pars[32];
+    const T Ndiscmin            = global_pars[33];
+    const T Nplug               = global_pars[34];
+    const T a                   = global_pars[35];
+    const T ny0                 = global_pars[36];
+    const T dWa                 = global_pars[37];
+    const T Rth0                = global_pars[38];
+    const T lcell               = global_pars[39];
+    const T Rtheff_scaling      = global_pars[40];
+    const T RseriesTiOx         = global_pars[41];
+    const T R0                  = global_pars[42];
+    const T Rthline             = global_pars[43];
+    const T alphaline           = global_pars[44];
+    const T current_min         = global_pars[45];
+    const T current_max         = global_pars[46];
+    const T Ndisc_min_bound     = global_pars[47];
+    const T Ndisc_max_bound     = global_pars[48];
+    const T Ndiscmax_std        = global_pars[49];
+    const T Ndiscmin_std        = global_pars[50];
+    const T ldet_std            = global_pars[51];
+    const T rdet_std            = global_pars[52];
     
     const T &weight_min_bound = par_4.x;                          // [0]
     T &device_specific_Ndiscmin_cuda = par_4.y; // [1]
@@ -588,8 +542,7 @@ template <typename T> struct UpdateFunctorJARTv1b {
                                   alpha0, alpha1, alpha2, alpha3, beta0, beta1,
                                   c0, c1, c2, c3, d0, d1, d2, d3,
                                   f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0,
-                                  e, kb, Arichardson, mdiel, h, zvo, eps_0,
-                                  T0, eps, epsphib, phiBn0, phin, un, Ndiscmin,
+                                  T0, un, Ndiscmin,
                                   device_specific_Ndiscmax_cuda, device_specific_Ndiscmin_cuda,
                                   Nplug, a, ny0, dWa, Rth0, lcell,
                                   device_specific_ldet_cuda,
@@ -606,8 +559,7 @@ template <typename T> struct UpdateFunctorJARTv1b {
                                    alpha0, alpha1, alpha2, alpha3, beta0, beta1,
                                    c0, c1, c2, c3, d0, d1, d2, d3,
                                    f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0,
-                                   e, kb, Arichardson, mdiel, h, zvo, eps_0,
-                                   T0, eps, epsphib, phiBn0, phin, un, Ndiscmin,
+                                   T0, un, Ndiscmin,
                                    device_specific_Ndiscmax_cuda, device_specific_Ndiscmin_cuda,
                                    Nplug, a, ny0, dWa, Rth0, lcell,
                                    device_specific_ldet_cuda,

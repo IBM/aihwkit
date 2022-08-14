@@ -16,6 +16,11 @@
 #include "rpu_pulsed_device.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
+// physical constants do not change!
+#define PHYSICAL_PARAMETER_e 1.602e-19 								// elementary charge [C]
+#define PHYSICAL_PARAMETER_kb 1.3807e-23								// Boltzman's constant  [VAs/K]
+#define PHYSICAL_PARAMETER_zvo 2									// oxygen vacancy charge number
+#define PHYSICAL_PARAMETER_eps_0 8.854e-12				      				// vacuum permittivity [As/Vm]
 
 namespace RPU {
 
@@ -53,20 +58,8 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T h3 = (T) 0.36;
     T j_0 = (T) 1.054;
     T k0 = (T) 1.0526;
-    // physical constants do not change!
-    const T e = 1.602e-19; 								// elementary charge [C]
-    const T kb = 1.3807e-23;								// Boltzman's constant  [VAs/K]		
-    const T Arichardson = 6.01e5;								// Richardson's constant [A/m^2K^2] 
-    const T mdiel = 9.10938e-31;			  				// electron rest mass [kg]
-    const T h = 6.626e-34; 							// Planck's constant [Js]
-    const int zvo = 2;									// oxygen vacancy charge number
-    const T eps_0 = 8.854e-12;				      				// vacuum permittivity [As/Vm]
     // Fitting Parameters for original model
     T T0 = (T) 293;								 	// ambient temperature [K] 
-    T eps = (T) 17; // from [10:25]; 						// static hafnium oxide permittivity 
-    T epsphib = (T) 5.5;							// hafnium oxide permittivity related to image force barrier lowering
-    T phiBn0 = (T) 0.18; // from [0.1:0.5];				// nominal schottky barrier height [eV]
-    T phin = (T) 0.1; // from [0.1:0.3];					// energy level difference between the Fermi level in the oxide and the oxide conduction band edge [eV]
     T un = (T) 4e-6; // from [1e-6:1e-5];				// electron mobility [m^2/Vs]
     T Ndiscmax = (T) 20*1e26; // from [0.001:1100];				// maximum oxygen vacancy concentration in the disc[10^26/m^3]
     T Ndiscmin = (T) 0.008*1e26; // from [0.0001:100];			// minimum oxygen vacancy concentration in the disc [10^26/m^3]
@@ -138,10 +131,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t k0:\t\t\t" << k0 << std::endl;
     
     ss << "\t T0:\t\t\t" << T0 << std::endl;
-    ss << "\t eps:\t\t\t" << eps << std::endl;
-    ss << "\t epsphib:\t\t" << epsphib << std::endl;
-    ss << "\t phiBn0:\t\t" << phiBn0 << std::endl;
-    ss << "\t phin:\t\t\t" << phin << std::endl;
     ss << "\t un:\t\t\t" << un << std::endl;
     ss << "\t Nplug:\t\t\t" << Nplug << std::endl;
     ss << "\t a:\t\t\t" << a << std::endl;

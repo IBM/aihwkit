@@ -1083,18 +1083,6 @@ class JARTv1bDevice(PulsedDevice):
     T0: float = 293
     """See ``reset``."""
 
-    eps: float = 17
-    """See ``reset``."""
-
-    epsphib: float = 5.5
-    """See ``reset``."""
-
-    phiBn0: float = 0.18
-    """See ``reset``."""
-
-    phin: float = 0.1
-    """See ``reset``."""
-
     un: float = 4e-6
     """See ``reset``."""
 

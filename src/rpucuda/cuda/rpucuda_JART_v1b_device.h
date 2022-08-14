@@ -17,7 +17,7 @@
 #include "rpucuda_pulsed_device.h"
 #include <memory>
 
-#define DEVICE_PARAMETER_COUNT 64
+#define DEVICE_PARAMETER_COUNT 53
 
 namespace RPU {
 
@@ -96,39 +96,28 @@ public:
       tmp_global_pars[28] = par.h3;
       tmp_global_pars[29] = par.j_0;
       tmp_global_pars[30] = par.k0;
-      tmp_global_pars[31] = par.e;
-      tmp_global_pars[32] = par.kb;
-      tmp_global_pars[33] = par.Arichardson;
-      tmp_global_pars[34] = par.mdiel;
-      tmp_global_pars[35] = par.h;
-      tmp_global_pars[36] = par.zvo;
-      tmp_global_pars[37] = par.eps_0;
-      tmp_global_pars[38] = par.T0;
-      tmp_global_pars[39] = par.eps;
-      tmp_global_pars[40] = par.epsphib;
-      tmp_global_pars[41] = par.phiBn0;
-      tmp_global_pars[42] = par.phin;
-      tmp_global_pars[43] = par.un;
-      tmp_global_pars[44] = par.Ndiscmin;
-      tmp_global_pars[45] = par.Nplug;
-      tmp_global_pars[46] = par.a;
-      tmp_global_pars[47] = par.ny0;
-      tmp_global_pars[48] = par.dWa;
-      tmp_global_pars[49] = par.Rth0;
-      tmp_global_pars[50] = par.lcell;
-      tmp_global_pars[51] = par.Rtheff_scaling;
-      tmp_global_pars[52] = par.RseriesTiOx;
-      tmp_global_pars[53] = par.R0;
-      tmp_global_pars[54] = par.Rthline;
-      tmp_global_pars[55] = par.alphaline;
-      tmp_global_pars[56] = par.current_min;
-      tmp_global_pars[57] = par.current_max;
-      tmp_global_pars[58] = par.Ndisc_min_bound;
-      tmp_global_pars[59] = par.Ndisc_max_bound;
-      tmp_global_pars[60] = par.Ndiscmax_std;
-      tmp_global_pars[61] = par.Ndiscmin_std;
-      tmp_global_pars[62] = par.ldet_std;
-      tmp_global_pars[63] = par.rdet_std;
+      tmp_global_pars[31] = par.T0;
+      tmp_global_pars[32] = par.un;
+      tmp_global_pars[33] = par.Ndiscmin;
+      tmp_global_pars[34] = par.Nplug;
+      tmp_global_pars[35] = par.a;
+      tmp_global_pars[36] = par.ny0;
+      tmp_global_pars[37] = par.dWa;
+      tmp_global_pars[38] = par.Rth0;
+      tmp_global_pars[39] = par.lcell;
+      tmp_global_pars[40] = par.Rtheff_scaling;
+      tmp_global_pars[41] = par.RseriesTiOx;
+      tmp_global_pars[42] = par.R0;
+      tmp_global_pars[43] = par.Rthline;
+      tmp_global_pars[44] = par.alphaline;
+      tmp_global_pars[45] = par.current_min;
+      tmp_global_pars[46] = par.current_max;
+      tmp_global_pars[47] = par.Ndisc_min_bound;
+      tmp_global_pars[48] = par.Ndisc_max_bound;
+      tmp_global_pars[49] = par.Ndiscmax_std;
+      tmp_global_pars[50] = par.Ndiscmin_std;
+      tmp_global_pars[51] = par.ldet_std;
+      tmp_global_pars[52] = par.rdet_std;
 
       dev_device_parameters = nullptr;
       dev_device_parameters = RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT, tmp_global_pars);

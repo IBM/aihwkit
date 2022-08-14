@@ -204,8 +204,6 @@ inline Voltages_holder<T> calculate_voltages(
     const T &RseriesTiOx,
     const T &lcell,
     T &ldet,
-    const int &zvo,
-    const T &e,
     T &A,
     const T &Nplug,
     double &Ndisc,
@@ -214,9 +212,9 @@ inline Voltages_holder<T> calculate_voltages(
   // V_series
   Voltages.V_series = I_mem*(RseriesTiOx + (R0*(1+alphaline*R0*pow(I_mem,2)*Rthline)));
   // V_disk
-  Voltages.V_disk =  I_mem*(ldet/(zvo*e*A*Ndisc*un));
+  Voltages.V_disk =  I_mem*(ldet/(PHYSICAL_PARAMETER_zvo*PHYSICAL_PARAMETER_e*A*Ndisc*un));
   // V_plug
-  Voltages.V_plug =  I_mem*((lcell-ldet)/(zvo*e*A*Nplug*un));
+  Voltages.V_plug =  I_mem*((lcell-ldet)/(PHYSICAL_PARAMETER_zvo*PHYSICAL_PARAMETER_e*A*Nplug*un));
   // V_Schottky
   Voltages.V_Schottky =  applied_voltage-Voltages.V_series-Voltages.V_disk-Voltages.V_plug;
   return Voltages;
@@ -253,18 +251,7 @@ inline T calculate_dNdt(
     const T &applied_voltage,
     T &I_mem,
     double &Ndisc,
-    const T &e,
-    const T &kb,	
-    const T &Arichardson,
-    const T &mdiel,
-    const T &h,
-    const int &zvo,
-    const T &eps_0,
     const T &T0,
-    const T &eps,
-    const T &epsphib,
-    const T &phiBn0,
-    const T &phin,
     const T &un,
     T &Ndiscmax,
     T &Ndiscmin,
@@ -286,11 +273,11 @@ inline T calculate_dNdt(
 
   T F1 = calculate_F1(applied_voltage, Ndisc, Ndiscmin, Ndiscmax);
 
-  Voltages_holder<T> Voltages = calculate_voltages(applied_voltage, I_mem, R0, alphaline, Rthline, RseriesTiOx, lcell, ldet, zvo, e, A, Nplug, Ndisc, un);
+  Voltages_holder<T> Voltages = calculate_voltages(applied_voltage, I_mem, R0, alphaline, Rthline, RseriesTiOx, lcell, ldet, A, Nplug, Ndisc, un);
 
   T Eion = calculate_Eion(applied_voltage, Voltages, lcell, ldet);
 
-  T gamma = zvo*a*Eion/(dWa*M_PI);
+  T gamma = PHYSICAL_PARAMETER_zvo*a*Eion/(dWa*M_PI);
 
   T Treal = calculate_T(applied_voltage, I_mem, T0, Rth0, Rtheff_scaling, Voltages);
   
@@ -298,7 +285,7 @@ inline T calculate_dNdt(
   T dWa_f = dWa*(sqrt(1-pow(gamma,2))-(gamma*M_PI)/2+gamma*asin(gamma));
   // dWamax
   T dWa_r = dWa*(sqrt(1-pow(gamma,2))+(gamma*M_PI)/2+gamma*asin(gamma));
-  T denominator = kb*Treal/e;
+  T denominator = PHYSICAL_PARAMETER_kb*Treal/PHYSICAL_PARAMETER_e;
   T dNdt = -(c_v0*a*ny0*F1*(exp(-dWa_f/denominator)-exp(-dWa_r/denominator)))/ldet;
   return dNdt;
 }
@@ -334,18 +321,7 @@ inline void step(
     const T &h3,
     const T &j_0,
     const T &k0, 
-    const T &e,
-    const T &kb,	
-    const T &Arichardson,
-    const T &mdiel,
-    const T &h,
-    const int &zvo,
-    const T &eps_0,
     const T &T0,
-    const T &eps,
-    const T &epsphib,
-    const T &phiBn0,
-    const T &phin,
     const T &un,
     const T &Original_Ndiscmin,
     T &Ndiscmax,
@@ -368,7 +344,7 @@ inline void step(
 
 
   T I_mem = calculate_current(Ndisc, applied_voltage, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
-  T dNdt = calculate_dNdt(applied_voltage, I_mem, Ndisc, e, kb, Arichardson, mdiel, h, zvo, eps_0, T0, eps, epsphib, phiBn0, phin, un, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A);
+  T dNdt = calculate_dNdt(applied_voltage, I_mem, Ndisc, T0, un, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A);
   Ndisc = Ndisc + dNdt*time_step;
 
   if (Ndisc>Ndiscmax){
@@ -460,18 +436,7 @@ inline void update_once(
     const T &h3,
     const T &j_0,
     const T &k0, 
-    const T &e,
-    const T &kb,	
-    const T &Arichardson,
-    const T &mdiel,
-    const T &h,
-    const int &zvo,
-    const T &eps_0,
     const T &T0,
-    const T &eps,
-    const T &epsphib,
-    const T &phiBn0,
-    const T &phin,
     const T &un,
     const T &Original_Ndiscmin,
     T &Ndiscmax,
@@ -511,14 +476,14 @@ inline void update_once(
 
   if (sign < 0) {
     for (int i = 0; i < pulse_counter; i++) {
-      step(pulse_voltage_SET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, e, kb, Arichardson, mdiel, h, zvo, eps_0, T0, eps, epsphib, phiBn0, phin, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
+      step(pulse_voltage_SET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, T0, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
     }
     if (Ndisc_double>Ndisc_max_bound){
       Ndisc_double = Ndisc_max_bound;
     }
   }else{
     for (int i = 0; i < pulse_counter; i++) {
-      step(pulse_voltage_RESET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, e, kb, Arichardson, mdiel, h, zvo, eps_0, T0, eps, epsphib, phiBn0, phin, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
+      step(pulse_voltage_RESET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, T0, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
     }
     if (Ndisc_double<Ndisc_min_bound){
       Ndisc_double = Ndisc_min_bound;
@@ -574,8 +539,7 @@ void JARTv1bRPUDevice<T>::doSparseUpdate(
                                    par.alpha0, par.alpha1, par.alpha2, par.alpha3, par.beta0, par.beta1,
                                    par.c0, par.c1, par.c2, par.c3, par.d0, par.d1, par.d2, par.d3,
                                    par.f0, par.f1, par.f2, par.f3, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0,
-                                   par.e, par.kb, par.Arichardson, par.mdiel, par.h, par.zvo, par.eps_0,
-                                   par.T0, par.eps, par.epsphib, par.phiBn0, par.phin, par.un, par.Ndiscmin,
+                                   par.T0, par.un, par.Ndiscmin,
                                    Ndiscmax[j], Ndiscmin[j],
                                    par.Nplug, par.a, par.ny0, par.dWa, par.Rth0, par.lcell,
                                    ldet[j],
@@ -607,8 +571,7 @@ void JARTv1bRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *
                                    par.alpha0, par.alpha1, par.alpha2, par.alpha3, par.beta0, par.beta1,
                                    par.c0, par.c1, par.c2, par.c3, par.d0, par.d1, par.d2, par.d3,
                                    par.f0, par.f1, par.f2, par.f3, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0,
-                                   par.e, par.kb, par.Arichardson, par.mdiel, par.h, par.zvo, par.eps_0,
-                                   par.T0, par.eps, par.epsphib, par.phiBn0, par.phin, par.un, par.Ndiscmin,
+                                   par.T0, par.un, par.Ndiscmin,
                                    Ndiscmax[j], Ndiscmin[j],
                                    par.Nplug, par.a, par.ny0, par.dWa, par.Rth0, par.lcell,
                                    ldet[j],
