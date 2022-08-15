@@ -963,11 +963,39 @@ class PiecewiseStepDevice(PulsedDevice):
 
 @dataclass
 class JARTv1bDevice(PulsedDevice):
-    """Ideal update behavior (using floating point), but forward/backward
-    might be non-ideal.
+    """Device update characteristics based on Jülich Aachen Resistive
+    Switching Tools (JART) VCM v1b model, details published in [1].
 
-    Ideal update behavior (using floating point), however,
-    forward/backward might still have a non-ideal ADC or noise added.
+    The model discribed in the original JART v1b models [2] containes a set
+    of complex non-linear equations, which is hard to solve in parerrel at
+    large scale with CUDA. To accelerate the calculation, we used the fit
+    function discribed in [3] instead. This fit function generates a current
+    estimate with parameters alpha0 to k0, without having to solve non-linear
+    equations.
+
+    After we have the current, we can calculated the voltages across
+    different layers, and calculate the condustance update. For the update
+    calculation, we are using the original JART model with physical
+    parameters discribed in [2].
+
+    For the noise part, device-to-device and cycle-to-cycle noise are also
+    implemented. They apply on the device parameters Ndiscmax and Ndiscmin,
+    which controls the maximum and minimum condustance. And also rdet and
+    ldet, which controls the geometry of the filiment inside the memristor.
+    These parameters affects only the conductance update, and the read
+    process is kept noise free at the device model level. Built in read
+    noise from the aihwkit tiles still works as normal.
+
+    [1] Todo: add publication details when finalized.
+    [2] C. Bengel, A. Siemon, F. C ̈uppers, S. Hoffmann-Eifert, A. Hardtdegen,
+    M. von Witzleben, L. Hellmich, R. Waser, and S. Menzel, “Variability-
+    aware modeling of filamentary oxide-based bipolar resistive switching
+    cells using spice level compact models,” IEEE Transactions on Circuits
+    and Systems I: Regular Papers, vol. 67, no. 12, pp. 4618-46
+    [3] V. Ntinas, A. Ascoli, I. Messaris, Y. Wang, V. Rana, S. Menzel, and
+    R. Tetzlaff, “Towards simplified physics-based memristor modeling of
+    valence change mechanism devices,” IEEE Transactions on Circuits and
+    Systems II: Express Briefs, 2022.
     """
 
     bindings_class: ClassVar[Type] = devices.JARTv1bResistiveDeviceParameter
@@ -1001,150 +1029,186 @@ class JARTv1bDevice(PulsedDevice):
 
     dw_min: float = 0.0001
     """Mean of the minimal update step sizes across devices and directions."""
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled anew when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise} \Delta w_\text{min}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
     
     alpha0: float = 4.81951e-5
-    """See ``reset``."""
+    """Fitting parameters discribed in [1].
+
+    Note that because these parameters are only fited with the default set of
+    physical parameters, they need to be changed accordingly when the physical
+    parameters are specified differenly.
+    """
 
     alpha2: float = 1.03685
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     alpha3: float = 0.34567
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     alpha1 = alpha0*exp(-alpha2/alpha3)
-    """See ``reset``."""
+    r"""See ``alpha0``.
+    This parameter should not be specified, and will be calculated as:
+    
+    .. math::
+        \alpha_{1} = \alpha_{0} * e^{left(-\frac{\alpha{2}}{\alpha{3}}\right)
+    """
 
     beta0: float = 7.0526e-4
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     beta1: float = 4.2383e-5
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     c0: float = 4.004
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     c1: float = 2.8646
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     c2: float = 4.2125
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     c3: float = 1.4134
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     d0: float = 6.6103
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     d1: float = 1.4524
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     d2: float = 7.4235
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     d3: float = 4.0585
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     f0: float = 6.326e-4
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     f1: float = 1.4711
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     f2: float = 0.5199
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     f3: float = 1.561
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     g0: float = 4.84e-3
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     g1: float = 0.1353
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     h0: float = 5.548
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     h1: float = 6.8648
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     h2: float = 51.586
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     h3: float = 0.36
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     j0: float = 1.054
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     k0: float =  1.0526
-    """See ``reset``."""
+    """See ``alpha0``."""
 
     T0: float = 293
-    """See ``reset``."""
+    """Ambient temperature [K], read [2] for more information."""
 
     un: float = 4e-6
-    """See ``reset``."""
+    """Electron mobility [m^2/Vs], read [2] for more information."""
 
     Ndiscmax: float = 20*1e26
-    """See ``reset``."""
+    """Average maximum oxygen vacancy concentration in the disc[10^26/m^3], read [2] for more information."""
 
     Ndiscmin: float = 0.008*1e26
-    """See ``reset``."""
+    """Average minimum oxygen vacancy concentration in the disc [10^26/m^3], read [2] for more information."""
 
     Nplug: float = 20*1e26
-    """See ``reset``."""
+    """Oxygen vacancy concentration in the plug [10^26/m^3], read [2] for more information."""
 
     a: float = 0.25e-9
-    """See ``reset``."""
+    """Ion hopping distance [m], read [2] for more information."""
 
     ny0: float = 2e13
-    """See ``reset``."""
+    """Attemp frequenzy [Hz], read [2] for more information."""
 
     dWa: float = 1.35
-    """See ``reset``."""
+    """Activation energy [eV], read [2] for more information."""
 
     Rth0: float = 15.72e6
-    """See ``reset``."""
+    """Thermal resistance of the Hafnium Oxide [K/W], read [2] for more information."""
 
     rdet: float = 45e-9
-    """See ``reset``."""
+    """Average radius of the filament area [m], read [2] for more information."""
 
     lcell: float = 3*1e-9
-    """See ``reset``."""
+    """Length of disc and plug region [m], read [2] for more information."""
 
     ldet: float = 0.4*1e-9
-    """See ``reset``."""
+    """Length of the disc region [m], read [2] for more information."""
 
     Rtheff_scaling: float = 0.27
-    """See ``reset``."""
+    """Scaling factor for ``Rth0`` during RESET, read [2] for more information."""
 
     RseriesTiOx: float = 650
-    """See ``reset``."""
+    """Series resistance of the TiOx layer [Ohm], read [2] for more information."""
 
     R0: float = 719.2437
-    """See ``reset``."""
+    """Line resistance for a current of 0 A [Ohm], read [2] for more information."""
 
     Rthline: float = 90471.47
-    """See ``reset``."""
+    """Thermal resistance of the lines [W/K], read [2] for more information."""
 
     alphaline: float = 3.92e-3
-    """See ``reset``."""
+    """Temperature coefficient of the lines [1/K], read [2] for more information."""
 
     read_voltage: float = 0.2
-    """See ``reset``."""
+    """Voltage applied to the memristor during read phase.
+
+    In this phase, the memristor condustance is assumed to be constant, and
+    no read-variability was applied. Read [1] for more information.
+    """
 
     pulse_voltage_SET: float = -0.342
-    """See ``reset``."""
+    """Voltage applied to the memristor during SET process, read [1] for more information."""
 
     pulse_voltage_RESET: float = 0.7065
-    """See ``reset``."""
+    """Voltage applied to the memristor during RESET process, read [1] for more information."""
 
     pulse_length: float = 1e-6
-    """See ``reset``."""
+    """Pulse length of the voltage pulses applied to the memristor during SET and RESET process, read [1] for more information."""
 
     base_time_step: float = 1e-8
-    """See ``reset``."""
+    """Internal simulation time step during the pulse updates,
+    this parameter controls the precision of the forword-mode Euler method
+    used when integrating change of the oxygen vacancy concentration in the
+    disc. It's advised that ``base_time_step`` should be at least 100 times
+    smaller than ``pulse_length``. Read [1] for more information.
+    """
 
     Ndisc_min_bound: float = 0.06e26
     """See ``reset``."""
@@ -1153,28 +1217,28 @@ class JARTv1bDevice(PulsedDevice):
     """See ``reset``."""
 
     Ndiscmax_dtod: float = 0
-    """See ``reset``."""
-
+    """Device-to-device std deviation of ``Ndiscmax``, read [1] for more information."""
+# TODO should we do relative units? 
     Ndiscmin_dtod: float = 0
-    """See ``reset``."""
+    """Device-to-device std deviation of ``Ndiscmin``, read [1] for more information."""
 
     ldet_dtod: float = 0
-    """See ``reset``."""
+    """Device-to-device std deviation of ``ldet``, read [1] for more information."""
 
     rdet_dtod: float = 0
-    """See ``reset``."""
+    """Device-to-device std deviation of ``rdet``, read [1] for more information."""
 
     Ndiscmax_std: float = 0
-    """See ``reset``."""
+    """Cycle-to-cycle std deviation of ``Ndiscmax``, read [1] for more information."""
 
     Ndiscmin_std: float = 0
-    """See ``reset``."""
+    """Cycle-to-cycle std deviation of ``Ndiscmin``, read [1] for more information."""
 
     ldet_std: float = 0
-    """See ``reset``."""
+    """Cycle-to-cycle std deviation of ``ldet``, read [1] for more information."""
 
     rdet_std: float = 0
-    """See ``reset``."""
+    """Cycle-to-cycle std deviation of ``rdet``, read [1] for more information."""
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
