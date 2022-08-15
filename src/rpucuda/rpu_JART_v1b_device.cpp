@@ -343,7 +343,7 @@ inline void step(
     const T &Ndisc_min_bound,
     const T &Ndisc_max_bound) {
 
-
+  T I_mem = calculate_current(Ndisc, applied_voltage, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
   T dNdt = calculate_dNdt(applied_voltage, I_mem, Ndisc, T0, un, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A);
   Ndisc = Ndisc + dNdt*time_step;
 
