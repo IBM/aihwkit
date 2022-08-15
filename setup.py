@@ -23,7 +23,7 @@ INSTALL_REQUIRES = [
     'scipy',
     'requests>=2.25,<3',
     'numpy>=1.18',
-    'protobuf>=3.13.0,<4'
+    'protobuf>=3.13.0,<4',
 ]
 
 def get_version() -> str:

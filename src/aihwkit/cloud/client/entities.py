@@ -38,6 +38,7 @@ class CloudExperimentCategory(Enum):
     """Category of a CloudExperiment."""
 
     BASIC_TRAINING = 1
+    BASIC_INFERENCE = 2
 
 
 @dataclass

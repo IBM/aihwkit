@@ -60,13 +60,11 @@ class InferenceTile(AnalogTile):
             from aihwkit.simulator.configs import InferenceRPUConfig
             rpu_config = InferenceRPUConfig()
 
-        # Noise model.
-        self.noise_model = deepcopy(rpu_config.noise_model)
+        # CAUTION: one cannot save parts of the RPUConfig as
+        # properties of the class! This is because those attributes
+        # would be restored even if the RPUConfig would be replaced
+        # during checkpoint loading
 
-        # Drift compensation.
-        self.drift_compensation = None
-        if rpu_config.drift_compensation:
-            self.drift_compensation = deepcopy(rpu_config.drift_compensation)
         self.drift_baseline = None
         self.drift_readout_tensor = None  # type: Optional[Tensor]
         self.alpha = ones((1,))
@@ -86,11 +84,12 @@ class InferenceTile(AnalogTile):
     @no_grad()
     def _forward_drift_readout_tensor(self) -> Optional[Tensor]:
         """Perform a forward pass using the drift read-out tensor."""
-        if self.drift_compensation is None:
+
+        if self.rpu_config.drift_compensation is None:
             return None
 
         if self.drift_readout_tensor is None:
-            self.drift_readout_tensor = self.drift_compensation.get_readout_tensor(
+            self.drift_readout_tensor = self.rpu_config.drift_compensation.get_readout_tensor(
                 self.tile.get_x_size()).detach().to(self.device)
             if self.in_trans:
                 self.drift_readout_tensor = self.drift_readout_tensor.tranpose(0, 1).clone()
@@ -111,17 +110,19 @@ class InferenceTile(AnalogTile):
         Args:
             from_reference: Whether to use weights from reference
         """
+
         if not from_reference or self.reference_combined_weights is None:
             self.reference_combined_weights = Tensor(self.tile.get_weights())
 
-        self.programmed_weights, self.nu_drift_list = self.noise_model.apply_programming_noise(
-            self.reference_combined_weights)
+        self.programmed_weights, self.nu_drift_list = \
+            self.rpu_config.noise_model.apply_programming_noise(
+                self.reference_combined_weights)
 
         self.tile.set_weights(self.programmed_weights.numpy())
 
-        if self.drift_compensation is not None:
+        if self.rpu_config.drift_compensation is not None:
             forward_output = self._forward_drift_readout_tensor()
-            self.drift_baseline = self.drift_compensation.init_baseline(forward_output)
+            self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(forward_output)
 
     @no_grad()
     def drift_weights(
@@ -146,14 +147,15 @@ class InferenceTile(AnalogTile):
         if self.programmed_weights is None:
             self.program_weights()
 
-        drifted_weights = self.noise_model.apply_drift_noise(
+        drifted_weights = self.rpu_config.noise_model.apply_drift_noise(
             self.programmed_weights, self.nu_drift_list, t_inference)
         self.tile.set_weights(drifted_weights.detach().cpu().numpy())
 
-        if self.drift_compensation is not None:
+        if self.rpu_config.drift_compensation is not None:
             forward_output = self._forward_drift_readout_tensor()
-            self.alpha = self.drift_compensation.apply(forward_output,
-                                                       self.drift_baseline).to(self.device)
+            self.alpha = self.rpu_config.drift_compensation.apply(
+                forward_output,
+                self.drift_baseline).to(self.device)
 
     def forward(self, x_input: Tensor, is_test: bool = False) -> Tensor:
         """Forward pass with drift compensation.
@@ -172,7 +174,7 @@ class InferenceTile(AnalogTile):
             weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
             self.tile.modify_weights(weight_modify_params)
 
-        if not is_test or self.drift_compensation is None:
+        if not is_test or self.rpu_config.drift_compensation is None:
             return super().forward(x_input, is_test)
 
         # only do drift compensation in eval mode

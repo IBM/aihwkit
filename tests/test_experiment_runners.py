@@ -19,7 +19,6 @@ from unittest.mock import patch
 
 from torch import device as torch_device
 from aihwkit.experiments.runners.local import LocalRunner
-from aihwkit.simulator.rpu_base import cuda
 
 from .helpers.decorators import parametrize_over_experiments
 from .helpers.experiments import (
@@ -27,7 +26,7 @@ from .helpers.experiments import (
     LeNet5FashionMNIST,
     Vgg8SVHN, Vgg8SVHNTikiTaka
 )
-from .helpers.testcases import AihwkitTestCase
+from .helpers.testcases import AihwkitTestCase, SKIP_CUDA_TESTS
 
 
 @parametrize_over_experiments([
@@ -46,10 +45,9 @@ class TestLocalRunner(AihwkitTestCase):
         """Test running the example using a local runner."""
         training_experiment = self.get_experiment()
         local_runner = LocalRunner(device=torch_device('cpu'))
-
         with patch('sys.stdout', new=StringIO()) as captured_stdout:
-            result = local_runner.run(training_experiment, max_elements_train=10)
-
+            result = local_runner.run(training_experiment, max_elements_train=10,
+                                      stdout=True)
         # Asserts over stdout.
         self.assertIn('Epoch: ', captured_stdout.getvalue())
 
@@ -59,14 +57,15 @@ class TestLocalRunner(AihwkitTestCase):
         self.assertIn('train_loss', result[0])
         self.assertIn('accuracy', result[0])
 
-    @skipIf(not cuda.is_compiled(), 'not compiled with CUDA support')
+    @skipIf(SKIP_CUDA_TESTS, 'not compiled with CUDA support')
     def test_run_example_gpu(self):
         """Test running the example using a local runner."""
         training_experiment = self.get_experiment()
         local_runner = LocalRunner(device=torch_device('cuda'))
 
         with patch('sys.stdout', new=StringIO()) as captured_stdout:
-            result = local_runner.run(training_experiment, max_elements_train=10)
+            result = local_runner.run(training_experiment, max_elements_train=10,
+                                      stdout=True)
 
         # Asserts over stdout.
         self.assertIn('Epoch: ', captured_stdout.getvalue())

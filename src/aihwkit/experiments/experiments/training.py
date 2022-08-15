@@ -12,7 +12,7 @@
 
 """Basic training Experiment."""
 
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type, Optional
 
 from torch import device as torch_device, max as torch_max, Tensor
 from torch.nn import Module, NLLLoss
@@ -255,10 +255,6 @@ class BasicTraining(Experiment):
         """
         results = []
 
-        # Move the model to the device if needed.
-        if device:
-            model = model.to(device)
-
         for epoch_number in range(epochs):
             self._call_hook(Signals.EPOCH_START, epoch_number)
             self._call_hook(Signals.TRAIN_EPOCH_START, epoch_number)
@@ -280,6 +276,38 @@ class BasicTraining(Experiment):
             epoch_results.update(self._call_hook(Signals.EPOCH_END))
             results.append(epoch_results)
 
+        return results
+
+    def run(self, max_elements: int = 0,
+            dataset_root: str = '/tmp/data',
+            device: Optional[torch_device] = None) -> List[Dict]:
+        """ Sets up and runs the training.
+
+        Results are returned and the internal model is updated.
+        """
+
+        # Build the objects needed for training.
+        training_loader, validation_loader = self.get_data_loaders(
+            self.dataset, self.batch_size,
+            max_elements_train=max_elements,
+            dataset_root=dataset_root
+        )
+
+        optimizer = self.get_optimizer(self.learning_rate, self.model)
+
+        # Move the model to the device if needed.
+        model = self.model
+        if device:
+            model = model.to(device)
+
+        results = self.train(training_loader,
+                             validation_loader,
+                             model,
+                             optimizer,
+                             self.loss_function(),
+                             self.epochs,
+                             device)
+        self.model = model  # update the stored model with the trained one
         return results
 
     def __str__(self) -> str:

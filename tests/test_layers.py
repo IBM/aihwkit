@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,7 +21,7 @@ from torch.cuda import current_device, device_count
 
 from aihwkit.nn import AnalogSequential
 from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.rpu_base import cuda, tiles
+from aihwkit.simulator.rpu_base import tiles
 from aihwkit.simulator.tiles import AnalogTile
 
 from .helpers.decorators import parametrize_over_layers
@@ -31,6 +31,7 @@ from .helpers.layers import (
 )
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import ConstantStep, Inference
+from .helpers.testcases import SKIP_CUDA_TESTS
 
 
 @parametrize_over_layers(
@@ -133,7 +134,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 
     def test_sequential_move_to_cuda(self):
         """Test moving AnalogSequential to cuda (from CPU)."""
-        if not cuda.is_compiled():
+        if SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
 
         # Map the original tile classes to the expected ones after `cuda()`.
@@ -165,7 +166,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 
     def test_sequential_move_to_cuda_via_to(self):
         """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
-        if not cuda.is_compiled():
+        if SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
 
         # Map the original tile classes to the expected ones after `cuda()`.
@@ -197,7 +198,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 
     def test_sequential_move_to_cuda_via_to_multiple_gpus(self):
         """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
-        if not cuda.is_compiled():
+        if SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
         if device_count() < 2:
             raise SkipTest('Need at least two devices for this test')
@@ -238,7 +239,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 
     def test_sequential_move_to_cuda_multiple_gpus(self):
         """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
-        if not cuda.is_compiled():
+        if SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
         if device_count() < 2:
             raise SkipTest('Need at least two devices for this test')
@@ -279,7 +280,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 
     def test_save_with_cuda(self):
         """Whether model is correctly reconstructed after saving"""
-        if not cuda.is_compiled():
+        if SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
 
         # Map the original tile classes to the expected ones after `cuda()`.
