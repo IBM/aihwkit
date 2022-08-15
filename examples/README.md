@@ -291,8 +291,8 @@ Descent optimizer and the loss is printed for every epoch.
 
 ## Example 10: [`10_plot_presets.py`]
 
-This examples print 5 of the different [`preset devices`] and [`preset configs`] available.
-Using this presets makes easy testing the different memory element that can be used to train a
+This example prints 5 of the different [`preset devices`] and [`preset configs`] available.
+Using these presets makes easy to test the different memory elements that can be used to train a
 neural network. The presets (except for the "Idealized analog device") are calibrated on the
 measured characteristics of real hardware devices that have been fabricated at IBM. Device non-ideal
 characteristics, noise, and variability are accurately simulated in all presets.
@@ -469,29 +469,53 @@ model and the weights are then saved so that these can be used for additional tr
 
 ## Example 19: [`19_analog_summary_lenet.py`]
 
-In this example, we define a Lenet model and apply the analog_summary function. 
-The `analog_summary(model, input_size)` function provides a per-layer analog information and statistics. 
-Given the model and the input size, it prints a table containing the following per-layer information: 
-* Layer Name 
+In this example, we define a Lenet model and apply the analog_summary function.
+The `analog_summary(model, input_size)` function provides a per-layer analog information and statistics.
+Given the model and the input size, it prints a table containing the following per-layer information:
+* Layer Name
 * Layer type (Analog or Digital)
-* Input Shape 
-* Output Shape 
+* Input Shape
+* Output Shape
 * Kernel Shape
-* Number of analog tiles used by the layer 
+* Number of analog tiles used by the layer
 * The re-use factor (the number of computed operations using the same tile)
-* Per-tile information : 
+* Per-tile information :
   * Logical tile shape (out, in)
   * Physical tile shape (out, in)
   * Utilization (%)
 
-The function also prints some general information, such as the total number of tiles or analog layers. 
+The function also prints some general information, such as the total number of tiles or analog layers.
 
 ## Example 20: [`20_mnist_ddp.py`]
 
-In this example we define a linear model that is trained using the MNIST dataset. The model is an 
-analog sequential model that is defined using both the analog linear and analog linear mapped layers. 
-The model also uses PyTorch's Distributed Data Parallel (DDP) for training, which efficiently uses 
+In this example we define a linear model that is trained using the MNIST dataset. The model is an
+analog sequential model that is defined using both the analog linear and analog linear mapped layers.
+The model also uses PyTorch's Distributed Data Parallel (DDP) for training, which efficiently uses
 multiple GPUs for parallel training in order to significantly decrease the training time.
+
+## Example 21: [`21_fit_device_data.py`]
+
+In this example shows how one could quickly fit real device data for
+analog training  using the `PiecewiseStepDevice`.
+
+## Example 22: [`22_war_and_peace_lstm.py`]
+
+This example explores the study done in [Gokmen T and Haensch W (2020)
+Algorithm for Training Neural Networks on Resistive Device
+Arrays. Front. Neurosci.] on a 2-layer LSTM network trained with the
+War and Peace dataset (which needs to be downloaded separately).
+
+In the example, there are 4 different RPU that can be used: a floating
+point tile to run the workload; an analog tile with ideal devices that
+use SGD for training; an analog tile with ideal and symmetric device
+that use SGD for training; an analog tile which uses ideal device with
+tiki-taka v2 algorithm that achieves better performance than SGD.
+
+## Example 23: [`23_using_analog_tile_as_matrix.py`]
+
+Here it is illustrated how the analog tiles can be directly used to
+implement an analog mat-vec (without a pytorch layer).
+
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
@@ -533,3 +557,6 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`18_cifar10_on_resnet.py`]: 18_cifar10_on_resnet.py
 [`19_analog_summary_lenet.py`]: 19_analog_summary_lenet.py
 [`20_mnist_ddp.py`]: 20_mnist_ddp.py
+[`21_fit_device_data.py`]: 21_fit_device_data.py
+[`22_war_and_peace_lstm.py`]: 22_war_and_peace_lstm.py
+[`23_using_analog_tile_as_matrix.py`]: 23_using_analog_tile_as_matrix.py

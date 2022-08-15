@@ -16,6 +16,8 @@
 #include <stdexcept>
 #include <string.h>
 
+#define UNUSED(X) (void)X
+
 #ifdef _MSC_VER
 #define PRAGMA(DIRECTIVE) __pragma(DIRECTIVE)
 #define PRAGMA_SIMD
@@ -40,6 +42,12 @@
     ss << "Error in " << __FILENAME__ << ":" << __LINE__ << "  ";                                  \
     ss << MSG;                                                                                     \
     throw std::runtime_error(ss.str());                                                            \
+  }
+
+#define RPU_INFO(MSG)                                                                              \
+  {                                                                                                \
+    std::cout << "Info in " << __FILENAME__ << ":" << __LINE__ << "  ";                            \
+    std::cout << MSG << std::endl;                                                                 \
   }
 
 #define RPU_NOT_IMPLEMENTED RPU_FATAL("Feature not yet implemented!");

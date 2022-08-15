@@ -32,7 +32,6 @@ from torch import nn
 from aihwkit.nn import AnalogRNN
 from aihwkit.nn import AnalogGRUCell  # or one of AnalogGRUCell, AnalogVanillaRNNCell
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
     WeightNoiseType, WeightClipType, WeightModifierType)
@@ -62,7 +61,7 @@ DEVICE = torch.device('cuda') if cuda.is_compiled() else torch.device('cpu')
 
 if USE_ANALOG_TRAINING:
     # Define a RPU configuration for analog training
-    rpu_config = SingleRPUConfig(device=GokmenVlasovPreset())
+    rpu_config = GokmenVlasovPreset()
 
 else:
     # Define an RPU configuration using inference/hardware-aware training tile

@@ -21,6 +21,7 @@ from numpy import array
 from numpy.random import rand
 from numpy.testing import assert_array_almost_equal, assert_raises
 from torch import Tensor, load, save, device, manual_seed
+from torch import abs as torch_abs
 from torch.nn import Module, Sequential
 from torch.nn import Linear as torch_linear
 from torch.nn.functional import mse_loss
@@ -30,7 +31,7 @@ from aihwkit.nn import (
     AnalogConv2d, AnalogConv2dMapped, AnalogSequential, AnalogLinearMapped
 )
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig, FloatingPointRPUConfig
+from aihwkit.simulator.configs import SingleRPUConfig, InferenceRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters, MappingParameter
 from aihwkit.simulator.rpu_base import cuda
@@ -170,6 +171,8 @@ class SerializationTest(ParametrizedTestCase):
             input_x = input_x.cuda()
             input_y = input_y.cuda()
 
+        self.train_model(model, loss_func, input_x, input_y)
+
         # Keep track of the current weights and biases for comparing.
         _, _, tile_weights, tile_biases, _ = self.get_layer_and_tile_weights(model)
 
@@ -195,6 +198,47 @@ class SerializationTest(ParametrizedTestCase):
         loss = self.train_model(model, loss_func, input_x, input_y)
         if self.tile_class != ConstantStep:
             self.assertTensorAlmostEqual(loss, new_loss)
+
+    def test_save_load_state_dict_train_after_old_model(self):
+        """Test saving and loading using a state dict and training after load with old model."""
+        model = self.get_layer()
+
+        # Perform an update in order to modify tile weights and biases.
+        loss_func = mse_loss
+        if isinstance(model, (AnalogConv2d, AnalogConv2dMapped)):
+            input_x = Tensor(rand(2, 2, 3, 3))*0.2
+            input_y = Tensor(rand(2, 3, 5, 5))*0.2
+        else:
+            input_x = Tensor(rand(2, model.in_features))*0.2
+            input_y = Tensor(rand(2, model.out_features))*0.2
+
+        if self.use_cuda:
+            input_x = input_x.cuda()
+            input_y = input_y.cuda()
+
+        self.train_model(model, loss_func, input_x, input_y)
+
+        # Keep track of the current weights and biases for comparing.
+        _, _, tile_weights, tile_biases, _ = self.get_layer_and_tile_weights(model)
+
+        # Save the model to a file.
+        with TemporaryFile() as file:
+            save(model.state_dict(), file)
+            # Create a new model and load its state dict.
+            file.seek(0)
+            model.load_state_dict(load(file))
+
+        # Compare the new model weights and biases. they should now be in sync
+        (new_model_weights, new_model_biases,
+         new_tile_weights, new_tile_biases, _) = self.get_layer_and_tile_weights(model)
+
+        assert_array_almost_equal(tile_weights, new_model_weights)
+        assert_array_almost_equal(tile_weights, new_tile_weights)
+        if self.bias:
+            assert_array_almost_equal(tile_biases, new_model_biases)
+            assert_array_almost_equal(tile_biases, new_tile_biases)
+
+        self.train_model(model, loss_func, input_x, input_y)
 
     def test_save_load_train_after(self):
         """Test saving and loading using a state dict and training after load."""
@@ -438,6 +482,40 @@ class SerializationTest(ParametrizedTestCase):
         new_analog_tile = self.get_analog_tile(new_model)
         alpha_new = new_analog_tile.get_out_scaling_alpha().detach().cpu()
         assert_array_almost_equal(array(alpha), array(alpha_new))
+
+    def test_remapping(self):
+        """Test remapping of the weights."""
+        # Create the device and the array.
+        rpu_config = InferenceRPUConfig(mapping=MappingParameter(
+            weight_scaling_omega=0.4,
+            weight_scaling_omega_columnwise=True))
+
+        model = self.get_layer(rpu_config=rpu_config)
+        analog_tile = self.get_analog_tile(model)
+
+        user_weights = Tensor(model.out_features, model.in_features).uniform_(-0.1, 0.1)
+        if self.bias:
+            user_biases = Tensor(model.out_features).uniform_(-0.1, 0.1)
+        else:
+            user_biases = None
+        model.set_weights(user_weights, user_biases, remap_weights=True,
+                          force_exact=True)
+
+        alpha_initial = analog_tile.get_out_scaling_alpha().detach().cpu()
+        self.assertNotEqual(alpha_initial.max(), 1.0)
+
+        # remap
+        model.remap_weights(weight_scaling_omega=1.0)
+
+        weights, _ = model.get_weights(apply_out_scales=True, force_exact=True)
+        analog_weights, _ = model.get_weights(apply_out_scales=False, force_exact=True)
+
+        assert_array_almost_equal(array(user_weights), array(weights))
+
+        alpha = analog_tile.get_out_scaling_alpha().detach().cpu()
+        assert_raises(AssertionError, assert_array_almost_equal, array(alpha), array(alpha_initial))
+
+        self.assertEqual(torch_abs(analog_weights).max(), 1.0)
 
     def test_save_load_state_dict_hidden_parameters(self):
         """Test saving and loading via state_dict with hidden parameters."""

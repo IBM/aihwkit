@@ -16,8 +16,11 @@
 #include "rpu_pulsed_device.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
-// #include "logger.h"
-#include <stdio.h>
+// physical constants do not change!
+#define PHYSICAL_PARAMETER_e 1.602e-19 								// elementary charge [C]
+#define PHYSICAL_PARAMETER_kb 1.3807e-23								// Boltzman's constant  [VAs/K]
+#define PHYSICAL_PARAMETER_zvo 2									// oxygen vacancy charge number
+#define PHYSICAL_PARAMETER_eps_0 8.854e-12				      				// vacuum permittivity [As/Vm]
 
 namespace RPU {
 
@@ -55,20 +58,8 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T h3 = (T) 0.36;
     T j_0 = (T) 1.054;
     T k0 = (T) 1.0526;
-    // physical constants do not change!
-    const T e = 1.602e-19; 								// elementary charge [C]
-    const T kb = 1.3807e-23;								// Boltzman's constant  [VAs/K]		
-    const T Arichardson = 6.01e5;								// Richardson's constant [A/m^2K^2] 
-    const T mdiel = 9.10938e-31;			  				// electron rest mass [kg]
-    const T h = 6.626e-34; 							// Planck's constant [Js]
-    const int zvo = 2;									// oxygen vacancy charge number
-    const T eps_0 = 8.854e-12;				      				// vacuum permittivity [As/Vm]
     // Fitting Parameters for original model
     T T0 = (T) 293;								 	// ambient temperature [K] 
-    T eps = (T) 17; // from [10:25]; 						// static hafnium oxide permittivity 
-    T epsphib = (T) 5.5;							// hafnium oxide permittivity related to image force barrier lowering
-    T phiBn0 = (T) 0.18; // from [0.1:0.5];				// nominal schottky barrier height [eV]
-    T phin = (T) 0.1; // from [0.1:0.3];					// energy level difference between the Fermi level in the oxide and the oxide conduction band edge [eV]
     T un = (T) 4e-6; // from [1e-6:1e-5];				// electron mobility [m^2/Vs]
     T Ndiscmax = (T) 20*1e26; // from [0.001:1100];				// maximum oxygen vacancy concentration in the disc[10^26/m^3]
     T Ndiscmin = (T) 0.008*1e26; // from [0.0001:100];			// minimum oxygen vacancy concentration in the disc [10^26/m^3]
@@ -92,9 +83,13 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T base_time_step = (T) 1e-8;
     T Ndisc_min_bound = (T) 0.06*1e26;
     T Ndisc_max_bound = (T) 1.9897452127440086504e26;
-    T Ninit = Ndisc_min_bound; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T current_min =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0)));
     T current_max =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0)));
+    T w_min = (T)-0.6;
+    T w_min_dtod = (T)0.3;
+    T w_max = (T)0.6;
+    T w_max_dtod = (T)0.3;
+    T Ninit = pow(((pow(((-g0*(exp(-g1*read_voltage)-1))/(((0-w_min)/(w_max-w_min))*(current_max-current_min)+current_min)), k0)-1)/(h0+h1*read_voltage+h2*exp(-h3*read_voltage))),(1/-j_0))*Ndiscmin; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T Ndiscmax_dtod = (T) 0;							// 
     T Ndiscmin_dtod = (T) 0;							//
     T ldet_dtod = (T) 0;							//
@@ -104,6 +99,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T ldet_std = (T) 0;							//
     T rdet_std = (T) 0;							//
 
+    T write_noise_std = (T)1.0;
     ,
     /*print body*/
 
@@ -135,10 +131,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t k0:\t\t\t" << k0 << std::endl;
     
     ss << "\t T0:\t\t\t" << T0 << std::endl;
-    ss << "\t eps:\t\t\t" << eps << std::endl;
-    ss << "\t epsphib:\t\t" << epsphib << std::endl;
-    ss << "\t phiBn0:\t\t" << phiBn0 << std::endl;
-    ss << "\t phin:\t\t\t" << phin << std::endl;
     ss << "\t un:\t\t\t" << un << std::endl;
     ss << "\t Nplug:\t\t\t" << Nplug << std::endl;
     ss << "\t a:\t\t\t" << a << std::endl;
@@ -189,7 +181,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmin = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_ldet = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_A = Array_2D_Get<T>(d_sz, x_sz);
-      device_specific_Ndisc = Array_2D_Get<double>(d_sz, x_sz);
 
       for (int j = 0; j < x_sz; ++j) {
         for (int i = 0; i < d_sz; ++i) {
@@ -197,7 +188,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = (T)0.0;
           device_specific_ldet[i][j] = (T)0.0;
           device_specific_A[i][j] = (T)0.0;
-          device_specific_Ndisc[i][j] = (double)0.0;
         }
       },
       /* dtor*/
@@ -205,7 +195,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       Array_2D_Free<T>(device_specific_Ndiscmin);
       Array_2D_Free<T>(device_specific_ldet);
       Array_2D_Free<T>(device_specific_A);
-      Array_2D_Free<double>(device_specific_Ndisc);
       ,
       /* copy */
       for (int j = 0; j < other.x_size_; ++j) {
@@ -214,7 +203,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = other.device_specific_Ndiscmin[i][j];
           device_specific_ldet[i][j] = other.device_specific_ldet[i][j];
           device_specific_A[i][j] = other.device_specific_A[i][j];
-          device_specific_Ndisc[i][j] = other.device_specific_Ndisc[i][j];
         }
       },
       /* move assignment */
@@ -222,27 +210,23 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmax = other.device_specific_Ndiscmax;
       device_specific_ldet = other.device_specific_ldet;
       device_specific_A = other.device_specific_A;
-      device_specific_Ndisc = other.device_specific_Ndisc;
 
       other.device_specific_Ndiscmax = nullptr;
       other.device_specific_Ndiscmin = nullptr;
       other.device_specific_ldet = nullptr;
       other.device_specific_A = nullptr;
-      other.device_specific_Ndisc = nullptr;
       ,
       /* swap*/
       swap(a.device_specific_Ndiscmax, b.device_specific_Ndiscmax);
       swap(a.device_specific_Ndiscmin, b.device_specific_Ndiscmin);
       swap(a.device_specific_ldet, b.device_specific_ldet);
       swap(a.device_specific_A, b.device_specific_A);
-      swap(a.device_specific_Ndisc, b.device_specific_Ndisc);
       ,
       /* dp names*/
       names.push_back(std::string("device_specific_Ndiscmax"));
       names.push_back(std::string("device_specific_Ndiscmin"));
       names.push_back(std::string("device_specific_ldet"));
       names.push_back(std::string("device_specific_A"));
-      names.push_back(std::string("device_specific_Ndisc"));
       ,
       /* dp2vec body*/
       int n_prev = (int)names.size();
@@ -253,7 +237,6 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
         data_ptrs[n_prev + 1][i] = device_specific_Ndiscmin[0][i];
         data_ptrs[n_prev + 2][i] = device_specific_ldet[0][i];
         data_ptrs[n_prev + 3][i] = device_specific_A[0][i];
-        data_ptrs[n_prev + 4][i] = device_specific_Ndisc[0][i];
       },
       /* vec2dp body*/
       int n_prev = (int)names.size();
@@ -264,17 +247,27 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
         device_specific_Ndiscmin[0][i] = data_ptrs[n_prev + 1][i];
         device_specific_ldet[0][i] = data_ptrs[n_prev + 2][i];
         device_specific_A[0][i] = data_ptrs[n_prev + 3][i];
-        device_specific_Ndisc[0][i] = data_ptrs[n_prev + 4][i];
       }
 
 
       ,
       /*invert copy DP */
+      for (int j = 0; j < this->x_size_; ++j) {
+        for (int i = 0; i < this->d_size_; ++i) {
+          std::swap(device_specific_Ndiscmax[i][j], device_specific_Ndiscmin[i][j]);
+        }
+      }
+      // Todo: if device specific Ndisc bounds: Remap wmax&wmin to Ndisc max_bound&min_bound 
 
   );
 
 
   void printDP(int x_count, int d_count) const override;
+
+  inline T **getNdiscmax() const { return device_specific_Ndiscmax; };
+  inline T **getNdiscmin() const { return device_specific_Ndiscmin; };
+  inline T **getldet() const { return device_specific_ldet; };
+  inline T **getA() const { return device_specific_A; };
 
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
@@ -298,7 +291,6 @@ private:
   T **device_specific_Ndiscmin = nullptr;
   T **device_specific_ldet = nullptr;
   T **device_specific_A = nullptr;
-  double **device_specific_Ndisc = nullptr;
 };
 
 } // namespace RPU

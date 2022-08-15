@@ -1123,6 +1123,313 @@ class JARTv1bDevice(PulsedDevice):
         return parameters_to_bindings(self)
 
 
+@dataclass
+class PiecewiseStepDevice(PulsedDevice):
+    r"""Piece-wise interpolated device update characteristics.
+
+    This model is derived from :class:`~PulsedDevice` and uses all its
+    parameters. :class:`~PiecewiseStepDevice` implements a new
+    functionality where the device's update response curve is given
+    explicitly on nodes over the weight range. The device will
+    automatically interpolate the update step size using the given node
+    values.
+
+    In detail, the update in down direction of the device is given as:
+
+    .. math::
+        w_{ij} \leftarrow w_{ij} + \Delta w_{ij}^d \left((1 - q) v^d(i_w)
+        + q \, v^d(i_w + 1)\right) (1 + \sigma_\text{c-to-c}\,\xi)
+
+    where :math:`i_w` is the index of the given vector :math:`v^d`
+    (``piecewise_down``) where the current weight value would fall
+    into if scaled to the current min and max values of that device
+    (first and last value are set at weight min and max, respectively,
+    the other values are equally distributed in the range).
+
+    The scalar :math:`q` is the relative position of the weight in the
+    current segment between the two selected nodes :math:`v^d(i_w)`
+    and :math:`v^d(i_w + 1)`.
+
+    The update in up direction is computed analogously using the
+    ``piecewise_up`` vector.
+
+    Note:
+
+        The piecewise up and down vectors need to have the same number
+        of elements.
+
+    Note:
+
+        In case of GPUs the maximal number of nodes in the vectors
+        is limited to below 64 due to performance reasons.
+
+    """
+
+    bindings_class: ClassVar[Type] = devices.PiecewiseStepResistiveDeviceParameter
+
+    piecewise_up: List[float] = field(default_factory=lambda: [1])
+    r"""Array of values that characterize the update steps in upwards direction.
+
+    The values are equally spaced in ``w_min`` and `w_max`` (which
+    could vary from device-to-device), where the first and the last
+    value is set at the boundary. The update will be computed by
+    linear interpolation of the adjacent values, depending on where
+    the weight is currently within the range.
+
+    The values are given as relative numbers: the final update size
+    will be computed by multiplying the value with the current
+    ``dw_min`` of the device.
+
+    E.g.  ``[1.5, 1, 1.5]`` and ``dw_min=0.1`` means that the update
+    (in up direction) is ``dw_min`` around zero weight value and
+    linearly increasing to ``1.5 * dw_min`` for larger or smaller
+    weight values.
+
+    """
+
+    piecewise_down: List[float] = field(default_factory=lambda: [1])
+    r"""Array of values that characterize the update steps in downwards direction.
+
+    Analogous to ``piecewise_up`` but for the downwards direction.
+    """
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled a new when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
+@dataclass
+class JARTv1bDevice(PulsedDevice):
+    """Ideal update behavior (using floating point), but forward/backward
+    might be non-ideal.
+
+    Ideal update behavior (using floating point), however,
+    forward/backward might still have a non-ideal ADC or noise added.
+    """
+
+    bindings_class: ClassVar[Type] = devices.JARTv1bResistiveDeviceParameter
+
+    w_max: float = 0.6
+    """See ``w_min``."""
+
+    w_min: float = -0.6
+    """Mean of hard bounds across device cross-point `ij`.
+
+    The parameters ``w_min`` and ``w_max`` are used to set the min/max bounds
+    independently.
+
+    Note:
+        For this abstract device, we assume that weights can have
+        positive and negative values and are symmetrically around
+        zero. In physical circuit terms, this might be implemented
+        as a difference of two resistive elements.
+    """
+
+    w_max_dtod: float = 0
+    """See ``w_min_dtod``."""
+
+    w_min_dtod: float = 0
+    """Device-to-device variation of the hard bounds.
+
+    Device-to-device variation of the hard bounds, of min and max value,
+    respectively. All are given in relative units to ``w_min``, or ``w_max``,
+    respectively.
+    """
+
+    dw_min: float = 0.0001
+    """Mean of the minimal update step sizes across devices and directions."""
+    
+    alpha0: float = 4.81951e-5
+    """See ``reset``."""
+
+    alpha2: float = 1.03685
+    """See ``reset``."""
+
+    alpha3: float = 0.34567
+    """See ``reset``."""
+
+    alpha1 = alpha0*exp(-alpha2/alpha3)
+    """See ``reset``."""
+
+    beta0: float = 7.0526e-4
+    """See ``reset``."""
+
+    beta1: float = 4.2383e-5
+    """See ``reset``."""
+
+    c0: float = 4.004
+    """See ``reset``."""
+
+    c1: float = 2.8646
+    """See ``reset``."""
+
+    c2: float = 4.2125
+    """See ``reset``."""
+
+    c3: float = 1.4134
+    """See ``reset``."""
+
+    d0: float = 6.6103
+    """See ``reset``."""
+
+    d1: float = 1.4524
+    """See ``reset``."""
+
+    d2: float = 7.4235
+    """See ``reset``."""
+
+    d3: float = 4.0585
+    """See ``reset``."""
+
+    f0: float = 6.326e-4
+    """See ``reset``."""
+
+    f1: float = 1.4711
+    """See ``reset``."""
+
+    f2: float = 0.5199
+    """See ``reset``."""
+
+    f3: float = 1.561
+    """See ``reset``."""
+
+    g0: float = 4.84e-3
+    """See ``reset``."""
+
+    g1: float = 0.1353
+    """See ``reset``."""
+
+    h0: float = 5.548
+    """See ``reset``."""
+
+    h1: float = 6.8648
+    """See ``reset``."""
+
+    h2: float = 51.586
+    """See ``reset``."""
+
+    h3: float = 0.36
+    """See ``reset``."""
+
+    j0: float = 1.054
+    """See ``reset``."""
+
+    k0: float =  1.0526
+    """See ``reset``."""
+
+    T0: float = 293
+    """See ``reset``."""
+
+    un: float = 4e-6
+    """See ``reset``."""
+
+    Ndiscmax: float = 20*1e26
+    """See ``reset``."""
+
+    Ndiscmin: float = 0.008*1e26
+    """See ``reset``."""
+
+    Nplug: float = 20*1e26
+    """See ``reset``."""
+
+    a: float = 0.25e-9
+    """See ``reset``."""
+
+    ny0: float = 2e13
+    """See ``reset``."""
+
+    dWa: float = 1.35
+    """See ``reset``."""
+
+    Rth0: float = 15.72e6
+    """See ``reset``."""
+
+    rdet: float = 45e-9
+    """See ``reset``."""
+
+    lcell: float = 3*1e-9
+    """See ``reset``."""
+
+    ldet: float = 0.4*1e-9
+    """See ``reset``."""
+
+    Rtheff_scaling: float = 0.27
+    """See ``reset``."""
+
+    RseriesTiOx: float = 650
+    """See ``reset``."""
+
+    R0: float = 719.2437
+    """See ``reset``."""
+
+    Rthline: float = 90471.47
+    """See ``reset``."""
+
+    alphaline: float = 3.92e-3
+    """See ``reset``."""
+
+    read_voltage: float = 0.2
+    """See ``reset``."""
+
+    pulse_voltage_SET: float = -0.342
+    """See ``reset``."""
+
+    pulse_voltage_RESET: float = 0.7065
+    """See ``reset``."""
+
+    pulse_length: float = 1e-6
+    """See ``reset``."""
+
+    base_time_step: float = 1e-8
+    """See ``reset``."""
+
+    Ndisc_min_bound: float = 0.06e26
+    """See ``reset``."""
+
+    Ndisc_max_bound: float = 1.9897452127440086504e26
+    """See ``reset``."""
+
+    Ndiscmax_dtod: float = 0
+    """See ``reset``."""
+
+    Ndiscmin_dtod: float = 0
+    """See ``reset``."""
+
+    ldet_dtod: float = 0
+    """See ``reset``."""
+
+    rdet_dtod: float = 0
+    """See ``reset``."""
+
+    Ndiscmax_std: float = 0
+    """See ``reset``."""
+
+    Ndiscmin_std: float = 0
+    """See ``reset``."""
+
+    ldet_std: float = 0
+    """See ``reset``."""
+
+    rdet_std: float = 0
+    """See ``reset``."""
+
+    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+        return parameters_to_bindings(self)
+
+
 ###############################################################################
 # Specific devices based on ``unit cell``.
 ###############################################################################

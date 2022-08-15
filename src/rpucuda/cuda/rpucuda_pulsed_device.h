@@ -168,6 +168,7 @@ public:
   virtual T *get1ParamsData() { return nullptr; };
   virtual float *get2ParamsData() { return nullptr; };
   virtual float *get4ParamsData() { return dev_4params_->getData(); }
+  virtual T getWeightGranularityNoise() const { return getPar().dw_min_std; };
 
 protected:
   virtual void applyUpdateWriteNoise(T *dev_weights);
@@ -177,13 +178,13 @@ protected:
   std::unique_ptr<CudaArray<float>> dev_reset_flag_ = nullptr;
   std::unique_ptr<CudaArray<float>> dev_persistent_weights_ = nullptr;
 
-private:
-  void initialize();
-
   std::unique_ptr<CudaArray<float>> dev_4params_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_diffusion_rate_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_decay_scale_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_reset_bias_ = nullptr;
+
+private:
+  void initialize();
 };
 
 #define BUILD_PULSED_DEVICE_CONSTRUCTORS_CUDA(                                                     \
