@@ -186,7 +186,7 @@ public:
   void diffuseWeights(T *dev_weights) override;
   void clipWeights(T *dev_weights, T clip) override;
   void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override;
-  virtual void resetAt(T *dev_weights, const char *dev_non_zero_msk);
+  void resetAt(T *dev_weights, const char *dev_non_zero_msk) override;
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override;
 
 private:
