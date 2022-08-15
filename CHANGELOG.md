@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
 * Inference experiment and runners. (\#410)
 * Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
-* Added ``CUDA_TEST`` switch to manually switch off the CUDA tests
+* Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests
 * Enabling comparisons of ``RPUConfig`` instances. (\#410)
 
 ### Fixed

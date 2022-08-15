@@ -17,8 +17,9 @@
 from typing import Any, Dict, Tuple, Type, Optional
 from os import path, mkdir
 from copy import deepcopy
+from requests import get as requests_get
 from numpy import ndarray, array, logspace, log10, zeros, concatenate
-from wget import download as Download
+
 
 from torch import device as torch_device, max as torch_max, Tensor
 from torch import load
@@ -33,6 +34,13 @@ from aihwkit.nn.modules.base import AnalogModuleBase
 
 
 WEIGHT_TEMPLATE_URL = "https://github.com/IBM-AI-Hardware-Center/Composer/raw/main/"
+
+
+def download(url, destination):
+    """Helper for downloading a file from url"""
+    response = requests_get(url)
+    with open(destination, "wb") as file_:
+        file_.write(response.content)
 
 
 class BasicInferencing(Experiment):
@@ -184,7 +192,7 @@ class BasicInferencing(Experiment):
                 if not path.exists(template_dir):
                     mkdir(template_dir)
                 if not path.exists(template_path):
-                    Download(template_url, template_path)
+                    download(template_url, template_path)
 
             print('template_path: ', template_path)
             if path.exists(template_path):

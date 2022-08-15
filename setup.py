@@ -24,7 +24,6 @@ INSTALL_REQUIRES = [
     'requests>=2.25,<3',
     'numpy>=1.18',
     'protobuf>=3.13.0,<4',
-    'wget==3.2'
 ]
 
 def get_version() -> str:

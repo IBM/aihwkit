@@ -4,7 +4,6 @@ setuptools<=46.0; python_version < '3.9'
 scikit-build>=0.11.1
 pybind11>=2.6.2
 # Runtime dependencies.
-wget==3.2
 torch>=1.7
 torchvision
 scipy
