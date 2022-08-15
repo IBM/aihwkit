@@ -21,7 +21,7 @@ from torch.optim import SGD
 from torchvision.models import resnet18, alexnet
 from parameterized import parameterized_class
 
-from aihwkit.simulator.configs.configs import FloatingPointRPUConfig
+from aihwkit.simulator.configs.configs import FloatingPointRPUConfig, InferenceRPUConfig
 from aihwkit.nn import AnalogSequential, AnalogLinear, AnalogConv2d
 from aihwkit.nn.conversion import convert_to_analog
 
@@ -75,6 +75,38 @@ class ConversionLayerTest(ParametrizedTestCase):
         self.assertEqual(analog_model[0].__class__, AnalogLinear)
         self.assertEqual(analog_model.__class__, AnalogSequential)
         self.assertTensorAlmostEqual(loss_func(analog_model(x_b), y_b), digital_loss)
+
+    def test_conversion_linear_sequential_specific(self):
+        """Test converting sequential and linear."""
+
+        def specfun(name, _, rpu_config):
+            """special layer """
+            if name in ['0', '2.1']:
+                return InferenceRPUConfig()
+            return rpu_config
+
+        model = Sequential(
+            Linear(4, 3),
+            Linear(3, 3),
+            Sequential(
+                Linear(3, 1),
+                Linear(1, 1)
+            )
+        )
+        if self.use_cuda:
+            model = model.cuda()
+
+        analog_model = convert_to_analog(model, FloatingPointRPUConfig(),
+                                         specific_rpu_config_fun=specfun)
+        self.assertEqual(analog_model[0].__class__, AnalogLinear)
+        self.assertEqual(next(analog_model[0].analog_tiles()).rpu_config.__class__,
+                         InferenceRPUConfig)
+        self.assertEqual(next(analog_model[2][1].analog_tiles()).rpu_config.__class__,
+                         InferenceRPUConfig)
+        self.assertEqual(next(analog_model[1].analog_tiles()).rpu_config.__class__,
+                         FloatingPointRPUConfig)
+        self.assertEqual(next(analog_model[2][0].analog_tiles()).rpu_config.__class__,
+                         FloatingPointRPUConfig)
 
     def test_conversion_torchvision_resnet(self):
         """Test converting resnet model from torchvision."""

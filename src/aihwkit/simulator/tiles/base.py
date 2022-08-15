@@ -32,6 +32,24 @@ from aihwkit.optim.context import AnalogContext
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
 
 
+class AnalogTileStateNames:  # pylint: disable=too-few-public-methods
+    """ Class defining analog tile state name constants.
+
+    Caution:
+       Do *not* edit. Some names are attribute names of the tile.
+    """
+
+    WEIGHTS = 'analog_tile_weights'
+    HIDDEN_PARAMETERS = 'analog_tile_hidden_parameters'
+    HIDDEN_PARAMETER_NAMES = 'analog_tile_hidden_parameter_names'
+    CLASS = 'analog_tile_class'
+    LR = 'analog_lr'
+    SHARED_WEIGHTS = 'shared_weights'
+    CONTEXT = 'analog_ctx'
+    OUT_SCALING = 'out_scaling_alpha'
+    RPU_CONFIG = 'rpu_config'
+
+
 class BaseTile(Generic[RPUConfigGeneric]):
     """Base class for tiles.
 
@@ -129,18 +147,19 @@ class BaseTile(Generic[RPUConfigGeneric]):
         This method removes the ``tile`` member, as the binding Tiles are not
         serializable.
         """
+        # Caution: all attributes of the tile will be saved.
         current_dict = self.__dict__.copy()
 
-        current_dict['analog_tile_weights'] = self.tile.get_weights()
+        SN = AnalogTileStateNames
+        current_dict[SN.WEIGHTS] = self.tile.get_weights()
         # Store the hidden parameters as a numpy array, as storing it as
         # Tensor causes issues in PyTorch 1.5.
-        current_dict['analog_tile_hidden_parameters'] \
+        current_dict[SN.HIDDEN_PARAMETERS] \
             = self.tile.get_hidden_parameters().data.numpy()
-        current_dict['analog_tile_hidden_parameter_names'] \
+        current_dict[SN.HIDDEN_PARAMETER_NAMES] \
             = self.tile.get_hidden_parameter_names()
-        current_dict['analog_tile_class'] = self.__class__.__name__
-        current_dict['analog_lr'] = self.tile.get_learning_rate()
-        current_dict['shared_weights'] = self.shared_weights
+        current_dict[SN.CLASS] = self.__class__.__name__
+        current_dict[SN.LR] = self.tile.get_learning_rate()
         current_dict.pop('tile', None)
 
         # don't save device. Will be determined by loading object
@@ -169,17 +188,17 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         # Note: self here is NOT initialized! So we need to recreate
         # attributes that were not saved in getstate
-
+        SN = AnalogTileStateNames
         current_dict = state.copy()
         current_dict.pop('image_sizes', None)  # should not be saved
-        weights = current_dict.pop('analog_tile_weights')
-        hidden_parameters = current_dict.pop('analog_tile_hidden_parameters')
-        hidden_parameters_names = current_dict.pop('analog_tile_hidden_parameter_names', [])
-        alpha_scale = current_dict.pop('analog_alpha_scale', None)
-        tile_class = current_dict.pop('analog_tile_class', self.__class__.__name__)
-        analog_lr = current_dict.pop('analog_lr', 0.01)
-        analog_ctx = current_dict.pop('analog_ctx')
-        shared_weights = current_dict.pop('shared_weights')
+        weights = current_dict.pop(SN.WEIGHTS)
+        hidden_parameters = current_dict.pop(SN.HIDDEN_PARAMETERS)
+        hidden_parameters_names = current_dict.pop(SN.HIDDEN_PARAMETER_NAMES, [])
+        alpha_scale = current_dict.pop('analog_alpha_scale', None)  # legacy
+        tile_class = current_dict.pop(SN.CLASS, self.__class__.__name__)
+        analog_lr = current_dict.pop(SN.LR, 0.01)
+        analog_ctx = current_dict.pop(SN.CONTEXT)
+        shared_weights = current_dict.pop(SN.SHARED_WEIGHTS)
         shared_weights_if = shared_weights is not None
 
         current_dict.pop('noise_model', None)  # legacy
@@ -217,7 +236,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         # re-generate shared weights (CPU)
         if shared_weights_if:
-            if not hasattr(self, 'shared_weights'):
+            if not hasattr(self, SN.SHARED_WEIGHTS):
                 # this is needed when pkl loading
                 self.shared_weights = shared_weights
 
@@ -229,7 +248,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             self.shared_weights = None
 
         # Regenerate context but keep the object ID
-        if not hasattr(self, 'analog_ctx'):  # when loading
+        if not hasattr(self, SN.CONTEXT):  # when loading
             self.analog_ctx = AnalogContext(self, parameter=analog_ctx)
         self.analog_ctx.reset(self)
         self.analog_ctx.set_data(analog_ctx.data)

@@ -19,7 +19,12 @@ from torch.nn.functional import mse_loss
 
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import MappingParameter
+from aihwkit.simulator.configs.utils import (
+    MappingParameter, IOParameters, WeightModifierParameter, WeightModifierType
+)
+from aihwkit.inference.compensation.drift import GlobalDriftCompensation
+from aihwkit.inference.noise.custom import StateIndependentNoiseModel
+from aihwkit.nn.conversion import convert_to_analog
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv1d, Conv1dCuda, Conv2d, Conv2dCuda, Conv3d, Conv3dCuda
@@ -79,6 +84,83 @@ class ConvolutionLayerTest(ParametrizedTestCase):
             loss = loss_func(pred, y_b)
             loss.backward()
             opt.step()
+
+    def base_test_inference_modifier(self, torch_model, x_b):
+        """ tests whether modifier are used """
+
+        rpu_config = InferenceRPUConfig(
+            mapping=MappingParameter(
+                weight_scaling_omega=0.0,
+                learn_out_scaling_alpha=False,
+                weight_scaling_omega_columnwise=False
+            ),
+            modifier=WeightModifierParameter(
+                type=WeightModifierType.ADD_NORMAL,
+                std_dev=1.0,
+            ),
+            forward=IOParameters(is_perfect=True)
+        )
+
+        model = convert_to_analog(torch_model, rpu_config)
+
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            model = model.cuda()
+
+        model.eval()
+        y_eval1 = model(x_b)
+        y_eval2 = model(x_b)
+
+        model.train()
+        y_train1 = model(x_b)
+        y_train2 = model(x_b)
+
+        self.assertNotAlmostEqualTensor(y_train1, y_train2)
+        self.assertTensorAlmostEqual(y_eval2, y_eval1)
+
+    def base_test_drift_compensation(self, torch_model, x_b):
+        """ tests whether drift compensation is performed """
+
+        rpu_config = InferenceRPUConfig(
+            mapping=MappingParameter(
+                weight_scaling_omega=0.0,
+                learn_out_scaling_alpha=False,
+                weight_scaling_omega_columnwise=False
+            ),
+            forward=IOParameters(is_perfect=True),
+            drift_compensation=GlobalDriftCompensation(),
+            noise_model=StateIndependentNoiseModel(
+                prog_noise_scale=0.0,
+                read_noise_scale=0.0,
+                drift_nu_std=0.0,
+                drift_nu_mean=0.1,
+            )
+        )
+
+        model = convert_to_analog(torch_model, rpu_config)
+
+        rpu_config.drift_compensation = None
+        model_without = convert_to_analog(torch_model, rpu_config)
+
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            model = model.cuda()
+            model_without = model_without.cuda()
+
+        model.eval()
+        y_before = model(x_b)
+        model.drift_analog_weights(1000.)
+        y_after = model(x_b)
+
+        model_without.eval()
+        y_without_before = model_without(x_b)
+        model_without.drift_analog_weights(1000.)
+        y_without_after = model_without(x_b)
+
+        self.assertTensorAlmostEqual(y_before, y_without_before)
+        self.assertTensorAlmostEqual(y_before, y_after)
+        self.assertNotAlmostEqualTensor(y_after, y_without_after)
+        self.assertNotAlmostEqualTensor(y_without_before, y_without_after)
 
 
 @parametrize_over_layers(
@@ -249,6 +331,32 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
 
 
 @parametrize_over_layers(
+    layers=[Conv1d, Conv1dCuda],
+    tiles=[Inference],
+    biases=['digital']
+)
+class Convolution1dLayerTestInference(ConvolutionLayerTest):
+    """Tests for AnalogConv1d layer specific for inference."""
+
+    digital_layer_cls = torch_Conv1d
+
+    def test_drift_compensation(self):
+        """ tests the drift compensation """
+
+        x_b = randn(3, 2, 4)
+        torch_model = self.get_digital_layer(in_channels=2, out_channels=2, kernel_size=4,
+                                             padding=2)
+        self.base_test_drift_compensation(torch_model, x_b)
+
+    def test_inference_modifier(self):
+        """ tests the modifier function """
+        x_b = randn(3, 2, 4)
+        torch_model = self.get_digital_layer(in_channels=2, out_channels=2, kernel_size=4,
+                                             padding=2)
+        self.base_test_inference_modifier(torch_model, x_b)
+
+
+@parametrize_over_layers(
     layers=[Conv2d, Conv2dCuda],
     tiles=[FloatingPoint, Inference],
     biases=['analog', 'digital', None]
@@ -413,6 +521,31 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         self.assertEqual(tile_weights.numel(), 2*3*4*4)
         if model.analog_bias:
             self.assertEqual(tile_biases.numel(), 3)
+
+
+@parametrize_over_layers(
+    layers=[Conv2d, Conv2dCuda],
+    tiles=[Inference],
+    biases=['digital']
+)
+class Convolution2dLayerTestInference(ConvolutionLayerTest):
+    """Tests for AnalogConv2d layer specific for infernence."""
+
+    digital_layer_cls = torch_Conv2d
+
+    def test_drift_compensation(self):
+        """ tests the drift compensation """
+        x_b = randn(3, 2, 4, 4)
+        torch_model = self.get_digital_layer(in_channels=2, out_channels=2, kernel_size=4,
+                                             padding=2)
+        self.base_test_drift_compensation(torch_model, x_b)
+
+    def test_inference_modifier(self):
+        """ tests the modifier function """
+        x_b = randn(3, 2, 4, 4)
+        torch_model = self.get_digital_layer(in_channels=2, out_channels=2, kernel_size=4,
+                                             padding=2)
+        self.base_test_inference_modifier(torch_model, x_b)
 
 
 @parametrize_over_layers(
@@ -585,3 +718,28 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
         self.assertEqual(tile_weights.numel(), 2*3*4*4*4)
         if model.analog_bias:
             self.assertEqual(tile_biases.numel(), 3)
+
+
+@parametrize_over_layers(
+    layers=[Conv3d, Conv3dCuda],
+    tiles=[Inference],
+    biases=['digital']
+)
+class Convolution3dLayerTestInference(ConvolutionLayerTest):
+    """Tests for AnalogConv2d layer specific for infernence."""
+
+    digital_layer_cls = torch_Conv3d
+
+    def test_drift_compensation(self):
+        """ tests the drift compensation """
+        x_b = randn(3, 2, 4, 4, 4)
+        torch_model = self.get_digital_layer(in_channels=2, out_channels=2, kernel_size=4,
+                                             padding=2)
+        self.base_test_drift_compensation(torch_model, x_b)
+
+    def test_inference_modifier(self):
+        """ tests the modifier function """
+        x_b = randn(3, 2, 4, 4, 4)
+        torch_model = self.get_digital_layer(in_channels=2, out_channels=2, kernel_size=4,
+                                             padding=2)
+        self.base_test_inference_modifier(torch_model, x_b)

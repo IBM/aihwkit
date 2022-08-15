@@ -58,6 +58,6 @@ class BaseDriftCompensation:
         """Read out the current value from the output of the forward
         pass and returns the drift compensation alpha scale."""
         current_value = self.readout(forward_output)
-        ratio = ref_value/current_value
+        ratio = ref_value / current_value
 
         return ratio

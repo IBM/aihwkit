@@ -21,7 +21,13 @@ from torch.optim import SGD
 
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig, FloatingPointRPUConfig
-from aihwkit.simulator.configs.utils import MappingParameter
+from aihwkit.simulator.configs.utils import (
+    MappingParameter, WeightModifierType, WeightModifierParameter, IOParameters
+)
+from aihwkit.inference.compensation.drift import GlobalDriftCompensation
+from aihwkit.inference.noise.custom import StateIndependentNoiseModel
+
+
 from aihwkit.nn import AnalogSequential, AnalogLinear
 
 from .helpers.decorators import parametrize_over_layers
@@ -332,3 +338,103 @@ class LinearLayerTest(ParametrizedTestCase):
         self.assertGreaterEqual(initial_out_scaling_alpha_1.numel(), 1)
         self.assertIsNotNone(model[1].analog_tile.get_out_scaling_alpha().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+
+
+@parametrize_over_layers(
+    layers=[Linear, LinearCuda],
+    tiles=[Inference],
+    biases=['digital']
+)
+class LinearLayerInferenceTest(ParametrizedTestCase):
+    """Linear layer abstractions tests for inference."""
+
+    def test_inference_modifier(self):
+        """ tests whether modifier are used """
+
+        x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
+
+        rpu_config = InferenceRPUConfig(
+            mapping=MappingParameter(
+                weight_scaling_omega=0.0,
+                learn_out_scaling_alpha=False,
+                weight_scaling_omega_columnwise=False
+            ),
+            modifier=WeightModifierParameter(
+                type=WeightModifierType.ADD_NORMAL,
+                std_dev=1.0,
+            ),
+            forward=IOParameters(is_perfect=True)
+        )
+
+        model = AnalogSequential(
+            self.get_layer(4, 2, rpu_config=rpu_config),
+            self.get_layer(2, 1, rpu_config=rpu_config)
+        )
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            model = model.cuda()
+
+        model.eval()
+        y_eval1 = model(x_b)
+        y_eval2 = model(x_b)
+
+        model.train()
+        y_train1 = model(x_b)
+        y_train2 = model(x_b)
+
+        self.assertNotAlmostEqualTensor(y_train1, y_train2)
+        self.assertTensorAlmostEqual(y_eval2, y_eval1)
+
+    def test_drift_compensation(self):
+        """ tests whether drift compensation is performed """
+
+        x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
+
+        rpu_config = InferenceRPUConfig(
+            mapping=MappingParameter(
+                weight_scaling_omega=0.0,
+                learn_out_scaling_alpha=False,
+                weight_scaling_omega_columnwise=False
+            ),
+            forward=IOParameters(is_perfect=True),
+            drift_compensation=GlobalDriftCompensation(),
+            noise_model=StateIndependentNoiseModel(
+                prog_noise_scale=0.0,
+                read_noise_scale=0.0,
+                drift_nu_std=0.0,
+                drift_nu_mean=0.1,
+            )
+        )
+
+        model = AnalogSequential(
+            self.get_layer(4, 2, rpu_config=rpu_config),
+            self.get_layer(2, 1, rpu_config=rpu_config)
+        )
+
+        rpu_config.drift_compensation = None
+        model_without = AnalogSequential(
+            self.get_layer(4, 2, rpu_config=rpu_config),
+            self.get_layer(2, 1, rpu_config=rpu_config)
+        )
+
+        model_without.load_state_dict(model.state_dict(), load_rpu_config=False)
+
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            model = model.cuda()
+            model_without = model_without.cuda()
+
+        model.eval()
+        y_before = model(x_b)
+        model.drift_analog_weights(1000.)
+        y_after = model(x_b)
+
+        model_without.eval()
+        y_without_before = model_without(x_b)
+        model_without.drift_analog_weights(1000.)
+        y_without_after = model_without(x_b)
+
+        self.assertTensorAlmostEqual(y_before, y_without_before)
+        self.assertTensorAlmostEqual(y_before, y_after)
+        self.assertNotAlmostEqualTensor(y_after, y_without_after)
+        self.assertNotAlmostEqualTensor(y_without_before, y_without_after)
