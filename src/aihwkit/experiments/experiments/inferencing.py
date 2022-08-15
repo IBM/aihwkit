@@ -36,7 +36,7 @@ from aihwkit.nn.modules.base import AnalogModuleBase
 WEIGHT_TEMPLATE_URL = "https://github.com/IBM-AI-Hardware-Center/Composer/raw/main/"
 
 
-def download(url, destination):
+def download(url: str, destination: str) -> None:
     """Helper for downloading a file from url"""
     response = requests_get(url)
     with open(destination, "wb") as file_:
