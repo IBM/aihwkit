@@ -873,6 +873,255 @@ class PowStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+@dataclass
+class JARTv1bDevice(PulsedDevice):
+    """Ideal update behavior (using floating point), but forward/backward
+    might be non-ideal.
+
+    Ideal update behavior (using floating point), however,
+    forward/backward might still have a non-ideal ADC or noise added.
+    """
+
+    bindings_class: ClassVar[Type] = devices.JARTv1bResistiveDeviceParameter
+
+    w_max: float = 0.6
+    """See ``w_min``."""
+
+    w_min: float = -0.6
+    """Mean of hard bounds across device cross-point `ij`.
+
+    The parameters ``w_min`` and ``w_max`` are used to set the min/max bounds
+    independently.
+
+    Note:
+        For this abstract device, we assume that weights can have
+        positive and negative values and are symmetrically around
+        zero. In physical circuit terms, this might be implemented
+        as a difference of two resistive elements.
+    """
+
+    w_max_dtod: float = 0
+    """See ``w_min_dtod``."""
+
+    w_min_dtod: float = 0
+    """Device-to-device variation of the hard bounds.
+
+    Device-to-device variation of the hard bounds, of min and max value,
+    respectively. All are given in relative units to ``w_min``, or ``w_max``,
+    respectively.
+    """
+
+    dw_min: float = 0.0001
+    """Mean of the minimal update step sizes across devices and directions."""
+
+    dw_min_dtod: float = 0
+    """Device-to-device std deviation of dw_min (in relative units to
+    ``dw_min``)."""
+
+    dw_min_std: float = 0
+    r"""Cycle-to-cycle variation size of the update step (related to
+    :math:`\sigma_\text{c-to-c}` above) in relative units to ``dw_min``.
+
+    Note:
+        Many spread (device-to-device variation) parameters are given in
+        relative units. For instance e.g. a setting of ``dw_min_std`` of 0.1
+        would mean 10% spread around the mean and thus a resulting standard
+        deviation (:math:`\sigma_\text{c-to-c}`) of ``dw_min`` * ``dw_min_std``.
+    """
+    
+    alpha0: float = 4.81951e-5
+    """See ``reset``."""
+
+    alpha2: float = 1.03685
+    """See ``reset``."""
+
+    alpha3: float = 0.34567
+    """See ``reset``."""
+
+    alpha1 = alpha0*exp(-alpha2/alpha3)
+    """See ``reset``."""
+
+    beta0: float = 7.0526e-4
+    """See ``reset``."""
+
+    beta1: float = 4.2383e-5
+    """See ``reset``."""
+
+    c0: float = 4.004
+    """See ``reset``."""
+
+    c1: float = 2.8646
+    """See ``reset``."""
+
+    c2: float = 4.2125
+    """See ``reset``."""
+
+    c3: float = 1.4134
+    """See ``reset``."""
+
+    d0: float = 6.6103
+    """See ``reset``."""
+
+    d1: float = 1.4524
+    """See ``reset``."""
+
+    d2: float = 7.4235
+    """See ``reset``."""
+
+    d3: float = 4.0585
+    """See ``reset``."""
+
+    f0: float = 6.326e-4
+    """See ``reset``."""
+
+    f1: float = 1.4711
+    """See ``reset``."""
+
+    f2: float = 0.5199
+    """See ``reset``."""
+
+    f3: float = 1.561
+    """See ``reset``."""
+
+    g0: float = 4.84e-3
+    """See ``reset``."""
+
+    g1: float = 0.1353
+    """See ``reset``."""
+
+    h0: float = 5.548
+    """See ``reset``."""
+
+    h1: float = 6.8648
+    """See ``reset``."""
+
+    h2: float = 51.586
+    """See ``reset``."""
+
+    h3: float = 0.36
+    """See ``reset``."""
+
+    j0: float = 1.054
+    """See ``reset``."""
+
+    k0: float =  1.0526
+    """See ``reset``."""
+
+    T0: float = 293
+    """See ``reset``."""
+
+    eps: float = 17
+    """See ``reset``."""
+
+    epsphib: float = 5.5
+    """See ``reset``."""
+
+    phiBn0: float = 0.18
+    """See ``reset``."""
+
+    phin: float = 0.1
+    """See ``reset``."""
+
+    un: float = 4e-6
+    """See ``reset``."""
+
+    Ndiscmax: float = 20*1e26
+    """See ``reset``."""
+
+    Ndiscmin: float = 0.008*1e26
+    """See ``reset``."""
+
+    Nplug: float = 20*1e26
+    """See ``reset``."""
+
+    a: float = 0.25e-9
+    """See ``reset``."""
+
+    ny0: float = 2e13
+    """See ``reset``."""
+
+    dWa: float = 1.35
+    """See ``reset``."""
+
+    Rth0: float = 15.72e6
+    """See ``reset``."""
+
+    rdet: float = 45e-9
+    """See ``reset``."""
+
+    lcell: float = 3*1e-9
+    """See ``reset``."""
+
+    ldet: float = 0.4*1e-9
+    """See ``reset``."""
+
+    Rtheff_scaling: float = 0.27
+    """See ``reset``."""
+
+    RseriesTiOx: float = 650
+    """See ``reset``."""
+
+    R0: float = 719.2437
+    """See ``reset``."""
+
+    Rthline: float = 90471.47
+    """See ``reset``."""
+
+    alphaline: float = 3.92e-3
+    """See ``reset``."""
+
+    read_voltage: float = 0.2
+    """See ``reset``."""
+
+    pulse_voltage_SET: float = -0.342
+    """See ``reset``."""
+
+    pulse_voltage_RESET: float = 0.7065
+    """See ``reset``."""
+
+    pulse_length: float = 1e-6
+    """See ``reset``."""
+
+    base_time_step: float = 1e-8
+    """See ``reset``."""
+
+    Ndisc_min_bound: float = 0.06e26
+    """See ``reset``."""
+
+    Ndisc_max_bound: float = 1.9897452127440086504e26
+    """See ``reset``."""
+
+    Ninit: float = Ndisc_min_bound
+    """See ``reset``."""
+
+    Ndiscmax_dtod: float = 0
+    """See ``reset``."""
+
+    Ndiscmin_dtod: float = 0
+    """See ``reset``."""
+
+    ldet_dtod: float = 0
+    """See ``reset``."""
+
+    rdet_dtod: float = 0
+    """See ``reset``."""
+
+    Ndiscmax_std: float = 0
+    """See ``reset``."""
+
+    Ndiscmin_std: float = 0
+    """See ``reset``."""
+
+    ldet_std: float = 0
+    """See ``reset``."""
+
+    rdet_std: float = 0
+    """See ``reset``."""
+
+    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+        return parameters_to_bindings(self)
+
 
 @dataclass
 class PiecewiseStepDevice(PulsedDevice):
