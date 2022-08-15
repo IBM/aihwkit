@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
 * Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests
 * Enabling comparisons of ``RPUConfig`` instances. (\#410)
+* Specific use-defined function for layer-wise setting for RPUConfigs
+  in conversions. (\#412)
 
 ### Fixed
 * Analog_summary error when model is on cuda device. (\#392)
@@ -34,12 +36,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Loading a new model state dict for inference does not overwrite the
   noise model setting. (\#410)
 * Avoid ``AnalogContext`` copying of self pointers. (\#410)
+* Fix issue that drift compensation is not applied to
+  conv-layers. (\#412)
+* Fix issue that noise modifiers are not applied to
+  conv-layers. (\#412)
 
 ### Changed
 * Weight noise visualization now shows the programming noise and drift
   noise difference. (\#389)
 * Concatenate the gradients before applying to the tile update
   function (some speedup for CUDA expected). (\#390)
+* Drift compensation uses eye instead of ones for readout. (\#412)
 
 ## [0.6.0] - 2022/05/16
 
@@ -49,8 +56,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
 * Reverse up / down option for ``LinearStepDevice``. (\#361)
 * Generic Analog RNN classes (LSTM, RNN, GRU) uni or bidirectional. (\#358)
-* Added new ``PiecewiseStepDevice`` where the update-step response function can be arbitrarily defined by the user
-  in a piece-wise linear manner. It can be conveniently used to fit any experimental device data. (\#356)
+* Added new ``PiecewiseStepDevice`` where the update-step response
+  function can be arbitrarily defined by the user in a piece-wise
+  linear manner. It can be conveniently used to fit any experimental
+  device data. (\#356)
 * Several enhancements to the public documentations: added a new
   section for hw-aware training, refreshed the reference API doc, and
   added the newly supported LSTM layers and the mapped conv

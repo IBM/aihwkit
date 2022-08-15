@@ -82,13 +82,20 @@ class InferenceTile(AnalogTile):
             self.ensure_shared_weights()
 
     @no_grad()
-    def _forward_drift_readout_tensor(self) -> Optional[Tensor]:
-        """Perform a forward pass using the drift read-out tensor."""
+    def _forward_drift_readout_tensor(self, reset_if: bool = False) -> Optional[Tensor]:
+        """Perform a forward pass using the drift read-out tensor.
+
+        Args:
+            reset_if: Will reset the readout tensor, otherwise use the stored one
+
+        Returns:
+            Readout tensor if drift compensation is on
+        """
 
         if self.rpu_config.drift_compensation is None:
             return None
 
-        if self.drift_readout_tensor is None:
+        if self.drift_readout_tensor is None or reset_if:
             self.drift_readout_tensor = self.rpu_config.drift_compensation.get_readout_tensor(
                 self.tile.get_x_size()).detach().to(self.device)
             if self.in_trans:
@@ -107,6 +114,9 @@ class InferenceTile(AnalogTile):
         This method also establishes the drift coefficients for each
         conductance slice.
 
+        Will also reset the drift readout tensor and compuate a new
+        drift compensation baseline
+
         Args:
             from_reference: Whether to use weights from reference
         """
@@ -121,7 +131,7 @@ class InferenceTile(AnalogTile):
         self.tile.set_weights(self.programmed_weights.numpy())
 
         if self.rpu_config.drift_compensation is not None:
-            forward_output = self._forward_drift_readout_tensor()
+            forward_output = self._forward_drift_readout_tensor(True)
             self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(forward_output)
 
     @no_grad()
@@ -171,6 +181,7 @@ class InferenceTile(AnalogTile):
 
         if not is_test and (self.rpu_config.modifier.type != WeightModifierType.COPY or
                             self.rpu_config.modifier.pdrop > 0.0):
+            # TODO: make this a little nicer. Now each time bindings are generated.
             weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
             self.tile.modify_weights(weight_modify_params)
 
@@ -179,6 +190,30 @@ class InferenceTile(AnalogTile):
 
         # only do drift compensation in eval mode
         return super().forward(x_input, True)*self.alpha
+
+    def forward_indexed(self, x_input: Tensor, is_test: bool = False) -> Tensor:
+        """Forward indexed pass with drift compensation.
+
+        Note:
+            The drift compensation scale will only be applied during
+            testing, ie if ``is_test=True``.
+        """
+        # Import `aihwkit.simulator.configs` items dynamically to avoid import cycles.
+        # pylint: disable=import-outside-toplevel
+        from aihwkit.simulator.configs.helpers import parameters_to_bindings
+        from aihwkit.simulator.configs.utils import WeightModifierType
+
+        if not is_test and (self.rpu_config.modifier.type != WeightModifierType.COPY or
+                            self.rpu_config.modifier.pdrop > 0.0):
+            # TODO: make this a little nicer. Now each time bindings are generated.
+            weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
+            self.tile.modify_weights(weight_modify_params)
+
+        if not is_test or self.rpu_config.drift_compensation is None:
+            return super().forward_indexed(x_input, is_test)
+
+        # only do drift compensation in eval mode
+        return super().forward_indexed(x_input, True)*self.alpha
 
     @no_grad()
     def post_update_step(self) -> None:
