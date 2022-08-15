@@ -36,8 +36,7 @@ job_compile_common: &job_compile_common
   install:
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-    - $PYTHON_EXECUTABLE -m pip install -r requirements.txt pytest
-    - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
+    - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
     # Install the package in editable mode.
     - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization]"
   script:
@@ -97,8 +96,8 @@ jobs:
     install:
       # Set the python executable, to force cmake picking the right one.
       - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-      - $PYTHON_EXECUTABLE -m pip install -r requirements.txt pytest
       - $PYTHON_EXECUTABLE -m pip install "torch==1.7.1"
+      - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
       # Install the package in editable mode.
       - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization]"
     env:

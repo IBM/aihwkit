@@ -12,7 +12,9 @@
 
 """Analog Modules that contain children Modules."""
 
-from typing import Callable, Optional, Union, Any, NamedTuple, TYPE_CHECKING
+from typing import (
+    Callable, Optional, Union, Any, NamedTuple, TYPE_CHECKING, Generator
+)
 from collections import OrderedDict
 
 from torch import device as torch_device
@@ -52,11 +54,16 @@ class AnalogSequential(Sequential):
         Returns:
             This module after the function has been applied.
         """
-        for module in self.modules():
-            if isinstance(module, AnalogModuleBase):
-                fn(module)
+        for module in self.analog_modules():
+            fn(module)
 
         return self
+
+    def analog_modules(self) -> Generator[AnalogModuleBase, None, None]:
+        """Generator over analog modules only"""
+        for module in self.modules():
+            if isinstance(module, AnalogModuleBase):
+                yield module
 
     def cpu(
             self

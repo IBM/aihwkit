@@ -182,6 +182,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         shared_weights = current_dict.pop('shared_weights')
         shared_weights_if = shared_weights is not None
 
+        current_dict.pop('noise_model', None)  # legacy
+        current_dict.pop('drift_compensation', None)  # legacy
+
         self.__dict__.update(current_dict)
 
         self.device = torch_device('cpu')

@@ -12,7 +12,7 @@
 
 """API client the AIHW Composer API."""
 
-from typing import List
+from typing import List, Dict
 
 from aihwkit.cloud.client.entities import CloudExperiment, CloudJob
 from aihwkit.cloud.client.exceptions import ApiResponseError, CredentialsError
@@ -21,11 +21,11 @@ from aihwkit.cloud.client.v1.parsers import ExperimentParser, GeneralParser
 from aihwkit.cloud.client.v1.stubs import (
     ExperimentStub, InputStub, JobStub, LoginStub, OutputStub
 )
-from aihwkit.cloud.converter.v1.training import BasicTrainingConverter
-from aihwkit.experiments.experiments.training import BasicTraining
+from aihwkit.cloud.converter.v1.inferencing import BasicInferencingConverter
+from aihwkit.experiments.experiments.inferencing import BasicInferencing
 
 
-class ApiClient:
+class InferenceApiClient:
     """API client the AIHW Composer API.
 
     Client for interfacing with the AIHW Composer API. Upon instantiation, the
@@ -46,7 +46,7 @@ class ApiClient:
         self.object_storage_session = ObjectStorageSession()
 
         # Create the helpers.
-        self.converter = BasicTrainingConverter()
+        self.converter = BasicInferencingConverter()
 
         # Create the stubs.
         self.experiments = ExperimentStub(self.session)
@@ -90,7 +90,9 @@ class ApiClient:
 
     def experiment_create(
             self,
-            input_: BasicTraining,
+            input_: BasicInferencing,
+            analog_info: Dict,
+            noise_model_info: Dict,
             name: str,
             device: str = 'gpu'
     ) -> CloudExperiment:
@@ -98,6 +100,8 @@ class ApiClient:
 
         Args:
             input_: the experiment to be executed.
+            analog_info: analog information.
+            noise_model_info: noise information.
             name: the name of the experiment.
             device: the desired device.
 
@@ -106,12 +110,13 @@ class ApiClient:
         """
         # Prepare the API data.
         # debug: print('input_: ', input_)
-        payload = self.converter.to_proto(input_).SerializeToString()
+        payload = self.converter.to_proto(input_, analog_info, noise_model_info).SerializeToString()
+        # payload = self.converter.to_proto(input_)
         # debug: print('payload after convert to proto and serialize to string: \n', payload)
 
         # Create the experiment.
         response = self.experiments.post({'name': name,
-                                          'category': 'train'})
+                                          'category': 'inference'})
         # debug: print('response from experiments.post: ', response)
         experiment = ExperimentParser.parse_experiment(response, self)
 
