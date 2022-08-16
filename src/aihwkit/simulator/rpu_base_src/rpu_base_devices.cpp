@@ -581,7 +581,6 @@ void declare_rpu_devices(py::module &m) {
 
   py::class_<JARTv1bParam, PyJARTv1bParam, PulsedParam>(m, "JARTv1bResistiveDeviceParameter")
       .def(py::init<>())
-      .def_readwrite("write_noise_std", &JARTv1bParam::write_noise_std_real)
       .def_readwrite("alpha0", &JARTv1bParam::alpha0)
       .def_readwrite("alpha1", &JARTv1bParam::alpha1)
       .def_readwrite("alpha2", &JARTv1bParam::alpha2)

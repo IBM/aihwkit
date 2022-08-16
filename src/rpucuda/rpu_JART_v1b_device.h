@@ -99,7 +99,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T ldet_std = (T) 0;							//
     T rdet_std = (T) 0;							//
 
-    T write_noise_std_real = (T)0.0;
     T write_noise_std = (T)1.0;
     ,
     /*print body*/
@@ -163,7 +162,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t Ndiscmin_std:\t\t" << Ndiscmin_std << std::endl;
     ss << "\t ldet_std:\t\t" << ldet_std << std::endl;
     ss << "\t rdet_std:\t\t" << rdet_std << std::endl;
-    ss << "\t write_noise_std:\t\t" << write_noise_std_real << std::endl;
     ,
     /* calc weight granularity body */
     return this->dw_min;

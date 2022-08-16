@@ -1029,23 +1029,6 @@ class JARTv1bDevice(PulsedDevice):
 
     dw_min: float = 0.0001
     """Mean of the minimal update step sizes across devices and directions."""
-
-    write_noise_std: float = 0.0
-    r"""Whether to use update write noise.
-
-    Whether to use update write noise that is added to the updated
-    devices weight, while the update is done on a hidden persistent weight. The
-    update write noise is then sampled anew when the device is touched
-    again.
-
-    Thus it is:
-
-    .. math::
-        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise} \Delta w_\text{min}\xi
-
-    and the update is done on :math:`w_{ij}` but the forward sees the
-    :math:`w_\text{apparent}`.
-    """
     
     alpha0: float = 4.81951e-5
     """Fitting parameters discribed in [1].
