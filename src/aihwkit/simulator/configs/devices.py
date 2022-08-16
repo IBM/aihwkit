@@ -966,25 +966,33 @@ class JARTv1bDevice(PulsedDevice):
     """Device update characteristics based on Jülich Aachen Resistive
     Switching Tools (JART) VCM v1b model, details published in [1].
 
-    The model discribed in the original JART v1b models [2] containes a set
-    of complex non-linear equations, which is hard to solve in parerrel at
+    The model described in the original JART v1b models [2] contains a set of
+    complex non-linear equations, which is hard to solve in parallel at a
     large scale with CUDA. To accelerate the calculation, we used the fit
-    function discribed in [3] instead. This fit function generates a current
+    function described in [3] instead. This fit function generates a current
     estimate with parameters alpha0 to k0, without having to solve non-linear
     equations.
 
-    After we have the current, we can calculated the voltages across
-    different layers, and calculate the condustance update. For the update
-    calculation, we are using the original JART model with physical
-    parameters discribed in [2].
+    After we have the current, we can calculate the voltages across different
+    layers, and calculate the conductance update. For the update calculation,
+    we are using the original JART model with physical parameters described
+    in [2].
+
+    To make the JART v1b device model switch in reasonable time while
+    preserving access to the intermediate states, we introduced the
+    parameters ``Ndisc_min_bound`` and ``Ndisc_max_bound``. We assume that
+    there exists such a peripheral circuit that limits the maximum and
+    minimum conductance of this device, and thus the maximum and minimum
+    oxygen vacancy concentration. Read [1] for more information.
 
     For the noise part, device-to-device and cycle-to-cycle noise are also
-    implemented. They apply on the device parameters Ndiscmax and Ndiscmin,
-    which controls the maximum and minimum condustance. And also rdet and
-    ldet, which controls the geometry of the filiment inside the memristor.
-    These parameters affects only the conductance update, and the read
-    process is kept noise free at the device model level. Built in read
-    noise from the aihwkit tiles still works as normal.
+    implemented on the device parameters Ndiscmax and Ndiscmin, which control
+    the maximum and minimum conductance of the device model itself without
+    any peripheral circuit. Noise is also implemented on rdet and ldet, which
+    controls the geometry of the filament inside the memristor. These
+    parameters affect only the conductance update, and the reading process is
+    kept noise free at the device model level. Built-in read noise from
+    aihwkit tiles still works as normal.
 
     [1] Todo: add publication details when finalized.
     [2] C. Bengel, A. Siemon, F. C ̈uppers, S. Hoffmann-Eifert, A. Hardtdegen,
@@ -1033,9 +1041,9 @@ class JARTv1bDevice(PulsedDevice):
     alpha0: float = 4.81951e-5
     """Fitting parameters discribed in [1].
 
-    Note that because these parameters are only fited with the default set of
+    Note that because these parameters are only fitted with the default set of
     physical parameters, they need to be changed accordingly when the physical
-    parameters are specified differenly.
+    parameters are specified differently.
     """
 
     alpha2: float = 1.03685
@@ -1170,9 +1178,9 @@ class JARTv1bDevice(PulsedDevice):
     """Temperature coefficient of the lines [1/K], read [2] for more information."""
 
     read_voltage: float = 0.2
-    """Voltage applied to the memristor during read phase.
+    """Voltage applied to the memristor during the read phase
 
-    In this phase, the memristor condustance is assumed to be constant, and
+    In this phase, the memristor conductance is assumed to be constant, and
     no read-variability was applied. Read [1] for more information.
     """
 
@@ -1187,17 +1195,17 @@ class JARTv1bDevice(PulsedDevice):
 
     base_time_step: float = 1e-8
     """Internal simulation time step during the pulse updates,
-    this parameter controls the precision of the forword-mode Euler method
+    this parameter controls the precision of the forward-mode Euler method
     used when integrating change of the oxygen vacancy concentration in the
     disc. It's advised that ``base_time_step`` should be at least 100 times
     smaller than ``pulse_length``. Read [1] for more information.
     """
 
     Ndisc_min_bound: float = 0.06e26
-    """See ``reset``."""
+    """Average minimum oxygen vacancy concentration controlled by the peripheral circuit [10^26/m^3], read [1] for more information."""
 
     Ndisc_max_bound: float = 1.9897452127440086504e26
-    """See ``reset``."""
+    """Average maximum oxygen vacancy concentration controlled by the peripheral circuit [10^26/m^3], read [1] for more information."""
 
     Ndiscmax_dtod: float = 0
     """Device-to-device std deviation of ``Ndiscmax``, read [1] for more information."""
