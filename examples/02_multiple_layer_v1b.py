@@ -28,6 +28,7 @@ from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import JARTv1bDevice
+from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
 x_b = Tensor([[0.1, 0.2, 0.0, 0.0], [0.2, 0.4, 0.0, 0.0]])
@@ -39,6 +40,12 @@ model = Sequential(
     AnalogLinear(2, 2, rpu_config=SingleRPUConfig(device=JARTv1bDevice())),
     AnalogLinear(2, 1, rpu_config=SingleRPUConfig(device=JARTv1bDevice()))
 )
+
+# Move the model and tensors to cuda if it is available.
+if cuda.is_compiled():
+    x = x.cuda()
+    y = y.cuda()
+    model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
 opt = AnalogSGD(model.parameters(), lr=0.5)
