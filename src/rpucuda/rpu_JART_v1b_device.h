@@ -18,7 +18,8 @@
 #include <math.h>
 // physical constants do not change!
 #define PHYSICAL_PARAMETER_e 1.602e-19 								// elementary charge [C]
-#define PHYSICAL_PARAMETER_kb 1.3807e-23								// Boltzman's constant  [VAs/K]
+// #define PHYSICAL_PARAMETER_kb 1.3807e-23								// Boltzman's constant  [VAs/K]
+#define PHYSICAL_PARAMETER_kb_over_e 8.61860174781523e-05
 #define PHYSICAL_PARAMETER_zvo 2									// oxygen vacancy charge number
 #define PHYSICAL_PARAMETER_eps_0 8.854e-12				      				// vacuum permittivity [As/Vm]
 
@@ -61,9 +62,9 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     // Fitting Parameters for original model
     T T0 = (T) 293;								 	// ambient temperature [K] 
     T un = (T) 4e-6; // from [1e-6:1e-5];				// electron mobility [m^2/Vs]
-    T Ndiscmax = (T) 20*1e26; // from [0.001:1100];				// maximum oxygen vacancy concentration in the disc[10^26/m^3]
-    T Ndiscmin = (T) 0.008*1e26; // from [0.0001:100];			// minimum oxygen vacancy concentration in the disc [10^26/m^3]
-    T Nplug = (T) 20*1e26; // from [0.001:100];					// oxygen vacancy concentration in the plug [10^26/m^3]
+    T Ndiscmax = (T) 20; // from [0.001:1100];				// maximum oxygen vacancy concentration in the disc[10^26/m^3]
+    T Ndiscmin = (T) 0.008; // from [0.0001:100];			// minimum oxygen vacancy concentration in the disc [10^26/m^3]
+    T Nplug = (T) 20; // from [0.001:100];					// oxygen vacancy concentration in the plug [10^26/m^3]
     T a = (T) 0.25e-9; // from [0.1e-9:1e-9];					// ion hopping distance [m]
     T ny0 = (T) 2e13; // from [1e10:1e14];					// attemp frequenzy [Hz]
     T dWa = (T) 1.35; // from [0.8:1.5];					// activation energy [eV]
@@ -81,15 +82,12 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T pulse_voltage_RESET = (T) 0.7065;
     T pulse_length = (T) 1e-6;
     T base_time_step = (T) 1e-8;
-    T Ndisc_min_bound = (T) 0.06*1e26;
-    T Ndisc_max_bound = (T) 1.9897452127440086504e26;
-    T current_min =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0)));
-    T current_max =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0)));
+    T Ndisc_min_bound = (T) 0.06;
+    T Ndisc_max_bound = (T) 1.9897452127440086504;
     T w_min = (T)-0.6;
     T w_min_dtod = (T)0.3;
     T w_max = (T)0.6;
     T w_max_dtod = (T)0.3;
-    T Ninit = pow(((pow(((-g0*(exp(-g1*read_voltage)-1))/(((0-w_min)/(w_max-w_min))*(current_max-current_min)+current_min)), k0)-1)/(h0+h1*read_voltage+h2*exp(-h3*read_voltage))),(1/-j_0))*Ndiscmin; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
     T Ndiscmax_dtod = (T) 0;							// 
     T Ndiscmin_dtod = (T) 0;							//
     T ldet_dtod = (T) 0;							//
@@ -98,6 +96,35 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T Ndiscmin_std = (T) 0;							//
     T ldet_std = (T) 0;							//
     T rdet_std = (T) 0;							//
+
+    
+    T current_min =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0)));
+    T current_max =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_max_bound/Ndiscmin),(-j_0))),(1/k0)));
+    T Ninit = pow(((pow(((-g0*(exp(-g1*read_voltage)-1))/(((0-w_min)/(w_max-w_min))*(current_max-current_min)+current_min)), k0)-1)/(h0+h1*read_voltage+h2*exp(-h3*read_voltage))),(1/-j_0))*Ndiscmin; // from [0.0001:1000];				// initial oxygen vacancy concentration in the disc [10^26/m^3]
+
+    T alpha_SET = (T) ((alpha1+alpha0)/(1+exp(-(pulse_voltage_SET+alpha2)/alpha3)))-alpha0;
+    T beta_SET = (T) (beta1*(1-exp(-pulse_voltage_SET)))-beta0*pulse_voltage_SET;
+    T c_SET = (T) c2*exp(-pulse_voltage_SET/c3)+c1*pulse_voltage_SET-c0;
+    T d_SET = (T) d2*exp(-pulse_voltage_SET/d3)+d1*pulse_voltage_SET-d0;
+    T f_SET = (T) f0+((f1-f0)/(1+pow((-pulse_voltage_SET/f2),f3)));
+
+    T g_RESET = (T) -g0*(exp(-g1*pulse_voltage_RESET)-1);
+    T h_RESET = (T) h0+h1*pulse_voltage_RESET+h2*exp(-h3*pulse_voltage_RESET);
+
+    T g_read = (T) -g0*(exp(-g1*read_voltage)-1);
+    T h_read = (T) h0+h1*read_voltage+h2*exp(-h3*read_voltage);
+
+    T Rth_negative = (T) Rth0;
+    T Rth_positive = (T) Rth0*Rtheff_scaling;
+
+    T V_series_coefficient = (T) R0*alphaline*R0*Rthline;
+    T V_disk_coefficient = (T) PHYSICAL_PARAMETER_zvo*PHYSICAL_PARAMETER_e*un*1e26;
+
+    T gamma_coefficient = (T) (PHYSICAL_PARAMETER_zvo*a)/(dWa*M_PI);
+    T a_ny0 = (T) a*ny0;
+
+    T current_to_weight_ratio = (T) (w_max-w_min)/(current_max-current_min);
+    T weight_to_current_ratio = (T) (current_max-current_min)/(w_max-w_min);
 
     T write_noise_std = (T)1.0;
     ,

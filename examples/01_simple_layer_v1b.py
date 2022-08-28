@@ -28,6 +28,25 @@ from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import JARTv1bDevice
 from aihwkit.simulator.rpu_base import cuda
 
+import wandb
+
+learning_rate=0.1
+epochs = 100
+CUDA_Enabled = False
+
+
+if cuda.is_compiled() & CUDA_Enabled:
+    wandb.init(project="basic test v1b", group="Single Layer Perceptron", job_type="CUDA")
+else:
+    
+    wandb.init(project="basic test v1b", group="Single Layer Perceptron", job_type="CPU")
+
+wandb.config = {
+  "learning_rate": learning_rate,
+  "epochs": epochs,
+  "CUDA_Enabled": CUDA_Enabled
+}
+
 # Prepare the datasets (input and expected output).
 x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
 y = Tensor([[1.0, 0.5], [0.7, 0.3]])
@@ -38,28 +57,22 @@ model = AnalogLinear(4, 2, bias=True,
                      rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
-if cuda.is_compiled():
+if cuda.is_compiled() & CUDA_Enabled:
     x = x.cuda()
     y = y.cuda()
     model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
-opt = AnalogSGD(model.parameters(), lr=0.1)
+opt = AnalogSGD(model.parameters(), lr=learning_rate)
 opt.regroup_param_groups(model)
 
-weights = model.get_weights()[0][0][0]
-count = 0
-print('Epoch%s:weights: {:.20f}'.format(weights)%count)
-for epoch in range(100):
+for epoch in range(epochs):
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.
     loss = mse_loss(pred, y)
+    wandb.log({"loss": loss})
     # Run training (backward propagation).
     loss.backward()
 
     opt.step()
-    weights = model.get_weights()[0][0][0]
-    count = count + 1
-    print('Epoch%s:weights: {:.20f}'.format(weights)%count)
-    print('Loss error: {:.16f}'.format(loss))

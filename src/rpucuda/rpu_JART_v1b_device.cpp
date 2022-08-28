@@ -69,288 +69,215 @@ template <typename T> void JARTv1bRPUDevice<T>::printDP(int x_count, int d_count
   }
 }
 
+template <typename T>
+inline T calculate_current_SET(
+    const double &Ndisc,
+    const T &alpha_SET,
+    const T &beta_SET,
+    const T &c_SET,
+    const T &d_SET,
+    const T &f_SET) {
+  return -alpha_SET-beta_SET/(pow((1+pow((c_SET/Ndisc),d_SET)),f_SET));
+}
 
 template <typename T>
-struct Voltages_holder
+inline T calculate_current_RESET_and_Read(
+    const double &Ndisc,
+    const T &g_RESET_or_Read,
+    const T &h_RESET_or_Read,
+    const T &j_0,
+    const T &k0, 
+    const T &Ndiscmin) {
+  return g_RESET_or_Read/(pow((1+h_RESET_or_Read*pow((Ndisc/Ndiscmin),-j_0)),1/k0));
+}
+
+template <typename T>
+struct Voltages_needed
 {
-  T V_series;
+  T other_than_V_series;
   T V_disk;
-  T V_plug;
-  T V_Schottky;
 };
 
 template <typename T>
-inline T calculate_current_negative(
-    double &Ndisc,
+inline Voltages_needed<T> calculate_voltages(
     const T &applied_voltage,
-    const T &alpha0,
-    const T &alpha1,
-    const T &alpha2,
-    const T &alpha3,
-    const T &beta0,
-    const T &beta1,
-    const T &c0,
-    const T &c1,
-    const T &c2,
-    const T &c3,
-    const T &d0,
-    const T &d1,
-    const T &d2,
-    const T &d3,
-    const T &f0,
-    const T &f1,
-    const T &f2,
-    const T &f3) {
-  return -(((alpha1+alpha0)/(1+exp(-(applied_voltage+alpha2)/alpha3)))-alpha0)-((beta1*(1-exp(-applied_voltage)))
-  -beta0*applied_voltage)/(pow(((1+pow(((c2*exp(-applied_voltage/c3)+c1*applied_voltage-c0)/(Ndisc/1e26)),(d2*exp(-applied_voltage/d3)+d1*applied_voltage-d0)))),(f0+((f1-f0)/(1+pow((-applied_voltage/f2),f3))))));
-}
-
-template <typename T>
-inline T calculate_current_positive(
-    double &Ndisc,
-    const T &applied_voltage,
-    const T &g0,
-    const T &g1,
-    const T &h0,
-    const T &h1,
-    const T &h2,
-    const T &h3,
-    const T &j_0,
-    const T &k0, 
-    const T &Ndiscmin) {
-  return (-g0*(exp(-g1*applied_voltage)-1))/(pow((1+(h0+h1*applied_voltage+h2*exp(-h3*applied_voltage))*pow((Ndisc/Ndiscmin),(-j_0))),(1/k0)));
-}
-
-template <typename T>
-inline T invert_positive_current(
-    T &I_mem,
-    const T &read_voltage,
-    const T &g0,
-    const T &g1,
-    const T &h0,
-    const T &h1,
-    const T &h2,
-    const T &h3,
-    const T &j_0,
-    const T &k0, 
-    const T &Ndiscmin) {
-  if (I_mem>0){
-  return pow(((pow(((-g0*(exp(-g1*read_voltage)-1))/I_mem), k0)-1)/(h0+h1*read_voltage+h2*exp(-h3*read_voltage))),(1/-j_0))*Ndiscmin;
-  }
-  else{
-    return 0;
-  }
-}
-
-template <typename T>
-inline T calculate_current(
-    double &Ndisc,
-    const T &applied_voltage,
-    const T &alpha0,
-    const T &alpha1,
-    const T &alpha2,
-    const T &alpha3,
-    const T &beta0,
-    const T &beta1,
-    const T &c0,
-    const T &c1,
-    const T &c2,
-    const T &c3,
-    const T &d0,
-    const T &d1,
-    const T &d2,
-    const T &d3,
-    const T &f0,
-    const T &f1,
-    const T &f2,
-    const T &f3,
-    const T &g0,
-    const T &g1,
-    const T &h0,
-    const T &h1,
-    const T &h2,
-    const T &h3,
-    const T &j_0,
-    const T &k0, 
-    const T &Ndiscmin) {
-  if (applied_voltage < 0) {
-    return calculate_current_negative(Ndisc, applied_voltage, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3);
-  } else {
-    return calculate_current_positive(Ndisc, applied_voltage, g0, g1, h0, h1, h2, h3, j_0, k0, Ndiscmin);
-  }
-}
-
-template <typename T>
-inline T calculate_T(
-    const T &applied_voltage,
-    T &I_mem,
-    const T &T0,
-    const T &Rth0,
-    const T &Rtheff_scaling,
-    Voltages_holder<T> &Voltages) {
-  if (applied_voltage > 0) {
-    return T0 + I_mem*(Voltages.V_disk+Voltages.V_plug+Voltages.V_Schottky)*Rth0*Rtheff_scaling;
-  } else {
-    return T0 + I_mem*(Voltages.V_disk+Voltages.V_plug+Voltages.V_Schottky)*Rth0;
-  }
-}
-
-template <typename T>
-inline Voltages_holder<T> calculate_voltages(
-    const T &applied_voltage,
-    T &I_mem,
+    const T &I_mem,
     const T &R0,
-    const T &alphaline,
-    const T &Rthline,
     const T &RseriesTiOx,
+    const T &V_series_coefficient,
+    const T &V_disk_coefficient,
     const T &lcell,
-    T &ldet,
-    T &A,
-    const T &Nplug,
-    double &Ndisc,
-    const T &un) {
-  Voltages_holder<T> Voltages;
-  // V_series
-  Voltages.V_series = I_mem*(RseriesTiOx + (R0*(1+alphaline*R0*pow(I_mem,2)*Rthline)));
+    const T &ldet,
+    const T &A,
+    const double &Ndisc) {
+  Voltages_needed<T> Voltages;
+  // V - V_series (V_disk+V_plug+V_Schottky)
+  Voltages.other_than_V_series = applied_voltage - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
   // V_disk
-  Voltages.V_disk =  I_mem*(ldet/(PHYSICAL_PARAMETER_zvo*PHYSICAL_PARAMETER_e*A*Ndisc*un));
-  // V_plug
-  Voltages.V_plug =  I_mem*((lcell-ldet)/(PHYSICAL_PARAMETER_zvo*PHYSICAL_PARAMETER_e*A*Nplug*un));
-  // V_Schottky
-  Voltages.V_Schottky =  applied_voltage-Voltages.V_series-Voltages.V_disk-Voltages.V_plug;
+  Voltages.V_disk =  I_mem*(ldet/(V_disk_coefficient*A*Ndisc));
   return Voltages;
 }
 
 template <typename T>
-inline T calculate_F1(
-    const T &applied_voltage,
-    double &Ndisc,
-    T &Ndiscmin,
-    T &Ndiscmax) {
-  if (applied_voltage > 0) {
-    return 1-pow((Ndiscmin/Ndisc),10);
-  } else {
-    return 1-pow((Ndisc/Ndiscmax),10);
-  }
-}
-
-template <typename T>
-inline T calculate_Eion(
-    const T &applied_voltage,
-    Voltages_holder<T> &Voltages,
-    const T &lcell,
-    T &ldet) {
-  if (applied_voltage < 0) {
-    return Voltages.V_disk/ldet;
-  } else {
-    return (Voltages.V_Schottky + Voltages.V_plug + Voltages.V_disk)/lcell;
-  }
-}
-
-template <typename T>
-inline T calculate_dNdt(
-    const T &applied_voltage,
-    T &I_mem,
-    double &Ndisc,
-    const T &T0,
-    const T &un,
-    T &Ndiscmax,
-    T &Ndiscmin,
-    const T &Nplug,
-    const T &a,
-    const T &ny0,
-    const T &dWa,
-    const T &Rth0,
-    const T &lcell,
-    T &ldet,
-    const T &Rtheff_scaling,
-    const T &RseriesTiOx,
-    const T &R0,
-    const T &Rthline,
-    const T &alphaline,
-    T &A) {
-
-  T c_v0 = (Nplug+Ndisc)/2;
-
-  T F1 = calculate_F1(applied_voltage, Ndisc, Ndiscmin, Ndiscmax);
-
-  Voltages_holder<T> Voltages = calculate_voltages(applied_voltage, I_mem, R0, alphaline, Rthline, RseriesTiOx, lcell, ldet, A, Nplug, Ndisc, un);
-
-  T Eion = calculate_Eion(applied_voltage, Voltages, lcell, ldet);
-
-  T gamma = PHYSICAL_PARAMETER_zvo*a*Eion/(dWa*M_PI);
-
-  T Treal = calculate_T(applied_voltage, I_mem, T0, Rth0, Rtheff_scaling, Voltages);
-  
-  // dWamin
-  T dWa_f = dWa*(sqrt(1-pow(gamma,2))-(gamma*M_PI)/2+gamma*asin(gamma));
-  // dWamax
-  T dWa_r = dWa*(sqrt(1-pow(gamma,2))+(gamma*M_PI)/2+gamma*asin(gamma));
-  T denominator = PHYSICAL_PARAMETER_kb*Treal/PHYSICAL_PARAMETER_e;
-  T dNdt = -(c_v0*a*ny0*F1*(exp(-dWa_f/denominator)-exp(-dWa_r/denominator)))/ldet;
-  return dNdt;
-}
-
-template <typename T>
-inline void step(
-    const T &applied_voltage,
+inline void step_SET(
+    const T &applied_voltage_SET,
     const T &time_step,
     double &Ndisc,
-    const T &alpha0,
-    const T &alpha1,
-    const T &alpha2,
-    const T &alpha3,
-    const T &beta0,
-    const T &beta1,
-    const T &c0,
-    const T &c1,
-    const T &c2,
-    const T &c3,
-    const T &d0,
-    const T &d1,
-    const T &d2,
-    const T &d3,
-    const T &f0,
-    const T &f1,
-    const T &f2,
-    const T &f3,
-    const T &g0,
-    const T &g1,
-    const T &h0,
-    const T &h1,
-    const T &h2,
-    const T &h3,
-    const T &j_0,
-    const T &k0, 
+    const T &alpha_SET,
+    const T &beta_SET,
+    const T &c_SET,
+    const T &d_SET,
+    const T &f_SET,
     const T &T0,
-    const T &un,
-    const T &Original_Ndiscmin,
     T &Ndiscmax,
-    T &Ndiscmin,
     const T &Nplug,
-    const T &a,
-    const T &ny0,
+    const T &a_ny0,
     const T &dWa,
-    const T &Rth0,
-    const T &lcell,
-    T &ldet,
-    const T &Rtheff_scaling,
+    const T &Rth_negative,
     const T &RseriesTiOx,
     const T &R0,
-    const T &Rthline,
-    const T &alphaline,
-    T &A,
-    const T &Ndisc_min_bound,
-    const T &Ndisc_max_bound) {
+    const T &V_series_coefficient,
+    const T &V_disk_coefficient,
+    const T &gamma_coefficient,
+    const T &lcell,
+    T &ldet,
+    T &A) {
+  // T I_mem = calculate_current_SET(Ndisc, alpha_SET, beta_SET, c_SET, d_SET, f_SET);
 
-  T I_mem = calculate_current(Ndisc, applied_voltage, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
-  T dNdt = calculate_dNdt(applied_voltage, I_mem, Ndisc, T0, un, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A);
-  Ndisc = Ndisc + dNdt*time_step;
+  // T c_v0 = (Nplug+Ndisc)/2.0;
+  // T F1 = 1-pow((Ndisc/Ndiscmax),10.0);
+
+  // Voltages_needed<T> Voltages = calculate_voltages(applied_voltage_SET, I_mem, R0, RseriesTiOx, V_series_coefficient, V_disk_coefficient, lcell, ldet, A, Ndisc);
+  
+  // T Eion = Voltages.V_disk/ldet;
+
+  // T gamma = gamma_coefficient*Eion;
+
+  // T Treal = T0 + I_mem*Voltages.other_than_V_series*Rth_negative;
+  
+  
+  // // dWamin
+  // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2.0+gamma*asin(gamma));
+  // // dWamax
+  // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2.0+gamma*asin(gamma));
+  // T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
+  // T dNdt = -(c_v0*a_ny0*F1*(exp(-dWa_f/denominator)-exp(-dWa_r/denominator)))/ldet;
+      
+
+  // Ndisc = Ndisc + dNdt*time_step;
+
+  
+    T I_mem = -alpha_SET-beta_SET/(pow((1+pow((c_SET/Ndisc),d_SET)),f_SET));
+
+    T V_disk = I_mem*(ldet/(V_disk_coefficient*A*Ndisc));
+
+    // T gamma = gamma_coefficient*Eion;
+    T gamma = gamma_coefficient*V_disk/ldet;
+    
+    // V - V_series = V_disk+V_plug+V_Schottky
+    T V_other_than_series = applied_voltage_SET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
+
+    T Treal = T0 + I_mem*V_other_than_series*Rth_negative;
+    // // dWamin
+    // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
+    // // dWamax
+    // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
+
+    T dWa_mean = dWa*(sqrt(1-pow(gamma,2.0))+gamma*asin(gamma));
+    T dWa_difference = dWa*((gamma*M_PI)/2.0);
+    // dWamin = dWa_f = dWa_mean - dWa_difference
+    // dWamax = dWa_r = dWa_mean + dWa_difference
+
+    T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
+
+    T c_v0 = (Nplug+Ndisc)/2.0;
+    T F1 = 1-pow((Ndisc/Ndiscmax),10.0);
+    T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/ldet;
+
+    Ndisc = Ndisc + dNdt*time_step;
 
   if (Ndisc>Ndiscmax){
     Ndisc = Ndiscmax;
   }
-  else if (Ndisc<Ndiscmin){
+}
+
+template <typename T>
+inline void step_RESET(
+    const T &applied_voltage_RESET,
+    const T &time_step,
+    double &Ndisc,
+    const T &g_RESET,
+    const T &h_RESET,
+    const T &j_0,
+    const T &k0, 
+    const T &T0,
+    const T &Original_Ndiscmin,
+    T &Ndiscmin,
+    const T &Nplug,
+    const T &a_ny0,
+    const T &dWa,
+    const T &Rth_positive,
+    const T &RseriesTiOx,
+    const T &R0,
+    const T &V_series_coefficient,
+    const T &V_disk_coefficient,
+    const T &gamma_coefficient,
+    const T &lcell,
+    T &ldet,
+    T &A) {
+
+  // T I_mem = calculate_current_RESET_and_Read(Ndisc, g_RESET, h_RESET, j_0, k0, Original_Ndiscmin);
+
+  // T c_v0 = (Nplug+Ndisc)/2;
+  // T F1 = 1-pow((Ndiscmin/Ndisc),10);
+
+  // Voltages_needed<T> Voltages = calculate_voltages(applied_voltage_RESET, I_mem, R0, RseriesTiOx, V_series_coefficient, V_disk_coefficient, lcell, ldet, A, Ndisc);
+  
+  // T Eion = Voltages.other_than_V_series/lcell;
+
+  // T gamma = gamma_coefficient*Eion;
+
+  // T Treal = T0 + I_mem*Voltages.other_than_V_series*Rth_positive;
+  
+  
+  // // dWamin
+  // T dWa_f = dWa*(sqrt(1-pow(gamma,2))-(gamma*M_PI)/2+gamma*asin(gamma));
+  // // dWamax
+  // T dWa_r = dWa*(sqrt(1-pow(gamma,2))+(gamma*M_PI)/2+gamma*asin(gamma));
+  // T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
+  // T dNdt = -(c_v0*a_ny0*F1*(exp(-dWa_f/denominator)-exp(-dWa_r/denominator)))/ldet;
+      
+
+  // Ndisc = Ndisc + dNdt*time_step;
+  
+  T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1/k0));
+  
+  // V - V_series = V_disk+V_plug+V_Schottky
+  T V_other_than_series = applied_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
+
+  // T gamma = gamma_coefficient*Eion;
+  T gamma = gamma_coefficient*V_other_than_series/lcell;
+
+  T Treal = T0 + I_mem*V_other_than_series*Rth_positive;
+  // // dWamin
+  // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
+  // // dWamax
+  // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
+
+  T dWa_mean = dWa*(sqrt(1-pow(gamma,2.0))+gamma*asin(gamma));
+  T dWa_difference = dWa*((gamma*M_PI)/2.0);
+  // dWamin = dWa_f = dWa_mean - dWa_difference
+  // dWamax = dWa_r = dWa_mean + dWa_difference
+
+  T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
+
+  T c_v0 = (Nplug+Ndisc)/2.0;
+  T F1 = 1-pow((Ndiscmin/Ndisc),10.0);
+  T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/ldet;
+
+  Ndisc = Ndisc + dNdt*time_step;
+
+  if (Ndisc<Ndiscmin){
       Ndisc = Ndiscmin;
   }
 }
@@ -358,22 +285,17 @@ inline void step(
 template <typename T>
 inline T map_Ndisc_to_weight(
     const T &read_voltage,
-    double &Ndisc,
+    const double &Ndisc,
     const T &current_min,
-    const T &current_max,
     const T &weight_min_bound,
-    const T &weight_max_bound,
-    const T &g0,
-    const T &g1,
-    const T &h0,
-    const T &h1,
-    const T &h2,
-    const T &h3,
+    const T &current_to_weight_ratio,
+    const T &g_read,
+    const T &h_read,
     const T &j_0,
     const T &k0,
     const T &Original_Ndiscmin) {
-  T read_current = calculate_current_positive(Ndisc, read_voltage, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
-  T weight = ((read_current-current_min)/(current_max-current_min))*(weight_max_bound-weight_min_bound)+weight_min_bound;
+  T read_current = calculate_current_RESET_and_Read(Ndisc, g_read, h_read, j_0, k0, Original_Ndiscmin);
+  T weight = (read_current-current_min)*current_to_weight_ratio+weight_min_bound;
   return weight;
 }
 
@@ -410,57 +332,41 @@ inline void update_once(
     const T &pulse_voltage_RESET,
     const T &pulse_length,
     const T &base_time_step,
-    const T &alpha0,
-    const T &alpha1,
-    const T &alpha2,
-    const T &alpha3,
-    const T &beta0,
-    const T &beta1,
-    const T &c0,
-    const T &c1,
-    const T &c2,
-    const T &c3,
-    const T &d0,
-    const T &d1,
-    const T &d2,
-    const T &d3,
-    const T &f0,
-    const T &f1,
-    const T &f2,
-    const T &f3,
-    const T &g0,
-    const T &g1,
-    const T &h0,
-    const T &h1,
-    const T &h2,
-    const T &h3,
+    const T &alpha_SET,
+    const T &beta_SET,
+    const T &c_SET,
+    const T &d_SET,
+    const T &f_SET,
+    const T &g_RESET,
+    const T &h_RESET,
+    const T &g_read,
+    const T &h_read,
     const T &j_0,
     const T &k0, 
     const T &T0,
-    const T &un,
     const T &Original_Ndiscmin,
     T &Ndiscmax,
     T &Ndiscmin,
     const T &Nplug,
-    const T &a,
-    const T &ny0,
+    const T &a_ny0,
     const T &dWa,
-    const T &Rth0,
-    const T &lcell,
-    T &ldet,
-    const T &Rtheff_scaling,
+    const T &Rth_negative,
+    const T &Rth_positive,
     const T &RseriesTiOx,
     const T &R0,
-    const T &Rthline,
-    const T &alphaline,
+    const T &V_series_coefficient,
+    const T &V_disk_coefficient,
+    const T &gamma_coefficient,
+    const T &lcell,
+    T &ldet,
     T &A,
     T &Ndisc,
     T &w,
     int &sign,
     const T &current_min,
-    const T &current_max,
+    const T &current_to_weight_ratio,
+    const T &weight_to_current_ratio,
     const T &weight_min_bound,
-    const T &weight_max_bound,
     const T &Ndisc_min_bound,
     const T &Ndisc_max_bound, 
     const T &Ndiscmax_std,
@@ -470,53 +376,58 @@ inline void update_once(
     RNG<T> *rng) {
   int pulse_counter = int (pulse_length/base_time_step);
   double Ndisc_double = Ndisc;
-  // printf("w before update %.20f\n", w);
-  // printf("Ndisc before update %.20e\n", Ndisc);
-  // printf("Ndisc_double before update %.20e\n", Ndisc_double);
 
   if (sign < 0) {
     for (int i = 0; i < pulse_counter; i++) {
-      step(pulse_voltage_SET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, T0, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
+      step_SET(pulse_voltage_SET, base_time_step, Ndisc_double, alpha_SET, beta_SET, c_SET, d_SET, f_SET, T0, Ndiscmax, Nplug, a_ny0, dWa, Rth_negative, RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, A);
     }
     if (Ndisc_double>Ndisc_max_bound){
       Ndisc_double = Ndisc_max_bound;
     }
   }else{
     for (int i = 0; i < pulse_counter; i++) {
-      step(pulse_voltage_RESET, base_time_step, Ndisc_double, alpha0, alpha1, alpha2, alpha3, beta0, beta1, c0, c1, c2, c3, d0, d1, d2, d3, f0, f1, f2, f3, g0, g1, h0, h1, h2, h3, j_0, k0, T0, un, Original_Ndiscmin, Ndiscmax, Ndiscmin, Nplug, a, ny0, dWa, Rth0, lcell, ldet, Rtheff_scaling, RseriesTiOx, R0, Rthline, alphaline, A, Ndisc_min_bound, Ndisc_max_bound);
+      step_RESET(pulse_voltage_RESET, base_time_step, Ndisc_double, g_RESET, h_RESET, j_0, k0, T0, Original_Ndiscmin, Ndiscmin, Nplug, a_ny0, dWa, Rth_positive, RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, A);
     }
     if (Ndisc_double<Ndisc_min_bound){
       Ndisc_double = Ndisc_min_bound;
     }
   } 
 
-  w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, current_max, weight_min_bound, weight_max_bound, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
+  w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, weight_min_bound, current_to_weight_ratio, g_read, h_read, j_0, k0, Original_Ndiscmin);
   Ndisc = Ndisc_double;
   apply_cycle_to_cycle_noise(Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, rng);
-  // printf("w after update %.20f\n", w);
-  // printf("Ndisc after update %.20e\n", Ndisc);
-  // printf("Ndisc_double after update %.20e\n", Ndisc_double);
+}
+
+template <typename T>
+inline T invert_read_current(
+    const T &I_mem,
+    const T &g_read,
+    const T &h_read,
+    const T &j_0,
+    const T &k0, 
+    const T &Ndiscmin) {
+  if (I_mem>0){
+  return pow(((pow((g_read/I_mem), k0)-1)/(h_read)),1/(-j_0))*Ndiscmin;
+  }
+  else{
+    return 0;
+  }
 }
 
 template <typename T>
 inline T map_weight_to_Ndisc(
     const T &read_voltage,
-    T &weight,
+    const T &weight,
     const T &current_min,
-    const T &current_max,
     const T &weight_min_bound,
-    const T &weight_max_bound,
-    const T &g0,
-    const T &g1,
-    const T &h0,
-    const T &h1,
-    const T &h2,
-    const T &h3,
+    const T &weight_to_current_ratio,
+    const T &g_read,
+    const T &h_read,
     const T &j_0,
     const T &k0,
     const T &Original_Ndiscmin) {
-  T current = ((weight-weight_min_bound)/(weight_max_bound-weight_min_bound))*(current_max-current_min)+current_min;
-  T Ndisc = invert_positive_current(current, read_voltage, g0, g1, h0, h1, h2, h3, j_0, k0, Original_Ndiscmin);
+  T current = (weight-weight_min_bound)*weight_to_current_ratio+current_min;
+  T Ndisc = invert_read_current(current, g_read, h_read, j_0, k0, Original_Ndiscmin);
   return Ndisc;
 }
 
@@ -532,22 +443,21 @@ void JARTv1bRPUDevice<T>::doSparseUpdate(
   T *Ndiscmin = device_specific_Ndiscmin[i];
   T *ldet = device_specific_ldet[i];
   T *A = device_specific_A[i];
-  T *min_bound = this->w_min_bound_[i];
-  T *max_bound = this->w_max_bound_[i];
+  // T *min_bound = this->w_min_bound_[i];
+  // T *max_bound = this->w_max_bound_[i];
 
   PULSED_UPDATE_W_LOOP(update_once(par.read_voltage, par.pulse_voltage_SET, par.pulse_voltage_RESET, par.pulse_length, par.base_time_step,
-                                   par.alpha0, par.alpha1, par.alpha2, par.alpha3, par.beta0, par.beta1,
-                                   par.c0, par.c1, par.c2, par.c3, par.d0, par.d1, par.d2, par.d3,
-                                   par.f0, par.f1, par.f2, par.f3, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0,
-                                   par.T0, par.un, par.Ndiscmin,
+                                   par.alpha_SET, par.beta_SET, par.c_SET, par.d_SET, par.f_SET, 
+                                   par.g_RESET, par.h_RESET, par.g_read, par.h_read, par.j_0, par.k0,
+                                   par.T0, par.Ndiscmin,
                                    Ndiscmax[j], Ndiscmin[j],
-                                   par.Nplug, par.a, par.ny0, par.dWa, par.Rth0, par.lcell,
-                                   ldet[j],
-                                   par.Rtheff_scaling, par.RseriesTiOx, par.R0, par.Rthline, par.alphaline,
-                                   A[j], Ndisc[j], w[j], sign,
-                                   par.current_min, par.current_max,
-                                   min_bound[j], max_bound[j],
-                                  //  par.w_min, par.w_max,
+                                   par.Nplug, par.a_ny0, par.dWa,
+                                   par.Rth_negative, par.Rth_positive, par.RseriesTiOx, par.R0,
+                                   par.V_series_coefficient, par.V_disk_coefficient, par.gamma_coefficient,
+                                   par.lcell,
+                                   ldet[j], A[j], Ndisc[j], w[j], sign,
+                                   par.current_min, par.current_to_weight_ratio, par.weight_to_current_ratio, par.w_min,
+                                  //  min_bound[j], max_bound[j],
                                    par.Ndisc_min_bound, par.Ndisc_max_bound,
                                    par.Ndiscmax_std, par.Ndiscmin_std, par.ldet_std, par.rdet_std,
                                    rng););
@@ -564,25 +474,24 @@ void JARTv1bRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *
   T *Ndiscmin = device_specific_Ndiscmin[0];
   T *ldet = device_specific_ldet[0];
   T *A = device_specific_A[0];
-  T *min_bound = this->w_min_bound_[0];
-  T *max_bound = this->w_max_bound_[0];
+  // T *min_bound = this->w_min_bound_[0];
+  // T *max_bound = this->w_max_bound_[0];
 
   PULSED_UPDATE_W_LOOP_DENSE(update_once(par.read_voltage, par.pulse_voltage_SET, par.pulse_voltage_RESET, par.pulse_length, par.base_time_step,
-                                   par.alpha0, par.alpha1, par.alpha2, par.alpha3, par.beta0, par.beta1,
-                                   par.c0, par.c1, par.c2, par.c3, par.d0, par.d1, par.d2, par.d3,
-                                   par.f0, par.f1, par.f2, par.f3, par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0,
-                                   par.T0, par.un, par.Ndiscmin,
-                                   Ndiscmax[j], Ndiscmin[j],
-                                   par.Nplug, par.a, par.ny0, par.dWa, par.Rth0, par.lcell,
-                                   ldet[j],
-                                   par.Rtheff_scaling, par.RseriesTiOx, par.R0, par.Rthline, par.alphaline,
-                                   A[j], Ndisc[j], w[j], sign,
-                                   par.current_min, par.current_max,
-                                   min_bound[j], max_bound[j],
-                                  //  par.w_min, par.w_max,
-                                   par.Ndisc_min_bound, par.Ndisc_max_bound,
-                                   par.Ndiscmax_std, par.Ndiscmin_std,par.ldet_std, par.rdet_std,
-                                   rng););
+                                         par.alpha_SET, par.beta_SET, par.c_SET, par.d_SET, par.f_SET, 
+                                         par.g_RESET, par.h_RESET, par.g_read, par.h_read, par.j_0, par.k0,
+                                         par.T0, par.Ndiscmin,
+                                         Ndiscmax[j], Ndiscmin[j],
+                                         par.Nplug, par.a_ny0, par.dWa,
+                                         par.Rth_negative, par.Rth_positive, par.RseriesTiOx, par.R0,
+                                         par.V_series_coefficient, par.V_disk_coefficient, par.gamma_coefficient,
+                                         par.lcell,
+                                         ldet[j], A[j], Ndisc[j], w[j], sign,
+                                         par.current_min, par.current_to_weight_ratio, par.weight_to_current_ratio, par.w_min,
+                                         //  min_bound[j], max_bound[j],
+                                         par.Ndisc_min_bound, par.Ndisc_max_bound,
+                                         par.Ndiscmax_std, par.Ndiscmin_std, par.ldet_std, par.rdet_std,
+                                         rng););
 }
 
 
@@ -618,8 +527,10 @@ template <typename T> void JARTv1bRPUDevice<T>::decayWeights(T **weights, bool b
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-                                              par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
+    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
@@ -656,8 +567,10 @@ void JARTv1bRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay)
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-                                              par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
+    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
@@ -672,8 +585,10 @@ void JARTv1bRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<
 
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
-                                                par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+      // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
+      //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
     }
   }
 }
@@ -696,8 +611,10 @@ template <typename T> void JARTv1bRPUDevice<T>::diffuseWeights(T **weights, RNG<
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-                                              par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
+    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
@@ -724,8 +641,10 @@ template <typename T> void JARTv1bRPUDevice<T>::clipWeights(T **weights, T clip)
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-                                              par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
+    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
@@ -754,8 +673,10 @@ void JARTv1bRPUDevice<T>::resetCols(
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
-                                              par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
+    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
@@ -778,8 +699,10 @@ void JARTv1bRPUDevice<T>::resetAtIndices(
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
-                                              par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
+    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
@@ -799,8 +722,10 @@ template <typename T> bool JARTv1bRPUDevice<T>::onSetWeights(T **weights) {
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-                                              par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
+    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
   return false;
 }

@@ -29,14 +29,26 @@ from aihwkit.simulator.configs.devices import JARTv1bDevice, SoftBoundsDevice, C
 from aihwkit.simulator.configs.utils import PulseType
 from aihwkit.simulator.rpu_base import cuda
 
-# # Prepare the datasets (input and expected output).
-# x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
-# y = Tensor([[1.0, 0.5], [0.7, 0.3]])
+import wandb
 
-# # Define a single-layer network, using a constant step device type.
-# rpu_config = SingleRPUConfig(device=JARTv1bDevice())
-# model = AnalogLinear(4, 2, bias=True,
-#                      rpu_config=rpu_config)
+project_name = "debug"
+# project_name = "basic test v1b"
+learning_rate=0.01
+epochs = 100
+CUDA_Enabled = True
+
+
+if cuda.is_compiled() & CUDA_Enabled:
+    wandb.init(project=project_name, group="Linear Regression", job_type="CUDA")
+else:
+    
+    wandb.init(project=project_name, group="Linear Regression", job_type="CPU")
+
+wandb.config = {
+  "learning_rate": learning_rate,
+  "epochs": epochs,
+  "CUDA_Enabled": CUDA_Enabled
+}
 
 # Prepare the datasets (input and expected output).
 slope = 0.5
@@ -55,20 +67,19 @@ model = AnalogLinear(1, 1, bias=False,
 model.set_weights(Tensor([[0.0]]))
 
 # Move the model and tensors to cuda if it is available.
-if cuda.is_compiled():
+if cuda.is_compiled() & CUDA_Enabled:
     x = x.cuda()
     y = y.cuda()
     model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
-opt = AnalogSGD(model.parameters(), lr=0.01)
+opt = AnalogSGD(model.parameters(), lr=learning_rate)
 opt.regroup_param_groups(model)
 
 weights = model.get_weights()[0][0][0]
-count = 0
-print('Epoch%s:weights: {:.20f}'.format(weights)%count)
+wandb.log({"weight": weights})
 
-for epoch in range(10):
+for epoch in range(epochs):
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.
@@ -77,10 +88,10 @@ for epoch in range(10):
     loss.backward()
 
     opt.step()
-    print('pred: {:.16f}'.format(pred[1][0]))
     weights = model.get_weights()[0][0][0]
-    count = count + 1
-    print('Epoch%s:weights: {:.20f}'.format(weights)%count)
+    
+    wandb.log({"weight": weights})
+    
     # if model.get_weights()[0][0][0] != weights:
     #     weights = model.get_weights()[0][0][0]
     #     count = count + 1

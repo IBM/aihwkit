@@ -1132,13 +1132,13 @@ class JARTv1bDevice(PulsedDevice):
     un: float = 4e-6
     """Electron mobility [m^2/Vs], read [2] for more information."""
 
-    Ndiscmax: float = 20*1e26
+    Ndiscmax: float = 20
     """Average maximum oxygen vacancy concentration in the disc[10^26/m^3], read [2] for more information."""
 
-    Ndiscmin: float = 0.008*1e26
+    Ndiscmin: float = 0.008
     """Average minimum oxygen vacancy concentration in the disc [10^26/m^3], read [2] for more information."""
 
-    Nplug: float = 20*1e26
+    Nplug: float = 20
     """Oxygen vacancy concentration in the plug [10^26/m^3], read [2] for more information."""
 
     a: float = 0.25e-9
@@ -1201,10 +1201,10 @@ class JARTv1bDevice(PulsedDevice):
     smaller than ``pulse_length``. Read [1] for more information.
     """
 
-    Ndisc_min_bound: float = 0.06e26
+    Ndisc_min_bound: float = 0.06
     """Average minimum oxygen vacancy concentration controlled by the peripheral circuit [10^26/m^3], read [1] for more information."""
 
-    Ndisc_max_bound: float = 1.9897452127440086504e26
+    Ndisc_max_bound: float = 1.9897452127440086504
     """Average maximum oxygen vacancy concentration controlled by the peripheral circuit [10^26/m^3], read [1] for more information."""
 
     Ndiscmax_dtod: float = 0
