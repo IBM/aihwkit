@@ -34,7 +34,6 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, InferenceRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters, MappingParameter
-from aihwkit.simulator.rpu_base import cuda
 from aihwkit.exceptions import TileError, ModuleError
 from aihwkit.nn.conversion import convert_to_analog
 
@@ -43,7 +42,7 @@ from .helpers.layers import (
     Conv2d, Conv2dCuda, Linear, LinearCuda, LinearMapped,
     LinearMappedCuda, Conv2dMapped, Conv2dMappedCuda
 )
-from .helpers.testcases import ParametrizedTestCase
+from .helpers.testcases import ParametrizedTestCase, SKIP_CUDA_TESTS
 from .helpers.tiles import FloatingPoint, ConstantStep, Inference
 
 
@@ -321,7 +320,7 @@ class SerializationTest(ParametrizedTestCase):
     def test_save_load_model_cross_device(self):
         """Test saving and loading a model directly."""
 
-        if not cuda.is_compiled():
+        if SKIP_CUDA_TESTS:
             raise SkipTest('CUDA not available.')
 
         model = self.get_layer()

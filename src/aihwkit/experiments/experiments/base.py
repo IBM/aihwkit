@@ -31,6 +31,10 @@ class Signals(Enum):
     VALIDATION_EPOCH_END = 31
     VALIDATION_EPOCH_BATCH_START = 32
     VALIDATION_EPOCH_BATCH_END = 33
+    INFERENCE_START = 40
+    INFERENCE_END = 41
+    INFERENCE_REPEAT_START = 50
+    INFERENCE_REPEAT_END = 51
 
 
 class Experiment:
@@ -54,11 +58,16 @@ class Experiment:
             Signals.VALIDATION_EPOCH_START: [],
             Signals.VALIDATION_EPOCH_END: [],
             Signals.VALIDATION_EPOCH_BATCH_START: [],
-            Signals.VALIDATION_EPOCH_BATCH_END: []
+            Signals.VALIDATION_EPOCH_BATCH_END: [],
+            Signals.INFERENCE_START: [],
+            Signals.INFERENCE_END: [],
+            Signals.INFERENCE_REPEAT_START: [],
+            Signals.INFERENCE_REPEAT_END: []
         }
 
         self.results: Optional[Any] = None
 
+    # add the specified routine to call with the specified hook key to the experiment.
     def add_hook(self, key: Signals, hook: Callable) -> None:
         """Register a hook for the experiment.
 
@@ -76,6 +85,7 @@ class Experiment:
         for key in self.hooks:
             self.hooks[key] = []
 
+    # call the routine that is associated with the specified hook key.
     def _call_hook(self, key: Signals, *args: Any, **kwargs: Any) -> Dict:
         """Invoke the hooks for a specific key."""
         ret = {}

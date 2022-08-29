@@ -126,7 +126,6 @@ class AnalogModuleBase(Module):
             par_name = self.ANALOG_SHARED_WEIGHT_PREFIX + str(self._analog_tile_counter)
             self.register_parameter(par_name, tile.shared_weights)
             self.register_helper(par_name)
-
         mapping = tile.rpu_config.mapping
         if mapping.learn_out_scaling_alpha:
             if tile.out_scaling_alpha is None:
@@ -453,7 +452,8 @@ class AnalogModuleBase(Module):
                 analog_state = state_dict.pop(key).copy()
 
                 if not self._load_rpu_config:
-                    if analog_tile.rpu_config.__class__ != analog_state['rpu_config'].__class__:
+
+                    if not isinstance(analog_tile.rpu_config, type(analog_state['rpu_config'])):
                         raise ModuleError("RPU config mismatch during loading: "
                                           "Tried to replace "
                                           f"{analog_state['rpu_config'].__class__.__name__} "

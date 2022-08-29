@@ -15,3 +15,4 @@
 # Convenience imports for easier access to the classes.
 
 from aihwkit.experiments.experiments.training import BasicTraining
+from aihwkit.experiments.experiments.inferencing import BasicInferencing

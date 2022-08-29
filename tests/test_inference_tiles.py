@@ -192,7 +192,7 @@ class InferenceTileTest(ParametrizedTestCase):
         ('copy', WeightModifierType.COPY,),
     ])
     def test_post_forward_modifier_types(self, _, modifier_type):
-        """Tests whether post update diffusion is performed."""
+        """Tests whether modifier is performed."""
         rpu_config = self.get_rpu_config()
         rpu_config.drift_compensation = None
         rpu_config.forward.is_perfect = True

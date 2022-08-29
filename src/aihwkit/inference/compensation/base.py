@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -58,6 +58,6 @@ class BaseDriftCompensation:
         """Read out the current value from the output of the forward
         pass and returns the drift compensation alpha scale."""
         current_value = self.readout(forward_output)
-        ratio = ref_value/current_value
+        ratio = ref_value / current_value
 
         return ratio

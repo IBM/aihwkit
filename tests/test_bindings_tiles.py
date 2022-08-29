@@ -21,18 +21,18 @@ from numpy.testing import assert_array_equal, assert_array_almost_equal
 from torch import Tensor, from_numpy
 from torch.cuda import init
 
-from aihwkit.simulator.rpu_base import tiles, cuda
+from aihwkit.simulator.rpu_base import tiles
 
 from aihwkit.simulator.configs import FloatingPointRPUConfig, SingleRPUConfig
 from aihwkit.simulator.configs.devices import FloatingPointDevice, ConstantStepDevice, IdealDevice
 from aihwkit.simulator.configs.utils import IOParameters, DriftParameter
 
 from .helpers.decorators import parametrize_over_tiles
-from .helpers.testcases import ParametrizedTestCase
+from .helpers.testcases import ParametrizedTestCase, SKIP_CUDA_TESTS
 from .helpers.tiles import (FloatingPoint, ConstantStep,
                             FloatingPointCuda, ConstantStepCuda)
 
-if cuda.is_compiled():
+if not SKIP_CUDA_TESTS:
     init()
 
 
@@ -183,7 +183,7 @@ class BindingsTilesTest(ParametrizedTestCase):
 
     def test_cuda_instantiation(self):
         """Test whether cuda weights are copied correctly."""
-        if not self.use_cuda and not cuda.is_compiled():
+        if not self.use_cuda or SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
 
         python_tile = self.get_tile(10, 12)

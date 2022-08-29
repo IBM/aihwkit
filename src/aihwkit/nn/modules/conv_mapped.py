@@ -410,7 +410,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
         Returns:
             A string with the extra representation.
         """
-        output = AnalogModuleBase.extra_repr(self)[:-1]
+        output = AnalogModuleBase.extra_repr(self)
         output += ', mapping={}'.format((len(self.in_sizes), len(self.out_sizes)))
 
         return output
