@@ -66,10 +66,4 @@ ARG CUDA_ARCH=86
 ARG NUM_CPU_THREADS=8
 RUN echo "Detected CUDA_ARCHITECTURE is = ${CUDA_ARCH}"
 # Build and install IBM aihwkit
-RUN make clean
-RUN python setup.py build_ext -j${NUM_CPU_THREADS} --inplace -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="${CUDA_ARCH}" -DRPU_BLAS=OpenBLAS
-
-# Set paths of installation
-RUN echo 'export PYTHONPATH=$HOME/aihwkit/src' >> /home/${USERNAME}/.bashrc
-
-
+RUN pip install . --install-option="-DUSE_CUDA=ON" --install-option="-DRPU_CUDA_ARCHITECTURES="${CUDA_ARCH}"" --install-option="-DRPU_BLAS=OpenBLAS"
