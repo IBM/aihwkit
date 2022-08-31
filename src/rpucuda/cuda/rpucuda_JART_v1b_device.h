@@ -66,60 +66,6 @@ public:
 
       const auto &par = getPar();
       T *tmp_global_pars = new T[DEVICE_PARAMETER_COUNT]();
-      // tmp_global_pars[0] = par.read_voltage;
-      // tmp_global_pars[1] = par.pulse_voltage_SET;
-      // tmp_global_pars[2] = par.pulse_voltage_RESET;
-      // tmp_global_pars[3] = par.pulse_length;
-      // tmp_global_pars[4] = par.base_time_step;
-      // tmp_global_pars[5] = par.alpha0;
-      // tmp_global_pars[6] = par.alpha1;
-      // tmp_global_pars[7] = par.alpha2;
-      // tmp_global_pars[8] = par.alpha3;
-      // tmp_global_pars[9] = par.beta0;
-      // tmp_global_pars[10] = par.beta1;
-      // tmp_global_pars[11] = par.c0;
-      // tmp_global_pars[12] = par.c1;
-      // tmp_global_pars[13] = par.c2;
-      // tmp_global_pars[14] = par.c3;
-      // tmp_global_pars[15] = par.d0;
-      // tmp_global_pars[16] = par.d1;
-      // tmp_global_pars[17] = par.d2;
-      // tmp_global_pars[18] = par.d3;
-      // tmp_global_pars[19] = par.f0;
-      // tmp_global_pars[20] = par.f1;
-      // tmp_global_pars[21] = par.f2;
-      // tmp_global_pars[22] = par.f3;
-      // tmp_global_pars[23] = par.g0;
-      // tmp_global_pars[24] = par.g1;
-      // tmp_global_pars[25] = par.h0;
-      // tmp_global_pars[26] = par.h1;
-      // tmp_global_pars[27] = par.h2;
-      // tmp_global_pars[28] = par.h3;
-      // tmp_global_pars[29] = par.j_0;
-      // tmp_global_pars[30] = par.k0;
-      // tmp_global_pars[31] = par.T0;
-      // tmp_global_pars[32] = par.un;
-      // tmp_global_pars[33] = par.Ndiscmin;
-      // tmp_global_pars[34] = par.Nplug;
-      // tmp_global_pars[35] = par.a;
-      // tmp_global_pars[36] = par.ny0;
-      // tmp_global_pars[37] = par.dWa;
-      // tmp_global_pars[38] = par.Rth0;
-      // tmp_global_pars[39] = par.lcell;
-      // tmp_global_pars[40] = par.Rtheff_scaling;
-      // tmp_global_pars[41] = par.RseriesTiOx;
-      // tmp_global_pars[42] = par.R0;
-      // tmp_global_pars[43] = par.Rthline;
-      // tmp_global_pars[44] = par.alphaline;
-      // tmp_global_pars[45] = par.current_min;
-      // tmp_global_pars[46] = par.current_max;
-      // tmp_global_pars[47] = par.Ndisc_min_bound;
-      // tmp_global_pars[48] = par.Ndisc_max_bound;
-      // tmp_global_pars[49] = par.Ndiscmax_std;
-      // tmp_global_pars[50] = par.Ndiscmin_std;
-      // tmp_global_pars[51] = par.ldet_std;
-      // tmp_global_pars[52] = par.rdet_std;
-
       
       tmp_global_pars[0] = par.read_voltage;
       tmp_global_pars[1] = par.pulse_voltage_SET;
@@ -222,14 +168,16 @@ public:
     return PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
   // implement abstract functions
-  void decayWeights(T *dev_weights, bool bias_no_decay) override;
-  void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override;
+  void decayWeights(T *dev_weights, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
+  void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
   void driftWeights(T *dev_weights, T time_since_epoch) override;
-  void diffuseWeights(T *dev_weights) override;
+  void diffuseWeights(T *dev_weights) override{RPU_NOT_IMPLEMENTED;};
   void clipWeights(T *dev_weights, T clip) override;
-  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override;
-  void resetAt(T *dev_weights, const char *dev_non_zero_msk) override;
+  // RRAM does not have the function to reset to a 0 weight value
+  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override{RPU_NOT_IMPLEMENTED;};
+  void resetAt(T *dev_weights, const char *dev_non_zero_msk) override{RPU_NOT_IMPLEMENTED;};
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override;
+  // void setWeights(const T *weightsptr) override;
 
 private:
   std::unique_ptr<CudaArray<float>> dev_ldet_A = nullptr;

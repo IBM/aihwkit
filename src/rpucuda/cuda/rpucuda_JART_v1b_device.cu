@@ -14,7 +14,6 @@
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_JART_v1b_device.h"
 #include <memory>
-#include <stdio.h>
 
 namespace RPU {
 
@@ -60,8 +59,8 @@ __device__ __forceinline__ void apply_cycle_to_cycle_noise(
   }
   if (rdet_std > (T)0.0) {
     T stoch_value = curand_normal(&local_state);
-    T rdet = pow(A/M_PI, 1/2) + rdet_std * stoch_value;
-    A = M_PI*pow(rdet,2);
+    T rdet = pow(A/M_PI, 0.5) + rdet_std * stoch_value;
+    A = M_PI*pow(rdet,2.0);
   }
 }
 
@@ -136,8 +135,8 @@ template <typename T> struct UpdateFunctorJARTv1b {
     // n is larger 0 in any case
     pulse_counter = pulse_counter *n;
     double Ndisc_double = Ndisc;
-    T max_bound = fmin(Ndisc_max_bound, device_specific_Ndiscmax_cuda);
-    T min_bound = fmax(Ndisc_min_bound, device_specific_Ndiscmin_cuda);
+    T max_bound = MIN(Ndisc_max_bound, device_specific_Ndiscmax_cuda);
+    T min_bound = MAX(Ndisc_min_bound, device_specific_Ndiscmin_cuda);
 
 if (negative > 0) {
   if (Ndisc_double >= max_bound)
@@ -147,7 +146,7 @@ if (negative > 0) {
   else
   {
     for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
-      T I_mem = -alpha_SET-beta_SET/(pow((1+pow((c_SET/Ndisc),d_SET)),f_SET));
+      T I_mem = -alpha_SET-beta_SET/(pow((1.0+pow((c_SET/Ndisc),d_SET)),f_SET));
 
       T V_disk = I_mem*(device_specific_ldet_cuda/(V_disk_coefficient*device_specific_A_cuda*Ndisc_double));
 
@@ -159,11 +158,11 @@ if (negative > 0) {
 
       T Treal = T0 + I_mem*V_other_than_series*Rth_negative;
       // // dWamin
-      // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
+      // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
       // // dWamax
-      // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
+      // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
 
-      T dWa_mean = dWa*(sqrt(1-pow(gamma,2.0))+gamma*asin(gamma));
+      T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
       T dWa_difference = dWa*((gamma*M_PI)/2.0);
       // dWamin = dWa_f = dWa_mean - dWa_difference
       // dWamax = dWa_r = dWa_mean + dWa_difference
@@ -171,15 +170,12 @@ if (negative > 0) {
       T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
       T c_v0 = (Nplug+Ndisc_double)/2.0;
-      T F1 = 1-pow((Ndisc_double/device_specific_Ndiscmax_cuda),10.0);
+      T F1 = 1.0-pow((Ndisc_double/device_specific_Ndiscmax_cuda),10.0);
       T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldet_cuda;
 
       Ndisc_double = Ndisc_double + dNdt*base_time_step;
     }
-    if (Ndisc_double >= max_bound)
-    {
-      Ndisc_double = max_bound;
-    }
+    Ndisc_double = MIN(Ndisc_double, max_bound);
   }
   
   
@@ -191,7 +187,7 @@ if (negative > 0) {
   else
   {
     for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
-      T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1/k0));
+      T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
       
       // V - V_series = V_disk+V_plug+V_Schottky
       T V_other_than_series = pulse_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
@@ -201,11 +197,11 @@ if (negative > 0) {
 
       T Treal = T0 + I_mem*V_other_than_series*Rth_positive;
       // // dWamin
-      // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
+      // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
       // // dWamax
-      // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
+      // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
 
-      T dWa_mean = dWa*(sqrt(1-pow(gamma,2.0))+gamma*asin(gamma));
+      T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
       T dWa_difference = dWa*((gamma*M_PI)/2.0);
       // dWamin = dWa_f = dWa_mean - dWa_difference
       // dWamax = dWa_r = dWa_mean + dWa_difference
@@ -213,21 +209,21 @@ if (negative > 0) {
       T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
       T c_v0 = (Nplug+Ndisc_double)/2.0;
-      T F1 = 1-pow((device_specific_Ndiscmin_cuda/Ndisc_double),10.0);
+      T F1 = 1.0-pow((device_specific_Ndiscmin_cuda/Ndisc_double),10.0);
       T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldet_cuda;
 
       Ndisc_double = Ndisc_double + dNdt*base_time_step;
     }
-    if (Ndisc_double <= min_bound)
-    {
-      Ndisc_double = min_bound;
-    }
+    Ndisc_double = MAX(Ndisc_double, min_bound);
   }
 }
 
     w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
     Ndisc = Ndisc_double;
-    printf("w after update %.20f\n", apparent_weight);
+    // apply_cycle_to_cycle_noise(device_specific_Ndiscmax_cuda, device_specific_Ndiscmin_cuda, device_specific_ldet_cuda, device_specific_A_cuda,
+    //                            Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, local_state);
+    uint32_t ns = 1;
+    __nanosleep(ns);
   }
 };
 
@@ -261,24 +257,18 @@ __global__ void kernelMapWeightToNdisc(
   T *weights, 
   T *Ndiscs, 
   int size, 
-  T read_voltage,
   T current_min, 
-  T current_max, 
   T weight_min_bound,
-  T weight_max_bound,
-  T g0,
-  T g1,
-  T h0,
-  T h1,
-  T h2,
-  T h3,
+  T weight_to_current_ratio,
+  T g_read,
+  T h_read,
   T j_0,
   T k0,
   T Ndiscmin) {
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
-    T current = ((weights[idx]-weight_min_bound)/(weight_max_bound-weight_min_bound))*(current_max-current_min)+current_min;
-    Ndiscs[idx] = pow(((pow(((-g0*(exp(-g1*read_voltage)-1))/current), k0)-1)/(h0+h1*read_voltage+h2*exp(-h3*read_voltage))),(1/-j_0))*Ndiscmin;
+    T current = (weights[idx]-weight_min_bound)*weight_to_current_ratio+current_min;
+    Ndiscs[idx] = pow(((pow((g_read/current), k0)-1.0)/(h_read)),1.0/(-j_0))*Ndiscmin;
     }
 }
 
@@ -288,28 +278,22 @@ void map_weight_to_Ndisc(
   T *w,
   T *Ndiscs,
   const int size,
-  const T read_voltage,
   const T current_min, 
-  const T current_max,
   const T weight_min_bound,
-  const T weight_max_bound,
-  const T g0,
-  const T g1,
-  const T h0,
-  const T h1,
-  const T h2,
-  const T h3,
+  const T weight_to_current_ratio,
+  const T g_read,
+  const T h_read,
   const T j_0,
   const T k0,
   const T Ndiscmin) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
-  kernelMapWeightToNdisc<T><<<nblocks, nthreads, 0, context->getStream()>>>(w, Ndiscs, size, read_voltage, current_min, current_max, weight_min_bound, weight_max_bound, g0, g1, h0, h1, h2, h3, j_0, k0, Ndiscmin);
+  kernelMapWeightToNdisc<T><<<nblocks, nthreads, 0, context->getStream()>>>(w, Ndiscs, size, current_min, weight_min_bound, weight_to_current_ratio, g_read, h_read, j_0, k0, Ndiscmin);
 }
-template void map_weight_to_Ndisc<float>(const CudaContext *, float *, float *, const int, const float, const float, const float, const float, const float, const float, const float, const float, const float, const float, const float, const float, const float, const float);
+template void map_weight_to_Ndisc<float>(const CudaContext *, float *, float *, const int, const float, const float, const float, const float, const float, const float, const float, const float);
 #ifdef RPU_USE_DOUBLE
-template void map_weight_to_Ndisc<double>(const CudaContext *, double *, double *, const int, const double, const double, const double, const double, const double, const double, const double, const double, const double, const double, const double, const double, const double, const double);
+template void map_weight_to_Ndisc<double>(const CudaContext *, double *, double *, const int, const double, const double, const double, const double, const double, const double, const double, const double);
 #endif
 
 template <typename T>
@@ -327,46 +311,45 @@ void JARTv1bRPUDeviceCuda<T>::applyWeightUpdate(T *weights, T *dw_and_current_we
 
   map_weight_to_Ndisc<T>(
       this->context_, weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-
+      par.current_min, par.w_min, par.weight_to_current_ratio,
+      par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 }
 
-template <typename T>
-void JARTv1bRPUDeviceCuda<T>::decayWeights(T *weights, T alpha, bool bias_no_decay) {
+// template <typename T>
+// void JARTv1bRPUDeviceCuda<T>::decayWeights(T *weights, T alpha, bool bias_no_decay) {
 
-  RPU::math::elemscalealpha<T>(
-      this->context_, weights, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
-      this->dev_decay_scale_->getData(), this->dev_4params_->getData(), alpha,
-      this->dev_reset_bias_ != nullptr ? this->dev_reset_bias_->getData() : nullptr);
+//   RPU::math::elemscalealpha<T>(
+//       this->context_, weights, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
+//       this->dev_decay_scale_->getData(), this->dev_4params_->getData(), alpha,
+//       this->dev_reset_bias_ != nullptr ? this->dev_reset_bias_->getData() : nullptr);
   
-  const auto &par = getPar();
-  T *Ndisc = get1ParamsData();
+//   const auto &par = getPar();
+//   T *Ndisc = get1ParamsData();
 
-  map_weight_to_Ndisc<T>(
-      this->context_, weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+//   map_weight_to_Ndisc<T>(
+//       this->context_, weights, Ndisc, this->size_,
+      // par.current_min, par.w_min, par.weight_to_current_ratio,
+      // par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
-}
+// }
 
-template <typename T> void JARTv1bRPUDeviceCuda<T>::decayWeights(T *weights, bool bias_no_decay) {
+// template <typename T> void JARTv1bRPUDeviceCuda<T>::decayWeights(T *weights, bool bias_no_decay) {
 
-  const auto &par = getPar();
+//   const auto &par = getPar();
 
-  RPU::math::elemscale<T>(
-      this->context_, weights, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
-      this->dev_decay_scale_->getData(), this->dev_4params_->getData(),
-      this->dev_reset_bias_ != nullptr ? this->dev_reset_bias_->getData() : nullptr);
+//   RPU::math::elemscale<T>(
+//       this->context_, weights, bias_no_decay ? MAX(this->size_ - this->d_size_, 0) : this->size_,
+//       this->dev_decay_scale_->getData(), this->dev_4params_->getData(),
+//       this->dev_reset_bias_ != nullptr ? this->dev_reset_bias_->getData() : nullptr);
   
-  T *Ndisc = get1ParamsData();
+//   T *Ndisc = get1ParamsData();
 
-  map_weight_to_Ndisc<T>(
-      this->context_, weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+//   map_weight_to_Ndisc<T>(
+//       this->context_, weights, Ndisc, this->size_,
+      // par.current_min, par.w_min, par.weight_to_current_ratio,
+      // par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
-}
+// }
 
 template <typename T>
 void JARTv1bRPUDeviceCuda<T>::driftWeights(T *weights, T time_since_last_call) {
@@ -379,45 +362,45 @@ void JARTv1bRPUDeviceCuda<T>::driftWeights(T *weights, T time_since_last_call) {
 
   map_weight_to_Ndisc<T>(
       this->context_, weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+      par.current_min, par.w_min, par.weight_to_current_ratio,
+      par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
 }
 
-template <typename T> void JARTv1bRPUDeviceCuda<T>::diffuseWeights(T *weights) {
+// template <typename T> void JARTv1bRPUDeviceCuda<T>::diffuseWeights(T *weights) {
 
-  if (this->dev_diffusion_rate_ == nullptr) {
-    return; // no diffusion
-  }
+//   if (this->dev_diffusion_rate_ == nullptr) {
+//     return; // no diffusion
+//   }
 
-  if (this->dev_diffusion_nrnd_ == nullptr) {
-    this->initDiffusionRnd();
-    this->rnd_context_->randNormal(
-        this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
-  }
-  this->rnd_context_->synchronize();
+//   if (this->dev_diffusion_nrnd_ == nullptr) {
+//     this->initDiffusionRnd();
+//     this->rnd_context_->randNormal(
+//         this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+//   }
+//   this->rnd_context_->synchronize();
 
-  RPU::math::elemasb02<T>(
-      this->context_, weights, this->size_, this->dev_diffusion_nrnd_->getData(),
-      this->dev_diffusion_rate_->getData(), this->dev_4params_->getData());
+//   RPU::math::elemasb02<T>(
+//       this->context_, weights, this->size_, this->dev_diffusion_nrnd_->getData(),
+//       this->dev_diffusion_rate_->getData(), this->dev_4params_->getData());
 
-  this->rnd_context_->recordWaitEvent(this->context_->getStream());
-  this->rnd_context_->randNormal(
-      this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+//   this->rnd_context_->recordWaitEvent(this->context_->getStream());
+//   this->rnd_context_->randNormal(
+//       this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
 
-  // Note: write noise will use the same rand to save memory. If
-  // diffusion + writenoise is often needed one might want to add an
-  // extra variable for the random numbers
+//   // Note: write noise will use the same rand to save memory. If
+//   // diffusion + writenoise is often needed one might want to add an
+//   // extra variable for the random numbers
   
-  const auto &par = getPar();
-  T *Ndisc = get1ParamsData();
+//   const auto &par = getPar();
+//   T *Ndisc = get1ParamsData();
 
-  map_weight_to_Ndisc<T>(
-      this->context_, weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+//   map_weight_to_Ndisc<T>(
+//       this->context_, weights, Ndisc, this->size_,
+      // par.current_min, par.w_min, par.weight_to_current_ratio,
+      // par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
-}
+// }
 
 template <typename T> void JARTv1bRPUDeviceCuda<T>::clipWeights(T *weights, T clip) {
 
@@ -431,95 +414,118 @@ template <typename T> void JARTv1bRPUDeviceCuda<T>::clipWeights(T *weights, T cl
 
   map_weight_to_Ndisc<T>(
       this->context_, weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+      par.current_min, par.w_min, par.weight_to_current_ratio,
+      par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
 }
 
-template <typename T>
-void JARTv1bRPUDeviceCuda<T>::resetAt(T *dev_weights, const char *dev_non_zero_msk) {
+// template <typename T>
+// void JARTv1bRPUDeviceCuda<T>::resetAt(T *dev_weights, const char *dev_non_zero_msk) {
 
-  const auto &par = getPar();
+//   const auto &par = getPar();
 
-  // if (par.usesPersistentWeight()) {
-  //   RPU_FATAL("ResetAt is not supported with write_noise_std>0!");
-  // }
+//   // if (par.usesPersistentWeight()) {
+//   //   RPU_FATAL("ResetAt is not supported with write_noise_std>0!");
+//   // }
 
-  RPU::math::elemresetsatmsk<T>(
-      this->context_, dev_weights, this->size_, dev_non_zero_msk,
-      this->dev_reset_bias_ == nullptr ? nullptr : this->dev_reset_bias_->getDataConst(), par.reset_std,
-      this->dev_4params_->getData());
+//   RPU::math::elemresetsatmsk<T>(
+//       this->context_, dev_weights, this->size_, dev_non_zero_msk,
+//       this->dev_reset_bias_ == nullptr ? nullptr : this->dev_reset_bias_->getDataConst(), par.reset_std,
+//       this->dev_4params_->getData());
   
-  T *Ndisc = get1ParamsData();
+//   T *Ndisc = get1ParamsData();
 
-  map_weight_to_Ndisc<T>(
-      this->context_, dev_weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+//   map_weight_to_Ndisc<T>(
+//       this->context_, dev_weights, Ndisc, this->size_,
+      // par.current_min, par.w_min, par.weight_to_current_ratio,
+      // par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
-}
+// }
 
-template <typename T>
-void JARTv1bRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols, T reset_prob) {
-  // col-major in CUDA.
+// template <typename T>
+// void JARTv1bRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols, T reset_prob) {
+//   // col-major in CUDA.
 
-  if (this->dev_reset_bias_ == nullptr) {
-    return; // no reset
-  }
+//   if (this->dev_reset_bias_ == nullptr) {
+//     return; // no reset
+//   }
 
-  // if (getPar().usesPersistentWeight()) {
-  //   RPU_FATAL("ResetCols is not supported with write_noise_std>0!");
-  // }
+//   // if (getPar().usesPersistentWeight()) {
+//   //   RPU_FATAL("ResetCols is not supported with write_noise_std>0!");
+//   // }
 
-  if (this->dev_reset_nrnd_ == nullptr) {
-    PulsedRPUDeviceCuda<T>::initResetRnd();
-  }
-  int n = n_cols * this->d_size_;
-  int offset = start_col * this->d_size_;
-  this->rnd_context_->randNormal(
-      this->dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
-  if (reset_prob < 1) {
-    this->rnd_context_->randUniform(this->dev_reset_flag_->getData(), n_cols * this->d_size_);
-  }
-  this->context_->recordWaitEvent(this->rnd_context_->getStream());
+//   if (this->dev_reset_nrnd_ == nullptr) {
+//     PulsedRPUDeviceCuda<T>::initResetRnd();
+//   }
+//   int n = n_cols * this->d_size_;
+//   int offset = start_col * this->d_size_;
+//   this->rnd_context_->randNormal(
+//       this->dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
+//   if (reset_prob < 1) {
+//     this->rnd_context_->randUniform(this->dev_reset_flag_->getData(), n_cols * this->d_size_);
+//   }
+//   this->context_->recordWaitEvent(this->rnd_context_->getStream());
 
-  if (n >= this->size_) {
-    // reset whole matrix
-    RPU::math::elemresetsat<T>(
-        this->context_, weights, this->size_, this->dev_reset_bias_->getDataConst(),
-        this->dev_reset_nrnd_->getDataConst(), this->dev_reset_flag_->getDataConst(), reset_prob,
-        this->dev_4params_->getData());
+//   if (n >= this->size_) {
+//     // reset whole matrix
+//     RPU::math::elemresetsat<T>(
+//         this->context_, weights, this->size_, this->dev_reset_bias_->getDataConst(),
+//         this->dev_reset_nrnd_->getDataConst(), this->dev_reset_flag_->getDataConst(), reset_prob,
+//         this->dev_4params_->getData());
 
-  } else if (offset + n <= this->size_) {
-    // one pass enough
-    RPU::math::elemresetsat<T>(
-        this->context_, weights + offset, n, this->dev_reset_bias_->getDataConst() + offset,
-        this->dev_reset_nrnd_->getDataConst(), this->dev_reset_flag_->getDataConst(), reset_prob,
-        this->dev_4params_->getData() + 4 * offset);
-  } else {
-    // two passes
-    int m = this->size_ - offset;
+//   } else if (offset + n <= this->size_) {
+//     // one pass enough
+//     RPU::math::elemresetsat<T>(
+//         this->context_, weights + offset, n, this->dev_reset_bias_->getDataConst() + offset,
+//         this->dev_reset_nrnd_->getDataConst(), this->dev_reset_flag_->getDataConst(), reset_prob,
+//         this->dev_4params_->getData() + 4 * offset);
+//   } else {
+//     // two passes
+//     int m = this->size_ - offset;
 
-    RPU::math::elemresetsat<T>(
-        this->context_, weights + offset, m, this->dev_reset_bias_->getDataConst() + offset,
-        this->dev_reset_nrnd_->getDataConst(), this->dev_reset_flag_->getDataConst(), reset_prob,
-        this->dev_4params_->getData() + 4 * offset);
+//     RPU::math::elemresetsat<T>(
+//         this->context_, weights + offset, m, this->dev_reset_bias_->getDataConst() + offset,
+//         this->dev_reset_nrnd_->getDataConst(), this->dev_reset_flag_->getDataConst(), reset_prob,
+//         this->dev_4params_->getData() + 4 * offset);
 
-    RPU::math::elemresetsat<T>(
-        this->context_, weights, n - m, this->dev_reset_bias_->getDataConst(),
-        this->dev_reset_nrnd_->getDataConst() + m, this->dev_reset_flag_->getDataConst() + m, reset_prob,
-        this->dev_4params_->getData());
-  }
+//     RPU::math::elemresetsat<T>(
+//         this->context_, weights, n - m, this->dev_reset_bias_->getDataConst(),
+//         this->dev_reset_nrnd_->getDataConst() + m, this->dev_reset_flag_->getDataConst() + m, reset_prob,
+//         this->dev_4params_->getData());
+//   }
   
-  const auto &par = getPar();
-  T *Ndisc = get1ParamsData();
+//   const auto &par = getPar();
+//   T *Ndisc = get1ParamsData();
 
-  map_weight_to_Ndisc<T>(
-      this->context_, weights, Ndisc, this->size_,
-      par.read_voltage, par.current_min, par.current_max, par.w_min, par.w_max,
-      par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
+//   map_weight_to_Ndisc<T>(
+//       this->context_, weights, Ndisc, this->size_,
+      // par.current_min, par.w_min, par.weight_to_current_ratio,
+      // par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
-}
+// }
+
+// template <typename T> void JARTv1bRPUDeviceCuda<T>::setWeights(const T *host_source) {
+
+//   CHECK_RPU_DEVICE_INIT;
+//   RPUSimple<T>::setWeights(host_source); // sets host
+
+//   if (rpu_device_) {
+//     if (rpu_device_->onSetWeights(this->getWeightsPtr())) {
+//       // apply bounds etc to host
+//       rpucuda_device_->populateFrom(*rpu_device_); // device pars have changed (due to onSetWeights)
+//     }
+//   }
+//   RPUCudaSimple<T>::setWeights(this->getWeightsPtr()[0]); // set device weights
+  
+//   const auto &par = getPar();
+//   T *Ndisc = get1ParamsData();
+//   T *weights = this->getWeightsPtr()[0];
+
+//   map_weight_to_Ndisc<T>(
+//       this->context_, weights, Ndisc, this->size_,
+//       par.current_min, par.w_min, par.weight_to_current_ratio,
+//       par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+// }
 
 template class JARTv1bRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE

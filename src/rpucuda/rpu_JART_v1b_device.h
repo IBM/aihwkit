@@ -296,15 +296,15 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
   inline T **getldet() const { return device_specific_ldet; };
   inline T **getA() const { return device_specific_A; };
 
-  void decayWeights(T **weights, bool bias_no_decay) override;
-  void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
+  void decayWeights(T **weights, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
+  void decayWeights(T **weights, T alpha, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
   void driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) override;
-  void diffuseWeights(T **weights, RNG<T> &rng) override;
+  void diffuseWeights(T **weights, RNG<T> &rng) override{RPU_NOT_IMPLEMENTED;};
   void clipWeights(T **weights, T add_clip) override;
   bool onSetWeights(T **weights) override;
-  void
-  resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
-  void resetAtIndices(T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng) override;
+  // RRAM does not have the function to reset to a 0 weight value
+  void resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override{RPU_NOT_IMPLEMENTED;};
+  void resetAtIndices(T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng) override{RPU_NOT_IMPLEMENTED;};
   
   
   void doSparseUpdate(

@@ -141,33 +141,9 @@ inline void step_SET(
     const T &gamma_coefficient,
     const T &lcell,
     T &ldet,
-    T &A) {
-  // T I_mem = calculate_current_SET(Ndisc, alpha_SET, beta_SET, c_SET, d_SET, f_SET);
-
-  // T c_v0 = (Nplug+Ndisc)/2.0;
-  // T F1 = 1-pow((Ndisc/Ndiscmax),10.0);
-
-  // Voltages_needed<T> Voltages = calculate_voltages(applied_voltage_SET, I_mem, R0, RseriesTiOx, V_series_coefficient, V_disk_coefficient, lcell, ldet, A, Ndisc);
-  
-  // T Eion = Voltages.V_disk/ldet;
-
-  // T gamma = gamma_coefficient*Eion;
-
-  // T Treal = T0 + I_mem*Voltages.other_than_V_series*Rth_negative;
-  
-  
-  // // dWamin
-  // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2.0+gamma*asin(gamma));
-  // // dWamax
-  // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2.0+gamma*asin(gamma));
-  // T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
-  // T dNdt = -(c_v0*a_ny0*F1*(exp(-dWa_f/denominator)-exp(-dWa_r/denominator)))/ldet;
-      
-
-  // Ndisc = Ndisc + dNdt*time_step;
-
-  
-    T I_mem = -alpha_SET-beta_SET/(pow((1+pow((c_SET/Ndisc),d_SET)),f_SET));
+    T &A,
+    T &max_bound) {
+    T I_mem = -alpha_SET-beta_SET/(pow((1.0+pow((c_SET/Ndisc),d_SET)),f_SET));
 
     T V_disk = I_mem*(ldet/(V_disk_coefficient*A*Ndisc));
 
@@ -179,11 +155,11 @@ inline void step_SET(
 
     T Treal = T0 + I_mem*V_other_than_series*Rth_negative;
     // // dWamin
-    // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
+    // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
     // // dWamax
-    // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
+    // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
 
-    T dWa_mean = dWa*(sqrt(1-pow(gamma,2.0))+gamma*asin(gamma));
+    T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
     T dWa_difference = dWa*((gamma*M_PI)/2.0);
     // dWamin = dWa_f = dWa_mean - dWa_difference
     // dWamax = dWa_r = dWa_mean + dWa_difference
@@ -191,14 +167,12 @@ inline void step_SET(
     T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
     T c_v0 = (Nplug+Ndisc)/2.0;
-    T F1 = 1-pow((Ndisc/Ndiscmax),10.0);
+    T F1 = 1.0-pow((Ndisc/Ndiscmax),10.0);
     T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/ldet;
 
     Ndisc = Ndisc + dNdt*time_step;
 
-  if (Ndisc>Ndiscmax){
-    Ndisc = Ndiscmax;
-  }
+    Ndisc = MIN(Ndisc, max_bound);
 }
 
 template <typename T>
@@ -224,33 +198,9 @@ inline void step_RESET(
     const T &gamma_coefficient,
     const T &lcell,
     T &ldet,
-    T &A) {
-
-  // T I_mem = calculate_current_RESET_and_Read(Ndisc, g_RESET, h_RESET, j_0, k0, Original_Ndiscmin);
-
-  // T c_v0 = (Nplug+Ndisc)/2;
-  // T F1 = 1-pow((Ndiscmin/Ndisc),10);
-
-  // Voltages_needed<T> Voltages = calculate_voltages(applied_voltage_RESET, I_mem, R0, RseriesTiOx, V_series_coefficient, V_disk_coefficient, lcell, ldet, A, Ndisc);
-  
-  // T Eion = Voltages.other_than_V_series/lcell;
-
-  // T gamma = gamma_coefficient*Eion;
-
-  // T Treal = T0 + I_mem*Voltages.other_than_V_series*Rth_positive;
-  
-  
-  // // dWamin
-  // T dWa_f = dWa*(sqrt(1-pow(gamma,2))-(gamma*M_PI)/2+gamma*asin(gamma));
-  // // dWamax
-  // T dWa_r = dWa*(sqrt(1-pow(gamma,2))+(gamma*M_PI)/2+gamma*asin(gamma));
-  // T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
-  // T dNdt = -(c_v0*a_ny0*F1*(exp(-dWa_f/denominator)-exp(-dWa_r/denominator)))/ldet;
-      
-
-  // Ndisc = Ndisc + dNdt*time_step;
-  
-  T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1/k0));
+    T &A,
+    T &min_bound) {
+  T I_mem = g_RESET/(pow((1.0+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
   
   // V - V_series = V_disk+V_plug+V_Schottky
   T V_other_than_series = applied_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
@@ -260,11 +210,11 @@ inline void step_RESET(
 
   T Treal = T0 + I_mem*V_other_than_series*Rth_positive;
   // // dWamin
-  // T dWa_f = dWa*(sqrt(1-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
+  // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
   // // dWamax
-  // T dWa_r = dWa*(sqrt(1-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
+  // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
 
-  T dWa_mean = dWa*(sqrt(1-pow(gamma,2.0))+gamma*asin(gamma));
+  T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
   T dWa_difference = dWa*((gamma*M_PI)/2.0);
   // dWamin = dWa_f = dWa_mean - dWa_difference
   // dWamax = dWa_r = dWa_mean + dWa_difference
@@ -272,14 +222,12 @@ inline void step_RESET(
   T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
   T c_v0 = (Nplug+Ndisc)/2.0;
-  T F1 = 1-pow((Ndiscmin/Ndisc),10.0);
+  T F1 = 1.0-pow((Ndiscmin/Ndisc),10.0);
   T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/ldet;
 
   Ndisc = Ndisc + dNdt*time_step;
 
-  if (Ndisc<Ndiscmin){
-      Ndisc = Ndiscmin;
-  }
+  Ndisc = MAX(Ndisc, min_bound);
 }
 
 template <typename T>
@@ -320,8 +268,8 @@ inline void apply_cycle_to_cycle_noise(
     ldet = ldet + ldet_std * rng->sampleGauss();
   }
   if (rdet_std > (T)0.0) {
-    T rdet = pow(A/M_PI, 1/2) + rdet_std * rng->sampleGauss();
-    A = M_PI*pow(rdet,2);
+    T rdet = pow(A/M_PI, 0.5) + rdet_std * rng->sampleGauss();
+    A = M_PI*pow(rdet,2.0);
   }
 }
 
@@ -376,20 +324,30 @@ inline void update_once(
     RNG<T> *rng) {
   int pulse_counter = int (pulse_length/base_time_step);
   double Ndisc_double = Ndisc;
+  T max_bound = MIN(Ndisc_max_bound, Ndiscmax);
+  T min_bound = MAX(Ndisc_min_bound, Ndiscmin);
 
   if (sign < 0) {
-    for (int i = 0; i < pulse_counter; i++) {
-      step_SET(pulse_voltage_SET, base_time_step, Ndisc_double, alpha_SET, beta_SET, c_SET, d_SET, f_SET, T0, Ndiscmax, Nplug, a_ny0, dWa, Rth_negative, RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, A);
+    if (Ndisc_double >= max_bound)
+    {
+      Ndisc_double = max_bound;
     }
-    if (Ndisc_double>Ndisc_max_bound){
-      Ndisc_double = Ndisc_max_bound;
+    else
+    {
+      for (int i = 0; i < pulse_counter; i++) {
+        step_SET(pulse_voltage_SET, base_time_step, Ndisc_double, alpha_SET, beta_SET, c_SET, d_SET, f_SET, T0, Ndiscmax, Nplug, a_ny0, dWa, Rth_negative, RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, A, max_bound);
+      }
     }
   }else{
-    for (int i = 0; i < pulse_counter; i++) {
-      step_RESET(pulse_voltage_RESET, base_time_step, Ndisc_double, g_RESET, h_RESET, j_0, k0, T0, Original_Ndiscmin, Ndiscmin, Nplug, a_ny0, dWa, Rth_positive, RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, A);
+    if (Ndisc_double <= min_bound)
+    {
+      Ndisc_double = min_bound;
     }
-    if (Ndisc_double<Ndisc_min_bound){
-      Ndisc_double = Ndisc_min_bound;
+    else
+    {
+      for (int i = 0; i < pulse_counter; i++) {
+        step_RESET(pulse_voltage_RESET, base_time_step, Ndisc_double, g_RESET, h_RESET, j_0, k0, T0, Original_Ndiscmin, Ndiscmin, Nplug, a_ny0, dWa, Rth_positive, RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, A, min_bound);
+      }
     }
   } 
 
@@ -407,7 +365,7 @@ inline T invert_read_current(
     const T &k0, 
     const T &Ndiscmin) {
   if (I_mem>0){
-  return pow(((pow((g_read/I_mem), k0)-1)/(h_read)),1/(-j_0))*Ndiscmin;
+  return pow(((pow((g_read/I_mem), k0)-1.0)/(h_read)),1.0/(-j_0))*Ndiscmin;
   }
   else{
     return 0;
@@ -416,7 +374,6 @@ inline T invert_read_current(
 
 template <typename T>
 inline T map_weight_to_Ndisc(
-    const T &read_voltage,
     const T &weight,
     const T &current_min,
     const T &weight_min_bound,
@@ -496,83 +453,79 @@ void JARTv1bRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *
 
 
 
-template <typename T> void JARTv1bRPUDevice<T>::decayWeights(T **weights, bool bias_no_decay) {
+// template <typename T> void JARTv1bRPUDevice<T>::decayWeights(T **weights, bool bias_no_decay) {
 
-  // maybe a bit overkill to check the bounds...
-  T *w = weights[0];
-  T *wd = this->w_decay_scale_[0];
-  T *max_bound = this->w_max_bound_[0];
-  T *min_bound = this->w_min_bound_[0];
-  T *b = this->w_reset_bias_[0];
+//   // maybe a bit overkill to check the bounds...
+//   T *w = weights[0];
+//   T *wd = this->w_decay_scale_[0];
+//   T *max_bound = this->w_max_bound_[0];
+//   T *min_bound = this->w_min_bound_[0];
+//   T *b = this->w_reset_bias_[0];
 
-  if (!bias_no_decay) {
-    PRAGMA_SIMD
-    for (int i = 0; i < this->size_; ++i) {
-      w[i] = (w[i] - b[i]) * wd[i] + b[i];
-      w[i] = MIN(w[i], max_bound[i]);
-      w[i] = MAX(w[i], min_bound[i]);
-    }
-  } else {
-    const int last_col = this->x_size_ - 1; // x-major (ie row major)
-    PRAGMA_SIMD
-    for (int i = 0; i < this->size_; ++i) {
-      T s = (i % this->x_size_ == last_col) ? (T)1.0 : wd[i];
-      w[i] = (w[i] - b[i]) * s + b[i];
-      w[i] = MIN(w[i], max_bound[i]);
-      w[i] = MAX(w[i], min_bound[i]);
-    }
-  }
+//   if (!bias_no_decay) {
+//     PRAGMA_SIMD
+//     for (int i = 0; i < this->size_; ++i) {
+//       w[i] = (w[i] - b[i]) * wd[i] + b[i];
+//       w[i] = MIN(w[i], max_bound[i]);
+//       w[i] = MAX(w[i], min_bound[i]);
+//     }
+//   } else {
+//     const int last_col = this->x_size_ - 1; // x-major (ie row major)
+//     PRAGMA_SIMD
+//     for (int i = 0; i < this->size_; ++i) {
+//       T s = (i % this->x_size_ == last_col) ? (T)1.0 : wd[i];
+//       w[i] = (w[i] - b[i]) * s + b[i];
+//       w[i] = MIN(w[i], max_bound[i]);
+//       w[i] = MAX(w[i], min_bound[i]);
+//     }
+//   }
 
-  const auto &par = getPar();
+//   const auto &par = getPar();
 
-  PRAGMA_SIMD
-  for (int i = 0; i < this->size_; i++) {
-    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
-                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
-  }
-}
+//   PRAGMA_SIMD
+//   for (int i = 0; i < this->size_; i++) {
+//     this->w_persistent_[0][i] = map_weight_to_Ndisc(w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+//                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+//   }
+// }
 
-template <typename T>
-void JARTv1bRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
+// template <typename T>
+// void JARTv1bRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
 
-  // maybe a bit overkill to check the bounds...
-  T *w = weights[0];
-  T *wd = this->w_decay_scale_[0];
-  T *max_bound = this->w_max_bound_[0];
-  T *min_bound = this->w_min_bound_[0];
-  T *b = this->w_reset_bias_[0];
+//   // maybe a bit overkill to check the bounds...
+//   T *w = weights[0];
+//   T *wd = this->w_decay_scale_[0];
+//   T *max_bound = this->w_max_bound_[0];
+//   T *min_bound = this->w_min_bound_[0];
+//   T *b = this->w_reset_bias_[0];
 
-  if (!bias_no_decay) {
-    PRAGMA_SIMD
-    for (int i = 0; i < this->size_; ++i) {
-      T s = 1 + alpha * (wd[i] - 1);
-      w[i] = (w[i] - b[i]) * s + b[i];
-      w[i] = MIN(w[i], max_bound[i]);
-      w[i] = MAX(w[i], min_bound[i]);
-    }
-  } else {
-    const int last_col = this->x_size_ - 1; // x-major (ie row major)
-    PRAGMA_SIMD
-    for (int i = 0; i < this->size_; ++i) {
-      T s = (i % this->x_size_ == last_col) ? (T)1.0 : (1 + alpha * (wd[i] - 1));
-      w[i] = (w[i] - b[i]) * s + b[i];
-      w[i] = MIN(w[i], max_bound[i]);
-      w[i] = MAX(w[i], min_bound[i]);
-    }
-  }
+//   if (!bias_no_decay) {
+//     PRAGMA_SIMD
+//     for (int i = 0; i < this->size_; ++i) {
+//       T s = 1 + alpha * (wd[i] - 1);
+//       w[i] = (w[i] - b[i]) * s + b[i];
+//       w[i] = MIN(w[i], max_bound[i]);
+//       w[i] = MAX(w[i], min_bound[i]);
+//     }
+//   } else {
+//     const int last_col = this->x_size_ - 1; // x-major (ie row major)
+//     PRAGMA_SIMD
+//     for (int i = 0; i < this->size_; ++i) {
+//       T s = (i % this->x_size_ == last_col) ? (T)1.0 : (1 + alpha * (wd[i] - 1));
+//       w[i] = (w[i] - b[i]) * s + b[i];
+//       w[i] = MIN(w[i], max_bound[i]);
+//       w[i] = MAX(w[i], min_bound[i]);
+//     }
+//   }
 
-  const auto &par = getPar();
+//   const auto &par = getPar();
 
-  PRAGMA_SIMD
-  for (int i = 0; i < this->size_; i++) {
-    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
-                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
-  }
-}
+//   PRAGMA_SIMD
+//   for (int i = 0; i < this->size_; i++) {
+//     this->w_persistent_[0][i] = map_weight_to_Ndisc(w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+//                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+//   }
+// }
 
 template <typename T>
 void JARTv1bRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T> &rng) {
@@ -585,38 +538,34 @@ void JARTv1bRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<
 
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
-      // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
-      //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(w[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
     }
   }
 }
 
-template <typename T> void JARTv1bRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
+// template <typename T> void JARTv1bRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
 
-  T *w = weights[0];
-  T *diffusion_rate = &(this->w_diffusion_rate_[0][0]);
-  T *max_bound = &(this->w_max_bound_[0][0]);
-  T *min_bound = &(this->w_min_bound_[0][0]);
+//   T *w = weights[0];
+//   T *diffusion_rate = &(this->w_diffusion_rate_[0][0]);
+//   T *max_bound = &(this->w_max_bound_[0][0]);
+//   T *min_bound = &(this->w_min_bound_[0][0]);
 
-  PRAGMA_SIMD
-  for (int i = 0; i < this->size_; ++i) {
-    w[i] += diffusion_rate[i] * rng.sampleGauss();
-    w[i] = MIN(w[i], max_bound[i]);
-    w[i] = MAX(w[i], min_bound[i]);
-  }
+//   PRAGMA_SIMD
+//   for (int i = 0; i < this->size_; ++i) {
+//     w[i] += diffusion_rate[i] * rng.sampleGauss();
+//     w[i] = MIN(w[i], max_bound[i]);
+//     w[i] = MAX(w[i], min_bound[i]);
+//   }
 
-  const auto &par = getPar();
+//   const auto &par = getPar();
 
-  PRAGMA_SIMD
-  for (int i = 0; i < this->size_; i++) {
-    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
-                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
-  }
-}
+//   PRAGMA_SIMD
+//   for (int i = 0; i < this->size_; i++) {
+//     this->w_persistent_[0][i] = map_weight_to_Ndisc(w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+//                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+//   }
+// }
 
 template <typename T> void JARTv1bRPUDevice<T>::clipWeights(T **weights, T clip) {
   // apply hard bounds
@@ -641,70 +590,64 @@ template <typename T> void JARTv1bRPUDevice<T>::clipWeights(T **weights, T clip)
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
 }
 
-template <typename T>
-void JARTv1bRPUDevice<T>::resetCols(
-    T **weights, int start_col, int n_col, T reset_prob, RealWorldRNG<T> &rng) {
+// template <typename T>
+// void JARTv1bRPUDevice<T>::resetCols(
+//     T **weights, int start_col, int n_col, T reset_prob, RealWorldRNG<T> &rng) {
 
-  T reset_std = getPar().reset_std;
-  for (int j = 0; j < this->x_size_; ++j) {
-    if ((start_col + n_col <= this->x_size_ && j >= start_col && j < start_col + n_col) ||
-        (start_col + n_col > this->x_size_ &&
-         ((j >= start_col) || (j < n_col - (this->x_size_ - start_col))))) {
-      PRAGMA_SIMD
-      for (int i = 0; i < this->d_size_; ++i) {
-        if (reset_prob == 1 || rng.sampleUniform() < reset_prob) {
-          weights[i][j] =
-              this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
-          weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
-          weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
-        }
-      }
-    }
-  }
+//   T reset_std = getPar().reset_std;
+//   for (int j = 0; j < this->x_size_; ++j) {
+//     if ((start_col + n_col <= this->x_size_ && j >= start_col && j < start_col + n_col) ||
+//         (start_col + n_col > this->x_size_ &&
+//          ((j >= start_col) || (j < n_col - (this->x_size_ - start_col))))) {
+//       PRAGMA_SIMD
+//       for (int i = 0; i < this->d_size_; ++i) {
+//         if (reset_prob == 1 || rng.sampleUniform() < reset_prob) {
+//           weights[i][j] =
+//               this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+//           weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
+//           weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
+//         }
+//       }
+//     }
+//   }
 
-  const auto &par = getPar();
+//   const auto &par = getPar();
 
-  PRAGMA_SIMD
-  for (int i = 0; i < this->size_; i++) {
-    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
-    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
-                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
-  }
-}
+//   PRAGMA_SIMD
+//   for (int i = 0; i < this->size_; i++) {
+//     this->w_persistent_[0][i] = map_weight_to_Ndisc(weights[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
+//                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+//   }
+// }
 
-template <typename T>
-void JARTv1bRPUDevice<T>::resetAtIndices(
-    T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng) {
+// template <typename T>
+// void JARTv1bRPUDevice<T>::resetAtIndices(
+//     T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng) {
 
-  T reset_std = getPar().reset_std;
+//   T reset_std = getPar().reset_std;
 
-  for (const auto &index : x_major_indices) {
-    int i = index / this->x_size_;
-    int j = index % this->x_size_;
+//   for (const auto &index : x_major_indices) {
+//     int i = index / this->x_size_;
+//     int j = index % this->x_size_;
 
-    weights[i][j] = this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
-    weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
-    weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
-  }
+//     weights[i][j] = this->w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+//     weights[i][j] = MIN(weights[i][j], this->w_max_bound_[i][j]);
+//     weights[i][j] = MAX(weights[i][j], this->w_min_bound_[i][j]);
+//   }
 
-  const auto &par = getPar();
+//   const auto &par = getPar();
 
-  PRAGMA_SIMD
-  for (int i = 0; i < this->size_; i++) {
-    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.current_max, this->w_min_bound_[0][i], this->w_max_bound_[0][i], 
-    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, weights[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
-                                              par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
-  }
-}
+//   PRAGMA_SIMD
+//   for (int i = 0; i < this->size_; i++) {
+//     this->w_persistent_[0][i] = map_weight_to_Ndisc(weights[0][i], par.current_min, par.w_min, par.weight_to_current_ratio,
+//                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+//   }
+// }
 
 template <typename T> bool JARTv1bRPUDevice<T>::onSetWeights(T **weights) {
 
@@ -722,12 +665,10 @@ template <typename T> bool JARTv1bRPUDevice<T>::onSetWeights(T **weights) {
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    // this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.current_max, min_bound[i], max_bound[i], 
-    //                                           par.g0, par.g1, par.h0, par.h1, par.h2, par.h3, par.j_0, par.k0, par.Ndiscmin);
-    this->w_persistent_[0][i] = map_weight_to_Ndisc(par.read_voltage, w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
+    this->w_persistent_[0][i] = map_weight_to_Ndisc(w[i], par.current_min, par.w_min, par.weight_to_current_ratio,
                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
   }
-  return false;
+  return true;
 }
 
 template class JARTv1bRPUDevice<float>;
