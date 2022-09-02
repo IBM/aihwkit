@@ -994,7 +994,7 @@ class JARTv1bDevice(PulsedDevice):
     kept noise free at the device model level. Built-in read noise from
     aihwkit tiles still works as normal.
 
-    [1] Todo: add publication details when finalized.
+    [1] TODO: add publication details when finalized.
     [2] C. Bengel, A. Siemon, F. C ̈uppers, S. Hoffmann-Eifert, A. Hardtdegen,
     M. von Witzleben, L. Hellmich, R. Waser, and S. Menzel, “Variability-
     aware modeling of filamentary oxide-based bipolar resistive switching
@@ -1037,6 +1037,23 @@ class JARTv1bDevice(PulsedDevice):
 
     dw_min: float = 0.0001
     """Mean of the minimal update step sizes across devices and directions."""
+
+    write_noise_std: float = 0.0
+    r"""Whether to use write noise.
+
+    Unlike other aihwkit devices, this value does not affect the updates.
+    The updates are only indirectly affected by ``Ndiscmax``, ``Ndiscmin``,
+    ``ldet``, ``rdet`` and the relevant noise. 
+
+    This value, however, controls the noise in the ``write and verify``
+    process of the peripheral circuit, which happens when setting the
+    weights directly from PyTorch (including initialization).
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{max_or_min} + \sigma_\text{write_noise}
+    """
     
     alpha0: float = 4.81951e-5
     """Fitting parameters discribed in [1].
@@ -1208,32 +1225,150 @@ class JARTv1bDevice(PulsedDevice):
     """Average maximum oxygen vacancy concentration controlled by the peripheral circuit [10^26/m^3], read [1] for more information."""
 
     Ndiscmax_dtod: float = 0
-    """Device-to-device std deviation of ``Ndiscmax``, read [1] for more information."""
-# TODO should we do relative units? 
+    r"""Device-to-device std deviation of ``Ndiscmax``.
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmax}_{device} = {Ndiscmax}_{average} * \left(1 + \sigma_\text{Ndiscmax_dtod}\xi\right)
+
+    Read [1] for more information."""
+    
     Ndiscmin_dtod: float = 0
-    """Device-to-device std deviation of ``Ndiscmin``, read [1] for more information."""
+    r"""Device-to-device std deviation of ``Ndiscmin``.
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmin}_{device} = {Ndiscmin}_{average} * \left(1 + \sigma_\text{Ndiscmin_dtod}\xi\right)
+
+    Read [1] for more information."""
 
     ldet_dtod: float = 0
-    """Device-to-device std deviation of ``ldet``, read [1] for more information."""
+    r"""Device-to-device std deviation of ``ldet``.
+
+    Thus it is:
+
+    .. math::
+        {ldet}_{device} = {ldet}_{average} * \left(1 + \sigma_\text{ldet_dtod}\xi\right)
+
+    Read [1] for more information."""
 
     rdet_dtod: float = 0
-    """Device-to-device std deviation of ``rdet``, read [1] for more information."""
+    r"""Device-to-device std deviation of ``rdet``.
+
+    Thus it is:
+
+    .. math::
+        {rdet}_{device} = {rdet}_{average} * \left(1 + \sigma_\text{rdet_dtod}\xi\right)
+
+    Read [1] for more information."""
 
     Ndiscmax_std: float = 0
-    """Cycle-to-cycle std deviation of ``Ndiscmax``, read [1] for more information."""
+    r"""Cycle-to-cycle std deviation of ``Ndiscmax``, used in a random walk process. 
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmax}_{new} = {Ndiscmax}_{old} * \left(1 + \sigma_\text{Ndiscmax_std}\xi\right)
+
+    Read [1] for more information."""
+
+    Ndiscmax_upper_bound: float = 0
+    """The maximum allowed value for ``Ndiscmax`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    Ndiscmax_lower_bound: float = 0
+    """The minimum allowed value for ``Ndiscmax`` during the random walk process.
+    The upper and lower bound will be disabled if the supplied value is negative.
+    Read [1] for more information."""
 
     Ndiscmin_std: float = 0
-    """Cycle-to-cycle std deviation of ``Ndiscmin``, read [1] for more information."""
+    r"""Cycle-to-cycle std deviation of ``Ndiscmin``, used in a random walk process. 
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmin}_{new} = {Ndiscmin}_{old} * \left(1 + \sigma_\text{Ndiscmin_std}\xi\right)
+
+    Read [1] for more information."""
+    
+    Ndiscmin_upper_bound: float = 0
+    """The maximum allowed value for ``Ndiscmin`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+    
+    Ndiscmin_lower_bound: float = 0
+    """The minimum allowed value for ``Ndiscmin`` during the random walk process.
+    The upper and lower bound will be disabled if the supplied value is negative.
+    Read [1] for more information."""
 
     ldet_std: float = 0
-    """Cycle-to-cycle std deviation of ``ldet``, read [1] for more information."""
+    """Cycle-to-cycle std deviation of ``ldet``, used in a random walk process. 
+    Generates a gaussian noise that is directly added to ``ldet`` for every update.
+    Read [1] for more information."""
+
+    ldet_std_slope: float = 0
+    r"""Cycle-to-cycle std deviation of ``ldet``, used in a random walk process. 
+    Generates a gaussian noise that is realted to the change in ``Ndisc``,
+    Larger updates will induce larger variations in  ``ldet``.
+
+    Thus it is:
+
+    .. math::
+        {ldet}_{new} = {ldet}_{old} * \left(1 + \sigma_\text{ldet_std}\xi + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{ldet_std_slope}\xi\right)
+
+    Read [1] for more information."""
+
+    ldet_upper_bound: float = 0
+    """The maximum allowed value for ``ldet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    ldet_lower_bound: float = 0
+    """The minimum allowed value for ``ldet`` during the random walk process.
+    The upper and lower bound will be disabled if the supplied value is negative.
+    Read [1] for more information."""
 
     rdet_std: float = 0
-    """Cycle-to-cycle std deviation of ``rdet``, read [1] for more information."""
+    """Cycle-to-cycle std deviation of ``rdet``, used in a random walk process. 
+    Generates a gaussian noise that is directly added to ``rdet`` for every update.
+    Read [1] for more information."""
+
+    rdet_std_slope: float = 0
+    r"""Cycle-to-cycle std deviation of ``rdet``, used in a random walk process. 
+    Generates a gaussian noise that is realted to the change in ``Ndisc``,
+    Larger updates will induce larger variations in  ``rdet``.
+
+    Thus it is:
+
+    .. math::
+        {rdet}_{new} = {rdet}_{old} * \left(1 + \sigma_\text{rdet_std}\xi + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{rdet_std_slope}\xi\right)
+
+    Read [1] for more information."""
+
+    rdet_upper_bound: float = 0
+    """The maximum allowed value for ``rdet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    rdet_lower_bound: float = 0
+    """The minimum allowed value for ``rdet`` during the random walk process.
+    The upper and lower bound will be disabled if the supplied value is negative.
+    Read [1] for more information."""
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return parameters_to_bindings(self)
+
+    def requires_diffusion(self) -> bool:
+        """Diffusion not supported for RRAM."""
+        return False
+
+    def requires_decay(self) -> bool:
+        """Decay not supported for RRAM."""
+        return False
 
 
 ###############################################################################

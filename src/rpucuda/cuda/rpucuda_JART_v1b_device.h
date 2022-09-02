@@ -17,8 +17,7 @@
 #include "rpucuda_pulsed_device.h"
 #include <memory>
 
-// #define DEVICE_PARAMETER_COUNT 53
-#define DEVICE_PARAMETER_COUNT 39
+#define DEVICE_PARAMETER_COUNT 48
 
 namespace RPU {
 
@@ -67,45 +66,55 @@ public:
       const auto &par = getPar();
       T *tmp_global_pars = new T[DEVICE_PARAMETER_COUNT]();
       
-      tmp_global_pars[0] = par.read_voltage;
-      tmp_global_pars[1] = par.pulse_voltage_SET;
-      tmp_global_pars[2] = par.pulse_voltage_RESET;
-      tmp_global_pars[3] = par.pulse_length;
-      tmp_global_pars[4] = par.base_time_step;
-      tmp_global_pars[5] = par.alpha_SET;
-      tmp_global_pars[6] = par.beta_SET;
-      tmp_global_pars[7] = par.c_SET;
-      tmp_global_pars[8] = par.d_SET;
-      tmp_global_pars[9] = par.f_SET;
-      tmp_global_pars[10] = par.g_RESET;
-      tmp_global_pars[11] = par.h_RESET;
-      tmp_global_pars[12] = par.g_read;
-      tmp_global_pars[13] = par.h_read;
-      tmp_global_pars[14] = par.j_0;
-      tmp_global_pars[15] = par.k0;
-      tmp_global_pars[16] = par.T0;
-      tmp_global_pars[17] = par.Ndiscmin;
-      tmp_global_pars[18] = par.Nplug;
-      tmp_global_pars[19] = par.a_ny0;
-      tmp_global_pars[20] = par.dWa;
-      tmp_global_pars[21] = par.Rth_negative;
-      tmp_global_pars[22] = par.Rth_positive;
-      tmp_global_pars[23] = par.RseriesTiOx;
-      tmp_global_pars[24] = par.R0;
-      tmp_global_pars[25] = par.V_series_coefficient;
-      tmp_global_pars[26] = par.V_disk_coefficient;
-      tmp_global_pars[27] = par.gamma_coefficient;
-      tmp_global_pars[28] = par.lcell;
-      tmp_global_pars[29] = par.current_min;
-      tmp_global_pars[30] = par.current_to_weight_ratio;
-      tmp_global_pars[31] = par.weight_to_current_ratio;
-      tmp_global_pars[32] = par.w_min;
+      tmp_global_pars[0] = par.pulse_voltage_SET;
+      tmp_global_pars[1] = par.pulse_voltage_RESET;
+      tmp_global_pars[2] = par.pulse_length;
+      tmp_global_pars[3] = par.base_time_step;
+      tmp_global_pars[4] = par.alpha_SET;
+      tmp_global_pars[5] = par.beta_SET;
+      tmp_global_pars[6] = par.c_SET;
+      tmp_global_pars[7] = par.d_SET;
+      tmp_global_pars[8] = par.f_SET;
+      tmp_global_pars[9] = par.g_RESET;
+      tmp_global_pars[10] = par.h_RESET;
+      tmp_global_pars[11] = par.g_read;
+      tmp_global_pars[12] = par.h_read;
+      tmp_global_pars[13] = par.j_0;
+      tmp_global_pars[14] = par.k0;
+      tmp_global_pars[15] = par.T0;
+      tmp_global_pars[16] = par.Ndiscmin;
+      tmp_global_pars[17] = par.Nplug;
+      tmp_global_pars[18] = par.a_ny0;
+      tmp_global_pars[19] = par.dWa;
+      tmp_global_pars[20] = par.Rth_negative;
+      tmp_global_pars[21] = par.Rth_positive;
+      tmp_global_pars[22] = par.RseriesTiOx;
+      tmp_global_pars[23] = par.R0;
+      tmp_global_pars[24] = par.V_series_coefficient;
+      tmp_global_pars[25] = par.V_disk_coefficient;
+      tmp_global_pars[26] = par.gamma_coefficient;
+      tmp_global_pars[27] = par.lcell;
+      tmp_global_pars[28] = par.current_min;
+      tmp_global_pars[29] = par.current_to_weight_ratio;
+      tmp_global_pars[30] = par.weight_to_current_ratio;
+      tmp_global_pars[31] = par.w_min;
+      // TODO: BUG: Use device variable bounds will result in PyTorch not receving the updated weights.
+      tmp_global_pars[32] = par.Ndisc_max_bound;
       tmp_global_pars[33] = par.Ndisc_min_bound;
-      tmp_global_pars[34] = par.Ndisc_max_bound;
-      tmp_global_pars[35] = par.Ndiscmax_std;
-      tmp_global_pars[36] = par.Ndiscmin_std;
-      tmp_global_pars[37] = par.ldet_std;
-      tmp_global_pars[38] = par.rdet_std;
+      tmp_global_pars[34] = par.Ndiscmax_std;
+      tmp_global_pars[35] = par.Ndiscmax_upper_bound;
+      tmp_global_pars[36] = par.Ndiscmax_lower_bound;
+      tmp_global_pars[37] = par.Ndiscmin_std;
+      tmp_global_pars[38] = par.Ndiscmin_upper_bound;
+      tmp_global_pars[39] = par.Ndiscmin_lower_bound;
+      tmp_global_pars[40] = par.ldet_std;
+      tmp_global_pars[41] = par.ldet_std_slope;
+      tmp_global_pars[42] = par.ldet_upper_bound;
+      tmp_global_pars[43] = par.ldet_lower_bound;
+      tmp_global_pars[44] = par.rdet_std;
+      tmp_global_pars[45] = par.rdet_std_slope;
+      tmp_global_pars[46] = par.rdet_upper_bound;
+      tmp_global_pars[47] = par.rdet_lower_bound;
 
       dev_device_parameters = nullptr;
       dev_device_parameters = RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT, tmp_global_pars);
@@ -114,16 +123,11 @@ public:
       delete[] tmp_ldet_A;
       delete[] tmp_global_pars;
       
-      // Overwrite par4
-      // copy RPU to device variables
-      int size = x_size * d_size;
-      float *tmp = new float[4 * size];
-      T *tmp_Ndisc = new T[size];
 
-      T *w_min_bound = rpu_device.getMinBound()[0];
-      T *w_max_bound = rpu_device.getMaxBound()[0];
-      T *device_specific_Ndiscmin_cuda = rpu_device.getNdiscmin()[0];
-      T *device_specific_Ndiscmax_cuda = rpu_device.getNdiscmax()[0];
+    // TODO: BUG: Segmentation fault (core dumped) appear if we don't overwrite PersistentWeights again.
+    // We shouldn't need to do this since the PersistentWeights are already writed as Ndisc from the CPU side.
+      int size = x_size * d_size;
+      T *tmp_Ndisc = new T[size];
 
       T *Ndiscs = rpu_device.getPersistentWeights()[0];
 
@@ -131,25 +135,17 @@ public:
         for (int j = 0; j < x_size; ++j) {
 
           int l = i * (x_size) + j;
-          // transposed: col major required by cuBLAS .. linear arangmenet for now
-          int k = j * (d_size * 4) + 4 * i;
-          tmp[k] = w_min_bound[l];
-          tmp[k + 1] = device_specific_Ndiscmin_cuda[l];
-          tmp[k + 2] = w_max_bound[l];
-          tmp[k + 3] = device_specific_Ndiscmax_cuda[l];
 
           int l_t = j * (d_size) + i;
           tmp_Ndisc[l_t] = Ndiscs[l];
         }
       }
 
-      this->dev_4params_->assign(tmp);
       this->dev_persistent_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
       this->dev_persistent_weights_->assign(tmp_Ndisc);
 
       this->context_->synchronize();
 
-      delete[] tmp;
       delete[] tmp_Ndisc;
       );
 
@@ -170,7 +166,7 @@ public:
   // implement abstract functions
   void decayWeights(T *dev_weights, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
   void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
-  void driftWeights(T *dev_weights, T time_since_epoch) override;
+  void driftWeights(T *dev_weights, T time_since_epoch) override{RPU_NOT_IMPLEMENTED;};
   void diffuseWeights(T *dev_weights) override{RPU_NOT_IMPLEMENTED;};
   void clipWeights(T *dev_weights, T clip) override;
   // RRAM does not have the function to reset to a 0 weight value

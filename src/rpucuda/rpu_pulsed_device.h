@@ -215,13 +215,13 @@ public:
   void printDP(int x_count, int d_count) const override;
 
   inline T **getPersistentWeights() const { return w_persistent_; };
-  inline T **getMaxBound() const { return w_max_bound_; };
-  inline T **getMinBound() const { return w_min_bound_; };
+  virtual T **getMaxBound() const { return w_max_bound_; };
+  virtual T **getMinBound() const { return w_min_bound_; };
   inline T **getDecayScale() const { return w_decay_scale_; };
   inline T **getDiffusionRate() const { return w_diffusion_rate_; };
   inline T **getResetBias() const { return w_reset_bias_; };
-  inline T **getScaleUp() const { return w_scale_up_; };
-  inline T **getScaleDown() const { return w_scale_down_; };
+  virtual T **getScaleUp() const { return w_scale_up_; };
+  virtual T **getScaleDown() const { return w_scale_down_; };
   PulsedRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<PulsedRPUDeviceMetaParameter<T> &>(SimpleRPUDevice<T>::getPar());
   };

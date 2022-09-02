@@ -14,12 +14,12 @@
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_JART_v1b_device.h"
 #include <memory>
+#include <stdio.h>
 
 namespace RPU {
 
 template <typename T>
 __device__ __forceinline__ T map_Ndisc_to_weight(
-    const T &read_voltage,
     const double &Ndisc,
     const T &current_min,
     const T &weight_min_bound,
@@ -36,6 +36,7 @@ __device__ __forceinline__ T map_Ndisc_to_weight(
 
 template <typename T>
 __device__ __forceinline__ void apply_cycle_to_cycle_noise(
+    const T &ratio,
     T &Ndiscmax,
     T &Ndiscmin,
     T &ldet,
@@ -44,22 +45,50 @@ __device__ __forceinline__ void apply_cycle_to_cycle_noise(
     const T &Ndiscmin_std,
     const T &ldet_std,
     const T &rdet_std,
-    curandState &local_state) {
+    const T &ldet_std_slope,
+    const T &rdet_std_slope,
+    curandState &local_state,
+    const T &Ndiscmax_upper_bound,
+    const T &Ndiscmax_lower_bound,
+    const T &Ndiscmin_upper_bound,
+    const T &Ndiscmin_lower_bound,
+    const T &ldet_upper_bound,
+    const T &ldet_lower_bound,
+    const T &rdet_upper_bound,
+    const T &rdet_lower_bound) {
   if (Ndiscmax_std > (T)0.0) {
     T stoch_value = curand_normal(&local_state);
-    Ndiscmax = Ndiscmax + Ndiscmax_std * stoch_value;
+    Ndiscmax = Ndiscmax * (1 + Ndiscmax_std * stoch_value);
+    if ((Ndiscmax_upper_bound > (T)0.0) && (Ndiscmax_lower_bound >= (T)0.0)) {
+      Ndiscmax = MIN(Ndiscmax, Ndiscmax_upper_bound);
+      Ndiscmax = MAX(Ndiscmax, Ndiscmax_lower_bound);
+    }
   }
   if (Ndiscmin_std > (T)0.0) {
     T stoch_value = curand_normal(&local_state);
-    Ndiscmin = Ndiscmin + Ndiscmin_std * stoch_value;
+    Ndiscmin = Ndiscmin * (1 + Ndiscmin_std * stoch_value);
+    if ((Ndiscmin_upper_bound > (T)0.0) && (Ndiscmin_lower_bound >= (T)0.0)) {
+      Ndiscmin = MIN(Ndiscmin, Ndiscmin_upper_bound);
+      Ndiscmin = MAX(Ndiscmin, Ndiscmin_lower_bound);
+    }
   }
-  if (ldet_std > (T)0.0) {
-    T stoch_value = curand_normal(&local_state);
-    ldet = ldet + ldet_std * stoch_value;
+  if ((ldet_std > (T)0.0)||(ldet_std_slope > (T)0.0)) {
+    T stoch_value_1 = curand_normal(&local_state);
+    T stoch_value_2 = curand_normal(&local_state);
+    ldet = ldet * (1 + ldet_std * stoch_value_1 + ratio * ldet_std_slope * stoch_value_2);
+    if ((ldet_upper_bound > (T)0.0) && (ldet_lower_bound >= (T)0.0)) {
+      ldet = MIN(ldet, ldet_upper_bound);
+      ldet = MAX(ldet, ldet_lower_bound);
+    }
   }
-  if (rdet_std > (T)0.0) {
-    T stoch_value = curand_normal(&local_state);
-    T rdet = pow(A/M_PI, 0.5) + rdet_std * stoch_value;
+  if ((rdet_std > (T)0.0)||(rdet_std_slope > (T)0.0)) {
+    T stoch_value_1 = curand_normal(&local_state);
+    T stoch_value_2 = curand_normal(&local_state);
+    T rdet = pow(A/M_PI, 0.5) * (1 + rdet_std * stoch_value_1 + ratio * rdet_std_slope * stoch_value_2);
+    if ((rdet_upper_bound > (T)0.0) && (rdet_lower_bound >= (T)0.0)) {
+      rdet = MIN(rdet, rdet_upper_bound);
+      rdet = MAX(rdet, rdet_lower_bound);
+    }
     A = M_PI*pow(rdet,2.0);
   }
 }
@@ -80,51 +109,68 @@ template <typename T> struct UpdateFunctorJARTv1b {
 
     UNUSED(global_params_count); // fixed
 
-    const T read_voltage            = global_pars[0];
-    const T pulse_voltage_SET       = global_pars[1];
-    const T pulse_voltage_RESET     = global_pars[2];
-    const T pulse_length            = global_pars[3];
-    const T base_time_step          = global_pars[4];
-    const T alpha_SET               = global_pars[5];
-    const T beta_SET                = global_pars[6];
-    const T c_SET                   = global_pars[7];
-    const T d_SET                   = global_pars[8];
-    const T f_SET                   = global_pars[9];
-    const T g_RESET                 = global_pars[10];
-    const T h_RESET                 = global_pars[11];
-    const T g_read                  = global_pars[12];
-    const T h_read                  = global_pars[13];
-    const T j_0                     = global_pars[14];
-    const T k0                      = global_pars[15];
-    const T T0                      = global_pars[16];
-    const T Ndiscmin                = global_pars[17];
-    const T Nplug                   = global_pars[18];
-    const T a_ny0                   = global_pars[19];
-    const T dWa                     = global_pars[20];
-    const T Rth_negative            = global_pars[21];
-    const T Rth_positive            = global_pars[22];
-    const T RseriesTiOx             = global_pars[23];
-    const T R0                      = global_pars[24];
-    const T V_series_coefficient    = global_pars[25];
-    const T V_disk_coefficient      = global_pars[26];
-    const T gamma_coefficient       = global_pars[27];
-    const T lcell                   = global_pars[28];
-    const T current_min             = global_pars[29];
-    const T current_to_weight_ratio = global_pars[30];
-    const T weight_to_current_ratio = global_pars[31];
-    const T w_min                   = global_pars[32];
+    const T pulse_voltage_SET       = global_pars[0];
+    const T pulse_voltage_RESET     = global_pars[1];
+    const T pulse_length            = global_pars[2];
+    const T base_time_step          = global_pars[3];
+    const T alpha_SET               = global_pars[4];
+    const T beta_SET                = global_pars[5];
+    const T c_SET                   = global_pars[6];
+    const T d_SET                   = global_pars[7];
+    const T f_SET                   = global_pars[8];
+    const T g_RESET                 = global_pars[9];
+    const T h_RESET                 = global_pars[10];
+    const T g_read                  = global_pars[11];
+    const T h_read                  = global_pars[12];
+    const T j_0                     = global_pars[13];
+    const T k0                      = global_pars[14];
+    const T T0                      = global_pars[15];
+    const T Ndiscmin                = global_pars[16];
+    const T Nplug                   = global_pars[17];
+    const T a_ny0                   = global_pars[18];
+    const T dWa                     = global_pars[19];
+    const T Rth_negative            = global_pars[20];
+    const T Rth_positive            = global_pars[21];
+    const T RseriesTiOx             = global_pars[22];
+    const T R0                      = global_pars[23];
+    const T V_series_coefficient    = global_pars[24];
+    const T V_disk_coefficient      = global_pars[25];
+    const T gamma_coefficient       = global_pars[26];
+    const T lcell                   = global_pars[27];
+    const T current_min             = global_pars[28];
+    const T current_to_weight_ratio = global_pars[29];
+    const T weight_to_current_ratio = global_pars[30];
+    const T w_min                   = global_pars[31];
+    // TODO: BUG: Use device variable bounds will result in PyTorch not receving the updated weights.
+    const T Ndisc_max_bound         = global_pars[32];
     const T Ndisc_min_bound         = global_pars[33];
-    const T Ndisc_max_bound         = global_pars[34];
-    const T Ndiscmax_std            = global_pars[35];
-    const T Ndiscmin_std            = global_pars[36];
-    const T ldet_std                = global_pars[37];
-    const T rdet_std                = global_pars[38];
+    const T Ndiscmax_std            = global_pars[34];
+    const T Ndiscmax_upper_bound    = global_pars[35];
+    const T Ndiscmax_lower_bound    = global_pars[36];
+    const T Ndiscmin_std            = global_pars[37];
+    const T Ndiscmin_upper_bound    = global_pars[38];
+    const T Ndiscmin_lower_bound    = global_pars[39];
+    const T ldet_std                = global_pars[40];
+    const T ldet_std_slope          = global_pars[41];
+    const T ldet_upper_bound        = global_pars[42];
+    const T ldet_lower_bound        = global_pars[43];
+    const T rdet_std                = global_pars[44];
+    const T rdet_std_slope          = global_pars[45];
+    const T rdet_upper_bound        = global_pars[46];
+    const T rdet_lower_bound        = global_pars[47];
     
-    // const T &weight_min_bound = par_4.x;                          // [0]
-    T &device_specific_Ndiscmin_cuda = par_4.y; // [1]
-    // const T &weight_max_bound = par_4.z;                          // [2]
-    T &device_specific_Ndiscmax_cuda = par_4.w; // [3]
+    /* NOTE: These values does not do random walk,
+             so the original values are not supposed to change.
+             Do not use refference pointer on these values.
+    */ 
+    T device_specific_Ndisc_min_bound_cuda = par_4.x;                          // [0]
+    T device_specific_Ndisc_max_bound_cuda = par_4.z;                          // [2]
 
+    /* NOTE: These values do random walks,
+             use refference to change the recorded values.
+    */ 
+    T &device_specific_Ndiscmin_cuda = par_4.y; // [1]
+    T &device_specific_Ndiscmax_cuda = par_4.w; // [3]
     T &device_specific_ldet_cuda = par_2.x; // [0]
     T &device_specific_A_cuda = par_2.y; // [1]
 
@@ -135,93 +181,91 @@ template <typename T> struct UpdateFunctorJARTv1b {
     // n is larger 0 in any case
     pulse_counter = pulse_counter *n;
     double Ndisc_double = Ndisc;
+    
+    // TODO: BUG: Use device variable bounds will result in PyTorch not receving the updated weights.
+    // T max_bound = MIN(device_specific_Ndisc_max_bound_cuda, device_specific_Ndiscmax_cuda);
+    // T min_bound = MAX(device_specific_Ndisc_min_bound_cuda, device_specific_Ndiscmin_cuda);
     T max_bound = MIN(Ndisc_max_bound, device_specific_Ndiscmax_cuda);
     T min_bound = MAX(Ndisc_min_bound, device_specific_Ndiscmin_cuda);
 
-if (negative > 0) {
-  if (Ndisc_double >= max_bound)
-  {
-    Ndisc_double = max_bound;
-  }
-  else
-  {
-    for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
-      T I_mem = -alpha_SET-beta_SET/(pow((1.0+pow((c_SET/Ndisc),d_SET)),f_SET));
+    if (negative > 0) {
+      if (Ndisc_double < max_bound){
+        for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
+          T I_mem = -alpha_SET-beta_SET/(pow((1.0+pow((c_SET/Ndisc),d_SET)),f_SET));
 
-      T V_disk = I_mem*(device_specific_ldet_cuda/(V_disk_coefficient*device_specific_A_cuda*Ndisc_double));
+          T V_disk = I_mem*(device_specific_ldet_cuda/(V_disk_coefficient*device_specific_A_cuda*Ndisc_double));
 
-      // T gamma = gamma_coefficient*Eion;
-      T gamma = gamma_coefficient*V_disk/device_specific_ldet_cuda;
-      
-      // V - V_series = V_disk+V_plug+V_Schottky
-      T V_other_than_series = pulse_voltage_SET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
+          // NOTE: T gamma = gamma_coefficient*Eion
+          T gamma = gamma_coefficient*V_disk/device_specific_ldet_cuda;
+          
+          // NOTE: V - V_series = V_disk+V_plug+V_Schottky
+          T V_other_than_series = pulse_voltage_SET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
 
-      T Treal = T0 + I_mem*V_other_than_series*Rth_negative;
-      // // dWamin
-      // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
-      // // dWamax
-      // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
+          T Treal = T0 + I_mem*V_other_than_series*Rth_negative;
 
-      T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
-      T dWa_difference = dWa*((gamma*M_PI)/2.0);
-      // dWamin = dWa_f = dWa_mean - dWa_difference
-      // dWamax = dWa_r = dWa_mean + dWa_difference
+          // NOTE: dWamin = dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean - dWa_difference
+          // NOTE: dWamax = dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean + dWa_difference
+          T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
+          T dWa_difference = dWa*((gamma*M_PI)/2.0);
 
-      T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
+          T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
-      T c_v0 = (Nplug+Ndisc_double)/2.0;
-      T F1 = 1.0-pow((Ndisc_double/device_specific_Ndiscmax_cuda),10.0);
-      T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldet_cuda;
+          T c_v0 = (Nplug+Ndisc_double)/2.0;
+          T F1 = 1.0-pow((Ndisc_double/device_specific_Ndiscmax_cuda),10.0);
+          T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldet_cuda;
 
-      Ndisc_double = Ndisc_double + dNdt*base_time_step;
+          Ndisc_double = Ndisc_double + dNdt*base_time_step;
+        }
+        // TODO: BUG: applying these noise will result in PyTorch not receving the updated weights.
+        // T ratio = Ndisc_double;
+        // ratio = (ratio-Ndisc)/(Ndiscmax-Ndisc);
+        // apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, local_state,
+        //                            Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
+        //                            ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
+        Ndisc_double = MIN(Ndisc_double, max_bound);
+        w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
+        Ndisc = Ndisc_double;
+      }
+    
+    }else{
+      if (Ndisc_double > min_bound){
+        for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
+          T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
+          
+          // NOTE: V - V_series = V_disk+V_plug+V_Schottky
+          T V_other_than_series = pulse_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
+
+          // NOTE: T gamma = gamma_coefficient*Eion
+          T gamma = gamma_coefficient*V_other_than_series/lcell;
+
+          T Treal = T0 + I_mem*V_other_than_series*Rth_positive;
+
+          // NOTE: dWamin = dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean - dWa_difference
+          // NOTE: dWamax = dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean + dWa_difference
+          T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
+          T dWa_difference = dWa*((gamma*M_PI)/2.0);
+
+          T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
+
+          T c_v0 = (Nplug+Ndisc_double)/2.0;
+          T F1 = 1.0-pow((device_specific_Ndiscmin_cuda/Ndisc_double),10.0);
+          T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldet_cuda;
+
+          Ndisc_double = Ndisc_double + dNdt*base_time_step;
+        }
+        // TODO: BUG: applying these noise will result in PyTorch not receving the updated weights.
+        // T ratio = Ndisc_double;
+        // ratio = (Ndisc-ratio)/(Ndisc-Ndiscmin);
+        // apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, local_state,
+        //                            Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
+        //                            ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
+        Ndisc_double = MAX(Ndisc_double, min_bound);
+        w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
+        Ndisc = Ndisc_double;
+      }
     }
-    Ndisc_double = MIN(Ndisc_double, max_bound);
-  }
-  
-  
-}else{
-  if (Ndisc_double <= min_bound)
-  {
-    Ndisc_double = min_bound;
-  }
-  else
-  {
-    for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
-      T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
-      
-      // V - V_series = V_disk+V_plug+V_Schottky
-      T V_other_than_series = pulse_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
-
-      // T gamma = gamma_coefficient*Eion;
-      T gamma = gamma_coefficient*V_other_than_series/lcell;
-
-      T Treal = T0 + I_mem*V_other_than_series*Rth_positive;
-      // // dWamin
-      // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
-      // // dWamax
-      // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
-
-      T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
-      T dWa_difference = dWa*((gamma*M_PI)/2.0);
-      // dWamin = dWa_f = dWa_mean - dWa_difference
-      // dWamax = dWa_r = dWa_mean + dWa_difference
-
-      T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
-
-      T c_v0 = (Nplug+Ndisc_double)/2.0;
-      T F1 = 1.0-pow((device_specific_Ndiscmin_cuda/Ndisc_double),10.0);
-      T dNdt = -(c_v0*a_ny0*F1*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldet_cuda;
-
-      Ndisc_double = Ndisc_double + dNdt*base_time_step;
-    }
-    Ndisc_double = MAX(Ndisc_double, min_bound);
-  }
-}
-
-    w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
-    Ndisc = Ndisc_double;
-    // apply_cycle_to_cycle_noise(device_specific_Ndiscmax_cuda, device_specific_Ndiscmin_cuda, device_specific_ldet_cuda, device_specific_A_cuda,
-    //                            Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, local_state);
+    // TODO: BUG: Removing this delay or the print line will result in PyTorch not receving the updated weights.
+    // printf("w after update %.20f\n", apparent_weight);
     uint32_t ns = 1;
     __nanosleep(ns);
   }
@@ -299,9 +343,9 @@ template void map_weight_to_Ndisc<double>(const CudaContext *, double *, double 
 template <typename T>
 void JARTv1bRPUDeviceCuda<T>::applyWeightUpdate(T *weights, T *dw_and_current_weight_out) {
 
-  // if (getPar().usesPersistentWeight()) {
-  //   RPU_FATAL("ApplyWeightUpdate is not supported with write_noise_std>0!");
-  // }
+  if (getPar().real_write_noise_std > 0) {
+    RPU_FATAL("ApplyWeightUpdate is not supported with write_noise_std>0!");
+  }
   RPU::math::elemaddcopysat<T>(
       this->context_, weights, dw_and_current_weight_out, this->size_,
       this->dev_4params_->getDataConst());
@@ -351,21 +395,21 @@ void JARTv1bRPUDeviceCuda<T>::applyWeightUpdate(T *weights, T *dw_and_current_we
 
 // }
 
-template <typename T>
-void JARTv1bRPUDeviceCuda<T>::driftWeights(T *weights, T time_since_last_call) {
+// template <typename T>
+// void JARTv1bRPUDeviceCuda<T>::driftWeights(T *weights, T time_since_last_call) {
 
-  PulsedRPUDeviceCudaBase<T>::driftWeights(weights, time_since_last_call);
-  this->wdrifter_cuda_->saturate(weights, this->dev_4params_->getData());
+//   PulsedRPUDeviceCudaBase<T>::driftWeights(weights, time_since_last_call);
+//   this->wdrifter_cuda_->saturate(weights, this->dev_4params_->getData());
   
-  const auto &par = getPar();
-  T *Ndisc = get1ParamsData();
+//   const auto &par = getPar();
+//   T *Ndisc = get1ParamsData();
 
-  map_weight_to_Ndisc<T>(
-      this->context_, weights, Ndisc, this->size_,
-      par.current_min, par.w_min, par.weight_to_current_ratio,
-      par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+//   map_weight_to_Ndisc<T>(
+//       this->context_, weights, Ndisc, this->size_,
+//       par.current_min, par.w_min, par.weight_to_current_ratio,
+//       par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
-}
+// }
 
 // template <typename T> void JARTv1bRPUDeviceCuda<T>::diffuseWeights(T *weights) {
 
@@ -410,6 +454,24 @@ template <typename T> void JARTv1bRPUDeviceCuda<T>::clipWeights(T *weights, T cl
   }
   
   const auto &par = getPar();
+
+  if (par.real_write_noise_std > 0) {
+    // re-uses the diffusion rnd
+    if (this->dev_diffusion_nrnd_ == nullptr) {
+      this->initDiffusionRnd();
+      this->rnd_context_->randNormal(
+          this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+    }
+    this->rnd_context_->synchronize();
+
+    RPU::math::elemweightedsum<T>(
+        this->context_, weights, this->size_, weights, (T)1.0,
+        this->dev_diffusion_nrnd_->getData(), par.real_write_noise_std);
+
+    this->rnd_context_->recordWaitEvent(this->context_->getStream());
+    this->rnd_context_->randNormal(
+        this->dev_diffusion_nrnd_->getData(), this->dev_diffusion_nrnd_->getSize());
+  }
   T *Ndisc = get1ParamsData();
 
   map_weight_to_Ndisc<T>(
@@ -502,29 +564,6 @@ template <typename T> void JARTv1bRPUDeviceCuda<T>::clipWeights(T *weights, T cl
       // par.current_min, par.w_min, par.weight_to_current_ratio,
       // par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 
-// }
-
-// template <typename T> void JARTv1bRPUDeviceCuda<T>::setWeights(const T *host_source) {
-
-//   CHECK_RPU_DEVICE_INIT;
-//   RPUSimple<T>::setWeights(host_source); // sets host
-
-//   if (rpu_device_) {
-//     if (rpu_device_->onSetWeights(this->getWeightsPtr())) {
-//       // apply bounds etc to host
-//       rpucuda_device_->populateFrom(*rpu_device_); // device pars have changed (due to onSetWeights)
-//     }
-//   }
-//   RPUCudaSimple<T>::setWeights(this->getWeightsPtr()[0]); // set device weights
-  
-//   const auto &par = getPar();
-//   T *Ndisc = get1ParamsData();
-//   T *weights = this->getWeightsPtr()[0];
-
-//   map_weight_to_Ndisc<T>(
-//       this->context_, weights, Ndisc, this->size_,
-//       par.current_min, par.w_min, par.weight_to_current_ratio,
-//       par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
 // }
 
 template class JARTv1bRPUDeviceCuda<float>;

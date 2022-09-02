@@ -64,8 +64,8 @@ model = Sequential(
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled() & CUDA_Enabled:
-    x = x.cuda()
-    y = y.cuda()
+    x_b = x_b.cuda()
+    y_b = y_b.cuda()
     model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.

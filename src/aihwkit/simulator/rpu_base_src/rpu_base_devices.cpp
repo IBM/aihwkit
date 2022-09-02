@@ -581,6 +581,7 @@ void declare_rpu_devices(py::module &m) {
 
   py::class_<JARTv1bParam, PyJARTv1bParam, PulsedParam>(m, "JARTv1bResistiveDeviceParameter")
       .def(py::init<>())
+      .def_readwrite("write_noise_std", &JARTv1bParam::real_write_noise_std)
       .def_readwrite("alpha0", &JARTv1bParam::alpha0)
       .def_readwrite("alpha1", &JARTv1bParam::alpha1)
       .def_readwrite("alpha2", &JARTv1bParam::alpha2)
@@ -636,9 +637,19 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("ldet_dtod", &JARTv1bParam::ldet_dtod)
       .def_readwrite("rdet_dtod", &JARTv1bParam::rdet_dtod)
       .def_readwrite("Ndiscmax_std", &JARTv1bParam::Ndiscmax_std)
+      .def_readwrite("Ndiscmax_upper_bound", &JARTv1bParam::Ndiscmax_upper_bound)
+      .def_readwrite("Ndiscmax_lower_bound", &JARTv1bParam::Ndiscmax_lower_bound)
       .def_readwrite("Ndiscmin_std", &JARTv1bParam::Ndiscmin_std)
+      .def_readwrite("Ndiscmin_upper_bound", &JARTv1bParam::Ndiscmin_upper_bound)
+      .def_readwrite("Ndiscmin_lower_bound", &JARTv1bParam::Ndiscmin_lower_bound)
       .def_readwrite("ldet_std", &JARTv1bParam::ldet_std)
+      .def_readwrite("ldet_std_slope", &JARTv1bParam::ldet_std_slope)
+      .def_readwrite("ldet_upper_bound", &JARTv1bParam::ldet_upper_bound)
+      .def_readwrite("ldet_lower_bound", &JARTv1bParam::ldet_lower_bound)
       .def_readwrite("rdet_std", &JARTv1bParam::rdet_std)
+      .def_readwrite("rdet_std_slope", &JARTv1bParam::rdet_std_slope)
+      .def_readwrite("rdet_upper_bound", &JARTv1bParam::rdet_upper_bound)
+      .def_readwrite("rdet_lower_bound", &JARTv1bParam::rdet_lower_bound)
       .def(
           "__str__",
           [](JARTv1bParam &self) {
