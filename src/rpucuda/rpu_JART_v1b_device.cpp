@@ -196,22 +196,18 @@ inline void step_SET(
 
     T V_disk = I_mem*(ldet/(V_disk_coefficient*A*Ndisc));
 
-    // T gamma = gamma_coefficient*Eion;
+    // NOTE: T gamma = gamma_coefficient*Eion
     T gamma = gamma_coefficient*V_disk/ldet;
     
-    // V - V_series = V_disk+V_plug+V_Schottky
+    // NOTE: V - V_series = V_disk+V_plug+V_Schottky
     T V_other_than_series = applied_voltage_SET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
 
     T Treal = T0 + I_mem*V_other_than_series*Rth_negative;
-    // // dWamin
-    // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
-    // // dWamax
-    // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
 
+    // NOTE: dWamin = dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean - dWa_difference
+    // NOTE: dWamax = dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean + dWa_difference
     T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
     T dWa_difference = dWa*((gamma*M_PI)/2.0);
-    // dWamin = dWa_f = dWa_mean - dWa_difference
-    // dWamax = dWa_r = dWa_mean + dWa_difference
 
     T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
@@ -249,22 +245,18 @@ inline void step_RESET(
     T &min_bound) {
   T I_mem = g_RESET/(pow((1.0+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
   
-  // V - V_series = V_disk+V_plug+V_Schottky
+  // NOTE: V - V_series = V_disk+V_plug+V_Schottky
   T V_other_than_series = applied_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
 
-  // T gamma = gamma_coefficient*Eion;
+  // NOTE: T gamma = gamma_coefficient*Eion
   T gamma = gamma_coefficient*V_other_than_series/lcell;
 
   T Treal = T0 + I_mem*V_other_than_series*Rth_positive;
-  // // dWamin
-  // T dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma));
-  // // dWamax
-  // T dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma));
 
+  // NOTE: dWamin = dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean - dWa_difference
+  // NOTE: dWamax = dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean + dWa_difference
   T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
   T dWa_difference = dWa*((gamma*M_PI)/2.0);
-  // dWamin = dWa_f = dWa_mean - dWa_difference
-  // dWamax = dWa_r = dWa_mean + dWa_difference
 
   T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
