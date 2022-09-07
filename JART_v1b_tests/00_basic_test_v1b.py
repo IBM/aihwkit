@@ -18,6 +18,7 @@ to sum all the elements from one array.
 # pylint: disable=invalid-name
 
 # Imports from PyTorch.
+import torch
 from torch import Tensor
 from torch.nn.functional import mse_loss
 
@@ -31,23 +32,31 @@ from aihwkit.simulator.rpu_base import cuda
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", help="YAML Configuration File", action="store_true")
+parser.add_argument("-c", "--config", help="YAML Configuration File")
 args = parser.parse_args()
-
 if args.config:
     config_file = args.config
 else:
     config_file = "noise_free.yml"
+
+split = config_file.split(".")
+if len(split) == 2:
+    job_type = split[0]
+else:
+    job_type = config_file
 
 import yaml
 stream = open(config_file, "r")
 config_dictionary = yaml.safe_load(stream)
 
 project_name = config_dictionary["project_name"]
-CUDA_Enabled = config_dictionary["CUDA_Enabled"]
+CUDA_Enabled = config_dictionary["USE_CUDA"]
 USE_wandb = config_dictionary["USE_wandb"]
+USE_0_initialization= config_dictionary["USE_0_initialization"]
+USE_bias= False
+del config_dictionary["USE_bias"]
+del config_dictionary["USE_0_initialization"]
 del config_dictionary["project_name"]
-del config_dictionary["CUDA_Enabled"]
 del config_dictionary["USE_wandb"]
 
 if "Repeat_Times" in config_dictionary:
@@ -59,12 +68,8 @@ else:
 for repeat in range(Repeat_Times):
     if USE_wandb:
         import wandb
-        if cuda.is_compiled() & CUDA_Enabled:
-            wandb.init(project=project_name, group="Linear Regression", job_type="CUDA")
-            wandb.config.update(config_dictionary)
-        else:
-            wandb.init(project=project_name, group="Linear Regression", job_type="CPU")
-            wandb.config.update(config_dictionary)
+        wandb.init(project=project_name, group="Linear Regression", job_type=job_type)
+        wandb.config.update(config_dictionary)
 
     # Prepare the datasets (input and expected output).
     slope = 0.5
@@ -72,7 +77,9 @@ for repeat in range(Repeat_Times):
     y = Tensor([[0.0], [slope], [2*slope], [3*slope], [4*slope]])
 
     # Define a single-layer network.
-    rpu_config = SingleRPUConfig(device=JARTv1bDevice(read_voltage=config_dictionary["pulse_related"]["read_voltage"],
+    rpu_config = SingleRPUConfig(device=JARTv1bDevice(w_max=config_dictionary["w_max"],
+                                                      w_min=config_dictionary["w_min"],
+                                                      read_voltage=config_dictionary["pulse_related"]["read_voltage"],
                                                       pulse_voltage_SET=config_dictionary["pulse_related"]["pulse_voltage_SET"],
                                                       pulse_voltage_RESET=config_dictionary["pulse_related"]["pulse_voltage_RESET"],
                                                       pulse_length=config_dictionary["pulse_related"]["pulse_length"],
@@ -102,7 +109,6 @@ for repeat in range(Repeat_Times):
     # rpu_config.update.desired_bl = 100  # max number in this case
     model = AnalogLinear(1, 1, bias=False,
                         rpu_config=rpu_config)
-
     model.set_weights(Tensor([[0.0]]))
 
     # Move the model and tensors to cuda if it is available.
@@ -138,4 +144,5 @@ for repeat in range(Repeat_Times):
             print('Epoch {} - Weight: {:.16f}'.format(
                 (epoch+1), weights))
     
-    wandb.finish()
+    if USE_wandb:
+        wandb.finish()

@@ -22,17 +22,17 @@ pulse_related:
 
 noise:
   w_max:
-    device_to_device: 0.3
-  w_min:
-    device_to_device: 0.3
-  Ndiscmax:
     device_to_device: 0.0
+  w_min:
+    device_to_device: 0.0
+  Ndiscmax:
+    device_to_device: 0.3
     cycle_to_cycle_direct: 0.0
     # 0 means disabled
     upper_bound: 0.0
     lower_bound: 0.0
   Ndiscmin:
-    device_to_device: 0.0
+    device_to_device: 0.3
     cycle_to_cycle_direct: 0.0
     # 0 means disabled
     upper_bound: 0.0

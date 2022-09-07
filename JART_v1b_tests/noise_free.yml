@@ -1,9 +1,13 @@
+USE_0_initialization: True
 Repeat_Times: 5
 USE_wandb: True
-CUDA_Enabled: False
+USE_CUDA: False
+USE_bias: True
 project_name: aihwkit_v1b_test
+w_max: 1.5
+w_min: -1.5
 epochs: 30
-batch_size: 64
+batch_size: 32
 learning_rate:  0.05
 scheduler:
   step_size: 10

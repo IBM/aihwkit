@@ -413,7 +413,7 @@ inline void update_once(
       apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, rng,
                                  Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
                                  ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
-      Ndisc = MIN(Ndisc_double, max_bound);
+      Ndisc_double = MIN(Ndisc_double, max_bound);
       w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, weight_min_bound, current_to_weight_ratio, g_read, h_read, j_0, k0, Original_Ndiscmin);
       Ndisc = Ndisc_double;
     }
@@ -429,7 +429,7 @@ inline void update_once(
       apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, rng,
                                  Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
                                  ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
-      Ndisc = MAX(Ndisc_double, min_bound);
+      Ndisc_double = MAX(Ndisc_double, min_bound);
       w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, weight_min_bound, current_to_weight_ratio, g_read, h_read, j_0, k0, Original_Ndiscmin);
       Ndisc = Ndisc_double;
     }

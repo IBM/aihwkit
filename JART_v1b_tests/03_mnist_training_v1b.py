@@ -33,11 +33,12 @@ from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.configs.devices import JARTv1bDevice
+from aihwkit.simulator.configs.utils import PulseType
 from aihwkit.simulator.rpu_base import cuda
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", help="YAML Configuration File", action="store_true")
+parser.add_argument("-c", "--config", help="YAML Configuration File")
 args = parser.parse_args()
 
 if args.config:
@@ -45,18 +46,27 @@ if args.config:
 else:
     config_file = "noise_free.yml"
 
+split = config_file.split(".")
+if len(split) == 2:
+    job_type = split[0]
+else:
+    job_type = config_file
+
 import yaml
 stream = open(config_file, "r")
 config_dictionary = yaml.safe_load(stream)
 
 project_name = config_dictionary["project_name"]
-CUDA_Enabled = config_dictionary["CUDA_Enabled"]
+CUDA_Enabled = config_dictionary["USE_CUDA"]
 USE_wandb = config_dictionary["USE_wandb"]
+USE_0_initialization= config_dictionary["USE_0_initialization"]
+USE_bias= config_dictionary["USE_bias"]
+del config_dictionary["USE_0_initialization"]
+del config_dictionary["project_name"]
+del config_dictionary["USE_wandb"]
+
 if USE_wandb:
     import wandb
-del config_dictionary["project_name"]
-del config_dictionary["CUDA_Enabled"]
-del config_dictionary["USE_wandb"]
 
 if "Repeat_Times" in config_dictionary:
     Repeat_Times = config_dictionary["Repeat_Times"]
@@ -106,7 +116,9 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         nn.Module: created analog model
     """
     
-    rpu_config = SingleRPUConfig(device=JARTv1bDevice(read_voltage=config_dictionary["pulse_related"]["read_voltage"],
+    rpu_config = SingleRPUConfig(device=JARTv1bDevice(w_max=config_dictionary["w_max"],
+                                                      w_min=config_dictionary["w_min"],
+                                                      read_voltage=config_dictionary["pulse_related"]["read_voltage"],
                                                       pulse_voltage_SET=config_dictionary["pulse_related"]["pulse_voltage_SET"],
                                                       pulse_voltage_RESET=config_dictionary["pulse_related"]["pulse_voltage_RESET"],
                                                       pulse_length=config_dictionary["pulse_related"]["pulse_length"],
@@ -130,16 +142,27 @@ def create_analog_network(input_size, hidden_sizes, output_size):
                                                       rdet_std=config_dictionary["noise"]["rdet"]["cycle_to_cycle_direct"],
                                                       rdet_std_slope=config_dictionary["noise"]["rdet"]["cycle_to_cycle_slope"],
                                                       rdet_upper_bound=config_dictionary["noise"]["rdet"]["upper_bound"],
-                                                      rdet_lower_bound=config_dictionary["noise"]["rdet"]["lower_bound"]))
+                                                      rdet_lower_bound=config_dictionary["noise"]["rdet"]["lower_bound"],
+                                                      w_min=-1.0,
+                                                      w_max=1.0))
     model = AnalogSequential(
-        AnalogLinear(input_size, hidden_sizes[0], True,rpu_config),
+        AnalogLinear(input_size, hidden_sizes[0], USE_bias, rpu_config),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[0], hidden_sizes[1], True,rpu_config),
+        AnalogLinear(hidden_sizes[0], hidden_sizes[1], USE_bias, rpu_config),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[1], output_size, True,rpu_config),
+        AnalogLinear(hidden_sizes[1], output_size, USE_bias, rpu_config),
         nn.LogSoftmax(dim=1)
     )
 
+    if USE_0_initialization:
+        for layer in model:
+            if hasattr(layer, 'get_weights'):
+                weights, bias = layer.get_weights()
+                if USE_bias:
+                    layer.set_weights(torch.zeros_like(weights), torch.zeros_like(bias))
+                else:
+                    layer.set_weights(torch.zeros_like(weights))
+                
     if USE_CUDA:
         model.cuda()
 
@@ -196,9 +219,7 @@ def train(model, train_set):
         training_loss = total_loss / len(train_set)
         if USE_wandb:
             wandb.log({"loss": training_loss, "epoch": epoch_number})
-        else:
-            print('Epoch {} - Training loss: {:.16f}'.format(
-                epoch_number, training_loss))
+        print('Epoch {} - Training loss: {:.16f}'.format(epoch_number, training_loss))
 
         # Decay learning rate if needed.
         scheduler.step()
@@ -231,10 +252,9 @@ def test_evaluation(model, val_set):
 
     Accuracy = predicted_ok/total_images
     if USE_wandb:
-        wandb.log({"Number Of Images Tested": total_images, "Model Accuracy": Accuracy})
-    else:
-        print('\nNumber Of Images Tested = {}'.format(total_images))
-        print('Model Accuracy = {}'.format(Accuracy))
+        wandb.log({"Model Accuracy": Accuracy})
+    print('\nNumber Of Images Tested = {}'.format(total_images))
+    print('Model Accuracy = {}'.format(Accuracy))
 
 
 def main():
@@ -243,12 +263,8 @@ def main():
 
     for repeat in range(Repeat_Times):
         if USE_wandb:
-            if cuda.is_compiled() & CUDA_Enabled:
-                wandb.init(project=project_name, group="Fully Connected MNIST", job_type="CUDA")
-                wandb.config.update(config_dictionary)
-            else:
-                wandb.init(project=project_name, group="Fully Connected MNIST", job_type="CPU")
-                wandb.config.update(config_dictionary)
+            wandb.init(project=project_name, group="Fully Connected MNIST", job_type=job_type)
+            wandb.config.update(config_dictionary)
         train_dataset, validation_dataset = load_images()
 
         # Prepare the model.
@@ -260,7 +276,8 @@ def main():
         # Evaluate the trained model.
         test_evaluation(model, validation_dataset)
 
-        wandb.finish()
+        if USE_wandb:
+            wandb.finish()
 
 
 if __name__ == '__main__':

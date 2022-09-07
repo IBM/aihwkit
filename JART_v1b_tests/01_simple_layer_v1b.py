@@ -18,6 +18,7 @@ to sum all the elements from one array.
 # pylint: disable=invalid-name
 
 # Imports from PyTorch.
+import torch
 from torch import Tensor
 from torch.nn.functional import mse_loss
 
@@ -30,7 +31,7 @@ from aihwkit.simulator.rpu_base import cuda
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", help="YAML Configuration File", action="store_true")
+parser.add_argument("-c", "--config", help="YAML Configuration File")
 args = parser.parse_args()
 
 if args.config:
@@ -38,15 +39,23 @@ if args.config:
 else:
     config_file = "noise_free.yml"
 
+split = config_file.split(".")
+if len(split) == 2:
+    job_type = split[0]
+else:
+    job_type = config_file
+
 import yaml
 stream = open(config_file, "r")
 config_dictionary = yaml.safe_load(stream)
 
 project_name = config_dictionary["project_name"]
-CUDA_Enabled = config_dictionary["CUDA_Enabled"]
+CUDA_Enabled = config_dictionary["USE_CUDA"]
 USE_wandb = config_dictionary["USE_wandb"]
+USE_0_initialization= config_dictionary["USE_0_initialization"]
+USE_bias= config_dictionary["USE_bias"]
+del config_dictionary["USE_0_initialization"]
 del config_dictionary["project_name"]
-del config_dictionary["CUDA_Enabled"]
 del config_dictionary["USE_wandb"]
 
 if "Repeat_Times" in config_dictionary:
@@ -58,19 +67,17 @@ else:
 for repeat in range(Repeat_Times):
     if USE_wandb:
         import wandb
-        if cuda.is_compiled() & CUDA_Enabled:
-            wandb.init(project=project_name, group="Single Layer Perceptron", job_type="CUDA")
-            wandb.config.update(config_dictionary)
-        else:
-            wandb.init(project=project_name, group="Single Layer Perceptron", job_type="CPU")
-            wandb.config.update(config_dictionary)
+        wandb.init(project=project_name, group="Single Layer Perceptron", job_type=job_type)
+        wandb.config.update(config_dictionary)
 
     # Prepare the datasets (input and expected output).
     x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
     y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
     # Define a single-layer network.
-    rpu_config = SingleRPUConfig(device=JARTv1bDevice(read_voltage=config_dictionary["pulse_related"]["read_voltage"],
+    rpu_config = SingleRPUConfig(device=JARTv1bDevice(w_max=config_dictionary["w_max"],
+                                                      w_min=config_dictionary["w_min"],
+                                                      read_voltage=config_dictionary["pulse_related"]["read_voltage"],
                                                       pulse_voltage_SET=config_dictionary["pulse_related"]["pulse_voltage_SET"],
                                                       pulse_voltage_RESET=config_dictionary["pulse_related"]["pulse_voltage_RESET"],
                                                       pulse_length=config_dictionary["pulse_related"]["pulse_length"],
@@ -98,6 +105,13 @@ for repeat in range(Repeat_Times):
     model = AnalogLinear(4, 2, bias=True,
                         rpu_config=rpu_config)
 
+    if USE_0_initialization:
+        weights, bias = model.get_weights()
+        if USE_bias:
+            model.set_weights(torch.zeros_like(weights), torch.zeros_like(bias))
+        else:
+            model.set_weights(torch.zeros_like(weights))
+
     # Move the model and tensors to cuda if it is available.
     if cuda.is_compiled() & CUDA_Enabled:
         x = x.cuda()
@@ -123,4 +137,5 @@ for repeat in range(Repeat_Times):
 
         opt.step()
 
-    wandb.finish()
+    if USE_wandb:
+        wandb.finish()
