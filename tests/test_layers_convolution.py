@@ -383,6 +383,42 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         y_analog = analog_model(x)
         self.assertTensorAlmostEqual(y_analog, y)
 
+    def test_torch_original_layer_indexed(self):
+        """Test a single layer, having the digital layer as reference."""
+        # This tests the forward pass
+        model = self.get_digital_layer(in_channels=2, out_channels=3, kernel_size=4, padding=2)
+        x = randn(3, 2, 4, 4)
+
+        if self.use_cuda:
+            x = x.cuda()
+
+        y = model(x)
+
+        analog_model = self.get_layer(in_channels=2, out_channels=3, kernel_size=4, padding=2)
+        analog_model.use_indexed = True
+        self.set_weights_from_digital_model(analog_model, model)
+
+        y_analog = analog_model(x)
+        self.assertTensorAlmostEqual(y_analog, y)
+
+    def test_torch_original_layer_not_indexed(self):
+        """Test a single layer, having the digital layer as reference."""
+        # This tests the forward pass
+        model = self.get_digital_layer(in_channels=2, out_channels=3, kernel_size=4, padding=2)
+        x = randn(3, 2, 4, 4)
+
+        if self.use_cuda:
+            x = x.cuda()
+
+        y = model(x)
+
+        analog_model = self.get_layer(in_channels=2, out_channels=3, kernel_size=4, padding=2)
+        analog_model.use_indexed = False
+        self.set_weights_from_digital_model(analog_model, model)
+
+        y_analog = analog_model(x)
+        self.assertTensorAlmostEqual(y_analog, y)
+
     def test_torch_train_original_layer(self):
         """Test the forward and update pass, having the digital layer as reference."""
         model = self.get_digital_layer(in_channels=2, out_channels=3, kernel_size=4, padding=2)

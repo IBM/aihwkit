@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+
 * Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
 * Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
@@ -28,20 +29,22 @@ The format is based on [Keep a Changelog], and this project adheres to
   in conversions. (\#412)
 
 ### Fixed
+
 * Analog_summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have set wrongly. (\#388)
 * Programming noise would not be applied if drift compensation was not
   used. (\#389)
-* Loading a new model state dict for inference does not overwrite the
-  noise model setting. (\#410)
+* Loading a new model state dict for inference does not overwrite the noise
+  model setting. (\#410)
 * Avoid ``AnalogContext`` copying of self pointers. (\#410)
-* Fix issue that drift compensation is not applied to
-  conv-layers. (\#412)
-* Fix issue that noise modifiers are not applied to
-  conv-layers. (\#412)
+* Fix issue that drift compensation is not applied to conv-layers. (\#412)
+* Fix issue that noise modifiers are not applied to conv-layers. (\#412)
+* The CPU ``AnalogConv2d`` layer now uses unfolded convolutions instead of
+  indexed covolutions (that are efficient only for GPUs). (\#415)
 
 ### Changed
+
 * Weight noise visualization now shows the programming noise and drift
   noise difference. (\#389)
 * Concatenate the gradients before applying to the tile update

@@ -10,18 +10,18 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Convolution layers."""
+"""Mapped convolution layers."""
 
 from typing import Optional, Tuple, Union, List
 
 from torch import Tensor, arange, cat, float64, int32, ones, split, no_grad
-from torch.nn import Unfold
-from torch.nn.functional import pad
+from torch.nn.functional import pad, unfold
 from torch.nn.modules.conv import _ConvNd, Conv1d, Conv2d, Conv3d
 from torch.nn.modules.utils import _single, _pair, _triple
 
-from aihwkit.nn.functions import AnalogIndexedFunction
+from aihwkit.nn.functions import AnalogIndexedFunction, AnalogFunction
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
+from aihwkit.simulator.tiles import BaseTile
 from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.configs import SingleRPUConfig
 
@@ -55,6 +55,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
     digital_bias: bool
     analog_bias: bool
     use_bias: bool
+    use_indexed: Optional[bool]
 
     def __init__(
             self,
@@ -72,6 +73,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: Optional[float] = None,
+            use_indexed: Optional[bool] = None
     ):
         # pylint: disable=too-many-arguments, too-many-locals
         if groups != 1:
@@ -127,6 +129,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
                          weight_scaling_omega=weight_scaling_omega)
 
         # Set the index matrices.
+        self.use_indexed = use_indexed
         self.input_size = 0
         self.register_helper('input_size')
         self.fold_indices_lst = []  # type: List[Tensor]
@@ -204,7 +207,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
         """
         raise NotImplementedError
 
-    def recalculate_indexes(self, x_input: Tensor) -> None:
+    def _recalculate_indexes(self, x_input: Tensor) -> None:
         """Calculate and set the indexes of the analog tile.
 
         Args:
@@ -228,19 +231,49 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             for analog_tile in in_tiles:
                 analog_tile.set_indexed(fold_indices, image_sizes)
 
+    def _single_forward_indexed(self, analog_tile: BaseTile, x_input: Tensor) -> Tensor:
+        """Compute the forward pass in indexed fashion. This is fast and
+        memory-efficient indexed convolution (only for GPUs)"""
+
+        return AnalogIndexedFunction.apply(
+            analog_tile.get_analog_ctx(), x_input,
+            analog_tile.shared_weights, not self.training)
+
+    def _single_forward_unfold(self, analog_tile: BaseTile, x_input: Tensor) -> Tensor:
+        """Forward using explicit unfolding (more suitable for CPUs) """
+        im_shape = x_input.shape
+        x_input_ = unfold(x_input, kernel_size=self.kernel_size, dilation=self.dilation,
+                          padding=self.padding, stride=self.stride).transpose(1, 2)
+
+        out = AnalogFunction.apply(
+            analog_tile.get_analog_ctx(), x_input_,
+            analog_tile.shared_weights, not self.training).transpose(1, 2)
+
+        out_im_size = (im_shape[2] + 2 * self.padding[0]
+                       - self.dilation[0] * (self.kernel_size[0] - 1) - 1) // self.stride[0] + 1
+        return out.view(im_shape[0], analog_tile.out_size, out_im_size, -1)
+
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
-        # pylint: disable=arguments-differ,arguments-renamed
+        # pylint: disable=arguments-differ, arguments-renamed, too-many-branches
 
-        input_size = x_input.numel() / x_input.size(0)
-        if self.input_size != input_size or not self.analog_tile_array[0][0].is_indexed():
-            self.recalculate_indexes(x_input)
+        if self.use_indexed is None:
+            use_indexed = self.analog_tile_array[0][0].device.type == 'cuda'
+        else:
+            use_indexed = self.use_indexed
+
+        if use_indexed:
+            input_size = x_input.numel() / x_input.size(0)
+            if self.input_size != input_size or not self.analog_tile_array[0][0].is_indexed():
+                self._recalculate_indexes(x_input)
 
         if self.analog_tile_count() == 1:
             analog_tile = self.analog_tile_array[0][0]
-            output = AnalogIndexedFunction.apply(
-                analog_tile.get_analog_ctx(), x_input,
-                analog_tile.shared_weights, not self.training)
+
+            if use_indexed:
+                output = self._single_forward_indexed(analog_tile, x_input)
+            else:
+                output = self._single_forward_unfold(analog_tile, x_input)
 
             output = analog_tile.apply_out_scaling(output, self.tensor_view)
 
@@ -254,12 +287,12 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
         result = None  # type: Tensor
         for idx, (x, in_tiles) in enumerate(zip(splits, self.analog_tile_array)):
             out_result = []
-            input_size = x.numel() / x.size(0)
 
             for analog_tile in in_tiles:
-                output = AnalogIndexedFunction.apply(
-                    analog_tile.get_analog_ctx(), x,
-                    analog_tile.shared_weights, not self.training)
+                if use_indexed:
+                    output = self._single_forward_indexed(analog_tile, x)
+                else:
+                    output = self._single_forward_unfold(analog_tile, x)
 
                 output = analog_tile.apply_out_scaling(output, self.tensor_view)
                 out_result.append(output)
@@ -482,7 +515,7 @@ class AnalogConv1dMapped(_AnalogConvNdMapped):
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _single(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega
+            rpu_config, realistic_read_write, weight_scaling_omega, True
         )
 
         self.tensor_view = (-1, 1)
@@ -558,9 +591,9 @@ class AnalogConv1dMapped(_AnalogConvNdMapped):
         if not all(item == 0 for item in self.padding):
             fold_indices = pad(fold_indices, pad=[self.padding[0], self.padding[0]],
                                mode='constant', value=0)
-        unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
+        unfolded = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
 
-        fold_indices = unfold.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
+        fold_indices = unfolded.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
 
         # concatenate the matrix index for different channels
         fold_indices_orig = fold_indices.clone()
@@ -623,6 +656,9 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
             for setting initial weights and read out of weights.
         weight_scaling_omega: the weight value where the max weight will be
             scaled to. If zero, no weight scaling will be performed.
+        use_indexed: Whether to use explicit unfolding or implicit indexing. If
+            None (default), it will use implicit indexing for CUDA and
+            explicit unfolding for CPU
     """
     # pylint: disable=abstract-method
 
@@ -640,6 +676,7 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
             weight_scaling_omega: Optional[float] = None,
+            use_indexed: Optional[bool] = None,
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _pair(kernel_size)
@@ -650,7 +687,7 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _pair(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega
+            rpu_config, realistic_read_write, weight_scaling_omega, use_indexed
         )
 
         self.tensor_view = (-1, 1, 1)
@@ -722,11 +759,11 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
         fold_indices = arange(2, input_size + 2, dtype=float64).detach()
         shape = [1] + list(x_input.shape[1:])
         fold_indices = fold_indices.reshape(*shape)
-        unfold = Unfold(kernel_size=self.kernel_size,
-                        stride=self.stride,
-                        padding=self.padding,
-                        dilation=self.dilation)
-        fold_indices = unfold(fold_indices).flatten().round().to(dtype=int32)
+        fold_indices = unfold(fold_indices,
+                              kernel_size=self.kernel_size,
+                              stride=self.stride,
+                              padding=self.padding,
+                              dilation=self.dilation).flatten().round().to(dtype=int32)
 
         if self.analog_bias:
             out_image_size = fold_indices.numel() // (self.kernel_size[0] * self.kernel_size[1])
@@ -816,7 +853,7 @@ class AnalogConv3dMapped(_AnalogConvNdMapped):
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
             False, _triple(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega
+            rpu_config, realistic_read_write, weight_scaling_omega, True
         )
 
         self.tensor_view = (-1, 1, 1, 1)
@@ -896,12 +933,12 @@ class AnalogConv3dMapped(_AnalogConvNdMapped):
                 self.padding[2], self.padding[2],
                 self.padding[1], self.padding[1],
                 self.padding[0], self.padding[0]], mode='constant', value=0)
-        unfold = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]). \
+        unfolded = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]). \
             unfold(3, self.kernel_size[1], self.stride[1]). \
             unfold(4, self.kernel_size[2], self.stride[2]).clone()
 
-        fold_indices = unfold.reshape(-1, self.kernel_size[0] * self.kernel_size[1] *
-                                      self.kernel_size[2]).transpose(0, 1).flatten().round()
+        fold_indices = unfolded.reshape(-1, self.kernel_size[0] * self.kernel_size[1] *
+                                        self.kernel_size[2]).transpose(0, 1).flatten().round()
 
         # concatenate the matrix index for different channels
         fold_indices_orig = fold_indices.clone()
