@@ -42,6 +42,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fix issue that noise modifiers are not applied to conv-layers. (\#412)
 * The CPU ``AnalogConv2d`` layer now uses unfolded convolutions instead of
   indexed covolutions (that are efficient only for GPUs). (\#415)
+* Fix issue that write noise hidden weights are not transferred to
+  pytorch when using ``get_hidden_parameters`` in case of CUDA. (\#417)
 
 ### Changed
 
