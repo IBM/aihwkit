@@ -149,6 +149,7 @@ public:
   PulsedRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<PulsedRPUDeviceMetaParameter<T> &>(SimpleRPUDeviceCuda<T>::getPar());
   };
+  std::vector<T> getHiddenWeights() const override;
 
   void runUpdateKernel(
       pwukp_t<T> kpars,

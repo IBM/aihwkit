@@ -213,6 +213,8 @@ public:
   void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   void printDP(int x_count, int d_count) const override;
+  int getHiddenWeightsCount() const override;
+  void setHiddenWeights(const std::vector<T> &data) override;
 
   inline T **getPersistentWeights() const { return w_persistent_; };
   inline T **getMaxBound() const { return w_max_bound_; };
