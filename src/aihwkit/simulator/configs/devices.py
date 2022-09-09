@@ -1230,8 +1230,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {Ndiscmax}_{device} = {Ndiscmax}_{average} * \left(1 + \sigma_\text{Ndiscmax_dtod}\xi\right)
+        {Ndiscmax}_{device} = {Ndiscmax}_{average} * \left(1 + \sigma_\text{Ndiscmax_dtod}\xi_{Gaussian}\right)
 
+    Read [1] for more information."""
+
+    Ndiscmax_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``Ndiscmax`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    Ndiscmax_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``Ndiscmax`` during the device to device instantiation.
     Read [1] for more information."""
     
     Ndiscmin_dtod: float = 0
@@ -1240,8 +1249,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {Ndiscmin}_{device} = {Ndiscmin}_{average} * \left(1 + \sigma_\text{Ndiscmin_dtod}\xi\right)
+        {Ndiscmin}_{device} = {Ndiscmin}_{average} * \left(1 + \sigma_\text{Ndiscmin_dtod}\xi_{Gaussian}\right)
 
+    Read [1] for more information."""
+
+    Ndiscmin_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``Ndiscmin`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    Ndiscmin_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``Ndiscmin`` during the device to device instantiation.
     Read [1] for more information."""
 
     ldet_dtod: float = 0
@@ -1250,8 +1268,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {ldet}_{device} = {ldet}_{average} * \left(1 + \sigma_\text{ldet_dtod}\xi\right)
+        {ldet}_{device} = {ldet}_{average} * \left(1 + \sigma_\text{ldet_dtod}\xi_{Gaussian}\right)
 
+    Read [1] for more information."""
+
+    ldet_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``ldet`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    ldet_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``ldet`` during the device to device instantiation.
     Read [1] for more information."""
 
     rdet_dtod: float = 0
@@ -1260,8 +1287,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {rdet}_{device} = {rdet}_{average} * \left(1 + \sigma_\text{rdet_dtod}\xi\right)
+        {rdet}_{device} = {rdet}_{average} * \left(1 + \sigma_\text{rdet_dtod}\xi_{Gaussian}\right)
 
+    Read [1] for more information."""
+
+    rdet_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``rdet`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    rdet_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``rdet`` during the device to device instantiation.
     Read [1] for more information."""
 
     Ndiscmax_std: float = 0
@@ -1270,18 +1306,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {Ndiscmax}_{new} = {Ndiscmax}_{old} * \left(1 + \sigma_\text{Ndiscmax_std}\xi\right)
+        {Ndiscmax}_{new} = {Ndiscmax}_{old} * \left(1 + \sigma_\text{Ndiscmax_std}\xi_{Uniform}\right)
 
     Read [1] for more information."""
 
-    Ndiscmax_upper_bound: float = 0
+    Ndiscmax_ctoc_upper_bound: float = 0
     """The maximum allowed value for ``Ndiscmax`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
-    Ndiscmax_lower_bound: float = 0
+    Ndiscmax_ctoc_lower_bound: float = 0
     """The minimum allowed value for ``Ndiscmax`` during the random walk process.
-    The upper and lower bound will be disabled if the supplied value is negative.
     Read [1] for more information."""
 
     Ndiscmin_std: float = 0
@@ -1290,18 +1325,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {Ndiscmin}_{new} = {Ndiscmin}_{old} * \left(1 + \sigma_\text{Ndiscmin_std}\xi\right)
+        {Ndiscmin}_{new} = {Ndiscmin}_{old} * \left(1 + \sigma_\text{Ndiscmin_std}\xi_{Uniform}\right)
 
     Read [1] for more information."""
     
-    Ndiscmin_upper_bound: float = 0
+    Ndiscmin_ctoc_upper_bound: float = 0
     """The maximum allowed value for ``Ndiscmin`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
     
-    Ndiscmin_lower_bound: float = 0
+    Ndiscmin_ctoc_lower_bound: float = 0
     """The minimum allowed value for ``Ndiscmin`` during the random walk process.
-    The upper and lower bound will be disabled if the supplied value is negative.
     Read [1] for more information."""
 
     ldet_std: float = 0
@@ -1317,18 +1351,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {ldet}_{new} = {ldet}_{old} * \left(1 + \sigma_\text{ldet_std}\xi + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{ldet_std_slope}\xi\right)
+        {ldet}_{new} = {ldet}_{old} * \left(1 + \sigma_\text{ldet_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{ldet_std_slope}\xi_{Uniform}\right)
 
     Read [1] for more information."""
 
-    ldet_upper_bound: float = 0
+    ldet_ctoc_upper_bound: float = 0
     """The maximum allowed value for ``ldet`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
-    ldet_lower_bound: float = 0
+    ldet_ctoc_lower_bound: float = 0
     """The minimum allowed value for ``ldet`` during the random walk process.
-    The upper and lower bound will be disabled if the supplied value is negative.
     Read [1] for more information."""
 
     rdet_std: float = 0
@@ -1344,18 +1377,17 @@ class JARTv1bDevice(PulsedDevice):
     Thus it is:
 
     .. math::
-        {rdet}_{new} = {rdet}_{old} * \left(1 + \sigma_\text{rdet_std}\xi + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{rdet_std_slope}\xi\right)
+        {rdet}_{new} = {rdet}_{old} * \left(1 + \sigma_\text{rdet_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{rdet_std_slope}\xi_{Uniform}\right)
 
     Read [1] for more information."""
 
-    rdet_upper_bound: float = 0
+    rdet_ctoc_upper_bound: float = 0
     """The maximum allowed value for ``rdet`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
-    rdet_lower_bound: float = 0
+    rdet_ctoc_lower_bound: float = 0
     """The minimum allowed value for ``rdet`` during the random walk process.
-    The upper and lower bound will be disabled if the supplied value is negative.
     Read [1] for more information."""
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:

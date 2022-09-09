@@ -57,18 +57,94 @@ void JARTv1bRPUDevice<T>::populate(
 
   PulsedRPUDevice<T>::populate(p, rng); // will clone par
   auto &par = getPar();
+  if (par.Ndiscmax_ctoc_upper_bound < 0) {
+    RPU_FATAL("Ndiscmax_ctoc_upper_bound needs to be 0 or positive.");
+  }
 
-  if (par.Ndiscmax_upper_bound < par.Ndiscmax_lower_bound) {
-    RPU_FATAL("Ndiscmax_upper_bound needs to be larger than Ndiscmax_lower_bound.");
+  if (par.Ndiscmax_ctoc_lower_bound < 0) {
+    RPU_FATAL("Ndiscmax_ctoc_lower_bound needs to be 0 or positive.");
   }
-  if (par.Ndiscmin_upper_bound < par.Ndiscmin_lower_bound) {
-    RPU_FATAL("Ndiscmin_upper_bound needs to be larger than Ndiscmin_lower_bound.");
+
+  if (par.Ndiscmin_ctoc_upper_bound < 0) {
+    RPU_FATAL("Ndiscmin_ctoc_upper_bound needs to be 0 or positive.");
   }
-  if (par.ldet_upper_bound < par.ldet_lower_bound) {
-    RPU_FATAL("ldet_upper_bound needs to be larger than ldet_lower_bound.");
+
+  if (par.Ndiscmin_ctoc_lower_bound < 0) {
+    RPU_FATAL("Ndiscmin_ctoc_lower_bound needs to be 0 or positive.");
   }
-  if (par.rdet_upper_bound < par.rdet_lower_bound) {
-    RPU_FATAL("rdet_upper_bound needs to be larger than rdet_lower_bound.");
+
+  if (par.ldet_ctoc_upper_bound < 0) {
+    RPU_FATAL("ldet_ctoc_upper_bound needs to be 0 or positive.");
+  }
+
+  if (par.ldet_ctoc_lower_bound < 0) {
+    RPU_FATAL("ldet_ctoc_lower_bound needs to be 0 or positive.");
+  }
+
+  if (par.rdet_ctoc_upper_bound < 0) {
+    RPU_FATAL("rdet_ctoc_upper_bound needs to be 0 or positive.");
+  }
+
+  if (par.rdet_ctoc_lower_bound < 0) {
+    RPU_FATAL("rdet_ctoc_lower_bound needs to be 0 or positive.");
+  }
+
+  if (par.Ndiscmax_dtod_upper_bound < 0) {
+    RPU_FATAL("Ndiscmax_dtod_upper_bound needs to be 0 or positive.");
+  }
+
+  if (par.Ndiscmax_dtod_lower_bound < 0) {
+    RPU_FATAL("Ndiscmax_dtod_lower_bound needs to be 0 or positive.");
+  }
+
+  if (par.Ndiscmin_dtod_upper_bound < 0) {
+    RPU_FATAL("Ndiscmin_dtod_upper_bound needs to be 0 or positive.");
+  }
+
+  if (par.Ndiscmin_dtod_lower_bound < 0) {
+    RPU_FATAL("Ndiscmin_dtod_lower_bound needs to be 0 or positive.");
+  }
+
+  if (par.ldet_dtod_upper_bound < 0) {
+    RPU_FATAL("ldet_dtod_upper_bound needs to be 0 or positive.");
+  }
+
+  if (par.ldet_dtod_lower_bound < 0) {
+    RPU_FATAL("ldet_dtod_lower_bound needs to be 0 or positive.");
+  }
+
+  if (par.rdet_dtod_upper_bound < 0) {
+    RPU_FATAL("rdet_dtod_upper_bound needs to be 0 or positive.");
+  }
+
+  if (par.rdet_dtod_lower_bound < 0) {
+    RPU_FATAL("rdet_dtod_lower_bound needs to be 0 or positive.");
+  }
+
+  if (par.Ndiscmax_ctoc_upper_bound < par.Ndiscmax_ctoc_lower_bound) {
+    RPU_FATAL("Ndiscmax_ctoc_upper_bound needs to be larger than Ndiscmax_ctoc_lower_bound.");
+  }
+  if (par.Ndiscmin_ctoc_upper_bound < par.Ndiscmin_ctoc_lower_bound) {
+    RPU_FATAL("Ndiscmin_ctoc_upper_bound needs to be larger than Ndiscmin_ctoc_lower_bound.");
+  }
+  if (par.ldet_ctoc_upper_bound < par.ldet_ctoc_lower_bound) {
+    RPU_FATAL("ldet_ctoc_upper_bound needs to be larger than ldet_ctoc_lower_bound.");
+  }
+  if (par.rdet_ctoc_upper_bound < par.rdet_ctoc_lower_bound) {
+    RPU_FATAL("rdet_ctoc_upper_bound needs to be larger than rdet_ctoc_lower_bound.");
+  }
+
+  if (par.Ndiscmax_dtod_upper_bound < par.Ndiscmax_dtod_lower_bound) {
+    RPU_FATAL("Ndiscmax_dtod_upper_bound needs to be larger than Ndiscmax_dtod_lower_bound.");
+  }
+  if (par.Ndiscmin_dtod_upper_bound < par.Ndiscmin_dtod_lower_bound) {
+    RPU_FATAL("Ndiscmin_dtod_upper_bound needs to be larger than Ndiscmin_dtod_lower_bound.");
+  }
+  if (par.ldet_dtod_upper_bound < par.ldet_dtod_lower_bound) {
+    RPU_FATAL("ldet_dtod_upper_bound needs to be larger than ldet_dtod_lower_bound.");
+  }
+  if (par.rdet_dtod_upper_bound < par.rdet_dtod_lower_bound) {
+    RPU_FATAL("rdet_dtod_upper_bound needs to be larger than rdet_dtod_lower_bound.");
   }
 
   for (int i = 0; i < this->d_size_; ++i) {
@@ -78,11 +154,32 @@ void JARTv1bRPUDevice<T>::populate(
                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
       device_specific_Ndisc_min_bound[i][j] = map_weight_to_Ndisc(this->w_min_bound_[i][j], par.current_min, par.w_min, par.weight_to_current_ratio,
                                               par.g_read, par.h_read, par.j_0, par.k0, par.Ndiscmin);
+
       device_specific_Ndiscmax[i][j] = par.Ndiscmax * (1 + par.Ndiscmax_dtod * rng->sampleGauss());
+      if (par.Ndiscmax_dtod_upper_bound > (T)0.0) {
+        device_specific_Ndiscmax[i][j] = MIN(device_specific_Ndiscmax[i][j], par.Ndiscmax_dtod_upper_bound);
+      }
+      device_specific_Ndiscmax[i][j] = MAX(device_specific_Ndiscmax[i][j], par.Ndiscmax_dtod_lower_bound);
+
       device_specific_Ndiscmin[i][j] = par.Ndiscmin * (1 + par.Ndiscmin_dtod * rng->sampleGauss());
+      if (par.Ndiscmin_dtod_upper_bound > (T)0.0) {
+        device_specific_Ndiscmin[i][j] = MIN(device_specific_Ndiscmin[i][j], par.Ndiscmin_dtod_upper_bound);
+      }
+      device_specific_Ndiscmin[i][j] = MAX(device_specific_Ndiscmin[i][j], par.Ndiscmin_dtod_lower_bound);
+
       device_specific_ldet[i][j] = par.ldet * (1 + par.ldet_dtod * rng->sampleGauss());
+      if (par.ldet_dtod_upper_bound > (T)0.0) {
+        device_specific_ldet[i][j] = MIN(device_specific_ldet[i][j], par.ldet_dtod_upper_bound);
+      }
+      device_specific_ldet[i][j] = MAX(device_specific_ldet[i][j], par.ldet_dtod_lower_bound);
+
       T device_specific_rdet = par.rdet * (1 + par.rdet_dtod * rng->sampleGauss());
+      if (par.rdet_dtod_upper_bound > (T)0.0) {
+        device_specific_rdet = MIN(device_specific_rdet, par.rdet_dtod_upper_bound);
+      }
+      device_specific_rdet = MAX(device_specific_rdet, par.rdet_dtod_lower_bound);
       device_specific_A[i][j] = (T) M_PI*pow(device_specific_rdet,2.0);
+
       this->w_persistent_[i][j] = par.Ninit;
     }
   }
@@ -194,10 +291,12 @@ inline void step_SET(
     T &max_bound) {
     T I_mem = -alpha_SET-beta_SET/(pow((1.0+pow((c_SET/Ndisc),d_SET)),f_SET));
 
-    T V_disk = I_mem*(ldet/(V_disk_coefficient*A*Ndisc));
+    // NOTE: V_disk = I_mem*(ldet/(V_disk_coefficient*A*Ndisc))
+    // NOTE: Eion = V_disk/ldet
+    T Eion = I_mem/(V_disk_coefficient*A*Ndisc);
 
     // NOTE: T gamma = gamma_coefficient*Eion
-    T gamma = gamma_coefficient*V_disk/ldet;
+    T gamma = gamma_coefficient*Eion;
     
     // NOTE: V - V_series = V_disk+V_plug+V_Schottky
     T V_other_than_series = applied_voltage_SET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
@@ -241,7 +340,6 @@ inline void step_RESET(
     const T &gamma_coefficient,
     const T &lcell,
     T &ldet,
-    T &A,
     T &min_bound) {
   T I_mem = g_RESET/(pow((1.0+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
   
@@ -298,41 +396,41 @@ inline void apply_cycle_to_cycle_noise(
     const T &ldet_std_slope,
     const T &rdet_std_slope,
     RNG<T> *rng,
-    const T &Ndiscmax_upper_bound,
-    const T &Ndiscmax_lower_bound,
-    const T &Ndiscmin_upper_bound,
-    const T &Ndiscmin_lower_bound,
-    const T &ldet_upper_bound,
-    const T &ldet_lower_bound,
-    const T &rdet_upper_bound,
-    const T &rdet_lower_bound) {
+    const T &Ndiscmax_ctoc_upper_bound,
+    const T &Ndiscmax_ctoc_lower_bound,
+    const T &Ndiscmin_ctoc_upper_bound,
+    const T &Ndiscmin_ctoc_lower_bound,
+    const T &ldet_ctoc_upper_bound,
+    const T &ldet_ctoc_lower_bound,
+    const T &rdet_ctoc_upper_bound,
+    const T &rdet_ctoc_lower_bound) {
   if (Ndiscmax_std > (T)0.0) {
-    Ndiscmax = Ndiscmax * (1 + Ndiscmax_std * rng->sampleGauss());
-    if ((Ndiscmax_upper_bound > (T)0.0) && (Ndiscmax_lower_bound >= (T)0.0)) {
-      Ndiscmax = MIN(Ndiscmax, Ndiscmax_upper_bound);
-      Ndiscmax = MAX(Ndiscmax, Ndiscmax_lower_bound);
+    Ndiscmax = Ndiscmax * (1 + Ndiscmax_std * (2*rng->sampleUniform()-1));
+    if (Ndiscmax_ctoc_upper_bound > (T)0.0) {
+      Ndiscmax = MIN(Ndiscmax, Ndiscmax_ctoc_upper_bound);
     }
+    Ndiscmax = MAX(Ndiscmax, Ndiscmax_ctoc_lower_bound);
   }
   if (Ndiscmin_std > (T)0.0) {
-    Ndiscmin = Ndiscmin * (1 + Ndiscmin_std * rng->sampleGauss());
-    if ((Ndiscmin_upper_bound > (T)0.0) && (Ndiscmin_lower_bound >= (T)0.0)) {
-      Ndiscmin = MIN(Ndiscmin, Ndiscmin_upper_bound);
-      Ndiscmin = MAX(Ndiscmin, Ndiscmin_lower_bound);
+    Ndiscmin = Ndiscmin * (1 + Ndiscmin_std * (2*rng->sampleUniform()-1));
+    if (Ndiscmin_ctoc_upper_bound > (T)0.0) {
+      Ndiscmin = MIN(Ndiscmin, Ndiscmin_ctoc_upper_bound);
     }
+    Ndiscmin = MAX(Ndiscmin, Ndiscmin_ctoc_lower_bound);
   }
   if ((ldet_std > (T)0.0)||(ldet_std_slope > (T)0.0)) {
-    ldet = ldet * (1 + ldet_std * rng->sampleGauss() + ratio * ldet_std_slope * rng->sampleGauss());
-    if ((ldet_upper_bound > (T)0.0) && (ldet_lower_bound >= (T)0.0)) {
-      ldet = MIN(ldet, ldet_upper_bound);
-      ldet = MAX(ldet, ldet_lower_bound);
+    ldet = ldet * (1 + ldet_std * (2*rng->sampleUniform()-1) + ratio * ldet_std_slope * (2*rng->sampleUniform()-1));
+    if (ldet_ctoc_upper_bound > (T)0.0) {
+      ldet = MIN(ldet, ldet_ctoc_upper_bound);
     }
+    ldet = MAX(ldet, ldet_ctoc_lower_bound);
   }
   if ((rdet_std > (T)0.0)||(rdet_std_slope > (T)0.0)) {
-    T rdet = pow(A/M_PI, 0.5) * (1 + rdet_std * rng->sampleGauss() + ratio * rdet_std_slope * rng->sampleGauss());
-    if ((rdet_upper_bound > (T)0.0) && (rdet_lower_bound >= (T)0.0)) {
-      rdet = MIN(rdet, rdet_upper_bound);
-      rdet = MAX(rdet, rdet_lower_bound);
+    T rdet = pow(A/M_PI, 0.5) * (1 + rdet_std * (2*rng->sampleUniform()-1) + ratio * rdet_std_slope * (2*rng->sampleUniform()-1));
+    if (rdet_ctoc_upper_bound > (T)0.0) {
+      rdet = MIN(rdet, rdet_ctoc_upper_bound);
     }
+    rdet = MAX(rdet, rdet_ctoc_lower_bound);
     A = M_PI*pow(rdet,2.0);
   }
 }
@@ -382,19 +480,19 @@ inline void update_once(
     const T device_specific_Ndisc_max_bound,
     const T device_specific_Ndisc_min_bound,
     const T &Ndiscmax_std,
-    const T &Ndiscmax_upper_bound,
-    const T &Ndiscmax_lower_bound,
+    const T &Ndiscmax_ctoc_upper_bound,
+    const T &Ndiscmax_ctoc_lower_bound,
     const T &Ndiscmin_std,
-    const T &Ndiscmin_upper_bound,
-    const T &Ndiscmin_lower_bound,
+    const T &Ndiscmin_ctoc_upper_bound,
+    const T &Ndiscmin_ctoc_lower_bound,
     const T &ldet_std,
     const T &ldet_std_slope,
-    const T &ldet_upper_bound,
-    const T &ldet_lower_bound,
+    const T &ldet_ctoc_upper_bound,
+    const T &ldet_ctoc_lower_bound,
     const T &rdet_std,
     const T &rdet_std_slope,
-    const T &rdet_upper_bound,
-    const T &rdet_lower_bound,
+    const T &rdet_ctoc_upper_bound,
+    const T &rdet_ctoc_lower_bound,
     RNG<T> *rng) {
   int pulse_counter = int (pulse_length/base_time_step);
   double Ndisc_double = Ndisc;
@@ -411,8 +509,8 @@ inline void update_once(
       T ratio = Ndisc_double;
       ratio = (ratio-Ndisc)/(Ndiscmax-Ndisc);
       apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, rng,
-                                 Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
-                                 ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
+                                 Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
+                                 ldet_ctoc_upper_bound, ldet_ctoc_lower_bound, rdet_ctoc_upper_bound, rdet_ctoc_lower_bound);
       Ndisc_double = MIN(Ndisc_double, max_bound);
       w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, weight_min_bound, current_to_weight_ratio, g_read, h_read, j_0, k0, Original_Ndiscmin);
       Ndisc = Ndisc_double;
@@ -422,13 +520,13 @@ inline void update_once(
     {
       for (int i = 0; i < pulse_counter; i++) {
         step_RESET(pulse_voltage_RESET, base_time_step, Ndisc_double, g_RESET, h_RESET, j_0, k0, T0, Original_Ndiscmin, Ndiscmin, Nplug, a_ny0, dWa, Rth_positive,
-        RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, A, min_bound);
+        RseriesTiOx, R0, V_series_coefficient, V_disk_coefficient, gamma_coefficient, lcell, ldet, min_bound);
       }
       T ratio = Ndisc_double;
       ratio = (Ndisc-ratio)/(Ndisc-Ndiscmin);
       apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, rng,
-                                 Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
-                                 ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
+                                 Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
+                                 ldet_ctoc_upper_bound, ldet_ctoc_lower_bound, rdet_ctoc_upper_bound, rdet_ctoc_lower_bound);
       Ndisc_double = MAX(Ndisc_double, min_bound);
       w = map_Ndisc_to_weight(read_voltage, Ndisc_double, current_min, weight_min_bound, current_to_weight_ratio, g_read, h_read, j_0, k0, Original_Ndiscmin);
       Ndisc = Ndisc_double;
@@ -463,10 +561,10 @@ void JARTv1bRPUDevice<T>::doSparseUpdate(
                                    ldet[j], A[j], Ndisc[j], w[j], sign,
                                    par.current_min, par.current_to_weight_ratio, par.weight_to_current_ratio, par.w_min,
                                    Ndisc_max_bound[j], Ndisc_min_bound[j],
-                                   par.Ndiscmax_std, par.Ndiscmax_upper_bound, par.Ndiscmax_lower_bound, 
-                                   par.Ndiscmin_std, par.Ndiscmin_upper_bound, par.Ndiscmin_lower_bound, 
-                                   par.ldet_std, par.ldet_std_slope, par.ldet_upper_bound, par.ldet_lower_bound, 
-                                   par.rdet_std, par.rdet_std_slope, par.rdet_upper_bound, par.rdet_lower_bound, 
+                                   par.Ndiscmax_std, par.Ndiscmax_ctoc_upper_bound, par.Ndiscmax_ctoc_lower_bound, 
+                                   par.Ndiscmin_std, par.Ndiscmin_ctoc_upper_bound, par.Ndiscmin_ctoc_lower_bound, 
+                                   par.ldet_std, par.ldet_std_slope, par.ldet_ctoc_upper_bound, par.ldet_ctoc_lower_bound, 
+                                   par.rdet_std, par.rdet_std_slope, par.rdet_ctoc_upper_bound, par.rdet_ctoc_lower_bound, 
                                    rng););
 }
 
@@ -496,10 +594,10 @@ void JARTv1bRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *
                                          ldet[j], A[j], Ndisc[j], w[j], sign,
                                          par.current_min, par.current_to_weight_ratio, par.weight_to_current_ratio, par.w_min,
                                          Ndisc_max_bound[j], Ndisc_min_bound[j],
-                                         par.Ndiscmax_std, par.Ndiscmax_upper_bound, par.Ndiscmax_lower_bound, 
-                                         par.Ndiscmin_std, par.Ndiscmin_upper_bound, par.Ndiscmin_lower_bound, 
-                                         par.ldet_std, par.ldet_std_slope, par.ldet_upper_bound, par.ldet_lower_bound, 
-                                         par.rdet_std, par.rdet_std_slope, par.rdet_upper_bound, par.rdet_lower_bound, 
+                                         par.Ndiscmax_std, par.Ndiscmax_ctoc_upper_bound, par.Ndiscmax_ctoc_lower_bound, 
+                                         par.Ndiscmin_std, par.Ndiscmin_ctoc_upper_bound, par.Ndiscmin_ctoc_lower_bound, 
+                                         par.ldet_std, par.ldet_std_slope, par.ldet_ctoc_upper_bound, par.ldet_ctoc_lower_bound, 
+                                         par.rdet_std, par.rdet_std_slope, par.rdet_ctoc_upper_bound, par.rdet_ctoc_lower_bound, 
                                          rng););
 }
 

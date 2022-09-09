@@ -44,7 +44,7 @@ noise:
     dtod_upper_bound: 0.0
     dtod_lower_bound: 0.0
   ldet:
-    device_to_device: 0.0
+    device_to_device: 0.3
     cycle_to_cycle_direct: 0.0
     cycle_to_cycle_slope: 0.0
     # 0 means disabled for the upper_bounds
@@ -54,7 +54,7 @@ noise:
     dtod_upper_bound: 0.0
     dtod_lower_bound: 0.0
   rdet:
-    device_to_device: 0.0
+    device_to_device: 0.3
     cycle_to_cycle_direct: 0.0
     cycle_to_cycle_slope: 0.0
     # 0 means disabled for the upper_bounds

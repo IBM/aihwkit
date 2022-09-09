@@ -102,19 +102,19 @@ public:
       tmp_global_pars[32] = par.Ndisc_max_bound;
       tmp_global_pars[33] = par.Ndisc_min_bound;
       tmp_global_pars[34] = par.Ndiscmax_std;
-      tmp_global_pars[35] = par.Ndiscmax_upper_bound;
-      tmp_global_pars[36] = par.Ndiscmax_lower_bound;
+      tmp_global_pars[35] = par.Ndiscmax_ctoc_upper_bound;
+      tmp_global_pars[36] = par.Ndiscmax_ctoc_lower_bound;
       tmp_global_pars[37] = par.Ndiscmin_std;
-      tmp_global_pars[38] = par.Ndiscmin_upper_bound;
-      tmp_global_pars[39] = par.Ndiscmin_lower_bound;
+      tmp_global_pars[38] = par.Ndiscmin_ctoc_upper_bound;
+      tmp_global_pars[39] = par.Ndiscmin_ctoc_lower_bound;
       tmp_global_pars[40] = par.ldet_std;
       tmp_global_pars[41] = par.ldet_std_slope;
-      tmp_global_pars[42] = par.ldet_upper_bound;
-      tmp_global_pars[43] = par.ldet_lower_bound;
+      tmp_global_pars[42] = par.ldet_ctoc_upper_bound;
+      tmp_global_pars[43] = par.ldet_ctoc_lower_bound;
       tmp_global_pars[44] = par.rdet_std;
       tmp_global_pars[45] = par.rdet_std_slope;
-      tmp_global_pars[46] = par.rdet_upper_bound;
-      tmp_global_pars[47] = par.rdet_lower_bound;
+      tmp_global_pars[46] = par.rdet_ctoc_upper_bound;
+      tmp_global_pars[47] = par.rdet_ctoc_lower_bound;
 
       dev_device_parameters = nullptr;
       dev_device_parameters = RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT, tmp_global_pars);

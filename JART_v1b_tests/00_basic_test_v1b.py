@@ -79,31 +79,45 @@ for repeat in range(Repeat_Times):
     # Define a single-layer network.
     rpu_config = SingleRPUConfig(device=JARTv1bDevice(w_max=config_dictionary["w_max"],
                                                       w_min=config_dictionary["w_min"],
+
                                                       read_voltage=config_dictionary["pulse_related"]["read_voltage"],
                                                       pulse_voltage_SET=config_dictionary["pulse_related"]["pulse_voltage_SET"],
                                                       pulse_voltage_RESET=config_dictionary["pulse_related"]["pulse_voltage_RESET"],
                                                       pulse_length=config_dictionary["pulse_related"]["pulse_length"],
                                                       base_time_step=config_dictionary["pulse_related"]["base_time_step"],
+
                                                       w_max_dtod=config_dictionary["noise"]["w_max"]["device_to_device"],
                                                       w_min_dtod=config_dictionary["noise"]["w_min"]["device_to_device"],
+
                                                       Ndiscmax_dtod=config_dictionary["noise"]["Ndiscmax"]["device_to_device"],
+                                                      Ndiscmax_dtod_upper_bound=config_dictionary["noise"]["Ndiscmax"]["dtod_upper_bound"],
+                                                      Ndiscmax_dtod_lower_bound=config_dictionary["noise"]["Ndiscmax"]["dtod_lower_bound"],
                                                       Ndiscmax_std=config_dictionary["noise"]["Ndiscmax"]["cycle_to_cycle_direct"],
-                                                      Ndiscmax_upper_bound=config_dictionary["noise"]["Ndiscmax"]["upper_bound"],
-                                                      Ndiscmax_lower_bound=config_dictionary["noise"]["Ndiscmax"]["lower_bound"],
+                                                      Ndiscmax_ctoc_upper_bound=config_dictionary["noise"]["Ndiscmax"]["ctoc_upper_bound"],
+                                                      Ndiscmax_ctoc_lower_bound=config_dictionary["noise"]["Ndiscmax"]["ctoc_lower_bound"],
+
                                                       Ndiscmin_dtod=config_dictionary["noise"]["Ndiscmin"]["device_to_device"],
+                                                      Ndiscmin_dtod_upper_bound=config_dictionary["noise"]["Ndiscmin"]["dtod_upper_bound"],
+                                                      Ndiscmin_dtod_lower_bound=config_dictionary["noise"]["Ndiscmin"]["dtod_lower_bound"],
                                                       Ndiscmin_std=config_dictionary["noise"]["Ndiscmin"]["cycle_to_cycle_direct"],
-                                                      Ndiscmin_upper_bound=config_dictionary["noise"]["Ndiscmin"]["upper_bound"],
-                                                      Ndiscmin_lower_bound=config_dictionary["noise"]["Ndiscmin"]["lower_bound"],
+                                                      Ndiscmin_ctoc_upper_bound=config_dictionary["noise"]["Ndiscmin"]["ctoc_upper_bound"],
+                                                      Ndiscmin_ctoc_lower_bound=config_dictionary["noise"]["Ndiscmin"]["ctoc_lower_bound"],
+
                                                       ldet_dtod=config_dictionary["noise"]["ldet"]["device_to_device"],
+                                                      ldet_dtod_upper_bound=config_dictionary["noise"]["ldet"]["dtod_upper_bound"],
+                                                      ldet_dtod_lower_bound=config_dictionary["noise"]["ldet"]["dtod_lower_bound"],
                                                       ldet_std=config_dictionary["noise"]["ldet"]["cycle_to_cycle_direct"],
                                                       ldet_std_slope=config_dictionary["noise"]["ldet"]["cycle_to_cycle_slope"],
-                                                      ldet_upper_bound=config_dictionary["noise"]["ldet"]["upper_bound"],
-                                                      ldet_lower_bound=config_dictionary["noise"]["ldet"]["lower_bound"],
+                                                      ldet_ctoc_upper_bound=config_dictionary["noise"]["ldet"]["ctoc_upper_bound"],
+                                                      ldet_ctoc_lower_bound=config_dictionary["noise"]["ldet"]["ctoc_lower_bound"],
+
                                                       rdet_dtod=config_dictionary["noise"]["rdet"]["device_to_device"],
+                                                      rdet_dtod_upper_bound=config_dictionary["noise"]["rdet"]["dtod_upper_bound"],
+                                                      rdet_dtod_lower_bound=config_dictionary["noise"]["rdet"]["dtod_lower_bound"],
                                                       rdet_std=config_dictionary["noise"]["rdet"]["cycle_to_cycle_direct"],
                                                       rdet_std_slope=config_dictionary["noise"]["rdet"]["cycle_to_cycle_slope"],
-                                                      rdet_upper_bound=config_dictionary["noise"]["rdet"]["upper_bound"],
-                                                      rdet_lower_bound=config_dictionary["noise"]["rdet"]["lower_bound"]))
+                                                      rdet_ctoc_upper_bound=config_dictionary["noise"]["rdet"]["ctoc_upper_bound"],
+                                                      rdet_ctoc_lower_bound=config_dictionary["noise"]["rdet"]["ctoc_lower_bound"]))
 
     # rpu_config.update.pulse_type = PulseType.DETERMINISTIC_IMPLICIT
     # rpu_config.update.desired_bl = 100  # max number in this case

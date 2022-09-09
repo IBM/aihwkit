@@ -26,7 +26,7 @@ noise:
   w_min:
     device_to_device: 0.0
   Ndiscmax:
-    device_to_device: 0.0
+    device_to_device: 0.3
     cycle_to_cycle_direct: 0.0
     # 0 means disabled for the upper_bounds
     # parameters have to be larger than 0, so the lower_bound is always enabled
@@ -35,7 +35,7 @@ noise:
     dtod_upper_bound: 0.0
     dtod_lower_bound: 0.0
   Ndiscmin:
-    device_to_device: 0.0
+    device_to_device: 0.3
     cycle_to_cycle_direct: 0.0
     # 0 means disabled for the upper_bounds
     # parameters have to be larger than 0, so the lower_bound is always enabled

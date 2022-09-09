@@ -28,14 +28,6 @@ from torch import nn
 from torch.optim.lr_scheduler import StepLR
 from torchvision import datasets, transforms
 
-# Imports from aihwkit.
-from aihwkit.nn import AnalogLinear, AnalogSequential
-from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import JARTv1bDevice
-from aihwkit.simulator.configs.utils import PulseType
-from aihwkit.simulator.rpu_base import cuda
-
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--config", help="YAML Configuration File")
@@ -64,6 +56,10 @@ USE_bias= config_dictionary["USE_bias"]
 del config_dictionary["USE_0_initialization"]
 del config_dictionary["project_name"]
 del config_dictionary["USE_wandb"]
+del config_dictionary["pulse_related"]
+del config_dictionary["noise"]
+del config_dictionary["w_max"]
+del config_dictionary["w_min"]
 
 if USE_wandb:
     import wandb
@@ -81,9 +77,7 @@ OUTPUT_SIZE = 10
 
 # Check device
 USE_CUDA = 0
-if cuda.is_compiled() & CUDA_Enabled:
-    USE_CUDA = 1
-DEVICE = torch.device('cuda' if USE_CUDA else 'cpu')
+DEVICE = torch.device('cuda:3' if USE_CUDA else 'cpu')
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join('data', 'DATASET')
@@ -115,54 +109,12 @@ def create_analog_network(input_size, hidden_sizes, output_size):
     Returns:
         nn.Module: created analog model
     """
-    
-    rpu_config = SingleRPUConfig(device=JARTv1bDevice(w_max=config_dictionary["w_max"],
-                                                      w_min=config_dictionary["w_min"],
-
-                                                      read_voltage=config_dictionary["pulse_related"]["read_voltage"],
-                                                      pulse_voltage_SET=config_dictionary["pulse_related"]["pulse_voltage_SET"],
-                                                      pulse_voltage_RESET=config_dictionary["pulse_related"]["pulse_voltage_RESET"],
-                                                      pulse_length=config_dictionary["pulse_related"]["pulse_length"],
-                                                      base_time_step=config_dictionary["pulse_related"]["base_time_step"],
-
-                                                      w_max_dtod=config_dictionary["noise"]["w_max"]["device_to_device"],
-                                                      w_min_dtod=config_dictionary["noise"]["w_min"]["device_to_device"],
-
-                                                      Ndiscmax_dtod=config_dictionary["noise"]["Ndiscmax"]["device_to_device"],
-                                                      Ndiscmax_dtod_upper_bound=config_dictionary["noise"]["Ndiscmax"]["dtod_upper_bound"],
-                                                      Ndiscmax_dtod_lower_bound=config_dictionary["noise"]["Ndiscmax"]["dtod_lower_bound"],
-                                                      Ndiscmax_std=config_dictionary["noise"]["Ndiscmax"]["cycle_to_cycle_direct"],
-                                                      Ndiscmax_ctoc_upper_bound=config_dictionary["noise"]["Ndiscmax"]["ctoc_upper_bound"],
-                                                      Ndiscmax_ctoc_lower_bound=config_dictionary["noise"]["Ndiscmax"]["ctoc_lower_bound"],
-
-                                                      Ndiscmin_dtod=config_dictionary["noise"]["Ndiscmin"]["device_to_device"],
-                                                      Ndiscmin_dtod_upper_bound=config_dictionary["noise"]["Ndiscmin"]["dtod_upper_bound"],
-                                                      Ndiscmin_dtod_lower_bound=config_dictionary["noise"]["Ndiscmin"]["dtod_lower_bound"],
-                                                      Ndiscmin_std=config_dictionary["noise"]["Ndiscmin"]["cycle_to_cycle_direct"],
-                                                      Ndiscmin_ctoc_upper_bound=config_dictionary["noise"]["Ndiscmin"]["ctoc_upper_bound"],
-                                                      Ndiscmin_ctoc_lower_bound=config_dictionary["noise"]["Ndiscmin"]["ctoc_lower_bound"],
-
-                                                      ldet_dtod=config_dictionary["noise"]["ldet"]["device_to_device"],
-                                                      ldet_dtod_upper_bound=config_dictionary["noise"]["ldet"]["dtod_upper_bound"],
-                                                      ldet_dtod_lower_bound=config_dictionary["noise"]["ldet"]["dtod_lower_bound"],
-                                                      ldet_std=config_dictionary["noise"]["ldet"]["cycle_to_cycle_direct"],
-                                                      ldet_std_slope=config_dictionary["noise"]["ldet"]["cycle_to_cycle_slope"],
-                                                      ldet_ctoc_upper_bound=config_dictionary["noise"]["ldet"]["ctoc_upper_bound"],
-                                                      ldet_ctoc_lower_bound=config_dictionary["noise"]["ldet"]["ctoc_lower_bound"],
-
-                                                      rdet_dtod=config_dictionary["noise"]["rdet"]["device_to_device"],
-                                                      rdet_dtod_upper_bound=config_dictionary["noise"]["rdet"]["dtod_upper_bound"],
-                                                      rdet_dtod_lower_bound=config_dictionary["noise"]["rdet"]["dtod_lower_bound"],
-                                                      rdet_std=config_dictionary["noise"]["rdet"]["cycle_to_cycle_direct"],
-                                                      rdet_std_slope=config_dictionary["noise"]["rdet"]["cycle_to_cycle_slope"],
-                                                      rdet_ctoc_upper_bound=config_dictionary["noise"]["rdet"]["ctoc_upper_bound"],
-                                                      rdet_ctoc_lower_bound=config_dictionary["noise"]["rdet"]["ctoc_lower_bound"]))
-    model = AnalogSequential(
-        AnalogLinear(input_size, hidden_sizes[0], USE_bias, rpu_config),
+    model = nn.Sequential(
+        nn.Linear(input_size, hidden_sizes[0], USE_bias),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[0], hidden_sizes[1], USE_bias, rpu_config),
+        nn.Linear(hidden_sizes[0], hidden_sizes[1], USE_bias),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[1], output_size, USE_bias, rpu_config),
+        nn.Linear(hidden_sizes[1], output_size, USE_bias),
         nn.LogSoftmax(dim=1)
     )
 
@@ -190,8 +142,7 @@ def create_sgd_optimizer(model):
     Returns:
         nn.Module: optimizer
     """
-    optimizer = AnalogSGD(model.parameters(), lr=config_dictionary["learning_rate"])
-    optimizer.regroup_param_groups(model)
+    optimizer = torch.optim.SGD(model.parameters(), lr=config_dictionary["learning_rate"])
 
     return optimizer
 
@@ -275,7 +226,7 @@ def main():
 
     for repeat in range(Repeat_Times):
         if USE_wandb:
-            wandb.init(project=project_name, group="Fully Connected MNIST", job_type=job_type)
+            wandb.init(project=project_name, group="Fully Connected MNIST", job_type="Floating Point Baseline")
             wandb.config.update(config_dictionary)
         train_dataset, validation_dataset = load_images()
 

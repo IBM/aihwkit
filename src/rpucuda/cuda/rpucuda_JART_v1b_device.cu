@@ -48,47 +48,47 @@ __device__ __forceinline__ void apply_cycle_to_cycle_noise(
     const T &ldet_std_slope,
     const T &rdet_std_slope,
     curandState &local_state,
-    const T &Ndiscmax_upper_bound,
-    const T &Ndiscmax_lower_bound,
-    const T &Ndiscmin_upper_bound,
-    const T &Ndiscmin_lower_bound,
-    const T &ldet_upper_bound,
-    const T &ldet_lower_bound,
-    const T &rdet_upper_bound,
-    const T &rdet_lower_bound) {
+    const T &Ndiscmax_ctoc_upper_bound,
+    const T &Ndiscmax_ctoc_lower_bound,
+    const T &Ndiscmin_ctoc_upper_bound,
+    const T &Ndiscmin_ctoc_lower_bound,
+    const T &ldet_ctoc_upper_bound,
+    const T &ldet_ctoc_lower_bound,
+    const T &rdet_ctoc_upper_bound,
+    const T &rdet_ctoc_lower_bound) {
   if (Ndiscmax_std > (T)0.0) {
-    T stoch_value = curand_normal(&local_state);
+    T stoch_value = 2*curand_uniform(&local_state)-1;
     Ndiscmax = Ndiscmax * (1 + Ndiscmax_std * stoch_value);
-    if ((Ndiscmax_upper_bound > (T)0.0) && (Ndiscmax_lower_bound >= (T)0.0)) {
-      Ndiscmax = MIN(Ndiscmax, Ndiscmax_upper_bound);
-      Ndiscmax = MAX(Ndiscmax, Ndiscmax_lower_bound);
+    if (Ndiscmax_ctoc_upper_bound > (T)0.0) {
+      Ndiscmax = MIN(Ndiscmax, Ndiscmax_ctoc_upper_bound);
     }
+    Ndiscmax = MAX(Ndiscmax, Ndiscmax_ctoc_lower_bound);
   }
   if (Ndiscmin_std > (T)0.0) {
-    T stoch_value = curand_normal(&local_state);
+    T stoch_value = 2*curand_uniform(&local_state)-1;
     Ndiscmin = Ndiscmin * (1 + Ndiscmin_std * stoch_value);
-    if ((Ndiscmin_upper_bound > (T)0.0) && (Ndiscmin_lower_bound >= (T)0.0)) {
-      Ndiscmin = MIN(Ndiscmin, Ndiscmin_upper_bound);
-      Ndiscmin = MAX(Ndiscmin, Ndiscmin_lower_bound);
+    if (Ndiscmin_ctoc_upper_bound > (T)0.0) {
+      Ndiscmin = MIN(Ndiscmin, Ndiscmin_ctoc_upper_bound);
     }
+    Ndiscmin = MAX(Ndiscmin, Ndiscmin_ctoc_lower_bound);
   }
   if ((ldet_std > (T)0.0)||(ldet_std_slope > (T)0.0)) {
-    T stoch_value_1 = curand_normal(&local_state);
-    T stoch_value_2 = curand_normal(&local_state);
+    T stoch_value_1 = 2*curand_uniform(&local_state)-1;
+    T stoch_value_2 = 2*curand_uniform(&local_state)-1;
     ldet = ldet * (1 + ldet_std * stoch_value_1 + ratio * ldet_std_slope * stoch_value_2);
-    if ((ldet_upper_bound > (T)0.0) && (ldet_lower_bound >= (T)0.0)) {
-      ldet = MIN(ldet, ldet_upper_bound);
-      ldet = MAX(ldet, ldet_lower_bound);
+    if (ldet_ctoc_upper_bound > (T)0.0) {
+      ldet = MIN(ldet, ldet_ctoc_upper_bound);
     }
+    ldet = MAX(ldet, ldet_ctoc_lower_bound);
   }
   if ((rdet_std > (T)0.0)||(rdet_std_slope > (T)0.0)) {
-    T stoch_value_1 = curand_normal(&local_state);
-    T stoch_value_2 = curand_normal(&local_state);
+    T stoch_value_1 = 2*curand_uniform(&local_state)-1;
+    T stoch_value_2 = 2*curand_uniform(&local_state)-1;
     T rdet = pow(A/M_PI, 0.5) * (1 + rdet_std * stoch_value_1 + ratio * rdet_std_slope * stoch_value_2);
-    if ((rdet_upper_bound > (T)0.0) && (rdet_lower_bound >= (T)0.0)) {
-      rdet = MIN(rdet, rdet_upper_bound);
-      rdet = MAX(rdet, rdet_lower_bound);
+    if (rdet_ctoc_upper_bound > (T)0.0) {
+      rdet = MIN(rdet, rdet_ctoc_upper_bound);
     }
+    rdet = MAX(rdet, rdet_ctoc_lower_bound);
     A = M_PI*pow(rdet,2.0);
   }
 }
@@ -145,19 +145,19 @@ template <typename T> struct UpdateFunctorJARTv1b {
     const T Ndisc_max_bound         = global_pars[32];
     const T Ndisc_min_bound         = global_pars[33];
     const T Ndiscmax_std            = global_pars[34];
-    const T Ndiscmax_upper_bound    = global_pars[35];
-    const T Ndiscmax_lower_bound    = global_pars[36];
+    const T Ndiscmax_ctoc_upper_bound    = global_pars[35];
+    const T Ndiscmax_ctoc_lower_bound    = global_pars[36];
     const T Ndiscmin_std            = global_pars[37];
-    const T Ndiscmin_upper_bound    = global_pars[38];
-    const T Ndiscmin_lower_bound    = global_pars[39];
+    const T Ndiscmin_ctoc_upper_bound    = global_pars[38];
+    const T Ndiscmin_ctoc_lower_bound    = global_pars[39];
     const T ldet_std                = global_pars[40];
     const T ldet_std_slope          = global_pars[41];
-    const T ldet_upper_bound        = global_pars[42];
-    const T ldet_lower_bound        = global_pars[43];
+    const T ldet_ctoc_upper_bound        = global_pars[42];
+    const T ldet_ctoc_lower_bound        = global_pars[43];
     const T rdet_std                = global_pars[44];
     const T rdet_std_slope          = global_pars[45];
-    const T rdet_upper_bound        = global_pars[46];
-    const T rdet_lower_bound        = global_pars[47];
+    const T rdet_ctoc_upper_bound        = global_pars[46];
+    const T rdet_ctoc_lower_bound        = global_pars[47];
     
     /* NOTE: These values does not do random walk,
              so the original values are not supposed to change.
@@ -193,10 +193,12 @@ template <typename T> struct UpdateFunctorJARTv1b {
         for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
           T I_mem = -alpha_SET-beta_SET/(pow((1.0+pow((c_SET/Ndisc),d_SET)),f_SET));
 
-          T V_disk = I_mem*(device_specific_ldet_cuda/(V_disk_coefficient*device_specific_A_cuda*Ndisc_double));
+          // NOTE: V_disk = I_mem*(ldet/(V_disk_coefficient*A*Ndisc))
+          // NOTE: Eion = V_disk/ldet
+          T Eion = I_mem/(V_disk_coefficient*device_specific_A_cuda*Ndisc_double);
 
           // NOTE: T gamma = gamma_coefficient*Eion
-          T gamma = gamma_coefficient*V_disk/device_specific_ldet_cuda;
+          T gamma = gamma_coefficient*Eion;
           
           // NOTE: V - V_series = V_disk+V_plug+V_Schottky
           T V_other_than_series = pulse_voltage_SET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
@@ -220,8 +222,8 @@ template <typename T> struct UpdateFunctorJARTv1b {
         // T ratio = Ndisc_double;
         // ratio = (ratio-Ndisc)/(Ndiscmax-Ndisc);
         // apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, local_state,
-        //                            Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
-        //                            ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
+        //                            Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
+        //                            ldet_ctoc_upper_bound, ldet_ctoc_lower_bound, rdet_ctoc_upper_bound, rdet_ctoc_lower_bound);
         Ndisc_double = MIN(Ndisc_double, max_bound);
         w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
         Ndisc = Ndisc_double;
@@ -257,8 +259,8 @@ template <typename T> struct UpdateFunctorJARTv1b {
         // T ratio = Ndisc_double;
         // ratio = (Ndisc-ratio)/(Ndisc-Ndiscmin);
         // apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldet, A, Ndiscmax_std, Ndiscmin_std, ldet_std, rdet_std, ldet_std_slope, rdet_std_slope, local_state,
-        //                            Ndiscmax_upper_bound, Ndiscmax_lower_bound, Ndiscmin_upper_bound, Ndiscmin_lower_bound,
-        //                            ldet_upper_bound, ldet_lower_bound, rdet_upper_bound, rdet_lower_bound);
+        //                            Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
+        //                            ldet_ctoc_upper_bound, ldet_ctoc_lower_bound, rdet_ctoc_upper_bound, rdet_ctoc_lower_bound);
         Ndisc_double = MAX(Ndisc_double, min_bound);
         w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
         Ndisc = Ndisc_double;

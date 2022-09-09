@@ -90,23 +90,31 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T w_max = (T)0.6;
     T w_max_dtod = (T)0.3;
     T Ndiscmax_dtod = (T) 0.0;							// 
+    T Ndiscmax_dtod_upper_bound = (T) 0.0;							// 
+    T Ndiscmax_dtod_lower_bound = (T) 0.0;							// 
     T Ndiscmin_dtod = (T) 0.0;							//
+    T Ndiscmin_dtod_upper_bound = (T) 0.0;							// 
+    T Ndiscmin_dtod_lower_bound = (T) 0.0;							// 
     T ldet_dtod = (T) 0.0;							//
+    T ldet_dtod_upper_bound = (T) 0.0;							// 
+    T ldet_dtod_lower_bound = (T) 0.0;							// 
     T rdet_dtod = (T) 0.0;							//
+    T rdet_dtod_upper_bound = (T) 0.0;							// 
+    T rdet_dtod_lower_bound = (T) 0.0;							// 
     T Ndiscmax_std = (T) 0.0;							// 
-    T Ndiscmax_upper_bound = (T) 0.0;							// 
-    T Ndiscmax_lower_bound = (T) 0.0;							// 
+    T Ndiscmax_ctoc_upper_bound = (T) 0.0;							// 
+    T Ndiscmax_ctoc_lower_bound = (T) 0.0;							// 
     T Ndiscmin_std = (T) 0.0;							//
-    T Ndiscmin_upper_bound = (T) 0.0;							// 
-    T Ndiscmin_lower_bound = (T) 0.0;							// 
+    T Ndiscmin_ctoc_upper_bound = (T) 0.0;							// 
+    T Ndiscmin_ctoc_lower_bound = (T) 0.0;							// 
     T ldet_std = (T) 0.0;							//
     T ldet_std_slope = (T) 0.0;							//
-    T ldet_upper_bound = (T) 0.0;							// 
-    T ldet_lower_bound = (T) 0.0;							// 
+    T ldet_ctoc_upper_bound = (T) 0.0;							// 
+    T ldet_ctoc_lower_bound = (T) 0.0;							// 
     T rdet_std = (T) 0.0;							//
     T rdet_std_slope = (T) 0.0;							//
-    T rdet_upper_bound = (T) 0.0;							// 
-    T rdet_lower_bound = (T) 0.0;							// 
+    T rdet_ctoc_upper_bound = (T) 0.0;							// 
+    T rdet_ctoc_lower_bound = (T) 0.0;							// 
 
     
     T current_min =  (T) (-g0*(exp(-g1*read_voltage)-1))/(pow((1+(h0+h1*read_voltage+h2*exp(-h3*read_voltage))*pow((Ndisc_min_bound/Ndiscmin),(-j_0))),(1/k0)));
@@ -195,23 +203,31 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t current_min:\t" << current_min << std::endl;
     ss << "\t current_max:\t" << current_max << std::endl;
     ss << "\t Ndiscmax_dtod:\t\t" << Ndiscmax_dtod << std::endl;
+    ss << "\t Ndiscmax_dtod_upper_bound:\t\t" << Ndiscmax_dtod_upper_bound << std::endl;
+    ss << "\t Ndiscmax_dtod_lower_bound:\t\t" << Ndiscmax_dtod_lower_bound << std::endl;
     ss << "\t Ndiscmin_dtod:\t\t" << Ndiscmin_dtod << std::endl;
+    ss << "\t Ndiscmin_dtod_upper_bound:\t\t" << Ndiscmin_dtod_upper_bound << std::endl;
+    ss << "\t Ndiscmin_dtod_lower_bound:\t\t" << Ndiscmin_dtod_lower_bound << std::endl;
     ss << "\t ldet_dtod:\t\t" << ldet_dtod << std::endl;
+    ss << "\t ldet_dtod_upper_bound:\t\t" << ldet_dtod_upper_bound << std::endl;
+    ss << "\t ldet_dtod_lower_bound:\t\t" << ldet_dtod_lower_bound << std::endl;
     ss << "\t rdet_dtod:\t\t" << rdet_dtod << std::endl;
+    ss << "\t rdet_dtod_upper_bound:\t\t" << rdet_dtod_upper_bound << std::endl;
+    ss << "\t rdet_dtod_lower_bound:\t\t" << rdet_dtod_lower_bound << std::endl;
     ss << "\t Ndiscmax_std:\t\t" << Ndiscmax_std << std::endl;
-    ss << "\t Ndiscmax_upper_bound:\t\t" << Ndiscmax_upper_bound << std::endl;
-    ss << "\t Ndiscmax_lower_bound:\t\t" << Ndiscmax_lower_bound << std::endl;
+    ss << "\t Ndiscmax_ctoc_upper_bound:\t\t" << Ndiscmax_ctoc_upper_bound << std::endl;
+    ss << "\t Ndiscmax_ctoc_lower_bound:\t\t" << Ndiscmax_ctoc_lower_bound << std::endl;
     ss << "\t Ndiscmin_std:\t\t" << Ndiscmin_std << std::endl;
-    ss << "\t Ndiscmin_upper_bound:\t\t" << Ndiscmin_upper_bound << std::endl;
-    ss << "\t Ndiscmin_lower_bound:\t\t" << Ndiscmin_lower_bound << std::endl;
+    ss << "\t Ndiscmin_ctoc_upper_bound:\t\t" << Ndiscmin_ctoc_upper_bound << std::endl;
+    ss << "\t Ndiscmin_ctoc_lower_bound:\t\t" << Ndiscmin_ctoc_lower_bound << std::endl;
     ss << "\t ldet_std:\t\t" << ldet_std << std::endl;
     ss << "\t ldet_std_slope:\t\t" << ldet_std_slope << std::endl;
-    ss << "\t ldet_upper_bound:\t\t" << ldet_upper_bound << std::endl;
-    ss << "\t ldet_lower_bound:\t\t" << ldet_lower_bound << std::endl;
+    ss << "\t ldet_ctoc_upper_bound:\t\t" << ldet_ctoc_upper_bound << std::endl;
+    ss << "\t ldet_ctoc_lower_bound:\t\t" << ldet_ctoc_lower_bound << std::endl;
     ss << "\t rdet_std:\t\t" << rdet_std << std::endl;
     ss << "\t rdet_std_slope:\t\t" << rdet_std_slope << std::endl;
-    ss << "\t rdet_upper_bound:\t\t" << rdet_upper_bound << std::endl;
-    ss << "\t rdet_lower_bound:\t\t" << rdet_lower_bound << std::endl;
+    ss << "\t rdet_ctoc_upper_bound:\t\t" << rdet_ctoc_upper_bound << std::endl;
+    ss << "\t rdet_ctoc_lower_bound:\t\t" << rdet_ctoc_lower_bound << std::endl;
     ,
     /* calc weight granularity body */
     return this->dw_min;
