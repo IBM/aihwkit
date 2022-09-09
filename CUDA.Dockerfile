@@ -30,11 +30,14 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Add a user `${USERNAME}` so that you're not developing as the `root` user
-ENV USERNAME=ibm
+ARG USERNAME=ibm
+ARG USERID=1000
+ARG GROUPID=1000
 RUN useradd ${USERNAME} \
     --create-home \
-    --shell=/bin/bash \
-    --user-group && \
+    --uid ${USERID} \
+    --gid ${GROUPID} \
+    --shell=/bin/bash && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/nopasswd
 
 # Change to your user
