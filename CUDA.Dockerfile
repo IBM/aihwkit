@@ -24,7 +24,6 @@ RUN apt-get update && \
     python3 python3-dev python3-pip python-is-python3 \
     sudo \
     wget && \
-
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -50,7 +49,6 @@ ARG PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu116
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir pybind11 scikit-build && \
     pip install --no-cache-dir torch torchvision torchaudio --extra-index-url ${PYTORCH_PIP_URL} && \
-
 # Set path of python packages
     echo 'export PATH=$HOME/.local/bin:$PATH' >> /home/${USERNAME}/.bashrc
 
