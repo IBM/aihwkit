@@ -208,7 +208,29 @@ sub-directory of the ahwkit base directory, e.g. by (when being in the base dire
 
     $ export PYTHONPATH=`pwd`/src:$PYTHONPATH
 
+CUDA-enabled docker image
+~~~~~~~~~~~~~~~~~~~~~~~~~
+# Get CUDA_ARCH for your GPU from `nvidia-smi`
 
+```bash
+export CUDA_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv | sed -n '2 p' | tr -d '.')
+echo $CUDA_ARCH
+```
+
+# Build Image
+
+```console
+docker build \
+--tag aihwkit:cuda \
+--build-arg USERNAME=${USER} \
+--build-arg USERID=(id -u $USER) \
+--build-arg GROUPID=(id -g $USER) \
+--build-arg CUDA_ARCH=${CUDA_ARCH} \
+--build-arg CUDA_VER=11.7 \
+--build-arg UBUNTU_VER=22.04 \
+--build-arg PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu116 \
+--file CUDA.Dockerfile .
+```
 .. note::
 
     Please note that the instructions on this page refer to installing as an
