@@ -32,7 +32,8 @@ RUN apt-get update && \
 ARG USERNAME=ibm
 ARG USERID=1000
 ARG GROUPID=1000
-RUN useradd ${USERNAME} \
+RUN groupadd -g ${GROUPID} ${USERNAME} && \
+    useradd ${USERNAME} \
     --create-home \
     --uid ${USERID} \
     --gid ${GROUPID} \
