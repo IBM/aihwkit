@@ -1592,6 +1592,14 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
     error vector. Quantization can be turned off by setting this to 0.
     """
 
+    stoc_round_x: bool = True
+    """Whether to use stochastic rounding in case of quantization of the input x.
+    """
+
+    stoc_round_d: bool = True
+    """Whether to use stochastic rounding in case of quantization of the error d.
+    """
+
     def as_bindings(self) -> devices.MixedPrecResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
         mixed_prec_parameter = parameters_to_bindings(self)
