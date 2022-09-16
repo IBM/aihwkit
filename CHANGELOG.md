@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Enabling comparisons of ``RPUConfig`` instances. (\#410)
 * Specific use-defined function for layer-wise setting for RPUConfigs
   in conversions. (\#412)
+* Added stochastic rounding options for ``MixedPrecisionCompound``. (\#418)
 
 ### Fixed
 
