@@ -282,6 +282,25 @@ template <typename T> void PulsedRPUDeviceCuda<T>::initResetRnd() {
   this->rnd_context_->synchronize();
 }
 
+template <typename T> std::vector<T> PulsedRPUDeviceCuda<T>::getHiddenWeights() const {
+  std::vector<T> data;
+  if (!getPar().usesPersistentWeight()) {
+    return data;
+  }
+  int offset = 0;
+
+  std::vector<T> w_vec(this->size_);
+  data.resize(this->size_);
+  if (dev_persistent_weights_) {
+    dev_persistent_weights_->copyTo(w_vec.data());
+    for (int i = 0; i < this->size_; i++) {
+      // transpose d_size maj -> x_size maj
+      data[offset + i] = w_vec[TRANSPOSE_X2D(i, this->x_size_, this->d_size_)];
+    }
+  }
+  return data;
+}
+
 template <typename T> void PulsedRPUDeviceCuda<T>::applyUpdateWriteNoise(T *dev_weights) {
 
   const auto &par = getPar();
