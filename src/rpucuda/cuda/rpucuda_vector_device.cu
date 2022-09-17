@@ -354,8 +354,6 @@ template <typename T> std::vector<T> VectorRPUDeviceCuda<T>::getHiddenWeights() 
   for (int k = 0; k < n_devices_; k++) {
     w_vec[k].resize(this->size_);
 
-    // dev_w.assignFromDevice(this->dev_weights_ptrs_[k]); //this->dev_weights_vec_->getData() +
-    // k*this->size_); //
     dev_w.assignFromDevice(
         this->dev_weights_vec_->getData() + k * this->size_); // this copies the "empty" hidden
     dev_w.copyTo(w_vec[k].data());
