@@ -341,7 +341,7 @@ inline void step_RESET(
     const T &lcell,
     T &ldet,
     T &min_bound) {
-  T I_mem = g_RESET/(pow((1.0+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
+  T I_mem = g_RESET/(pow((1.0+h_RESET*pow((Ndisc/Original_Ndiscmin),-j_0)),1.0/k0));
   
   // NOTE: V - V_series = V_disk+V_plug+V_Schottky
   T V_other_than_series = applied_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));

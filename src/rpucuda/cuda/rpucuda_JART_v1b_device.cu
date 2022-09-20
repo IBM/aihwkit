@@ -125,7 +125,7 @@ template <typename T> struct UpdateFunctorJARTv1b {
     const T j_0                     = global_pars[13];
     const T k0                      = global_pars[14];
     const T T0                      = global_pars[15];
-    const T Ndiscmin                = global_pars[16];
+    const T Original_Ndiscmin       = global_pars[16];
     const T Nplug                   = global_pars[17];
     const T a_ny0                   = global_pars[18];
     const T dWa                     = global_pars[19];
@@ -225,14 +225,14 @@ template <typename T> struct UpdateFunctorJARTv1b {
         //                            Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
         //                            ldet_ctoc_upper_bound, ldet_ctoc_lower_bound, rdet_ctoc_upper_bound, rdet_ctoc_lower_bound);
         Ndisc_double = MIN(Ndisc_double, max_bound);
-        w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
+        w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Original_Ndiscmin);
         Ndisc = Ndisc_double;
       }
     
     }else{
       if (Ndisc_double > min_bound){
         for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
-          T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Ndiscmin),-j_0)),1.0/k0));
+          T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Original_Ndiscmin),-j_0)),1.0/k0));
           
           // NOTE: V - V_series = V_disk+V_plug+V_Schottky
           T V_other_than_series = pulse_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
@@ -262,7 +262,7 @@ template <typename T> struct UpdateFunctorJARTv1b {
         //                            Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
         //                            ldet_ctoc_upper_bound, ldet_ctoc_lower_bound, rdet_ctoc_upper_bound, rdet_ctoc_lower_bound);
         Ndisc_double = MAX(Ndisc_double, min_bound);
-        w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Ndiscmin);
+        w = map_Ndisc_to_weight(Ndisc_double, current_min, w_min, current_to_weight_ratio, g_read, h_read, j_0, k0, Original_Ndiscmin);
         Ndisc = Ndisc_double;
       }
     }
