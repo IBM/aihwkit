@@ -166,7 +166,7 @@ cython_debug/
 */wandb/
 
 # nohup output files
-*/nohup.out
+*nohup.out
 
 # wandb plots
 */figures/

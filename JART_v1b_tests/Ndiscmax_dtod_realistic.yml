@@ -22,46 +22,44 @@ pulse_related:
 
 noise:
   w_max:
-    device_to_device: 0.1
+    device_to_device: 0.0
   w_min:
-    device_to_device: 0.1
+    device_to_device: 0.0
   Ndiscmax:
     device_to_device: 1.0
-    cycle_to_cycle_direct: 0.9
+    cycle_to_cycle_direct: 0.0
     # 0 means disabled for the upper_bounds
     # parameters have to be larger than 0, so the lower_bound is always enabled
-    ctoc_upper_bound: 38
-    ctoc_lower_bound: 2
+    ctoc_upper_bound: 0.0
+    ctoc_lower_bound: 0.0
     dtod_upper_bound: 22
     dtod_lower_bound: 18
   Ndiscmin:
-    device_to_device: 1.0
-    cycle_to_cycle_direct: 0.1
+    device_to_device: 0.0
+    cycle_to_cycle_direct: 0.0
     # 0 means disabled for the upper_bounds
     # parameters have to be larger than 0, so the lower_bound is always enabled
-    # ctoc_upper_bound: 0.0088
-    # ctoc_lower_bound: 0.0072
-    ctoc_upper_bound: 0.016
-    ctoc_lower_bound: 0.004
-    dtod_upper_bound: 0.016
-    dtod_lower_bound: 0.004
+    ctoc_upper_bound: 0.0
+    ctoc_lower_bound: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
   ldet:
-    device_to_device: 1.0
-    cycle_to_cycle_direct: 0.01
-    cycle_to_cycle_slope: 0.1
+    device_to_device: 0.0
+    cycle_to_cycle_direct: 0.0
+    cycle_to_cycle_slope: 0.0
     # 0 means disabled for the upper_bounds
     # parameters have to be larger than 0, so the lower_bound is always enabled
-    ctoc_upper_bound: 0.44e-9
-    ctoc_lower_bound: 0.36e-9
-    dtod_upper_bound: 0.44e-9
-    dtod_lower_bound: 0.36e-9
+    ctoc_upper_bound: 0.0
+    ctoc_lower_bound: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
   rdet:
-    device_to_device: 1.0
-    cycle_to_cycle_direct: 0.01
-    cycle_to_cycle_slope: 0.1
+    device_to_device: 0.0
+    cycle_to_cycle_direct: 0.0
+    cycle_to_cycle_slope: 0.0
     # 0 means disabled for the upper_bounds
     # parameters have to be larger than 0, so the lower_bound is always enabled
-    ctoc_upper_bound: 49.5e-9
-    ctoc_lower_bound: 40.5e-9
-    dtod_upper_bound: 49.5e-9
-    dtod_lower_bound: 40.5e-9
+    ctoc_upper_bound: 0.0
+    ctoc_lower_bound: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
