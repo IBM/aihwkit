@@ -48,7 +48,7 @@ ARG PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu116
 
 # Install python packages as your user
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir pybind11 scikit-build && \
+    pip install --no-cache-dir pybind11 scikit-build protobuf==3.20.2 && \
     pip install --no-cache-dir torch torchvision torchaudio --extra-index-url ${PYTORCH_PIP_URL} && \
 # Set path of python packages
     echo 'export PATH=$HOME/.local/bin:$PATH' >> /home/${USERNAME}/.bashrc
