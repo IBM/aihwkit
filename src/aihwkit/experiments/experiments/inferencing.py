@@ -203,7 +203,7 @@ class BasicInferencing(Experiment):
 
             if self.remap_weights:
                 for module in model.analog_modules():
-                    module.remap_weights(1.0)
+                    module.remap_weights()
 
         return model.to(device)
 

@@ -124,7 +124,6 @@ class AnalogOptimizerMixin:
             for param in group['params']:
                 if isinstance(param, AnalogContext):
                     param.analog_tile.post_update_step()
-
         return ret
 
     def set_learning_rate(self, learning_rate: float = 0.1) -> None:

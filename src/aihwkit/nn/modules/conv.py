@@ -30,7 +30,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     __constants__ = ['stride', 'padding', 'dilation', 'groups',
                      'padding_mode', 'output_padding', 'in_channels',
                      'out_channels', 'kernel_size', 'in_features', 'out_features',
-                     'realistic_read_write', 'weight_scaling_omega',
+                     'realistic_read_write',
                      'digital_bias', 'analog_bias', 'use_bias']
     in_channels: int
     out_channels: int
@@ -39,7 +39,6 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     padding: Tuple[int, ...]
     dilation: Tuple[int, ...]
     realistic_read_write: bool
-    weight_scaling_omega: float
     transposed: bool
     output_padding: Tuple[int, ...]
     groups: int
@@ -67,7 +66,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             padding_mode: str,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[float] = None,
+            weight_scaling_omega: Optional[bool] = None,
             use_indexed: Optional[bool] = None
     ):
         # pylint: disable=too-many-arguments, too-many-locals
@@ -85,6 +84,8 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         if rpu_config is None:
             rpu_config = SingleRPUConfig()
 
+        rpu_config = self._set_weight_scaling_omega(rpu_config, weight_scaling_omega)
+
         AnalogModuleBase.__init__(
             self,
             self.get_tile_size(in_channels, groups, kernel_size),
@@ -99,8 +100,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         self.register_analog_tile(self.analog_tile)
 
         # Set weights from the reset_parameters
-        self.set_weights(self.weight, self.bias, remap_weights=True,
-                         weight_scaling_omega=weight_scaling_omega)
+        self.set_weights(self.weight, self.bias)
 
         # Set the index matrices.
         self.use_indexed = use_indexed
@@ -232,9 +232,9 @@ class AnalogConv1d(_AnalogConvNd):
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and during reading of the weights.
-        weight_scaling_omega: If non-zero, the analog weights will be
-            scaled by ``weight_scaling_omega`` divided by the absolute
-            maximum value of the original weight matrix.
+        weight_scaling_omega: depreciated, use
+            :class:`aihwkit.simulator.configs.utils.MappingParameter`
+            instead to specify weight scaling
     """
     # pylint: disable=abstract-method
 
@@ -251,7 +251,7 @@ class AnalogConv1d(_AnalogConvNd):
             padding_mode: str = 'zeros',
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[float] = None,
+            weight_scaling_omega: Optional[bool] = None
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _single(kernel_size)
@@ -397,9 +397,9 @@ class AnalogConv2d(_AnalogConvNd):
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and read out of weights.
-        weight_scaling_omega: If non-zero, the analog weights will be
-            scaled by ``weight_scaling_omega`` divided by the absolute
-            maximum value of the original weight matrix.
+        weight_scaling_omega: depreciated, use
+            :class:`aihwkit.simulator.configs.utils.MappingParameter`
+            instead to specify weight scaling
         use_indexed: Whether to use explicit unfolding or implicit indexing. If
             None (default), it will use implicit indexing for CUDA and
             explicit unfolding for CPU
@@ -419,7 +419,7 @@ class AnalogConv2d(_AnalogConvNd):
             padding_mode: str = 'zeros',
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[float] = None,
+            weight_scaling_omega: Optional[bool] = None,
             use_indexed: Optional[bool] = None
     ):
         # pylint: disable=too-many-arguments
@@ -554,9 +554,9 @@ class AnalogConv3d(_AnalogConvNd):
         rpu_config: resistive processing unit configuration.
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and read out of weights.
-        weight_scaling_omega: If non-zero, the analog weights will be
-            scaled by ``weight_scaling_omega`` divided by the absolute
-            maximum value of the original weight matrix.
+        weight_scaling_omega: depreciated, use
+            :class:`aihwkit.simulator.configs.utils.MappingParameter`
+            instead to specify weight scaling
     """
     # pylint: disable=abstract-method
 
@@ -573,7 +573,7 @@ class AnalogConv3d(_AnalogConvNd):
             padding_mode: str = 'zeros',
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[float] = None,
+            weight_scaling_omega: Optional[bool] = None
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _triple(kernel_size)

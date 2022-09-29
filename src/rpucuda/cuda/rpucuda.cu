@@ -136,6 +136,7 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
   }
 
   // no copy
+  wremapper_cuda_ = nullptr;
   wclipper_cuda_ = nullptr;
 
   dev_x_vector_->assign(*other.dev_x_vector_);
@@ -196,6 +197,7 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
   dev_diffusion_nrnd_ = std::move(other.dev_diffusion_nrnd_);
 
   wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
+  wremapper_cuda_ = std::move(other.wremapper_cuda_);
 
   shared_weights_if_ = other.shared_weights_if_;
   return *this;
@@ -700,6 +702,21 @@ template <typename T> void RPUCudaSimple<T>::modifyFBWeights(const WeightModifie
 
   // modify FB weights
   fb_wmodifier_cuda_->apply(dev_fb_weights_->getData(), dev_weights_->getDataConst(), wmpar);
+}
+
+template <typename T>
+void RPUCudaSimple<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases) {
+
+  ENFORCE_NO_DELAYED_UPDATE; // will get confused with the buffer
+
+  if (wremapper_cuda_ == nullptr) {
+    wremapper_cuda_ =
+        RPU::make_unique<WeightRemapperCuda<T>>(context_, this->x_size_, this->d_size_);
+  }
+
+  // remap weights
+  wremapper_cuda_->apply(
+      dev_weights_->getData(), this->getAlphaLearningRate(), wrmpar, scales, biases);
 }
 
 /*********************************************************************************/
