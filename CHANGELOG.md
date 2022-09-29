@@ -77,6 +77,11 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Input `weight_scaling_omega` argument to layers is deprecated. (\#423)
 
+### Removed
+
+* The `_scaled` versions of the weight getter and setter methods are
+removed (\#423) 
+
 
 ## [0.6.0] - 2022/05/16
 
