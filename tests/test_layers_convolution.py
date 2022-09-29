@@ -75,7 +75,6 @@ class ConvolutionLayerTest(ParametrizedTestCase):
     def train_model(model, loss_func, x_b, y_b):
         """Train the model."""
         opt = AnalogSGD(model.parameters(), lr=0.1)
-        opt.regroup_param_groups(model)
 
         epochs = 10
         for _ in range(epochs):
@@ -91,8 +90,8 @@ class ConvolutionLayerTest(ParametrizedTestCase):
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
                 weight_scaling_omega=0.0,
-                learn_out_scaling_alpha=False,
-                weight_scaling_omega_columnwise=False
+                learn_out_scaling=False,
+                weight_scaling_columnwise=False
             ),
             modifier=WeightModifierParameter(
                 type=WeightModifierType.ADD_NORMAL,
@@ -107,12 +106,16 @@ class ConvolutionLayerTest(ParametrizedTestCase):
             x_b = x_b.cuda()
             model = model.cuda()
 
+        opt = AnalogSGD(model.parameters(), lr=0.0)
+        opt.step()
+
         model.eval()
         y_eval1 = model(x_b)
         y_eval2 = model(x_b)
 
         model.train()
         y_train1 = model(x_b)
+        opt.step()
         y_train2 = model(x_b)
 
         self.assertNotAlmostEqualTensor(y_train1, y_train2)
@@ -124,8 +127,8 @@ class ConvolutionLayerTest(ParametrizedTestCase):
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
                 weight_scaling_omega=0.0,
-                learn_out_scaling_alpha=False,
-                weight_scaling_omega_columnwise=False
+                learn_out_scaling=False,
+                weight_scaling_columnwise=False
             ),
             forward=IOParameters(is_perfect=True),
             drift_compensation=GlobalDriftCompensation(),
@@ -249,11 +252,11 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
             if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
-    def test_out_scaling_alpha_learning(self):
-        """Check if out scaling alpha are learning."""
+    def test_out_scaling_learning(self):
+        """Check if out scaling are learning."""
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
-            weight_scaling_omega=0.6,
-            learn_out_scaling_alpha=True))
+            learn_out_scaling=True,
+            out_scaling_columnwise=False))
 
         analog_model = Sequential(
             self.get_layer(in_channels=2, out_channels=2, kernel_size=4,
@@ -270,25 +273,27 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        initial_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        self.assertEqual(initial_out_scaling_0.numel(), 1)
+        self.assertEqual(initial_out_scaling_1.numel(), 1)
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        learned_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
+        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
-    def test_out_scaling_alpha_learning_columnwise(self):
+    def test_out_scaling_learning_columnwise(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
             weight_scaling_omega=0.6,
-            learn_out_scaling_alpha=True,
-            weight_scaling_omega_columnwise=True))
+            learn_out_scaling=True,
+            weight_scaling_columnwise=True))
 
         analog_model = Sequential(
             self.get_layer(in_channels=2, out_channels=2, kernel_size=4,
@@ -305,18 +310,18 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        initial_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        learned_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
+        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_layer_instantiation(self):
         """Test AnalogConv2d layer instantiation."""
@@ -478,11 +483,11 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
             if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
-    def test_out_scaling_alpha_learning(self):
+    def test_out_scaling_learning(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
             weight_scaling_omega=0.6,
-            learn_out_scaling_alpha=True))
+            learn_out_scaling=True))
 
         analog_model = Sequential(
             self.get_layer(in_channels=2, out_channels=2, kernel_size=4,
@@ -499,25 +504,25 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        initial_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        learned_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
+        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
-    def test_out_scaling_alpha_learning_columnwise(self):
+    def test_out_scaling_learning_columnwise(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
             weight_scaling_omega=0.6,
-            learn_out_scaling_alpha=True,
-            weight_scaling_omega_columnwise=True))
+            learn_out_scaling=True,
+            weight_scaling_columnwise=True))
 
         analog_model = Sequential(
             self.get_layer(in_channels=2, out_channels=2, kernel_size=4,
@@ -534,18 +539,18 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        initial_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        learned_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
+        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_layer_instantiation(self):
         """Test AnalogConv2d layer instantiation."""
@@ -669,11 +674,11 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
             if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
-    def test_out_scaling_alpha_learning(self):
+    def test_out_scaling_learning(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
-            weight_scaling_omega=0.6,
-            learn_out_scaling_alpha=True))
+            learn_out_scaling=True,
+            out_scaling_columnwise=False))
 
         analog_model = Sequential(
             self.get_layer(in_channels=2, out_channels=2, kernel_size=4,
@@ -690,28 +695,27 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        initial_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        learned_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
-        self.assertEqual(initial_out_scaling_alpha_0.numel(), 1)
-        self.assertIsNotNone(analog_model[0].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
+        self.assertEqual(initial_out_scaling_0.numel(), 1)
+        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
 
-        self.assertEqual(initial_out_scaling_alpha_1.numel(), 1)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+        self.assertEqual(initial_out_scaling_1.numel(), 1)
+        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
-    def test_out_scaling_alpha_learning_columnwise(self):
+    def test_out_scaling_learning_columnwise(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
-            weight_scaling_omega=0.6,
-            learn_out_scaling_alpha=True,
-            weight_scaling_omega_columnwise=True))
+            learn_out_scaling=True,
+            out_scaling_columnwise=True))
 
         analog_model = Sequential(
             self.get_layer(in_channels=2, out_channels=2, kernel_size=4,
@@ -728,21 +732,21 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        initial_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_alpha_0 = analog_model[0].analog_tile.get_out_scaling_alpha().clone()
-        learned_out_scaling_alpha_1 = analog_model[1].analog_tile.get_out_scaling_alpha().clone()
+        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
 
-        self.assertGreaterEqual(initial_out_scaling_alpha_0.numel(), 1)
-        self.assertIsNotNone(analog_model[0].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_0, learned_out_scaling_alpha_0)
+        self.assertGreaterEqual(initial_out_scaling_0.numel(), 1)
+        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
 
-        self.assertGreaterEqual(initial_out_scaling_alpha_1.numel(), 1)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_out_scaling_alpha().grad)
-        self.assertNotAlmostEqualTensor(initial_out_scaling_alpha_1, learned_out_scaling_alpha_1)
+        self.assertGreaterEqual(initial_out_scaling_1.numel(), 1)
+        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_layer_instantiation(self):
         """Test AnalogConv2d layer instantiation."""

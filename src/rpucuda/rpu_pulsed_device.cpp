@@ -334,7 +334,7 @@ void PulsedRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
 };
 
 template <typename T> int PulsedRPUDevice<T>::getHiddenWeightsCount() const {
-  return getPar().usesPersistentWeight()? 1 : 0;
+  return getPar().usesPersistentWeight() ? 1 : 0;
 }
 
 template <typename T> void PulsedRPUDevice<T>::setHiddenWeights(const std::vector<T> &data) {
@@ -343,8 +343,8 @@ template <typename T> void PulsedRPUDevice<T>::setHiddenWeights(const std::vecto
   if (m == 0) {
     return;
   }
-  if (data.size() != (size_t) this->size_ * m || m != 1) {
-      RPU_FATAL("Size mismatch for hidden weights.");
+  if (data.size() != (size_t)this->size_ * m || m != 1) {
+    RPU_FATAL("Size mismatch for hidden weights.");
   }
   // first this device's hidden weights
   for (int i = 0; i < this->size_; i++) {

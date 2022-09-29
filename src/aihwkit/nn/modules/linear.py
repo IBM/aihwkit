@@ -11,7 +11,6 @@
 # that they have been altered from the originals.
 
 """Analog layers."""
-
 from typing import Optional
 
 from torch import Tensor
@@ -43,18 +42,17 @@ class AnalogLinear(AnalogModuleBase, Linear):
         bias: whether to use a bias row on the analog tile or not.
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and during reading of the weights.
-        weight_scaling_omega: the weight value that the current max
-            weight value will be scaled to. If zero, no weight scaling will
-            be performed.
+        weight_scaling_omega: depreciated, use
+            :class:`aihwkit.simulator.configs.utils.MappingParameter`
+            instead to specify weight scaling
     """
     # pylint: disable=abstract-method
 
-    __constants__ = ['in_features', 'out_features', 'realistic_read_write', 'weight_scaling_omega',
+    __constants__ = ['in_features', 'out_features', 'realistic_read_write',
                      'digital_bias', 'analog_bias', 'use_bias']
     in_features: int
     out_features: int
     realistic_read_write: bool
-    weight_scaling_omega: float
     digital_bias: bool
     analog_bias: bool
     use_bias: bool
@@ -66,7 +64,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
             bias: bool = True,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[float] = None,
+            weight_scaling_omega: Optional[bool] = None
               ):
         # Call super() after tile creation, including ``reset_parameters``.
         Linear.__init__(self, in_features, out_features, bias=bias)
@@ -74,6 +72,8 @@ class AnalogLinear(AnalogModuleBase, Linear):
         # Create tile
         if rpu_config is None:
             rpu_config = SingleRPUConfig()
+
+        rpu_config = self._set_weight_scaling_omega(rpu_config, weight_scaling_omega)
 
         AnalogModuleBase.__init__(
             self,
@@ -89,8 +89,7 @@ class AnalogLinear(AnalogModuleBase, Linear):
         self.register_analog_tile(self.analog_tile)
 
         # Set weights from the reset_parameters call
-        self.set_weights(self.weight, self.bias, remap_weights=True,
-                         weight_scaling_omega=weight_scaling_omega)
+        self.set_weights(self.weight, self.bias)
 
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)

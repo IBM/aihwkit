@@ -55,18 +55,17 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         bias: whether to use a bias row on the analog tile or not
         realistic_read_write: whether to enable realistic read/write
             for setting initial weights and read out of weights
-        weight_scaling_omega: the weight value where the max
-            weight will be scaled to. If zero, no weight scaling will
-            be performed
+        weight_scaling_omega: depreciated, use
+            :class:`aihwkit.simulator.configs.utils.MappingParameter`
+            instead to specify weight scaling
     """
     # pylint: disable=abstract-method, too-many-locals, too-many-instance-attributes
 
-    __constants__ = ['in_features', 'out_features', 'realistic_read_write', 'weight_scaling_omega',
+    __constants__ = ['in_features', 'out_features', 'realistic_read_write',
                      'digital_bias', 'analog_bias', 'use_bias']
     in_features: int
     out_features: int
     realistic_read_write: bool
-    weight_scaling_omega: float
     digital_bias: bool
     analog_bias: bool
     use_bias: bool
@@ -80,7 +79,7 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             bias: bool = True,
             rpu_config: Optional[RPUConfigAlias] = None,
             realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[float] = None,
+            weight_scaling_omega: Optional[bool] = None,
     ):
 
         # Call super() after tile creation, including ``reset_parameters``.
@@ -89,6 +88,8 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         # Create tiles
         if rpu_config is None:
             rpu_config = SingleRPUConfig()
+
+        rpu_config = self._set_weight_scaling_omega(rpu_config, weight_scaling_omega)
 
         AnalogModuleBase.__init__(
             self,
@@ -123,8 +124,7 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             self.analog_tile_array.append(in_tiles)
 
         # Set weights from the reset_parameters
-        self.set_weights(self.weight, self.bias, remap_weights=True,
-                         weight_scaling_omega=weight_scaling_omega)
+        self.set_weights(self.weight, self.bias)
 
         # Unregister weight/bias as a parameter but keep for sync
         self.unregister_parameter('weight')
@@ -154,15 +154,16 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             weight: Tensor,
             bias: Optional[Tensor] = None,
             force_exact: bool = False,
-            remap_weights: bool = True,
-            weight_scaling_omega: float = None
+            apply_weight_scaling: bool = True,
+            weight_scaling_omega: Optional[float] = None
     ) -> None:
         """Set the weight (and bias) with given Tensors.
 
-        This uses an realistic write if the property ``realistic_read_write``
-        of the layer is set, unless it is overwritten by ``force_exact``. It
-        uses a scaled write if ``weight_scaling_omega`` is positive (see
-        :meth:`~aihwkit.simulator.tiles.base.BaseTile.set_weights_scaled`).
+        This uses an realistic read if the property ``realistic_read_write`` of
+        the layer is set, unless it is overwritten by ``force_exact``. It
+        scales the analog weights by the digital alpha scale if
+        ``weight_scaling_omega`` is positive (see
+        :meth:`~aihwkit.simulator.tiles.base.apply_weight_scaling`).
 
         Note:
             This is the recommended way for setting the weight/bias matrix of
@@ -175,22 +176,17 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             weight: weight matrix
             bias: bias vector
             force_exact: forces an exact write to the analog tiles
-            remap_weights: Whether to rescale the given weight matrix
+            apply_weight_scaling: Whether to rescale the given weight matrix
                 and populate the digital output scaling factors as
                 specified in the configuration
                 :class:`~aihwkit.configs.utils.MappingParameter`. A
                 new ``weight_scaling_omega`` can be given. Note that
                 this will overwrite the existing digital out scaling
                 factors.
-
-                Note that each tile (in case of multiple mapped tiles)
-                has it separate out scaling factors.
-
             weight_scaling_omega: The weight scaling omega factor (see
                 :class:`~aihwkit.configs.utils.MappingParameter`). If
                 given explicitly here, it will overwrite the value in
                 the mapping field.
-
         """
         shape = [self.out_features, self.in_features]
         weight = weight.clone().reshape(shape)
@@ -204,20 +200,16 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                 out_end += out_size
 
                 tile_weight = weight[out_start:out_end, in_start:in_end]
-
-                if remap_weights:
-
-                    omega = weight_scaling_omega
-                    if omega is None:
-                        omega = analog_tile.rpu_config.mapping.weight_scaling_omega
-
-                    analog_tile.set_weights_scaled(
+                if realistic:
+                    analog_tile.set_weights_realistic(
                         tile_weight, None,
-                        realistic=realistic,
-                        weight_scaling_omega=omega
-                    )
+                        apply_weight_scaling,
+                        weight_scaling_omega)
                 else:
-                    analog_tile.set_weights(tile_weight, None, realistic=realistic)
+                    analog_tile.set_weights(
+                        tile_weight, None,
+                        apply_weight_scaling,
+                        weight_scaling_omega)
 
                 out_start = out_end
             in_start = in_end
@@ -229,14 +221,14 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         self._sync_weights_from_tile()
 
     def get_weights(self, force_exact: bool = False,
-                    apply_out_scales: bool = True) -> Tuple[Tensor, Optional[Tensor]]:
+                    apply_weight_scaling: bool = True) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the weight (and bias) tensors.
 
         This uses an realistic read if the property ``realistic_read_write`` of
         the layer is set, unless it is overwritten by ``force_exact``. It
         scales the analog weights by the digital alpha scale if
         ``weight_scaling_omega`` is positive (see
-        :meth:`~aihwkit.simulator.tiles.base.BaseTile.get_weights_scaled`).
+        :meth:`~aihwkit.simulator.tiles.base.apply_weight_scaling`).
 
         Note:
             This is the recommended way for setting the weight/bias matrix from
@@ -247,30 +239,29 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
 
         Args:
             force_exact: forces an exact read to the analog tiles
-            apply_out_scales: Whether to return the weights with the
+
+            apply_weight_scaling: Whether to return the weights with the
                 (digital) output scaling factors applied. Note the
                 "logical" weights of the layer which the DNN is
                 effectively using are those with the output scales
-                applied. If ``apply_out_scales`` is set to False, then
+                applied. If ``apply_weight_scaling`` is set to False, then
                 only the weight values that is programmed onto the
                 crossbar array are returned, without applying the
-                digital scales.
+                digital scales. Default is True.
 
         Returns:
             tuple: weight matrix, bias vector
-
         """
-
         realistic = self.realistic_read_write and not force_exact
 
         weight_lst = []
         for in_tiles in self.analog_tile_array:
             in_tile_weight = []
             for analog_tile in in_tiles:
-                if apply_out_scales:
-                    tile_weight, _ = analog_tile.get_weights_scaled(realistic=realistic)
+                if realistic:
+                    tile_weight, _ = analog_tile.get_weights_realistic(apply_weight_scaling)
                 else:
-                    tile_weight, _ = analog_tile.get_weights(realistic=realistic)
+                    tile_weight, _ = analog_tile.get_weights(apply_weight_scaling)
                 in_tile_weight.append(tile_weight)
             weight_lst.append(cat(in_tile_weight, 0))
 
