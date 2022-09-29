@@ -431,7 +431,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
-        alpha_new = new_analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha_new = new_analog_tile.get_scales().detach().cpu()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_save_load_shared_weights(self):
@@ -467,7 +467,7 @@ class SerializationTest(ParametrizedTestCase):
         rpu_config = SingleRPUConfig(mapping=MappingParameter(weight_scaling_omega=0.4))
         model = self.get_layer(rpu_config=rpu_config)
         analog_tile = self.get_analog_tile(model)
-        alpha = analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha = analog_tile.get_scales().detach().cpu()
         self.assertNotEqual(alpha, 1.0)
 
         # Save the model to a file.
@@ -479,7 +479,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
-        alpha_new = new_analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha_new = new_analog_tile.get_scales().detach().cpu()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_remapping(self):
@@ -487,7 +487,7 @@ class SerializationTest(ParametrizedTestCase):
         # Create the device and the array.
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
             weight_scaling_omega=0.4,
-            weight_scaling_omega_columnwise=True))
+            weight_scaling_columnwise=True))
 
         model = self.get_layer(rpu_config=rpu_config)
         analog_tile = self.get_analog_tile(model)
@@ -497,21 +497,21 @@ class SerializationTest(ParametrizedTestCase):
             user_biases = Tensor(model.out_features).uniform_(-0.1, 0.1)
         else:
             user_biases = None
-        model.set_weights(user_weights, user_biases, remap_weights=True,
+        model.set_weights(user_weights, user_biases, apply_weight_scaling=True,
                           force_exact=True)
 
-        alpha_initial = analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha_initial = analog_tile.get_scales().detach().cpu()
         self.assertNotEqual(alpha_initial.max(), 1.0)
 
-        # remap
+        # remap module
         model.remap_weights(weight_scaling_omega=1.0)
 
-        weights, _ = model.get_weights(apply_out_scales=True, force_exact=True)
-        analog_weights, _ = model.get_weights(apply_out_scales=False, force_exact=True)
+        weights, _ = model.get_weights(apply_weight_scaling=True, force_exact=True)
+        analog_weights, _ = model.get_weights(apply_weight_scaling=False, force_exact=True)
 
         assert_array_almost_equal(array(user_weights), array(weights))
 
-        alpha = analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha = analog_tile.get_scales().detach().cpu()
         assert_raises(AssertionError, assert_array_almost_equal, array(alpha), array(alpha_initial))
 
         self.assertEqual(torch_abs(analog_weights).max(), 1.0)

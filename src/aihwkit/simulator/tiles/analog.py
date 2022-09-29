@@ -248,6 +248,8 @@ class AnalogTile(BaseTile):
                 self.is_cuda = True
                 self.device = device
                 self.analog_ctx.cuda(device)
+                if self.mapping_scales is not None:
+                    self.mapping_scales = self.mapping_scales.cuda(device)
                 if self.out_scaling_alpha is not None:
                     self.out_scaling_alpha.data = self.out_scaling_alpha.data.cuda(device)
         return self

@@ -59,6 +59,18 @@ void declare_rpu_tiles(py::module &m) {
       .value("LayerGaussian", RPU::WeightClipType::LayerGaussian)
       .value("AverageChannelMax", RPU::WeightClipType::AverageChannelMax);
 
+  py::class_<RPU::WeightRemapParameter>(m, "WeightRemapParameter")
+      .def(py::init<>())
+      .def_readwrite("remapped_wmax", &RPU::WeightRemapParameter::remapped_wmax)
+      .def_readwrite("max_scale_range", &RPU::WeightRemapParameter::max_scale_range)
+      .def_readwrite("max_scale_ref", &RPU::WeightRemapParameter::max_scale_ref)
+      .def_readwrite("type", &RPU::WeightRemapParameter::type);
+
+  py::enum_<RPU::WeightRemapType>(m, "WeightRemapType")
+      .value("None", RPU::WeightRemapType::None)
+      .value("LayerwiseSymmetric", RPU::WeightRemapType::LayerwiseSymmetric)
+      .value("ChannelwiseSymmetric", RPU::WeightRemapType::ChannelwiseSymmetric);
+
   py::class_<Class>(
       m, "FloatingPointTile",
       R"pbdoc(
@@ -132,12 +144,11 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "get_weights",
           [](Class &self) {
-            // Build the buffer.
-            py::array_t<T> weights = py::array_t<T>({self.getDSize(), self.getXSize()});
-            py::buffer_info weights_buffer = weights.request();
+            torch::Tensor weights = torch::empty({self.getDSize(), self.getXSize()});
 
             // Call RPU function.
-            self.getWeights((T *)weights_buffer.ptr);
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.getWeights(weights.data_ptr<T>());
             return weights;
           },
           R"pbdoc(
@@ -149,25 +160,25 @@ void declare_rpu_tiles(py::module &m) {
                This is **not** hardware realistic, and is used for debug purposes only.
 
            Returns:
-               ndarray: the ``[d_size, x_size]`` weight matrix.
+               tensor: the ``[d_size, x_size]`` weight matrix.
            )pbdoc")
 
       .def(
           "set_weights",
-          [](Class &self, py::array_t<T> weights) {
+          [](Class &self, torch::Tensor &weights) {
             // Validate the weights dimensions.
-            if (weights.ndim() != 2 || weights.shape(0) != self.getDSize() ||
-                weights.shape(1) != self.getXSize()) {
+            if (weights.dim() != 2 || weights.size(0) != self.getDSize() ||
+                weights.size(1) != self.getXSize()) {
               throw std::runtime_error(
                   "Invalid weights dimensions: expected [" + std::to_string(self.getDSize()) + "," +
-                  std::to_string(self.getXSize()) + "] array");
+                  std::to_string(self.getXSize()) + "] tensor");
             }
-
-            // Build the buffer.
-            py::buffer_info weights_buffer = weights.request();
+            auto cpu_weights = weights.detach().cpu().contiguous();
+            CHECK_CONTIGUOUS(cpu_weights);
 
             // Call RPU function.
-            return self.setWeights((T *)weights_buffer.ptr);
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            return self.setWeights(cpu_weights.data_ptr<T>());
           },
           py::arg("weights"),
           R"pbdoc(
@@ -185,12 +196,11 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "get_weights_realistic",
           [](Class &self) {
-            // Build the buffer.
-            py::array_t<T> weights = py::array_t<T>({self.getDSize(), self.getXSize()});
-            py::buffer_info weights_buffer = weights.request();
+            torch::Tensor weights = torch::empty({self.getDSize(), self.getXSize()});
 
             // Call RPU function.
-            self.getWeightsReal((T *)weights_buffer.ptr);
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.getWeightsReal(weights.data_ptr<T>());
             return weights;
           },
           R"pbdoc(
@@ -200,25 +210,26 @@ void declare_rpu_tiles(py::module &m) {
            version of reading out the weights.
 
            Returns:
-               ndarray: the ``[d_size, x_size]`` weight matrix.
+               tensor: the ``[d_size, x_size]`` weight matrix.
            )pbdoc")
 
       .def(
           "set_weights_realistic",
-          [](Class &self, py::array_t<T> weights, int n_loops = 10) {
+          [](Class &self, torch::Tensor weights, int n_loops = 10) {
             // Validate the weights dimensions.
-            if (weights.ndim() != 2 || weights.shape(0) != self.getDSize() ||
-                weights.shape(1) != self.getXSize()) {
+            if (weights.dim() != 2 || weights.size(0) != self.getDSize() ||
+                weights.size(1) != self.getXSize()) {
               throw std::runtime_error(
                   "Invalid weights dimensions: expected [" + std::to_string(self.getDSize()) + "," +
-                  std::to_string(self.getXSize()) + "] array");
+                  std::to_string(self.getXSize()) + "] tensor");
             }
 
-            // Build the buffer.
-            py::buffer_info weights_buffer = weights.request();
+            auto cpu_weights = weights.detach().cpu().contiguous();
+            CHECK_CONTIGUOUS(cpu_weights);
 
             // Call RPU function.
-            return self.setWeightsReal((T *)weights_buffer.ptr, n_loops);
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            return self.setWeightsReal(cpu_weights.data_ptr<T>(), n_loops);
           },
           py::arg("weights"), py::arg("n_loops") = 10,
           R"pbdoc(
@@ -235,28 +246,29 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "set_shared_weights",
-          [](Class &self, torch::Tensor weights) {
+          [](Class &self, torch::Tensor &weights) {
             CHECK_TORCH_INPUT(weights);
             if (weights.dim() != 2 || weights.size(0) != self.getDSize() ||
                 weights.size(1) != self.getXSize()) {
               throw std::runtime_error(
                   "Invalid weights dimensions: expected [" + std::to_string(self.getDSize()) + "," +
-                  std::to_string(self.getXSize()) + "] array");
+                  std::to_string(self.getXSize()) + "] tensor");
             }
+            CHECK_CONTIGUOUS(weights);
             std::lock_guard<std::mutex> lock(self.mutex_);
             return self.setSharedWeights(weights.data_ptr<T>());
           },
           py::arg("weights"))
       .def(
           "set_delta_weights",
-          [](Class &self, torch::Tensor delta_weights) {
+          [](Class &self, torch::Tensor &delta_weights) {
             CHECK_TORCH_INPUT(delta_weights);
 
             if (delta_weights.dim() != 2 || delta_weights.size(0) != self.getDSize() ||
                 delta_weights.size(1) != self.getXSize()) {
               throw std::runtime_error(
                   "Invalid delta weights dimensions: expected [" + std::to_string(self.getDSize()) +
-                  "," + std::to_string(self.getXSize()) + "] array");
+                  "," + std::to_string(self.getXSize()) + "] tensor");
             }
             std::lock_guard<std::mutex> lock(self.mutex_);
             return self.setDeltaWeights(delta_weights.data_ptr<T>());
@@ -347,6 +359,33 @@ void declare_rpu_tiles(py::module &m) {
                weight_clipper_params: parameters of the clipping.
            )pbdoc")
       .def(
+          "remap_weights",
+          [](Class &self, ::RPU::WeightRemapParameter &wrmpar, torch::Tensor scales) {
+            CHECK_TORCH_INPUT(scales);
+            if ((scales.numel() != self.getDSize()) || scales.dim() != 1) {
+              throw std::runtime_error(
+                  "Invalid scales dimensions: expected [" + std::to_string(self.getDSize()) +
+                  "] tensor");
+            }
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.remapWeights(wrmpar, scales.data_ptr<T>());
+            return scales;
+          },
+          py::arg("weight_remap_params"), py::arg("scales"),
+          R"pbdoc(
+           Remaps the weights for use of hardware-aware training.
+
+           Several remap types are available, see ``WeightRemapParameter``.
+
+           Args:
+               weight_remap_params: parameters of the remapping.
+               scales: scales that will be used and updated during remapping
+
+           Returns:
+               torch::tensor: ``[d_size]`` of scales
+
+           )pbdoc")
+      .def(
           "modify_weights",
           [](Class &self, ::RPU::WeightModifierParameter &wmpar) {
             std::lock_guard<std::mutex> lock(self.mutex_);
@@ -403,7 +442,7 @@ void declare_rpu_tiles(py::module &m) {
 
             if (x_input.dim() < 1) {
               throw std::runtime_error(
-                  "Invalid x_input dimensions: expected at least 1 dimensional array");
+                  "Invalid x_input dimensions: expected at least 1 dimensional tensor");
             }
             int in_size = x_trans ? x_input.size(0) : x_input.size(-1);
             int expected_in_size = self.getXSize() - (bias ? 1 : 0);
@@ -415,7 +454,7 @@ void declare_rpu_tiles(py::module &m) {
               std::string shape_str = x_trans ? ("[*, " + std::to_string(expected_in_size) + "]")
                                               : ("[" + std::to_string(expected_in_size) + ",*]");
               throw std::runtime_error(
-                  "Invalid x_input dimensions: expected " + shape_str + " array");
+                  "Invalid x_input dimensions: expected " + shape_str + " tensor");
             }
 
             // Build the buffers.
@@ -472,7 +511,7 @@ void declare_rpu_tiles(py::module &m) {
 
             if (d_input.dim() < 1) {
               throw std::runtime_error(
-                  "Invalid d_input dimensions: expected at least 1 dimensional array");
+                  "Invalid d_input dimensions: expected at least 1 dimensional tensor");
             }
             int in_size = d_trans ? d_input.size(0) : d_input.size(-1);
             int expected_in_size = self.getDSize();
@@ -484,7 +523,7 @@ void declare_rpu_tiles(py::module &m) {
               std::string shape_str = d_trans ? ("[*, " + std::to_string(expected_in_size) + "]")
                                               : ("[" + std::to_string(expected_in_size) + ", *]");
               throw std::runtime_error(
-                  "Invalid d_input dimensions: expected " + shape_str + " array");
+                  "Invalid d_input dimensions: expected " + shape_str + " tensor");
             }
 
             // Build the buffers.
@@ -540,7 +579,7 @@ void declare_rpu_tiles(py::module &m) {
 
             if ((x_input.dim() < 1) || (d_input.dim() < 1)) {
               throw std::runtime_error(
-                  "Invalid x_input/d_input dimensions: expected at least 1 dimensional array");
+                  "Invalid x_input/d_input dimensions: expected at least 1 dimensional tensor");
             }
 
             int in_size = x_trans ? x_input.size(0) : x_input.size(-1);
@@ -556,14 +595,14 @@ void declare_rpu_tiles(py::module &m) {
               std::string shape_str = x_trans ? ("[*, " + std::to_string(expected_in_size) + "]")
                                               : ("[" + std::to_string(expected_in_size) + ", *]");
               throw std::runtime_error(
-                  "Invalid x_input dimensions: expected " + shape_str + " array");
+                  "Invalid x_input dimensions: expected " + shape_str + " tensor");
             }
             // Validate the d_input dimensions.
             if (out_size != expected_out_size) {
               std::string shape_str = d_trans ? ("[*, " + std::to_string(expected_out_size) + "]")
                                               : ("[" + std::to_string(expected_out_size) + ", *]");
               throw std::runtime_error(
-                  "Invalid d_input dimensions: expected " + shape_str + " array");
+                  "Invalid d_input dimensions: expected " + shape_str + " tensor");
             }
 
             if (m_batch != m_batch_from_d) {
@@ -769,7 +808,7 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "set_hidden_parameters",
           [](Class &self, const torch::Tensor &hidden_parameters_) {
-            auto hidden_parameters = hidden_parameters_.contiguous();
+            auto hidden_parameters = hidden_parameters_.detach().contiguous().cpu();
             CHECK_TORCH_INPUT(hidden_parameters);
 
             std::vector<std::string> v;

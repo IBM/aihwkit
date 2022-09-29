@@ -84,8 +84,9 @@ class WebComposerMappingParameter(MappingParameter):
     digital_bias: bool = True
 
     weight_scaling_omega: float = 1.0
-    weight_scaling_omega_columnwise: bool = True
-    learn_out_scaling_alpha: bool = True
+    weight_scaling_columnwise: bool = True
+    learn_out_scaling: bool = True
+    out_scaling_columnwise: bool = True
 
     max_input_size: int = 512
     max_output_size: int = 512
@@ -126,8 +127,9 @@ class OldWebComposerMappingParameter(WebComposerMappingParameter):
     digital_bias: bool = False
 
     weight_scaling_omega: float = 1.0
-    weight_scaling_omega_columnwise: bool = True
-    learn_out_scaling_alpha: bool = False
+    weight_scaling_columnwise: bool = True
+    learn_out_scaling: bool = False
+    out_scaling_columnwise: bool = False
 
 
 @dataclass

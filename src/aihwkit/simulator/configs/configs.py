@@ -24,7 +24,7 @@ from aihwkit.simulator.configs.helpers import (
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, PulseType, UpdateParameters, WeightClipParameter,
-    WeightModifierParameter, MappingParameter
+    WeightModifierParameter, WeightRemapParameter, MappingParameter
 )
 from aihwkit.inference import (
     BaseDriftCompensation, BaseNoiseModel, GlobalDriftCompensation,
@@ -139,20 +139,68 @@ class InferenceRPUConfig(MapableRPU, _PrintableMixin):
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
     forward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the forward direction."""
+    """Input-output parameter setting for the forward direction.
+
+    This parameters govern the hardware definitions specifying analog
+    MVM non-idealities.
+
+    Note:
+
+        This forward pass is applied equally in training and
+        inference. In addition, materials effects such as drift and
+        programming noise can be enabled during inference by
+        specifying the ``noise_model``
+
+    """
 
     noise_model: BaseNoiseModel = field(default_factory=PCMLikeNoiseModel)
-    """Statistical noise model to be used during (realistic) inference."""
+    """Statistical noise model to be used during (realistic) inference.
+
+    This noise models establishes a phenomenological model of the
+    material which is applied to the weights during inference only, when
+    ``program_analog_weights`` or ``drift_analog_weights`` is called.
+
+    """
 
     drift_compensation: Optional[BaseDriftCompensation] = field(
         default_factory=GlobalDriftCompensation)
     """For compensating the drift during inference only."""
 
     clip: WeightClipParameter = field(default_factory=WeightClipParameter)
-    """Parameter for weight clip."""
+    """Parameter for weight clip.
+
+    If a clipping type is set, the weights are clipped according to
+    the type specified.
+
+    Caution:
+
+        The clipping type is set to ``None`` by default, setting
+        parameters of the clipping will not be taken into account, if
+        the clipping type is not specified.
+    """
+
+    remap: WeightRemapParameter = field(default_factory=WeightRemapParameter)
+    """Parameter for remapping.
+
+    Remapping can be enabled by specifying a remap ``type``. If
+    enabled, it ensures that the weights are mapped maximally into the
+    conductance units during training. It will be called after each mini-batch.
+    """
 
     modifier: WeightModifierParameter = field(default_factory=WeightModifierParameter)
-    """Parameter for weight modifier."""
+
+    """Parameter for weight modifier.
+
+    If a modifier type is set, it is called once per mini-match in the
+    ``post_update_step`` and modifies the weight in forward and
+    backward direction for the next mini-batch during training, but
+    updates hidden reference weights. In eval mode, the reference
+    weights are used instead for forward.
+
+    The modifier is used to do hardware-aware training, so that the
+    model becomes more noise robust during inference (e.g. when the
+    ``noise_model`` is employed).
+    """
 
     # The following fields are not included in `__init__`, and should be
     # treated as read-only.

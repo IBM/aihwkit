@@ -22,7 +22,7 @@ INSTALL_REQUIRES = [
     'torchvision',
     'scipy',
     'requests>=2.25,<3',
-    'numpy>=1.18',
+    'numpy>=1.19',
     'protobuf>=3.13.0,<4',
 ]
 
