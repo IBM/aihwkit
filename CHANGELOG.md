@@ -72,7 +72,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Renamed `learn_out_scaling_alpha` parameter in `MappingParameter` to
   `learn_out_scaling` and columnwise learning has a separate switch
   `out_scaling_columnwise`. (\#423)
-* Input `weight_scaling_omega` argument to layers deprecated. (\#423)
+
+### Deprecated
+
+* Input `weight_scaling_omega` argument to layers is deprecated. (\#423)
 
 
 ## [0.6.0] - 2022/05/16
