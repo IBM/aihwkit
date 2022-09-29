@@ -28,6 +28,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Specific use-defined function for layer-wise setting for RPUConfigs
   in conversions. (\#412)
 * Added stochastic rounding options for ``MixedPrecisionCompound``. (\#418)
+* New `remap` parameter field and functionality in
+  ``InferenceRPUConfig`` (\#423).
+* Tile-level weight getter and setter have `apply_weight_scaling`
+  argument (\#423)
+* Pre- and post update / backward / forward methods in `BaseTile` for
+  easier user-defined modification of pre and/or post-processings of a tile. (\#423)
 
 ### Fixed
 
@@ -45,6 +51,10 @@ The format is based on [Keep a Changelog], and this project adheres to
   indexed covolutions (that are efficient only for GPUs). (\#415)
 * Fix issue that write noise hidden weights are not transferred to
   pytorch when using ``get_hidden_parameters`` in case of CUDA. (\#417)
+* Learning rate scaling due to output scales. (\#423)
+* `WeightModifiers` of the `InferenceRPUConfig` are no longer called
+  in the forward pass, but instead in the `post_update_step`
+  method to avoid issues with repeated forward calls. (\#423)
 
 ### Changed
 
@@ -53,6 +63,17 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Concatenate the gradients before applying to the tile update
   function (some speedup for CUDA expected). (\#390)
 * Drift compensation uses eye instead of ones for readout. (\#412)
+* `weight_scaling_omega_columnwise` parameter in `MappingParameter` is now called
+  `weight_scaling_columnwise`. (\#423)
+* Tile-level weight getter and setter now use Tensors instead of numpy
+  arrays (\#423)
+* Output scaling and mapping scales are now distiniguished, only the
+  former is learnable. (\#423)
+* Renamed `learn_out_scaling_alpha` parameter in `MappingParameter` to
+  `learn_out_scaling` and columnwise learning has a separate switch
+  `out_scaling_columnwise`. (\#423)
+* Input `weight_scaling_omega` argument to layers deprecated. (\#423)
+
 
 ## [0.6.0] - 2022/05/16
 
