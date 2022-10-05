@@ -649,7 +649,7 @@ class SerializationTest(ParametrizedTestCase):
         new_analog_tile = self.get_analog_tile(new_model)
         if new_analog_tile.__class__.__name__ != analog_tile.__class__.__name__:
             with self.assertRaises(TileError):
-                self.assertRaises(new_model.load_state_dict(state_dict))
+                new_model.load_state_dict(state_dict)
 
     def test_load_state_load_rpu_config(self):
         """Test creating a new model using a state dict, while using a different RPU config."""
