@@ -11,7 +11,10 @@
 # that they have been altered from the originals.
 
 """Tests for the high level simulator devices functionality."""
+from sys import version_info
+from unittest import SkipTest
 
+from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.configs.utils import (
     IOParameters, UpdateParameters
 )
@@ -96,6 +99,17 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         device_params = rpu_config.device.as_bindings()
 
         _ = tile_params.create_array(10, 20, device_params)
+
+    def test_type_error(self):
+        """Test wrong mappings to bindings."""
+        if not (version_info[0] >= 3 and version_info[1] > 7):
+            raise SkipTest("Only supported for python > 3.7")
+
+        rpu_config = self.get_rpu_config()
+        rpu_config.forward.out_bound = True
+
+        with self.assertRaises(ConfigError):
+            rpu_config.as_bindings()
 
     def test_config_device_parameters(self):
         """Test modifying the device parameters."""

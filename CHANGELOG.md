@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog], and this project adheres to
   argument (\#423)
 * Pre- and post update / backward / forward methods in `BaseTile` for
   easier user-defined modification of pre and/or post-processings of a tile. (\#423)
+* Type-checking for `RPUConfig` fields. (\#424)
 
 ### Fixed
 
