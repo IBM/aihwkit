@@ -56,6 +56,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `WeightModifiers` of the `InferenceRPUConfig` are no longer called
   in the forward pass, but instead in the `post_update_step`
   method to avoid issues with repeated forward calls. (\#423)
+* Fix training `learn_out_scales` issue after checkpoint load. (\#434)
 
 ### Changed
 
@@ -81,7 +82,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Removed
 
 * The `_scaled` versions of the weight getter and setter methods are
-removed (\#423) 
+removed (\#423)
 
 
 ## [0.6.0] - 2022/05/16
