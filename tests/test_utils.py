@@ -43,13 +43,13 @@ from .helpers.layers import (
     LinearMappedCuda, Conv2dMapped, Conv2dMappedCuda
 )
 from .helpers.testcases import ParametrizedTestCase, SKIP_CUDA_TESTS
-from .helpers.tiles import FloatingPoint, ConstantStep, Inference
+from .helpers.tiles import FloatingPoint, ConstantStep, Inference, InferenceLearnOutScaling
 
 
 @parametrize_over_layers(
     layers=[Linear, Conv2d, LinearMapped, LinearCuda, LinearMappedCuda,
             Conv2dCuda, Conv2dMapped, Conv2dMappedCuda],
-    tiles=[FloatingPoint, ConstantStep, Inference],
+    tiles=[FloatingPoint, ConstantStep, Inference, InferenceLearnOutScaling],
     biases=['analog', 'digital', None],
 )
 class SerializationTest(ParametrizedTestCase):
@@ -59,14 +59,13 @@ class SerializationTest(ParametrizedTestCase):
     def train_model(model, loss_func, x_b, y_b):
         """Train the model."""
         opt = AnalogSGD(model.parameters(), lr=0.5)
-        opt.regroup_param_groups(model)
-
+        # opt.regroup_param_groups(model)
         epochs = 3
         for _ in range(epochs):
             opt.zero_grad()
             pred = model(x_b)
-            loss = loss_func(pred, y_b)
 
+            loss = loss_func(pred, y_b)
             loss.backward()
             opt.step()
         return loss
@@ -90,16 +89,12 @@ class SerializationTest(ParametrizedTestCase):
         else:
             bias = None
 
-        analog_weight, analog_bias = model.analog_tile.get_weights()
-        analog_weight = analog_weight.detach().cpu().numpy().reshape(weight.shape)
-        if model.analog_bias:
+        analog_weight, analog_bias = model.get_weights()
+        analog_weight = analog_weight.detach().cpu().numpy()
+        if analog_bias is not None:
             analog_bias = analog_bias.detach().cpu().numpy()
-        elif model.digital_bias:
-            analog_bias = model.bias.detach().cpu().numpy()
-        else:
-            analog_bias = None
 
-        return weight, bias, analog_weight, analog_bias, model.digital_bias
+        return weight, bias, analog_weight.reshape(weight.shape), analog_bias, True
 
     @staticmethod
     def get_analog_tile(model):
@@ -194,6 +189,7 @@ class SerializationTest(ParametrizedTestCase):
             assert_array_almost_equal(tile_biases, new_tile_biases)
 
         new_loss = self.train_model(new_model, loss_func, input_x, input_y)
+
         loss = self.train_model(model, loss_func, input_x, input_y)
         if self.tile_class != ConstantStep:
             self.assertTensorAlmostEqual(loss, new_loss)

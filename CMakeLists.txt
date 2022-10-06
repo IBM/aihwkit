@@ -13,13 +13,13 @@ project(aihwkit C CXX)
 
 # Project options.
 option(BUILD_TEST "Build C++ test binaries" OFF)
-option(USE_CUDA "Build with CUDA support" OFF)
+option(USE_CUDA "Build with CUDA support" $ENV{USE_CUDA})
 option(RPU_DEBUG "Enable debug printing" OFF)
 option(RPU_USE_FASTMOD "Use fast mod" ON)
 option(RPU_USE_FASTRAND "Use fastrand" OFF)
 
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
-set(RPU_CUDA_ARCHITECTURES "60" CACHE STRING "Target CUDA architectures")
+set(RPU_CUDA_ARCHITECTURES "60;70;75;80" CACHE STRING "Target CUDA architectures")
 
 # Internal variables.
 set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON

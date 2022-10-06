@@ -12,6 +12,9 @@ src/aihwkit/simulator/*.so
 # Temporary folder for the example downloads.
 data/
 
+# Folder for cibuildwheel.
+wheelhouse/
+
 ## From https://github.com/github/gitignore/blob/master/Python.gitignore
 
 # Byte-compiled / optimized / DLL files
