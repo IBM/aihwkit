@@ -86,7 +86,7 @@ class WebComposerMappingParameter(MappingParameter):
     weight_scaling_omega: float = 1.0
     weight_scaling_columnwise: bool = True
     learn_out_scaling: bool = True
-    out_scaling_columnwise: bool = True
+    out_scaling_columnwise: bool = False
 
     max_input_size: int = 512
     max_output_size: int = 512

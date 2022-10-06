@@ -68,11 +68,11 @@ class BasicInferencingConverter:
         """Convert a protobuf representation to an `Experiment`."""
 
         dataset = InverseMappings.datasets[protobuf.dataset.dataset_id]
-
+        layers = protobuf.network.layers
         # build RPUconfig_info to be used when it is instantiated dynamically
         alog_info = AnalogInfo(protobuf.inferencing.analog_info)
         nm_info = NoiseModelInfo(protobuf.inferencing.noise_model_info)
-        rc_info = RPUconfigInfo(nm_info, alog_info)
+        rc_info = RPUconfigInfo(nm_info, alog_info, layers)
 
         model = self._model_from_proto(protobuf.network, rc_info)
 
@@ -104,8 +104,8 @@ class BasicInferencingConverter:
 
     @staticmethod
     def _dataset_to_proto(dataset: type, batch_size: int) -> Any:
-        if dataset not in Mappings.datasets.keys():
-            raise ConversionError('Unsupported dataset: {}'.format(dataset))
+        if dataset not in Mappings.datasets:
+            raise ConversionError(f'Unsupported dataset: {dataset}')
 
         return Dataset(
             dataset_id=Mappings.datasets[dataset],
@@ -121,7 +121,8 @@ class BasicInferencingConverter:
         children_types = {type(layer) for layer in model.children()}
         valid_types = set(Mappings.layers.keys()) | set(Mappings.activation_functions.keys())
         if children_types - valid_types:
-            raise ConversionError('Unsupported layers: {}'.format(children_types - valid_types))
+            raise ConversionError('Unsupported layers: '
+                                  f'{children_types - valid_types}')
 
         # Create a new input_file pb Network object with weight_template_id
         network = Network(weight_template_id=weight_template_id)
@@ -189,7 +190,7 @@ class BasicInferencingConverter:
         nm_info = NoiseModelInfo(BasicInferencingConverter._noise_model_to_proto(
             noise_model_info))  # type: ignore[name-defined]
         a_info = AnalogInfo(AnalogProto(**analog_info))
-        return RPUconfigInfo(nm_info, a_info)
+        return RPUconfigInfo(nm_info, a_info, None)
 
     @staticmethod
     def rpu_config_from_info(analog_info: Dict,
@@ -200,7 +201,8 @@ class BasicInferencingConverter:
         nm_info = NoiseModelInfo(BasicInferencingConverter._noise_model_to_proto(
             noise_model_info))  # type: ignore[name-defined]
         a_info = AnalogInfo(AnalogProto(**analog_info))
-        return RPUconfigInfo(nm_info, a_info).create_inference_rpu_config(func_id)
+        return RPUconfigInfo(nm_info,
+                             a_info, None).create_inference_rpu_config(func_id)
 
     @staticmethod
     def _inferencing_to_proto(

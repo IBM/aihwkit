@@ -51,6 +51,7 @@ class AnalogTileStateNames:  # pylint: disable=too-few-public-methods
     SHARED_WEIGHTS = 'shared_weights'
     CONTEXT = 'analog_ctx'
     OUT_SCALING = 'out_scaling_alpha'
+    MAPPING_SCALES = 'mapping_scales'
     RPU_CONFIG = 'rpu_config'
 
 
@@ -191,7 +192,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Raises:
             TileError: if tile class does not match or hidden parameters do not match
         """
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals, too-many-statements, too-many-branches
 
         # Note: self here is NOT initialized! So we need to recreate
         # attributes that were not saved in getstate
@@ -199,6 +200,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         current_dict = state.copy()
         current_dict.pop('image_sizes', None)  # should not be saved
         weights = current_dict.pop(SN.WEIGHTS)
+
         hidden_parameters = current_dict.pop(SN.HIDDEN_PARAMETERS)
         hidden_parameters_names = current_dict.pop(SN.HIDDEN_PARAMETER_NAMES, [])
         alpha_scale = current_dict.pop('analog_alpha_scale', None)  # legacy
@@ -207,6 +209,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         analog_ctx = current_dict.pop(SN.CONTEXT)
         shared_weights = current_dict.pop(SN.SHARED_WEIGHTS)
         shared_weights_if = shared_weights is not None
+
+        mapping_scales = current_dict.pop(SN.MAPPING_SCALES, None)
+        learned_out_scales = current_dict.pop(SN.OUT_SCALING, None)
 
         current_dict.pop('noise_model', None)  # legacy
         current_dict.pop('drift_compensation', None)  # legacy
@@ -236,10 +241,13 @@ class BaseTile(Generic[RPUConfigGeneric]):
             # Check whether names match
             raise TileError('Mismatch with loaded analog state: '
                             'Hidden parameter structure is unexpected.')
+        if not isinstance(weights, Tensor):
+            weights = from_numpy(array(weights))
+        self.tile.set_weights(weights)
+
         if not isinstance(hidden_parameters, Tensor):
             hidden_parameters = from_numpy(array(hidden_parameters))
         self.tile.set_hidden_parameters(hidden_parameters)
-        self.tile.set_weights(weights)
 
         self.tile.set_learning_rate(analog_lr)
 
@@ -261,6 +269,32 @@ class BaseTile(Generic[RPUConfigGeneric]):
             self.analog_ctx = AnalogContext(self, parameter=analog_ctx)
         self.analog_ctx.reset(self)
         self.analog_ctx.set_data(analog_ctx.data)
+
+        # set scales
+        self.out_scaling_alpha = None
+        self.mapping_scales = None
+        self.init_mapping_scales()
+        self.init_learned_out_scales()
+
+        if self.out_scaling_alpha is None and learned_out_scales is not None:
+            if mapping_scales is None:
+                mapping_scales = 1.0
+            x = learned_out_scales.view(learned_out_scales.numel()).clone()
+            mapping_scales = mapping_scales * x
+            learned_out_scales = None
+
+        self.set_mapping_scales(mapping_scales)
+        self.set_learned_out_scales(learned_out_scales)
+
+        if alpha_scale is not None:
+            # legacy. We apply the alpha scale instaed of the
+            # out_scaling_alpha when loading. The alpha_scale
+            # mechansim is now replaced with the out scaling factors
+            #
+            # Caution: will overwrite the loaded out_scaling_alphas
+            # if they would exist also (should not be for old checkpoints)
+
+            self.set_mapping_scales(alpha_scale)
 
         if to_device.type.startswith('cuda'):
             self.cuda(to_device)
@@ -592,7 +626,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return self.mapping_scales
 
     @no_grad()
-    def set_mapping_scales(self, mapping_scales: Optional[Tensor]) -> Tensor:
+    def set_mapping_scales(self, mapping_scales: Optional[Union[Tensor, float]]) -> None:
         """Set the scales used for the weight mapping.
 
         Args:
@@ -606,11 +640,20 @@ class BaseTile(Generic[RPUConfigGeneric]):
             self.mapping_scales = None
             return
 
-        if isinstance(self.mapping_scales, Tensor) and len(mapping_scales) == 1:
+        if isinstance(mapping_scales, float):
+            if self.mapping_scales is None:
+                self.mapping_scales = ones((1, ),
+                                           dtype=float32,
+                                           device=self.device,
+                                           requires_grad=False)
             self.mapping_scales[:] = mapping_scales
             return
 
-        self.mapping_scales = mapping_scales.flatten()
+        if isinstance(self.mapping_scales, Tensor) and len(mapping_scales) == 1:
+            self.mapping_scales[:] = mapping_scales.to(self.device)
+            return
+
+        self.mapping_scales = mapping_scales.flatten().to(self.device)
 
     @no_grad()
     def init_mapping_scales(self) -> None:
@@ -690,13 +733,15 @@ class BaseTile(Generic[RPUConfigGeneric]):
         mapping = self.rpu_config.mapping  # type: ignore
         if mapping.learn_out_scaling:
             if mapping.out_scaling_columnwise:
-                self.out_scaling_alpha = Parameter(ones((self.out_size, ),
-                                                        dtype=float32,
-                                                        device=self.device))
+                self.out_scaling_alpha = ones((self.out_size, ),
+                                              dtype=float32,
+                                              device=self.device,
+                                              requires_grad=True)
             else:
-                self.out_scaling_alpha = Parameter(ones((1, ),
-                                                        dtype=float32,
-                                                        device=self.device))
+                self.out_scaling_alpha = ones((1, ),
+                                              dtype=float32,
+                                              device=self.device,
+                                              requires_grad=True)
 
     @no_grad()
     def set_learned_out_scales(self, alpha: Union[Tensor, float]) -> None:
@@ -739,7 +784,6 @@ class BaseTile(Generic[RPUConfigGeneric]):
             if tensor_view is None:
                 tensor_view = self._get_tensor_view(values.dim(),
                                                     0 if self.out_trans else values.dim() - 1)
-
             return values * self.out_scaling_alpha.view(*tensor_view)
         return values
 

@@ -24,11 +24,13 @@ from torchvision.datasets import FashionMNIST, SVHN  # type: ignore[import]
 
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.presets.web import (
-    WebComposerInferenceRPUConfig, OldWebComposerInferenceRPUConfig
-)
+    WebComposerInferenceRPUConfig, OldWebComposerInferenceRPUConfig)
 from aihwkit.cloud.converter.definitions.i_onnx_common_pb2 import AttributeProto
 from aihwkit.cloud.converter.exceptions import ConversionError
-from aihwkit.nn import AnalogConv2d, AnalogLinear
+from aihwkit.nn import (
+    AnalogConv2d, AnalogConv2dMapped,
+    AnalogLinear, AnalogLinearMapped
+)
 from aihwkit.optim import AnalogSGD
 from aihwkit.cloud.converter.v1.rpu_config_info import RPUconfigInfo
 
@@ -139,10 +141,13 @@ class LayerFunction(Function):
         if field == 'bias':
             return getattr(source, 'bias', None) is not None
         if field == 'rpu_config':
-            preset_cls = type(source.analog_tile.rpu_config)
+            # preset_cls = type(source.analog_tile.rpu_config)
+            analog_tile = next(source.analog_tiles())
+            preset_cls = type(analog_tile.rpu_config)
             if preset_cls not in Mappings.presets:
-                raise ConversionError('Invalid rpu_config in layer: {} not '
-                                      'among the presets'.format(preset_cls))
+                raise ConversionError('Invalid rpu_config in layer: '
+                                      f'{preset_cls} not '
+                                      'among the presets')
             return Mappings.presets[preset_cls]
         return super().get_field_value_to_proto(source, field, default)
 
@@ -182,7 +187,23 @@ class Mappings:
             'bias': bool,
             'rpu_config': str,
         }),
+        AnalogConv2dMapped: LayerFunction('AnalogConv2dMapped', {
+            'in_channels': int,
+            'out_channels': int,
+            'kernel_size': [int],
+            'stride': [int],
+            'padding': [int],
+            'dilation': [int],
+            'bias': bool,
+            'rpu_config': str,
+        }),
         AnalogLinear: LayerFunction('AnalogLinear', {
+            'in_features': int,
+            'out_features': int,
+            'bias': bool,
+            'rpu_config': str,
+        }),
+        AnalogLinearMapped: LayerFunction('AnalogLinearMapped', {
             'in_features': int,
             'out_features': int,
             'bias': bool,

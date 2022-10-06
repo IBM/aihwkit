@@ -185,7 +185,7 @@ class BasicInferencing(Experiment):
                 if weight_template_id.startswith('http'):
                     template_url = weight_template_id
                 else:
-                    print('weights_template_id: ', weight_template_id)
+                    # print('weights_template_id: ', weight_template_id)
                     template_path = template_dir + "/" + weight_template_id + ".pth"
                     template_url = WEIGHT_TEMPLATE_URL + weight_template_id + ".pth"
                 # check if the file exists
@@ -194,7 +194,7 @@ class BasicInferencing(Experiment):
                 if not path.exists(template_path):
                     download(template_url, template_path)
 
-            print('template_path: ', template_path)
+            # print('template_path: ', template_path)
             if path.exists(template_path):
                 model.load_state_dict(load(template_path, map_location=device),
                                       load_rpu_config=False)
@@ -203,7 +203,7 @@ class BasicInferencing(Experiment):
 
             if self.remap_weights:
                 for module in model.analog_modules():
-                    module.remap_weights()
+                    module.remap_weights(1.0)
 
         return model.to(device)
 

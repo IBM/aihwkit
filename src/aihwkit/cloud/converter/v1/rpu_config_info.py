@@ -11,20 +11,28 @@
 # that they have been altered from the originals.
 
 """Creates InferenceRPUConfig to add to nn model"""
-
+from typing import Dict, Any
 from collections import OrderedDict
 
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
-from aihwkit.simulator.presets.web import OldWebComposerInferenceRPUConfig
+from aihwkit.simulator.presets.web import (
+    WebComposerInferenceRPUConfig,
+    OldWebComposerInferenceRPUConfig
+)
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
 from aihwkit.inference.noise.custom import StateIndependentNoiseModel
 from aihwkit.inference.compensation.drift import GlobalDriftCompensation
 from aihwkit.cloud.converter.v1.analog_info import AnalogInfo
 from aihwkit.cloud.converter.v1.noise_model_info import NoiseModelInfo
 
+RPU_CLASSES = {
+    'InferenceRPUConfig': InferenceRPUConfig,
+    'WebComposerInferenceRPUConfig': WebComposerInferenceRPUConfig,
+    'OldWebComposerInferenceRPUConfig': OldWebComposerInferenceRPUConfig
+}
+
+
 # pylint: disable=too-few-public-methods
-
-
 class NoiseModelDeviceIDException(Exception):
     """Exception raised if noise model device id is not correct"""
 
@@ -32,12 +40,51 @@ class NoiseModelDeviceIDException(Exception):
 class RPUconfigInfo:
     """Data only class for RPUConfig fields"""
 
-    def __init__(self, nm_info: NoiseModelInfo, a_info: AnalogInfo):
-        """"Constructor for this class"""
-
+    def __init__(self, nm_info: NoiseModelInfo,
+                 a_info: AnalogInfo,
+                 layers: Any = None):
+        """
+        The only constructor for this class
+        """
         self._noise_model_info = nm_info
         self._analog_info = a_info
+        self._layers = layers
         self._device_id = ''
+
+    @staticmethod
+    def _get_common_rpucfg_name(layers: Any) -> Any:
+        """Set common rpu config name by search all analog layers"""
+        # Use default RPU config for Composer
+        if layers is None:
+            return 'WebComposerInferenceRPUConfig'
+        # Need to loop through protobuf layers and figure out
+        #   common rpu_config value.
+        names: Dict[str, int] = {}
+        # pylint: disable=too-many-nested-blocks
+        for layer_proto in layers:  # type: ignore[attr-defined]
+            if layer_proto.WhichOneof('item') == 'layer':
+                layer = layer_proto.layer
+                if layer.id.startswith('Analog'):
+                    # Loop though all AttributeProto objecs in layer.arguments
+                    for argument in layer.arguments:
+                        if argument.name == 'rpu_config':
+                            # stored as UTF8 byte string in attribute s
+                            arg_value = getattr(argument, 's')
+                            # update count of this rpu_config in all analog layers
+                            if arg_value in names:
+                                names[arg_value] += 1
+                            else:
+                                names[arg_value] = 1
+        # pylint: enable=too-many-nested-blocks
+        # should have exactly on in dictionary 'names'
+        if len(names) > 1:
+            print(f'>>> ERROR: more than one rpu_config: {names}')
+            return None
+        if len(names) == 1:
+            # keys() returns dict_keys object, need a list
+            return list(names.keys())[0].decode('UTF-8')  # type: ignore[attr-defined]
+        print('>>> INFO: experiment has not analog layers')
+        return ''
 
     def _print_rpu_config(
             self,
@@ -92,9 +139,22 @@ class RPUconfigInfo:
     def create_inference_rpu_config(self, func_id: str,
                                     verbose: bool = False) -> InferenceRPUConfig:
         """Creates a InferenceRPUConfig class using noise and analog info"""
+        # Need to find name of 'common-rpu-conf-class-name' in protobuf
+        #   This should be the consistent across all layers.
+        #   The Composer Validator should have already caught this but
+        #   it is checked here for testcases and other unknown environments
+        rpu_class_name = self._get_common_rpucfg_name(self._layers)
+        print(f'>>> INFO: rpu_class_name={rpu_class_name}')
+        if rpu_class_name is None or len(rpu_class_name) == 0:
+            raise Exception('class name error. see previous messages')
+        rpu_config_class = None
+        if rpu_class_name in RPU_CLASSES:
+            rpu_config_class = RPU_CLASSES[rpu_class_name]
+        else:
+            raise Exception(f"rpu class name '{rpu_class_name}' not one of '{RPU_CLASSES.keys()}'")
 
-        rpu_config = OldWebComposerInferenceRPUConfig()
-
+        # Dynamically create the right InferenceRPUConfig class
+        rpu_config = rpu_config_class()
         # Assign values from AnalogProto
         rpu_config.forward.out_noise = self._analog_info.output_noise_strength
 
