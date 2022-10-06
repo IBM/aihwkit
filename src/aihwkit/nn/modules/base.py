@@ -102,7 +102,8 @@ class AnalogModuleBase(Module):
         if name not in self._registered_helper_parameter:
             self._registered_helper_parameter.append(name)
 
-    def register_analog_tile(self, tile: 'BaseTile', name: Optional[str] = None) -> None:
+    def register_analog_tile(self, tile: 'BaseTile', name: Optional[str] = None,
+                             update_only: bool = False) -> None:
         """Register the analog context of the tile.
 
         Note:
@@ -111,11 +112,15 @@ class AnalogModuleBase(Module):
 
         Args:
             tile: tile to register
-            name: Optional tile name used as the parameter name
+            name: Optional tile name used as the parameter name.
+            update_only: Whether to re-register (does not advance tile counter)
         """
 
         if name is None:
             name = str(self._analog_tile_counter)
+
+        if not update_only:
+            self._analog_tile_counter += 1
 
         ctx_name = self.ANALOG_CTX_PREFIX + name
 
@@ -125,15 +130,16 @@ class AnalogModuleBase(Module):
         if tile.shared_weights is not None:
             if not isinstance(tile.shared_weights, Parameter):
                 tile.shared_weights = Parameter(tile.shared_weights)
-            par_name = self.ANALOG_SHARED_WEIGHT_PREFIX + str(self._analog_tile_counter)
+            par_name = self.ANALOG_SHARED_WEIGHT_PREFIX + name
             self.register_parameter(par_name, tile.shared_weights)
             self.register_helper(par_name)
 
-        if tile.get_learned_out_scales() is not None:
-            par_name = self.ANALOG_OUT_SCALING_ALPHA_PREFIX + str(self._analog_tile_counter)
-            self.register_parameter(par_name, tile.get_learned_out_scales())
-
-        self._analog_tile_counter += 1
+        if tile.out_scaling_alpha is not None:
+            if not isinstance(tile.out_scaling_alpha, Parameter):
+                tile.out_scaling_alpha = Parameter(tile.out_scaling_alpha)
+            par_name = self.ANALOG_OUT_SCALING_ALPHA_PREFIX + name
+            self.register_parameter(par_name, tile.out_scaling_alpha)
+            self.register_helper(par_name)
 
     def unregister_parameter(self, param_name: str) -> None:
         """Unregister module parameter from parameters.
@@ -415,14 +421,29 @@ class AnalogModuleBase(Module):
                     For instance, changing the device type might
                     change the expected fields in the hidden
                     parameters and result in an error.
+
         Returns:
             see torch's ``load_state_dict``
 
         Raises: ModuleError: in case the rpu_config class mismatches
-            for ``load_rpu_config=False``.
+            or mapping parameter mismatch for
+            ``load_rpu_config=False``
+
         """
         self._set_load_rpu_config_state(load_rpu_config)
         return super().load_state_dict(state_dict, strict)
+
+    def __setstate__(self, state: Dict) -> None:
+        """Set the state after unpickling.
+
+        Makes sure that the parameter in the tiles are correctly registered.
+
+        """
+        self.__dict__.update(state)
+
+        # update registered parameters
+        for name, analog_tile in list(self.named_analog_tiles()):
+            self.register_analog_tile(analog_tile, name, update_only=True)
 
     def _load_from_state_dict(
             self,
@@ -443,6 +464,7 @@ class AnalogModuleBase(Module):
         Raises:
             ModuleError: in case the rpu_config class mismatches.
         """
+        # pylint: disable=too-many-locals
 
         for name, analog_tile in list(self.named_analog_tiles()):
             key = prefix + self.ANALOG_STATE_PREFIX + name
@@ -459,8 +481,25 @@ class AnalogModuleBase(Module):
                                           "Tried to replace "
                                           f"{analog_state['rpu_config'].__class__.__name__} "
                                           f"with {analog_tile.rpu_config.__class__.__name__}")
+
+                    if hasattr(analog_state['rpu_config'], 'mapping'):
+                        old_mapping = analog_state['rpu_config'].mapping
+                        new_mapping = analog_tile.rpu_config.mapping
+                        if (old_mapping.max_input_size != new_mapping.max_input_size
+                                or old_mapping.max_output_size != new_mapping.max_output_size
+                                or old_mapping.digital_bias != new_mapping.digital_bias
+                                or (old_mapping.out_scaling_columnwise
+                                    != new_mapping.out_scaling_columnwise)):
+                            raise ModuleError("MappingParameter mismatch during loading: "
+                                              "Tried to replace "
+                                              f"{old_mapping} "
+                                              f"with {new_mapping}")
+
                     analog_state['rpu_config'] = analog_tile.rpu_config
                 analog_tile.__setstate__(analog_state)
+
+                # update registered parameters
+                self.register_analog_tile(analog_tile, name, update_only=True)
 
             elif strict:
                 missing_keys.append(key)

@@ -343,6 +343,25 @@ class Inference:
         return InferenceTile(out_size, in_size, rpu_config, **kwargs)
 
 
+class InferenceLearnOutScaling:
+    """Inference tile (perfect forward)."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = None
+    use_cuda = False
+
+    def get_rpu_config(self):
+        rpu_config = InferenceRPUConfig()
+        rpu_config.forward.is_perfect = True
+        rpu_config.mapping.learn_out_scaling = True
+
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return InferenceTile(out_size, in_size, rpu_config, **kwargs)
+
+
 class FloatingPointCuda:
     """FloatingPointTile."""
 
