@@ -102,17 +102,25 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T rdet_dtod_upper_bound = (T) 0.0;							// 
     T rdet_dtod_lower_bound = (T) 0.0;							// 
     T Ndiscmax_std = (T) 0.0;							// 
+    T Ndiscmax_ctoc_upper_bound_old = (T) 0.0;							// 
+    T Ndiscmax_ctoc_lower_bound_old = (T) 0.0;							// 
     T Ndiscmax_ctoc_upper_bound = (T) 0.0;							// 
     T Ndiscmax_ctoc_lower_bound = (T) 0.0;							// 
     T Ndiscmin_std = (T) 0.0;							//
+    T Ndiscmin_ctoc_upper_bound_old = (T) 0.0;							// 
+    T Ndiscmin_ctoc_lower_bound_old = (T) 0.0;							// 
     T Ndiscmin_ctoc_upper_bound = (T) 0.0;							// 
     T Ndiscmin_ctoc_lower_bound = (T) 0.0;							// 
     T ldet_std = (T) 0.0;							//
     T ldet_std_slope = (T) 0.0;							//
+    T ldet_ctoc_upper_bound_old = (T) 0.0;							// 
+    T ldet_ctoc_lower_bound_old = (T) 0.0;							// 
     T ldet_ctoc_upper_bound = (T) 0.0;							// 
     T ldet_ctoc_lower_bound = (T) 0.0;							// 
     T rdet_std = (T) 0.0;							//
     T rdet_std_slope = (T) 0.0;							//
+    T rdet_ctoc_upper_bound_old = (T) 0.0;							// 
+    T rdet_ctoc_lower_bound_old = (T) 0.0;							// 
     T rdet_ctoc_upper_bound = (T) 0.0;							// 
     T rdet_ctoc_lower_bound = (T) 0.0;							// 
 
@@ -215,17 +223,25 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t rdet_dtod_upper_bound:\t\t" << rdet_dtod_upper_bound << std::endl;
     ss << "\t rdet_dtod_lower_bound:\t\t" << rdet_dtod_lower_bound << std::endl;
     ss << "\t Ndiscmax_std:\t\t" << Ndiscmax_std << std::endl;
+    ss << "\t Ndiscmax_ctoc_upper_bound_old:\t\t" << Ndiscmax_ctoc_upper_bound_old << std::endl;
+    ss << "\t Ndiscmax_ctoc_lower_bound_old:\t\t" << Ndiscmax_ctoc_lower_bound_old << std::endl;
     ss << "\t Ndiscmax_ctoc_upper_bound:\t\t" << Ndiscmax_ctoc_upper_bound << std::endl;
     ss << "\t Ndiscmax_ctoc_lower_bound:\t\t" << Ndiscmax_ctoc_lower_bound << std::endl;
     ss << "\t Ndiscmin_std:\t\t" << Ndiscmin_std << std::endl;
+    ss << "\t Ndiscmin_ctoc_upper_bound_old:\t\t" << Ndiscmin_ctoc_upper_bound_old << std::endl;
+    ss << "\t Ndiscmin_ctoc_lower_bound_old:\t\t" << Ndiscmin_ctoc_lower_bound_old << std::endl;
     ss << "\t Ndiscmin_ctoc_upper_bound:\t\t" << Ndiscmin_ctoc_upper_bound << std::endl;
     ss << "\t Ndiscmin_ctoc_lower_bound:\t\t" << Ndiscmin_ctoc_lower_bound << std::endl;
     ss << "\t ldet_std:\t\t" << ldet_std << std::endl;
     ss << "\t ldet_std_slope:\t\t" << ldet_std_slope << std::endl;
+    ss << "\t ldet_ctoc_upper_bound_old:\t\t" << ldet_ctoc_upper_bound_old << std::endl;
+    ss << "\t ldet_ctoc_lower_bound_old:\t\t" << ldet_ctoc_lower_bound_old << std::endl;
     ss << "\t ldet_ctoc_upper_bound:\t\t" << ldet_ctoc_upper_bound << std::endl;
     ss << "\t ldet_ctoc_lower_bound:\t\t" << ldet_ctoc_lower_bound << std::endl;
     ss << "\t rdet_std:\t\t" << rdet_std << std::endl;
     ss << "\t rdet_std_slope:\t\t" << rdet_std_slope << std::endl;
+    ss << "\t rdet_ctoc_upper_bound_old:\t\t" << rdet_ctoc_upper_bound_old << std::endl;
+    ss << "\t rdet_ctoc_lower_bound_old:\t\t" << rdet_ctoc_lower_bound_old << std::endl;
     ss << "\t rdet_ctoc_upper_bound:\t\t" << rdet_ctoc_upper_bound << std::endl;
     ss << "\t rdet_ctoc_lower_bound:\t\t" << rdet_ctoc_lower_bound << std::endl;
     ,
@@ -249,6 +265,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmin = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_ldet = Array_2D_Get<T>(d_sz, x_sz);
       device_specific_A = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_Ndiscmax_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_Ndiscmin_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_ldet_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_A_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_Ndiscmax_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_Ndiscmin_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_ldet_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
+      device_specific_A_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
 
       for (int j = 0; j < x_sz; ++j) {
         for (int i = 0; i < d_sz; ++i) {
@@ -258,6 +282,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = (T)0.0;
           device_specific_ldet[i][j] = (T)0.0;
           device_specific_A[i][j] = (T)0.0;
+          device_specific_Ndiscmax_ctoc_upper_bound[i][j] = (T)0.0;
+          device_specific_Ndiscmin_ctoc_upper_bound[i][j] = (T)0.0;
+          device_specific_ldet_ctoc_upper_bound[i][j] = (T)0.0;
+          device_specific_A_ctoc_upper_bound[i][j] = (T)0.0;
+          device_specific_Ndiscmax_ctoc_lower_bound[i][j] = (T)0.0;
+          device_specific_Ndiscmin_ctoc_lower_bound[i][j] = (T)0.0;
+          device_specific_ldet_ctoc_lower_bound[i][j] = (T)0.0;
+          device_specific_A_ctoc_lower_bound[i][j] = (T)0.0;
         }
       },
       /* dtor*/
@@ -267,6 +299,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       Array_2D_Free<T>(device_specific_Ndiscmin);
       Array_2D_Free<T>(device_specific_ldet);
       Array_2D_Free<T>(device_specific_A);
+      Array_2D_Free<T>(device_specific_Ndiscmax_ctoc_upper_bound);
+      Array_2D_Free<T>(device_specific_Ndiscmin_ctoc_upper_bound);
+      Array_2D_Free<T>(device_specific_ldet_ctoc_upper_bound);
+      Array_2D_Free<T>(device_specific_A_ctoc_upper_bound);
+      Array_2D_Free<T>(device_specific_Ndiscmax_ctoc_lower_bound);
+      Array_2D_Free<T>(device_specific_Ndiscmin_ctoc_lower_bound);
+      Array_2D_Free<T>(device_specific_ldet_ctoc_lower_bound);
+      Array_2D_Free<T>(device_specific_A_ctoc_lower_bound);
       ,
       /* copy */
       for (int j = 0; j < other.x_size_; ++j) {
@@ -277,6 +317,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
           device_specific_Ndiscmin[i][j] = other.device_specific_Ndiscmin[i][j];
           device_specific_ldet[i][j] = other.device_specific_ldet[i][j];
           device_specific_A[i][j] = other.device_specific_A[i][j];
+          device_specific_Ndiscmax_ctoc_upper_bound[i][j] = other.device_specific_Ndiscmax_ctoc_upper_bound[i][j];
+          device_specific_Ndiscmin_ctoc_upper_bound[i][j] = other.device_specific_Ndiscmin_ctoc_upper_bound[i][j];
+          device_specific_ldet_ctoc_upper_bound[i][j] = other.device_specific_ldet_ctoc_upper_bound[i][j];
+          device_specific_A_ctoc_upper_bound[i][j] = other.device_specific_A_ctoc_upper_bound[i][j];
+          device_specific_Ndiscmax_ctoc_lower_bound[i][j] = other.device_specific_Ndiscmax_ctoc_lower_bound[i][j];
+          device_specific_Ndiscmin_ctoc_lower_bound[i][j] = other.device_specific_Ndiscmin_ctoc_lower_bound[i][j];
+          device_specific_ldet_ctoc_lower_bound[i][j] = other.device_specific_ldet_ctoc_lower_bound[i][j];
+          device_specific_A_ctoc_lower_bound[i][j] = other.device_specific_A_ctoc_lower_bound[i][j];
         }
       },
       /* move assignment */
@@ -286,6 +334,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       device_specific_Ndiscmin = other.device_specific_Ndiscmin;
       device_specific_ldet = other.device_specific_ldet;
       device_specific_A = other.device_specific_A;
+      device_specific_Ndiscmax_ctoc_upper_bound = other.device_specific_Ndiscmax_ctoc_upper_bound;
+      device_specific_Ndiscmin_ctoc_upper_bound = other.device_specific_Ndiscmin_ctoc_upper_bound;
+      device_specific_ldet_ctoc_upper_bound = other.device_specific_ldet_ctoc_upper_bound;
+      device_specific_A_ctoc_upper_bound = other.device_specific_A_ctoc_upper_bound;
+      device_specific_Ndiscmax_ctoc_lower_bound = other.device_specific_Ndiscmax_ctoc_lower_bound;
+      device_specific_Ndiscmin_ctoc_lower_bound = other.device_specific_Ndiscmin_ctoc_lower_bound;
+      device_specific_ldet_ctoc_lower_bound = other.device_specific_ldet_ctoc_lower_bound;
+      device_specific_A_ctoc_lower_bound = other.device_specific_A_ctoc_lower_bound;
 
       other.device_specific_Ndisc_max_bound = nullptr;
       other.device_specific_Ndisc_min_bound = nullptr;
@@ -293,6 +349,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       other.device_specific_Ndiscmin = nullptr;
       other.device_specific_ldet = nullptr;
       other.device_specific_A = nullptr;
+      other.device_specific_Ndiscmax_ctoc_upper_bound = nullptr;
+      other.device_specific_Ndiscmin_ctoc_upper_bound = nullptr;
+      other.device_specific_ldet_ctoc_upper_bound = nullptr;
+      other.device_specific_A_ctoc_upper_bound = nullptr;
+      other.device_specific_Ndiscmax_ctoc_lower_bound = nullptr;
+      other.device_specific_Ndiscmin_ctoc_lower_bound = nullptr;
+      other.device_specific_ldet_ctoc_lower_bound = nullptr;
+      other.device_specific_A_ctoc_lower_bound = nullptr;
       ,
       /* swap*/
       swap(a.device_specific_Ndisc_max_bound, b.device_specific_Ndisc_max_bound);
@@ -301,6 +365,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       swap(a.device_specific_Ndiscmin, b.device_specific_Ndiscmin);
       swap(a.device_specific_ldet, b.device_specific_ldet);
       swap(a.device_specific_A, b.device_specific_A);
+      swap(a.device_specific_Ndiscmax_ctoc_upper_bound, b.device_specific_Ndiscmax_ctoc_upper_bound);
+      swap(a.device_specific_Ndiscmin_ctoc_upper_bound, b.device_specific_Ndiscmin_ctoc_upper_bound);
+      swap(a.device_specific_ldet_ctoc_upper_bound, b.device_specific_ldet_ctoc_upper_bound);
+      swap(a.device_specific_A_ctoc_upper_bound, b.device_specific_A_ctoc_upper_bound);
+      swap(a.device_specific_Ndiscmax_ctoc_lower_bound, b.device_specific_Ndiscmax_ctoc_lower_bound);
+      swap(a.device_specific_Ndiscmin_ctoc_lower_bound, b.device_specific_Ndiscmin_ctoc_lower_bound);
+      swap(a.device_specific_ldet_ctoc_lower_bound, b.device_specific_ldet_ctoc_lower_bound);
+      swap(a.device_specific_A_ctoc_lower_bound, b.device_specific_A_ctoc_lower_bound);
       ,
       /* dp names*/
       names.push_back(std::string("device_specific_Ndisc_max_bound"));
@@ -309,6 +381,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       names.push_back(std::string("device_specific_Ndiscmin"));
       names.push_back(std::string("device_specific_ldet"));
       names.push_back(std::string("device_specific_A"));
+      names.push_back(std::string("device_specific_Ndiscmax_ctoc_upper_bound"));
+      names.push_back(std::string("device_specific_Ndiscmin_ctoc_upper_bound"));
+      names.push_back(std::string("device_specific_ldet_ctoc_upper_bound"));
+      names.push_back(std::string("device_specific_A_ctoc_upper_bound"));
+      names.push_back(std::string("device_specific_Ndiscmax_ctoc_lower_bound"));
+      names.push_back(std::string("device_specific_Ndiscmin_ctoc_lower_bound"));
+      names.push_back(std::string("device_specific_ldet_ctoc_lower_bound"));
+      names.push_back(std::string("device_specific_A_ctoc_lower_bound"));
       ,
       /* dp2vec body*/
       int n_prev = (int)names.size();
@@ -321,6 +401,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
         data_ptrs[n_prev + 3][i] = device_specific_Ndiscmin[0][i];
         data_ptrs[n_prev + 4][i] = device_specific_ldet[0][i];
         data_ptrs[n_prev + 5][i] = device_specific_A[0][i];
+        data_ptrs[n_prev + 6][i] = device_specific_Ndiscmax_ctoc_upper_bound[0][i];
+        data_ptrs[n_prev + 7][i] = device_specific_Ndiscmin_ctoc_upper_bound[0][i];
+        data_ptrs[n_prev + 8][i] = device_specific_ldet_ctoc_upper_bound[0][i];
+        data_ptrs[n_prev + 9][i] = device_specific_A_ctoc_upper_bound[0][i];
+        data_ptrs[n_prev + 10][i] = device_specific_Ndiscmax_ctoc_lower_bound[0][i];
+        data_ptrs[n_prev + 11][i] = device_specific_Ndiscmin_ctoc_lower_bound[0][i];
+        data_ptrs[n_prev + 12][i] = device_specific_ldet_ctoc_lower_bound[0][i];
+        data_ptrs[n_prev + 13][i] = device_specific_A_ctoc_lower_bound[0][i];
       },
       /* vec2dp body*/
       int n_prev = (int)names.size();
@@ -333,6 +421,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
         device_specific_Ndiscmin[0][i] = data_ptrs[n_prev + 3][i];
         device_specific_ldet[0][i] = data_ptrs[n_prev + 4][i];
         device_specific_A[0][i] = data_ptrs[n_prev + 5][i];
+        device_specific_Ndiscmax_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 6][i];
+        device_specific_Ndiscmin_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 7][i];
+        device_specific_ldet_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 8][i];
+        device_specific_A_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 9][i];
+        device_specific_Ndiscmax_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 10][i];
+        device_specific_Ndiscmin_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 11][i];
+        device_specific_ldet_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 12][i];
+        device_specific_A_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 13][i];
       }
 
 
@@ -342,6 +438,8 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
         for (int i = 0; i < this->d_size_; ++i) {
           std::swap(device_specific_Ndisc_max_bound[i][j], device_specific_Ndisc_min_bound[i][j]);
           std::swap(device_specific_Ndiscmax[i][j], device_specific_Ndiscmin[i][j]);
+          std::swap(device_specific_Ndiscmax_ctoc_upper_bound[i][j], device_specific_Ndiscmin_ctoc_upper_bound[i][j]);
+          std::swap(device_specific_Ndiscmax_ctoc_lower_bound[i][j], device_specific_Ndiscmin_ctoc_lower_bound[i][j]);
         }
       }
       // Todo: if device specific Ndisc bounds: Remap wmax&wmin to Ndisc max_bound&min_bound 
@@ -387,6 +485,14 @@ private:
   T **device_specific_Ndiscmin = nullptr;
   T **device_specific_ldet = nullptr;
   T **device_specific_A = nullptr;
+  T **device_specific_Ndiscmax_ctoc_upper_bound = nullptr;
+  T **device_specific_Ndiscmin_ctoc_upper_bound = nullptr;
+  T **device_specific_ldet_ctoc_upper_bound = nullptr;
+  T **device_specific_A_ctoc_upper_bound = nullptr;
+  T **device_specific_Ndiscmax_ctoc_lower_bound = nullptr;
+  T **device_specific_Ndiscmin_ctoc_lower_bound = nullptr;
+  T **device_specific_ldet_ctoc_lower_bound = nullptr;
+  T **device_specific_A_ctoc_lower_bound = nullptr;
 };
 
 } // namespace RPU

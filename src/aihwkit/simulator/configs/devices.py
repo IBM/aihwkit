@@ -1310,13 +1310,29 @@ class JARTv1bDevice(PulsedDevice):
 
     Read [1] for more information."""
 
-    Ndiscmax_ctoc_upper_bound: float = 0
+    Ndiscmax_ctoc_upper_bound_old: float = 0
     """The maximum allowed value for ``Ndiscmax`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    This parameter is for the old version of ctoc variation, where the ctoc range is
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmax_ctoc_upper_bound`` when using CPU."""
+
+    Ndiscmax_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``Ndiscmax`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmax_ctoc_lower_bound`` when using CPU."""
+
+    Ndiscmax_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``Ndiscmax`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
     Ndiscmax_ctoc_lower_bound: float = 0
-    """The minimum allowed value for ``Ndiscmax`` during the random walk process.
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``Ndiscmax`` during the random walk process.
     Read [1] for more information."""
 
     Ndiscmin_std: float = 0
@@ -1329,13 +1345,28 @@ class JARTv1bDevice(PulsedDevice):
 
     Read [1] for more information."""
     
-    Ndiscmin_ctoc_upper_bound: float = 0
+    Ndiscmin_ctoc_upper_bound_old: float = 0
     """The maximum allowed value for ``Ndiscmin`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmin_ctoc_upper_bound`` when using CPU."""
+    
+    Ndiscmin_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``Ndiscmin`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmin_ctoc_lower_bound`` when using CPU."""
+    
+    Ndiscmin_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``Ndiscmin`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
     
     Ndiscmin_ctoc_lower_bound: float = 0
-    """The minimum allowed value for ``Ndiscmin`` during the random walk process.
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``Ndiscmin`` during the random walk process.
     Read [1] for more information."""
 
     ldet_std: float = 0
@@ -1355,13 +1386,28 @@ class JARTv1bDevice(PulsedDevice):
 
     Read [1] for more information."""
 
-    ldet_ctoc_upper_bound: float = 0
+    ldet_ctoc_upper_bound_old: float = 0
     """The maximum allowed value for ``ldet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``ldet_ctoc_upper_bound`` when using CPU."""
+
+    ldet_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``ldet`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``ldet_ctoc_lower_bound`` when using CPU."""
+
+    ldet_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``ldet`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
     ldet_ctoc_lower_bound: float = 0
-    """The minimum allowed value for ``ldet`` during the random walk process.
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``ldet`` during the random walk process.
     Read [1] for more information."""
 
     rdet_std: float = 0
@@ -1381,13 +1427,28 @@ class JARTv1bDevice(PulsedDevice):
 
     Read [1] for more information."""
 
-    rdet_ctoc_upper_bound: float = 0
+    rdet_ctoc_upper_bound_old: float = 0
     """The maximum allowed value for ``rdet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``rdet_ctoc_upper_bound`` when using CPU."""
+
+    rdet_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``rdet`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``rdet_ctoc_lower_bound`` when using CPU."""
+
+    rdet_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``rdet`` during the random walk process.
     The upper and lower bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
     rdet_ctoc_lower_bound: float = 0
-    """The minimum allowed value for ``rdet`` during the random walk process.
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``rdet`` during the random walk process.
     Read [1] for more information."""
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
