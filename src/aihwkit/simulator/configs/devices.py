@@ -970,6 +970,508 @@ class PiecewiseStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+@dataclass
+class JARTv1bDevice(PulsedDevice):
+    """Device update characteristics based on Jülich Aachen Resistive
+    Switching Tools (JART) VCM v1b model, details published in [1].
+
+    The model described in the original JART v1b models [2] contains a set of
+    complex non-linear equations, which is hard to solve in parallel at a
+    large scale with CUDA. To accelerate the calculation, we used the fit
+    function described in [3] instead. This fit function generates a current
+    estimate with parameters alpha0 to k0, without having to solve non-linear
+    equations.
+
+    After we have the current, we can calculate the voltages across different
+    layers, and calculate the conductance update. For the update calculation,
+    we are using the original JART model with physical parameters described
+    in [2].
+
+    To make the JART v1b device model switch in reasonable time while
+    preserving access to the intermediate states, we introduced the
+    parameters ``Ndisc_min_bound`` and ``Ndisc_max_bound``. We assume that
+    there exists such a peripheral circuit that limits the maximum and
+    minimum conductance of this device, and thus the maximum and minimum
+    oxygen vacancy concentration. Read [1] for more information.
+
+    For the noise part, device-to-device and cycle-to-cycle noise are also
+    implemented on the device parameters Ndiscmax and Ndiscmin, which control
+    the maximum and minimum conductance of the device model itself without
+    any peripheral circuit. Noise is also implemented on rdet and ldet, which
+    controls the geometry of the filament inside the memristor. These
+    parameters affect only the conductance update, and the reading process is
+    kept noise free at the device model level. Built-in read noise from
+    aihwkit tiles still works as normal.
+
+    [1] TODO: add publication details when finalized.
+    [2] C. Bengel, A. Siemon, F. C ̈uppers, S. Hoffmann-Eifert, A. Hardtdegen,
+    M. von Witzleben, L. Hellmich, R. Waser, and S. Menzel, “Variability-
+    aware modeling of filamentary oxide-based bipolar resistive switching
+    cells using spice level compact models,” IEEE Transactions on Circuits
+    and Systems I: Regular Papers, vol. 67, no. 12, pp. 4618-46
+    [3] V. Ntinas, A. Ascoli, I. Messaris, Y. Wang, V. Rana, S. Menzel, and
+    R. Tetzlaff, “Towards simplified physics-based memristor modeling of
+    valence change mechanism devices,” IEEE Transactions on Circuits and
+    Systems II: Express Briefs, 2022.
+    """
+
+    bindings_class: ClassVar[Type] = devices.JARTv1bResistiveDeviceParameter
+
+    w_max: float = 0.6
+    """See ``w_min``."""
+
+    w_min: float = -0.6
+    """Mean of hard bounds across device cross-point `ij`.
+
+    The parameters ``w_min`` and ``w_max`` are used to set the min/max bounds
+    independently.
+
+    Note:
+        For this abstract device, we assume that weights can have
+        positive and negative values and are symmetrically around
+        zero. In physical circuit terms, this might be implemented
+        as a difference of two resistive elements.
+    """
+
+    w_max_dtod: float = 0
+    """See ``w_min_dtod``."""
+
+    w_min_dtod: float = 0
+    """Device-to-device variation of the hard bounds.
+
+    Device-to-device variation of the hard bounds, of min and max value,
+    respectively. All are given in relative units to ``w_min``, or ``w_max``,
+    respectively.
+    """
+
+    dw_min: float = 0.0001
+    """Mean of the minimal update step sizes across devices and directions."""
+
+    write_noise_std: float = 0.0
+    r"""Whether to use write noise.
+
+    Unlike other aihwkit devices, this value does not affect the updates.
+    The updates are only indirectly affected by ``Ndiscmax``, ``Ndiscmin``,
+    ``ldet``, ``rdet`` and the relevant noise. 
+
+    This value, however, controls the noise in the ``write and verify``
+    process of the peripheral circuit, which happens when setting the
+    weights directly from PyTorch (including initialization).
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{max_or_min} + \sigma_\text{write_noise}
+    """
+    
+    alpha0: float = 4.81951e-5
+    """Fitting parameters discribed in [1].
+
+    Note that because these parameters are only fitted with the default set of
+    physical parameters, they need to be changed accordingly when the physical
+    parameters are specified differently.
+    """
+
+    alpha2: float = 1.03685
+    """See ``alpha0``."""
+
+    alpha3: float = 0.34567
+    """See ``alpha0``."""
+
+    alpha1 = alpha0*exp(-alpha2/alpha3)
+    r"""See ``alpha0``.
+    This parameter should not be specified, and will be calculated as:
+    
+    .. math::
+        \alpha_{1} = \alpha_{0} * e^{left(-\frac{\alpha{2}}{\alpha{3}}\right)
+    """
+
+    beta0: float = 7.0526e-4
+    """See ``alpha0``."""
+
+    beta1: float = 4.2383e-5
+    """See ``alpha0``."""
+
+    c0: float = 4.004
+    """See ``alpha0``."""
+
+    c1: float = 2.8646
+    """See ``alpha0``."""
+
+    c2: float = 4.2125
+    """See ``alpha0``."""
+
+    c3: float = 1.4134
+    """See ``alpha0``."""
+
+    d0: float = 6.6103
+    """See ``alpha0``."""
+
+    d1: float = 1.4524
+    """See ``alpha0``."""
+
+    d2: float = 7.4235
+    """See ``alpha0``."""
+
+    d3: float = 4.0585
+    """See ``alpha0``."""
+
+    f0: float = 6.326e-4
+    """See ``alpha0``."""
+
+    f1: float = 1.4711
+    """See ``alpha0``."""
+
+    f2: float = 0.5199
+    """See ``alpha0``."""
+
+    f3: float = 1.561
+    """See ``alpha0``."""
+
+    g0: float = 4.84e-3
+    """See ``alpha0``."""
+
+    g1: float = 0.1353
+    """See ``alpha0``."""
+
+    h0: float = 5.548
+    """See ``alpha0``."""
+
+    h1: float = 6.8648
+    """See ``alpha0``."""
+
+    h2: float = 51.586
+    """See ``alpha0``."""
+
+    h3: float = 0.36
+    """See ``alpha0``."""
+
+    j0: float = 1.054
+    """See ``alpha0``."""
+
+    k0: float =  1.0526
+    """See ``alpha0``."""
+
+    T0: float = 293
+    """Ambient temperature [K], read [2] for more information."""
+
+    un: float = 4e-6
+    """Electron mobility [m^2/Vs], read [2] for more information."""
+
+    Ndiscmax: float = 20
+    """Average maximum oxygen vacancy concentration in the disc[10^26/m^3], read [2] for more information."""
+
+    Ndiscmin: float = 0.008
+    """Average minimum oxygen vacancy concentration in the disc [10^26/m^3], read [2] for more information."""
+
+    Nplug: float = 20
+    """Oxygen vacancy concentration in the plug [10^26/m^3], read [2] for more information."""
+
+    a: float = 0.25e-9
+    """Ion hopping distance [m], read [2] for more information."""
+
+    ny0: float = 2e13
+    """Attemp frequenzy [Hz], read [2] for more information."""
+
+    dWa: float = 1.35
+    """Activation energy [eV], read [2] for more information."""
+
+    Rth0: float = 15.72e6
+    """Thermal resistance of the Hafnium Oxide [K/W], read [2] for more information."""
+
+    rdet: float = 45e-9
+    """Average radius of the filament area [m], read [2] for more information."""
+
+    lcell: float = 3*1e-9
+    """Length of disc and plug region [m], read [2] for more information."""
+
+    ldet: float = 0.4*1e-9
+    """Length of the disc region [m], read [2] for more information."""
+
+    Rtheff_scaling: float = 0.27
+    """Scaling factor for ``Rth0`` during RESET, read [2] for more information."""
+
+    RseriesTiOx: float = 650
+    """Series resistance of the TiOx layer [Ohm], read [2] for more information."""
+
+    R0: float = 719.2437
+    """Line resistance for a current of 0 A [Ohm], read [2] for more information."""
+
+    Rthline: float = 90471.47
+    """Thermal resistance of the lines [W/K], read [2] for more information."""
+
+    alphaline: float = 3.92e-3
+    """Temperature coefficient of the lines [1/K], read [2] for more information."""
+
+    read_voltage: float = 0.2
+    """Voltage applied to the memristor during the read phase
+
+    In this phase, the memristor conductance is assumed to be constant, and
+    no read-variability was applied. Read [1] for more information.
+    """
+
+    pulse_voltage_SET: float = -0.342
+    """Voltage applied to the memristor during SET process, read [1] for more information."""
+
+    pulse_voltage_RESET: float = 0.7065
+    """Voltage applied to the memristor during RESET process, read [1] for more information."""
+
+    pulse_length: float = 1e-6
+    """Pulse length of the voltage pulses applied to the memristor during SET and RESET process, read [1] for more information."""
+
+    base_time_step: float = 1e-8
+    """Internal simulation time step during the pulse updates,
+    this parameter controls the precision of the forward-mode Euler method
+    used when integrating change of the oxygen vacancy concentration in the
+    disc. It's advised that ``base_time_step`` should be at least 100 times
+    smaller than ``pulse_length``. Read [1] for more information.
+    """
+
+    Ndisc_min_bound: float = 0.06
+    """Average minimum oxygen vacancy concentration controlled by the peripheral circuit [10^26/m^3], read [1] for more information."""
+
+    Ndisc_max_bound: float = 1.9897452127440086504
+    """Average maximum oxygen vacancy concentration controlled by the peripheral circuit [10^26/m^3], read [1] for more information."""
+
+    Ndiscmax_dtod: float = 0
+    r"""Device-to-device std deviation of ``Ndiscmax``.
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmax}_{device} = {Ndiscmax}_{average} * \left(1 + \sigma_\text{Ndiscmax_dtod}\xi_{Gaussian}\right)
+
+    Read [1] for more information."""
+
+    Ndiscmax_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``Ndiscmax`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    Ndiscmax_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``Ndiscmax`` during the device to device instantiation.
+    Read [1] for more information."""
+    
+    Ndiscmin_dtod: float = 0
+    r"""Device-to-device std deviation of ``Ndiscmin``.
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmin}_{device} = {Ndiscmin}_{average} * \left(1 + \sigma_\text{Ndiscmin_dtod}\xi_{Gaussian}\right)
+
+    Read [1] for more information."""
+
+    Ndiscmin_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``Ndiscmin`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    Ndiscmin_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``Ndiscmin`` during the device to device instantiation.
+    Read [1] for more information."""
+
+    ldet_dtod: float = 0
+    r"""Device-to-device std deviation of ``ldet``.
+
+    Thus it is:
+
+    .. math::
+        {ldet}_{device} = {ldet}_{average} * \left(1 + \sigma_\text{ldet_dtod}\xi_{Gaussian}\right)
+
+    Read [1] for more information."""
+
+    ldet_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``ldet`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    ldet_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``ldet`` during the device to device instantiation.
+    Read [1] for more information."""
+
+    rdet_dtod: float = 0
+    r"""Device-to-device std deviation of ``rdet``.
+
+    Thus it is:
+
+    .. math::
+        {rdet}_{device} = {rdet}_{average} * \left(1 + \sigma_\text{rdet_dtod}\xi_{Gaussian}\right)
+
+    Read [1] for more information."""
+
+    rdet_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``rdet`` during the device to device instantiation.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    rdet_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``rdet`` during the device to device instantiation.
+    Read [1] for more information."""
+
+    Ndiscmax_std: float = 0
+    r"""Cycle-to-cycle std deviation of ``Ndiscmax``, used in a random walk process. 
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmax}_{new} = {Ndiscmax}_{old} * \left(1 + \sigma_\text{Ndiscmax_std}\xi_{Uniform}\right)
+
+    Read [1] for more information."""
+
+    Ndiscmax_ctoc_upper_bound_old: float = 0
+    """The maximum allowed value for ``Ndiscmax`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    This parameter is for the old version of ctoc variation, where the ctoc range is
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmax_ctoc_upper_bound`` when using CPU."""
+
+    Ndiscmax_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``Ndiscmax`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmax_ctoc_lower_bound`` when using CPU."""
+
+    Ndiscmax_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``Ndiscmax`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    Ndiscmax_ctoc_lower_bound: float = 0
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``Ndiscmax`` during the random walk process.
+    Read [1] for more information."""
+
+    Ndiscmin_std: float = 0
+    r"""Cycle-to-cycle std deviation of ``Ndiscmin``, used in a random walk process. 
+
+    Thus it is:
+
+    .. math::
+        {Ndiscmin}_{new} = {Ndiscmin}_{old} * \left(1 + \sigma_\text{Ndiscmin_std}\xi_{Uniform}\right)
+
+    Read [1] for more information."""
+    
+    Ndiscmin_ctoc_upper_bound_old: float = 0
+    """The maximum allowed value for ``Ndiscmin`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmin_ctoc_upper_bound`` when using CPU."""
+    
+    Ndiscmin_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``Ndiscmin`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``Ndiscmin_ctoc_lower_bound`` when using CPU."""
+    
+    Ndiscmin_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``Ndiscmin`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+    
+    Ndiscmin_ctoc_lower_bound: float = 0
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``Ndiscmin`` during the random walk process.
+    Read [1] for more information."""
+
+    ldet_std: float = 0
+    """Cycle-to-cycle std deviation of ``ldet``, used in a random walk process. 
+    Generates a gaussian noise that is directly added to ``ldet`` for every update.
+    Read [1] for more information."""
+
+    ldet_std_slope: float = 0
+    r"""Cycle-to-cycle std deviation of ``ldet``, used in a random walk process. 
+    Generates a gaussian noise that is realted to the change in ``Ndisc``,
+    Larger updates will induce larger variations in  ``ldet``.
+
+    Thus it is:
+
+    .. math::
+        {ldet}_{new} = {ldet}_{old} * \left(1 + \sigma_\text{ldet_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{ldet_std_slope}\xi_{Uniform}\right)
+
+    Read [1] for more information."""
+
+    ldet_ctoc_upper_bound_old: float = 0
+    """The maximum allowed value for ``ldet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``ldet_ctoc_upper_bound`` when using CPU."""
+
+    ldet_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``ldet`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``ldet_ctoc_lower_bound`` when using CPU."""
+
+    ldet_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``ldet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    ldet_ctoc_lower_bound: float = 0
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``ldet`` during the random walk process.
+    Read [1] for more information."""
+
+    rdet_std: float = 0
+    """Cycle-to-cycle std deviation of ``rdet``, used in a random walk process. 
+    Generates a gaussian noise that is directly added to ``rdet`` for every update.
+    Read [1] for more information."""
+
+    rdet_std_slope: float = 0
+    r"""Cycle-to-cycle std deviation of ``rdet``, used in a random walk process. 
+    Generates a gaussian noise that is realted to the change in ``Ndisc``,
+    Larger updates will induce larger variations in  ``rdet``.
+
+    Thus it is:
+
+    .. math::
+        {rdet}_{new} = {rdet}_{old} * \left(1 + \sigma_\text{rdet_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{rdet_std_slope}\xi_{Uniform}\right)
+
+    Read [1] for more information."""
+
+    rdet_ctoc_upper_bound_old: float = 0
+    """The maximum allowed value for ``rdet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``rdet_ctoc_upper_bound`` when using CPU."""
+
+    rdet_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``rdet`` during the random walk process.
+    applied later, and have to be larger than the dtod range.
+    This parameter is preserved for CUDA implementation only,
+    please use ``rdet_ctoc_lower_bound`` when using CPU."""
+
+    rdet_ctoc_upper_bound: float = 0
+    """The maximum allowed percentage based on the device to device initialization 
+    for ``rdet`` during the random walk process.
+    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    Read [1] for more information."""
+
+    rdet_ctoc_lower_bound: float = 0
+    """The minimum allowed percentage based on the device to device initialization 
+    for ``rdet`` during the random walk process.
+    Read [1] for more information."""
+
+    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+        """Return a representation of this instance as a simulator bindings object."""
+        return parameters_to_bindings(self)
+
+    def requires_diffusion(self) -> bool:
+        """Diffusion not supported for RRAM."""
+        return False
+
+    def requires_decay(self) -> bool:
+        """Decay not supported for RRAM."""
+        return False
+
 
 ###############################################################################
 # Specific devices based on ``unit cell``.

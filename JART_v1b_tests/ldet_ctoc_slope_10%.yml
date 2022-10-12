@@ -1,0 +1,65 @@
+USE_0_initialization: True
+Repeat_Times: 5
+USE_wandb: True
+USE_CUDA: False
+USE_bias: True
+project_name: aihwkit_v1b_test
+w_max: 1.5
+w_min: -1.5
+epochs: 30
+batch_size: 32
+learning_rate:  0.05
+scheduler:
+  step_size: 10
+  gamma: 0.5
+
+pulse_related:
+  read_voltage: 0.2
+  pulse_voltage_SET: -0.342
+  pulse_voltage_RESET: 0.7065
+  pulse_length: 1.0e-6
+  base_time_step: 1.0e-8
+
+noise:
+  w_max:
+    device_to_device: 0.0
+  w_min:
+    device_to_device: 0.0
+  Ndiscmax:
+    device_to_device: 0.0
+    cycle_to_cycle_direct: 0.0
+    # 0 means disabled for the upper_bounds
+    # parameters have to be larger than 0, so the lower_bound is always enabled
+    ctoc_upper_bound: 0.0
+    ctoc_lower_bound: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
+  Ndiscmin:
+    device_to_device: 0.0
+    cycle_to_cycle_direct: 0.0
+    # 0 means disabled for the upper_bounds
+    # parameters have to be larger than 0, so the lower_bound is always enabled
+    ctoc_upper_bound: 0.0
+    ctoc_lower_bound: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
+  ldet:
+    device_to_device: 0.0
+    cycle_to_cycle_direct: 0.0
+    cycle_to_cycle_slope: 0.1
+    # 0 means disabled for the upper_bounds
+    # parameters have to be larger than 0, so the lower_bound is always enabled
+    ctoc_upper_bound: 0.1
+    ctoc_lower_bound: -0.1
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
+  rdet:
+    device_to_device: 0.0
+    cycle_to_cycle_direct: 0.0
+    cycle_to_cycle_slope: 0.0
+    # 0 means disabled for the upper_bounds
+    # parameters have to be larger than 0, so the lower_bound is always enabled
+    ctoc_upper_bound: 0.0
+    ctoc_lower_bound: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0

@@ -19,6 +19,7 @@
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_piecewisestep_device.h"
+#include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_powstep_device.h"
 #include "rpucuda_pulsed.h"
 #include "rpucuda_pulsed_device.h"
@@ -259,7 +260,8 @@ typedef ::testing::Types<
     ExpStepRPUDeviceMetaParameter<num_t>,
     PowStepRPUDeviceMetaParameter<num_t>,
     ConstantStepRPUDeviceMetaParameter<num_t>,
-    PiecewiseStepRPUDeviceMetaParameter<num_t>>
+    PiecewiseStepRPUDeviceMetaParameter<num_t>,
+    JARTv1bRPUDeviceMetaParameter<num_t>>
 
     MetaPar;
 

@@ -20,6 +20,7 @@
 #include "rpu_onesided_device.h"
 #include "rpu_piecewisestep_device.h"
 #include "rpu_powstep_device.h"
+#include "rpu_JART_v1b_device.h"
 #include "rpu_pulsed.h"
 #include "rpu_simple_device.h"
 #include "rpu_transfer_device.h"
