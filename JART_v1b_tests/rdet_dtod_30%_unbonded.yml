@@ -1,14 +1,14 @@
 USE_0_initialization: True
-Repeat_Times: 5
+Repeat_Times: 9
 USE_wandb: True
 USE_CUDA: False
 USE_bias: True
 project_name: aihwkit_v1b_test
 w_max: 1.5
 w_min: -1.5
-epochs: 30
+epochs: 100
 batch_size: 32
-learning_rate:  0.05
+learning_rate:  0.0000005
 scheduler:
   step_size: 10
   gamma: 0.5
@@ -21,10 +21,15 @@ pulse_related:
   base_time_step: 1.0e-8
 
 noise:
+  enable_w_max_w_min_bounds: False
   w_max:
     device_to_device: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
   w_min:
     device_to_device: 0.0
+    dtod_upper_bound: 0.0
+    dtod_lower_bound: 0.0
   Ndiscmax:
     device_to_device: 0.0
     cycle_to_cycle_direct: 0.0
@@ -43,7 +48,7 @@ noise:
     ctoc_lower_bound: 0.0
     dtod_upper_bound: 0.0
     dtod_lower_bound: 0.0
-  ldet:
+  ldisc:
     device_to_device: 0.0
     cycle_to_cycle_direct: 0.0
     cycle_to_cycle_slope: 0.0
@@ -53,7 +58,7 @@ noise:
     ctoc_lower_bound: 0.0
     dtod_upper_bound: 0.0
     dtod_lower_bound: 0.0
-  rdet:
+  rdisc:
     device_to_device: 0.3
     cycle_to_cycle_direct: 0.0
     cycle_to_cycle_slope: 0.0

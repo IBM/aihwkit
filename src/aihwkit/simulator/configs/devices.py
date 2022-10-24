@@ -988,7 +988,7 @@ class JARTv1bDevice(PulsedDevice):
     For the noise part, device-to-device and cycle-to-cycle noise are also
     implemented on the device parameters Ndiscmax and Ndiscmin, which control
     the maximum and minimum conductance of the device model itself without
-    any peripheral circuit. Noise is also implemented on rdet and ldet, which
+    any peripheral circuit. Noise is also implemented on rdisc and ldisc, which
     controls the geometry of the filament inside the memristor. These
     parameters affect only the conductance update, and the reading process is
     kept noise free at the device model level. Built-in read noise from
@@ -1035,6 +1035,27 @@ class JARTv1bDevice(PulsedDevice):
     respectively.
     """
 
+    enable_w_max_w_min_bounds: bool = False
+    """Enable the boundarie for maximum and minumum conductance, i.e. weights.
+    If disabled, default aihwkit implementation will make sure of resonable values.
+    You may want this for dead cells with fixed weights, etc."""
+
+    w_max_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``w_max`` during the device to device instantiation.
+    Read [1] for more information."""
+
+    w_max_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``w_max`` during the device to device instantiation.
+    Read [1] for more information."""
+
+    w_min_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``w_max`` during the device to device instantiation.
+    Read [1] for more information."""
+
+    w_min_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``w_max`` during the device to device instantiation.
+    Read [1] for more information."""
+    
     dw_min: float = 0.0001
     """Mean of the minimal update step sizes across devices and directions."""
 
@@ -1043,7 +1064,7 @@ class JARTv1bDevice(PulsedDevice):
 
     Unlike other aihwkit devices, this value does not affect the updates.
     The updates are only indirectly affected by ``Ndiscmax``, ``Ndiscmin``,
-    ``ldet``, ``rdet`` and the relevant noise. 
+    ``ldisc``, ``rdisc`` and the relevant noise. 
 
     This value, however, controls the noise in the ``write and verify``
     process of the peripheral circuit, which happens when setting the
@@ -1170,13 +1191,13 @@ class JARTv1bDevice(PulsedDevice):
     Rth0: float = 15.72e6
     """Thermal resistance of the Hafnium Oxide [K/W], read [2] for more information."""
 
-    rdet: float = 45e-9
+    rdisc: float = 45e-9
     """Average radius of the filament area [m], read [2] for more information."""
 
     lcell: float = 3*1e-9
     """Length of disc and plug region [m], read [2] for more information."""
 
-    ldet: float = 0.4*1e-9
+    ldisc: float = 0.4*1e-9
     """Length of the disc region [m], read [2] for more information."""
 
     Rtheff_scaling: float = 0.27
@@ -1236,11 +1257,12 @@ class JARTv1bDevice(PulsedDevice):
 
     Ndiscmax_dtod_upper_bound: float = 0
     """The maximum boundary for truncating ``Ndiscmax`` during the device to device instantiation.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
     Ndiscmax_dtod_lower_bound: float = 0
     """The minimum boundary for truncating ``Ndiscmax`` during the device to device instantiation.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     Read [1] for more information."""
     
     Ndiscmin_dtod: float = 0
@@ -1255,49 +1277,52 @@ class JARTv1bDevice(PulsedDevice):
 
     Ndiscmin_dtod_upper_bound: float = 0
     """The maximum boundary for truncating ``Ndiscmin`` during the device to device instantiation.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
     Ndiscmin_dtod_lower_bound: float = 0
     """The minimum boundary for truncating ``Ndiscmin`` during the device to device instantiation.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     Read [1] for more information."""
 
-    ldet_dtod: float = 0
-    r"""Device-to-device std deviation of ``ldet``.
+    ldisc_dtod: float = 0
+    r"""Device-to-device std deviation of ``ldisc``.
 
     Thus it is:
 
     .. math::
-        {ldet}_{device} = {ldet}_{average} * \left(1 + \sigma_\text{ldet_dtod}\xi_{Gaussian}\right)
+        {ldisc}_{device} = {ldisc}_{average} * \left(1 + \sigma_\text{ldisc_dtod}\xi_{Gaussian}\right)
 
     Read [1] for more information."""
 
-    ldet_dtod_upper_bound: float = 0
-    """The maximum boundary for truncating ``ldet`` during the device to device instantiation.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    ldisc_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``ldisc`` during the device to device instantiation.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
-    ldet_dtod_lower_bound: float = 0
-    """The minimum boundary for truncating ``ldet`` during the device to device instantiation.
+    ldisc_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``ldisc`` during the device to device instantiation.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     Read [1] for more information."""
 
-    rdet_dtod: float = 0
-    r"""Device-to-device std deviation of ``rdet``.
+    rdisc_dtod: float = 0
+    r"""Device-to-device std deviation of ``rdisc``.
 
     Thus it is:
 
     .. math::
-        {rdet}_{device} = {rdet}_{average} * \left(1 + \sigma_\text{rdet_dtod}\xi_{Gaussian}\right)
+        {rdisc}_{device} = {rdisc}_{average} * \left(1 + \sigma_\text{rdisc_dtod}\xi_{Gaussian}\right)
 
     Read [1] for more information."""
 
-    rdet_dtod_upper_bound: float = 0
-    """The maximum boundary for truncating ``rdet`` during the device to device instantiation.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    rdisc_dtod_upper_bound: float = 0
+    """The maximum boundary for truncating ``rdisc`` during the device to device instantiation.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
-    rdet_dtod_lower_bound: float = 0
-    """The minimum boundary for truncating ``rdet`` during the device to device instantiation.
+    rdisc_dtod_lower_bound: float = 0
+    """The minimum boundary for truncating ``rdisc`` during the device to device instantiation.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     Read [1] for more information."""
 
     Ndiscmax_std: float = 0
@@ -1312,7 +1337,7 @@ class JARTv1bDevice(PulsedDevice):
 
     Ndiscmax_ctoc_upper_bound_old: float = 0
     """The maximum allowed value for ``Ndiscmax`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     This parameter is for the old version of ctoc variation, where the ctoc range is
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
@@ -1320,6 +1345,7 @@ class JARTv1bDevice(PulsedDevice):
 
     Ndiscmax_ctoc_lower_bound_old: float = 0
     """The minimum allowed value for ``Ndiscmax`` during the random walk process.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
     please use ``Ndiscmax_ctoc_lower_bound`` when using CPU."""
@@ -1327,11 +1353,12 @@ class JARTv1bDevice(PulsedDevice):
     Ndiscmax_ctoc_upper_bound: float = 0
     """The maximum allowed percentage based on the device to device initialization 
     for ``Ndiscmax`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
     Ndiscmax_ctoc_lower_bound: float = 0
     """The minimum allowed percentage based on the device to device initialization 
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     for ``Ndiscmax`` during the random walk process.
     Read [1] for more information."""
 
@@ -1347,13 +1374,14 @@ class JARTv1bDevice(PulsedDevice):
     
     Ndiscmin_ctoc_upper_bound_old: float = 0
     """The maximum allowed value for ``Ndiscmin`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
     please use ``Ndiscmin_ctoc_upper_bound`` when using CPU."""
     
     Ndiscmin_ctoc_lower_bound_old: float = 0
     """The minimum allowed value for ``Ndiscmin`` during the random walk process.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
     please use ``Ndiscmin_ctoc_lower_bound`` when using CPU."""
@@ -1361,94 +1389,99 @@ class JARTv1bDevice(PulsedDevice):
     Ndiscmin_ctoc_upper_bound: float = 0
     """The maximum allowed percentage based on the device to device initialization 
     for ``Ndiscmin`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
     
     Ndiscmin_ctoc_lower_bound: float = 0
     """The minimum allowed percentage based on the device to device initialization 
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     for ``Ndiscmin`` during the random walk process.
     Read [1] for more information."""
 
-    ldet_std: float = 0
-    """Cycle-to-cycle std deviation of ``ldet``, used in a random walk process. 
-    Generates a gaussian noise that is directly added to ``ldet`` for every update.
+    ldisc_std: float = 0
+    """Cycle-to-cycle std deviation of ``ldisc``, used in a random walk process. 
+    Generates a gaussian noise that is directly added to ``ldisc`` for every update.
     Read [1] for more information."""
 
-    ldet_std_slope: float = 0
-    r"""Cycle-to-cycle std deviation of ``ldet``, used in a random walk process. 
+    ldisc_std_slope: float = 0
+    r"""Cycle-to-cycle std deviation of ``ldisc``, used in a random walk process. 
     Generates a gaussian noise that is realted to the change in ``Ndisc``,
-    Larger updates will induce larger variations in  ``ldet``.
+    Larger updates will induce larger variations in  ``ldisc``.
 
     Thus it is:
 
     .. math::
-        {ldet}_{new} = {ldet}_{old} * \left(1 + \sigma_\text{ldet_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{ldet_std_slope}\xi_{Uniform}\right)
+        {ldisc}_{new} = {ldisc}_{old} * \left(1 + \sigma_\text{ldisc_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{ldisc_std_slope}\xi_{Uniform}\right)
 
     Read [1] for more information."""
 
-    ldet_ctoc_upper_bound_old: float = 0
-    """The maximum allowed value for ``ldet`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    ldisc_ctoc_upper_bound_old: float = 0
+    """The maximum allowed value for ``ldisc`` during the random walk process.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
-    please use ``ldet_ctoc_upper_bound`` when using CPU."""
+    please use ``ldisc_ctoc_upper_bound`` when using CPU."""
 
-    ldet_ctoc_lower_bound_old: float = 0
-    """The minimum allowed value for ``ldet`` during the random walk process.
+    ldisc_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``ldisc`` during the random walk process.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
-    please use ``ldet_ctoc_lower_bound`` when using CPU."""
+    please use ``ldisc_ctoc_lower_bound`` when using CPU."""
 
-    ldet_ctoc_upper_bound: float = 0
+    ldisc_ctoc_upper_bound: float = 0
     """The maximum allowed percentage based on the device to device initialization 
-    for ``ldet`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    for ``ldisc`` during the random walk process.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
-    ldet_ctoc_lower_bound: float = 0
+    ldisc_ctoc_lower_bound: float = 0
     """The minimum allowed percentage based on the device to device initialization 
-    for ``ldet`` during the random walk process.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
+    for ``ldisc`` during the random walk process.
     Read [1] for more information."""
 
-    rdet_std: float = 0
-    """Cycle-to-cycle std deviation of ``rdet``, used in a random walk process. 
-    Generates a gaussian noise that is directly added to ``rdet`` for every update.
+    rdisc_std: float = 0
+    """Cycle-to-cycle std deviation of ``rdisc``, used in a random walk process. 
+    Generates a gaussian noise that is directly added to ``rdisc`` for every update.
     Read [1] for more information."""
 
-    rdet_std_slope: float = 0
-    r"""Cycle-to-cycle std deviation of ``rdet``, used in a random walk process. 
+    rdisc_std_slope: float = 0
+    r"""Cycle-to-cycle std deviation of ``rdisc``, used in a random walk process. 
     Generates a gaussian noise that is realted to the change in ``Ndisc``,
-    Larger updates will induce larger variations in  ``rdet``.
+    Larger updates will induce larger variations in  ``rdisc``.
 
     Thus it is:
 
     .. math::
-        {rdet}_{new} = {rdet}_{old} * \left(1 + \sigma_\text{rdet_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{rdet_std_slope}\xi_{Uniform}\right)
+        {rdisc}_{new} = {rdisc}_{old} * \left(1 + \sigma_\text{rdisc_std}\xi_{Uniform} + \frac{{Ndisc}_{new} - {Ndisc}_{old}}{{Ndiscmax} - {Ndisc}_{old}} * \sigma_\text{rdisc_std_slope}\xi_{Uniform}\right)
 
     Read [1] for more information."""
 
-    rdet_ctoc_upper_bound_old: float = 0
-    """The maximum allowed value for ``rdet`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    rdisc_ctoc_upper_bound_old: float = 0
+    """The maximum allowed value for ``rdisc`` during the random walk process.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
-    please use ``rdet_ctoc_upper_bound`` when using CPU."""
+    please use ``rdisc_ctoc_upper_bound`` when using CPU."""
 
-    rdet_ctoc_lower_bound_old: float = 0
-    """The minimum allowed value for ``rdet`` during the random walk process.
+    rdisc_ctoc_lower_bound_old: float = 0
+    """The minimum allowed value for ``rdisc`` during the random walk process.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
     applied later, and have to be larger than the dtod range.
     This parameter is preserved for CUDA implementation only,
-    please use ``rdet_ctoc_lower_bound`` when using CPU."""
+    please use ``rdisc_ctoc_lower_bound`` when using CPU."""
 
-    rdet_ctoc_upper_bound: float = 0
+    rdisc_ctoc_upper_bound: float = 0
     """The maximum allowed percentage based on the device to device initialization 
-    for ``rdet`` during the random walk process.
-    The upper and lower bounds will be disabled if the supplied value is 0 or negative.
+    for ``rdisc`` during the random walk process.
+    The upper bounds will be disabled if the supplied value is 0 or negative.
     Read [1] for more information."""
 
-    rdet_ctoc_lower_bound: float = 0
+    rdisc_ctoc_lower_bound: float = 0
     """The minimum allowed percentage based on the device to device initialization 
-    for ``rdet`` during the random walk process.
+    The lower bounds has default vlues of 0 to make sure that all values are positive.
+    for ``rdisc`` during the random walk process.
     Read [1] for more information."""
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
