@@ -18,7 +18,8 @@
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.nn.conversion import convert_to_analog
 
-from transformers import AutoTokenizer, BertForQuestionAnswering
+from transformers import (AutoTokenizer, BertForQuestionAnswering,
+                        Trainer, TrainingArguments, DefaultDataCollator)
 
 from datasets import load_dataset
 
@@ -31,24 +32,29 @@ squad = load_dataset("squad")
 
 print(squad["train"][0])
 
+# From huggingface tutorial on question answering
 # Some examples in the dataset may have contexts that exceed the maximum input length
 #   We can truncate the context using truncation="only_second"
 #
 def preprocess(dataset):
-    questions = [ q.strip() for q in dataset["questions"] ]
+    questions = [ q.strip() for q in dataset["question"] ]
     inputs = tokenizer(
         questions,
         dataset["context"],
         max_length=384,
+        stride=128,
         truncation="only_second",
+        return_overflowing_tokens=True,
+        return_offsets_mapping=True,
+        padding="max_length"
     )
 
-    offset_mapping = inputs.pop("offset_mapping")
+    offset_mappings = inputs.pop("offset_mapping")
     answers = dataset["answers"]
     start_positions = []
     end_positions = []
 
-    for i, offset in enumerate(offset_mapping):
+    for i, offset in enumerate(offset_mappings):
         answer = answers[i]
         start_char = answer["answer_start"][0]
         end_char = answer["answer_start"][0] + len(answer["text"][0])
@@ -64,16 +70,29 @@ def preprocess(dataset):
         context_end = idx - 1
 
         # If the answer is not fully inside the context, label it (0, 0)
+
+        # offset[context_start][0] gets the character position corresponding to the start
+        # of the token at the beginning of the context
+        # offset[context_start][1] gets the character position corresponding to the end
+        # of the token at the end of the context
+
+        # We then check that the answer is contained within these corresponding positions
         if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
+            # The answer isn't contained within the context, so add (0, 0)
             start_positions.append(0)
             end_positions.append(0)
         else:
             # Otherwise it's the start and end token positions
+
+            # Shift a pointer from the beginning of the context over to the beginning of
+            # the first token in the answer
             idx = context_start
             while idx <= context_end and offset[idx][0] <= start_char:
                 idx += 1
             start_positions.append(idx - 1)
 
+            # Shift a pointer from the end of the context over to the end of
+            # the last token in the answer
             idx = context_end
             while idx >= context_start and offset[idx][1] >= end_char:
                 idx -= 1
@@ -82,3 +101,30 @@ def preprocess(dataset):
     inputs["start_positions"] = start_positions
     inputs["end_positions"] = end_positions
     return inputs
+
+# Preprocessing changes number of samples, so we need to remove some columns so
+# the data updates properly
+squad = squad.map(preprocess, batched=True, remove_columns=squad["train"].column_names)
+
+training_args = TrainingArguments(
+    output_dir='./',
+    evaluation_strategy="epoch",
+    learning_rate=1e-4,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=3,
+    weight_decay=0.01,
+)
+
+collator = DefaultDataCollator()
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    data_collator=collator,
+    train_dataset=squad["train"],
+    eval_dataset=squad["validation"],
+    tokenizer=tokenizer,
+)
+
+trainer.train()
