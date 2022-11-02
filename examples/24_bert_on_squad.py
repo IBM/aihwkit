@@ -25,7 +25,7 @@ from datasets import load_dataset
 
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
-model = BertForQuestionAnswering.from_pretrained("bert-base-uncased", low_cpu_mem_usage=True)
+model = BertForQuestionAnswering.from_pretrained("bert-base-uncased")
 model = convert_to_analog(model, SingleRPUConfig())
 
 squad = load_dataset("squad")
@@ -42,9 +42,7 @@ def preprocess(dataset):
         questions,
         dataset["context"],
         max_length=384,
-        stride=128,
         truncation="only_second",
-        return_overflowing_tokens=True,
         return_offsets_mapping=True,
         padding="max_length"
     )
