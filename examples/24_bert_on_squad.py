@@ -17,6 +17,7 @@
 
 from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.nn.conversion import convert_to_analog
+from aihwkit.optim import AnalogSGD
 
 from transformers import (AutoTokenizer, BertForQuestionAnswering,
                         Trainer, TrainingArguments, DefaultDataCollator)
@@ -107,7 +108,6 @@ squad = squad.map(preprocess, batched=True, remove_columns=squad["train"].column
 training_args = TrainingArguments(
     output_dir='./',
     evaluation_strategy="epoch",
-    learning_rate=1e-4,
     per_device_train_batch_size=16,
     per_device_eval_batch_size=16,
     num_train_epochs=3,
@@ -116,6 +116,8 @@ training_args = TrainingArguments(
 
 collator = DefaultDataCollator()
 
+optimizer = AnalogSGD(model.parameters(), lr=2e-4)
+
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -123,6 +125,19 @@ trainer = Trainer(
     train_dataset=squad["train"],
     eval_dataset=squad["validation"],
     tokenizer=tokenizer,
+    optimizers=(optimizer, None)
 )
 
 trainer.train()
+
+''' Next steps
+        - Create analog optimizer
+        - Start using tensor board to track info + debugging
+        - Use a custom RPU configuration for Inference on PCM device
+
+    Drift Experiment
+        - Take digital model and fine-tune it on a task + use it for inference
+        - Perform hardware-aware training with same model
+        - Show that hwa training creates a more robust model
+            since drift is accomodated for over time
+'''
