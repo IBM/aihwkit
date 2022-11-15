@@ -15,11 +15,14 @@
 # pylint: disable=invalid-name
 # pylint: disable=too-many-locals
 
+import numpy as np
+import collections
+
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import WeightClipType, WeightNoiseType, BoundManagementType
 from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.simulator.presets.utils import PresetIOParameters
-from aihwkit.nn.conversion import convert_to_analog
+from aihwkit.nn.conversion import convert_to_analog_mapped
 from aihwkit.optim import AnalogSGD
 
 from transformers import (AutoTokenizer, AutoModelForQuestionAnswering,
@@ -50,7 +53,7 @@ def create_rpu_config(g_max = 160, tile_size=256, dac_res=256, adc_res=256, w_no
 
 def create_model_and_tokenizer(rpu_config):
     model = AutoModelForQuestionAnswering.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
-    model = convert_to_analog(model, rpu_config)
+    model = convert_to_analog_mapped(model, rpu_config)
 
     tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
     return model, tokenizer
@@ -167,6 +170,90 @@ def preprocess_validation(dataset, tokenizer):
 
     return tokenized_dataset
 
+def postprocess_predictions(examples, features, raw_predictions, n_best_size = 20, max_answer_length = 30):
+    features.set_format(type=features.format["type"], columns=list(features.features.keys()))
+    all_start_logits, all_end_logits = raw_predictions
+
+    # Map examples ids to index
+    example_id_to_index = { k: i for i, k in enumerate(examples["id"]) }
+
+    # Create dict of lists, mapping example indices with corresponding feature indices
+    features_per_example = collections.defaultdict(list)
+
+    for i, feature in enumerate(features):
+        # For each example, take example_id, map to corresponding index
+        features_per_example[example_id_to_index[feature["example_id"]]].append(i)
+
+    # The dictionaries we have to fill
+    predictions = collections.OrderedDict()
+
+    print(f"Post-processing {len(examples)} example predictions split into {len(features)} features.")
+
+    # Loop over all examples
+    for example_index, example in enumerate(examples):
+        # Find the feature indices corresponding to the current example
+        feature_indices = features_per_example[example_index]
+
+        # Store valid answers
+        valid_answers = []
+
+        context = example["context"]
+        # Looping through all the features associated to the current example.
+        for feature_index in feature_indices:
+            # We grab the predictions of the model for this feature.
+            start_logits = all_start_logits[feature_index]
+            end_logits = all_end_logits[feature_index]
+
+            # This is what will allow us to map some the positions in our logits to span of texts in the original
+            # context.
+            offset_mapping = features[feature_index]["offset_mapping"]
+
+            # Go through all possibilities for the `n_best_size` greater start and end logits.
+            start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            for start_index in start_indexes:
+                for end_index in end_indexes:
+                    # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
+                    # to part of the input_ids that are not in the context.
+                    if (
+                        start_index >= len(offset_mapping)
+                        or end_index >= len(offset_mapping)
+                        or offset_mapping[start_index] is None
+                        or offset_mapping[end_index] is None
+                    ):
+                        continue
+                    # Don't consider answers with a length that is either < 0 or > max_answer_length.
+                    if end_index < start_index or end_index - start_index + 1 > max_answer_length:
+                        continue
+
+                    # Map the start token to the index of the start of that token in the context
+                    # Map the end token to the index of the end of that token in the context
+                    start_char = offset_mapping[start_index][0]
+                    end_char = offset_mapping[end_index][1]
+
+                    # Add the answer
+                    # Score is the sum of logits for the start and end position of the answer
+                    # Include the text which is taken directly from the context
+                    valid_answers.append(
+                        {
+                            "score": start_logits[start_index] + end_logits[end_index],
+                            "text": context[start_char : end_char]
+                        }
+                    )
+
+        # If we have valid answers, choose the best one
+        if len(valid_answers) > 0:
+            best_answer = sorted(valid_answers, key=lambda x: x["score"], reverse=True)[0]
+        else:
+            # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
+            # failure.
+            best_answer = {"text": "", "score": 0.0}
+
+        # Choose the best answer as the prediction for the current example
+        predictions[example["id"]] = best_answer["text"]
+
+    return predictions
+
 def create_dataset():
     squad = load_dataset("squad")
 
@@ -178,15 +265,18 @@ def create_dataset():
     return squad
 
 def create_optimizer(model):
+    """Create the analog-aware optimizer"""
+
     optimizer = AnalogSGD(model.parameters(), lr=2e-4)
 
     optimizer.regroup_param_groups(model)
+
     return optimizer
 
 def make_trainer(model, optimizer, squad, tokenizer):
     training_args = TrainingArguments(
         output_dir='./',
-        evaluation_strategy="no",
+        save_strategy="no",
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         num_train_epochs=3,
@@ -207,23 +297,36 @@ def make_trainer(model, optimizer, squad, tokenizer):
 
     return trainer
 
-def do_inference(model, trainer, squad, t_inferences=[0., 1., 20., 1000., 1e5]):
+def do_inference(model, trainer, squad, max_inference_time=1e6, n_times=9):
     eval_data = squad["validation"].map(preprocess_validation, batched=True, remove_columns=squad["validation"].column_names)
 
-    raw_predictions = trainer.predict(eval_data)
+    metric = load_metric("squad")
+    drift_metrics = []
 
-    # TODO: create function to postprocess predictions and evaluate the
+    ground_truth = [ { "id": ex["id"], "answers": ex["answers"] } for ex in squad["validation"] ]
 
-    for t_inference in t_inferences:
+    # TODO: integrate tensorboard and test in AiMOS
+
+    t_inference_list = [0.0] + np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
+
+    for t_inference in t_inference_list:
         model.drift_analog_weights(t_inference)
 
         # Perform inference + evaluate metric here
+        raw_predictions = trainer.predict(eval_data)
+        predictions = postprocess_predictions(squad["validation"], eval_data, raw_predictions)
 
+        # Format to list of dicts instead of a large dict
+        formatted_preds = [ { "id": k, "text": v } for k, v in predictions.items() ]
+        drift_metrics.append(metric.compute(predictions=formatted_preds, references=ground_truth))
 
 rpu_config = create_rpu_config()
 model, tokenizer = create_model_and_tokenizer(rpu_config)
 squad = create_dataset()
 optimizer = create_optimizer(model)
+trainer = make_trainer(model, optimizer, squad, tokenizer)
+
+do_inference(model, trainer, squad)
 
 
 ''' Next steps
