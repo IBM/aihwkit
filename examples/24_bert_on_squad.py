@@ -25,6 +25,7 @@ from aihwkit.simulator.configs.utils import WeightClipType, WeightNoiseType, Bou
 from aihwkit.simulator.presets.utils import PresetIOParameters
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn.conversion import convert_to_analog_mapped
+from aihwkit.nn.modules.container import AnalogSequential
 from aihwkit.optim import AnalogSGD
 
 from transformers import (
@@ -63,16 +64,20 @@ def create_rpu_config(g_max = 160, tile_size=256, dac_res=256, adc_res=256, w_no
     return rpu_config
 
 def create_model_and_tokenizer(rpu_config):
-    model = AutoModelForQuestionAnswering.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
-    model = convert_to_analog_mapped(model, rpu_config)
+    model = AutoModelForQuestionAnswering.from_pretrained("csarron/bert-base-uncased-squad-v1")
+    model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
+    print(model)
 
-    tokenizer = AutoTokenizer.from_pretrained("bert-large-uncased-whole-word-masking-finetuned-squad")
+    tokenizer = AutoTokenizer.from_pretrained("csarron/bert-base-uncased-squad-v1")
     return model, tokenizer
+
+rpu_config = create_rpu_config()
+model, tokenizer = create_model_and_tokenizer(rpu_config)
 
 # From huggingface tutorial on question answering
 # Some examples in the dataset may have contexts that exceed the maximum input length
 #   We can truncate the context using truncation="only_second"
-def preprocess_train(dataset, tokenizer):
+def preprocess_train(dataset):
     questions = [ q.strip() for q in dataset["question"] ]
     inputs = tokenizer(
         questions,
@@ -136,17 +141,17 @@ def preprocess_train(dataset, tokenizer):
     inputs["end_positions"] = end_positions
     return inputs
 
-def preprocess_validation(dataset, tokenizer):
+def preprocess_validation(dataset):
     # Some of the questions have lots of whitespace on the left, which is not useful and will make the
     # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
     # left whitespace
-    dataset["question"] = [ q.lstrip() for q in dataset["question"] ]
+    questions = [ q.lstrip() for q in dataset["question"] ]
 
     # Tokenize our dataset with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
     tokenized_dataset = tokenizer(
-        dataset["question"],
+        questions,
         dataset["context"],
         truncation="only_second",
         max_length=384,
@@ -265,15 +270,15 @@ def postprocess_predictions(examples, features, raw_predictions, n_best_size = 2
 
     return predictions
 
-def create_dataset():
+def create_datasets():
     squad = load_dataset("squad")
-
-    print(squad["train"][0])
 
     # Preprocessing changes number of samples, so we need to remove some columns so
     # the data updates properly
-    squad = squad.map(preprocess_train, batched=True, remove_columns=squad["train"].column_names)
-    return squad
+    tokenized_data = squad.map(preprocess_train, batched=True, remove_columns=squad["train"].column_names)
+    eval_data = squad["validation"].map(preprocess_validation, batched=True, remove_columns=squad["validation"].column_names)
+
+    return squad, tokenized_data, eval_data
 
 def create_optimizer(model):
     """Create the analog-aware optimizer"""
@@ -284,12 +289,12 @@ def create_optimizer(model):
 
     return optimizer
 
-def make_trainer(model, optimizer, squad, tokenizer):
+def make_trainer(model, optimizer, tokenized_data, tokenizer):
     training_args = TrainingArguments(
         output_dir='./',
         save_strategy="no",
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        per_device_train_batch_size=2,
+        per_device_eval_batch_size=2,
         num_train_epochs=3,
         weight_decay=0.01,
     )
@@ -300,20 +305,20 @@ def make_trainer(model, optimizer, squad, tokenizer):
     writer = SummaryWriter(log_dir=log_dir)
 
     trainer = Trainer(
-        model=model,
+        model=model[0],
         args=training_args,
         data_collator=collator,
-        train_dataset=squad["train"],
-        eval_dataset=squad["validation"],
+        train_dataset=tokenized_data["train"],
+        eval_dataset=tokenized_data["validation"],
         tokenizer=tokenizer,
         optimizers=(optimizer, None),
-        callbacks=TensorBoardCallback(writer)
+        callbacks=[ TensorBoardCallback(writer) ]
     )
 
     return trainer
 
-def do_inference(model, trainer, squad, max_inference_time=1e6, n_times=9):
-    eval_data = squad["validation"].map(preprocess_validation, batched=True, remove_columns=squad["validation"].column_names)
+def do_inference(model, trainer, squad, eval_data, max_inference_time=1e6, n_times=9):
+    model.eval()
 
     metric = load_metric("squad")
     drift_metrics = []
@@ -327,7 +332,7 @@ def do_inference(model, trainer, squad, max_inference_time=1e6, n_times=9):
 
         # Perform inference + evaluate metric here
         raw_predictions = trainer.predict(eval_data)
-        predictions = postprocess_predictions(squad["validation"], eval_data, raw_predictions)
+        predictions = postprocess_predictions(squad["validation"], eval_data, raw_predictions.predictions)
 
         # Format to list of dicts instead of a large dict
         formatted_preds = [ { "id": k, "text": v } for k, v in predictions.items() ]
@@ -338,13 +343,11 @@ def do_inference(model, trainer, squad, max_inference_time=1e6, n_times=9):
               f"F1: {f1: .2f}\t"
               f"Drift: {drift: .2e}")
 
-rpu_config = create_rpu_config()
-model, tokenizer = create_model_and_tokenizer(rpu_config)
-squad = create_dataset()
+squad, tokenized_data, eval_data = create_datasets()
 optimizer = create_optimizer(model)
-trainer = make_trainer(model, optimizer, squad, tokenizer)
+trainer = make_trainer(model, optimizer, tokenized_data, tokenizer)
 
-do_inference(model, trainer, squad)
+do_inference(model, trainer, squad, eval_data)
 
 
 ''' Next steps
