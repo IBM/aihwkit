@@ -15,18 +15,29 @@
 # pylint: disable=invalid-name
 # pylint: disable=too-many-locals
 
+from datetime import datetime
+
 import numpy as np
 import collections
 
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import WeightClipType, WeightNoiseType, BoundManagementType
-from aihwkit.simulator.noise_models import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.simulator.presets.utils import PresetIOParameters
+from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn.conversion import convert_to_analog_mapped
 from aihwkit.optim import AnalogSGD
 
-from transformers import (AutoTokenizer, AutoModelForQuestionAnswering,
-                        Trainer, TrainingArguments, DefaultDataCollator)
+from transformers import (
+    AutoTokenizer,
+    AutoModelForQuestionAnswering,
+    Trainer,
+    TrainingArguments,
+    DefaultDataCollator,
+)
+
+from transformers.integrations import TensorBoardCallback
+
+from torch.utils.tensorboard import SummaryWriter
 
 from datasets import load_dataset, load_metric
 
@@ -285,6 +296,9 @@ def make_trainer(model, optimizer, squad, tokenizer):
 
     collator = DefaultDataCollator()
 
+    log_dir="logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    writer = SummaryWriter(log_dir=log_dir)
+
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -292,7 +306,8 @@ def make_trainer(model, optimizer, squad, tokenizer):
         train_dataset=squad["train"],
         eval_dataset=squad["validation"],
         tokenizer=tokenizer,
-        optimizers=(optimizer, None)
+        optimizers=(optimizer, None),
+        callbacks=TensorBoardCallback(writer)
     )
 
     return trainer
@@ -304,8 +319,6 @@ def do_inference(model, trainer, squad, max_inference_time=1e6, n_times=9):
     drift_metrics = []
 
     ground_truth = [ { "id": ex["id"], "answers": ex["answers"] } for ex in squad["validation"] ]
-
-    # TODO: integrate tensorboard and test in AiMOS
 
     t_inference_list = [0.0] + np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
 
@@ -320,6 +333,11 @@ def do_inference(model, trainer, squad, max_inference_time=1e6, n_times=9):
         formatted_preds = [ { "id": k, "text": v } for k, v in predictions.items() ]
         drift_metrics.append(metric.compute(predictions=formatted_preds, references=ground_truth))
 
+        exact_match, f1, drift = drift_metrics[-1]["exact_match"], drift_metrics[-1]["f1"], t_inference
+        print(f"Exact match: {exact_match: .2f}\t"
+              f"F1: {f1: .2f}\t"
+              f"Drift: {drift: .2e}")
+
 rpu_config = create_rpu_config()
 model, tokenizer = create_model_and_tokenizer(rpu_config)
 squad = create_dataset()
@@ -331,7 +349,6 @@ do_inference(model, trainer, squad)
 
 ''' Next steps
         - Convert to notebook
-        - Start using tensor board to track info + debugging
         - Drift Experiment
             - Take digital model and fine-tune it on a task + use it for inference
             - Perform hardware-aware training with model
