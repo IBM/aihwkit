@@ -41,6 +41,7 @@ from transformers.integrations import TensorBoardCallback
 from torch.utils.tensorboard import SummaryWriter
 
 from evaluate import load
+from datasets import load_dataset
 
 # max length and stride specific to pretrained model
 max_length=320
@@ -170,8 +171,8 @@ def preprocess_validation(dataset):
         dataset["question"],
         dataset["context"],
         truncation="only_second",
-        max_length=384,
-        stride=128,
+        max_length=max_length,
+        stride=doc_stride,
         return_overflowing_tokens=True,
         return_offsets_mapping=True,
         padding="max_length",
@@ -287,7 +288,7 @@ def postprocess_predictions(examples, features, raw_predictions, n_best_size = 2
     return predictions
 
 def create_datasets():
-    squad = load("squad")
+    squad = load_dataset("squad")
 
     # Preprocessing changes number of samples, so we need to remove some columns so
     # the data updates properly
