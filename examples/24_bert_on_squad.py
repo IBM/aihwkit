@@ -310,8 +310,8 @@ def make_trainer(model, optimizer, tokenized_data, tokenizer):
     training_args = TrainingArguments(
         output_dir='./',
         save_strategy="no",
-        per_device_train_batch_size=2,
-        per_device_eval_batch_size=2,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
         num_train_epochs=3,
         weight_decay=0.01,
     )
