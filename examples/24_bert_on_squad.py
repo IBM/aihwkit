@@ -40,9 +40,13 @@ from transformers.integrations import TensorBoardCallback
 
 from torch.utils.tensorboard import SummaryWriter
 
-from datasets import load_dataset, load_metric
+from evaluate import load
 
-def create_rpu_config(g_max = 160, tile_size=256, dac_res=256, adc_res=256, w_noise=0.1):
+# max length and stride specific to pretrained model
+max_length=320
+doc_stride=128
+
+def create_rpu_config(g_max=160, tile_size=256, dac_res=256, adc_res=256, w_noise=0.1):
     rpu_config = InferenceRPUConfig()
     rpu_config.clip.type = WeightClipType.FIXED_VALUE
     rpu_config.clip.fixed_value = 1.0
@@ -74,84 +78,96 @@ def create_model_and_tokenizer(rpu_config):
 rpu_config = create_rpu_config()
 model, tokenizer = create_model_and_tokenizer(rpu_config)
 
-# From huggingface tutorial on question answering
 # Some examples in the dataset may have contexts that exceed the maximum input length
 #   We can truncate the context using truncation="only_second"
 def preprocess_train(dataset):
-    questions = [ q.strip() for q in dataset["question"] ]
-    inputs = tokenizer(
-        questions,
+    # Some of the questions have lots of whitespace on the left, which is not useful and will make the
+    # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
+    # left whitespace
+    dataset["question"] =  [q.lstrip() for q in dataset["question"] ]
+
+    # Tokenize our dataset with truncation and padding, but keep the overflows using a stride. This results
+    # in one example possible giving several features when a context is long, each of those features having a
+    # context that overlaps a bit the context of the previous feature.
+    tokenized_dataset = tokenizer(
+        dataset["question"],
         dataset["context"],
-        max_length=384,
         truncation="only_second",
+        max_length=max_length,
+        stride=doc_stride,
+        return_overflowing_tokens=True,
         return_offsets_mapping=True,
-        padding="max_length"
+        padding="max_length",
     )
 
-    offset_mappings = inputs.pop("offset_mapping")
-    answers = dataset["answers"]
-    start_positions = []
-    end_positions = []
+    # Since one example might give us several features if it has a long context, we need a map from a feature to
+    # its corresponding example. This key gives us just that.
+    sample_mapping = tokenized_dataset.pop("overflow_to_sample_mapping")
+    # The offset mappings will give us a map from token to character position in the original context. This will
+    # help us compute the start_positions and end_positions.
+    offset_mapping = tokenized_dataset.pop("offset_mapping")
 
-    for i, offset in enumerate(offset_mappings):
-        answer = answers[i]
-        start_char = answer["answer_start"][0]
-        end_char = answer["answer_start"][0] + len(answer["text"][0])
-        sequence_ids = inputs.sequence_ids(i)
+    # Let's label those dataset!
+    tokenized_dataset["start_positions"] = []
+    tokenized_dataset["end_positions"] = []
 
-        # Find the start and end of the context
-        idx = 0
-        while sequence_ids[idx] != 1:
-            idx += 1
-        context_start = idx
-        while sequence_ids[idx] == 1:
-            idx += 1
-        context_end = idx - 1
+    for i, offsets in enumerate(offset_mapping):
+        # We will label impossible answers with the index of the CLS token.
+        input_ids = tokenized_dataset["input_ids"][i]
+        cls_index = input_ids.index(tokenizer.cls_token_id)
 
-        # If the answer is not fully inside the context, label it (0, 0)
+        # Grab the sequence corresponding to that example (to know what is the context and what is the question).
+        sequence_ids = tokenized_dataset.sequence_ids(i)
 
-        # offset[context_start][0] gets the character position corresponding to the start
-        # of the token at the beginning of the context
-        # offset[context_start][1] gets the character position corresponding to the end
-        # of the token at the end of the context
-
-        # We then check that the answer is contained within these corresponding positions
-        if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
-            # The answer isn't contained within the context, so add (0, 0)
-            start_positions.append(0)
-            end_positions.append(0)
+        # One example can give several spans, this is the index of the example containing this span of text.
+        sample_index = sample_mapping[i]
+        answers = dataset["answers"][sample_index]
+        # If no answers are given, set the cls_index as answer.
+        if len(answers["answer_start"]) == 0:
+            tokenized_dataset["start_positions"].append(cls_index)
+            tokenized_dataset["end_positions"].append(cls_index)
         else:
-            # Otherwise it's the start and end token positions
+            # Start/end character index of the answer in the text.
+            start_char = answers["answer_start"][0]
+            end_char = start_char + len(answers["text"][0])
 
-            # Shift a pointer from the beginning of the context over to the beginning of
-            # the first token in the answer
-            idx = context_start
-            while idx <= context_end and offset[idx][0] <= start_char:
-                idx += 1
-            start_positions.append(idx - 1)
+            # Start token index of the current span in the text.
+            token_start_index = 0
+            while sequence_ids[token_start_index] != 1:
+                token_start_index += 1
 
-            # Shift a pointer from the end of the context over to the end of
-            # the last token in the answer
-            idx = context_end
-            while idx >= context_start and offset[idx][1] >= end_char:
-                idx -= 1
-            end_positions.append(idx + 1)
+            # End token index of the current span in the text.
+            token_end_index = len(input_ids) - 1
+            while sequence_ids[token_end_index] != 1:
+                token_end_index -= 1
 
-    inputs["start_positions"] = start_positions
-    inputs["end_positions"] = end_positions
-    return inputs
+            # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
+            if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
+                tokenized_dataset["start_positions"].append(cls_index)
+                tokenized_dataset["end_positions"].append(cls_index)
+            else:
+                # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
+                # Note: we could go after the last offset if the answer is the last word (edge case).
+                while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
+                    token_start_index += 1
+                tokenized_dataset["start_positions"].append(token_start_index - 1)
+                while offsets[token_end_index][1] >= end_char:
+                    token_end_index -= 1
+                tokenized_dataset["end_positions"].append(token_end_index + 1)
+
+    return tokenized_dataset
 
 def preprocess_validation(dataset):
     # Some of the questions have lots of whitespace on the left, which is not useful and will make the
     # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
     # left whitespace
-    questions = [ q.lstrip() for q in dataset["question"] ]
+    dataset["question"] = [ q.lstrip() for q in dataset["question"] ]
 
     # Tokenize our dataset with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
     tokenized_dataset = tokenizer(
-        questions,
+        dataset["question"],
         dataset["context"],
         truncation="only_second",
         max_length=384,
@@ -271,7 +287,7 @@ def postprocess_predictions(examples, features, raw_predictions, n_best_size = 2
     return predictions
 
 def create_datasets():
-    squad = load_dataset("squad")
+    squad = load("squad")
 
     # Preprocessing changes number of samples, so we need to remove some columns so
     # the data updates properly
@@ -315,13 +331,12 @@ def make_trainer(model, optimizer, tokenized_data, tokenizer):
         callbacks=[ TensorBoardCallback(writer) ]
     )
 
-    return trainer
+    return trainer, writer
 
-def do_inference(model, trainer, squad, eval_data, max_inference_time=1e6, n_times=9):
+def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9):
     model.eval()
 
-    metric = load_metric("squad")
-    drift_metrics = []
+    metric = load("squad")
 
     ground_truth = [ { "id": ex["id"], "answers": ex["answers"] } for ex in squad["validation"] ]
 
@@ -335,26 +350,33 @@ def do_inference(model, trainer, squad, eval_data, max_inference_time=1e6, n_tim
         predictions = postprocess_predictions(squad["validation"], eval_data, raw_predictions.predictions)
 
         # Format to list of dicts instead of a large dict
-        formatted_preds = [ { "id": k, "text": v } for k, v in predictions.items() ]
-        drift_metrics.append(metric.compute(predictions=formatted_preds, references=ground_truth))
+        formatted_preds = [ { "id": k, "prediction_text": v } for k, v in predictions.items() ]
 
-        exact_match, f1, drift = drift_metrics[-1]["exact_match"], drift_metrics[-1]["f1"], t_inference
+        out_metric = metric.compute(predictions=formatted_preds, references=ground_truth)
+        f1, exact_match = out_metric["f1"], out_metric["exact_match"]
+
+        writer.add_scalar('val/f1', f1, t_inference)
+        writer.add_scalar('val/exact_match', exact_match, t_inference)
+
+        exact_match, f1, drift = exact_match, f1, t_inference
         print(f"Exact match: {exact_match: .2f}\t"
               f"F1: {f1: .2f}\t"
               f"Drift: {drift: .2e}")
 
 squad, tokenized_data, eval_data = create_datasets()
 optimizer = create_optimizer(model)
-trainer = make_trainer(model, optimizer, tokenized_data, tokenizer)
+trainer, writer = make_trainer(model, optimizer, tokenized_data, tokenizer)
 
-do_inference(model, trainer, squad, eval_data)
+do_inference(model, trainer, squad, eval_data, writer)
 
 
 ''' Next steps
-        - Convert to notebook
         - Drift Experiment
             - Take digital model and fine-tune it on a task + use it for inference
             - Perform hardware-aware training with model
             - Show that hwa training creates a more robust model
                 since drift is accomodated for over time
+        - Add setup/installation steps needed to run example to README
+        - Distributed compute
+        - Convert to notebook
 '''
