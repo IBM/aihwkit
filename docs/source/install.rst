@@ -46,7 +46,7 @@ creating an analog layer and predicting the output::
     from torch import Tensor
     from aihwkit.nn import AnalogLinear
 
-    model = AnalogLinear(3, 2)
+    model = AnalogLinear(2, 2)
     model(Tensor([[0.1, 0.2], [0.3, 0.4]]))
 
 If you encounter any issues during the installation or executing the snippet,
