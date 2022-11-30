@@ -20,6 +20,8 @@ from datetime import datetime
 import numpy as np
 import collections
 
+import argparse
+
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import WeightClipType, WeightNoiseType, BoundManagementType
 from aihwkit.simulator.presets.utils import PresetIOParameters
@@ -43,9 +45,43 @@ from torch.utils.tensorboard import SummaryWriter
 from evaluate import load
 from datasets import load_dataset
 
+# Parse some arguments
+parser = argparse.ArgumentParser('Analog BERT on SQuAD example')
+parser.add_argument('-d', '--digital',
+                    help='Add to use digital inference',
+                    action='store_true')
+parser.add_argument('-i', '--ideal',
+                    help='Add to use ideal config instead of default noisy one',
+                    action='store_true')
+
+args = parser.parse_args()
+
 # max length and stride specific to pretrained model
 max_length=320
 doc_stride=128
+
+def create_ideal_rpu_config(g_max=160, tile_size=256, w_noise=0.0, out_noise=0.0):
+    rpu_config = InferenceRPUConfig()
+    rpu_config.modifier
+    rpu_config.clip.type = WeightClipType.FIXED_VALUE
+    rpu_config.clip.fixed_value = 1.0
+    rpu_config.modifier.rel_to_actual_wmax = True
+    rpu_config.mapping.digital_bias = True
+    rpu_config.mapping.learn_out_scaling_alpha = True
+    rpu_config.mapping.weight_scaling_omega = 1
+    rpu_config.mapping.weight_scaling_omega_columnwise = True
+    rpu_config.mapping.max_input_size = tile_size
+    rpu_config.mapping.max_output_size = 255
+    rpu_config.forward = PresetIOParameters()
+    rpu_config.forward.w_noise_type = WeightNoiseType.PCM_READ
+    rpu_config.forward.w_noise = w_noise
+    rpu_config.forward.out_noise = out_noise
+    rpu_config.forward.inp_res = -1
+    rpu_config.forward.out_res = -1
+    rpu_config.forward.bound_management = BoundManagementType.ITERATIVE
+    rpu_config.noise_model = PCMLikeNoiseModel(g_max=g_max, prog_noise_scale=0, read_noise_scale=0)
+    rpu_config.drift_compensation = GlobalDriftCompensation()
+    return rpu_config
 
 def create_rpu_config(g_max=160, tile_size=256, dac_res=256, adc_res=256, w_noise=0.0175):
     rpu_config = InferenceRPUConfig()
@@ -70,26 +106,28 @@ def create_rpu_config(g_max=160, tile_size=256, dac_res=256, adc_res=256, w_nois
 
 def create_model_and_tokenizer(rpu_config):
     model = AutoModelForQuestionAnswering.from_pretrained("csarron/bert-base-uncased-squad-v1")
-    model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
+    if not args.digital:
+        model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
     print(model)
 
     tokenizer = AutoTokenizer.from_pretrained("csarron/bert-base-uncased-squad-v1")
     return model, tokenizer
 
-rpu_config = create_rpu_config()
+rpu_config = create_ideal_rpu_config() if args.ideal else create_rpu_config()
 model, tokenizer = create_model_and_tokenizer(rpu_config)
 
 # Some examples in the dataset may have contexts that exceed the maximum input length
-#   We can truncate the context using truncation="only_second"
+# We can truncate the context using truncation="only_second"
 def preprocess_train(dataset):
     # Some of the questions have lots of whitespace on the left, which is not useful and will make the
     # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
     # left whitespace
-    dataset["question"] =  [q.lstrip() for q in dataset["question"] ]
+    dataset["question"] = [ q.lstrip() for q in dataset["question"] ]
 
     # Tokenize our dataset with truncation and padding, but keep the overflows using a stride. This results
-    # in one example possible giving several features when a context is long, each of those features having a
-    # context that overlaps a bit the context of the previous feature.
+    # in one example possibly giving several features when a context is long, each of those features having a
+    # context that overlaps a bit the context of the previous feature, the stride being the number
+    # of overlapping tokens in the overlap.
     tokenized_dataset = tokenizer(
         dataset["question"],
         dataset["context"],
@@ -108,7 +146,7 @@ def preprocess_train(dataset):
     # help us compute the start_positions and end_positions.
     offset_mapping = tokenized_dataset.pop("offset_mapping")
 
-    # Let's label those dataset!
+    # Store start and end character positions for answers in context
     tokenized_dataset["start_positions"] = []
     tokenized_dataset["end_positions"] = []
 
@@ -322,7 +360,7 @@ def make_trainer(model, optimizer, tokenized_data, tokenizer):
     writer = SummaryWriter(log_dir=log_dir)
 
     trainer = Trainer(
-        model=model[0],
+        model=model if args.digital else model[0],
         args=training_args,
         data_collator=collator,
         train_dataset=tokenized_data["train"],
@@ -367,6 +405,9 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
 squad, tokenized_data, eval_data = create_datasets()
 optimizer = create_optimizer(model)
 trainer, writer = make_trainer(model, optimizer, tokenized_data, tokenizer)
+
+# Do hw-aware training
+# trainer.train()
 
 do_inference(model, trainer, squad, eval_data, writer)
 
