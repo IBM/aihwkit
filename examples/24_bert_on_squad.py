@@ -407,7 +407,8 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
     t_inference_list = [0.0] + np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
 
     for t_inference in t_inference_list:
-        model.drift_analog_weights(t_inference)
+        if not ARGS.digital:
+            model.drift_analog_weights(t_inference)
 
         # Perform inference + evaluate metric here
         raw_predictions = trainer.predict(eval_data)
