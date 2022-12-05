@@ -60,6 +60,10 @@ PARSER.add_argument("-i", "--ideal",
 PARSER.add_argument("-w", "--wandb",
                     help="Add to use wandb",
                     action="store_true")
+PARSER.add_argument("-n", "--noise",
+                    help="Weight noise",
+                    default=0.0175,
+                    type=float)
 
 ARGS = PARSER.parse_args()
 
@@ -440,7 +444,7 @@ def main():
         wandb.init()
 
     # Define RPU configuration and use it to create model and tokenizer
-    rpu_config = create_ideal_rpu_config() if ARGS.ideal else create_rpu_config()
+    rpu_config = create_ideal_rpu_config() if ARGS.ideal else create_rpu_config(w_noise=ARGS.noise)
     model = create_model(rpu_config)
     squad, tokenized_data, eval_data = create_datasets()
     optimizer = create_optimizer(model)
