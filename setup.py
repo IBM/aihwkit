@@ -76,7 +76,7 @@ setup(
     zip_safe=False,
     extras_require={
         'visualization': ['matplotlib>=3.0'],
-        'bert_example': [
+        'bert': [
             'transformers',
             'evaluate',
             'datasets',

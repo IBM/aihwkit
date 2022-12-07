@@ -39,6 +39,7 @@ job_compile_common: &job_compile_common
     - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
     # Install the package in editable mode.
     - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization]"
+    - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v ".[bert]"
   script:
     - $PYTHON_EXECUTABLE -m pip install "parameterized==0.7.4"
     - make pytest
@@ -100,6 +101,7 @@ jobs:
       - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
       # Install the package in editable mode.
       - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization]"
+      - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v ".[bert]"
     env:
       - TORCH_VERSION_SPECIFIER="==1.7.1"
 
