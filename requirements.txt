@@ -9,7 +9,3 @@ scipy
 requests>=2.25,<3
 numpy>=1.19
 protobuf>=3.15.0,<4
-transformers
-evaluate
-datasets
-wandb

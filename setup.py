@@ -75,6 +75,12 @@ setup(
     python_requires='>=3.7',
     zip_safe=False,
     extras_require={
-        'visualization': ['matplotlib>=3.0']
+        'visualization': ['matplotlib>=3.0'],
+        'bert_example': [
+            'transformers',
+            'evaluate',
+            'datasets',
+            'wandb'
+        ]
     }
 )
