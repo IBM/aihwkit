@@ -67,6 +67,13 @@ PARSER.add_argument("-n", "--noise",
                     help="Weight noise",
                     default=0.0175,
                     type=float)
+PARSER.add_argument("-r", "--run_name",
+                    help="Tensorboard run name",
+                    defualt=datetime.now().strftime("%Y%m%d-%H%M%S"),
+                    type=str)
+PARSER.add_argument("-h", "--hwa_train",
+                    help="Use Hardware-Aware training",
+                    action="store_true")
 
 ARGS = PARSER.parse_args()
 
@@ -436,7 +443,7 @@ def make_trainer(model, optimizer, tokenized_data):
 
     collator = DefaultDataCollator()
 
-    log_dir = "logs/fit/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = "logs/fit/" + ARGS.run_name
     writer = SummaryWriter(log_dir=log_dir)
 
     trainer = Trainer(
@@ -508,7 +515,8 @@ def main():
     trainer, writer = make_trainer(model, optimizer, tokenized_data)
 
     # Do hw-aware training
-    # trainer.train()
+    if ARGS.hwa_train:
+        trainer.train()
 
     do_inference(model, trainer, squad, eval_data, writer)
 
