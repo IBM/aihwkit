@@ -19,19 +19,11 @@
 # pylint: disable=too-many-locals
 
 from datetime import datetime
-
-import numpy as np
-import collections
-
 import argparse
+import collections
+import numpy as np
 
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import WeightClipType, WeightNoiseType, BoundManagementType
-from aihwkit.simulator.presets.utils import PresetIOParameters
-from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
-from aihwkit.nn.conversion import convert_to_analog_mapped
-from aihwkit.nn.modules.container import AnalogSequential
-from aihwkit.optim import AnalogSGD
+from transformers.integrations import TensorBoardCallback
 
 from transformers import (
     AutoTokenizer,
@@ -41,12 +33,18 @@ from transformers import (
     DefaultDataCollator,
 )
 
-from transformers.integrations import TensorBoardCallback
-
 from torch.utils.tensorboard import SummaryWriter
 
 from evaluate import load
 from datasets import load_dataset
+
+from aihwkit.simulator.configs import InferenceRPUConfig
+from aihwkit.simulator.configs.utils import WeightClipType, WeightNoiseType, BoundManagementType
+from aihwkit.simulator.presets.utils import PresetIOParameters
+from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
+from aihwkit.nn.conversion import convert_to_analog_mapped
+from aihwkit.nn.modules.container import AnalogSequential
+from aihwkit.optim import AnalogSGD
 
 
 MODEL_NAME = "csarron/bert-base-uncased-squad-v1"
@@ -103,7 +101,6 @@ DOC_STRIDE = 128
 def create_ideal_rpu_config(g_max=160, tile_size=256, w_noise=0.0, out_noise=0.0):
     """Create RPU Config with ideal conditions"""
     rpu_config = InferenceRPUConfig()
-    rpu_config.modifier
     rpu_config.clip.type = WeightClipType.FIXED_VALUE
     rpu_config.clip.fixed_value = 1.0
     rpu_config.modifier.rel_to_actual_wmax = True
@@ -506,10 +503,9 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
                 "exact_match": exact_match,
             })
 
-        exact_match, f1, drift = exact_match, f1, t_inference
         print(f"Exact match: {exact_match: .2f}\t"
               f"F1: {f1: .2f}\t"
-              f"Drift: {drift: .2e}")
+              f"Drift: {t_inference: .2e}")
 
 
 def main():
@@ -537,10 +533,3 @@ if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
 else:
     main()
-
-""" Next steps
-        - Distributed compute
-        - Show that hwa training creates a more robust model
-            since drift is accomodated for over time
-        - Convert to notebook
-"""
