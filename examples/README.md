@@ -634,6 +634,104 @@ tiki-taka v2 algorithm that achieves better performance than SGD.
 Here it is illustrated how the analog tiles can be directly used to
 implement an analog mat-vec (without a pytorch layer).
 
+## Example 24: [`24_bert_on_squad.py`]
+
+This example is adapted from
+https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
+
+The example loads a pre-trained BERT model trained on
+the SQuAD dataset. It then applies `convert_to_analog()`
+to examine the effects of `drift_analog_weights()` on inference performance at
+different weight noise levels. Tensorboard is used to display the SQuAD
+metrics evaluated using the model at various times after training completed.
+
+Commandline arguments can be used to control certain options
+```python
+PARSER.add_argument("-d", "--digital",
+                    help="Add to use digital inference",
+                    action="store_true")
+PARSER.add_argument("-i", "--ideal",
+                    help="Add to use ideal config instead of default noisy one",
+                    action="store_true")
+PARSER.add_argument("-w", "--wandb",
+                    help="Add to use wandb",
+                    action="store_true")
+PARSER.add_argument("-n", "--noise",
+                    help="Weight noise",
+                    default=0.0175,
+                    type=float)
+PARSER.add_argument("-r", "--run_name",
+                    help="Tensorboard run name",
+                    defualt=datetime.now().strftime("%Y%m%d-%H%M%S"),
+                    type=str)
+PARSER.add_argument("-h", "--hwa_train",
+                    help="Use Hardware-Aware training",
+                    action="store_true")
+```
+
+### AiMOS NPL Environment Setup
+
+Use `ssh` to connect to one of the [landing pads](https://docs.cci.rpi.edu/landingpads/)
+From there, connect to the NPL cluster with `ssh nplfen01`.
+
+Setup a proxy with
+```bash
+export http_proxy=http://proxy:8888
+export https_proxy=$http_proxy
+```
+Adding these lines to the `~/.bashrc` will ensure these are called upon every login.
+
+Follow the [installation instructions](https://docs.cci.rpi.edu/software/Conda/) to install conda.
+Then, create an environment with `conda create --name <env-name>`,
+and run `conda activate <env-name>`.
+
+After activation, install the necessary
+[dependences](https://aihwkit.readthedocs.io/en/latest/advanced_install.html),
+and run the following commands:
+
+`conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia`
+
+`conda install huggingface_hub transformers evaluate datasets tensorboard`
+
+Optionally, for Weights and Biases integration,
+
+`conda install wandb -c conda-forge`
+
+Then, clone the repository into `~/barn/`. Jobs can then be submitted using the
+[Slurm](https://slurm.schedmd.com/documentation.html) job scheduler.
+Staging of jobs should be done in `~/scratch/`. Additional information
+about the GPFS filesystem can be found [here](https://docs.cci.rpi.edu/File_System/#home)
+An example script that can be run with `sbatch ./<name-of-script>` is shown below.
+```bash
+#!/bin/bash
+#SBATCH -D /gpfs/u/home/AHWT/AHWT<user-name>/scratch
+#SBATCH -o joboutput.%J
+#SBATCH -e joberror.%J
+#SBATCH --time=06:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --gpus=1
+source ~/.bashrc
+conda activate <env-name>
+srun --mem=32G python ~/barn/aihwkit/examples/24_bert_on_squad.py --noise 0.1 &
+wait
+```
+
+The job can be monitored via the `squeue` command,
+or canceled with `scancel`.
+
+### Tensorboard Setup
+Once the job has begun, a `logs/fit/` directory will
+appear in the working directory.
+Within a conda environment, Tensorboard can be started with
+
+`tensorboard --logdir /path/to/logs --host "0.0.0.0" --port 60000`
+
+Then, in a separate terminal,
+
+`ssh -L60000:nplfen01:60000 <your-id>@blp01.ccni.rpi.edu`
+
+Now you can point your browser to `http://localhost:60000`
+
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
