@@ -611,6 +611,30 @@ Then, in a separate terminal,
 Now you can point your browser to `http://localhost:60000`
 
 
+## Example 21: [`21_fit_device_data.py`]
+
+In this example shows how one could quickly fit real device data for
+analog training  using the `PiecewiseStepDevice`.
+
+## Example 22: [`22_war_and_peace_lstm.py`]
+
+This example explores the study done in [Gokmen T and Haensch W (2020)
+Algorithm for Training Neural Networks on Resistive Device
+Arrays. Front. Neurosci.] on a 2-layer LSTM network trained with the
+War and Peace dataset (which needs to be downloaded separately).
+
+In the example, there are 4 different RPU that can be used: a floating
+point tile to run the workload; an analog tile with ideal devices that
+use SGD for training; an analog tile with ideal and symmetric device
+that use SGD for training; an analog tile which uses ideal device with
+tiki-taka v2 algorithm that achieves better performance than SGD.
+
+## Example 23: [`23_using_analog_tile_as_matrix.py`]
+
+Here it is illustrated how the analog tiles can be directly used to
+implement an analog mat-vec (without a pytorch layer).
+
+
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
