@@ -39,7 +39,13 @@ from evaluate import load
 from datasets import load_dataset
 
 from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import WeightClipType, WeightNoiseType, BoundManagementType
+from aihwkit.simulator.configs.utils import (
+    WeightModifierType,
+    WeightClipType,
+    WeightNoiseType,
+    BoundManagementType
+)
+
 from aihwkit.simulator.presets.utils import PresetIOParameters
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn.conversion import convert_to_analog_mapped
@@ -47,6 +53,7 @@ from aihwkit.nn.modules.container import AnalogSequential
 from aihwkit.optim import AnalogSGD
 
 
+# BERT model from Hugging Face model hub fine-tuned on SQuAD v1
 MODEL_NAME = "csarron/bert-base-uncased-squad-v1"
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 
@@ -98,7 +105,7 @@ MAX_LENGTH = 320
 DOC_STRIDE = 128
 
 
-def create_ideal_rpu_config(g_max=160, tile_size=256, w_noise=0.0, out_noise=0.0):
+def create_ideal_rpu_config(g_max=160, tile_size=256):
     """Create RPU Config with ideal conditions"""
     rpu_config = InferenceRPUConfig()
     rpu_config.clip.type = WeightClipType.FIXED_VALUE
@@ -110,19 +117,13 @@ def create_ideal_rpu_config(g_max=160, tile_size=256, w_noise=0.0, out_noise=0.0
     rpu_config.mapping.weight_scaling_omega_columnwise = True
     rpu_config.mapping.max_input_size = tile_size
     rpu_config.mapping.max_output_size = 255
-    rpu_config.forward = PresetIOParameters()
-    rpu_config.forward.w_noise_type = WeightNoiseType.PCM_READ
-    rpu_config.forward.w_noise = w_noise
-    rpu_config.forward.out_noise = out_noise
-    rpu_config.forward.inp_res = -1
-    rpu_config.forward.out_res = -1
-    rpu_config.forward.bound_management = BoundManagementType.ITERATIVE
+    rpu_config.forward.is_perfect = True
     rpu_config.noise_model = PCMLikeNoiseModel(g_max=g_max, prog_noise_scale=0, read_noise_scale=0)
     rpu_config.drift_compensation = GlobalDriftCompensation()
     return rpu_config
 
 
-def create_rpu_config(g_max=160, tile_size=256, dac_res=256, adc_res=256, w_noise=0.0175):
+def create_rpu_config(w_noise, g_max=160, tile_size=256, dac_res=256, adc_res=256):
     """Create RPU Config emulated typical PCM Device"""
     if ARGS.wandb:
         w_noise = wandb.config.weight_noise
@@ -131,6 +132,8 @@ def create_rpu_config(g_max=160, tile_size=256, dac_res=256, adc_res=256, w_nois
     rpu_config.clip.type = WeightClipType.FIXED_VALUE
     rpu_config.clip.fixed_value = 1.0
     rpu_config.modifier.rel_to_actual_wmax = True
+    rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
+    rpu_config.modifier.std_dev = 0.1
     rpu_config.mapping.digital_bias = True
     rpu_config.mapping.learn_out_scaling_alpha = True
     rpu_config.mapping.weight_scaling_omega = 1
@@ -464,21 +467,11 @@ def make_trainer(model, optimizer, tokenized_data):
 
 
 def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9):
-    """Perform inference experiment at weight noise level specified at runtime
+    """Perform inference experiment at weight noise level specified at runtime.
     SQuAD exact match and f1 metrics are captured in Tensorboard
     """
-    model.eval()
-
-    metric = load("squad")
-
-    ground_truth = [{"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]]
-
-    t_inference_list = [0.0] + np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
-
-    for t_inference in t_inference_list:
-        if not ARGS.digital:
-            model.drift_analog_weights(t_inference)
-
+    # Helper functions
+    def predict():
         # Perform inference + evaluate metric here
         raw_predictions = trainer.predict(eval_data)
         predictions = postprocess_predictions(
@@ -490,8 +483,10 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
         formatted_preds = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
 
         out_metric = metric.compute(predictions=formatted_preds, references=ground_truth)
-        f1, exact_match = out_metric["f1"], out_metric["exact_match"]
 
+        return out_metric["f1"], out_metric["exact_match"]
+
+    def write_metrics(f1, exact_match, t_inference):
         # Add information to tensorboard
         writer.add_scalar("val/f1", f1, t_inference)
         writer.add_scalar("val/exact_match", exact_match, t_inference)
@@ -506,6 +501,27 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
         print(f"Exact match: {exact_match: .2f}\t"
               f"F1: {f1: .2f}\t"
               f"Drift: {t_inference: .2e}")
+
+    model.eval()
+
+    metric = load("squad")
+
+    ground_truth = [{"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]]
+
+    t_inference_list = np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
+
+    # Get the initial metrics
+    f1, exact_match = predict()
+    write_metrics(f1, exact_match, 0.0)
+
+    for t_inference in t_inference_list:
+        # Only drift and recalculate metrics if in analog
+        if not ARGS.digital:
+            model.drift_analog_weights(t_inference)
+
+            f1, exact_match = predict()
+
+        write_metrics(f1, exact_match, t_inference)
 
 
 def main():
