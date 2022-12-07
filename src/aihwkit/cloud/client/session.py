@@ -81,7 +81,7 @@ class ApiSession(Session):
         self.api_token = api_token
         self.verify = verify
         if not verify:
-            urllib3.disable_warnings(InsecureRequestWarning)
+            urllib3.disable_warnings(InsecureRequestWarning)  # type: ignore[no-untyped-call]
 
         self.jwt_token = None  # type: Optional[str]
 

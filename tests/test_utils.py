@@ -34,7 +34,6 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, InferenceRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
 from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters, MappingParameter
-from aihwkit.simulator.rpu_base import cuda
 from aihwkit.exceptions import TileError, ModuleError
 from aihwkit.nn.conversion import convert_to_analog
 
@@ -43,14 +42,14 @@ from .helpers.layers import (
     Conv2d, Conv2dCuda, Linear, LinearCuda, LinearMapped,
     LinearMappedCuda, Conv2dMapped, Conv2dMappedCuda
 )
-from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, ConstantStep, Inference
+from .helpers.testcases import ParametrizedTestCase, SKIP_CUDA_TESTS
+from .helpers.tiles import FloatingPoint, ConstantStep, Inference, InferenceLearnOutScaling
 
 
 @parametrize_over_layers(
     layers=[Linear, Conv2d, LinearMapped, LinearCuda, LinearMappedCuda,
             Conv2dCuda, Conv2dMapped, Conv2dMappedCuda],
-    tiles=[FloatingPoint, ConstantStep, Inference],
+    tiles=[FloatingPoint, ConstantStep, Inference, InferenceLearnOutScaling],
     biases=['analog', 'digital', None],
 )
 class SerializationTest(ParametrizedTestCase):
@@ -60,14 +59,13 @@ class SerializationTest(ParametrizedTestCase):
     def train_model(model, loss_func, x_b, y_b):
         """Train the model."""
         opt = AnalogSGD(model.parameters(), lr=0.5)
-        opt.regroup_param_groups(model)
-
+        # opt.regroup_param_groups(model)
         epochs = 3
         for _ in range(epochs):
             opt.zero_grad()
             pred = model(x_b)
-            loss = loss_func(pred, y_b)
 
+            loss = loss_func(pred, y_b)
             loss.backward()
             opt.step()
         return loss
@@ -91,16 +89,12 @@ class SerializationTest(ParametrizedTestCase):
         else:
             bias = None
 
-        analog_weight, analog_bias = model.analog_tile.get_weights()
-        analog_weight = analog_weight.detach().cpu().numpy().reshape(weight.shape)
-        if model.analog_bias:
+        analog_weight, analog_bias = model.get_weights()
+        analog_weight = analog_weight.detach().cpu().numpy()
+        if analog_bias is not None:
             analog_bias = analog_bias.detach().cpu().numpy()
-        elif model.digital_bias:
-            analog_bias = model.bias.detach().cpu().numpy()
-        else:
-            analog_bias = None
 
-        return weight, bias, analog_weight, analog_bias, model.digital_bias
+        return weight, bias, analog_weight.reshape(weight.shape), analog_bias, True
 
     @staticmethod
     def get_analog_tile(model):
@@ -195,6 +189,7 @@ class SerializationTest(ParametrizedTestCase):
             assert_array_almost_equal(tile_biases, new_tile_biases)
 
         new_loss = self.train_model(new_model, loss_func, input_x, input_y)
+
         loss = self.train_model(model, loss_func, input_x, input_y)
         if self.tile_class != ConstantStep:
             self.assertTensorAlmostEqual(loss, new_loss)
@@ -321,7 +316,7 @@ class SerializationTest(ParametrizedTestCase):
     def test_save_load_model_cross_device(self):
         """Test saving and loading a model directly."""
 
-        if not cuda.is_compiled():
+        if SKIP_CUDA_TESTS:
             raise SkipTest('CUDA not available.')
 
         model = self.get_layer()
@@ -432,7 +427,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
-        alpha_new = new_analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha_new = new_analog_tile.get_scales().detach().cpu()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_save_load_shared_weights(self):
@@ -468,7 +463,7 @@ class SerializationTest(ParametrizedTestCase):
         rpu_config = SingleRPUConfig(mapping=MappingParameter(weight_scaling_omega=0.4))
         model = self.get_layer(rpu_config=rpu_config)
         analog_tile = self.get_analog_tile(model)
-        alpha = analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha = analog_tile.get_scales().detach().cpu()
         self.assertNotEqual(alpha, 1.0)
 
         # Save the model to a file.
@@ -480,7 +475,7 @@ class SerializationTest(ParametrizedTestCase):
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
-        alpha_new = new_analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha_new = new_analog_tile.get_scales().detach().cpu()
         assert_array_almost_equal(array(alpha), array(alpha_new))
 
     def test_remapping(self):
@@ -488,7 +483,7 @@ class SerializationTest(ParametrizedTestCase):
         # Create the device and the array.
         rpu_config = InferenceRPUConfig(mapping=MappingParameter(
             weight_scaling_omega=0.4,
-            weight_scaling_omega_columnwise=True))
+            weight_scaling_columnwise=True))
 
         model = self.get_layer(rpu_config=rpu_config)
         analog_tile = self.get_analog_tile(model)
@@ -498,21 +493,21 @@ class SerializationTest(ParametrizedTestCase):
             user_biases = Tensor(model.out_features).uniform_(-0.1, 0.1)
         else:
             user_biases = None
-        model.set_weights(user_weights, user_biases, remap_weights=True,
+        model.set_weights(user_weights, user_biases, apply_weight_scaling=True,
                           force_exact=True)
 
-        alpha_initial = analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha_initial = analog_tile.get_scales().detach().cpu()
         self.assertNotEqual(alpha_initial.max(), 1.0)
 
-        # remap
+        # remap module
         model.remap_weights(weight_scaling_omega=1.0)
 
-        weights, _ = model.get_weights(apply_out_scales=True, force_exact=True)
-        analog_weights, _ = model.get_weights(apply_out_scales=False, force_exact=True)
+        weights, _ = model.get_weights(apply_weight_scaling=True, force_exact=True)
+        analog_weights, _ = model.get_weights(apply_weight_scaling=False, force_exact=True)
 
         assert_array_almost_equal(array(user_weights), array(weights))
 
-        alpha = analog_tile.get_out_scaling_alpha().detach().cpu()
+        alpha = analog_tile.get_scales().detach().cpu()
         assert_raises(AssertionError, assert_array_almost_equal, array(alpha), array(alpha_initial))
 
         self.assertEqual(torch_abs(analog_weights).max(), 1.0)
@@ -650,7 +645,7 @@ class SerializationTest(ParametrizedTestCase):
         new_analog_tile = self.get_analog_tile(new_model)
         if new_analog_tile.__class__.__name__ != analog_tile.__class__.__name__:
             with self.assertRaises(TileError):
-                self.assertRaises(new_model.load_state_dict(state_dict))
+                new_model.load_state_dict(state_dict)
 
     def test_load_state_load_rpu_config(self):
         """Test creating a new model using a state dict, while using a different RPU config."""

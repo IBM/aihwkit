@@ -14,7 +14,7 @@
 
 from torch.autograd import no_grad
 from torch import abs as torch_abs
-from torch import clamp, ones, Tensor
+from torch import clamp, Tensor, eye
 
 from aihwkit.inference.compensation.base import BaseDriftCompensation
 
@@ -27,16 +27,16 @@ class GlobalDriftCompensation(BaseDriftCompensation):
 
     @no_grad()
     def readout(self, out_tensor: Tensor) -> Tensor:
-        """Read outs the abs max."""
-        return clamp(torch_abs(out_tensor).max(), min=0.0001)
+        """Read outs the mean abs."""
+        return clamp(torch_abs(out_tensor).mean(), min=0.0001)
 
     @no_grad()
     def get_readout_tensor(self, in_size: int) -> Tensor:
         """Return the read-out tensor.
 
-        Uses a single all one vector.
+        Uses the set of one-hot vectors (eye).
         """
-        return ones((1, in_size))
+        return eye(in_size)
 
     def __str__(self) -> str:
         return '{}()'.format(self.__class__.__name__)

@@ -64,8 +64,8 @@ minimal dependencies (note that ``Xcode`` needs to be installed)::
     $ brew install openblas
     $ pip install cmake scikit-build torch pybind11
 
-miniconda
-"""""""""
+miniconda (e.g. linux)
+""""""""""""""""""""""
 
 On a miniconda-based system, the following commands can be used for installing
 the minimal dependencies [#f3]_::
@@ -73,6 +73,18 @@ the minimal dependencies [#f3]_::
     $ conda install cmake openblas pybind11
     $ conda install -c conda-forge scikit-build
     $ conda install -c pytorch pytorch
+
+.. note::
+    You can also install all the requirements by::
+
+        $ pip install -r requirements.txt
+        $ pip install -r requirements-dev.txt
+        $ pip install -r requirements-examples.txt
+
+.. note::
+    If you are using CUDA (see below) then you need to have a
+    CUDA-enabled pytorch installed. Please refer to the torch website
+    how to install that
 
 
 Windows using conda (Experimental)
@@ -121,31 +133,111 @@ Prompt for VS 2019.
     If you want to use ``pip`` instead of ``conda``, the following commands can
     be used::
 
-    $ pip install cmake scikit-build pybind11
-    $ pip install torch -f https://download.pytorch.org/whl/torch_stable.html
+        $ pip install cmake scikit-build pybind11
+        $ pip install torch -f https://download.pytorch.org/whl/torch_stable.html
+
 
 Installing and compiling
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once the dependencies are in place, the following command can be used for
-compiling and installing the Python package::
+compiling. Here we assume that you have already cloned the directory
+and changed into it::
 
-    $ pip install -v aihwkit
+    $ git clone https://github.com/IBM/aihwkit.git
+    $ cd aihwkit
 
-This command will:
+You can typically install requirements by (but see above for more
+specific details)::
 
-* download the source tarball for the library.
-* invoke ``scikit-build``
-* which in turn will invoke ``cmake`` for the compilation.
-* execute the commands in verbose mode, for helping troubleshooting issues.
-* install the Python package.
+    $ pip install -r requirements.txt
+    $ pip install -r requirements-dev.txt
+    $ pip install -r requirements-examples.txt
+
+
+Without GPU support (with OpenBLAS):
+  This uses the OpenBLAS library for fast numerical computations::
+
+    $ make build
+
+  .. note::
+
+    Note that openblas needs to be installed, e.g. with::
+        $ conda install openblas
+
+Without GPU support (with MKL):
+  This uses the Intel MKL library instead of the OpenBlas library::
+
+    $ make build_mkl
+
+  .. note::
+     Note that MKL needs to be installed and environment variable
+     ``MKLROOT`` set if not in standard folders. E.g. with::
+
+         $ conda install -c intel mkl mkl-devel mkl-static mkl-include
+
+With GPU support:
+  The CUDA library needs to be set up properly so that the compiler
+  can find it (you may need to set ``CUDA_HOME``). Please refer to the
+  installation instructions. This also uses MKL
+  as default, whihc thus needs to be installed (see above). Then::
+
+      $ make build_cuda
+
+  If you know your CUDA architecture, then you can give it directly
+  (which will result typically in a much quicker initially loading time)::
+
+      $ make build_cuda flags="-DRPU_CUDA_ARCHITECTURES='60'"
+
 
 If there are any issue with the dependencies or the compilation, the output
 of the command will help diagnosing the issue.
 
+In-place installation
+~~~~~~~~~~~~~~~~~~~~~
+
+If you want install the library inside the cloned directory (see also
+:doc:`developer_install`), it is more convenient for developers. For
+that simply replace the above make commands with ``build_inplace``,
+e.g.::
+
+    $ make build_inplace_cuda
+
+Here, you need to make sure that the ``PYTHONPATH`` is set to the ``src``
+sub-directory of the ahwkit base directory, e.g. by (when being in the base directory)::
+
+    $ export PYTHONPATH=`pwd`/src:$PYTHONPATH
+
+CUDA-enabled docker image
+~~~~~~~~~~~~~~~~~~~~~~~~~
+As an alternative to a regular install, a CUDA-enabled docker image can also be
+built using the ``CUDA.Dockerfile`` included in the repository.
+
+In order to build the image, first identify the ``CUDA_ARCH`` for your GPU
+using ` `nvidia-smi`` in your local machine::
+
+    export CUDA_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv | sed -n '2 p' | tr -d '.')
+    echo $CUDA_ARCH
+
+The image can be built via::
+
+    docker build \
+    --tag aihwkit:cuda \
+    --build-arg USERNAME=${USER} \
+    --build-arg USERID=(id -u $USER) \
+    --build-arg GROUPID=(id -g $USER) \
+    --build-arg CUDA_ARCH=${CUDA_ARCH} \
+    --build-arg CUDA_VER=11.7 \
+    --build-arg UBUNTU_VER=22.04 \
+    --build-arg PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu116 \
+    --file CUDA.Dockerfile .
+
+If building your image against a different CUDA or PyTorch version, please
+ensure setting the build arguments accordingly.
+
 .. note::
 
-    Please note that the instruction on this page refer to installing as an
+    Please note that the instructions on this page refer to installing as an
     end user. If you are planning to contribute to the project, an alternative
     setup and tips can be found at the :doc:`developer_install` section that
     is more tuned towards the needs of a development cycle.

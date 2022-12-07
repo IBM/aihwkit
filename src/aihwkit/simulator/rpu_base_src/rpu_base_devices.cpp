@@ -655,6 +655,8 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("compute_sparsity", &MixedPrecParam::compute_sparsity)
       .def_readwrite("n_x_bins", &MixedPrecParam::n_x_bins)
       .def_readwrite("n_d_bins", &MixedPrecParam::n_d_bins)
+      .def_readwrite("stoc_round_d", &MixedPrecParam::stoc_round_d)
+      .def_readwrite("stoc_round_x", &MixedPrecParam::stoc_round_x)
       .def_readwrite("transfer_lr", &MixedPrecParam::transfer_lr)
       .def(
           "set_device_parameter",

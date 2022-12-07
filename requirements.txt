@@ -7,5 +7,5 @@ torch>=1.7
 torchvision
 scipy
 requests>=2.25,<3
-numpy>=1.18
+numpy>=1.19
 protobuf>=3.15.0,<4

@@ -65,13 +65,11 @@ WeightClipperCuda<T>::WeightClipperCuda(CudaContext *context, int x_size, int d_
 
 template <typename T>
 void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) {
-  // does a weight remap to the scales.
 
   int nthreads = context_->getNThreads();
   int nblocks = context_->getNBlocks(size_, nthreads);
   auto s = context_->getStream();
 
-  // this is to remap the weights
   switch (wclpar.type) {
   case WeightClipType::None: {
     break;

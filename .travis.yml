@@ -36,11 +36,11 @@ job_compile_common: &job_compile_common
   install:
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-    - pip install -r requirements.txt pytest
+    - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
     # Install the package in editable mode.
-    - VERBOSE=1 pip install -v -e ".[visualization]"
+    - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization]"
   script:
-    - pip install "parameterized==0.7.4"
+    - $PYTHON_EXECUTABLE -m pip install "parameterized==0.7.4"
     - make pytest
 
 build_deploy_common: &build_deploy_common
@@ -69,7 +69,7 @@ jobs:
     stage: Test and lint
     python: "3.7"
     script:
-      - pip install -r requirements-dev.txt
+      - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
       - make pycodestyle
       - make pylint
       - make mypy
@@ -96,10 +96,10 @@ jobs:
     install:
       # Set the python executable, to force cmake picking the right one.
       - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-      - pip install -r requirements.txt pytest
-      - pip install "torch==1.7.1"
+      - $PYTHON_EXECUTABLE -m pip install "torch==1.7.1"
+      - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
       # Install the package in editable mode.
-      - VERBOSE=1 pip install -v -e ".[visualization]"
+      - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization]"
     env:
       - TORCH_VERSION_SPECIFIER="==1.7.1"
 

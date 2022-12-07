@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -282,8 +282,17 @@ class UnitCell(_PrintableMixin):
 
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
 
+    bindings_ignore: ClassVar[List] = ['diffusion', 'lifetime']
+
     unit_cell_devices: List = field(default_factory=list)
     """Devices that compose this unit cell."""
+
+    construction_seed: int = 0
+    """If not ``0``, set a unique seed for hidden parameters during
+    construction.
+
+    Applies to all ``unit_cell_devices``.
+    """
 
     def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
@@ -1484,11 +1493,20 @@ class DigitalRankUpdateCell(_PrintableMixin):
 
     bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
 
+    bindings_ignore: ClassVar[List] = ['diffusion', 'lifetime']
+
     device: Union[PulsedDevice,
                   OneSidedUnitCell,
                   VectorUnitCell,
                   ReferenceUnitCell] = field(default_factory=ConstantStepDevice)
     """(Analog) device that are used for forward and backward."""
+
+    construction_seed: int = 0
+    """If not ``0``, set a unique seed for hidden parameters during
+    construction.
+
+    Applies to ``device``.
+    """
 
     def as_bindings(self) -> devices.AbstractResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
@@ -1590,6 +1608,14 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
 
     Dynamic quantization is used by computing the absolute max value of each
     error vector. Quantization can be turned off by setting this to 0.
+    """
+
+    stoc_round_x: bool = True
+    """Whether to use stochastic rounding in case of quantization of the input x.
+    """
+
+    stoc_round_d: bool = True
+    """Whether to use stochastic rounding in case of quantization of the error d.
     """
 
     def as_bindings(self) -> devices.MixedPrecResistiveDeviceParameter:

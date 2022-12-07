@@ -12,7 +12,9 @@
 
 """Analog Modules that contain children Modules."""
 
-from typing import Callable, Optional, Union, Any, NamedTuple, TYPE_CHECKING
+from typing import (
+    Callable, Optional, Union, Any, NamedTuple, Tuple, TYPE_CHECKING, Generator
+)
 from collections import OrderedDict
 
 from torch import device as torch_device
@@ -52,11 +54,22 @@ class AnalogSequential(Sequential):
         Returns:
             This module after the function has been applied.
         """
-        for module in self.modules():
-            if isinstance(module, AnalogModuleBase):
-                fn(module)
+        for module in self.analog_modules():
+            fn(module)
 
         return self
+
+    def analog_modules(self) -> Generator[AnalogModuleBase, None, None]:
+        """Generator over analog modules only"""
+        for module in self.modules():
+            if isinstance(module, AnalogModuleBase):
+                yield module
+
+    def named_analog_modules(self) -> Generator[Tuple[str, AnalogModuleBase], None, None]:
+        """Generator over analog modules only"""
+        for name, module in self.named_modules():
+            if isinstance(module, AnalogModuleBase):
+                yield name, module
 
     def cpu(
             self
@@ -199,13 +212,24 @@ class AnalogSequential(Sequential):
                     break
         self._ddp_params_and_buffers_to_ignore = exclude_params
 
-    def remap_analog_weights(self, weight_scaling_omega: Optional[float] = None) -> None:
-        """Remap the out-scaling alpha to analog weight conversion.
+    def remap_analog_weights(self, weight_scaling_omega: Optional[float] = 1.0) -> None:
+        """Remap the analog weights and set the digital out scales.
+
+        Caution:
+
+            This should typically *not* be called for analog training
+            unless realistic_read_write is set. In this case, it would
+            perform a full re-write of the weights. However,
+            typically, this this method is intended to correct the
+            mapping for hardware-aware trained models before doing the
+            inference with programmed weights.
 
         Args:
+
             weight_scaling_omega: The optional value to remap the
-                weight max to. Will take the previous value used
-                (typically the one from ``RPUConfig.mapping``)
+                weight max to. If None it will take the value set
+                initially in the ``RPUConfig.mapping``. Defaults to 1.0.
+
         """
 
         self._apply_to_analog(lambda m: m.remap_weights(

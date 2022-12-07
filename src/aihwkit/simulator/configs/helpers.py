@@ -11,21 +11,51 @@
 # that they have been altered from the originals.
 
 """Utilities for resistive processing units configurations."""
-
+from sys import version_info
 from dataclasses import Field, fields, is_dataclass
 from enum import Enum
 from textwrap import indent
 from typing import Any, List
 
 from aihwkit.simulator.rpu_base import devices, tiles
+from aihwkit.exceptions import ConfigError
+
+if version_info[0] >= 3 and version_info[1] > 7:
+    # pylint: disable=no-name-in-module
+    from typing import get_origin  # type: ignore
+else:
+    get_origin = None  # pylint: disable=invalid-name
 
 
-def parameters_to_bindings(params: Any) -> Any:
-    """Convert a dataclass parameter into a bindings class."""
+def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
+    """Convert a dataclass parameter into a bindings class.
+
+    Args:
+        params: parameter dataclass
+        check_fields: whether to check for the correct attributes
+
+    Returns:
+        the C++ bindings
+
+    Raises:
+        ConfigError: if the field type mismatches (int to float conversion is ignored)
+    """
     result = params.bindings_class()
-    for field, value in params.__dict__.items():
+
+    field_dict = {field.name: (field, getattr(params, field.name))
+                  for field in fields(params)}
+    if check_fields:
+        ignore_fields = getattr(params, 'bindings_ignore', [])
+        for key in params.__dict__.keys():
+            if key not in field_dict and key not in ignore_fields:
+                raise ConfigError(f"Cannot find '{key}' in params "
+                                  f"'{params.__class__.__name__}'. "
+                                  "Wrong attribute name?")
+
+    for field, (dataclass_field, value) in field_dict.items():
+
         # Convert enums to the bindings enums.
-        if field in ('unit_cell_devices', 'device', 'mapping'):
+        if field in ('unit_cell_devices', 'device'):
             # Exclude special fields that are not present in the bindings.
             continue
 
@@ -39,6 +69,13 @@ def parameters_to_bindings(params: Any) -> Any:
         elif is_dataclass(value):
             setattr(result, field, parameters_to_bindings(value))
         else:
+            if get_origin is not None:
+                expected_type = get_origin(dataclass_field.type) or dataclass_field.type
+                if ((not isinstance(value, expected_type))
+                    and not (expected_type == float and isinstance(value, int)
+                             and not isinstance(value, bool))):
+                    raise ConfigError(f"Expected type {expected_type} for field {field}")
+
             setattr(result, field, value)
 
     return result
@@ -49,7 +86,7 @@ def tile_parameters_to_bindings(params: Any) -> Any:
     field_map = {'forward': 'forward_io',
                  'backward': 'backward_io'}
     excluded_fields = ('device', 'noise_model', 'drift_compensation',
-                       'clip', 'modifier', 'mapping')
+                       'clip', 'modifier', 'mapping', 'remap')
 
     result = params.bindings_class()
     for field, value in params.__dict__.items():

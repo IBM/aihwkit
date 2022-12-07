@@ -28,7 +28,8 @@ from aihwkit.simulator.configs.utils import (
     WeightNoiseType,
     WeightClipType,
     WeightModifierType,
-    WeightModifierParameter
+    WeightModifierParameter,
+    WeightRemapType,
 )
 from aihwkit.inference import PCMLikeNoiseModel
 
@@ -183,6 +184,61 @@ class InferenceTileTest(ParametrizedTestCase):
         self.assertNotAlmostEqualTensor(tile_weights, weights)
         self.assertNotAlmostEqualTensor(tile_biases, biases)
 
+    def test_post_update_step_remap_layer(self):
+        """Tests whether post update remap is performed."""
+        rpu_config = self.get_rpu_config()
+        rpu_config.mapping.out_scaling_columnwise = False
+        rpu_config.mapping.learn_out_scaling = True
+        rpu_config.mapping.weight_scaling_omega = 1.0
+        rpu_config.mapping.weight_scaling_columnwise = False
+
+        rpu_config.remap.type = WeightRemapType.LAYERWISE_SYMMETRIC
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        weights = Tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        biases = Tensor([-0.1, -0.3])
+
+        analog_tile.set_learning_rate(0.123)
+        analog_tile.set_weights(weights, biases)
+
+        analog_tile.post_update_step()
+
+        tile_weights, tile_biases = analog_tile.get_weights()
+
+        self.assertTensorAlmostEqual(tile_weights, weights / 0.6)
+        self.assertTensorAlmostEqual(tile_biases, biases / 0.6)
+
+        scales = analog_tile.get_mapping_scales()
+        self.assertTensorAlmostEqual(scales, Tensor([0.6, 0.6]))
+
+    def test_post_update_step_remap_column(self):
+        """Tests whether post update remap is performed."""
+        rpu_config = self.get_rpu_config()
+        rpu_config.mapping.out_scaling_columnwise = True
+        rpu_config.mapping.learn_out_scaling = True
+        rpu_config.mapping.weight_scaling_omega = 1.0
+        rpu_config.mapping.weight_scaling_columnwise = True
+
+        rpu_config.remap.type = WeightRemapType.CHANNELWISE_SYMMETRIC
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        weights = Tensor([[-0.7, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        biases = Tensor([-0.1, -0.3])
+
+        analog_tile.set_learning_rate(0.123)
+        analog_tile.set_weights(weights, biases)
+
+        analog_tile.post_update_step()
+
+        tile_weights, tile_biases = analog_tile.get_weights()
+
+        expected_scales = Tensor([0.7, 0.6])
+        self.assertTensorAlmostEqual(tile_weights, weights / expected_scales.view(-1, 1))
+        self.assertTensorAlmostEqual(tile_biases, biases / expected_scales)
+
+        scales = analog_tile.get_mapping_scales()
+        self.assertTensorAlmostEqual(scales, expected_scales)
+
     @parameterized.expand([
         ('none', None,),
         ('dorefa', WeightModifierType.DOREFA,),
@@ -192,7 +248,7 @@ class InferenceTileTest(ParametrizedTestCase):
         ('copy', WeightModifierType.COPY,),
     ])
     def test_post_forward_modifier_types(self, _, modifier_type):
-        """Tests whether post update diffusion is performed."""
+        """Tests whether modifier is performed."""
         rpu_config = self.get_rpu_config()
         rpu_config.drift_compensation = None
         rpu_config.forward.is_perfect = True
@@ -215,6 +271,7 @@ class InferenceTileTest(ParametrizedTestCase):
         analog_tile.set_weights(weights, biases)
 
         x_output = analog_tile.forward(x_input, is_test=True)
+        analog_tile.post_update_step()
         x_output_post = analog_tile.forward(x_input, is_test=False)
         x_output_post_true = analog_tile.forward(x_input, is_test=True)
         tile_weights, tile_biases = analog_tile.get_weights()

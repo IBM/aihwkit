@@ -94,6 +94,33 @@ void declare_rpu_tiles_cuda(py::module &m) {
             return self.setDeltaWeights(delta_weights.data_ptr<T>());
           },
           py::arg("delta_weights"))
+      .def(
+          "remap_weights",
+          [](Class &self, ::RPU::WeightRemapParameter &wrmpar, torch::Tensor scales) {
+            CHECK_TORCH_CUDA_INPUT(scales);
+            if ((scales.numel() != self.getDSize()) || scales.dim() != 1) {
+              throw std::runtime_error(
+                  "Invalid scales dimensions: expected [" + std::to_string(self.getDSize()) +
+                  "] tensor");
+            }
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.remapWeights(wrmpar, scales.data_ptr<T>());
+            return scales;
+          },
+          py::arg("weight_remap_params"), py::arg("scales"),
+          R"pbdoc(
+           Remaps the weights for use of hardware-aware training.
+
+           Several remap types are available, see ``WeightRemapParameter``.
+
+           Args:
+               weight_remap_params: parameters of the remapping.
+               scales: scales that will be used and updated during remapping
+
+           Returns:
+               torch::tensor: ``[d_size]`` of scales
+
+           )pbdoc")
 
       .def(
           "forward",

@@ -16,7 +16,7 @@ from copy import deepcopy
 from typing import List, Optional, Union, TYPE_CHECKING
 
 from torch import device as torch_device
-from torch import ones, zeros, Tensor
+from torch import ones, zeros, Tensor, float32
 from torch.autograd import no_grad
 
 from aihwkit.exceptions import CudaError
@@ -60,13 +60,11 @@ class InferenceTile(AnalogTile):
             from aihwkit.simulator.configs import InferenceRPUConfig
             rpu_config = InferenceRPUConfig()
 
-        # Noise model.
-        self.noise_model = deepcopy(rpu_config.noise_model)
+        # CAUTION: one cannot save parts of the RPUConfig as
+        # properties of the class! This is because those attributes
+        # would be restored even if the RPUConfig would be replaced
+        # during checkpoint loading
 
-        # Drift compensation.
-        self.drift_compensation = None
-        if rpu_config.drift_compensation:
-            self.drift_compensation = deepcopy(rpu_config.drift_compensation)
         self.drift_baseline = None
         self.drift_readout_tensor = None  # type: Optional[Tensor]
         self.alpha = ones((1,))
@@ -84,13 +82,43 @@ class InferenceTile(AnalogTile):
             self.ensure_shared_weights()
 
     @no_grad()
-    def _forward_drift_readout_tensor(self) -> Optional[Tensor]:
-        """Perform a forward pass using the drift read-out tensor."""
-        if self.drift_compensation is None:
+    def init_mapping_scales(self) -> None:
+        """Helper function to initialize the mapping scales used to scale the
+        weights in digital and determine the conductance conversion.
+
+        Note:
+            This method is called from the constructor.
+        """
+        # Import `aihwkit.simulator.configs` items dynamically to avoid import cycles.
+        # pylint: disable=import-outside-toplevel
+        from aihwkit.simulator.configs.utils import WeightRemapType
+
+        super().init_mapping_scales()
+        remap = self.rpu_config.remap  # type: ignore
+        if remap.type != WeightRemapType.NONE:
+            # needs to be always out_size
+            mapping_scales = ones((self.out_size, ),
+                                  dtype=float32,
+                                  device=self.device,
+                                  requires_grad=False)
+            self.set_mapping_scales(mapping_scales)
+
+    @no_grad()
+    def _forward_drift_readout_tensor(self, reset_if: bool = False) -> Optional[Tensor]:
+        """Perform a forward pass using the drift read-out tensor.
+
+        Args:
+            reset_if: Will reset the readout tensor, otherwise use the stored one
+
+        Returns:
+            Readout tensor if drift compensation is on
+        """
+
+        if self.rpu_config.drift_compensation is None:
             return None
 
-        if self.drift_readout_tensor is None:
-            self.drift_readout_tensor = self.drift_compensation.get_readout_tensor(
+        if self.drift_readout_tensor is None or reset_if:
+            self.drift_readout_tensor = self.rpu_config.drift_compensation.get_readout_tensor(
                 self.tile.get_x_size()).detach().to(self.device)
             if self.in_trans:
                 self.drift_readout_tensor = self.drift_readout_tensor.tranpose(0, 1).clone()
@@ -108,20 +136,25 @@ class InferenceTile(AnalogTile):
         This method also establishes the drift coefficients for each
         conductance slice.
 
+        Will also reset the drift readout tensor and compuate a new
+        drift compensation baseline
+
         Args:
             from_reference: Whether to use weights from reference
         """
+
         if not from_reference or self.reference_combined_weights is None:
             self.reference_combined_weights = Tensor(self.tile.get_weights())
 
-        self.programmed_weights, self.nu_drift_list = self.noise_model.apply_programming_noise(
-            self.reference_combined_weights)
+        self.programmed_weights, self.nu_drift_list = \
+            self.rpu_config.noise_model.apply_programming_noise(
+                self.reference_combined_weights)
 
-        self.tile.set_weights(self.programmed_weights.numpy())
+        self.tile.set_weights(self.programmed_weights)
 
-        if self.drift_compensation is not None:
-            forward_output = self._forward_drift_readout_tensor()
-            self.drift_baseline = self.drift_compensation.init_baseline(forward_output)
+        if self.rpu_config.drift_compensation is not None:
+            forward_output = self._forward_drift_readout_tensor(True)
+            self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(forward_output)
 
     @no_grad()
     def drift_weights(
@@ -146,52 +179,70 @@ class InferenceTile(AnalogTile):
         if self.programmed_weights is None:
             self.program_weights()
 
-        drifted_weights = self.noise_model.apply_drift_noise(
+        drifted_weights = self.rpu_config.noise_model.apply_drift_noise(
             self.programmed_weights, self.nu_drift_list, t_inference)
-        self.tile.set_weights(drifted_weights.detach().cpu().numpy())
+        self.tile.set_weights(drifted_weights)
 
-        if self.drift_compensation is not None:
+        if self.rpu_config.drift_compensation is not None:
             forward_output = self._forward_drift_readout_tensor()
-            self.alpha = self.drift_compensation.apply(forward_output,
-                                                       self.drift_baseline).to(self.device)
+            self.alpha = self.rpu_config.drift_compensation.apply(
+                forward_output,
+                self.drift_baseline).to(self.device)
 
-    def forward(self, x_input: Tensor, is_test: bool = False) -> Tensor:
-        """Forward pass with drift compensation.
+    @no_grad()
+    def post_forward(self, x_output: Tensor, dim: int, is_test: bool = False) -> Tensor:
+        """Operations after the actual forward step for post processing """
 
-        Note:
-            The drift compensation scale will only be applied during
-            testing, ie if ``is_test=True``.
+        x_output = super().post_forward(x_output, dim, is_test)
+
+        if not is_test or self.rpu_config.drift_compensation is None:
+            return x_output
+
+        # only do drift compensation in eval mode
+        return x_output * self.alpha
+
+    @no_grad()
+    def post_update_step(self) -> None:
+        """Operators that need to be called once per mini-batch.
+
+        In the :class:`~InferenceTile`, the following calls are made
+        (if enabled in the ``rpu_config`` settings). First, the post
+        update step of the parent is called, then the weight clipping
+        is done, subsequently then remapping is done (if enforced),
+        and finally the forward-backward weight modifier is
+        called. The latter will modify the weights that are used
+        during forward and backward (but not update) until the next
+        time this function is called.
+
         """
         # Import `aihwkit.simulator.configs` items dynamically to avoid import cycles.
         # pylint: disable=import-outside-toplevel
         from aihwkit.simulator.configs.helpers import parameters_to_bindings
-        from aihwkit.simulator.configs.utils import WeightModifierType
-
-        if not is_test and (self.rpu_config.modifier.type != WeightModifierType.COPY or
-                            self.rpu_config.modifier.pdrop > 0.0):
-            weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
-            self.tile.modify_weights(weight_modify_params)
-
-        if not is_test or self.drift_compensation is None:
-            return super().forward(x_input, is_test)
-
-        # only do drift compensation in eval mode
-        return super().forward(x_input, True)*self.alpha
-
-    @no_grad()
-    def post_update_step(self) -> None:
-        """Operators that need to be called once per mini-batch."""
-        # Import `aihwkit.simulator.configs` items dynamically to avoid import cycles.
-        # pylint: disable=import-outside-toplevel
-        from aihwkit.simulator.configs.helpers import parameters_to_bindings
-        from aihwkit.simulator.configs.utils import WeightClipType
+        from aihwkit.simulator.configs.utils import (
+            WeightClipType, WeightModifierType, WeightRemapType
+        )
 
         super().post_update_step()
 
-        # TODO: make this a little nicer. Now each time bindings are generated.
+        # TODO: make this a little nicer. Now each time bindings are
+        # generated, which however has the advantage that parameters
+        # could be changed-on-the-fly
+
         if self.rpu_config.clip.type != WeightClipType.NONE:
             weight_clip_params = parameters_to_bindings(self.rpu_config.clip)
             self.tile.clip_weights(weight_clip_params)
+
+        if self.rpu_config.remap.type != WeightRemapType.NONE:
+            weight_remap_params = parameters_to_bindings(self.rpu_config.remap)
+            scales = self.get_scales()
+            scales = self.tile.remap_weights(weight_remap_params, scales)
+            self.set_scales(scales)
+
+        # update the forward / backward modified weights here
+        if (self.rpu_config.modifier.type != WeightModifierType.COPY or
+                self.rpu_config.modifier.pdrop > 0.0):
+            weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
+            self.tile.modify_weights(weight_modify_params)
 
     def cuda(
             self,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -220,6 +220,19 @@ class WeightClipType(Enum):
     AVERAGE_CHANNEL_MAX = 'AverageChannelMax'
     """Calculates the abs max of each output channel (row of the weight
     matrix) and takes the average as clipping value for all."""
+
+
+class WeightRemapType(Enum):
+    """Weight clipper type."""
+
+    NONE = 'None'
+    """None."""
+
+    LAYERWISE_SYMMETRIC = 'LayerwiseSymmetric'
+    """Remap according to the absolute max of the full weight matrix."""
+
+    CHANNELWISE_SYMMETRIC = 'ChannelwiseSymmetric'
+    """Remap each column (output channel) in respect to the absolute max."""
 
 
 class VectorUnitCellUpdatePolicy(Enum):
@@ -558,7 +571,13 @@ class WeightModifierParameter(_PrintableMixin):
 
 @dataclass
 class WeightClipParameter(_PrintableMixin):
-    """Parameter that clip the weights during hardware-aware training."""
+    """Parameter that clip the weights during hardware-aware training.
+
+    Important:
+        A clipping ``type`` has to be set before any of the parameter
+        changes take any effect.
+
+    """
 
     bindings_class: ClassVar[Type] = tiles.WeightClipParameter
 
@@ -576,6 +595,33 @@ class WeightClipParameter(_PrintableMixin):
     """Sigma value for clipping for the ``LayerGaussian`` type."""
 
     type: WeightClipType = WeightClipType.NONE
+    """Type of clipping."""
+
+
+@dataclass
+class WeightRemapParameter(_PrintableMixin):
+    """Parameter that remap the weights during hardware-aware training.
+
+    Important:
+        A remap ``type`` has to be set before any of the parameter
+        changes take any effect.
+    """
+    bindings_class: ClassVar[Type] = tiles.WeightRemapParameter
+
+    remapped_wmax: float = 1.0
+    """Assumed max of weight, ie the value of the weight the maximal
+    conductance is mapped to. Typically 1.0.
+    """
+
+    max_scale_range: float = 0.0
+    """Maximal range of scale values. Use zero to turn any restrictions
+    off (default)."""
+
+    max_scale_ref: float = 0.0
+    """Reference scale that use used as minimal scale for determining the
+    scale range."""
+
+    type: WeightRemapType = WeightRemapType.NONE
     """Type of clipping."""
 
 
@@ -729,15 +775,22 @@ class MappingParameter(_PrintableMixin):
 
     weight_scaling_omega: float = 0.0
     """omega_scale is a user defined parameter used to scale the weights
-    while remapping these to cover the full range of values allowed"""
+    while remapping these to cover the full range of values allowed.
+    """
 
-    weight_scaling_omega_columnwise: bool = False
+    weight_scaling_columnwise: bool = False
     """Whether the weight matrix will be remapped column-wise over
-    the maximum device allowed value"""
+    the maximum device allowed value."""
 
-    learn_out_scaling_alpha: bool = False
-    """define the out_scaling_alpha as a learnable parameter
-    used to scale the output"""
+    learn_out_scaling: bool = False
+    """Define (additional) out scales that are learnable parameter
+    used to scale the output."""
+
+    out_scaling_columnwise: bool = False
+    """Whether the learnable out scaling parameter enabled by
+    ``learn_out_scaling`` is a scalar (``False``) or learned for
+    each output (``True``).
+    """
 
     max_input_size: int = 512
     """Maximal input size (number of columns) of the weight matrix

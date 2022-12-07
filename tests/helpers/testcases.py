@@ -12,12 +12,14 @@
 
 """TestCases for aihwkit tests."""
 
+import os
 from typing import Type
 from unittest import SkipTest, TestCase
 
 from numpy.testing import assert_array_almost_equal, assert_raises
-
 from aihwkit.simulator.rpu_base import cuda
+
+SKIP_CUDA_TESTS = os.getenv('SKIP_CUDA_TESTS') or not cuda.is_compiled()
 
 
 class AihwkitTestCase(TestCase):
@@ -67,7 +69,7 @@ class ParametrizedTestCase(AihwkitTestCase):
     """Friendly name of the parameters used in this test."""
 
     def setUp(self) -> None:
-        if self.use_cuda and not cuda.is_compiled():
+        if self.use_cuda and SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
 
         super().setUp()

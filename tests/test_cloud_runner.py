@@ -18,6 +18,7 @@ from unittest import SkipTest
 from aihwkit.cloud.client.entities import CloudExperiment, CloudJobStatus
 from aihwkit.cloud.client.utils import ClientConfiguration
 from aihwkit.experiments.experiments.training import BasicTraining
+from aihwkit.experiments.experiments.inferencing import BasicInferencing
 from aihwkit.experiments.runners.cloud import CloudRunner
 
 from .helpers.decorators import parametrize_over_experiments
@@ -66,7 +67,10 @@ class CloudRunnerTest(AihwkitTestCase):
             raise SkipTest('No executions found')
 
         cloud_experiment = experiments[-1].get_experiment()
-        self.assertIsInstance(cloud_experiment, BasicTraining)
+        if 'BasicInferencing' in str(cloud_experiment):
+            self.assertIsInstance(cloud_experiment, BasicInferencing)
+        else:
+            self.assertIsInstance(cloud_experiment, BasicTraining)
 
     def test_get_cloud_experiment_result(self):
         """Test getting the result from a cloud experiment."""

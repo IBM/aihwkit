@@ -105,22 +105,28 @@ class ApiClient:
             A ``CloudExperiment``.
         """
         # Prepare the API data.
+        # debug: print('input_: ', input_)
         payload = self.converter.to_proto(input_).SerializeToString()
+        # debug: print('payload after convert to proto and serialize to string: \n', payload)
 
         # Create the experiment.
         response = self.experiments.post({'name': name,
                                           'category': 'train'})
+        # debug: print('response from experiments.post: ', response)
         experiment = ExperimentParser.parse_experiment(response, self)
 
         # Create the input.
         response = self.inputs.post({'experiment': experiment.id_,
                                      'device': device})
         object_storage_url = response['url']
+        # debug: print ('url: \n', object_storage_url)
         _ = self.object_storage_session.put(url=object_storage_url, data=payload)
 
         # Create the job.
-        response = self.jobs.post({'experiment': experiment.id_})
+        response = self.jobs.post({'device': device, 'experiment': experiment.id_})
+        # debug: print('response from jobs.post: ', response)
         experiment.job = ExperimentParser.parse_job(response)
+        # debug: print('In experiment_create: experiment.job: \n', experiment.job)
 
         return experiment
 

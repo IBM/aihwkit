@@ -57,6 +57,7 @@ class AnalogContext(Parameter):
 
     def reset(self, analog_tile: Optional['BaseTile'] = None) -> None:
         """Reset the gradient trace and optionally sets the tile pointer."""
+
         if analog_tile is not None:
             self.analog_tile = analog_tile
             self.analog_tile.analog_ctx = self
@@ -67,6 +68,15 @@ class AnalogContext(Parameter):
     def has_gradient(self) -> bool:
         """Return whether a gradient trace was stored."""
         return len(self.analog_input) > 0
+
+    def __copy__(self) -> Parameter:
+        """Turn off copying of the pointers. Context will be re-created
+        when tile is created"""
+        return Parameter(self.data)
+
+    def __deepcopy__(self, memo: Any) -> Parameter:
+        """ Turn off deep copying. Context will be re-created when tile is created """
+        return Parameter(self.data)
 
     def cuda(
             self,

@@ -19,9 +19,11 @@ from typing import Any, Optional
 
 from aihwkit.cloud.client.exceptions import ExperimentStatusError
 from aihwkit.cloud.converter.definitions.input_file_pb2 import TrainingInput
+from aihwkit.cloud.converter.definitions.i_input_file_pb2 import InferenceInput
 from aihwkit.cloud.converter.definitions.output_file_pb2 import TrainingOutput
 from aihwkit.cloud.converter.v1.training import BasicTrainingConverter, BasicTrainingResultConverter
-from aihwkit.experiments import BasicTraining
+from aihwkit.cloud.converter.v1.inferencing import BasicInferencingConverter
+# from aihwkit.experiments import BasicTraining, BasicInferencing
 
 
 class CloudJobStatus(Enum):
@@ -38,6 +40,7 @@ class CloudExperimentCategory(Enum):
     """Category of a CloudExperiment."""
 
     BASIC_TRAINING = 1
+    BASIC_INFERENCE = 2
 
 
 @dataclass
@@ -61,7 +64,7 @@ class CloudExperiment:
     input_id: Optional[str] = field(repr=False)
     job: Optional[CloudJob] = field(repr=False)
 
-    def get_experiment(self) -> BasicTraining:
+    def get_experiment(self) -> Any:
         """Return a data Experiment.
 
         Returns:
@@ -75,11 +78,16 @@ class CloudExperiment:
 
         input_ = self._api_client.input_get(self.input_id)
 
-        input_proto = TrainingInput()
-        input_proto.ParseFromString(input_)
+        if 'InferenceRPUConfig' in str(input_):
+            input_proto = InferenceInput()
+            input_proto.ParseFromString(input_)
+            proto = BasicInferencingConverter().from_proto(input_proto)
+        else:
+            input_proto = TrainingInput()
+            input_proto.ParseFromString(input_)
+            proto = BasicTrainingConverter().from_proto(input_proto)
 
-        converter = BasicTrainingConverter()
-        return converter.from_proto(input_proto)
+        return proto
 
     def get_result(self) -> list:
         """Return the result of an Experiment.

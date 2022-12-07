@@ -21,6 +21,7 @@
 #include "weight_clipper_cuda.h"
 #include "weight_drifter_cuda.h"
 #include "weight_modifier_cuda.h"
+#include "weight_remapper_cuda.h"
 #include <memory>
 #include <random>
 
@@ -182,7 +183,7 @@ public:
 
   void driftWeights(T time_since_last_call) override;
   void diffuseWeights() override;
-
+  void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
   void clipWeights(T clip) override;
   void clipWeights(const WeightClipParameter &wclpar) override;
 
@@ -220,6 +221,7 @@ protected:
 
   std::unique_ptr<CudaArray<T>> dev_temp_tensor_ = nullptr;
 
+  std::unique_ptr<WeightRemapperCuda<T>> wremapper_cuda_ = nullptr;
   std::unique_ptr<WeightClipperCuda<T>> wclipper_cuda_ = nullptr;
 
 private:

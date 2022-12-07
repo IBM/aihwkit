@@ -22,10 +22,9 @@ INSTALL_REQUIRES = [
     'torchvision',
     'scipy',
     'requests>=2.25,<3',
-    'numpy>=1.18',
-    'protobuf>=3.13.0,<4'
+    'numpy>=1.19',
+    'protobuf>=3.13.0,<4',
 ]
-
 
 def get_version() -> str:
     """Get the package version."""

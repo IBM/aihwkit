@@ -16,6 +16,7 @@
 #include "weight_clipper.h"
 #include "weight_drifter.h"
 #include "weight_modifier.h"
+#include "weight_remapper.h"
 #include <cfenv>
 #include <iostream>
 #include <memory>
@@ -211,6 +212,8 @@ public:
     swap(a.matrix_indices_set_, b.matrix_indices_set_);
 
     swap(a.wdrifter_, b.wdrifter_);
+
+    swap(a.wremapper_, b.wremapper_);
     swap(a.wclipper_, b.wclipper_);
 
     swap(a.fb_weights_, b.fb_weights_);
@@ -324,6 +327,10 @@ public:
 
   /* conductance drift */
   virtual void driftWeights(T time_since_last_call);
+
+  /* Remapping the weights. Scales and Biases need to be handled
+     from outside for now*/
+  virtual void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr);
 
   /* Modify forward/backward weights (while keeping the update
      weights to a reference). This essentially copies the weight
@@ -643,6 +650,7 @@ private:
   int temp_tensor_size_ = 0;
 
   std::unique_ptr<WeightDrifter<T>> wdrifter_ = nullptr;
+  std::unique_ptr<WeightRemapper<T>> wremapper_ = nullptr;
   std::unique_ptr<WeightClipper<T>> wclipper_ = nullptr;
   std::unique_ptr<WeightModifier<T>> fb_weight_modifier_ = nullptr;
 

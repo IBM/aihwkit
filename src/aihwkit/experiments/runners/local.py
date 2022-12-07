@@ -44,7 +44,7 @@ class LocalRunner(Runner):
             experiment: BasicTraining,
             max_elements_train: int = 0,
             dataset_root: str = '/tmp/datasets',
-            stdout: bool = True
+            stdout: bool = False,
     ) -> List[Dict]:
         """Run a single Experiment.
 
@@ -66,7 +66,8 @@ class LocalRunner(Runner):
                 experiment.
 
         Returns:
-            A list of dictionaries with information about each epoch.
+            A list of dictionaries with information about each
+            epoch.
         """
         # pylint: disable=arguments-differ
 
@@ -88,24 +89,4 @@ class LocalRunner(Runner):
             _ = experiment.dataset(dataset_root, download=True, split='train')
             _ = experiment.dataset(dataset_root, download=True, split='test')
 
-        # Move the model to the device.
-        if self.device:
-            if self.device.type == 'cuda':
-                experiment.model = experiment.model.to(self.device)
-
-        # Build the objects needed for training.
-        training_loader, validation_loader = experiment.get_data_loaders(
-            experiment.dataset, experiment.batch_size,
-            max_elements_train=max_elements_train,
-            dataset_root=dataset_root
-        )
-        optimizer = experiment.get_optimizer(experiment.learning_rate, experiment.model)
-
-        experiment.results = experiment.train(training_loader,
-                                              validation_loader,
-                                              experiment.model,
-                                              optimizer,
-                                              experiment.loss_function(),
-                                              experiment.epochs,
-                                              self.device)
-        return experiment.results
+        return experiment.run(max_elements_train, dataset_root, self.device)

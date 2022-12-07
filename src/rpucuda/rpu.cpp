@@ -293,11 +293,12 @@ template <typename T> RPUSimple<T>::RPUSimple(const RPUSimple<T> &other) : RPUAb
 
   if (other.wdrifter_) {
     // call copy constructor
-    wdrifter_ = make_unique<WeightDrifter<T>>(*other.wdrifter_);
+    wdrifter_ = RPU::make_unique<WeightDrifter<T>>(*other.wdrifter_);
   }
 
   // no copy needed
   wclipper_ = nullptr;
+  wremapper_ = nullptr;
 
   // cannot copy external weight pointer... user needs to call it again
   delta_weights_extern_[0] = nullptr;
@@ -305,7 +306,8 @@ template <typename T> RPUSimple<T>::RPUSimple(const RPUSimple<T> &other) : RPUAb
   if (other.fb_weights_) {
     fb_weights_ = Array_2D_Get<T>(this->d_size_, this->x_size_);
     RPU::math::copy<T>(this->x_size_ * this->d_size_, other.fb_weights_[0], 1, fb_weights_[0], 1);
-    fb_weight_modifier_ = make_unique<WeightModifier<T>>(this->x_size_, this->d_size_); // no copy
+    fb_weight_modifier_ =
+        RPU::make_unique<WeightModifier<T>>(this->x_size_, this->d_size_); // no copy
   }
 
   use_delayed_update_ = other.use_delayed_update_;
@@ -390,6 +392,7 @@ template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(RPUSimple<T> &&other
   other.matrix_indices_set_ = false;
 
   wdrifter_ = std::move(other.wdrifter_);
+  wremapper_ = std::move(other.wremapper_);
 
   last_update_m_batch_ = other.last_update_m_batch_;
 
@@ -1475,8 +1478,8 @@ template <typename T> void RPUSimple<T>::decayWeights(bool bias_no_decay) {
 
 template <typename T> void RPUSimple<T>::driftWeights(T time_since_last_call) {
   if (!wdrifter_) {
-    wdrifter_ =
-        make_unique<WeightDrifter<T>>(this->x_size_ * this->d_size_, getPar().drift); // simpleDrift
+    wdrifter_ = RPU::make_unique<WeightDrifter<T>>(
+        this->x_size_ * this->d_size_, getPar().drift); // simpleDrift
   }
   wdrifter_->apply(this->getWeightsPtr()[0], time_since_last_call, *rng_);
 }
@@ -1496,7 +1499,7 @@ template <typename T> void RPUSimple<T>::clipWeights(T clip) {
 template <typename T> void RPUSimple<T>::clipWeights(const WeightClipParameter &wclpar) {
 
   if (wclipper_ == nullptr) {
-    wclipper_ = make_unique<WeightClipper<T>>(this->x_size_, this->d_size_);
+    wclipper_ = RPU::make_unique<WeightClipper<T>>(this->x_size_, this->d_size_);
   }
 
   wclipper_->apply(getWeightsPtr()[0], wclpar);
@@ -1517,11 +1520,20 @@ template <typename T> void RPUSimple<T>::diffuseWeights() {
 
 /*********************************************************************************/
 
+template <typename T>
+void RPUSimple<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases) {
+
+  if (wremapper_ == nullptr) {
+    wremapper_ = RPU::make_unique<WeightRemapper<T>>(this->x_size_, this->d_size_);
+  }
+  wremapper_->apply(getWeightsPtr()[0], this->getAlphaLearningRate(), wrmpar, scales, biases);
+}
+
 template <typename T> void RPUSimple<T>::modifyFBWeights(const WeightModifierParameter &wmpar) {
 
   if (fb_weights_ == nullptr) {
     fb_weights_ = Array_2D_Get<T>(this->d_size_, this->x_size_);
-    fb_weight_modifier_ = make_unique<WeightModifier<T>>(this->x_size_, this->d_size_);
+    fb_weight_modifier_ = RPU::make_unique<WeightModifier<T>>(this->x_size_, this->d_size_);
   }
 
   // modify FB weights

@@ -21,18 +21,18 @@ from numpy.testing import assert_array_equal, assert_array_almost_equal
 from torch import Tensor, from_numpy
 from torch.cuda import init
 
-from aihwkit.simulator.rpu_base import tiles, cuda
+from aihwkit.simulator.rpu_base import tiles
 
 from aihwkit.simulator.configs import FloatingPointRPUConfig, SingleRPUConfig
 from aihwkit.simulator.configs.devices import FloatingPointDevice, ConstantStepDevice, IdealDevice
 from aihwkit.simulator.configs.utils import IOParameters, DriftParameter
 
 from .helpers.decorators import parametrize_over_tiles
-from .helpers.testcases import ParametrizedTestCase
+from .helpers.testcases import ParametrizedTestCase, SKIP_CUDA_TESTS
 from .helpers.tiles import (FloatingPoint, ConstantStep,
                             FloatingPointCuda, ConstantStepCuda)
 
-if cuda.is_compiled():
+if not SKIP_CUDA_TESTS:
     init()
 
 
@@ -106,9 +106,9 @@ class BindingsTilesTest(ParametrizedTestCase):
         python_tile = self.get_custom_tile(2, 3, lifetime=1.0/decay_rate)
         cpp_tile = python_tile.tile
 
-        init_weights = cpp_tile.get_weights().copy()
+        init_weights = cpp_tile.get_weights().numpy()
         cpp_tile.decay_weights(1.0)
-        weights = cpp_tile.get_weights()
+        weights = cpp_tile.get_weights().numpy()
 
         assert_array_almost_equal(weights, init_weights*(1.0 - decay_rate))
 
@@ -120,9 +120,9 @@ class BindingsTilesTest(ParametrizedTestCase):
         python_tile = self.get_custom_tile(100, 122, diffusion=diffusion_rate)
         cpp_tile = python_tile.tile
 
-        init_weights = cpp_tile.get_weights().copy()
+        init_weights = cpp_tile.get_weights().numpy()
         cpp_tile.diffuse_weights()
-        weights = cpp_tile.get_weights()
+        weights = cpp_tile.get_weights().numpy()
 
         deviation_std = std((weights - init_weights).flatten())
         self.assertLess(deviation_std, 1.1*diffusion_rate)
@@ -137,7 +137,7 @@ class BindingsTilesTest(ParametrizedTestCase):
         python_tile = self.get_custom_tile(100, 122, drift=drift_params)
         cpp_tile = python_tile.tile
 
-        init_weights = cpp_tile.get_weights().copy()
+        init_weights = cpp_tile.get_weights()
         cpp_tile.drift_weights(delta_t)
         weights = cpp_tile.get_weights()
 
@@ -158,7 +158,7 @@ class BindingsTilesTest(ParametrizedTestCase):
         x_t = from_numpy(uniform(-1.2, 1.2, size=(m_batch, n_cols)).astype('float32'))
         d_t = from_numpy(uniform(-0.1, 0.1, size=(m_batch, n_rows)).astype('float32'))
 
-        init_weights = cpp_tile.get_weights().copy()
+        init_weights = cpp_tile.get_weights()
 
         if python_tile.is_cuda:
             x_t = x_t.cuda()
@@ -183,7 +183,7 @@ class BindingsTilesTest(ParametrizedTestCase):
 
     def test_cuda_instantiation(self):
         """Test whether cuda weights are copied correctly."""
-        if not self.use_cuda and not cuda.is_compiled():
+        if not self.use_cuda or SKIP_CUDA_TESTS:
             raise SkipTest('not compiled with CUDA support')
 
         python_tile = self.get_tile(10, 12)
@@ -205,14 +205,19 @@ class FloatingPointTileTest(ParametrizedTestCase):
         python_tile = self.get_tile(2, 3)
         cpp_tile = python_tile.tile
 
-        # Set weights using Lists.
-        input_weights = [[1, 2, 3], [4, 5, 6]]
+        # Set weights using Tensors.
+        input_weights = Tensor([[1., 2., 3.], [4., 5., 6.]])
         cpp_tile.set_weights(input_weights)
         assert_array_equal(cpp_tile.get_weights(), input_weights)
 
-        # Set weights using numpy arrays.
-        input_weights = array([[6, 5, 4], [3, 2, 1]])
-        cpp_tile.set_weights(input_weights)
+        # Set weights using numpy (via python tile).
+        input_weights = array([[1., 2., 3.], [4., 5., 6.]])
+        python_tile.set_weights(input_weights)
+        assert_array_equal(cpp_tile.get_weights(), input_weights)
+
+        # Set weights using Lists (via python tile).
+        input_weights = [[1., 2., 3.], [4., 5., 6.]]
+        python_tile.set_weights(input_weights)
         assert_array_equal(cpp_tile.get_weights(), input_weights)
 
     def test_setters_weights_realistic(self):
@@ -220,15 +225,10 @@ class FloatingPointTileTest(ParametrizedTestCase):
         python_tile = self.get_tile(2, 3)
         cpp_tile = python_tile.tile
 
-        # Set weights using Lists.
-        input_weights = [[1, 2, 3], [4, 5, 6]]
-        cpp_tile.set_weights_realistic(input_weights, 1)
-        assert_array_equal(cpp_tile.get_weights_realistic(), input_weights)
-
-        # Set weights using numpy arrays.
-        input_weights = array([[6, 5, 4], [3, 2, 1]])
-        cpp_tile.set_weights_realistic(input_weights, 10)
-        assert_array_equal(cpp_tile.get_weights_realistic(), input_weights)
+        # Set weights using Tensors.
+        input_weights = Tensor([[1., 2., 3.], [4., 5., 6.]])
+        cpp_tile.set_weights(input_weights)
+        assert_array_equal(cpp_tile.get_weights(), input_weights)
 
     def test_n_dim_forward(self):
         """Tests whether forward n-dim inputs work as expected"""
@@ -316,13 +316,8 @@ class AnalogTileTest(ParametrizedTestCase):
         python_tile = self.get_tile(2, 3)
         cpp_tile = python_tile.tile
 
-        # Set weights using Lists.
-        input_weights = [[1, 2, 3], [4, 5, 6]]
-        cpp_tile.set_weights(input_weights)
-        self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
-
-        # Set weights using numpy arrays.
-        input_weights = array([[6, 5, 4], [3, 2, 1]])
+        # Set weights using Tensors.
+        input_weights = Tensor([[6, 5, 4], [3, 2, 1]])
         cpp_tile.set_weights(input_weights)
         self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
 
@@ -331,12 +326,7 @@ class AnalogTileTest(ParametrizedTestCase):
         python_tile = self.get_tile(2, 3)
         cpp_tile = python_tile.tile
 
-        # Set weights using Lists.
-        input_weights = [[1, 2, 3], [4, 5, 6]]
-        cpp_tile.set_weights_realistic(input_weights, 10)
-        self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
-
-        # Set weights using numpy arrays.
-        input_weights = array([[6, 5, 4], [3, 2, 1]])
+        # Set weights using Tensors.
+        input_weights = Tensor([[6, 5, 4], [3, 2, 1]])
         cpp_tile.set_weights_realistic(input_weights, 10)
         self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
