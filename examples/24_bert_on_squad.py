@@ -101,6 +101,7 @@ DOC_STRIDE = 128
 
 
 def create_ideal_rpu_config(g_max=160, tile_size=256, w_noise=0.0, out_noise=0.0):
+    """Create RPU Config with ideal conditions"""
     rpu_config = InferenceRPUConfig()
     rpu_config.modifier
     rpu_config.clip.type = WeightClipType.FIXED_VALUE
@@ -125,6 +126,7 @@ def create_ideal_rpu_config(g_max=160, tile_size=256, w_noise=0.0, out_noise=0.0
 
 
 def create_rpu_config(g_max=160, tile_size=256, dac_res=256, adc_res=256, w_noise=0.0175):
+    """Create RPU Config emulated typical PCM Device"""
     if ARGS.wandb:
         w_noise = wandb.config.weight_noise
 
@@ -150,6 +152,7 @@ def create_rpu_config(g_max=160, tile_size=256, dac_res=256, adc_res=256, w_nois
 
 
 def create_model(rpu_config):
+    """Return Question Answering model"""
     model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
     if not ARGS.digital:
         model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
@@ -161,6 +164,7 @@ def create_model(rpu_config):
 # Some examples in the dataset may have contexts that exceed the maximum input length
 # We can truncate the context using truncation="only_second"
 def preprocess_train(dataset):
+    """Preprocess the training dataset"""
     # Some of the questions have lots of whitespace on the left,
     # which is not useful and will make the
     # truncation of the context fail (the tokenized question will take a lots of space).
@@ -253,6 +257,7 @@ def preprocess_train(dataset):
 
 
 def preprocess_validation(dataset):
+    """Preprocess the validation set"""
     # Some of the questions have lots of whitespace on the left,
     # which is not useful and will make the
     # truncation of the context fail (the tokenized question will take a lots of space).
@@ -313,7 +318,7 @@ def postprocess_predictions(
     n_best_size=20,
     max_answer_length=30
 ):
-
+    """Postprocess raw predictions"""
     features.set_format(type=features.format["type"], columns=list(features.features.keys()))
     all_start_logits, all_end_logits = raw_predictions
 
@@ -405,6 +410,7 @@ def postprocess_predictions(
 
 
 def create_datasets():
+    """Load the SQuAD dataset, the tokenized version, and the validation set"""
     squad = load_dataset("squad")
 
     # Preprocessing changes number of samples, so we need to remove some columns so
@@ -423,7 +429,6 @@ def create_datasets():
 
 def create_optimizer(model):
     """Create the analog-aware optimizer"""
-
     optimizer = AnalogSGD(model.parameters(), lr=2e-4)
 
     optimizer.regroup_param_groups(model)
@@ -432,6 +437,7 @@ def create_optimizer(model):
 
 
 def make_trainer(model, optimizer, tokenized_data):
+    """Create the Huggingface Trainer"""
     training_args = TrainingArguments(
         output_dir='./',
         save_strategy="no",
@@ -461,6 +467,9 @@ def make_trainer(model, optimizer, tokenized_data):
 
 
 def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9):
+    """Perform inference experiment at weight noise level specified at runtime
+    SQuAD exact match and f1 metrics are captured in Tensorboard
+    """
     model.eval()
 
     metric = load("squad")
@@ -504,6 +513,9 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
 
 
 def main():
+    """Provide the lambda function for WandB sweep. If WandB is not used, then this
+    is what is executed in the job
+    """
     if ARGS.wandb:
         wandb.init()
 
