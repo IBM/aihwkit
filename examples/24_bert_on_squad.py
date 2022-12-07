@@ -74,11 +74,15 @@ PARSER.add_argument("-n", "--noise",
                     type=float)
 PARSER.add_argument("-r", "--run_name",
                     help="Tensorboard run name",
-                    defualt=datetime.now().strftime("%Y%m%d-%H%M%S"),
+                    default=datetime.now().strftime("%Y%m%d-%H%M%S"),
                     type=str)
-PARSER.add_argument("-h", "--hwa_train",
+PARSER.add_argument("-t", "--train_hwa",
                     help="Use Hardware-Aware training",
                     action="store_true")
+PARSER.add_argument("-l", "--learning_rate",
+                    help="Learning rate for training",
+                    default=2e-4,
+                    type=float)
 
 ARGS = PARSER.parse_args()
 
@@ -429,7 +433,7 @@ def create_datasets():
 
 def create_optimizer(model):
     """Create the analog-aware optimizer"""
-    optimizer = AnalogSGD(model.parameters(), lr=2e-4)
+    optimizer = AnalogSGD(model.parameters(), lr=ARGS.learning_rate)
 
     optimizer.regroup_param_groups(model)
 

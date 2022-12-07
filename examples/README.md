@@ -529,9 +529,9 @@ metrics evaluated using the model at various times after training completed.
 
 Commandline arguments can be used to control certain options.
 For example:
-`python /path/to/aihwkit/examples/24_bert_on_squad.py --noise 0.1 --hwa_train --run_name "run 1"`
-to set the weight noise to 0.1, do hardware-aware training, and name the
-run "run 1" in Tensorboard.
+`python /path/to/aihwkit/examples/24_bert_on_squad.py -n 0.1 -r "run 1" -l 0.0005 -t`
+to set the weight noise to 0.1, name the run in Tensorboard "run 1",
+set the learning rate to 0.0005, and do hardware-aware training
 
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
