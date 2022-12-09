@@ -32,8 +32,7 @@ from torchvision import datasets, transforms
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda
 
 # Check device

@@ -12,7 +12,6 @@
 
 """High level analog tiles (floating point)."""
 
-from copy import deepcopy
 from typing import Optional, Union, TYPE_CHECKING
 
 from torch import device as torch_device
@@ -117,25 +116,6 @@ class FloatingPointTile(BaseTile):
             rpu_config = FloatingPointRPUConfig()
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
-    def cpu(self) -> 'BaseTile':
-        """Return a copy of this tile in CPU memory.
-
-        Note:
-            CUDA tiles weight can be accessed by `get_weights` etc
-            methods, there is no need to move them to CPU and it is
-            currently not supported.
-
-        Returns:
-            self in case of CPU
-
-        Raises:
-            CudaError: if a CUDA tile is moved to CPU
-        """
-        if self.is_cuda:
-            raise CudaError('Currently it is not possible to move CUDA tile to cpu.')
-
-        return self
-
     def cuda(
             self,
             device: Optional[Union[torch_device, str, int]] = None
@@ -187,32 +167,3 @@ class FloatingPointTile(BaseTile):
         meta_parameter = rpu_config.device.as_bindings()
 
         return meta_parameter.create_array(x_size, d_size)
-
-
-class CudaFloatingPointTile(FloatingPointTile):
-    """Floating point tile (CUDA).
-
-    Floating point tile that uses GPU for its operation. The instantiation is
-    based on an existing non-cuda tile: all the source attributes are copied
-    except for the simulator tile, which is recreated using a GPU tile.
-
-    Caution:
-        Deprecated. Use ``FloatingPointTile(..).cuda()`` instead.
-
-    Args:
-        source_tile: tile to be used as the source of this tile
-    """
-
-    is_cuda = True
-
-    def __init__(self, source_tile: FloatingPointTile):
-        if not cuda.is_compiled():
-            raise CudaError('aihwkit has not been compiled with CUDA support')
-
-        # Create a new instance of the rpu config.
-        new_rpu_config = deepcopy(source_tile.rpu_config)
-
-        # Create the tile, replacing the simulator tile.
-        super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
-                         source_tile.bias, source_tile.in_trans, source_tile.out_trans)
-        self.cuda(self.device)

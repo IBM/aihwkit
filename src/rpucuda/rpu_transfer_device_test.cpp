@@ -18,7 +18,7 @@
 #include <chrono>
 #include <memory>
 #include <random>
-//#include "test_helper.h"
+// #include "test_helper.h"
 
 #define TOLERANCE 1e-5
 
@@ -111,13 +111,10 @@ public:
 // define the tests
 INSTANTIATE_TEST_CASE_P(GammaWeightening, RPUDeviceTestFixture, ::testing::Values(0.0, 0.5));
 
-TEST_P(RPUDeviceTestFixture, Empty) { dp->print(); }
-
 TEST_P(RPUDeviceTestFixture, createDevice) {
-
   rpu_device = this->dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
   ASSERT_TRUE(dynamic_cast<TransferRPUDevice<num_t> *>(&*rpu_device) != nullptr);
-  rpu_device->dispInfo();
+  // rpu_device->dispInfo();
 
   delete rpu_device;
 }

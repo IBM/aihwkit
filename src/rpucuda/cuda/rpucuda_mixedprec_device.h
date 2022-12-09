@@ -21,8 +21,8 @@ template <typename T> class MixedPrecRPUDeviceCuda : public MixedPrecRPUDeviceBa
 
 public:
   explicit MixedPrecRPUDeviceCuda(){};
-  explicit MixedPrecRPUDeviceCuda(CudaContext *c, int x_size, int d_size);
-  explicit MixedPrecRPUDeviceCuda(CudaContext *c, const MixedPrecRPUDevice<T> &other);
+  explicit MixedPrecRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
+  explicit MixedPrecRPUDeviceCuda(CudaContextPtr c, const MixedPrecRPUDevice<T> &other);
 
   ~MixedPrecRPUDeviceCuda(){};
   MixedPrecRPUDeviceCuda(const MixedPrecRPUDeviceCuda<T> &other);

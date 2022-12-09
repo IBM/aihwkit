@@ -16,7 +16,7 @@
 #include "utility_functions.h"
 
 #include <iostream>
-//#include <random>
+// #include <random>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -26,7 +26,7 @@ namespace RPU {
 /********************************************************************************
  * RPUCudaSimple<T>
  *********************************************************************************/
-template <typename T> void RPUCudaSimple<T>::initialize(CudaContext *c) {
+template <typename T> void RPUCudaSimple<T>::initialize(CudaContextPtr c) {
 
   context_ = c;
   dev_weights_ = RPU::make_unique<CudaArray<T>>(c, this->x_size_ * this->d_size_);
@@ -40,16 +40,12 @@ template <typename T> void RPUCudaSimple<T>::initialize(CudaContext *c) {
   dev_d_vector_ = RPU::make_unique<CudaArray<T>>(c, this->d_size_);
   dev_x_vector_ = RPU::make_unique<CudaArray<T>>(c, this->x_size_);
 
-  dev_x_matrix_bias_ = nullptr;
-  dev_x_matrix_bias_size_ = 0;
-
   dev_temp_tensor_ = nullptr;
-
   context_->synchronize();
 }
 
 template <typename T>
-RPUCudaSimple<T>::RPUCudaSimple(CudaContext *c, int x_size, int d_size)
+RPUCudaSimple<T>::RPUCudaSimple(CudaContextPtr c, int x_size, int d_size)
     : RPUSimple<T>(x_size, d_size) {
   this->initialize(c);
 
@@ -60,9 +56,9 @@ RPUCudaSimple<T>::RPUCudaSimple(CudaContext *c, int x_size, int d_size)
 template <typename T>
 RPUCudaSimple<T>::RPUCudaSimple(cudaStream_t s, int x_size, int d_size)
     : RPUSimple<T>(x_size, d_size) {
-  shared_context_ = RPU::make_unique<CudaContext>(s);
+  internal_context_ = RPU::make_unique<CudaContext>(s);
 
-  this->initialize(&*shared_context_);
+  this->initialize(&*internal_context_);
 
   DEBUG_CALL(this->disp(););
   DEBUG_OUT("RPUCudaSimple constructed (on shared stream)");
@@ -74,7 +70,7 @@ template <typename T> void RPUCudaSimple<T>::initFrom(const RPUSimple<T> &rpu) {
 }
 
 template <typename T>
-RPUCudaSimple<T>::RPUCudaSimple(CudaContext *c, RPUSimple<T> &o) : RPUSimple<T>(o) {
+RPUCudaSimple<T>::RPUCudaSimple(CudaContextPtr c, RPUSimple<T> &o) : RPUSimple<T>(o) {
 
   this->initialize(c);
   initFrom(o);
@@ -86,8 +82,8 @@ template <typename T>
 RPUCudaSimple<T>::RPUCudaSimple(cudaStream_t s, RPUSimple<T> &o) : RPUSimple<T>(o) {
 
   // we are using the copy constructor of the base class RPUSimple
-  shared_context_ = RPU::make_unique<CudaContext>(s);
-  this->initialize(&*shared_context_);
+  internal_context_ = RPU::make_unique<CudaContext>(s);
+  this->initialize(&*internal_context_);
   initFrom(o);
 
   DEBUG_OUT("RPUCudaSimple constructed from RPUSimple on shared stream");
@@ -104,7 +100,7 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
   this->initialize(other.context_); // private
 
   // note: CUDA event/stream logic should be unique. It is only copied if already shared
-  shared_context_ = other.shared_context_;
+  internal_context_ = RPU::make_unique<CudaContext>(*other.internal_context_);
 
   if (other.dev_weights_) {
     dev_weights_->assign(*other.dev_weights_);
@@ -154,9 +150,9 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
 
 // copy assignment
 template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(const RPUCudaSimple<T> &other) {
-
   RPUCudaSimple<T> tmp(other);
   swap(*this, tmp);
+  context_->synchronize(); // need sync because of tmp
   return *this;
 }
 
@@ -173,8 +169,7 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
   context_ = other.context_;
   other.context_ = nullptr;
 
-  shared_context_ = other.shared_context_;
-  other.shared_context_ = nullptr;
+  internal_context_ = std::move(other.internal_context_);
 
   dev_weights_ = std::move(other.dev_weights_);
   dev_weights_buffer_ = std::move(other.dev_weights_buffer_);
@@ -186,10 +181,6 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
   dev_x_vector_ = std::move(other.dev_x_vector_);
   dev_d_vector_ = std::move(other.dev_d_vector_);
   dev_x_vector_bias_ = std::move(dev_x_vector_bias_);
-  dev_x_matrix_bias_ = std::move(other.dev_x_matrix_bias_);
-
-  dev_x_matrix_bias_size_ = other.dev_x_matrix_bias_size_;
-  other.dev_x_matrix_bias_size_ = 0;
 
   dev_temp_tensor_ = std::move(other.dev_temp_tensor_);
 
@@ -288,6 +279,7 @@ template <typename T> T *RPUCudaSimple<T>::getWeightsBufferCuda() {
   if (dev_weights_buffer_ == nullptr) {
     dev_weights_buffer_ =
         RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * this->d_size_);
+    this->context_->synchronize();
   }
   return dev_weights_buffer_->getData();
 };
@@ -305,14 +297,11 @@ template <typename T> void RPUCudaSimple<T>::copyWeightsToBuffer() {
 }
 
 template <typename T> T *RPUCudaSimple<T>::getMatrixBiasBuffer(int m_batch) {
-
-  if (dev_x_matrix_bias_ == nullptr || m_batch * this->x_size_ > dev_x_matrix_bias_->getSize()) {
-    DEBUG_OUT("Get new buffer size " << m_batch);
-    dev_x_matrix_bias_ = nullptr;
-    dev_x_matrix_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * m_batch);
-  }
-  dev_x_matrix_bias_size_ = m_batch; // allow shrinking
-  return dev_x_matrix_bias_->getData();
+  T *bias_buffer = context_->template getSharedBuffer<T>(RPU_BUFFER_BIAS, m_batch * this->x_size_);
+  return bias_buffer;
+}
+template <typename T> void RPUCudaSimple<T>::releaseMatrixBiasBuffer() {
+  context_->template releaseSharedBuffer<T>(RPU_BUFFER_BIAS);
 }
 
 template <typename T>
@@ -327,13 +316,9 @@ T *RPUCudaSimple<T>::copyToMatrixBiasBuffer(
 
 template <typename T>
 void RPUCudaSimple<T>::copyFromMatrixBiasBuffer(
-    T *X_input_without_bias, int m_batch, bool x_trans) {
-  if ((m_batch < dev_x_matrix_bias_size_) || (dev_x_matrix_bias_ == nullptr)) {
-    RPU_FATAL("Buffer size mismatch. This should never happen!")
-  }
+    T *X_input_without_bias, int m_batch, bool x_trans, T *bias_buffer) {
   RPU::math::copyWithoutBias<T>(
-      this->context_, X_input_without_bias, dev_x_matrix_bias_->getData(), this->x_size_, m_batch,
-      x_trans);
+      this->context_, X_input_without_bias, bias_buffer, this->x_size_, m_batch, x_trans);
 };
 
 template <typename T>
@@ -358,7 +343,9 @@ void RPUCudaSimple<T>::getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, 
 
   int n = (x_size + d_size) * dim3 * m_batch;
   if ((dev_temp_tensor_ == nullptr) || (dev_temp_tensor_->getSize() < n)) {
+    this->context_->synchronize();
     dev_temp_tensor_ = RPU::make_unique<CudaArray<T>>(context_, n);
+    this->context_->synchronize();
   }
   *x_tensor = dev_temp_tensor_->getData();
   *d_tensor = *x_tensor + (x_size)*dim3 * m_batch;
@@ -638,7 +625,7 @@ template <typename T> void RPUCudaSimple<T>::clipWeights(const WeightClipParamet
 
   if (!wclipper_cuda_) {
     wclipper_cuda_ =
-        make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+        RPU::make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
   }
 
   wclipper_cuda_->apply(dev_weights_->getData(), wclpar);
@@ -689,7 +676,8 @@ template <typename T> T *RPUCudaSimple<T>::getFBWeightsCuda(bool is_test) const 
   return use_fb ? dev_fb_weights_->getData() : dev_weights_->getData();
 }
 
-template <typename T> void RPUCudaSimple<T>::modifyFBWeights(const WeightModifierParameter &wmpar) {
+template <typename T>
+void RPUCudaSimple<T>::modifyFBWeights(const WeightModifierParameter<T> &wmpar) {
 
   ENFORCE_NO_DELAYED_UPDATE; // will get confused with the buffer
 
@@ -723,6 +711,12 @@ void RPUCudaSimple<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scale
 template <typename T> void RPUCudaSimple<T>::printWeights(int x_count, int d_count) {
   this->copyWeightsToHost(this->weights_[0]);
   RPUSimple<T>::printWeights(x_count, d_count);
+}
+
+/*********************************************************************************/
+template <typename T> void RPUCudaSimple<T>::finishAllCalculations() {
+  this->finishUpdateCalculations();
+  this->context_->synchronizeContext();
 }
 
 template class RPUCudaSimple<float>;

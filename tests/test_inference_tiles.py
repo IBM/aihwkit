@@ -12,7 +12,7 @@
 
 """Tests for inference tiles."""
 
-from typing import Optional
+from typing import Optional, List
 
 from parameterized import parameterized
 from torch import ones
@@ -243,11 +243,15 @@ class InferenceTileTest(ParametrizedTestCase):
         ('none', None,),
         ('dorefa', WeightModifierType.DOREFA,),
         ('mult_normal', WeightModifierType.MULT_NORMAL,),
+        ('poly', WeightModifierType.POLY, [1., 3.]),
+        ('polyN', WeightModifierType.POLY, [0.1, 0.2, 0.2, 0.3]),
         ('discretize', WeightModifierType.DISCRETIZE,),
         ('add_normal', WeightModifierType.DISCRETIZE_ADD_NORMAL,),
         ('copy', WeightModifierType.COPY,),
     ])
-    def test_post_forward_modifier_types(self, _, modifier_type):
+    def test_post_forward_modifier_types(self, _,
+                                         modifier_type: 'WeightModifierType',
+                                         coeffs: Optional[List] = None):
         """Tests whether modifier is performed."""
         rpu_config = self.get_rpu_config()
         rpu_config.drift_compensation = None
@@ -255,7 +259,7 @@ class InferenceTileTest(ParametrizedTestCase):
         rpu_config.forward.out_noise = 0.0
         rpu_config.forward.inp_noise = 0.0
 
-        modifier = self.get_modifier(modifier_type)
+        modifier = self.get_modifier(modifier_type, coeffs)
         if modifier is not None:
             rpu_config.modifier = modifier
 
@@ -288,25 +292,26 @@ class InferenceTileTest(ParametrizedTestCase):
 
     @staticmethod
     def get_modifier(
-            modifier_type: Optional[WeightModifierType]
+            modifier_type: Optional[WeightModifierType],
+            coeffs: Optional[List] = None,
     ) -> Optional[WeightModifierParameter]:
         """Returns the modifier parameter."""
         if modifier_type is None:
             return None
+        if coeffs is None:
+            coeffs = [1.0, 0.1]
 
         modifier = WeightModifierParameter(
             type=modifier_type,
             std_dev=1.0,
             enable_during_test=False,
             res=0.132,
-            coeff0=1.0,
-            coeff1=0.1,
-            coeff2=0.2,
+            coeffs=coeffs,
             rel_to_actual_wmax=False,
             assumed_wmax=1.0
         )
 
         if modifier_type == WeightModifierType.COPY:
-            modifier.pdrop = 0.9999
+            modifier.pdrop = 0.5
 
         return modifier

@@ -18,7 +18,7 @@ from typing import Any, List, Optional, Tuple, Type, Callable
 from torch import Tensor, jit
 from torch.nn import Dropout, ModuleList, init
 
-from aihwkit.nn import AnalogSequential
+from aihwkit.nn.modules.container import AnalogSequential
 from aihwkit.nn.modules.rnn.layers import AnalogRNNLayer, AnalogBidirRNNLayer
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 
@@ -92,15 +92,15 @@ class ModularRNN(AnalogSequential):
         """
         return [lay.get_zero_state(batch_size) for lay in self.layers]
 
-    def forward(
+    def forward(  # pylint: disable=arguments-differ
             self,
-            input_: Tensor,
+            input: Tensor,  # pylint: disable=redefined-builtin
             states: List
     ) -> Tuple[Tensor, List]:
-        # pylint: disable=arguments-differ
+
         # List[RNNState]: One state per layer.
         output_states = jit.annotate(List, [])
-        output = input_
+        output = input
 
         for i, rnn_layer in enumerate(self.layers):
             state = states[i]
@@ -221,12 +221,11 @@ class AnalogRNN(AnalogSequential):
 
     def forward(
             self,
-            x: Tensor,
+            input: Tensor,  # pylint: disable=redefined-builtin
             states: Optional[List] = None
     ) -> Tuple[Tensor, List]:
-        # pylint: disable=arguments-differ
         if states is None:
             # TODO: batch_first.
-            states = self.get_zero_state(x.shape[1])
+            states = self.get_zero_state(input.shape[1])
 
-        return self.rnn(x, states)
+        return self.rnn(input, states)

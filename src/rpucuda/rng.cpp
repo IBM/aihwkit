@@ -65,10 +65,10 @@ template <typename T> RNG<T> &RNG<T>::operator=(const RNG<T> &other) {
   return *this;
 }
 // move constructor
-template <typename T> RNG<T>::RNG(RNG<T> &&other) { *this = std::move(other); }
+template <typename T> RNG<T>::RNG(RNG<T> &&other) noexcept { *this = std::move(other); }
 
 // move assignment
-template <typename T> RNG<T> &RNG<T>::operator=(RNG<T> &&other) {
+template <typename T> RNG<T> &RNG<T>::operator=(RNG<T> &&other) noexcept {
 
   gauss_numbers_list_ = other.gauss_numbers_list_;
   other.gauss_numbers_list_ = nullptr;
@@ -78,7 +78,8 @@ template <typename T> RNG<T> &RNG<T>::operator=(RNG<T> &&other) {
 }
 
 template <typename T> void RNG<T>::randomizeSeed() {
-  unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  unsigned int seed =
+      (unsigned int)std::chrono::high_resolution_clock::now().time_since_epoch().count();
   srand(seed);
   fast_srand((randomint_t)(rand() % RPU_MAX_RAND_RANGE));
   generateNewList();

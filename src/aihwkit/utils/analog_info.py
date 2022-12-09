@@ -1,6 +1,20 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
 """Analog Information utility.
 
-This module prints relevant information about the model and its analog execution.
+This module prints relevant information about the model and its analog
+execution.
+
 """
 
 from functools import reduce
@@ -8,9 +22,8 @@ import operator
 from typing import Optional, Any, List
 
 # Imports from PyTorch.
-import torch
-from torch import Tensor
-from torch import nn
+from torch import zeros
+from torch.nn import Module
 
 from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
 from aihwkit.nn.modules.conv_mapped import _AnalogConvNdMapped
@@ -35,20 +48,18 @@ COLUMN_NAMES = {
     "reuse_factor": (0, "Reuse Factor")
 }
 
-INPUT_SIZE_TYPE = Any
 FORMATTING_WIDTH = 200
-COLUMN_WIDTH = 20
+COLUMN_WIDTH = 10
 FLOAT_FORMAT = "{0:.2f}"
 
 
 class TileInfo:
-    """
-    class storing tile statistics and information.
-    """
-    log_in_size: INPUT_SIZE_TYPE
-    log_out_size: INPUT_SIZE_TYPE
-    phy_in_size: INPUT_SIZE_TYPE
-    phy_out_size: INPUT_SIZE_TYPE
+    """Class for storing tile statistics and information."""
+
+    log_in_size: Any
+    log_out_size: Any
+    phy_in_size: Any
+    phy_out_size: Any
     utilization: float
 
     def __init__(self, tile: BaseTile, is_mapped: bool):
@@ -62,7 +73,7 @@ class TileInfo:
         self.utilization = log_space * 100 / max_space if is_mapped else 100
 
     def tile_summary_dict(self) -> dict:
-        """return a dictionary with the tile info."""
+        """Return a dictionary with the tile info."""
         phys_shape = 'N/A' if not self.is_mapped else (self.phy_out_size, self.phy_in_size)
         return {"log_shape": str((self.log_out_size, self.log_in_size)),
                 "phys_shape": str(phys_shape),
@@ -76,25 +87,23 @@ class TileInfo:
 
 
 class LayerInfo:
-    """
-    class storing layer statistics and information.
-    """
+    """Class for storing layer statistics and information."""
     # pylint: disable=too-many-instance-attributes
-    module: nn.Module
+    module: Module
     name: str
     isanalog: bool
     num_tiles: int
     tiles_info: List[TileInfo]
-    input_size: INPUT_SIZE_TYPE
-    output_size: INPUT_SIZE_TYPE
-    kernel_size: INPUT_SIZE_TYPE
+    input_size: Any
+    output_size: Any
+    kernel_size: Any
     reuse_factor: int
 
     def __init__(self,
-                 module: nn.Module,
+                 module: Module,
                  rpu_config: Optional[RPUConfigAlias] = None,
-                 input_size: INPUT_SIZE_TYPE = None,
-                 output_size: INPUT_SIZE_TYPE = None):
+                 input_size: Any = None,
+                 output_size: Any = None):
         self.module = module
         self.name = self.module.__class__.__name__
         self.isanalog = isinstance(self.module, AnalogModuleBase)
@@ -128,7 +137,11 @@ class LayerInfo:
 
     def calculate_reuse_factor(self) -> None:
         """Compute the reuse factor.
-        The reuse factor is the number of vector matrix multiplication a layer computes."""
+
+        The reuse factor is the number of vector matrix multiplication
+        a layer computes.
+
+        """
         if isinstance(self.module, (AnalogLinear, AnalogLinearMapped)):
             ruf = reduce(operator.mul, (self.input_size), 1) // int(self.input_size[-1])
             self.__set_reuse_factor(ruf)
@@ -172,10 +185,11 @@ class LayerInfo:
 
 
 class AnalogInfo:
-    """class for computing and storing results of the analog summary."""
+    """Class for computing and storing results of the analog summary."""
+
     def __init__(self,
-                 model: nn.Module,
-                 input_size: INPUT_SIZE_TYPE = None,
+                 model: Module,
+                 input_size: Any = None,
                  rpu_config: Optional[RPUConfigAlias] = None):
 
         self.model = model
@@ -185,9 +199,9 @@ class AnalogInfo:
         self.total_tile_number = self.calculate_num_tiles()
         self.total_nb_analog = self.calculate_num_analog()
 
-    def register_hooks_recursively(self, module: nn.Module, hook: Any) -> None:
+    def register_hooks_recursively(self, module: Module, hook: Any) -> None:
         """Hooks the function into all layers with no children."""
-        if list(module.children()) == []:
+        if not list(module.children()):
             module.register_forward_hook(hook)
         else:
             for _, layer in module.named_children():
@@ -196,10 +210,13 @@ class AnalogInfo:
     def create_layer_summary(self) -> List[LayerInfo]:
         """Create the layer summary list.
 
-        This list contains LayerInfo elements that corresponds to each layer of the model."""
+        This list contains LayerInfo elements that corresponds to each
+        layer of the model.
+
+        """
         layer_summary = []
 
-        def get_size_hook(_: nn.Module, _input: INPUT_SIZE_TYPE, _output: INPUT_SIZE_TYPE) -> None:
+        def get_size_hook(_: Module, _input: Any, _output: Any) -> None:
             nonlocal layer_summary
             input_size = list(_input[0].size())
             output_size = list(_output.size())
@@ -207,7 +224,7 @@ class AnalogInfo:
 
         self.register_hooks_recursively(self.model, get_size_hook)
         device = next(self.model.parameters()).device
-        dummy_var = torch.zeros(self.input_size).to(device)
+        dummy_var = zeros(self.input_size).to(device)
         self.model(dummy_var)
         return layer_summary
 
@@ -236,8 +253,8 @@ class AnalogInfo:
         header = [*COLUMN_NAMES.values()]
         for i, category in enumerate(COLUMN_DEFINITIONS):
             header_i = [v for x, v in header if x == i]
-            trim_length = (COLUMN_WIDTH*len(header_i) - len(category))
-            result += category + " "*trim_length
+            trim_length = (COLUMN_WIDTH * len(header_i) - len(category))
+            result += category + " " * trim_length
             if i == len(COLUMN_DEFINITIONS)-1:
                 break
             result += '| '
@@ -257,11 +274,13 @@ class AnalogInfo:
         return result
 
 
-def analog_summary(model: nn.Module,
-                   input_size: Optional[INPUT_SIZE_TYPE] = None,
+def analog_summary(model: Module,
+                   input_size: Optional[Any] = None,
                    rpu_config: Optional[RPUConfigAlias] = None) -> AnalogInfo:
-    """
-    Summarize the given PyTorch model. Summarized information includes:
+    """Summarize the given PyTorch model.
+
+    Summarized information includes:
+
         1) Layer names,
         2) input/output shapes,
         3) kernel shape,
@@ -271,15 +290,13 @@ def analog_summary(model: nn.Module,
         7) reuse factor
 
     Args:
-        model (nn.Module):
-            PyTorch model to run on the analog platform.
+        model: PyTorch model to run on the analog platform.
 
-        input_size:
-            required to run a forward pass of the model.
+        input_size: required to run a forward pass of the model.
 
-        rpu_config:
-            resistive processing unit configuration.
-    Return:
+        rpu_config: resistive processing unit configuration.
+
+    Returns:
         AnalogInfo Object.
     """
     results = AnalogInfo(model, input_size, rpu_config)

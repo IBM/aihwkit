@@ -17,10 +17,9 @@
 namespace RPU {
 
 template <typename T> class PulsedRPUDeviceCuda;
-
 template <typename T> class PulsedUpdateMetaParameter;
-
 template <typename T> class BitLineMaker;
+template <typename T> class ChoppedWeightOutput;
 
 // base class
 template <typename T> class PWUKernelParameterBase {
@@ -28,7 +27,7 @@ template <typename T> class PWUKernelParameterBase {
 public:
   PWUKernelParameterBase(){}; // default
   PWUKernelParameterBase(
-      CudaContext *construction_context,
+      CudaContextPtr construction_context,
       int x_size_in,
       int d_size_in,
       int m_batch_in,
@@ -99,6 +98,7 @@ public:
     if (use_bo64 > 0 && (!out_trans)) { // not supported by BLM
       valid = false;
     }
+    use_cwo = false;
   };
 
   virtual void
@@ -111,15 +111,16 @@ public:
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
-      uint32_t *d_counts_chunk = nullptr) = 0;
+      uint32_t *d_counts_chunk = nullptr,
+      const ChoppedWeightOutput<T> *cwo = nullptr) = 0;
 
-  inline int getNStates() { return this->nstates; };
+  inline int getNStates() const { return this->nstates; };
   inline void setNStates(int n) { this->nstates = n; };
-  inline bool isValid() { return this->valid; };
-  inline std::string getName() { return this->name; };
-  inline bool getOutTrans() { return this->out_trans; };
-  inline int getUseBo64() { return this->use_bo64; };
-  inline int getImplicitPulses() { return this->implicit_pulses; };
+  inline bool isValid() const { return this->valid; };
+  inline std::string getName() const { return this->name; };
+  inline bool getOutTrans() const { return this->out_trans; };
+  inline int getUseBo64() const { return this->use_bo64; };
+  inline int getImplicitPulses() const { return this->implicit_pulses; };
 
   inline void forceBo64Translate() {
     if (this->use_bo64 == 1) {
@@ -131,26 +132,44 @@ public:
 
   inline void ensureChunk() {
     if (use_bo64 || out_trans || implicit_pulses) {
-      valid = false;
+      this->valid = false;
+    }
+  };
+
+  inline void ensureCWO() {
+    if (!this->use_cwo) {
+      this->valid = false;
+    }
+  };
+
+  inline void disableCWO() {
+    if (this->use_cwo) {
+      this->valid = false;
     }
   };
 
   virtual void print() const {
 
-    std::cout << name << std::endl;
-    std::cout << "\t nthreads:\t " << nthreads << std::endl;
-    std::cout << "\t nblocks:\t " << nblocks << std::endl;
-    std::cout << "\t shared_mem:\t " << shared_mem << std::endl;
-    std::cout << "\t out_trans:\t " << out_trans << std::endl;
-    std::cout << "\t sizeof_count:\t " << sizeof_count << std::endl;
-    std::cout << "\t nstates:\t " << nstates << std::endl;
-    std::cout << "\t batch_stride:\t " << batch_load_stride << std::endl;
-    std::cout << "\t nK32:\t\t " << nK32 << std::endl;
-    std::cout << "\t m_batch:\t " << m_batch << std::endl;
-    std::cout << "\t x_size:\t " << x_size << std::endl;
-    std::cout << "\t d_size:\t " << d_size << std::endl;
-    std::cout << "\t timing:\t " << timing << std::endl;
-    std::cout << "\t implicit:\t " << implicit_pulses << std::endl;
+    if (!isValid()) {
+      std::cout << name << ": Kernel is not valid!" << std::endl;
+    } else {
+      std::cout << name << std::endl;
+      std::cout << "\t nthreads:\t " << nthreads << std::endl;
+      std::cout << "\t nblocks:\t " << nblocks << std::endl;
+      std::cout << "\t shared_mem:\t " << shared_mem << std::endl;
+      std::cout << "\t out_trans:\t " << out_trans << std::endl;
+      std::cout << "\t sizeof_count:\t " << sizeof_count << std::endl;
+      std::cout << "\t nstates:\t " << nstates << std::endl;
+      std::cout << "\t batch stride:\t " << max_batch_load_stride << std::endl;
+      std::cout << "\t nK32:\t\t " << nK32 << std::endl;
+      std::cout << "\t m_batch:\t " << m_batch << std::endl;
+      std::cout << "\t x_size:\t " << x_size << std::endl;
+      std::cout << "\t d_size:\t " << d_size << std::endl;
+      std::cout << "\t size:\t\t " << size << std::endl;
+      std::cout << "\t timing:\t " << timing << std::endl;
+      std::cout << "\t implicit:\t " << implicit_pulses << std::endl;
+      std::cout << "\t use_cwo:\t " << use_cwo << std::endl;
+    }
   };
 
 public:
@@ -170,13 +189,13 @@ protected:
   int use_bo64 = 0;
   int nK32 = 1;
   int m_batch = 1;
-  int batch_load_stride = 0;
+  int max_batch_load_stride = 0;
   int nstates = 0;
 
   int nthreads = 0;
   int nblocks = 0;
   int max_block_count = 0;
-
+  bool use_cwo = false;
   bool valid = false;
 };
 

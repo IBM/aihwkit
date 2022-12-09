@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 
 # Imports from aihwkit.
 from aihwkit.utils.visualization import plot_device_compact
-from aihwkit.simulator.configs.devices import PiecewiseStepDevice
+from aihwkit.simulator.configs import PiecewiseStepDevice
 from aihwkit.simulator.rpu_base import cuda
 
 USE_CUDA = cuda.is_compiled()

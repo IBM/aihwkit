@@ -33,8 +33,9 @@ from torchvision import datasets, transforms
 from aihwkit.optim import AnalogSGD
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.simulator.presets import TikiTakaEcRamPreset
+from aihwkit.simulator.configs import MappingParameter
 from aihwkit.simulator.rpu_base import cuda
-from aihwkit.simulator.configs.utils import MappingParameter
+
 
 # Device to use
 USE_CUDA = 0

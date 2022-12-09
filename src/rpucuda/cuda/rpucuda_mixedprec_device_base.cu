@@ -10,10 +10,11 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_math_util.h"
 #include "io_iterator.h"
+#include "rpu_cub.h"
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_mixedprec_device.h"
-#include <cub/cub.cuh>
 #include <memory>
 
 namespace RPU {
@@ -26,7 +27,7 @@ namespace RPU {
 */
 
 template <typename T>
-MixedPrecRPUDeviceBaseCuda<T>::MixedPrecRPUDeviceBaseCuda(CudaContext *c, int x_size, int d_size)
+MixedPrecRPUDeviceBaseCuda<T>::MixedPrecRPUDeviceBaseCuda(CudaContextPtr c, int x_size, int d_size)
     : SimpleRPUDeviceCuda<T>(c, x_size, d_size){};
 
 template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::allocateContainers() {
@@ -89,6 +90,7 @@ MixedPrecRPUDeviceBaseCuda<T> &
 MixedPrecRPUDeviceBaseCuda<T>::operator=(const MixedPrecRPUDeviceBaseCuda<T> &other) {
   MixedPrecRPUDeviceBaseCuda<T> tmp(other);
   swap(*this, tmp);
+  this->context_->synchronize();
   return *this;
 };
 

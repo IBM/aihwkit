@@ -50,7 +50,6 @@ public:
   virtual bool hasDirectUpdate() const = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
   virtual void setHiddenUpdateIdx(int idx){};
-
   virtual void populateFrom(const AbstractRPUDevice<T> &rpu_device) = 0;
   virtual DeviceUpdateType implements() const = 0;
   virtual bool isPulsedDevice() const { return false; };
@@ -59,9 +58,9 @@ public:
     return std::unique_ptr<AbstractRPUDeviceCuda<T>>(clone());
   };
   static AbstractRPUDeviceCuda<T> *
-  createFrom(CudaContext *c, const AbstractRPUDevice<T> &rpu_device);
+  createFrom(CudaContextPtr c, const AbstractRPUDevice<T> &rpu_device);
   static std::unique_ptr<AbstractRPUDeviceCuda<T>>
-  createFromUnique(CudaContext *c, const AbstractRPUDevice<T> &rpu_device);
+  createFromUnique(CudaContextPtr c, const AbstractRPUDevice<T> &rpu_device);
 };
 
 /* Simple device. Like simple RPU, a floating point baseline. It also has a storage for the device
@@ -70,8 +69,8 @@ template <typename T> class SimpleRPUDeviceCuda : public AbstractRPUDeviceCuda<T
 
 public:
   explicit SimpleRPUDeviceCuda(){};
-  explicit SimpleRPUDeviceCuda(CudaContext *c, int x_size, int d_size);
-  explicit SimpleRPUDeviceCuda(CudaContext *c, const SimpleRPUDevice<T> &other);
+  explicit SimpleRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
+  explicit SimpleRPUDeviceCuda(CudaContextPtr c, const SimpleRPUDevice<T> &other);
 
   ~SimpleRPUDeviceCuda(){};
   SimpleRPUDeviceCuda(const SimpleRPUDeviceCuda<T> &other);
@@ -128,7 +127,7 @@ protected:
   int x_size_ = 0;
   int d_size_ = 0;
   int size_ = 0;
-  CudaContext *context_;
+  CudaContextPtr context_;
 
   std::unique_ptr<WeightDrifterCuda<T>> wdrifter_cuda_ = nullptr;
   // these are helpers and not copied
@@ -139,7 +138,7 @@ protected:
 
 private:
   std::unique_ptr<AbstractRPUDeviceMetaParameter<T>> par_storage_;
-  void initialize(CudaContext *context, int x_size, int d_size);
+  void initialize(CudaContextPtr context, int x_size, int d_size);
 };
 
 } // namespace RPU

@@ -23,8 +23,9 @@ from aihwkit.exceptions import ConfigError
 if version_info[0] >= 3 and version_info[1] > 7:
     # pylint: disable=no-name-in-module
     from typing import get_origin  # type: ignore
+    HAS_ORIGIN = True
 else:
-    get_origin = None  # pylint: disable=invalid-name
+    HAS_ORIGIN = False
 
 
 def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
@@ -69,7 +70,7 @@ def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
         elif is_dataclass(value):
             setattr(result, field, parameters_to_bindings(value))
         else:
-            if get_origin is not None:
+            if HAS_ORIGIN:
                 expected_type = get_origin(dataclass_field.type) or dataclass_field.type
                 if ((not isinstance(value, expected_type))
                     and not (expected_type == float and isinstance(value, int)
@@ -86,7 +87,7 @@ def tile_parameters_to_bindings(params: Any) -> Any:
     field_map = {'forward': 'forward_io',
                  'backward': 'backward_io'}
     excluded_fields = ('device', 'noise_model', 'drift_compensation',
-                       'clip', 'modifier', 'mapping', 'remap')
+                       'clip', 'modifier', 'mapping', 'remap', 'pre_post')
 
     result = params.bindings_class()
     for field, value in params.__dict__.items():

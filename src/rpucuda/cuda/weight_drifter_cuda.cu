@@ -98,12 +98,12 @@ __global__ void kernelDriftWeights(
 
 // ctor
 template <typename T>
-WeightDrifterCuda<T>::WeightDrifterCuda(CudaContext *context, int size)
+WeightDrifterCuda<T>::WeightDrifterCuda(CudaContextPtr context, int size)
     : context_(context), size_(size), max_size_(size), active_(false), current_t_(0.0) {}
 
 template <typename T>
 WeightDrifterCuda<T>::WeightDrifterCuda(
-    CudaContext *context, const WeightDrifter<T> &wd, int x_size, int d_size)
+    CudaContextPtr context, const WeightDrifter<T> &wd, int x_size, int d_size)
     : WeightDrifterCuda(context, x_size * d_size) {
   populateFrom(wd, x_size, d_size);
 }

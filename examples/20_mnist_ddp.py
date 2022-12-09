@@ -18,8 +18,7 @@ https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
 Uses learning rates of η = 0.01, 0.005, and 0.0025
 for epochs 0–10, 11–20, and 21–30, respectively.
 """
-# pylint: disable=invalid-name
-# pylint: disable=too-many-locals
+# pylint: disable=invalid-name, too-many-locals, not-callable
 
 import os
 from time import time
@@ -192,7 +191,7 @@ def train(model, train_set):
         # Decay learning rate if needed.
         scheduler.step()
 
-    dist.all_gather(total_time, torch.Tensor(time()-time_init).to(device))
+    dist.all_gather(total_time, torch.tensor(time() - time_init).to(device))
 
     if rank == 0:
         avg_train_time = torch.mean(torch.cat(total_time, 0))
@@ -231,7 +230,7 @@ def test_evaluation(model, val_set):
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
 
-    dist.all_gather(acc_list, torch.Tensor(predicted_ok/total_images).to(device))
+    dist.all_gather(acc_list, torch.tensor(predicted_ok / total_images).to(device))
 
     if rank == 0:
         acc = torch.mean(torch.cat(acc_list, 0))

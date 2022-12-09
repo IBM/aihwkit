@@ -21,13 +21,13 @@ namespace RPU {
 template <typename T> class WeightClipperCuda {
 
 public:
-  explicit WeightClipperCuda(CudaContext *context, int x_size, int d_size);
+  explicit WeightClipperCuda(CudaContextPtr context, int x_size, int d_size);
   WeightClipperCuda(){};
 
   void apply(T *weights, const WeightClipParameter &wclpar);
 
 private:
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
   int x_size_ = 0;
   int d_size_ = 0;
   int size_ = 0;

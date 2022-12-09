@@ -24,10 +24,9 @@ from torch.nn.functional import mse_loss
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import UnitCellRPUConfig
-from aihwkit.simulator.configs.devices import (
-    TransferCompound,
-    SoftBoundsDevice)
+from aihwkit.simulator.configs import (
+    UnitCellRPUConfig, TransferCompound, SoftBoundsDevice
+)
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
@@ -91,6 +90,9 @@ opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
 for epoch in range(500):
+
+    opt.zero_grad()
+
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.

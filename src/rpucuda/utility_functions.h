@@ -59,7 +59,7 @@
     ss << MSG;                                                                                     \
   }
 
-//#define RPU_DEBUG
+// #define RPU_DEBUG
 
 #define ENFORCE_NO_DELAYED_UPDATE                                                                  \
   if (this->isDelayedUpdate()) {                                                                   \
@@ -91,6 +91,14 @@
 
 namespace RPU {
 
+class Context {
+public:
+  virtual ~Context() = default;
+  virtual void synchronize() const {};
+};
+
+typedef Context *ContextPtr;
+
 template <typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&...args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
@@ -112,21 +120,29 @@ inline T getDiscretizedValueRound(T value, T res, bool sto_round, RNGClass &rng)
                                  : (round(value / res) * res));
 }
 
-template <typename T> inline T **Array_2D_Get(int r, int c) {
+template <bool sto_round, typename T, typename RNGClass>
+inline T getDiscretizedValueSR(T value, T res, RNGClass &rng) {
+  if (sto_round) {
+    return getDiscretizedValue(value, res, true, rng);
+  }
+  return (res <= 0) ? value : (RPU_ROUNDFUN(value / res) * res);
+}
+
+template <typename T> inline T **Array_2D_Get(size_t r, size_t c) {
   T **arr = new T *[r];
-  arr[0] = new T[r * c];
-  for (int i = 0; i < r; ++i) {
-    arr[i] = *arr + c * i;
+  arr[0] = new T[(size_t)r * c];
+  for (size_t i = 0; i < r; ++i) {
+    arr[i] = *arr + (size_t)c * i;
   }
   return arr;
 }
 
-template <typename T> inline T **Array_2D_Get_Eye(int n) {
+template <typename T> inline T **Array_2D_Get_Eye(size_t n) {
 
   T **eye = Array_2D_Get<T>(n, n);
 
-  for (int j = 0; j < n; ++j) {
-    for (int i = 0; i < n; ++i) {
+  for (size_t j = 0; j < n; ++j) {
+    for (size_t i = 0; i < n; ++i) {
       if (i == j) {
         eye[i][j] = (T)1.0;
       } else {
@@ -139,33 +155,33 @@ template <typename T> inline T **Array_2D_Get_Eye(int n) {
 
 template <typename T> void Array_2D_Free(T **arr) {
   if (arr != nullptr) {
-    delete[](*arr);
+    delete[] (*arr);
     *arr = nullptr;
     delete[] arr;
     arr = nullptr;
   }
 }
 
-template <typename T> inline T ***Array_3D_Get(int n, int r, int c) {
+template <typename T> inline T ***Array_3D_Get(size_t n, size_t r, size_t c) {
   T ***arr = new T **[n];
-  for (int j = 0; j < n; j++) {
+  for (size_t j = 0; j < n; j++) {
     arr[j] = new T *[r];
   }
   arr[0][0] = new T[r * c * n];
-  for (int j = 0; j < n; j++) {
-    for (int i = 0; i < r; ++i) {
+  for (size_t j = 0; j < n; j++) {
+    for (size_t i = 0; i < r; ++i) {
       arr[j][i] = arr[0][0] + c * i + j * r * c;
     }
   }
   return arr;
 }
 
-template <typename T> void Array_3D_Free(T ***arr, int n) {
+template <typename T> void Array_3D_Free(T ***arr, size_t n) {
   if (arr != nullptr) {
     delete[] arr[0][0];
     arr[0][0] = nullptr;
 
-    for (int j = 0; j < n; j++) {
+    for (size_t j = 0; j < n; j++) {
       delete[] arr[j];
       arr[j] = nullptr;
     }

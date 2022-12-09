@@ -11,8 +11,9 @@
 # that they have been altered from the originals.
 
 """Helper class for adding rpu_config to neural network model"""
+# pylint: disable=no-name-in-module,import-error
 
-from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (
+from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: ignore[attr-defined]
     AnalogProto
 )
 

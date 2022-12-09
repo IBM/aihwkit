@@ -12,15 +12,12 @@
 
 """High level analog tiles (inference)."""
 
-from copy import deepcopy
-from typing import List, Optional, Union, TYPE_CHECKING
+from typing import List, Optional, Union, Any, TYPE_CHECKING
 
 from torch import device as torch_device
 from torch import ones, zeros, Tensor, float32
 from torch.autograd import no_grad
 
-from aihwkit.exceptions import CudaError
-from aihwkit.simulator.rpu_base import cuda
 from aihwkit.simulator.tiles.analog import AnalogTile
 
 if TYPE_CHECKING:
@@ -190,10 +187,11 @@ class InferenceTile(AnalogTile):
                 self.drift_baseline).to(self.device)
 
     @no_grad()
-    def post_forward(self, x_output: Tensor, dim: int, is_test: bool = False) -> Tensor:
+    def post_forward(self, x_output: Tensor, dim: int, is_test: bool = False,
+                     ctx: Any = None) -> Tensor:
         """Operations after the actual forward step for post processing """
 
-        x_output = super().post_forward(x_output, dim, is_test)
+        x_output = super().post_forward(x_output, dim, is_test, ctx)
 
         if not is_test or self.rpu_config.drift_compensation is None:
             return x_output
@@ -268,32 +266,3 @@ class InferenceTile(AnalogTile):
         self.ensure_shared_weights()
 
         return self
-
-
-class CudaInferenceTile(InferenceTile):
-    """Analog inference tile (CUDA).
-
-    Analog inference tile that uses GPU for its operation. The instantiation is based on
-    an existing non-cuda tile: all the source attributes are copied except
-    for the simulator tile, which is recreated using a GPU tile.
-
-    Caution:
-        Deprecated. Use ``InferenceTile(..).cuda()`` instead.
-
-    Args:
-        source_tile: tile to be used as the source of this tile
-    """
-
-    def __init__(self, source_tile: AnalogTile):
-        if not cuda.is_compiled():
-            raise CudaError('aihwkit has not been compiled with CUDA support')
-
-        # Create a new instance of the rpu config.
-        new_rpu_config = deepcopy(source_tile.rpu_config)
-
-        # Create the tile, replacing the simulator tile.
-        super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
-                         source_tile.bias, source_tile.in_trans, source_tile.out_trans,
-                         shared_weights=True)
-
-        self.cuda(self.device)

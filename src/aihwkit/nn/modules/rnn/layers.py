@@ -15,7 +15,7 @@
 from typing import Any, List, Tuple, Type, Union
 from torch import Tensor, stack, jit, cat
 from torch.nn import ModuleList
-from aihwkit.nn import AnalogSequential
+from aihwkit.nn.modules.container import AnalogSequential
 
 
 class AnalogRNNLayer(AnalogSequential):

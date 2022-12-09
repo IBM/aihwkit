@@ -38,7 +38,7 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
 
   switch (wclpar.type) {
   case WeightClipType::FixedValue: {
-    clip_value = wclpar.fixed_value;
+    clip_value = (T)wclpar.fixed_value;
     break;
   }
   case WeightClipType::AverageChannelMax: {
@@ -67,7 +67,7 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
     clip_value = fabs(sum_amax / d_size_);
 
     if (wclpar.fixed_value > 0) {
-      clip_value = MIN(clip_value, wclpar.fixed_value);
+      clip_value = MIN(clip_value, (T)wclpar.fixed_value);
     }
 
     break;
@@ -85,7 +85,7 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
     mean_value /= size_;
 
     // compute std
-    T s = size_ - 1;
+    T s = (T)(size_ - 1);
     PRAGMA_SIMD
     for (int i = 0; i < size_; i++) {
       T m = weights[i] - mean_value;
@@ -93,9 +93,9 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
     }
     std_value = sqrt(std_value);
 
-    clip_value = std_value * wclpar.sigma;
+    clip_value = std_value * (T)wclpar.sigma;
     if (wclpar.fixed_value > 0) {
-      clip_value = MIN(clip_value, wclpar.fixed_value);
+      clip_value = (T)MIN(clip_value, wclpar.fixed_value);
     }
     break;
   }

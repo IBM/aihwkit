@@ -27,7 +27,7 @@ struct CustomMaxAbs {
 template <typename T> class Maximizer {
 
 public:
-  explicit Maximizer(CudaContext *c, int size, bool abs_if = true);
+  explicit Maximizer(CudaContextPtr c, int size, bool abs_if = true);
 
   /* computes the max/amax values */
   template <typename InputIteratorT>
@@ -48,7 +48,7 @@ private:
 
   int buffer_m_batch_ = 0;
   int size_ = 0;
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
 
   CustomMaxAbs max_abs_op_;
   bool abs_if_ = true;

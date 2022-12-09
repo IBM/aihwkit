@@ -20,19 +20,18 @@ namespace RPU {
 
 template <typename T>
 void OneSidedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const {
-  ss << this->getName() << std::endl;
   // every
-  ss << "   OneSided parameter: \n";
+  ss << "\t\bOneSided parameter: \n";
   ss << "\t refresh_every: \t" << refresh_every << " [MACC]" << std::endl;
   if (refresh_every > 0) {
-    ss << "      Refresh forward IO parameter:" << std::endl;
+    ss << "\t\bRefresh forward IO parameter:" << std::endl;
     refresh_io.printToStream(ss);
-    ss << "      Refresh update parameter:" << std::endl;
+    ss << "\t\bRefresh update parameter:" << std::endl;
     refresh_up.printToStream(ss);
   }
 
   if (this->vec_par.size() > 0) {
-    ss << "   ";
+    ss << "\t\bOneSided device parameter (" << this->vec_par[0]->getName() << "):" << std::endl;
     this->vec_par[0]->printToStream(ss);
   }
 };
@@ -105,8 +104,8 @@ OneSidedRPUDevice<T>::OneSidedRPUDevice(const OneSidedRPUDevice<T> &other)
   a_indices_ = other.a_indices_;
   b_indices_ = other.b_indices_;
 
-  refresh_fb_pass_ = make_unique<ForwardBackwardPassIOManaged<T>>(*other.refresh_fb_pass_);
-  refresh_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(*other.refresh_pwu_);
+  refresh_fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManaged<T>>(*other.refresh_fb_pass_);
+  refresh_pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(*other.refresh_pwu_);
   refresh_counter_ = other.refresh_counter_;
   refresh_vecs_ = other.refresh_vecs_;
 }
@@ -189,7 +188,7 @@ void OneSidedRPUDevice<T>::populate(
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   refresh_fb_pass_ =
       RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
-  refresh_fb_pass_->setIOPar(par.refresh_io, par.refresh_io);
+  refresh_fb_pass_->populateFBParameter(par.refresh_io, par.refresh_io);
 
   refresh_pwu_ =
       RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);

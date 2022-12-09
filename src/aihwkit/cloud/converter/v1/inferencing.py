@@ -23,12 +23,14 @@ from aihwkit.cloud.converter.v1.i_mappings import (
     InverseMappings, Mappings)
 
 # pylint: disable=no-name-in-module,import-error
-from aihwkit.experiments.experiments.inferencing import BasicInferencing  # type: ignore[import]
-from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (
+from aihwkit.experiments.experiments.inferencing import (  # type: ignore[import]
+    BasicInferencing
+)
+from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (   # type: ignore[attr-defined]
     InferenceInput, Dataset, Inferencing, NoiseModelProto, PCMProto, GenericProto, AnalogProto
 )
 
-from aihwkit.cloud.converter.definitions.i_common_pb2 import (
+from aihwkit.cloud.converter.definitions.i_common_pb2 import (   # type: ignore[attr-defined]
     LayerOrActivationFunction, Network, LayerProto,
     ActivationFunctionProto, Version
 )

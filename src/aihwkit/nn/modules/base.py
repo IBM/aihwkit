@@ -72,6 +72,7 @@ class AnalogModuleBase(Module):
     ANALOG_SHARED_WEIGHT_PREFIX: str = 'analog_shared_weights_'
     ANALOG_STATE_PREFIX: str = 'analog_tile_state_'
     ANALOG_OUT_SCALING_ALPHA_PREFIX: str = 'analog_out_scaling_alpha_'
+    ANALOG_INPUT_RANGE_PREFIX: str = 'analog_input_range_'
 
     def __init__(
             self,
@@ -85,6 +86,7 @@ class AnalogModuleBase(Module):
         self._analog_tile_counter = 0
         self._registered_helper_parameter = []  # type: list
         self._load_rpu_config = True
+        self._strict_rpu_config_check = True
 
         if mapping is None:
             mapping = MappingParameter()
@@ -139,6 +141,13 @@ class AnalogModuleBase(Module):
                 tile.out_scaling_alpha = Parameter(tile.out_scaling_alpha)
             par_name = self.ANALOG_OUT_SCALING_ALPHA_PREFIX + name
             self.register_parameter(par_name, tile.out_scaling_alpha)
+            self.register_helper(par_name)
+
+        if tile.input_range is not None:
+            if not isinstance(tile.input_range, Parameter):
+                tile.input_range = Parameter(tile.input_range)
+            par_name = self.ANALOG_INPUT_RANGE_PREFIX + name
+            self.register_parameter(par_name, tile.input_range)
             self.register_helper(par_name)
 
     def unregister_parameter(self, param_name: str) -> None:
@@ -216,7 +225,7 @@ class AnalogModuleBase(Module):
             bias: Optional[Tensor] = None,
             force_exact: bool = False,
             apply_weight_scaling: bool = True,
-            weight_scaling_omega: float = None
+            weight_scaling_omega: Optional[float] = None
     ) -> None:
         """Set the weight (and bias) values with given tensors.
 
@@ -396,13 +405,16 @@ class AnalogModuleBase(Module):
         self.set_weights(self.weight, self.bias if self.analog_bias else None,
                          force_exact=True)
 
-    def _set_load_rpu_config_state(self, load_rpu_config: bool = True) -> None:
+    def _set_load_rpu_config_state(self, load_rpu_config: bool = True,
+                                   strict_rpu_config_check: bool = True) -> None:
         self._load_rpu_config = load_rpu_config
+        self._strict_rpu_config_check = strict_rpu_config_check
 
     def load_state_dict(self,  # pylint: disable=arguments-differ
                         state_dict: 'OrderedDict[str, Tensor]',
                         strict: bool = True,
-                        load_rpu_config: bool = True) -> NamedTuple:
+                        load_rpu_config: bool = True,
+                        strict_rpu_config_check: bool = True) -> NamedTuple:
         """Specializes torch's ``load_state_dict`` to add a flag whether to
         load the RPU config from the saved state.
 
@@ -422,15 +434,22 @@ class AnalogModuleBase(Module):
                     change the expected fields in the hidden
                     parameters and result in an error.
 
+            strict_rpu_config_check: Whether to check and throw an
+                error if the current ``rpu_config`` is not of the same
+                class type when setting ``load_rpu_config`` to
+                False. In case of ``False`` the user has to make sure
+                that the ``rpu_config`` are compatible.
+
         Returns:
             see torch's ``load_state_dict``
 
-        Raises: ModuleError: in case the rpu_config class mismatches
+        Raises:
+            ModuleError: in case the rpu_config class mismatches
             or mapping parameter mismatch for
             ``load_rpu_config=False``
 
         """
-        self._set_load_rpu_config_state(load_rpu_config)
+        self._set_load_rpu_config_state(load_rpu_config, strict_rpu_config_check)
         return super().load_state_dict(state_dict, strict)
 
     def __setstate__(self, state: Dict) -> None:
@@ -464,7 +483,7 @@ class AnalogModuleBase(Module):
         Raises:
             ModuleError: in case the rpu_config class mismatches.
         """
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals, too-many-branches
 
         for name, analog_tile in list(self.named_analog_tiles()):
             key = prefix + self.ANALOG_STATE_PREFIX + name
@@ -476,11 +495,13 @@ class AnalogModuleBase(Module):
 
                 if not self._load_rpu_config:
 
-                    if not isinstance(analog_tile.rpu_config, type(analog_state['rpu_config'])):
-                        raise ModuleError("RPU config mismatch during loading: "
-                                          "Tried to replace "
-                                          f"{analog_state['rpu_config'].__class__.__name__} "
-                                          f"with {analog_tile.rpu_config.__class__.__name__}")
+                    if self._strict_rpu_config_check:
+                        if not isinstance(analog_tile.rpu_config,
+                                          type(analog_state['rpu_config'])):
+                            raise ModuleError("RPU config mismatch during loading: "
+                                              "Tried to replace "
+                                              f"{analog_state['rpu_config'].__class__.__name__} "
+                                              f"with {analog_tile.rpu_config.__class__.__name__}")
 
                     if hasattr(analog_state['rpu_config'], 'mapping'):
                         old_mapping = analog_state['rpu_config'].mapping
@@ -512,16 +533,34 @@ class AnalogModuleBase(Module):
         for par_name in self._registered_helper_parameter:
             key = prefix + par_name
             if key in state_dict:
-                state_dict.pop(key)
                 rm_keys.append(key)
+
+        # legacy
+        for part in [self.ANALOG_SHARED_WEIGHT_PREFIX,
+                     self.ANALOG_OUT_SCALING_ALPHA_PREFIX]:
+            for key in state_dict:
+                if part in key:
+                    rm_keys.append(key)
+
+        for key in rm_keys:
+            if key in state_dict:
+                state_dict.pop(key)
 
         super()._load_from_state_dict(
            state_dict, prefix, local_metadata, strict, missing_keys,
            unexpected_keys, error_msgs)
 
+        # legacy
+        for part in [self.ANALOG_SHARED_WEIGHT_PREFIX,
+                     self.ANALOG_OUT_SCALING_ALPHA_PREFIX]:
+            for key in missing_keys:
+                if part in key:
+                    rm_keys.append(key)
+
         # remove the missing keys of the helper parameters
         for key in rm_keys:
-            missing_keys.remove(key)
+            if key in missing_keys:
+                missing_keys.remove(key)
 
     def state_dict(  # pylint: disable=arguments-differ
             self,

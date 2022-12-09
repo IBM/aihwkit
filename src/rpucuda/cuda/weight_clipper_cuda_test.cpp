@@ -69,8 +69,7 @@ public:
   }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   int x_size, d_size;
   int size;
   WeightClipParameter wclpar;
@@ -93,7 +92,7 @@ TEST_F(WeightClipperTestFixture, FixedValue) {
 
   dev_w->copyTo(v);
   num_t dev_w_max = Find_Absolute_Max<num_t>(v, size);
-  std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
+  // std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
   EXPECT_FLOAT_EQ(w_max, dev_w_max);
   EXPECT_FLOAT_EQ(w_max, wclpar.fixed_value);
 }
@@ -111,7 +110,7 @@ TEST_F(WeightClipperTestFixture, LayerGaussian) {
 
   dev_w->copyTo(v);
   num_t dev_w_max = Find_Absolute_Max<num_t>(v, size);
-  std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
+  // std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
   EXPECT_NEAR(w_max, dev_w_max, 0.01);
   EXPECT_NEAR(w_max, wclpar.sigma, 0.01);
 }
@@ -128,7 +127,7 @@ TEST_F(WeightClipperTestFixture, AverageChannelMax) {
 
   dev_w->copyTo(v);
   num_t dev_w_max = Find_Absolute_Max<num_t>(v, size);
-  std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
+  // std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
   EXPECT_NEAR(w_max, dev_w_max, 0.0001);
 }
 

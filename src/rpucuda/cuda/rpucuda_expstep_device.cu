@@ -50,7 +50,6 @@ template <typename T> struct UpdateFunctorExpStep {
   {
     UNUSED(par_2);               // no used here
     UNUSED(global_params_count); // fixed anyway
-
     // par_4 order (min_bound, scale_down, max_bound, scale_up )
 
     // global_pars see below
@@ -181,6 +180,11 @@ pwukpvec_t<T> ExpStepRPUDeviceCuda<T>::getUpdateKernels(
         this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
         pars.getName()));
 
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+                    T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
+        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+        pars.getName()));
+
   } else {
     v.push_back(RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorExpStep<T>, 7>>(
         this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
@@ -194,6 +198,11 @@ pwukpvec_t<T> ExpStepRPUDeviceCuda<T>::getUpdateKernels(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorExpStep<T>, 7>>(
             this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
             pars.getName()));
+
+    v.push_back(RPU::make_unique<
+                PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorExpStep<T>, 7>>(
+        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+        pars.getName()));
   }
   return v;
 }

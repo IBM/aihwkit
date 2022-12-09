@@ -51,13 +51,11 @@ void MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(std::stringstream &ss
   ss << std::endl;
 
   if (compute_sparsity) {
-    ss << "\t compute_sparsity: \t" << compute_sparsity;
+    ss << "\t compute_sparsity: \t" << compute_sparsity << std::endl;
   }
-  ss << std::endl;
 
   if (device_par) {
-    ss << "   Device Parameter "
-       << ": " << device_par->getName() << std::endl;
+    ss << "\t\bDevice Parameter: " << device_par->getName() << std::endl;
     ss << "   ";
     device_par->printToStream(ss);
   }
@@ -102,15 +100,15 @@ MixedPrecRPUDeviceBaseMetaParameter<T> &MixedPrecRPUDeviceBaseMetaParameter<T>::
 // move constructor
 template <typename T>
 MixedPrecRPUDeviceBaseMetaParameter<T>::MixedPrecRPUDeviceBaseMetaParameter(
-    MixedPrecRPUDeviceBaseMetaParameter<T> &&other) {
+    MixedPrecRPUDeviceBaseMetaParameter<T> &&other) noexcept {
 
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
-MixedPrecRPUDeviceBaseMetaParameter<T> &
-MixedPrecRPUDeviceBaseMetaParameter<T>::operator=(MixedPrecRPUDeviceBaseMetaParameter<T> &&other) {
+MixedPrecRPUDeviceBaseMetaParameter<T> &MixedPrecRPUDeviceBaseMetaParameter<T>::operator=(
+    MixedPrecRPUDeviceBaseMetaParameter<T> &&other) noexcept {
 
   SimpleRPUDeviceMetaParameter<T>::operator=(std::move(other));
 
@@ -159,7 +157,7 @@ template <typename T>
 MixedPrecRPUDeviceBase<T>::MixedPrecRPUDeviceBase(const MixedPrecRPUDeviceBase<T> &other)
     : SimpleRPUDevice<T>(other) {
 
-  transfer_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(*other.transfer_pwu_);
+  transfer_pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(*other.transfer_pwu_);
   rpu_device_ = other.rpu_device_->cloneUnique();
 
   current_row_index_ = other.current_row_index_;
@@ -182,13 +180,14 @@ MixedPrecRPUDeviceBase<T>::operator=(const MixedPrecRPUDeviceBase<T> &other) {
 
 // move constructor
 template <typename T>
-MixedPrecRPUDeviceBase<T>::MixedPrecRPUDeviceBase(MixedPrecRPUDeviceBase<T> &&other) {
+MixedPrecRPUDeviceBase<T>::MixedPrecRPUDeviceBase(MixedPrecRPUDeviceBase<T> &&other) noexcept {
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
-MixedPrecRPUDeviceBase<T> &MixedPrecRPUDeviceBase<T>::operator=(MixedPrecRPUDeviceBase<T> &&other) {
+MixedPrecRPUDeviceBase<T> &
+MixedPrecRPUDeviceBase<T>::operator=(MixedPrecRPUDeviceBase<T> &&other) noexcept {
   SimpleRPUDevice<T>::operator=(std::move(other));
 
   transfer_pwu_ = std::move(other.transfer_pwu_);
@@ -290,7 +289,8 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
   n_transfers = MIN(n_transfers, this->d_size_);
   int i_row = current_row_index_;
   if (par.random_row && (n_transfers < this->d_size_)) {
-    i_row = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
+    i_row =
+        MAX(MIN((int)floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
   }
 
   int d2_size = this->d_size_ * this->d_size_;
@@ -302,7 +302,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
     }
   }
 
-  T *tvec = transfer_d_vecs_.data() + i_row * this->d_size_;
+  T *tvec = transfer_d_vecs_.data() + (size_t)i_row * this->d_size_;
   int n_rest = this->d_size_ - i_row;
 
   if (n_rest < n_transfers) {
@@ -344,7 +344,7 @@ void MixedPrecRPUDeviceBase<T>::getDPNames(std::vector<std::string> &names) cons
 }
 
 template <typename T>
-void MixedPrecRPUDeviceBase<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+void MixedPrecRPUDeviceBase<T>::getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) {
 
   CHECK_RPU_DEVICE_INIT;
 
@@ -356,10 +356,10 @@ void MixedPrecRPUDeviceBase<T>::getDeviceParameter(std::vector<T *> &data_ptrs) 
   }
 
   std::vector<T *> v(data_ptrs.begin(), data_ptrs.end() - 1);
-  rpu_device_->getDeviceParameter(v);
+  rpu_device_->getDeviceParameter(weights, v);
 
   // "hidden weights Chi"
-  int m = names.size() - 1;
+  size_t m = names.size() - 1;
   getChi(data_ptrs[m]);
 }
 
@@ -374,7 +374,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::setHiddenWeights(const std
 
   CHECK_RPU_DEVICE_INIT;
 
-  int m = rpu_device_->getHiddenWeightsCount();
+  size_t m = rpu_device_->getHiddenWeightsCount();
   if (data.size() < (size_t)((m + 1) * this->size_)) {
     RPU_FATAL("Size mismatch for hidden weights.");
   }
@@ -382,7 +382,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::setHiddenWeights(const std
   std::vector<T> v(data.begin(), data.end() - this->size_);
   rpu_device_->setHiddenWeights(v);
 
-  int offset = m * this->size_;
+  size_t offset = m * this->size_;
   setChi(data.data() + offset);
 }
 
@@ -398,17 +398,17 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::printDP(int x_count, int d
 
   CHECK_RPU_DEVICE_INIT;
 
-  int x_count1 = MAX(MIN(x_count, this->x_size_), 0);
-  int d_count1 = MAX(MIN(d_count, this->d_size_), 0);
+  size_t x_count1 = MAX(MIN(x_count, this->x_size_), 0);
+  size_t d_count1 = MAX(MIN(d_count, this->d_size_), 0);
 
-  rpu_device_->printDP(x_count1, d_count1);
+  rpu_device_->printDP((int)x_count1, (int)d_count1);
 
   T *chi = new T[this->size_];
   getChi(chi);
   std::cout << "  Hidden weight [Chi] " << std::endl;
-  for (int i = 0; i < d_count1; ++i) {
-    for (int j = 0; j < x_count1; ++j) {
-      int k = j + i * this->x_size_;
+  for (size_t i = 0; i < d_count1; ++i) {
+    for (size_t j = 0; j < x_count1; ++j) {
+      size_t k = j + i * this->x_size_;
       std::cout << chi[k] << ", ";
     }
     std::cout << ";" << std::endl;

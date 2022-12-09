@@ -21,7 +21,7 @@ namespace RPU {
 template <typename T> class WeightRemapperCuda {
 
 public:
-  explicit WeightRemapperCuda(CudaContext *context, int x_size, int d_size);
+  explicit WeightRemapperCuda(CudaContextPtr context, int x_size, int d_size);
   WeightRemapperCuda(){};
 
   void apply(

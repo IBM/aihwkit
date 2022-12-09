@@ -14,7 +14,10 @@
 # pylint: disable=too-many-lines
 
 from collections import OrderedDict
-from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import (
+    Dict, Generic, List, Optional,
+    Tuple, TypeVar, Union, TYPE_CHECKING, Any
+)
 from copy import deepcopy
 
 from numpy.typing import ArrayLike
@@ -22,18 +25,21 @@ from numpy import array
 
 from torch import (
     Tensor, stack, zeros, as_tensor, cat, unsqueeze, squeeze, ones,
-    float32, from_numpy
+    float32, from_numpy, full, clamp, zeros_like
 )
 from torch import device as torch_device
 from torch import max as torch_max
 from torch.nn import Parameter
 from torch.autograd import no_grad
 
-from aihwkit.exceptions import TileError
 from aihwkit.simulator.rpu_base import tiles
+from aihwkit.exceptions import TileError, ConfigError
 from aihwkit.optim.context import AnalogContext
 
 RPUConfigGeneric = TypeVar('RPUConfigGeneric')
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.configs.utils import MappingParameter, InputRangeParameter
 
 
 class AnalogTileStateNames:  # pylint: disable=too-few-public-methods
@@ -86,6 +92,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.shared_weights = None  # type: Parameter
         self.out_scaling_alpha = None  # type: Parameter
         self.mapping_scales = None  # type: Tensor
+        self.input_range = None  # type: Parameter
+
+        # Whether CUDA-calls should be blocking
+        self.non_blocking = False
 
         # Only used for indexed.
         self.image_sizes = []  # type: List[int]
@@ -103,9 +113,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # create analog context
         self.analog_ctx = AnalogContext(self)
 
-        # init scales
+        # init input / output processing
         self.init_learned_out_scales()
         self.init_mapping_scales()
+        self.init_input_processing()
 
     @no_grad()
     def get_analog_ctx(self) -> AnalogContext:
@@ -215,6 +226,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         current_dict.pop('noise_model', None)  # legacy
         current_dict.pop('drift_compensation', None)  # legacy
+
+        # legacy
+        if 'non_blocking' not in current_dict:
+            current_dict['non_blocking'] = False
 
         self.__dict__.update(current_dict)
 
@@ -593,7 +608,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         # Prepare the array expected by the pybind function, appending the
         # biases row if needed.
-        mapping = self.rpu_config.mapping  # type: ignore
+        if not hasattr(self.rpu_config, 'mapping'):
+            return combined_weights
+
+        mapping = self.rpu_config.mapping  # type: MappingParameter
         omega = weight_scaling_omega
         if omega is None:
             omega = mapping.weight_scaling_omega
@@ -663,8 +681,11 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Note:
             This method is called from the constructor.
         """
+        if not hasattr(self.rpu_config, 'mapping'):
+            self.set_mapping_scales(None)
+            return
 
-        mapping = self.rpu_config.mapping  # type: ignore
+        mapping = self.rpu_config.mapping  # type: MappingParameter
         mapping_scales = None
         if mapping.weight_scaling_omega:
             if mapping.weight_scaling_columnwise:
@@ -678,6 +699,30 @@ class BaseTile(Generic[RPUConfigGeneric]):
                                       device=self.device,
                                       requires_grad=False)
         self.set_mapping_scales(mapping_scales)
+
+    @no_grad()
+    def init_input_processing(self) -> None:
+        """Helper function to initialize the input processing.
+
+        Note:
+            This method is called from the constructor.
+
+        Raises: ConfigError in case ``manage_output_clipping`` is
+            enabled but not supported.
+        """
+        self.input_range = None
+        if not hasattr(self.rpu_config, 'pre_post'):
+            return
+
+        ir_params = self.rpu_config.pre_post.input_range  # type: InputRangeParameter
+        if ir_params.enable:
+            self.input_range_update_idx = 0
+            self.input_range = full((1,), ir_params.init_value, dtype=float32,
+                                    device=self.device, requires_grad=True)
+
+            if (ir_params.manage_output_clipping
+                    and not ir_params.supports_manage_output_clipping(self.rpu_config)):
+                raise ConfigError("RPU Config does not support `manage_output_clipping`.")
 
     @no_grad()
     def set_scales(self, scales: Union[Tensor, float]) -> None:
@@ -729,6 +774,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Note:
             This method is called from the constructor.
         """
+
+        if not hasattr(self.rpu_config, 'mapping'):
+            return
 
         mapping = self.rpu_config.mapping  # type: ignore
         if mapping.learn_out_scaling:
@@ -786,6 +834,34 @@ class BaseTile(Generic[RPUConfigGeneric]):
                                                     0 if self.out_trans else values.dim() - 1)
             return values * self.out_scaling_alpha.view(*tensor_view)
         return values
+
+    @no_grad()
+    def apply_input_range(self, values: Tensor, update_from_data: bool = False) -> Tensor:
+        """ Apply the input clipping.
+
+        Args:
+            values: tensor to clip
+            update_from_data: whether to update from data if applicable
+
+        Returns:
+            clipped output tensor
+        """
+        if self.input_range is None:
+            return values
+
+        if update_from_data:
+            ir_params = self.rpu_config.pre_post.input_range  # type: ignore
+            idx = self.input_range_update_idx
+            if idx < ir_params.init_from_data:
+                self.input_range.data = (self.input_range.data * idx
+                                         + ir_params.init_std_alpha * values.std()
+                                         ) / (idx + 1)
+                self.input_range_update_idx += 1
+
+        self.input_range.data = self.input_range.data.abs()
+        return clamp(values,
+                     min=-self.input_range.item(),  # pylint: disable=invalid-unary-operand-type
+                     max=self.input_range.item())
 
     def set_learning_rate(self, learning_rate: float) -> None:
         """Set the tile learning rate.
@@ -877,9 +953,45 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         return self.tile.reset_columns(start_column_idx, num_columns, reset_prob)
 
+    @no_grad()
+    def reset(
+            self,
+            reset_prob: float = 1.0
+    ) -> None:
+        r"""Reset the updated device tile according to the reset parameters of the tile.
+
+        Resets the weights with device-to-device and cycle-to-cycle
+        variability (depending on device type), typically:
+
+        .. math::
+            W_{ij} = \xi*\sigma_\text{reset} + b^\text{reset}_{ij}
+
+        The reset parameters are set during tile init.
+
+        Args:
+            reset_prob: individual probability of reset.
+
+        Returns:
+            None
+        """
+        return self.tile.reset_columns(0, -1, reset_prob)
+
     def cpu(self) -> 'BaseTile':
-        """Return a copy of this tile in CPU memory."""
-        raise NotImplementedError
+        """Return a copy of this tile in CPU memory.
+
+        Returns:
+            self in case of CPU
+
+        """
+        if not self.is_cuda:
+            return self
+
+        state_dict = self.__getstate__()
+        for value in state_dict.values():
+            if isinstance(value, AnalogContext):
+                value.data = value.data.cpu()
+        self.__setstate__(state_dict)
+        return self
 
     def cuda(
             self,
@@ -903,7 +1015,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return tuple(tensor_view)
 
     @no_grad()
-    def pre_forward(self, x_input: Tensor, dim: int, is_test: bool = False) -> Tensor:
+    def pre_forward(self, x_input: Tensor, dim: int,
+                    is_test: bool = False, ctx: Any = None) -> Tensor:
         """Operations before the actual forward step for pre processing.
 
         By default, this is an no-op. However, it could be overridden
@@ -913,33 +1026,57 @@ class BaseTile(Generic[RPUConfigGeneric]):
             x_input: input tensor for the analog MVM of the tile.
             dim: input channel dimension, ie the x_size dimension
             is_test: whether in eval mode
+            ctx: torch auto-grad context [Optional]
 
         Returns:
             Output tensor of the same shape
         """
         # pylint: disable=unused-argument
+        if self.input_range is not None:
+            x_input = self.apply_input_range(x_input, not is_test) / self.input_range
         return x_input
 
     @no_grad()
-    def post_forward(self, x_output: Tensor, dim: int, is_test: bool = False) -> Tensor:
+    def post_forward(self, x_output: Tensor,
+                     dim: int,
+                     is_test: bool = False,
+                     ctx: Any = None) -> Tensor:
         """Operations after the actual forward step for post processing.
 
         Args:
             x_output:  tensor that is the output from the forward pass of the tile
             dim: output channel dimension, ie the d_size dimension
             is_test: whether in eval mode
+            ctx: torch auto-grad context [Optional]
 
         Returns:
             Output tensor of the same shape
         """
         # pylint: disable=unused-argument
+        scale = None
+        if self.input_range is not None:
+            scale = self.input_range
+
+            # if output clip determines input clip learning
+            ir_params = self.rpu_config.pre_post.input_range  # type: ignore
+            if ctx is not None and ir_params.manage_output_clipping:
+                out_bound = self.rpu_config.forward.out_bound * 0.999  # type: ignore
+                output_percentage = (x_output.abs() < out_bound).float().mean()
+                ctx.output_percentage = output_percentage
+
         if self.mapping_scales is not None:
             tensor_view = self._get_tensor_view(x_output.dim(), dim)
-            return x_output * self.get_mapping_scales().view(tensor_view)
+            if scale is not None:
+                scale = scale * self.get_mapping_scales().view(tensor_view)
+            else:
+                scale = self.get_mapping_scales().view(tensor_view)
+
+        if scale is not None:
+            return x_output * scale
         return x_output
 
     @no_grad()
-    def forward(self, x_input: Tensor, is_test: bool = False) -> Tensor:
+    def forward(self, x_input: Tensor, is_test: bool = False, ctx: Any = None) -> Tensor:
         """Perform the forward pass.
 
         Calls first the ``pre_forward``, then the tile forward, and
@@ -954,6 +1091,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
             is_test: whether to assume testing mode.
+            ctx: torch auto-grad context [Optional]
 
         Returns:
             torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
@@ -962,64 +1100,101 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # We use no-grad as we do it explicitly in the optimizer.
         x_input = self.pre_forward(x_input,
                                    0 if self.in_trans else x_input.dim() - 1,
-                                   is_test)
+                                   is_test, ctx)
         x_output = self.tile.forward(x_input, self.bias, self.in_trans,
-                                     self.out_trans, is_test)
+                                     self.out_trans, is_test, self.non_blocking)
         return self.post_forward(x_output,
                                  0 if self.out_trans else x_output.dim() - 1,
-                                 is_test)
+                                 is_test, ctx)
 
     @no_grad()
-    def pre_backward(self, d_input: Tensor, dim: int) -> Tensor:
+    def pre_backward(self, d_input: Tensor, dim: int, ctx: Any = None) -> Tensor:
         """Operations before the actual backward step for pre processing.
 
         By default, this is an no-op. However, it could be overridden
         in derived tile classes.
 
         Args:
-           d_input: The input tensor from to the analog MVM of the tile.
-           dim: the dim of the d_size dimension
+            d_input: The input tensor from to the analog MVM of the tile.
+            dim: the dim of the d_size dimension
+            ctx: torch auto-grad context [Optional]
 
         Returns:
-           The preprocessed tensor of the same shape
-
+            The preprocessed tensor of the same shape
         """
+        # pylint: disable=unused-argument
         if self.mapping_scales is not None:
             tensor_view = self._get_tensor_view(d_input.dim(), dim)
             return d_input * self.get_mapping_scales().view(tensor_view)
         return d_input
 
     @no_grad()
-    def post_backward(self, d_output: Tensor, dim: int) -> Tensor:
+    def post_backward(self, d_output: Tensor, dim: int, ctx: Any = None) -> Tensor:
         """Operations after the actual backward step for post processing.
 
         Here, the mapping scales are applied if exist.
 
         Args:
-           d_output: The output tensor from the analog MVM of the tile.
-           dim: the dim of the x_size dimension
+            d_output: The output tensor from the analog MVM of the tile.
+            dim: the dim of the x_size dimension
+            ctx: torch auto-grad context [Optional]
 
         Returns:
-           The postprocessed tensor of the same shape
+            The postprocessed tensor of the same shape
         """
         # pylint: disable=unused-argument
+
+        if self.input_range is not None and ctx is not None:
+            # compute gradient of the clip
+            x_input,  = ctx.saved_tensors
+            ir_params = self.rpu_config.pre_post.input_range  # type: ignore
+
+            upper_thres = x_input >= self.input_range
+            lower_thres = x_input <= -self.input_range  # pylint: disable=invalid-unary-operand-type
+
+            grad = zeros_like(self.input_range)
+
+            grad += clamp(upper_thres * d_output, min=None, max=0.0).sum()
+            grad -= clamp(lower_thres * d_output, min=0.0, max=None).sum()
+
+            if ir_params.gradient_relative:
+                grad *= self.input_range
+            grad *= ir_params.gradient_scale
+
+            if ir_params.manage_output_clipping:
+                output_percentage = getattr(ctx, 'output_percentage', 1.0)
+                grad -= (1.0 - output_percentage) * self.input_range * (
+                    output_percentage < ir_params.output_min_percentage)
+
+            if ir_params.decay > 0:
+                percentage = (x_input.abs() < self.input_range).float().mean()
+                grad += ir_params.decay * self.input_range * (
+                    percentage > ir_params.input_min_percentage)
+
+            if self.input_range.grad is None:
+                self.input_range.grad = grad
+            else:
+                self.input_range.grad += grad
+
         return d_output
 
     @no_grad()
-    def backward(self, d_input: Tensor) -> Tensor:
+    def backward(self, d_input: Tensor, ctx: Any = None) -> Tensor:
         """Perform the backward pass.
 
         Args:
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+            ctx: torch auto-grad context [Optional]
 
         Returns:
             torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
         """
-        d_input = self.pre_backward(d_input,
-                                    0 if self.out_trans else d_input.dim() - 1)
-        d_output = self.tile.backward(d_input, self.bias, self.out_trans, self.in_trans)
-        return self.post_backward(d_output,
-                                  0 if self.in_trans else d_output.dim() - 1)
+        d_input = self.pre_backward(d_input, 0 if self.out_trans else d_input.dim() - 1,
+                                    ctx)
+        d_output = self.tile.backward(d_input, self.bias, self.out_trans, self.in_trans,
+                                      self.non_blocking)
+        return self.post_backward(d_output, 0 if self.in_trans else d_output.dim() - 1,
+                                  ctx)
 
     @no_grad()
     def pre_update(self, x_input: Tensor, x_dim: int,
@@ -1030,16 +1205,26 @@ class BaseTile(Generic[RPUConfigGeneric]):
         will be divided by the mapping scales to compensate for the
         conductance mapping.
 
+        Caution:
+
+            The ``x_input`` and ``d_input`` here are the *original* inputs
+            to the ``forward` and ``backward`` methods, thus the
+            ``pre_forward`` and ``pre_backward`` function are *not*
+            applied, and might need to be applied again here.
+
         Args:
-           x_input: The forward input tensor.
-           x_dim: the dim of the x_size dimension of the forward input.
-           d_input: The backward (gradient) input tensor.
-           d_dim: the dim of the d_size dimension of the backward input.
+            x_input: The forward input tensor.
+            x_dim: the dim of the x_size dimension of the forward input.
+            d_input: The backward (gradient) input tensor.
+            d_dim: the dim of the d_size dimension of the backward input.
 
         Returns:
            Tuple of the preprocessed x_input and d_input tensors of the same shape
+
         """
         # pylint: disable=unused-argument
+        if self.input_range is not None:
+            x_input = self.apply_input_range(x_input, False) / self.input_range
 
         if self.mapping_scales is not None:
             tensor_view = self._get_tensor_view(d_input.dim(), d_dim)
@@ -1065,7 +1250,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
                                            d_input,
                                            0 if self.out_trans else d_input.dim() - 1)
         return self.tile.update(x_input, d_input, self.bias,
-                                self.in_trans, self.out_trans)
+                                self.in_trans, self.out_trans, self.non_blocking)
 
     def get_hidden_parameters(self) -> OrderedDict:
         """Get the hidden parameters of the tile.
@@ -1189,7 +1374,8 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.tile.set_matrix_indices(indices)
 
     @no_grad()
-    def forward_indexed(self, x_input: Tensor, is_test: bool = False) -> Tensor:
+    def forward_indexed(self, x_input: Tensor, is_test: bool = False,
+                        ctx: Any = None) -> Tensor:
         """Perform the forward pass for convolutions.
 
         Depending on the input tensor size it performs the forward pass for a
@@ -1198,6 +1384,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Args:
             x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
             is_test: whether to assume testing mode.
+            ctx: torch auto-grad context [Optional]
 
         Returns:
             torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
@@ -1225,12 +1412,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
         else:
             raise TileError('self.image_sizes length is not 3, 5 or 7')
 
-        x_input = self.pre_forward(x_input, 1, is_test)
-        x_output = self.tile.forward_indexed(x_input, d_tensor, is_test)
-        return self.post_forward(x_output, 1, is_test)
+        x_input = self.pre_forward(x_input, 1, is_test, ctx)
+        x_output = self.tile.forward_indexed(x_input, d_tensor, is_test, self.non_blocking)
+        return self.post_forward(x_output, 1, is_test, ctx)
 
     @no_grad()
-    def backward_indexed(self, d_input: Tensor) -> Tensor:
+    def backward_indexed(self, d_input: Tensor, ctx: Any = None) -> Tensor:
         """Perform the backward pass for convolutions.
 
         Depending on the input tensor size it performs the backward pass for a
@@ -1238,6 +1425,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         Args:
             d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+            ctx: torch auto-grad context [Optional]
 
         Returns:
             torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
@@ -1265,9 +1453,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         else:
             raise TileError('self.image_sizes length is not 3, 5 or 7')
 
-        d_input = self.pre_backward(d_input, 1)
-        d_output = self.tile.backward_indexed(d_input, x_tensor)
-        return self.post_backward(d_output, 1)
+        d_input = self.pre_backward(d_input, 1, ctx)
+        d_output = self.tile.backward_indexed(d_input, x_tensor, self.non_blocking)
+        return self.post_backward(d_output, 1, ctx)
 
     @no_grad()
     def update_indexed(self, x_input: Tensor, d_input: Tensor) -> None:
@@ -1283,7 +1471,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             None
         """
         x_input, d_input = self.pre_update(x_input, 1, d_input, 1)
-        return self.tile.update_indexed(x_input, d_input)
+        return self.tile.update_indexed(x_input, d_input, self.non_blocking)
 
     @no_grad()
     def post_update_step(self) -> None:

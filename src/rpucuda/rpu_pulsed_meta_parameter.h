@@ -14,6 +14,7 @@
 
 #include "math_util.h"
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <random>
 
@@ -30,7 +31,7 @@ enum class NoiseManagementType {
   AbsMaxSingleValue
 };
 
-enum class BoundManagementType { None, Iterative, IterativeWorstCase, Shift };
+enum class BoundManagementType { None, Iterative, IterativeWorstCase };
 
 enum class OutputWeightNoiseType { None, AdditiveConstant, PCMRead };
 
@@ -43,14 +44,27 @@ enum class PulseType {
   DeterministicImplicit
 };
 
+enum class AnalogMVType { Ideal, OnePass, PosNegSeparate, PosNegSeparateDigitalSum };
+
 template <typename T> struct IOMetaParameter {
   bool _par_initialized = false;
 
   bool is_perfect = false; // short-cut to use pure floating point (only out_scale will be applied)
-
+  AnalogMVType mv_type = AnalogMVType::OnePass;
   OutputWeightNoiseType w_noise_type = OutputWeightNoiseType::None;
   T ir_drop = (T)0.0;
   T ir_drop_Gw_div_gmax = (T)5.7143e5; // physical ratio of wire conductance to physical gmax
+
+  T v_offset_std = (T)0.0;     // systematic voltage offset variation at output
+  std::vector<T> v_offset_vec; // systematic voltage offset variation at output
+  T v_offset_w_min = (T)0.0;   // reference value for offset. typically -1 (for w_min = -1)
+  T r_series = (T)0.0;
+  T r_series_max_total = std::numeric_limits<T>::max();
+
+  T inp_asymmetry = (T)0.0; // negative input number are scaled with (1 - asymmetry)
+  T out_asymmetry = (T)0.0;
+  T w_read_asymmetry_dtod = (T)0.0; // neg input weight-scale (e.g. pcm polarity) NOTE: only
+                                    // observed for AnalogMVType::PosNegSeparate
 
   T inp_bound = (T)1.0;
   T inp_res = (T)1.0 / (pow((T)2.0, (T)7.0) - (T)2.0);
@@ -64,6 +78,16 @@ template <typename T> struct IOMetaParameter {
   T _out_res = (T)0;
   bool out_sto_round = false;
   T out_scale = (T)1.0;
+
+  // this is: y/(1 + nl_i*|y|) with
+  // nl_i = out_nonlinearity / out_bound * (1 + out_nonlinearity_std * rng_->sampleGauss());
+  // thus an out_nonlinearity of 1 would reduce the output by half at out_bound
+  T out_nonlinearity = (T)0.0;
+  T out_nonlinearity_std = (T)0.0; // output to output line systematic variation
+  std::vector<T> out_nonlinearity_vec;
+  // y/out_bound value where the slope of the NL is 1 on average. This calibration is done in ADC
+  T slope_calibration = (T)0.5;
+
   NoiseManagementType noise_management = NoiseManagementType::AbsMax;
   T nm_thres = (T)0.0;
   T nm_assumed_wmax = (T)0.6;
@@ -75,17 +99,43 @@ template <typename T> struct IOMetaParameter {
   T max_bm_res =
       (T)0.25; // bounds BM to less than max_bm_res times the input number of states (1/inp_res)
 
-  void initializeForForward(); // only one can be called. Maybe better derive Forward/Backward
-                               // version and overload?
-  void initializeForBackward();
+  void initializeForForward(int x_size, int d_size);
+  void initializeForBackward(int x_size, int d_size);
   void print() const {
     std::stringstream ss;
     printToStream(ss);
     std::cout << ss.str();
   };
+
+  inline bool hasVoltageOffsets() const {
+    return v_offset_std > (T)0 || r_series > (T)0 || v_offset_vec.size() > (size_t)0;
+  };
+  inline bool isPerfect() const { return mv_type == AnalogMVType::Ideal || is_perfect; }
+  inline bool hasOutNonlinearity() const {
+    return (out_nonlinearity > (T)0 || out_nonlinearity_vec.size() > (size_t)0) && (!isPerfect());
+  };
+  inline bool hasNLCalibration() const { return hasOutNonlinearity() || r_series > 0; }
   void printToStream(std::stringstream &ss) const {
 
-    if (!is_perfect) {
+    if (!isPerfect()) {
+
+      switch (mv_type) {
+      case AnalogMVType::Ideal:
+        ss << "\t mv_type:\t\tIdeal\n";
+        break;
+      case AnalogMVType::OnePass:
+        ss << "\t mv_type:\t\tOnePass\n";
+        break;
+      case AnalogMVType::PosNegSeparate:
+        ss << "\t mv_type:\t\tPosNegSeparate\n";
+        break;
+      case AnalogMVType::PosNegSeparateDigitalSum:
+        ss << "\t mv_type:\t\tPosNegSeparateDigitalSum\n";
+        break;
+      default:
+        RPU_FATAL("MV type not implemented.");
+      }
+
       ss << "\t inp/out_bound:\t\t" << inp_bound << " / " << out_bound << std::endl;
       if (_par_initialized) {
         ss << "\t DAC/ADC:\t\t" << 1.0 / MAX(_inp_res, 0) << " / " << 1.0 / MAX(_out_res, 0)
@@ -117,11 +167,45 @@ template <typename T> struct IOMetaParameter {
         ss << "\t ir_drop [scale]:\t" << ir_drop << "  (ir_drop_Gw_div_gmax is "
            << ir_drop_Gw_div_gmax << ")" << std::endl;
       }
+      if (hasVoltageOffsets()) {
+        ss << "\t r_series:\t\t" << r_series << std::endl;
+        ss << "\t r_series_max_total:\t" << r_series_max_total << std::endl;
+        if (v_offset_std > (T)0.0) {
+          ss << "\t v_offset_std:\t\t" << v_offset_std << std::endl;
+        } else if (v_offset_vec.size() > (size_t)0) {
+          // compute here ?
+          ss << "\t v_offset_std:\t\tuser-defined" << std::endl;
+        }
+        ss << "\t v_offset_w_min:\t" << v_offset_w_min << std::endl;
+      }
+
+      if (hasOutNonlinearity()) {
+        if (out_nonlinearity > (T)0.0 || out_nonlinearity_std > (T)0.0) {
+          ss << "\t out_nonlinearity:\t" << out_nonlinearity << std::endl;
+          ss << "\t out_nonlinearity_std:\t" << out_nonlinearity_std << std::endl;
+        } else {
+          ss << "\t out_nonlinearity:\tuser-defined" << std::endl;
+        }
+      }
+      if (hasNLCalibration()) {
+        ss << "\t slope_calibration:\t" << slope_calibration << std::endl;
+      }
+
+      if (inp_asymmetry != (T)0) {
+        ss << "\t inp_asymmetry:\t\t" << inp_asymmetry << std::endl;
+      }
+      if (out_asymmetry != (T)0) {
+        ss << "\t out_asymmetry:\t\t" << out_asymmetry << std::endl;
+      }
+
+      if (w_read_asymmetry_dtod > 0 && mv_type == AnalogMVType::PosNegSeparate) {
+        ss << "\t w_read_asymmetry_dtod:\t" << w_read_asymmetry_dtod << std::endl;
+      }
     }
     if (out_scale != 1.0) {
       ss << "\t out_scale:\t\t" << out_scale << std::endl;
     }
-    if (!is_perfect) {
+    if (!isPerfect()) {
       if (noise_management == NoiseManagementType::AbsMax && nm_thres > 0) {
         ss << "\t noise_management [nm_thres]:\t" << nm_thres << std::endl;
       } else if (noise_management == NoiseManagementType::AbsMaxNPSum) {
@@ -143,9 +227,6 @@ template <typename T> struct IOMetaParameter {
         break;
       case BoundManagementType::Iterative:
         ss << "Iterative";
-        break;
-      case BoundManagementType::Shift:
-        ss << "Shift";
         break;
       case BoundManagementType::IterativeWorstCase:
         ss << "Iterative [2nd round with NM::AbsMaxNPSum]";
@@ -169,7 +250,8 @@ template <typename T> struct PulsedUpdateMetaParameter {
 
   bool update_management = true;
   bool update_bl_management = true;
-
+  T um_grad_scale = 1.0; // bias gradient for UM (ie 0.5 means more clipping of gradient)
+  T um_reg_scale = 1.0;  // scale for regularizer of UM / UBLM (scale=1 means reg = dw_min**2)
   bool sto_round = false;
 
   T res = (T)0; // this is taken to be in the range 0..1 as positive and negative phases are done
@@ -184,12 +266,12 @@ template <typename T> struct PulsedUpdateMetaParameter {
 
   PulseType pulse_type = PulseType::StochasticCompressed;
 
-  virtual bool needsImplicitPulses() const {
+  inline bool needsImplicitPulses() const {
     return pulse_type == PulseType::DeterministicImplicit || pulse_type == PulseType::None;
   };
 
   void initialize();
-  virtual int getNK32Default() const { return desired_BL / 32 + 1; };
+  inline int getNK32Default() const { return desired_BL / 32 + 1; };
 
   virtual void calculateBlAB(int &BL, T &A, T &B, T lr, T weight_granularity) const;
   virtual void performUpdateManagement(
@@ -223,6 +305,10 @@ template <typename T> struct PulsedUpdateMetaParameter {
       }
       ss << "\t desired_BL:\t\t" << desired_BL << std::endl;
       ss << "\t fixed_BL:\t\t" << std::boolalpha << fixed_BL << std::endl;
+      ss << "\t update_management:\t" << std::boolalpha << update_management << std::endl;
+      if (um_grad_scale != (T)1.0) {
+        ss << "\t um_grad_scale:\t" << um_grad_scale << std::endl;
+      }
       ss << "\t update_management:\t" << std::boolalpha << update_management << std::endl;
       ss << "\t update_bl_management:\t" << std::boolalpha << update_bl_management << std::endl;
       ss << "\t up_DAC_stoc_round:\t" << sto_round << std::endl;

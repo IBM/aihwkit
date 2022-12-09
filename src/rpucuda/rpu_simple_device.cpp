@@ -46,7 +46,7 @@ template <typename T> SimpleRPUDevice<T>::SimpleRPUDevice(const SimpleRPUDevice<
   }
 
   if (other.wdrifter_) {
-    wdrifter_ = make_unique<WeightDrifter<T>>(*other.wdrifter_);
+    wdrifter_ = RPU::make_unique<WeightDrifter<T>>(*other.wdrifter_);
   }
 }
 
@@ -140,7 +140,7 @@ void SimpleRPUDevice<T>::populate(const SimpleRPUDeviceMetaParameter<T> &p, Real
   par_storage_->initialize();
 
   if (p.drift.nu > 0) {
-    wdrifter_ = make_unique<WeightDrifter<T>>(this->size_, p.drift, rng);
+    wdrifter_ = RPU::make_unique<WeightDrifter<T>>(this->size_, p.drift, rng);
   } else {
     wdrifter_ = nullptr;
   }

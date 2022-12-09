@@ -37,7 +37,7 @@ struct CustomPSum {
 template <typename T> class NoiseManager {
 
 public:
-  explicit NoiseManager(CudaContext *c, int size);
+  explicit NoiseManager(CudaContextPtr c, int size);
 
   /* computes the scale values */
   template <typename InputIteratorT>
@@ -79,7 +79,7 @@ private:
   int buffer_m_batch_ = 0;
   int last_m_batch_ = 0;
   int size_ = 0;
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
   bool const_set_if_ = false;
   bool ravg_initialized_ = false;
 

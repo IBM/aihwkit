@@ -29,7 +29,7 @@ template <typename T> void DenseBitLineMaker<T>::initialize(int x_size, int d_si
 template <typename T> void DenseBitLineMaker<T>::allocateContainers() {
 
   freeContainers();
-  rw_rng_ = make_unique<RealWorldRNG<T>>(0);
+  rw_rng_ = RPU::make_unique<RealWorldRNG<T>>(0);
 
   x_counts_ = new int[x_size_];
   d_counts_ = new int[d_size_];

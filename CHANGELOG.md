@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+
 * Added stand-alone functions for applying inference drift to any model (\#419)
 * Example 24: analog inference and hardware-aware training on BERT (\#440)
 * Example 23: how to use ``AnalogTile`` directly to implement an

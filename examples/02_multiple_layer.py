@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 
 # (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
@@ -26,8 +25,7 @@ from torch.nn import Sequential
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
 
 # Prepare the datasets (input and expected output).
 x_b = Tensor([[0.1, 0.2, 0.0, 0.0], [0.2, 0.4, 0.0, 0.0]])

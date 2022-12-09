@@ -19,19 +19,20 @@ from dataclasses import dataclass, field
 from aihwkit.simulator.configs.configs import (
     SingleRPUConfig, UnitCellRPUConfig, DigitalRankUpdateRPUConfig
 )
-from aihwkit.simulator.configs.devices import (
-    PulsedDevice, TransferCompound, UnitCell, VectorUnitCell,
+from aihwkit.simulator.configs.devices import PulsedDevice
+from aihwkit.simulator.configs.compounds import (
+    TransferCompound, UnitCell, VectorUnitCell, BufferedTransferCompound,
     DigitalRankUpdateCell, MixedPrecisionCompound,
-    BufferedTransferCompound
 )
+from aihwkit.simulator.configs.enums import VectorUnitCellUpdatePolicy
 from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
+    IOParameters, UpdateParameters
 )
 from aihwkit.simulator.presets.devices import (
     CapacitorPresetDevice, EcRamPresetDevice, EcRamMOPresetDevice, IdealizedPresetDevice,
     ReRamESPresetDevice, ReRamSBPresetDevice, GokmenVlasovPresetDevice,
-    PCMPresetUnitCell
 )
+from aihwkit.simulator.presets.compounds import PCMPresetUnitCell
 from aihwkit.simulator.presets.utils import (
     PresetIOParameters, PresetUpdateParameters
 )

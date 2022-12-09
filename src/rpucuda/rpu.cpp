@@ -61,7 +61,7 @@ void RPUAbstract<T>::forwardMatrix(
   const T *x_input = X_input;
   T *d_output = D_output;
 
-  for (int i = 0; i < m_batch; i++) {
+  for (size_t i = 0; i < (size_t)m_batch; i++) {
     this->forwardVector(x_input + i * x_offset, d_output + i * d_offset, x_inc, d_inc, is_test);
   }
 }
@@ -77,7 +77,7 @@ void RPUAbstract<T>::backwardMatrix(
   const T *d_input = D_input;
   T *x_output = X_output;
 
-  for (int i = 0; i < m_batch; i++) {
+  for (size_t i = 0; i < (size_t)m_batch; i++) {
     this->backwardVector(d_input + i * d_offset, x_output + i * x_offset, d_inc, x_inc);
   }
 }
@@ -85,15 +85,15 @@ void RPUAbstract<T>::backwardMatrix(
 template <typename T>
 void RPUAbstract<T>::updateMatrix(
     const T *X_input, const T *D_input, int m_batch, bool x_trans, bool d_trans) {
-  int x_offset = x_trans ? 1 : x_size_;
-  int d_offset = d_trans ? 1 : d_size_;
+  size_t x_offset = x_trans ? 1 : x_size_;
+  size_t d_offset = d_trans ? 1 : d_size_;
   int x_inc = x_trans ? m_batch : 1;
   int d_inc = d_trans ? m_batch : 1;
 
   const T *x_input = X_input;
   const T *d_input = D_input;
 
-  for (int i = 0; i < m_batch; i++) {
+  for (size_t i = 0; i < (size_t)m_batch; i++) {
     this->updateVector(x_input + i * x_offset, d_input + i * d_offset, x_inc, d_inc);
   }
 }
@@ -106,15 +106,15 @@ void RPUAbstract<T>::forwardMatrixBias(
     bool x_trans,
     bool d_trans,
     bool is_test) {
-  int x_offset = x_trans ? 1 : x_size_ - 1;
-  int d_offset = d_trans ? 1 : d_size_;
+  size_t x_offset = x_trans ? 1 : x_size_ - 1;
+  size_t d_offset = d_trans ? 1 : d_size_;
   int x_inc = x_trans ? m_batch : 1;
   int d_inc = d_trans ? m_batch : 1;
 
   const T *x_input_without_bias = X_input_without_bias;
   T *d_output = D_output;
 
-  for (int i = 0; i < m_batch; i++) {
+  for (size_t i = 0; i < (size_t)m_batch; i++) {
     this->forwardVectorBias(
         x_input_without_bias + i * x_offset, d_output + i * d_offset, x_inc, d_inc, is_test);
   }
@@ -123,15 +123,15 @@ void RPUAbstract<T>::forwardMatrixBias(
 template <typename T>
 void RPUAbstract<T>::backwardMatrixBias(
     const T *D_input, T *X_output_without_bias, int m_batch, bool d_trans, bool x_trans) {
-  int x_offset = x_trans ? 1 : x_size_ - 1;
-  int d_offset = d_trans ? 1 : d_size_;
+  size_t x_offset = x_trans ? 1 : x_size_ - 1;
+  size_t d_offset = d_trans ? 1 : d_size_;
   int x_inc = x_trans ? m_batch : 1;
   int d_inc = d_trans ? m_batch : 1;
 
   const T *d_input = D_input;
   T *x_output_without_bias = X_output_without_bias;
 
-  for (int i = 0; i < m_batch; i++) {
+  for (size_t i = 0; i < (size_t)m_batch; i++) {
     this->backwardVectorBias(
         d_input + i * d_offset, x_output_without_bias + i * x_offset, d_inc, x_inc);
   }
@@ -140,15 +140,15 @@ void RPUAbstract<T>::backwardMatrixBias(
 template <typename T>
 void RPUAbstract<T>::updateMatrixBias(
     const T *X_input_without_bias, const T *D_input, int m_batch, bool x_trans, bool d_trans) {
-  int x_offset = x_trans ? 1 : x_size_ - 1;
-  int d_offset = d_trans ? 1 : d_size_;
+  size_t x_offset = x_trans ? 1 : x_size_ - 1;
+  size_t d_offset = d_trans ? 1 : d_size_;
   int x_inc = x_trans ? m_batch : 1;
   int d_inc = d_trans ? m_batch : 1;
 
   const T *x_input_without_bias = X_input_without_bias;
   const T *d_input = D_input;
 
-  for (int i = 0; i < m_batch; i++) {
+  for (size_t i = 0; i < (size_t)m_batch; i++) {
     this->updateVectorBias(
         x_input_without_bias + i * x_offset, d_input + i * d_offset, x_inc, d_inc);
   }
@@ -173,11 +173,9 @@ template <typename T> void SimpleMetaParameter<T>::printToStream(std::stringstre
     ss << "\t lifetime [decay]:\t" << lifetime << std::endl;
   }
   if (drift.nu > 0) {
-    ss << "Drift:" << std::endl;
     drift.printToStream(ss);
   }
   if (diffusion > 0) {
-    ss << "Diffusion:" << std::endl;
     ss << "\t diffusion:\t\t" << diffusion << std::endl;
   }
 }
@@ -341,10 +339,12 @@ template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(const RPUSimple<T> &
   return *this;
 }
 // move constructor
-template <typename T> RPUSimple<T>::RPUSimple(RPUSimple<T> &&other) { *this = std::move(other); }
+template <typename T> RPUSimple<T>::RPUSimple(RPUSimple<T> &&other) noexcept {
+  *this = std::move(other);
+}
 
 // move assignment
-template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(RPUSimple<T> &&other) {
+template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(RPUSimple<T> &&other) noexcept {
 
   RPUAbstract<T>::operator=(std::move(other));
 
@@ -538,14 +538,17 @@ void RPUSimple<T>::forwardMatrixBias(
   // TODO: use a better way to do this with GEMM LDA etc.
   T *bias_buffer = this->copyToMatrixBiasBuffer(X_input_without_bias, m_batch, x_trans);
   this->forwardMatrix(bias_buffer, D_output, m_batch, x_trans, d_trans, is_test);
+  this->releaseMatrixBiasBuffer();
 }
 
 template <typename T>
 void RPUSimple<T>::backwardMatrixBias(
     const T *D_input, T *X_output_without_bias, int m_batch, bool d_trans, bool x_trans) {
   // TODO: use a better way to do this with GEMM LDA etc.
-  this->backwardMatrix(D_input, this->getMatrixBiasBuffer(m_batch), m_batch, d_trans, x_trans);
-  this->copyFromMatrixBiasBuffer(X_output_without_bias, m_batch, x_trans);
+  T *bias_buffer = this->getMatrixBiasBuffer(m_batch);
+  this->backwardMatrix(D_input, bias_buffer, m_batch, d_trans, x_trans);
+  this->copyFromMatrixBiasBuffer(X_output_without_bias, m_batch, x_trans, bias_buffer);
+  this->releaseMatrixBiasBuffer();
 }
 
 template <typename T>
@@ -554,6 +557,7 @@ void RPUSimple<T>::updateMatrixBias(
   // TODO: use a better way to do this with GEMM LDA etc.
   T *bias_buffer = this->copyToMatrixBiasBuffer(X_input_without_bias, m_batch, x_trans);
   this->updateMatrix(bias_buffer, D_input, m_batch, x_trans, d_trans);
+  this->releaseMatrixBiasBuffer();
 }
 
 template <typename T> T *RPUSimple<T>::getMatrixBiasBuffer(int m_batch) {
@@ -563,7 +567,7 @@ template <typename T> T *RPUSimple<T>::getMatrixBiasBuffer(int m_batch) {
     if (temp_x_matrix_bias_ != nullptr) {
       delete[] temp_x_matrix_bias_;
     }
-    temp_x_matrix_bias_ = new T[m_batch * this->x_size_];
+    temp_x_matrix_bias_ = new T[(size_t)m_batch * this->x_size_];
     temp_x_matrix_bias_size_ = m_batch;
   }
   return temp_x_matrix_bias_;
@@ -572,19 +576,14 @@ template <typename T> T *RPUSimple<T>::getMatrixBiasBuffer(int m_batch) {
 template <typename T>
 T *RPUSimple<T>::copyToMatrixBiasBuffer(const T *X_input_without_bias, int m_batch, bool x_trans) {
   T *bias_buffer = getMatrixBiasBuffer(m_batch);
-  ;
   RPU::math::makeBias<T>(bias_buffer, X_input_without_bias, this->x_size_, m_batch, x_trans);
   return bias_buffer;
 }
 
 template <typename T>
-void RPUSimple<T>::copyFromMatrixBiasBuffer(T *X_input_without_bias, int m_batch, bool x_trans) {
-  if ((m_batch > temp_x_matrix_bias_size_) || (temp_x_matrix_bias_ == nullptr)) {
-    RPU_FATAL("Buffer size mismatch. This should never happen!");
-  }
-
-  RPU::math::copyWithoutBias<T>(
-      X_input_without_bias, temp_x_matrix_bias_, this->x_size_, m_batch, x_trans);
+void RPUSimple<T>::copyFromMatrixBiasBuffer(
+    T *X_input_without_bias, int m_batch, bool x_trans, T *bias_buffer) {
+  RPU::math::copyWithoutBias<T>(X_input_without_bias, bias_buffer, this->x_size_, m_batch, x_trans);
 }
 
 /*********************************************************************************/
@@ -1218,7 +1217,7 @@ template <typename T> void RPUSimple<T>::setWeightsWithAlpha(const T *weightsptr
 
     int imax = RPU::math::iamax<T>(sz, w, 1);
     T alpha = fabs(w[imax] / assumed_wmax);
-    RPU::math::scal<T>(sz, 1.0 / alpha, w, 1);
+    RPU::math::scal<T>(sz, (T)1.0 / alpha, w, 1);
 
     this->setAlphaScale(alpha);
     this->setWeights(w);
@@ -1255,7 +1254,7 @@ void RPUSimple<T>::setWeightsAndBiasWithAlpha(
     DEBUG_OUT("WARNING: scaling weights with ALPHA scale!");
     int imax = RPU::math::iamax<T>(sz, w, 1);
     T alpha = fabs(w[imax] / assumed_wmax);
-    RPU::math::scal<T>(sz, 1.0 / alpha, w, 1);
+    RPU::math::scal<T>(sz, (T)1.0 / alpha, w, 1);
     this->setAlphaScale(alpha);
   }
 
@@ -1282,10 +1281,10 @@ template <typename T> void RPUSimple<T>::setSharedWeights(T *weightsptr) {
   *weights_ = weightsptr;
   shared_weights_if_ = true;
   if ((this->d_size_ > 0) &&
-      (weights_[this->d_size_ - 1] != *weights_ + this->x_size_ * this->d_size_)) {
+      (weights_[this->d_size_ - 1] != *weights_ + (size_t)this->x_size_ * this->d_size_)) {
     // only set if changed
     for (int i = 0; i < this->d_size_; ++i) {
-      weights_[i] = *weights_ + this->x_size_ * i;
+      weights_[i] = *weights_ + (size_t)this->x_size_ * i;
     }
   }
 }
@@ -1362,8 +1361,8 @@ template <typename T> void RPUSimple<T>::setDeltaWeights(T *dw_extern) {
     ENFORCE_NO_DELAYED_UPDATE;
 
     delta_weights_extern_[0] = dw_extern;
-    for (int i = 0; i < this->d_size_; i++) {
-      delta_weights_extern_[i] = delta_weights_extern_[0] + this->x_size_ * i;
+    for (size_t i = 0; i < (size_t)this->d_size_; i++) {
+      delta_weights_extern_[i] = delta_weights_extern_[0] + (size_t)this->x_size_ * i;
     }
   } else {
     // caution: only first element is set to nullptr. others
@@ -1529,7 +1528,7 @@ void RPUSimple<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scales, T
   wremapper_->apply(getWeightsPtr()[0], this->getAlphaLearningRate(), wrmpar, scales, biases);
 }
 
-template <typename T> void RPUSimple<T>::modifyFBWeights(const WeightModifierParameter &wmpar) {
+template <typename T> void RPUSimple<T>::modifyFBWeights(const WeightModifierParameter<T> &wmpar) {
 
   if (fb_weights_ == nullptr) {
     fb_weights_ = Array_2D_Get<T>(this->d_size_, this->x_size_);

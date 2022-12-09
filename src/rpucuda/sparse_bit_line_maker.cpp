@@ -308,7 +308,9 @@ int SparseBitLineMaker<T>::makeCounts(
   } else {
     up.calculateBlAB(BL, A, B, lr, dw_min);
   }
-
+  if (BL == 0) {
+    return 0;
+  }
   if (MAX(BL, up.desired_BL) > max_BL_) {
     initialize(x_size_, d_size_, MAX(BL, up.desired_BL));
   }

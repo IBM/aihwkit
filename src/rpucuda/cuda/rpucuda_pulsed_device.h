@@ -27,7 +27,7 @@ template <typename T> class PulsedRPUDeviceCudaBase : public SimpleRPUDeviceCuda
 public:
   PulsedRPUDeviceCudaBase() = default;
   ~PulsedRPUDeviceCudaBase() = default;
-  explicit PulsedRPUDeviceCudaBase(CudaContext *c, int x_size, int d_size)
+  explicit PulsedRPUDeviceCudaBase(CudaContextPtr c, int x_size, int d_size)
       : SimpleRPUDeviceCuda<T>(c, x_size, d_size){};
 
   PulsedRPUDeviceCudaBase(const PulsedRPUDeviceCudaBase<T> &other)
@@ -40,6 +40,7 @@ public:
     using std::swap;
     swap(static_cast<SimpleRPUDeviceCuda<T> &>(a), static_cast<SimpleRPUDeviceCuda<T> &>(b));
     swap(a.weight_granularity_, b.weight_granularity_);
+    swap(a.num_states_, b.num_states_);
   }
   void populateFrom(const AbstractRPUDevice<T> &rpu_device_in) override {
     SimpleRPUDeviceCuda<T>::populateFrom(rpu_device_in);
@@ -49,6 +50,7 @@ public:
       RPU_FATAL("populateFrom expects PulsedRPUDeviceBase.");
     }
     setWeightGranularity(rpu_device.getWeightGranularity());
+    setNumStates(rpu_device.getNumStates());
   };
 
   bool isPulsedDevice() const override { return true; };
@@ -75,7 +77,7 @@ public:
 
   virtual void runUpdateKernel(
       pwukp_t<T> kpars,
-      CudaContext *c,
+      CudaContextPtr c,
       T *dev_weights,
       int m_batch,
       const BitLineMaker<T> *blm,
@@ -84,7 +86,9 @@ public:
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
-      uint32_t *d_counts_chunk = nullptr) = 0;
+      uint32_t *d_counts_chunk = nullptr,
+      const ChoppedWeightOutput<T> *cwo = nullptr) = 0;
+
   virtual pwukpvec_t<T> getUpdateKernels(
       int m_batch,
       int nK32,
@@ -95,15 +99,23 @@ public:
   PulsedRPUDeviceCudaBase<T> *clone() const override { RPU_FATAL("Needs implementation"); };
 
   inline T getWeightGranularity() const { return weight_granularity_; };
-  virtual T getPulseCountLearningRate(T learning_rate) { return learning_rate; };
+  inline T getNumStates() const { return num_states_; };
+  virtual T getPulseCountLearningRate(
+      T learning_rate, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) {
+    UNUSED(up);
+    UNUSED(current_m_batch);
+    return learning_rate;
+  };
 
 protected:
   inline void setWeightGranularity(T weight_granularity) {
     weight_granularity_ = weight_granularity;
   };
+  inline void setNumStates(T num_states) { num_states_ = num_states; };
 
 private:
   T weight_granularity_ = 0.0;
+  T num_states_ = 0.0;
 };
 
 /* Base class for all devices that do a simple pulsed update with 6 parameters*/
@@ -111,8 +123,8 @@ template <typename T> class PulsedRPUDeviceCuda : public PulsedRPUDeviceCudaBase
 
 public:
   explicit PulsedRPUDeviceCuda(){};
-  explicit PulsedRPUDeviceCuda(CudaContext *c, int x_size, int d_size);
-  // explicit PulsedRPUDeviceCuda(CudaContext * c, const PulsedRPUDevice<T> * other);
+  explicit PulsedRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
+  // explicit PulsedRPUDeviceCuda(CudaContextPtr  c, const PulsedRPUDevice<T> * other);
 
   ~PulsedRPUDeviceCuda(){};
   PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other);
@@ -153,7 +165,7 @@ public:
 
   void runUpdateKernel(
       pwukp_t<T> kpars,
-      CudaContext *c,
+      CudaContextPtr c,
       T *dev_weights,
       int m_batch,
       const BitLineMaker<T> *blm,
@@ -162,7 +174,8 @@ public:
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
-      uint32_t *d_counts_chunk = nullptr) override;
+      uint32_t *d_counts_chunk = nullptr,
+      const ChoppedWeightOutput<T> *cwo = nullptr) override;
 
   // for interfacing with pwu_kernel
   virtual T *getGlobalParamsData() { return nullptr; };
@@ -192,12 +205,12 @@ private:
     CUDACLASS, CPUCLASS, CTOR_BODY, DTOR_BODY, COPY_BODY, MOVE_BODY, SWAP_BODY, HOST_COPY_BODY)    \
 public:                                                                                            \
   explicit CUDACLASS(){};                                                                          \
-  explicit CUDACLASS(CudaContext *c, int x_size, int d_size)                                       \
+  explicit CUDACLASS(CudaContextPtr c, int x_size, int d_size)                                     \
       : PulsedRPUDeviceCuda<T>(c, x_size, d_size) {                                                \
     initialize();                                                                                  \
   };                                                                                               \
                                                                                                    \
-  explicit CUDACLASS(CudaContext *c, const CPUCLASS<T> &rpu_device)                                \
+  explicit CUDACLASS(CudaContextPtr c, const CPUCLASS<T> &rpu_device)                              \
       : PulsedRPUDeviceCuda<T>(c, rpu_device.getXSize(), rpu_device.getDSize()) {                  \
     initialize();                                                                                  \
     populateFrom(rpu_device);                                                                      \

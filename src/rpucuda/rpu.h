@@ -24,7 +24,7 @@
 #include <random>
 #include <sstream>
 
-//#pragma STDC FENV_ACCESS ON
+// #pragma STDC FENV_ACCESS ON
 
 #define USE_LOOPED_MATRIX_FORWARD(T)                                                               \
   inline void forwardMatrix(                                                                       \
@@ -137,6 +137,7 @@ public:
   T getLearningRate() const { return learning_rate_; };
 
   virtual void finishUpdateCalculations(){};
+  virtual void finishAllCalculations(){};
   virtual void makeUpdateAsync(){};
 
 protected:
@@ -182,8 +183,8 @@ public:
 
   RPUSimple(const RPUSimple<T> &);
   RPUSimple<T> &operator=(const RPUSimple<T> &);
-  RPUSimple(RPUSimple<T> &&);
-  RPUSimple<T> &operator=(RPUSimple<T> &&);
+  RPUSimple(RPUSimple<T> &&) noexcept;
+  RPUSimple<T> &operator=(RPUSimple<T> &&) noexcept;
 
   friend void swap(RPUSimple<T> &a, RPUSimple<T> &b) noexcept {
 
@@ -301,7 +302,7 @@ public:
      which usually are drawn during instantiation of the RPU object
      based on parameters defining their probabilty distributions. */
   virtual void getDeviceParameterNames(std::vector<std::string> &names) const { names.clear(); };
-  virtual void getDeviceParameter(std::vector<T *> &data_ptrs) const {};
+  virtual void getDeviceParameter(std::vector<T *> &data_ptrs){};
   virtual void setDeviceParameter(const std::vector<T *> &data_ptrs){};
 
   virtual int getHiddenUpdateIdx() const { return 0; };
@@ -341,7 +342,7 @@ public:
      generated based on the reference weights. Usually, during
      testing, the referenece weiight matrix is used instead (can be
      selected by settiing wmpar appropriately).  */
-  virtual void modifyFBWeights(const WeightModifierParameter &wmpar);
+  virtual void modifyFBWeights(const WeightModifierParameter<T> &wmpar);
 
   /* Delayed update support. If use_delayed_update is turned on when
      constructing the RPU, then it only uses the buffered weight for
@@ -382,22 +383,22 @@ public:
   void forward(
       const T *X_input,
       T *D_output,
-      bool bias,
-      int m_batch,
+      bool bias = false,
+      int m_batch = 1,
       bool x_trans = false,
       bool d_trans = false,
       bool is_test = false);
   void backward(
       const T *D_input,
       T *X_output,
-      bool bias,
+      bool bias = false,
       int m_batch = 1,
       bool d_trans = false,
       bool x_trans = false);
   void update(
       const T *X_input,
       const T *D_input,
-      bool bias,
+      bool bias = false,
       int m_batch = 1,
       bool x_trans = false,
       bool d_trans = false);
@@ -470,6 +471,9 @@ public:
       int m_batch_slice,
       const int *batch_indices);
 
+  virtual ContextPtr getContext() const { return nullptr; };
+  virtual bool hasInternalContext() const { return true; };
+
 protected:
   /* for specialized forward/backward. To be used in any forward pass
      Note: we do not test with specialized forward/backward
@@ -505,7 +509,9 @@ protected:
 
   /* when overriding copy methods below, _Matrix_Bias can be used in derived */
   virtual T *copyToMatrixBiasBuffer(const T *X_input_without_bias, int m_batch, bool x_trans);
-  virtual void copyFromMatrixBiasBuffer(T *X_input_without_bias, int m_batch, bool x_trans);
+  virtual void
+  copyFromMatrixBiasBuffer(T *X_input_without_bias, int m_batch, bool x_trans, T *bias_buffer);
+  virtual void releaseMatrixBiasBuffer(){};
   virtual T *getMatrixBiasBuffer(int m_batch);
   void forwardMatrixBias(
       const T *X_input_without_bias,

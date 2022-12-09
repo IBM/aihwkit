@@ -38,7 +38,7 @@ namespace RPU {
   }
 
 template <typename T>
-VectorRPUDeviceCuda<T>::VectorRPUDeviceCuda(CudaContext *c, const VectorRPUDevice<T> &rpu_device)
+VectorRPUDeviceCuda<T>::VectorRPUDeviceCuda(CudaContextPtr c, const VectorRPUDevice<T> &rpu_device)
     : PulsedRPUDeviceCudaBase<T>(c, rpu_device.getXSize(), rpu_device.getDSize()) {
   populateFrom(rpu_device);
 };
@@ -47,19 +47,18 @@ template <typename T> void VectorRPUDeviceCuda<T>::allocateContainers() {
 
   dev_weights_vec_ = nullptr;
 
-  CudaContext *c = this->context_;
+  CudaContextPtr c = this->context_;
   context_vec_.clear();
   for (int k = 0; k < n_devices_; k++) {
 
     if (!getPar().same_context) {
-      context_vec_.push_back(
-          std::unique_ptr<CudaContext>(new CudaContext(this->context_->getGPUId())));
+      context_vec_.push_back(RPU::make_unique<CudaContext>(this->context_->getGPUId()));
       c = &*context_vec_[k];
     }
   }
   // put weights vector in one big matrix to do GEMV for reduce
-  dev_weights_vec_ = std::unique_ptr<CudaArray<T>>(new CudaArray<T>(c, this->size_ * n_devices_));
-  dev_reduce_weightening_ = std::unique_ptr<CudaArray<T>>(new CudaArray<T>(c, n_devices_));
+  dev_weights_vec_ = RPU::make_unique<CudaArray<T>>(c, this->size_ * n_devices_);
+  dev_reduce_weightening_ = RPU::make_unique<CudaArray<T>>(c, n_devices_);
 
   this->context_->synchronizeDevice();
 
@@ -97,6 +96,7 @@ template <typename T>
 VectorRPUDeviceCuda<T> &VectorRPUDeviceCuda<T>::operator=(const VectorRPUDeviceCuda<T> &other) {
   VectorRPUDeviceCuda<T> tmp(other);
   swap(*this, tmp);
+  this->context_->synchronize();
   return *this;
 };
 
@@ -161,13 +161,11 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 
   rpucuda_device_vec_.clear();
   for (int k = 0; k < n_devices_; k++) {
-    CudaContext *c;
+    CudaContextPtr c;
     c = getPar().same_context ? this->context_ : &*context_vec_[k];
-    // this is a safe case, since rpu_device_vec is populated with PulsedRPUDevices
     rpucuda_device_vec_.push_back(
-        std::unique_ptr<PulsedRPUDeviceCuda<T>>(static_cast<PulsedRPUDeviceCuda<T> *>(
+        std::unique_ptr<PulsedRPUDeviceCudaBase<T>>(static_cast<PulsedRPUDeviceCudaBase<T> *>(
             AbstractRPUDeviceCuda<T>::createFrom(c, *rpu_device_vec[k]))));
-
     // first transpose and copy to device.
     tmp_weights.assignTranspose(weights_vec[k][0], this->d_size_, this->x_size_);
     this->context_->synchronize();
@@ -181,7 +179,8 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
   this->context_->synchronizeDevice();
 }
 
-template <typename T> void VectorRPUDeviceCuda<T>::reduceToWeights(CudaContext *c, T *dev_weights) {
+template <typename T>
+void VectorRPUDeviceCuda<T>::reduceToWeights(CudaContextPtr c, T *dev_weights) {
 
   RPU::math::gemv(
       c, false, this->size_, n_devices_, (T)1.0, dev_weights_vec_->getData(), this->size_,
@@ -242,14 +241,10 @@ pwukpvec_t<T> VectorRPUDeviceCuda<T>::getUpdateKernels(
 
   // not possible to have different device types for now. No easy
   // way to do (get rid of PWU(PK)?). However, probably not needed anyway
-  DeviceUpdateType pt = rpucuda_device_vec_[0]->getPar().implements();
+  DeviceUpdateType pt = rpucuda_device_vec_[0]->implements();
   for (int k = 0; k < rpucuda_device_vec_.size(); k++) {
-    if (pt != rpucuda_device_vec_[k]->getPar().implements()) { // should be unique
+    if (pt != rpucuda_device_vec_[k]->implements()) { // should be unique
       RPU_FATAL("No RPUCuda vector devices cannot be of different types (for now).");
-    }
-    auto *rcd = dynamic_cast<PulsedRPUDeviceCuda<T> *>(&*rpucuda_device_vec_[k]);
-    if (rcd == nullptr) {
-      RPU_FATAL("Vector device does only support devices derived from PulsedRPUDevice");
     }
   }
   // just use vec device idx 1 for tuning the kernels
@@ -264,6 +259,11 @@ pwukpvec_t<T> VectorRPUDeviceCuda<T>::getUpdateKernels(
     }
   }
 
+  // CWO never supported, since it needs a direct read of the updated weights
+  for (auto &kpars : v) {
+    kpars->disableCWO();
+  }
+
   DEBUG_OUT("getUpdateKernel " << v.size());
   return v;
 }
@@ -271,7 +271,7 @@ pwukpvec_t<T> VectorRPUDeviceCuda<T>::getUpdateKernels(
 template <typename T>
 void VectorRPUDeviceCuda<T>::runUpdateKernel(
     pwukp_t<T> kpars,
-    CudaContext *up_context,
+    CudaContextPtr up_context,
     T *dev_weights,
     int m_batch,
     const BitLineMaker<T> *blm,
@@ -280,11 +280,19 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
     curandState_t *dev_states,
     int one_sided,
     uint32_t *x_counts_chunk,
-    uint32_t *d_counts_chunk) {
+    uint32_t *d_counts_chunk,
+    const ChoppedWeightOutput<T> *cwo) {
   DEBUG_OUT("start run update kernel.");
   DEBUG_CALL(kpars->print(););
   int m = rpucuda_device_vec_.size();
   const auto &par = getPar();
+
+  if (cwo) {
+    // this is because the weight is assumed to be updated
+    // directly. Additonaly ops (like reduceToWeights) would not be
+    // called correctly
+    RPU_FATAL("CWO is not supported for vector devices.");
+  }
 
   if (par.singleDeviceUpdate()) {
     // random states and context are shared, since only one is updated at a time.
@@ -294,11 +302,9 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
       current_device_idx_ = ++current_device_idx_ % m;
     }
 
-    kpars->run(
-        up_context->getStream(), dev_weights_ptrs_[current_device_idx_], m_batch, blm,
-        static_cast<PulsedRPUDeviceCuda<T> *>(
-            &*rpucuda_device_vec_[current_device_idx_]), // checked above
-        up, dev_states, one_sided, x_counts_chunk, d_counts_chunk);
+    this->rpucuda_device_vec_[current_device_idx_]->runUpdateKernel(
+        kpars, up_context, this->dev_weights_ptrs_[current_device_idx_], m_batch, blm, up, lr,
+        dev_states, one_sided, x_counts_chunk, d_counts_chunk);
 
   } else {
     // VectorDeviceUpdatePolicy::All
@@ -307,7 +313,7 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
       up_context->recordEvent();
     }
 
-    CudaContext *c = up_context;
+    CudaContextPtr c = up_context;
 
     int n = kpars->getNStates() / m; // each device uses different random states
 
@@ -317,10 +323,9 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
         c = &*context_vec_[k];
       }
 
-      kpars->run(
-          c->getStream(), dev_weights_ptrs_[k], m_batch, blm,
-          static_cast<PulsedRPUDeviceCuda<T> *>(&*rpucuda_device_vec_[k]), // checked above
-          up, dev_states + k * n, one_sided, x_counts_chunk, d_counts_chunk);
+      this->rpucuda_device_vec_[k]->runUpdateKernel(
+          kpars, c, this->dev_weights_ptrs_[k], m_batch, blm, up, lr, dev_states + k * n, one_sided,
+          x_counts_chunk, d_counts_chunk);
 
       if (!par.same_context) {
         up_context->recordWaitEvent(c);

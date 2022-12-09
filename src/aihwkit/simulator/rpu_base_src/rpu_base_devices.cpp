@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,8 +27,10 @@ void declare_rpu_devices(py::module &m) {
   using TransferParam = RPU::TransferRPUDeviceMetaParameter<T>;
   using MixedPrecParam = RPU::MixedPrecRPUDeviceMetaParameter<T>;
   using PowStepParam = RPU::PowStepRPUDeviceMetaParameter<T>;
+  using PowStepReferenceParam = RPU::PowStepReferenceRPUDeviceMetaParameter<T>;
   using PiecewiseStepParam = RPU::PiecewiseStepRPUDeviceMetaParameter<T>;
   using BufferedTransferParam = RPU::BufferedTransferRPUDeviceMetaParameter<T>;
+  using SoftBoundsReferenceParam = RPU::SoftBoundsReferenceRPUDeviceMetaParameter<T>;
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -281,6 +283,28 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
+  class PyPowStepReferenceParam : public PowStepReferenceParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, PowStepReferenceParam, getName, );
+    }
+    PowStepReferenceParam *clone() const override {
+      PYBIND11_OVERLOAD(PowStepReferenceParam *, PowStepReferenceParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, PowStepReferenceParam, implements, );
+    }
+    RPU::PowStepReferenceRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::PowStepReferenceRPUDevice<T> *, PowStepReferenceParam, createDevice, x_size, d_size,
+          rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, PowStepReferenceParam, calcWeightGranularity, );
+    }
+  };
+
   class PyPiecewiseStepParam : public PiecewiseStepParam {
   public:
     std::string getName() const override {
@@ -321,6 +345,28 @@ void declare_rpu_devices(py::module &m) {
     }
     T calcWeightGranularity() const override {
       PYBIND11_OVERLOAD(T, BufferedTransferParam, calcWeightGranularity, );
+    }
+  };
+
+  class PySoftBoundsReferenceParam : public SoftBoundsReferenceParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, SoftBoundsReferenceParam, getName, );
+    }
+    SoftBoundsReferenceParam *clone() const override {
+      PYBIND11_OVERLOAD(SoftBoundsReferenceParam *, SoftBoundsReferenceParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, SoftBoundsReferenceParam, implements, );
+    }
+    RPU::SoftBoundsReferenceRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::SoftBoundsReferenceRPUDevice<T> *, SoftBoundsReferenceParam, createDevice, x_size,
+          d_size, rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, SoftBoundsReferenceParam, calcWeightGranularity, );
     }
   };
 
@@ -368,6 +414,8 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("pulse_type", &RPU::PulsedUpdateMetaParameter<T>::pulse_type)
       .def_readwrite("res", &RPU::PulsedUpdateMetaParameter<T>::res)
       .def_readwrite("sto_round", &RPU::PulsedUpdateMetaParameter<T>::sto_round)
+      .def_readwrite("um_reg_scale", &RPU::PulsedUpdateMetaParameter<T>::um_reg_scale)
+      .def_readwrite("um_grad_scale", &RPU::PulsedUpdateMetaParameter<T>::um_grad_scale)
       .def_readwrite("update_management", &RPU::PulsedUpdateMetaParameter<T>::update_management)
       .def_readwrite(
           "update_bl_management", &RPU::PulsedUpdateMetaParameter<T>::update_bl_management)
@@ -396,7 +444,17 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("w_noise", &RPU::IOMetaParameter<T>::w_noise)
       .def_readwrite("w_noise_type", &RPU::IOMetaParameter<T>::w_noise_type)
       .def_readwrite("ir_drop", &RPU::IOMetaParameter<T>::ir_drop)
-      .def_readwrite("ir_drop_g_ratio", &RPU::IOMetaParameter<T>::ir_drop_Gw_div_gmax);
+      .def_readwrite("ir_drop_g_ratio", &RPU::IOMetaParameter<T>::ir_drop_Gw_div_gmax)
+      .def_readwrite("out_nonlinearity", &RPU::IOMetaParameter<T>::out_nonlinearity)
+      .def_readwrite("out_nonlinearity_std", &RPU::IOMetaParameter<T>::out_nonlinearity_std)
+      .def_readwrite("mv_type", &RPU::IOMetaParameter<T>::mv_type)
+      .def_readwrite("inp_asymmetry", &RPU::IOMetaParameter<T>::inp_asymmetry)
+      .def_readwrite("out_asymmetry", &RPU::IOMetaParameter<T>::out_asymmetry)
+      .def_readwrite("slope_calibration", &RPU::IOMetaParameter<T>::slope_calibration)
+      .def_readwrite("r_series", &RPU::IOMetaParameter<T>::r_series)
+      .def_readwrite("v_offset_std", &RPU::IOMetaParameter<T>::v_offset_std)
+      .def_readwrite("v_offset_w_min", &RPU::IOMetaParameter<T>::v_offset_w_min)
+      .def_readwrite("w_read_asymmetry_dtod", &RPU::IOMetaParameter<T>::w_read_asymmetry_dtod);
 
   py::class_<RPU::DriftParameter<T>>(m, "DriftParameter")
       .def(py::init<>())
@@ -438,6 +496,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("diffusion_dtod", &PulsedParam::diffusion_dtod)
       .def_readwrite("dw_min", &PulsedParam::dw_min)
       .def_readwrite("dw_min_dtod", &PulsedParam::dw_min_dtod)
+      .def_readwrite("dw_min_dtod_log_normal", &PulsedParam::dw_min_dtod_log_normal)
       .def_readwrite("dw_min_std", &PulsedParam::dw_min_std)
       .def_readwrite("enforce_consistency", &PulsedParam::enforce_consistency)
       .def_readwrite("lifetime_dtod", &PulsedParam::lifetime_dtod)
@@ -696,6 +755,33 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
+  py::class_<PowStepReferenceParam, PyPowStepReferenceParam, PulsedParam>(
+      m, "PowStepReferenceResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("pow_gamma", &PowStepReferenceParam::ps_gamma)
+      .def_readwrite("pow_gamma_dtod", &PowStepReferenceParam::ps_gamma_dtod)
+      .def_readwrite("pow_up_down", &PowStepReferenceParam::ps_gamma_up_down)
+      .def_readwrite("pow_up_down_dtod", &PowStepReferenceParam::ps_gamma_up_down_dtod)
+      .def_readwrite("reference_std", &PowStepReferenceParam::reference_std)
+      .def_readwrite("reference_mean", &PowStepReferenceParam::reference_mean)
+      .def_readwrite("subtract_symmetry_point", &PowStepReferenceParam::subtract_symmetry_point)
+      .def_readwrite("n_estimation_steps", &PowStepReferenceParam::n_estimation_steps)
+      .def(
+          "__str__",
+          [](PowStepReferenceParam &self) {
+            std::stringstream ss;
+            self.printToStream(ss);
+            return ss.str();
+          })
+      .def(
+          "calc_weight_granularity", &PowStepReferenceParam::calcWeightGranularity,
+          R"pbdoc(
+        Calculates the granularity of the weights (typically ``dw_min``)
+
+        Returns:
+           float: weight granularity
+        )pbdoc");
+
   py::class_<PiecewiseStepParam, PyPiecewiseStepParam, PulsedParam>(
       m, "PiecewiseStepResistiveDeviceParameter")
       .def(py::init<>())
@@ -724,15 +810,32 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("thres_scale", &BufferedTransferParam::thres_scale)
       .def_readwrite("momentum", &BufferedTransferParam::momentum)
       .def_readwrite("step", &BufferedTransferParam::step)
+      .def_readwrite("forget_buffer", &BufferedTransferParam::forget_buffer)
+      .def("__str__", [](BufferedTransferParam &self) {
+        std::stringstream ss;
+        self.printToStream(ss);
+        return ss.str();
+      });
+
+  py::class_<SoftBoundsReferenceParam, PySoftBoundsReferenceParam, PulsedParam>(
+      m, "SoftBoundsReferenceResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("slope_up_dtod", &SoftBoundsReferenceParam::slope_up_dtod)
+      .def_readwrite("slope_down_dtod", &SoftBoundsReferenceParam::slope_down_dtod)
+      .def_readwrite("reference_mean", &SoftBoundsReferenceParam::reference_mean)
+      .def_readwrite("reference_std", &SoftBoundsReferenceParam::reference_std)
+      .def_readwrite("subtract_symmetry_point", &SoftBoundsReferenceParam::subtract_symmetry_point)
+      .def_readwrite("write_noise_std", &SoftBoundsReferenceParam::write_noise_std)
+      .def_readwrite("mult_noise", &SoftBoundsReferenceParam::mult_noise)
       .def(
           "__str__",
-          [](BufferedTransferParam &self) {
+          [](SoftBoundsReferenceParam &self) {
             std::stringstream ss;
             self.printToStream(ss);
             return ss.str();
           })
       .def(
-          "calc_weight_granularity", &BufferedTransferParam::calcWeightGranularity,
+          "calc_weight_granularity", &SoftBoundsReferenceParam::calcWeightGranularity,
           R"pbdoc(
         Calculates the granularity of the weights (typically ``dw_min``)
 
@@ -746,8 +849,7 @@ void declare_rpu_devices(py::module &m) {
   py::enum_<RPU::BoundManagementType>(m, "BoundManagementType")
       .value("None", RPU::BoundManagementType::None)
       .value("Iterative", RPU::BoundManagementType::Iterative)
-      .value("IterativeWorstCase", RPU::BoundManagementType::IterativeWorstCase)
-      .value("Shift", RPU::BoundManagementType::Shift);
+      .value("IterativeWorstCase", RPU::BoundManagementType::IterativeWorstCase);
 
   py::enum_<RPU::VectorDeviceUpdatePolicy>(m, "VectorUnitCellUpdatePolicy")
       .value("All", RPU::VectorDeviceUpdatePolicy::All)
@@ -775,4 +877,10 @@ void declare_rpu_devices(py::module &m) {
       .value("NoneWithDevice", RPU::PulseType::NoneWithDevice)
       .value("MeanCount", RPU::PulseType::MeanCount)
       .value("DeterministicImplicit", RPU::PulseType::DeterministicImplicit);
+
+  py::enum_<RPU::AnalogMVType>(m, "AnalogMVType")
+      .value("Ideal", RPU::AnalogMVType::Ideal)
+      .value("OnePass", RPU::AnalogMVType::OnePass)
+      .value("PosNegSeparate", RPU::AnalogMVType::PosNegSeparate)
+      .value("PosNegSeparateDigitalSum", RPU::AnalogMVType::PosNegSeparateDigitalSum);
 }

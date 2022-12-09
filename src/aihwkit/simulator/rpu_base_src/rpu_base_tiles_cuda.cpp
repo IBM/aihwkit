@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -46,7 +46,6 @@ void declare_rpu_tiles_cuda(py::module &m) {
     )pbdoc")
       .def(
           py::init([](RPU::RPUSimple<T> &rpu) {
-            // TODO: why does directly passing a stream gets
             return std::unique_ptr<Class>(new Class(at::cuda::getCurrentCUDAStream(), rpu));
           }),
           py::arg("cpu_tile"))
@@ -125,7 +124,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
       .def(
           "forward",
           [](Class &self, const torch::Tensor &x_input_, bool bias = false, bool x_trans = false,
-             bool d_trans = false, bool is_test = false) {
+             bool d_trans = false, bool is_test = false, bool non_blocking = false) {
             auto x_input = x_input_.contiguous();
             CHECK_TORCH_CUDA_INPUT(x_input);
 
@@ -158,15 +157,19 @@ void declare_rpu_tiles_cuda(py::module &m) {
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.setStream(at::cuda::getCurrentCUDAStream()); // TODO: better way to get the stream?
+            self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.forward(
                 x_input.template data_ptr<T>(), d_output.template data_ptr<T>(), bias, m_batch,
                 x_trans, d_trans, is_test);
 
+            if (!non_blocking) {
+              self.finishAllCalculations();
+            }
+            self.releaseExternalStream();
             return d_output;
           },
           py::arg("x_input"), py::arg("bias") = false, py::arg("x_trans") = false,
-          py::arg("d_trans") = false, py::arg("is_test") = false,
+          py::arg("d_trans") = false, py::arg("is_test") = false, py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product (forward pass).
 
@@ -189,6 +192,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
                x_trans: whether the ``x_input`` matrix is transposed. That is of size ``[x_size (- 1), *, N]``
                d_trans: whether the ``d`` matrix is transposed.
                is_test: whether inference (true) mode or training (false)
+               non_blocking: whether to not sync the cuda execution
 
            Returns:
                torch::tensor: ``[N, *, d_size]`` or ``[d_size, *, N]`` matrix.
@@ -197,7 +201,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
       .def(
           "backward",
           [](Class &self, const torch::Tensor &d_input_, bool bias = false, bool d_trans = false,
-             bool x_trans = false) {
+             bool x_trans = false, bool non_blocking = false) {
             auto d_input = d_input_.contiguous();
             CHECK_TORCH_CUDA_INPUT(d_input);
 
@@ -230,14 +234,19 @@ void declare_rpu_tiles_cuda(py::module &m) {
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.setStream(at::cuda::getCurrentCUDAStream());
+            self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.backward(
                 d_input.template data_ptr<T>(), x_output.template data_ptr<T>(), bias, m_batch,
                 d_trans, x_trans);
+
+            if (!non_blocking) {
+              self.finishAllCalculations();
+            }
+            self.releaseExternalStream();
             return x_output;
           },
           py::arg("d_input"), py::arg("bias") = false, py::arg("d_trans") = false,
-          py::arg("x_trans") = false,
+          py::arg("x_trans") = false, py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the transposed dot product (backward pass).
 
@@ -256,6 +265,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
                bias: whether to use bias.
                d_trans: whether the ``d_input`` matrix is transposed. That is of size ``[d_size, *, N]``
                x_trans: whether the ``x`` output matrix is transposed.
+               non_blocking: whether to not sync the cuda execution
 
            Returns:
                torch::Tensor: ``[N, *, x_size (-1)]`` or ``[x_size (-1), *, N]`` torch::Tensor.
@@ -264,7 +274,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
       .def(
           "update",
           [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_,
-             bool bias = false, bool x_trans = false, bool d_trans = false) {
+             bool bias = false, bool x_trans = false, bool d_trans = false,
+             bool non_blocking = false) {
             auto d_input = d_input_.contiguous();
             auto x_input = x_input_.contiguous();
 
@@ -307,14 +318,18 @@ void declare_rpu_tiles_cuda(py::module &m) {
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.setStream(at::cuda::getCurrentCUDAStream());
-
+            self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.update(
                 x_input.template data_ptr<T>(), d_input.template data_ptr<T>(), bias, m_batch,
                 x_trans, d_trans);
+
+            if (!non_blocking) {
+              self.finishAllCalculations();
+            }
+            self.releaseExternalStream();
           },
           py::arg("x_input"), py::arg("d_input"), py::arg("bias"), py::arg("d_trans") = false,
-          py::arg("x_trans") = false,
+          py::arg("x_trans") = false, py::arg("non_blocking") = false,
           R"pbdoc(
            Compute an n-rank update.
 
@@ -336,11 +351,12 @@ void declare_rpu_tiles_cuda(py::module &m) {
                bias: whether to use bias.
                x_trans: whether the ``x_input`` matrix is transposed, ie. ``[x_size (-1), *, N]``
                d_trans: whether the ``d`` matrix is transposed, ie. ``[d_size, *, N]``
+               non_blocking: Whether to not sync the cuda execution
            )pbdoc")
       .def(
           "forward_indexed",
           [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_tensor_,
-             bool is_test = false) {
+             bool is_test = false, bool non_blocking = false) {
             auto x_input = x_input_.contiguous();
             auto d_tensor = d_tensor_.contiguous();
             CHECK_TORCH_CUDA_INPUT(x_input);
@@ -352,13 +368,19 @@ void declare_rpu_tiles_cuda(py::module &m) {
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.setStream(at::cuda::getCurrentCUDAStream());
+            self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.forwardIndexed(
                 x_input.template data_ptr<T>(), d_tensor.template data_ptr<T>(), x_input.numel(),
                 d_image_size, N, true, is_test);
+
+            if (!non_blocking) {
+              self.finishAllCalculations();
+            }
+            self.releaseExternalStream();
             return d_tensor;
           },
           py::arg("x_input"), py::arg("d_tensor"), py::arg("is_test") = false,
+          py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (forward pass).
 
@@ -369,13 +391,15 @@ void declare_rpu_tiles_cuda(py::module &m) {
                x_input: 4D torch::tensor in order N,C,H,W
                d_tensor: torch:tensor with convolution dimensions
                is_test: whether inference (true) mode or training (false)
+               non_blocking: Whether to not sync the cuda execution
 
            Returns:
                d_output: 4D torch::tensor in order N,C,d_height,d_width
            )pbdoc")
       .def(
           "backward_indexed",
-          [](Class &self, const torch::Tensor &d_input_, const torch::Tensor &x_tensor_) {
+          [](Class &self, const torch::Tensor &d_input_, const torch::Tensor &x_tensor_,
+             bool non_blocking = false) {
             auto d_input = d_input_.contiguous();
             auto x_tensor = x_tensor_.contiguous();
             CHECK_TORCH_CUDA_INPUT(d_input);
@@ -387,13 +411,18 @@ void declare_rpu_tiles_cuda(py::module &m) {
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.setStream(at::cuda::getCurrentCUDAStream());
+            self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.backwardIndexed(
                 d_input.template data_ptr<T>(), x_tensor.template data_ptr<T>(), x_tensor.numel(),
                 d_image_size, N, true);
+
+            if (!non_blocking) {
+              self.finishAllCalculations();
+            }
+            self.releaseExternalStream();
             return x_tensor;
           },
-          py::arg("d_input"), py::arg("x_tensor"),
+          py::arg("d_input"), py::arg("x_tensor"), py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
@@ -403,13 +432,15 @@ void declare_rpu_tiles_cuda(py::module &m) {
            Args:
               d_input: 4D torch::tensor in order N,C,H,W
               x_tensor: torch:tensor with convolution dimensions
+              non_blocking: Whether to not sync the cuda execution
 
            Returns:
               x_output: 4D torch::tensor in order N,C,x_height,x_width
            )pbdoc")
       .def(
           "update_indexed",
-          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_) {
+          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_,
+             bool non_blocking = false) {
             auto x_input = x_input_.contiguous();
             auto d_input = d_input_.contiguous();
             CHECK_TORCH_CUDA_INPUT(x_input);
@@ -421,12 +452,17 @@ void declare_rpu_tiles_cuda(py::module &m) {
             // Call RPU function.
             self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.setStream(at::cuda::getCurrentCUDAStream());
+            self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.updateIndexed(
                 x_input.template data_ptr<T>(), d_input.template data_ptr<T>(), x_input.numel(),
                 d_image_size, N, true);
+
+            if (!non_blocking) {
+              self.finishAllCalculations();
+            }
+            self.releaseExternalStream();
           },
-          py::arg("x_input"), py::arg("d_input"),
+          py::arg("x_input"), py::arg("d_input"), py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
@@ -436,6 +472,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
            Args:
                x_input: 4D torch::tensor input in order N,C,H,W
                d_input: 4D torch::tensor (grad_output) in order N,C,oH,oW
+               non_blocking: Whether to not sync the cuda execution
+
            )pbdoc");
 
   py::class_<ClassPulsed, RPU::RPUCudaSimple<T>>(

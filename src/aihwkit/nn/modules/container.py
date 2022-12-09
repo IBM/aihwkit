@@ -59,6 +59,43 @@ class AnalogSequential(Sequential):
 
         return self
 
+    def apply_to_analog_modules(self, fn: Callable) -> 'AnalogSequential':
+        """Apply a function to all the analog modules.
+
+        Args:
+            fn: function to be applied.
+
+        Returns:
+            This module after the function has been applied.
+        """
+        for module in self.analog_modules():
+            fn(module)
+
+        return self
+
+    def apply_to_analog_tiles(self, fn: Callable) -> 'AnalogSequential':
+        """Apply a function to all the analog tiles of all layers in this module.
+
+        Example::
+
+            model.apply_to_analog_tiles(lambda tile: tile.reset())
+
+        This would reset each analog tile in the whole DNN looping
+        through all layers and all tiles that might exist in a
+        particular layer.
+
+        Args:
+            fn: function to be applied.
+
+        Returns:
+            This module after the function has been applied.
+
+        """
+        for module in self.analog_modules():
+            for analog_tiles in module.analog_tiles():
+                fn(analog_tiles)
+        return self
+
     def analog_modules(self) -> Generator[AnalogModuleBase, None, None]:
         """Generator over analog modules only"""
         for module in self.modules():

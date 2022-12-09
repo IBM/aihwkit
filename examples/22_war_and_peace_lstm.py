@@ -23,7 +23,6 @@ https://www.frontiersin.org/articles/10.3389/fnins.2018.00745/full
 import os
 import argparse
 import time
-import sys
 
 from typing import Tuple
 from torch import tensor, device, FloatTensor, Tensor, transpose, save, load
@@ -36,12 +35,12 @@ import numpy as np
 
 from aihwkit.nn import AnalogSequential, AnalogRNN, AnalogLinear, AnalogLSTMCellCombinedWeight
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import InferenceRPUConfig, UnitCellRPUConfig, SingleRPUConfig
-from aihwkit.simulator.configs.devices import BufferedTransferCompound, SoftBoundsDevice, \
-    ConstantStepDevice
-from aihwkit.simulator.configs.utils import MappingParameter
+from aihwkit.simulator.configs import (
+    InferenceRPUConfig, UnitCellRPUConfig, SingleRPUConfig,
+    BufferedTransferCompound, SoftBoundsDevice,
+    ConstantStepDevice,  MappingParameter, IOParameters, UpdateParameters
+)
 from aihwkit.simulator.rpu_base import cuda
-from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 
 # Check device
 USE_CUDA = 0
@@ -271,7 +270,6 @@ def create_rpu_config(config='FP'):
                 scale_transfer_lr=True,  # in relative terms to SGD LR
                 transfer_lr=1.0,  # same transfer LR as for SGD
                 fast_lr=5.0,
-                thresh_scale=1/0.001
             ),
             update=UpdateParameters(desired_bl=10),
             mapping=mapping
@@ -448,16 +446,14 @@ def main():
             train_total_loss / len(train_data.dataset),
             test_total_loss / len(test_data.dataset)))
 
-        original_stdout = sys.stdout
-        with open((path_file + '.config'), "w") as f:
-            sys.stdout = f
-            print('==========================')
-            print('Info about all settings:\n')
+        with open((path_file + '.config'), "w", encoding="utf-8") as f:
+
+            print('==========================', file=f)
+            print('Info about all settings:\n', file=f)
             print(rpu_config)
-            print('==========================')
-            print('\nInfo about the instantiated C++ tile:\n')
-            print(model.lstm_1.rnn.layers[0].cell.weight.analog_tile.tile)
-            sys.stdout = original_stdout
+            print('==========================', file=f)
+            print('\nInfo about the instantiated C++ tile:\n', file=f)
+            print(model.lstm_1.rnn.layers[0].cell.weight.analog_tile.tile, file=f)
 
         np.savetxt((path_file + '.csv'), epoch_losses, delimiter=",")
         save(model.state_dict(), (path_file + '.ckpt'))

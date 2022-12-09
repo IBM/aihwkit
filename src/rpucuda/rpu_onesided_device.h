@@ -123,6 +123,9 @@ public:
   virtual T **getNegWeights() { return this->getWeightVec()[g_minus_]; };
 
   inline uint64_t getRefreshCount() const { return refresh_counter_; };
+  inline const ForwardBackwardPassIOManaged<T> &getRefreshFBPass() const {
+    return *refresh_fb_pass_;
+  };
 
 protected:
   void populate(const OneSidedRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);

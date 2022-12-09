@@ -81,6 +81,7 @@ public:
     dp->refresh_up = up;
     dp->refresh_up.pulse_type = PulseType::None; // perfect refresh
     dp->refresh_every = GetParam();
+    // dp->print();
 
     rng = new RNG<num_t>(0);
 
@@ -117,9 +118,8 @@ public:
   RealWorldRNG<num_t> rw_rng;
   std::unique_ptr<AbstractRPUDevice<num_t>> rpu_device;
   std::unique_ptr<AbstractRPUDeviceCuda<num_t>> rpucuda_device;
-
   CudaContext context_container{-1, false};
-  CudaContext *context;
+  CudaContextPtr context;
 };
 
 // define the tests
@@ -343,7 +343,7 @@ TEST_P(RPUDeviceCudaTestFixture, LayerTest) {
   layer_pulsed.setWeights(w_ref[0]);
 
   auto culayer_pulsed = RPUCudaPulsed<num_t>(context, layer_pulsed);
-  culayer_pulsed.disp();
+  // culayer_pulsed.disp();
 
   int m_batch = 1; // note that CUDA will refresh less often then CPU
                    // in case the refresh is smaller than m_batch

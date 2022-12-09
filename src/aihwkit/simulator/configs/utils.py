@@ -11,264 +11,48 @@
 # that they have been altered from the originals.
 
 # pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-lines
 
 """Utility parameters for resistive processing units."""
 
-from dataclasses import dataclass
-from enum import Enum
-from typing import ClassVar, Type
+from dataclasses import dataclass, field
+from typing import ClassVar, Type, Union, Any, List, TYPE_CHECKING
 
 from aihwkit.simulator.configs.helpers import _PrintableMixin
 from aihwkit.simulator.rpu_base import devices, tiles
+from aihwkit.simulator.configs.enums import (
+    BoundManagementType, NoiseManagementType, WeightNoiseType, PulseType,
+    WeightModifierType, WeightClipType, WeightRemapType,
+    AnalogMVType
+)
+
+if TYPE_CHECKING:
+    from aihwkit.nn.modules.linear import AnalogLinear
+    from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
 
-# Helper enums.
-
-
-class BoundManagementType(Enum):
-    """Bound management type.
-
-    In the case ``Iterative`` the MAC is iteratively recomputed with
-    inputs iteratively halved, when the output bound was hit.
-
-    Caution:
-        Bound management is **only** available for the forward pass. It
-        will be ignored when used for the backward pass.
-    """
-
-    NONE = 'None'
-    """No bound management."""
-
-    ITERATIVE = 'Iterative'
-    r"""Iteratively recomputes input scale set to :math:`\alpha\leftarrow\alpha/2`.
-
-    It iteratively recomputes the bounds up to limit of passes (given by
-    ``max_bm_factor`` or ``max_bm_res``).
-    """
-
-    ITERATIVE_WORST_CASE = 'IterativeWorstCase'
-    """Worst case bound management.
-
-    Uses ``AbsMax`` noise management for the first pass and only when output
-    bound is hit, the ``AbsMaxNPSum`` for the second. Thus, at most 2 passes
-    are computed.
-    """
-
-    SHIFT = 'Shift'
-    """Shift bound management.
-
-    Shifts the output by adding the difference ``output_bound - max_output`` to
-    the analog output value. This is only useful to increase the dynamic range
-    before the softmax, where the max can be safely.
-
-    Note:
-        Shifting needs hardware implementations.
-    """
-
-
-class NoiseManagementType(Enum):
-    r"""Noise management type.
-
-    Noise management determines a factor :math:`\alpha` how the input is reduced:
-
-    .. math:: \mathbf{y} = \alpha\;F_\text{analog-mac}\left(\mathbf{x}/\alpha\right)
-    """
-
-    NONE = 'None'
-    """No noise management."""
-
-    ABS_MAX = 'AbsMax'
-    r"""Use :math:`\alpha\equiv\max{|\mathbf{x}|}`."""
-
-    ABS_MAX_NP_SUM = 'AbsMaxNPSum'
-    """Assume weight value is constant and given by ``nm_assumed_wmax``.
-
-    Takes a worst case scenario of the weight matrix to calculate the input
-    scale to ensure that output is not clipping. Assumed weight value is
-    constant and given by ``nm_assumed_wmax``.
-    """
-
-    MAX = 'Max'
-    r"""Use :math:`\alpha\equiv\max{\mathbf{x}}`."""
-
-    CONSTANT = 'Constant'
-    r"""A constant value (given by parameter ``nm_thres``)."""
-
-    AVERAGE_ABS_MAX = 'AverageAbsMax'
-    """Moment-based scale input scale estimation.
-
-    Computes the average abs max over the mini-batch and applies ``nm_decay``
-    to update the value with the history.
-
-    Note:
-        ``nm_decay`` is ``1-momentum`` and always given in mini-batches.
-        However, the CUDA implementation does not discount values within
-        mini-batches, whereas the CPU implementation does.
-    """
-
-
-class WeightNoiseType(Enum):
-    r"""Output weight noise type.
-
-    The weight noise is applied for each MAC computation, while not
-    touching the actual weight matrix but referring it to the output.
-
-    .. math:: y_i = \sum_j w_{ij}+\xi_{ij}
-    """
-
-    NONE = 'None'
-    """No weight noise."""
-
-    ADDITIVE_CONSTANT = 'AdditiveConstant'
-    r"""The :math:`\xi\sim{\cal N}(0,\sigma)` thus all are Gaussian distributed.
-
-    :math:`\sigma` is determined by ``w_noise``.
-    """
-
-    PCM_READ = 'PCMRead'
-    """Output-referred PCM-like read noise.
-
-    Output-referred PCM-like read noise that scales with the amount of current
-    generated for each output line and thus scales with both conductance values
-    and input strength.
-
-    The same general for is taken as for PCM-like statistical model of the 1/f
-    noise during inference, see
-    :class:`aihwkit.inference.noise.pcm.PCMLikeNoiseModel`.
-    """
-
-
-class PulseType(Enum):
-    """Pulse type."""
-
-    NONE = 'None'
-    """Floating point update instead of pulses."""
-
-    STOCHASTIC_COMPRESSED = 'StochasticCompressed'
-    """Generates actual stochastic bit lines.
-
-    Plus and minus pulses are taken in the same pass.
-    """
-
-    STOCHASTIC = 'Stochastic'
-    """Two passes for plus and minus (only CPU)."""
-
-    NONE_WITH_DEVICE = 'NoneWithDevice'
-    """Floating point like ``None``, but with analog devices (e.g. weight
-    clipping)."""
-
-    MEAN_COUNT = 'MeanCount'
-    """Coincidence based in prob (:math:`p_a p_b`)."""
-
-    DETERMINISTIC_IMPLICIT = 'DeterministicImplicit'
-    r"""Coincidences are computed in deterministic manner.
-
-    Coincidences are calculated by :math:`b_l x_q d_q` where ``BL`` is the
-    desired bit length (possibly subject to dynamic adjustments using
-    ``update_bl_management``) and :math:`x_q` and :math:`d_q` are the quantized
-    input and error values, respectively, normalized to the range
-    :math:`0,\ldots,1`. It can be shown that explicit bit lines exist that
-    generate these coincidences.
-    """
-
-
-class WeightModifierType(Enum):
-    """Weight modifier type."""
-
-    COPY = 'Copy'
-    """Just copy, however, could also drop."""
-
-    DISCRETIZE = 'Discretize'
-    """Quantize the weights."""
-
-    MULT_NORMAL = 'MultNormal'
-    """Multiplicative Gaussian noise."""
-
-    ADD_NORMAL = 'AddNormal'
-    """Additive Gaussian noise."""
-
-    DISCRETIZE_ADD_NORMAL = 'DiscretizeAddNormal'
-    """First discretize and then additive Gaussian noise."""
-
-    DOREFA = 'DoReFa'
-    """DoReFa discretization."""
-
-    POLY = 'Poly'
-    r"""2nd order Polynomial noise model (in terms of the weight value).
-
-    In detail, for the duration of a mini-batch, each weight will be
-    added a Gaussian random number with the standard deviation of
-    :math:`\sigma_\text{wnoise} (c_0 + c_1 w_{ij}/\omega + c_2
-    w_{ij}^2/\omega^2` where :math:`omega` is either the actual max
-    weight (if ``rel_to_actual_wmax`` is set) or the value
-    ``assumed_wmax``.
-    """
-
-
-class WeightClipType(Enum):
-    """Weight clipper type."""
-
-    NONE = 'None'
-    """None."""
-
-    FIXED_VALUE = 'FixedValue'
-    """Clip to fixed value give, symmetrical around zero."""
-
-    LAYER_GAUSSIAN = 'LayerGaussian'
-    """Calculates the second moment of the whole weight matrix and clips
-    at ``sigma`` times the result symmetrically around zero."""
-
-    AVERAGE_CHANNEL_MAX = 'AverageChannelMax'
-    """Calculates the abs max of each output channel (row of the weight
-    matrix) and takes the average as clipping value for all."""
-
-
-class WeightRemapType(Enum):
-    """Weight clipper type."""
-
-    NONE = 'None'
-    """None."""
-
-    LAYERWISE_SYMMETRIC = 'LayerwiseSymmetric'
-    """Remap according to the absolute max of the full weight matrix."""
-
-    CHANNELWISE_SYMMETRIC = 'ChannelwiseSymmetric'
-    """Remap each column (output channel) in respect to the absolute max."""
-
-
-class VectorUnitCellUpdatePolicy(Enum):
-    """Vector unit cell update policy."""
-
-    ALL = 'All'
-    """All devices updated simultaneously."""
-
-    SINGLE_FIXED = 'SingleFixed'
-    """Device index is not changed. Can be set initially and/or updated on
-    the fly."""
-
-    SINGLE_SEQUENTIAL = 'SingleSequential'
-    """Each device one at a time in sequence."""
-
-    SINGLE_RANDOM = 'SingleRandom'
-    """A single device is selected by random choice each mini-batch."""
-
-
-# Specialized parameters.
 
 @dataclass
 class IOParameters(_PrintableMixin):
-    """Parameter that modify the IO behavior."""
+    """Parameter that define the analog-matvec (forward / backward) and
+    peripheral digital input-output behavior.
+
+    Here one can enable analog-digital conversion, dynamic input
+    scaling, and define the properties of the analog-matvec
+    computations, such as noise and non-idealities (e.g. IR-drop).
+    """
 
     bindings_class: ClassVar[Type] = devices.AnalogTileInputOutputParameter
 
-    bm_test_negative_bound: bool = True
+    is_perfect: bool = False
+    """Short-cut to compute a perfect forward pass.
 
-    bound_management: BoundManagementType = BoundManagementType.ITERATIVE
-    """Type of bound management, see :class:`BoundManagementType`.
-
-    Caution:
-        Bound management is **only** available for the forward pass. It
-        will be ignored when used for the backward pass.
+    If ``True``, it assumes an ideal forward pass (e.g. no bound, ADC etc...).
+    Will disregard all other settings in this case.
     """
+
+    mv_type: AnalogMVType = AnalogMVType.ONE_PASS
+    """Selects the type of analog mat-vec computation. See
+    :class:`AnalogMVType` for details. """
 
     inp_bound: float = 1.0
     """Input bound and ranges for the digital-to-analog converter (DAC)."""
@@ -287,48 +71,16 @@ class IOParameters(_PrintableMixin):
     inp_sto_round: bool = False
     """Whether to enable stochastic rounding of DAC."""
 
-    is_perfect: bool = False
-    """Short-cut to compute a perfect forward pass.
+    inp_asymmetry: float = 0.0
+    """Input asymmetry :math:`a_\text{input}`.
 
-    If ``True``, it assumes an ideal forward pass (e.g. no bound, ADC etc...).
-    Will disregard all other settings in this case.
+    Input of the negative input pass is scaled by :math:`(1 - a_\text{input})`.
+
+    Note:
+        This setting has only effect in case of and
+        :class:`AnalogMVType` that uses separate passes for positive
+        and negative inputs.
     """
-
-    max_bm_factor: int = 1000
-    """Maximal bound management factor.
-
-    If this factor is reached then the iterative process is stopped.
-    """
-
-    max_bm_res: float = 0.25
-    """Limit the maximal number of iterations of the bound management.
-
-    Another way to limit the maximal number of iterations of the bound
-    management. The max effective resolution number of the inputs, e.g. use
-    :math:`1/4` for 2 bits.
-    """
-
-    nm_thres: float = 0.0
-    r"""Constant noise management value for ``type`` ``Constant``.
-
-    In other cases, this is a upper threshold :math:`\theta` above which the
-    noise management factor is saturated. E.g. for `AbsMax`:
-
-    .. math::
-        :nowrap:
-
-        \begin{equation*} \alpha=\begin{cases}\max_i|x_i|, &
-        \text{if} \max_i|x_i|<\theta \\ \theta, &
-        \text{otherwise}\end{cases} \end{equation*}
-
-    Caution:
-        If ``nm_thres`` is set (and type is not ``Constant``), the noise
-        management will clip some large input values, in favor of having a
-        better SNR for smaller input values.
-    """
-
-    noise_management: NoiseManagementType = NoiseManagementType.ABS_MAX
-    """Type of noise management, see :class:`NoiseManagementType`."""
 
     out_bound: float = 12.0
     """Output bound and ranges for analog-to-digital converter (ADC)."""
@@ -346,11 +98,34 @@ class IOParameters(_PrintableMixin):
     or resolution (1/steps).
     """
 
+    out_sto_round: bool = False
+    """Whether to enable stochastic rounding of ADC."""
+
     out_scale: float = 1.0
     """Additional fixed scalar factor."""
 
-    out_sto_round: bool = False
-    """Whether to enable stochastic rounding of ADC."""
+    out_asymmetry: float = 0.0
+    """Output asymmetry :math:`a_\text{output}`.
+
+    Output of the negative input pass is scaled by :math:`(1 - a_\text{output})`.
+
+    Note:
+        This setting has only effect in case of and
+        :class:`AnalogMVType` that uses separate passes for positive
+        and negative inputs.
+    """
+
+    bound_management: BoundManagementType = BoundManagementType.ITERATIVE
+
+    """Type of bound management, see :class:`BoundManagementType`.
+
+    Caution:
+        Bound management is **only** available for the forward pass. It
+        will be ignored when used for the backward pass.
+    """
+
+    noise_management: NoiseManagementType = NoiseManagementType.ABS_MAX
+    """Type of noise management, see :class:`NoiseManagementType`."""
 
     w_noise: float = 0.0
     r"""Scale of output referred weight noise (:math:`\sigma_w`) for a given
@@ -375,7 +150,7 @@ class IOParameters(_PrintableMixin):
     on the input current.
     """
 
-    ir_drop_g_ratio: float = 1/(0.35*5e-6)
+    ir_drop_g_ratio: float = 1.0 / 0.35 / 5e-6
     """Physical ratio of wire conductance from one cell to the next to
     physical max conductance of a device.
 
@@ -383,10 +158,94 @@ class IOParameters(_PrintableMixin):
     Ohm wire resistance.
     """
 
+    out_nonlinearity: float = 0.0
+    """S-shaped non-linearity applied to the analog output.
+
+    Output non-linearity applies an S-shaped non-linearity to the
+    analog output (before the ADC), i.e. :math:`\frac{y_i}{1 +
+    n_i*|y_i|}` where :math:`n_i` is drawn at the instantiation time
+    by::
+        out_nonlinearity / out_bound * (1 + out_nonlinearity_std * rand)
+    """
+
+    out_nonlinearity_std: float = 0.0
+    """ Output-to-output non linearity variation. """
+
+    slope_calibration: float = 0.0
+    """Models a calibration process of the output non-linearity (and
+    r-series).
+
+    This is the relative value in the output range where the slope of
+    the non-linearity should have slope 1. E.g. 0.5 would be at half-out
+    range.
+    """
+
+    v_offset_std: float = 0.0
+    """Voltage offset variation.
+
+    The output is multiplied by a systematic factor set for each
+    output line at time of instantiation, e.g. :math:`(1 - v_i)` for
+    the coding device and :math:`(1 + v_i)` for the reference device
+    (assuming differential reads).
+
+    """
+
+    v_offset_w_min: float = -1.0
+    """ Voltage offset for an implicit reference unit. """
+
+    r_series: float = 0.0
+    """Series resistance in fraction of the total output current."""
+
+    w_read_asymmetry_dtod: float = 0.0
+    """Device polarity read dependence.
+
+    The negative inputs perceive a slightly different weight (e.g. pcm
+    polarity dependence). Each device has a different factor, and the
+    spread of this device-to-device variability can be set with
+    ``w_read_asymmetry_dtod``. A weight (given negative input) will be
+    then scaled by :math:`1 - f_{ij}` where :math:`f_{ij}` is drawn
+    from a Gaussian distribution (with zero mean and standard
+    deviation ``w_read_asymmetry_dtod``).
+    """
+
+    max_bm_factor: int = 1000
+
+    """Maximal bound management factor.
+
+    If this factor is reached then the iterative process is stopped.
+    """
+
+    max_bm_res: float = 0.25
+    """Limit the maximal number of iterations of the bound management.
+
+    Another way to limit the maximal number of iterations of the bound
+    management. The max effective resolution number of the inputs, e.g. use
+    :math:`1/4` for 2 bits.
+    """
+    bm_test_negative_bound: bool = True
+
+    nm_thres: float = 0.0
+    r"""Constant noise management value for ``type`` ``Constant``.
+
+    In other cases, this is a upper threshold :math:`\theta` above which the
+    noise management factor is saturated. E.g. for `AbsMax`:
+
+    .. math::
+        :nowrap:
+
+        \begin{equation*} \alpha=\begin{cases}\max_i|x_i|, &
+        \text{if} \max_i|x_i|<\theta \\ \theta, &
+        \text{otherwise}\end{cases} \end{equation*}
+
+    Caution:
+        If ``nm_thres`` is set (and type is not ``Constant``), the noise
+        management will clip some large input values, in favor of having a
+        better SNR for smaller input values.
+    """
+
 
 @dataclass
 class UpdateParameters(_PrintableMixin):
-
     """Parameter that modify the update behaviour of a pulsed device."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileUpdateParameter
@@ -406,13 +265,13 @@ class UpdateParameters(_PrintableMixin):
     step size) it is::
 
         BL = desired_BL
-        A = B =  sqrt(learning_rate / (dw_min * BL));
+        A = B =  sqrt(learning_rate / (dw_min * BL))
 
     In case of ``False``::
 
         if dw_min * desired_BL < learning_rate:
-            A = B = 1;
-            BL = ceil(learning_rate / dw_min;
+            A = B = 1
+            BL = ceil(learning_rate / dw_min
         else:
             # same as for fixed_BL=True
     """
@@ -473,10 +332,22 @@ class UpdateParameters(_PrintableMixin):
     strengths.
     If
 
-    .. math:: \gamma \equiv \max_i |x_i| / \max_j |d_j|
+    .. math:: \gamma \equiv \max_i |x_i| / (\alpha \max_j |d_j|)
 
     is the ratio between the two maximal inputs, then ``A`` is additionally
     scaled by :math:`\gamma` and ``B`` is scaled by :math:`1/\gamma`.
+
+    The gradient scale :math:`\alpha` can be set with ``um_grad_scale``
+    """
+
+    um_grad_scale: float = 1.0
+    r"""Scales the gradient for the update management.
+
+    The factor :math:`\alpha` for the ``update_management``. If
+    smaller than 1 it means that the gradient will be earlier clipped
+    when learning rate is too large (ie. exceeding the maximal
+    pulse number times the weight granularity). If 1, both d and x inputs
+    are clipped for the same learning rate.
     """
 
 
@@ -557,9 +428,11 @@ class WeightModifierParameter(_PrintableMixin):
     """Whether to not apply noise to the last column (which usually contains
     the bias values)."""
 
-    coeff0: float = 0.26348 / 25.0
-    coeff1: float = 0.0768
-    coeff2: float = -0.001877 * 25.0
+    coeffs: List[float] = field(
+        default_factory=lambda: [0.0105392, 0.0768, -0.046925],
+        metadata={'hide_if': [0.0105392, 0.0768, -0.046925]}
+    )
+
     """Coefficients for the ``POLY`` weight modifier type.
 
     See :class:`WeightModifierType` for details.
@@ -754,7 +627,7 @@ class MappingParameter(_PrintableMixin):
 
     Caution:
 
-        Some of these parameters have only an affect for modules that
+        Some of these parameters have only an effect for modules that
         support tile mappings.
     """
 
@@ -815,3 +688,137 @@ class MappingParameter(_PrintableMixin):
         Only relevant for ``Mapped`` modules such as
         :class:`aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`.
     """
+
+
+@dataclass
+class InputRangeParameter(_PrintableMixin):
+    """ Parameter related to input range learning """
+
+    enable: bool = False
+    """Whether to enable to learn the input range. Note that if enable is
+    ``False`` then no clip is applied.
+
+    Note:
+
+        The input bound (``forward.inp_bound``) is assumed to be 1 if
+        enabled as the input range already scales the input into to the
+        range :math:`(-1, 1)` by dividing the input to the type by
+        itself and multiplying the output accordingly.
+
+        Typically, noise and bound management should be set to `NONE`
+        for the input range learning as it replaces the dynamic
+        managements with a static but learned input bound. However, in
+        some exceptional experimental cases one might want to enable
+        the management techniques on top of the input range learning,
+        so that no error is raised if they are not set to `NONE`.
+    """
+
+    init_value: float = 3.0
+    """Initial setting of the input range in case of input range learning."""
+
+    init_from_data: int = 100
+    """Number of batches to use for initialization from data. Set 0 to turn off."""
+
+    init_std_alpha: float = 3.0
+    """Standard deviation multiplier for initialization from data."""
+
+    decay: float = 0.001
+    """Decay rate for input range learning."""
+
+    input_min_percentage: float = 0.95
+    """Decay is only applied if percentage of non-clipped values is above this value.
+
+    Note:
+
+        The added gradient is (in case of non-clipped input
+        percentage ``percentage > input_min_percentage``)::
+
+            grad += decay * input_range
+    """
+
+    manage_output_clipping: bool = True
+    """Whether to increase the input range when output clipping occurs.
+
+    Caution:
+
+        The output bound is taken from the ``forward.out_bound``
+        value, which has to exist. Noise and bound management have to
+        be set to NONE if this feature is enabled otherwise a
+        ``ConfigError`` is raised.
+
+    """
+
+    output_min_percentage: float = 0.95
+    """Increase of the input range is only applied if percentage of
+    non-clipped output values is below this value.
+
+    Note:
+
+        The gradient subtracted from the input range is (in case of
+        ``output_percentage < output_min_percentage``)::
+
+            grad -= (1.0 - output_percentage) * input_range
+    """
+
+    gradient_scale: float = 1.0
+    """Scale of the gradient magnitude (learning rate) for the input range learning."""
+
+    gradient_relative: bool = True
+    """Whether to make the gradient of the input range learning relative to
+    the current range value.
+    """
+
+    def supports_manage_output_clipping(self, rpu_config: Any) -> bool:
+        """ Checks whether rpu_config supported ``manage_output_clipping``.
+
+        Args:
+            rpu_config: RPUConfig to check
+
+        Returns:
+            True if supported otherwise False
+        """
+
+        if not hasattr(rpu_config, 'forward') or rpu_config.forward.is_perfect:
+            return False
+        if not isinstance(rpu_config.forward, IOParameters):
+            return False
+        if rpu_config.forward.noise_management != NoiseManagementType.NONE:
+            return False
+        if rpu_config.forward.bound_management != BoundManagementType.NONE:
+            return False
+        return True
+
+
+@dataclass
+class PrePostProcessingParameter(_PrintableMixin):
+    """Parameter related to digital input and output processing, such as input clip
+    learning.
+     """
+    input_range: InputRangeParameter = field(default_factory=InputRangeParameter)
+
+
+@dataclass
+class MapableRPU(_PrintableMixin):
+    """Defines the mapping parameters and utility factories"""
+
+    mapping: MappingParameter = field(default_factory=MappingParameter)
+    """Parameter related to mapping weights to tiles for supporting modules."""
+
+    def get_linear(self) -> Union[Type['AnalogLinear'], Type['AnalogLinearMapped']]:
+        """Returns a AnalogLinear module as specified """
+        # pylint: disable=import-outside-toplevel
+        # need to import here to avoid circular imports
+        from aihwkit.nn.modules.linear import AnalogLinear
+        from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
+
+        if self.mapping.max_input_size > 0 or self.mapping.max_output_size > 0:
+            return AnalogLinearMapped
+        return AnalogLinear
+
+
+@dataclass
+class PrePostProcessingRPU(_PrintableMixin):
+    """Defines the pre-post parameters and utility factories"""
+
+    pre_post: PrePostProcessingParameter = field(default_factory=PrePostProcessingParameter)
+    """Parameter related digital pre and post processing."""

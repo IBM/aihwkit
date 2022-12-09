@@ -17,7 +17,7 @@ a simple temporal sequence. The experiment plots training perplexity,
 inference results on the test dataset using analog hardware, and inference
 results over time using analog hardware and drift compensation.
 """
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, arguments-differ, redefined-builtin
 
 import os
 
@@ -32,9 +32,9 @@ from torch import nn
 from aihwkit.nn import AnalogRNN
 from aihwkit.nn import AnalogGRUCell  # or one of AnalogGRUCell, AnalogVanillaRNNCell
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    WeightNoiseType, WeightClipType, WeightModifierType)
+from aihwkit.simulator.configs import (
+    InferenceRPUConfig, WeightNoiseType, WeightClipType, WeightModifierType
+)
 from aihwkit.simulator.presets import GokmenVlasovPreset
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn import AnalogLinear, AnalogSequential
@@ -98,8 +98,8 @@ class AnalogBidirRNNNetwork(AnalogSequential):
                              rpu_config=rpu_config)
         self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        embed = self.dropout(self.embedding(x_in))
+    def forward(self, input, in_states=None):
+        embed = self.dropout(self.embedding(input))
         out, out_states = self.rnn(embed, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
@@ -118,9 +118,9 @@ class AnalogBidirRNNNetwork_noEmbedding(AnalogSequential):
         self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
                                     rpu_config=rpu_config)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+    def forward(self, input, in_states=None):
         """ Forward pass """
-        out, out_states = self.rnn(x_in, in_states)
+        out, out_states = self.rnn(input, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
 
@@ -138,8 +138,8 @@ class AnalogRNNNetwork(AnalogSequential):
                              rpu_config=rpu_config)
         self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        embed = self.dropout(self.embedding(x_in))
+    def forward(self, input, in_states=None):
+        embed = self.dropout(self.embedding(input))
         out, out_states = self.rnn(embed, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
@@ -157,9 +157,9 @@ class AnalogRNNNetwork_noEmbedding(AnalogSequential):
         self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
                                     rpu_config=rpu_config)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
+    def forward(self, input, in_states=None):
         """ Forward pass """
-        out, out_states = self.rnn(x_in, in_states)
+        out, out_states = self.rnn(input, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
 

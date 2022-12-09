@@ -39,7 +39,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ,
     /*print body*/
 
-    ss << "\t ls_mult_noise:\t\t" << std::boolalpha << ls_mult_noise << std::endl;
+    ss << "\t ls_mult_noise:\t\t\t" << std::boolalpha << ls_mult_noise << std::endl;
     ss << "\t ls_mean_bound_reference:\t" << std::boolalpha << ls_mean_bound_reference << std::endl;
     ss << "\t ls_decrease_up   [rel. decrease at max]: " << ls_decrease_up
        << " (dtod=" << ls_decrease_up_dtod << ")" << std::endl;
@@ -105,8 +105,6 @@ struct SoftBoundsRPUDeviceMetaParameter : LinearStepRPUDeviceMetaParameter<T> {
   void printToStream(std::stringstream &ss) const override {
     checkSoftBounds();
     PulsedRPUDeviceMetaParameter<T>::printToStream(ss);
-    // ss << "   ";
-    // ss << getName() << " parameter:" << std::endl;
     ss << "\t ls_mult_noise:\t\t" << std::boolalpha << this->ls_mult_noise << std::endl;
     if (this->ls_reverse_up) {
       ss << "\t ls_reverse_up:\t" << std::boolalpha << this->ls_reverse_up << std::endl;

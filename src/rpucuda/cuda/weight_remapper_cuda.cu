@@ -122,7 +122,7 @@ __global__ void kernelRemapScaleRowwiseRange(
 
 // ctor
 template <typename T>
-WeightRemapperCuda<T>::WeightRemapperCuda(CudaContext *context, int x_size, int d_size)
+WeightRemapperCuda<T>::WeightRemapperCuda(CudaContextPtr context, int x_size, int d_size)
     : context_(context), x_size_(x_size), d_size_(d_size), size_(x_size * d_size),
       max_size_(x_size * d_size) {}
 

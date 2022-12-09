@@ -23,7 +23,7 @@ from torchvision.models import resnet34
 # Imports from aihwkit.
 from aihwkit.nn.conversion import convert_to_analog_mapped
 from aihwkit.simulator.presets import TikiTakaReRamSBPreset
-from aihwkit.simulator.configs.utils import MappingParameter
+from aihwkit.simulator.configs import MappingParameter
 
 # Example: Load a predefined model from pytorch library and convert to
 #          its analog version.
