@@ -21,3 +21,4 @@ from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
 from aihwkit.inference.noise.custom import StateIndependentNoiseModel
 from aihwkit.inference.compensation.base import BaseDriftCompensation
 from aihwkit.inference.compensation.drift import GlobalDriftCompensation
+from aihwkit.inference.utils import drift_analog_weights, program_analog_weights

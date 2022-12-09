@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
-
+* Added stand-alone functions for applying inference drift to any model (\#419)
 * Example 24: analog inference and hardware-aware training on BERT (\#440)
 * Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
@@ -40,7 +40,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Fixed
 
 * Missing zero-grad call in example 02 (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU (\#447) 
+* Indexing error in ``OneSidedDevice`` for CPU (\#447)
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have set wrongly. (\#388)
