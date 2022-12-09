@@ -23,10 +23,6 @@ from torch.nn import Module, Parameter
 from torch import device as torch_device
 
 from aihwkit.exceptions import ModuleError
-from aihwkit.simulator.configs.configs import (
-    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
-    UnitCellRPUConfig, DigitalRankUpdateRPUConfig
-)
 from aihwkit.simulator.configs.utils import MappingParameter
 from aihwkit.simulator.tiles import InferenceTile
 from aihwkit.optim.context import AnalogContext
@@ -34,10 +30,14 @@ from aihwkit.optim.context import AnalogContext
 if TYPE_CHECKING:
     from aihwkit.simulator.tiles import BaseTile
     from collections import OrderedDict
+    from aihwkit.simulator.configs.configs import (
+        FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
+        UnitCellRPUConfig, DigitalRankUpdateRPUConfig
+    )
 
-RPUConfigAlias = Union[FloatingPointRPUConfig, SingleRPUConfig,
-                       UnitCellRPUConfig, InferenceRPUConfig,
-                       DigitalRankUpdateRPUConfig]
+RPUConfigAlias = Union['FloatingPointRPUConfig', 'SingleRPUConfig',
+                       'UnitCellRPUConfig', 'InferenceRPUConfig',
+                       'DigitalRankUpdateRPUConfig']
 
 
 class AnalogModuleBase(Module):

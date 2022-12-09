@@ -39,18 +39,18 @@ from torch.utils.tensorboard import SummaryWriter
 from evaluate import load
 from datasets import load_dataset
 
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
+from aihwkit.simulator.configs import (
+    InferenceRPUConfig,
     WeightModifierType,
     WeightClipType,
     WeightNoiseType,
     BoundManagementType
 )
 
-from aihwkit.simulator.presets.utils import PresetIOParameters
+from aihwkit.simulator.presets import PresetIOParameters
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn.conversion import convert_to_analog_mapped
-from aihwkit.nn.modules.container import AnalogSequential
+from aihwkit.nn import AnalogSequential
 from aihwkit.optim import AnalogSGD
 
 

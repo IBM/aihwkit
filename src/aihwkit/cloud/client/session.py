@@ -12,7 +12,7 @@
 
 """Session handler for the AIHW Composer API."""
 
-from typing import Any, Text, Union
+from typing import Any, Text, Union, TYPE_CHECKING
 
 from requests import HTTPError, Session
 import urllib3
@@ -20,6 +20,9 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from aihwkit.version import __version__
 from aihwkit.cloud.client.exceptions import ApiResponseError, ResponseError
+
+if TYPE_CHECKING:
+    from typing import Optional
 
 
 class ObjectStorageSession(Session):
