@@ -247,7 +247,6 @@ class InferenceTileTest(ParametrizedTestCase):
         ('polyN', WeightModifierType.POLY, [0.1, 0.2, 0.2, 0.3]),
         ('discretize', WeightModifierType.DISCRETIZE,),
         ('add_normal', WeightModifierType.DISCRETIZE_ADD_NORMAL,),
-        ('copy', WeightModifierType.COPY,),
     ])
     def test_post_forward_modifier_types(self, _,
                                          modifier_type: 'WeightModifierType',
