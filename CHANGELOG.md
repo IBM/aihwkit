@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* Missing zero-grad call in example 02 (\#446)
 * Indexing error in ``OneSidedDevice`` for CPU (\#447) 
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
