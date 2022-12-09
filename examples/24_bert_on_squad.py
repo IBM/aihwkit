@@ -15,8 +15,7 @@
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 """
-# pylint: disable=invalid-name
-# pylint: disable=too-many-locals
+# pylint: disable=invalid-name, too-many-locals, import-error
 
 from datetime import datetime
 import argparse
