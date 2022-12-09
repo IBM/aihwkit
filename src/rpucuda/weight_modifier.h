@@ -108,8 +108,7 @@ template <typename T> struct WeightModifierParameter {
     return (
         pdrop > 0 || (type == WeightModifierType::Discretize && sto_round) ||
         type == WeightModifierType::MultNormal || type == WeightModifierType::Poly ||
-        type == WeightModifierType::AddNormal ||
-        type == WeightModifierType::DiscretizeAddNormal ||
+        type == WeightModifierType::AddNormal || type == WeightModifierType::DiscretizeAddNormal ||
         (type == WeightModifierType::DoReFa && sto_round));
   };
 };

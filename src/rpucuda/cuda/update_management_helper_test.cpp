@@ -101,7 +101,7 @@ TYPED_TEST(UMHTestFixture, computeScaleAndK) {
       cu_x.getData(), cu_d.getData(), dw_min, lr,
       true, // update_management,
       true, // update_bl_management,
-      this->m_batch, x_trans, d_trans, BL, 1);
+      this->m_batch, x_trans, d_trans, BL, 1.0, 1.0);
 
   c->synchronize();
   TypeParam *scale_val = new TypeParam[this->m_batch];

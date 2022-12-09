@@ -814,7 +814,6 @@ template void elemconst<uint64_t>(const CudaContext *, uint64_t *, const int, co
 template void elemconst<int>(const CudaContext *, int *, const int, const int);
 template void elemconst<char>(const CudaContext *, char *, const int, const char);
 
-
 // w = max(min(w,|a|),-|a|)
 template <typename T> __global__ void kernelAClip(T *values, int size, T abs_a) {
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MIN(MAX(values[idx], -abs_a), abs_a); }
