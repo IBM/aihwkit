@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 
 # (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
@@ -15,7 +14,6 @@
 
 from torch.nn import Module
 from aihwkit.exceptions import ModuleError
-from aihwkit.nn.modules.base import AnalogModuleBase
 
 
 def drift_analog_weights(model: Module, t_inference: float = 0.0) -> None:
@@ -28,6 +26,9 @@ def drift_analog_weights(model: Module, t_inference: float = 0.0) -> None:
     Raises:
         ModuleError: if the layer is not in evaluation mode.
     """
+    # avoid circular import
+    # pylint: disable=import-outside-toplevel
+    from aihwkit.nn.modules.base import AnalogModuleBase
     if model.training:
         raise ModuleError('drift_analog_weights can only be applied in '
                           'evaluation mode')
@@ -47,6 +48,9 @@ def program_analog_weights(model: Module) -> None:
     Raises:
         ModuleError: if the layer is not in evaluation mode.
     """
+    # avoid circular import
+    # pylint: disable=import-outside-toplevel
+    from aihwkit.nn.modules.base import AnalogModuleBase
     if model.training:
         raise ModuleError('program_analog_weights can only be applied in '
                           'evaluation mode')
