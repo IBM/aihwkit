@@ -464,6 +464,7 @@ def make_trainer(model, optimizer, tokenized_data):
         per_device_eval_batch_size=4,
         num_train_epochs=3,
         weight_decay=0.01,
+        no_cuda=False,
     )
 
     collator = DefaultDataCollator()

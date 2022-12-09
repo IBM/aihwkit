@@ -80,7 +80,8 @@ setup(
             'transformers',
             'evaluate',
             'datasets',
-            'wandb'
+            'wandb',
+            'tensorboard',
         ]
     }
 )
