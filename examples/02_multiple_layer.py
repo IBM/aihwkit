@@ -45,6 +45,9 @@ opt = AnalogSGD(model.parameters(), lr=0.5)
 opt.regroup_param_groups(model)
 
 for epoch in range(100):
+
+    opt.zero_grad()
+
     # Add the training Tensor to the model (input).
     pred = model(x_b)
     # Add the expected output Tensor.
@@ -53,4 +56,5 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
+
     print('Loss error: {:.16f}'.format(loss))
