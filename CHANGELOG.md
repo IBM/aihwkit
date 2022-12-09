@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
+* Example 24: analog inference and hardware-aware training on BERT (\#440)
 * Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
 * Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
@@ -38,7 +39,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
-* Analog_summary error when model is on cuda device. (\#392)
+* Indexing error in ``OneSidedDevice`` for CPU (\#447) 
+* Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have set wrongly. (\#388)
 * Programming noise would not be applied if drift compensation was not

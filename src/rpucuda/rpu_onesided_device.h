@@ -106,8 +106,6 @@ public:
 
   void invert();
   virtual const T *getRefreshVecs() const { return refresh_vecs_.data(); };
-  void initUpdateCycle(
-      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
 

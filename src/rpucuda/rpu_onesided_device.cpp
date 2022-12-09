@@ -84,7 +84,10 @@ template struct OneSidedRPUDeviceMetaParameter<double>;
 
 // ctor
 template <typename T>
-OneSidedRPUDevice<T>::OneSidedRPUDevice(int x_sz, int d_sz) : VectorRPUDevice<T>(x_sz, d_sz) {}
+OneSidedRPUDevice<T>::OneSidedRPUDevice(int x_sz, int d_sz) : VectorRPUDevice<T>(x_sz, d_sz) {
+  a_indices_.resize(x_sz);
+  b_indices_.resize(x_sz);
+}
 
 template <typename T>
 OneSidedRPUDevice<T>::OneSidedRPUDevice(
@@ -202,18 +205,6 @@ template <typename T> inline void OneSidedRPUDevice<T>::invert() {
   std::swap(g_plus_, g_minus_);
   this->reduce_weightening_[g_plus_] = 1;
   this->reduce_weightening_[g_minus_] = -1;
-}
-
-template <typename T>
-void OneSidedRPUDevice<T>::initUpdateCycle(
-    T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {
-
-  VectorRPUDevice<T>::initUpdateCycle(weights, up, current_lr, m_batch_info);
-
-  if (a_indices_.size() < (size_t)up.desired_BL) {
-    a_indices_.resize(up.desired_BL);
-    b_indices_.resize(up.desired_BL);
-  }
 }
 
 template <typename T>
