@@ -36,8 +36,8 @@ public:
 
   RPUPulsed(const RPUPulsed<T> &);
   RPUPulsed<T> &operator=(const RPUPulsed<T> &);
-  RPUPulsed(RPUPulsed<T> &&);
-  RPUPulsed<T> &operator=(RPUPulsed<T> &&);
+  RPUPulsed(RPUPulsed<T> &&) noexcept;
+  RPUPulsed<T> &operator=(RPUPulsed<T> &&) noexcept;
 
   friend void swap(RPUPulsed<T> &a, RPUPulsed<T> &b) noexcept {
     using std::swap;
@@ -58,6 +58,7 @@ public:
   void diffuseWeights() override;
   void clipWeights(T clip) override;
   void clipWeights(const WeightClipParameter &wclpar) override;
+  void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
   void resetCols(int start_col, int n_cols, T reset_prob) override;
 
   void updateVectorWithCounts(
@@ -78,7 +79,7 @@ public:
   virtual const PulsedMetaParameter<T> &getMetaPar() const { return par_; };
 
   void getDeviceParameterNames(std::vector<std::string> &names) const override;
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
+  void getDeviceParameter(std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
 
   int getHiddenUpdateIdx() const override;
@@ -91,6 +92,9 @@ public:
 
   std::unique_ptr<AbstractRPUDevice<T>> cloneDevice();
   const AbstractRPUDevice<T> &getRPUDevice() { return *rpu_device_; };
+
+  const FBParameter<T> &getFBParameter() const;
+  void setFBParameter(FBParameter<T> &fb_pars);
 
 protected:
   void forwardVector(const T *x_input, T *d_output, int x_inc, int d_inc, bool is_test) override;
@@ -114,7 +118,7 @@ private:
   std::unique_ptr<ForwardBackwardPassIOManaged<T>> fb_pass_ = nullptr;
 
   PulsedMetaParameter<T> par_;
-  void initialize(PulsedMetaParameter<T> *p, int x_sz, int d_sz);
+  // void initialize(PulsedMetaParameter<T> *p, int x_sz, int d_sz);
 };
 
 template <typename T> struct PulsedMetaParameter {
@@ -137,7 +141,7 @@ template <typename T> struct PulsedMetaParameter {
   RPUPulsed<T> *createRPUArray(int x_size, int d_size, AbstractRPUDeviceMetaParameter<T> *dp);
 
   bool _par_initialized = false; // for keeping track of initialize
-  void initialize();
+  void initialize(int x_size, int d_size);
 
   void print() const;
   void printToStream(std::stringstream &ss, bool suppress_update = false) const;

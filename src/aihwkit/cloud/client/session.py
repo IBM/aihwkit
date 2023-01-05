@@ -12,7 +12,7 @@
 
 """Session handler for the AIHW Composer API."""
 
-from typing import Any, Optional, Text, Union
+from typing import Any, Text, Union, TYPE_CHECKING
 
 from requests import HTTPError, Session
 import urllib3
@@ -21,11 +21,14 @@ from urllib3.exceptions import InsecureRequestWarning
 from aihwkit.version import __version__
 from aihwkit.cloud.client.exceptions import ApiResponseError, ResponseError
 
+if TYPE_CHECKING:
+    from typing import Optional
+
 
 class ObjectStorageSession(Session):
     """Session handler for requests to object storage."""
 
-    def request(
+    def request(  # type: ignore
             self,
             method: str,
             url: Union[str, bytes, Text],
@@ -92,7 +95,7 @@ class ApiSession(Session):
         self.jwt_token = jwt_token
         self.headers.update({'Authorization': 'Bearer {}'.format(jwt_token)})
 
-    def request(
+    def request(  # type: ignore
             self,
             method: str,
             url: Union[str, bytes, Text],

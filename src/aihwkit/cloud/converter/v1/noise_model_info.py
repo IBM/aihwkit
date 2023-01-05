@@ -12,7 +12,8 @@
 
 """Noise model info in rpu_config to neural network model"""
 
-from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (
+# pylint: disable=no-name-in-module,import-error
+from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: ignore[attr-defined]
     NoiseModelProto
 )
 
@@ -57,7 +58,7 @@ class NoiseModelInfo:
     def _assert_generic(self) -> None:
         """Check is device is generic"""
 
-        assert(self.device_id == self.GENERIC), \
+        assert self.device_id == self.GENERIC, \
             "device_id does not have value '{}'".format(self.GENERIC)
 
     @property

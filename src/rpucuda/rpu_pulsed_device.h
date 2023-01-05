@@ -44,6 +44,7 @@ template <typename T> struct PulsedRPUDeviceMetaParameterBase : SimpleRPUDeviceM
   DeviceUpdateType implements() const override { return DeviceUpdateType::Undefined; };
 
   virtual T calcWeightGranularity() const { RPU_FATAL("Needs implementation."); };
+  virtual T calcNumStates() const { RPU_FATAL("Needs implementation."); };
 
   friend void
   swap(PulsedRPUDeviceMetaParameterBase<T> &a, PulsedRPUDeviceMetaParameterBase<T> &b) noexcept {
@@ -56,11 +57,12 @@ template <typename T> struct PulsedRPUDeviceMetaParameterBase : SimpleRPUDeviceM
 
 template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaParameterBase<T> {
 
-  bool legacy_params = false; // to not load the reset/drift params
+  bool legacy_params = false; // to not load the reset / drift params
 
   T dw_min = (T)0.001;
   T dw_min_dtod = (T)0.3;
   T dw_min_std = (T)0.3; // ctoc of pulse
+  bool dw_min_dtod_log_normal = false;
 
   T w_min = (T)-0.6;
   T w_min_dtod = (T)0.3;
@@ -99,7 +101,7 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   DeviceUpdateType implements() const override { return DeviceUpdateType::Undefined; };
 
   virtual bool implementsWriteNoise() const { return false; }; // needs to be activated in derived
-  inline bool usesPersistentWeight() const { return write_noise_std > 0; };
+  virtual bool usesPersistentWeight() const { return write_noise_std > 0; };
   inline T getScaledWriteNoise() const { return write_noise_std * this->dw_min; };
 
   void initialize() override {
@@ -109,6 +111,7 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     }
     reset_dtod = MAX(reset_dtod, (T)0.0);
     reset_std = MAX(reset_std, (T)0.0);
+    reset = MAX(reset, (T)0.0);
   };
 };
 
@@ -122,13 +125,14 @@ public:
 
   PulsedRPUDeviceBase(const PulsedRPUDeviceBase<T> &other) = default;
   PulsedRPUDeviceBase<T> &operator=(const PulsedRPUDeviceBase<T> &other) = default;
-  PulsedRPUDeviceBase(PulsedRPUDeviceBase<T> &&other) = default;
-  PulsedRPUDeviceBase<T> &operator=(PulsedRPUDeviceBase<T> &&other) = default;
+  PulsedRPUDeviceBase(PulsedRPUDeviceBase<T> &&other) noexcept = default;
+  PulsedRPUDeviceBase<T> &operator=(PulsedRPUDeviceBase<T> &&other) noexcept = default;
 
   friend void swap(PulsedRPUDeviceBase<T> &a, PulsedRPUDeviceBase<T> &b) noexcept {
     using std::swap;
     swap(static_cast<SimpleRPUDevice<T> &>(a), static_cast<SimpleRPUDevice<T> &>(b));
     swap(a.weight_granularity_, b.weight_granularity_);
+    swap(a.num_states_, b.num_states_);
   }
 
   virtual void copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> *rpu_device) {
@@ -151,27 +155,48 @@ public:
   };
   // for Meta-devices [like vector/transfer]: called once before each update starts
   virtual void initUpdateCycle(
-      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info){};
+      T **weights,
+      const PulsedUpdateMetaParameter<T> &up,
+      T current_lr,
+      int m_batch_info,
+      const T *x_input = nullptr,
+      const int x_inc = 1,
+      const T *d_input = nullptr,
+      const int d_inc = 1){};
   // called when update completed
   virtual void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info){};
 
   inline T getWeightGranularity() const { return weight_granularity_; };
-  virtual T getPulseCountLearningRate(T learning_rate) { return learning_rate; };
+  inline T getNumStates() const { return num_states_; };
+  virtual T getPulseCountLearningRate(
+      T learning_rate, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) {
+    UNUSED(up);
+    UNUSED(current_m_batch);
+    return learning_rate;
+  };
+
+  // called from the weight updater before the call to
+  // initUpdateCycle. Can be used to do some additional computation on
+  // the input
+  virtual void
+  initWithUpdateInput(const T *x_input, const int x_inc, const T *d_input, const int d_inc){};
 
 protected:
   inline void setWeightGranularity(T weight_granularity) {
     weight_granularity_ = weight_granularity;
   };
-  // to be overwritten. Essentially dw_min at symmetry point. Will be used eg. for update management
+  inline void setNumStates(T num_states) { num_states_ = num_states; };
 
   void populate(const PulsedRPUDeviceMetaParameterBase<T> &par, RealWorldRNG<T> *rng) {
     SimpleRPUDevice<T>::populate(par, rng);
     setWeightGranularity(par.calcWeightGranularity());
+    setNumStates(par.calcNumStates());
   };
 
 private:
   T weight_granularity_ = 0.0;
+  T num_states_ = 0.0;
 };
 
 template <typename T> class PulsedRPUDevice : public PulsedRPUDeviceBase<T> {
@@ -210,7 +235,7 @@ public:
   PulsedRPUDevice<T> *clone() const override { RPU_FATAL("Needs implementation"); };
 
   void getDPNames(std::vector<std::string> &names) const override;
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   void printDP(int x_count, int d_count) const override;
   int getHiddenWeightsCount() const override;
@@ -319,7 +344,10 @@ public:                                                                         
     INVERT_COPY_BODY;                                                                              \
   };                                                                                               \
                                                                                                    \
-  void printToStream(std::stringstream &ss) const override { getPar().printToStream(ss); };        \
+  void printToStream(std::stringstream &ss) const override {                                       \
+    ss << "Device:" << std::endl;                                                                  \
+    getPar().printToStream(ss);                                                                    \
+  };                                                                                               \
   CLASSNAME<T> *clone() const override { return new CLASSNAME<T>(*this); };                        \
                                                                                                    \
 private:                                                                                           \
@@ -344,9 +372,9 @@ public:                                                                         
     {DPNAMES_BODY};                                                                                \
   };                                                                                               \
                                                                                                    \
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override {                            \
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override {                     \
                                                                                                    \
-    PulsedRPUDevice<T>::getDeviceParameter(data_ptrs);                                             \
+    PulsedRPUDevice<T>::getDeviceParameter(weights, data_ptrs);                                    \
                                                                                                    \
     std::vector<std::string> names;                                                                \
     std::vector<std::string> all_names;                                                            \
@@ -386,11 +414,12 @@ public:                                                                         
     };                                                                                             \
                                                                                                    \
     T calcWeightGranularity() const override{GRANULARITY_BODY};                                    \
+    T calcNumStates() const override {                                                             \
+      return (this->w_max - this->w_min) / calcWeightGranularity();                                \
+    };                                                                                             \
                                                                                                    \
     void printToStream(std::stringstream &ss) const override {                                     \
       PulsedRPUDeviceMetaParameter<T>::printToStream(ss);                                          \
-      ss << "   ";                                                                                 \
-      ss << #DEVICENAME << " parameter:" << std::endl;                                             \
       PRINT_BODY                                                                                   \
     };                                                                                             \
                                                                                                    \

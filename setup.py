@@ -23,7 +23,7 @@ INSTALL_REQUIRES = [
     'scipy',
     'requests>=2.25,<3',
     'numpy>=1.19',
-    'protobuf>=3.13.0,<4',
+    'protobuf>=4.21.6',
 ]
 
 def get_version() -> str:
@@ -76,12 +76,13 @@ setup(
     zip_safe=False,
     extras_require={
         'visualization': ['matplotlib>=3.0'],
+        'fitting': ['lmfit'],
         'bert': [
             'transformers',
             'evaluate',
             'datasets',
             'wandb',
             'tensorboard',
-        ]
+        ],
     }
 )

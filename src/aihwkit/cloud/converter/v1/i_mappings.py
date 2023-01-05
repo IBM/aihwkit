@@ -10,6 +10,8 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=no-name-in-module, import-error, too-few-public-methods
+
 """Mappings for version 1 of the AIHW Composer format."""
 
 from collections import namedtuple
@@ -25,7 +27,10 @@ from torchvision.datasets import FashionMNIST, SVHN  # type: ignore[import]
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.presets.web import (
     WebComposerInferenceRPUConfig, OldWebComposerInferenceRPUConfig)
-from aihwkit.cloud.converter.definitions.i_onnx_common_pb2 import AttributeProto
+
+from aihwkit.cloud.converter.definitions.i_onnx_common_pb2 import (   # type: ignore[attr-defined]
+    AttributeProto
+)
 from aihwkit.cloud.converter.exceptions import ConversionError
 from aihwkit.nn import (
     AnalogConv2d, AnalogConv2dMapped,
@@ -119,7 +124,6 @@ class Function:
 
         return cls(**kwargs)
 
-    # pylint: disable=no-self-use
     def get_field_value_to_proto(self, source: Any, field: str, default: Any = None) -> Any:
         """Get the value of a field."""
         return getattr(source, field, default)
@@ -127,7 +131,6 @@ class Function:
     def get_argument_from_proto(self, source: Any, field: str, default: Any = None) -> Dict:
         """Get the value of an argument."""
         return {source.name: getattr(source, field, default)}
-    # pylint: enable=no-self-use
 
 
 class LayerFunction(Function):
@@ -169,7 +172,6 @@ class LayerFunction(Function):
 
 class Mappings:
     """Mappings between Python entities and AIHW format."""
-    # pylint: disable=too-few-public-methods
 
     datasets = {
         FashionMNIST: 'fashion_mnist',
@@ -290,7 +292,6 @@ def build_inverse_mapping(mapping: Dict) -> Dict:
 
 class InverseMappings:
     """Mappings between AIHW Composer format and Python entities."""
-    # pylint: disable=too-few-public-methods
 
     datasets = build_inverse_mapping(Mappings.datasets)
     layers = build_inverse_mapping(Mappings.layers)

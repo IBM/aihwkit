@@ -54,22 +54,23 @@ public:
     size = x_size * d_size;
     time_since_last_call = 3.0;
     ntimes = 10;
+    context = &context_container;
 
-    context.setRandomSeed(0);
-    dev_w = RPU::make_unique<CudaArray<num_t>>(&context, size);
-    dev_w2 = RPU::make_unique<CudaArray<num_t>>(&context, size);
-    context.randNormal(dev_w->getData(), dev_w->getSize());
+    context->setRandomSeed(0);
+    dev_w = RPU::make_unique<CudaArray<num_t>>(context, size);
+    dev_w2 = RPU::make_unique<CudaArray<num_t>>(context, size);
+    context->randNormal(dev_w->getData(), dev_w->getSize());
 
-    dev_nu = RPU::make_unique<CudaArray<num_t>>(&context, size);
+    dev_nu = RPU::make_unique<CudaArray<num_t>>(context, size);
 
     par.nu_dtod = 0.1; // ensure larger than 0 to test nu construction and simpledrift
     par.nu_std = 0.0;
     par.w_read_std = 0.0;
 
     wdrifter = RPU::make_unique<WeightDrifter<num_t>>(size, par, &rw_rng);
-    wdrifter_cuda = RPU::make_unique<WeightDrifterCuda<num_t>>(&context, *wdrifter, x_size, d_size);
+    wdrifter_cuda = RPU::make_unique<WeightDrifterCuda<num_t>>(context, *wdrifter, x_size, d_size);
 
-    context.synchronize();
+    context->synchronize();
     w = new num_t[size];
     w_orig = new num_t[size];
     w2 = new num_t[size];
@@ -81,7 +82,7 @@ public:
     dev_w->assignTranspose(w, d_size, x_size);
     dev_w2->assignTranspose(w, d_size, x_size);
 
-    context.synchronize();
+    context->synchronize();
   }
 
   void TearDown() {
@@ -91,10 +92,11 @@ public:
     delete[] nu;
   }
 
+  CudaContext context_container{-1, false};
+  CudaContextPtr context;
+  RNG<num_t> rng{0};
   int size, ntimes, x_size, d_size;
   num_t time_since_last_call;
-  CudaContext context;
-  RNG<num_t> rng{0};
   RealWorldRNG<num_t> rw_rng{0};
   std::unique_ptr<CudaArray<num_t>> dev_w, dev_w2, dev_nu;
   std::unique_ptr<WeightDrifterCuda<num_t>> wdrifter_cuda;
@@ -111,9 +113,9 @@ TEST_F(WeightDrifterTestFixture, Construction) {
   ASSERT_TRUE(wdrifter->getNu() != nullptr);
 
   dev_nu->assignFromDevice(wdrifter_cuda->getNu());
-  context.synchronize();
+  context->synchronize();
   dev_nu->copyTo(nu);
-  context.synchronize();
+  context->synchronize();
 
   for (int k = 0; k < size; k++) {
     int i = k % x_size; // x index: not transposed: first x_size
@@ -135,10 +137,10 @@ TEST_F(WeightDrifterTestFixture, ApplySimple) {
   par.g_offset = 0.0;
 
   wdrifter = RPU::make_unique<WeightDrifter<num_t>>(size, par, &rw_rng);
-  wdrifter_cuda = RPU::make_unique<WeightDrifterCuda<num_t>>(&context, *wdrifter, x_size, d_size);
+  wdrifter_cuda = RPU::make_unique<WeightDrifterCuda<num_t>>(context, *wdrifter, x_size, d_size);
 
   wdrifter_cuda->apply(dev_w->getData(), time_since_last_call);
-  context.synchronize();
+  context->synchronize();
 
   CUDA_TIMING_START(this->context);
   for (int i = 0; i < ntimes - 1; i++) {
@@ -166,41 +168,42 @@ TEST_F(WeightDrifterTestFixture, ApplySimple) {
 TEST_F(WeightDrifterTestFixture, ApplyChange) {
 
   dev_w->setConst(0.5);
-  context.synchronize();
+  context->synchronize();
   for (int i = 0; i < size; i++) {
     w2[i] = 0.5;
   }
 
   wdrifter_cuda->apply(dev_w->getData(), time_since_last_call);
-  context.synchronize();
+  context->synchronize();
   dev_w->copyTo(w);
-  context.synchronize();
+  context->synchronize();
   transpose(w, d_size, x_size);
 
   wdrifter->apply(w2, time_since_last_call, rng);
   for (int i = 0; i < size; i++) {
     ASSERT_FLOAT_EQ(w[i], w2[i]);
   }
-  num_t w_ref = 0.5 * (pow(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
-  std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << w_ref << std::endl;
+  // num_t w_ref = 0.5 * (pow(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
+  // std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << w_ref <<
+  // std::endl;
 
   // set everything to one
   num_t c = 0.234567;
   dev_w->setConst(c);
-  context.synchronize();
+  context->synchronize();
   for (int i = 0; i < size; i++) {
     w2[i] = c;
   }
 
   wdrifter_cuda->apply(dev_w->getData(), time_since_last_call);
-  context.synchronize();
+  context->synchronize();
   dev_w->copyTo(w);
-  context.synchronize();
+  context->synchronize();
   transpose(w, d_size, x_size);
 
   wdrifter->apply(w2, time_since_last_call, rng);
 
-  std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << c << std::endl;
+  // std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << c << std::endl;
 
   for (int i = 0; i < size; i++) {
     ASSERT_FLOAT_EQ(w[i], w2[i]);
@@ -208,15 +211,16 @@ TEST_F(WeightDrifterTestFixture, ApplyChange) {
 
   // apply drift again
   wdrifter_cuda->apply(dev_w->getData(), time_since_last_call);
-  context.synchronize();
+  context->synchronize();
   dev_w->copyTo(w);
-  context.synchronize();
+  context->synchronize();
   transpose(w, d_size, x_size);
 
   wdrifter->apply(w2, time_since_last_call, rng);
 
-  w_ref = c * (pow(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
-  std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << w_ref << std::endl;
+  // w_ref = c * (pow(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
+  // std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << w_ref <<
+  // std::endl;
 
   for (int i = 0; i < size; i++) {
     ASSERT_FLOAT_EQ(w[i], w2[i]);

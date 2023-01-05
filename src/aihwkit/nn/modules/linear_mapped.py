@@ -129,9 +129,6 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         # Unregister weight/bias as a parameter but keep for sync
         self.unregister_parameter('weight')
 
-        if self.analog_bias:
-            self.unregister_parameter('bias')
-
     def get_split_sizes(self, size: int, split_max_size: int) -> List[int]:
         """ Computed the split sizes.
 

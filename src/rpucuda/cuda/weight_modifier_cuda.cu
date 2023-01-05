@@ -60,10 +60,14 @@ __global__ void kernelModifyWeightsDiscretize(
       sto_round,
 
       T value = weights[i] / amax;
-      value /= res; if (stoch_if) {
+      value /= res;
+
+      if (stoch_if) {
         T stoch_value = curand_uniform(&local_state);
         value += stoch_value - 0.5;
-      } new_weights[i] = amax * res * round(value););
+      }
+
+      new_weights[i] = amax * res * round(value););
 }
 
 template <typename T>
@@ -91,10 +95,14 @@ __global__ void kernelModifyWeightsDoReFa(
       T value = weights[i];
       value = tanhf(value) * scale;
 
-      value /= res; if (stoch_if) {
+      value /= res;
+
+      if (stoch_if) {
         T stoch_value = curand_uniform(&local_state);
         value += stoch_value - 0.5;
-      } new_weights[i] = res * round(value););
+      }
+
+      new_weights[i] = res * round(value););
 }
 
 template <typename T>
@@ -120,8 +128,12 @@ __global__ void kernelModifyWeightsDiscretizeAddNormal(
       true,
 
       T value = weights[i] / amax;
+
       value /= res;
-      if (sto_round) { value += curand_uniform(&local_state) - 0.5; } value = res * round(value);
+
+      if (sto_round) { value += curand_uniform(&local_state) - 0.5; }
+
+      value = res * round(value);
       T stoch_value = curand_normal(&local_state);
       new_weights[i] = amax * (value + stddev * stoch_value););
 }
@@ -173,6 +185,41 @@ __global__ void kernelModifyWeightsMultNormal(
 }
 
 template <typename T>
+__global__ void kernelModifyWeightsProgNoiseN(
+    int size_in,
+    int d_size,
+    const bool copy_last_column,
+    T *new_weights,
+    const T *weights,
+    const T stddev_in, // additional scale:
+    int n_coeffs,
+    T *coeffs,
+    const float assumed_wmax,
+    const float *wmax,
+    curandState_t *random_states) {
+  T amax = (wmax) ? (*wmax) : assumed_wmax;
+  amax = amax > 0.0 ? amax : (T)1.0;
+
+  const T stddev = stddev_in;
+
+  RPU_WM_KERNEL_LOOP(
+      true,
+
+      T w = weights[i];
+      T stoch_value = curand_normal(&local_state);
+
+      T aw = fabs(w) / amax; T paw = 1; T sig = coeffs[0];
+
+      for (int j = 1; j < n_coeffs; j++) {
+        paw *= aw;
+        sig += coeffs[j] * paw;
+      }
+
+      sig *= stddev;
+      new_weights[i] = w + amax * sig * stoch_value;);
+}
+
+template <typename T>
 __global__ void kernelModifyWeightsProgNoise(
     int size_in,
     int d_size,
@@ -186,6 +233,7 @@ __global__ void kernelModifyWeightsProgNoise(
     const float assumed_wmax,
     const float *wmax,
     curandState_t *random_states) {
+
   T amax = (wmax) ? (*wmax) : assumed_wmax;
   amax = amax > 0.0 ? amax : (T)1.0;
 
@@ -197,9 +245,9 @@ __global__ void kernelModifyWeightsProgNoise(
   RPU_WM_KERNEL_LOOP(true,
 
                      T w = weights[i];
-                     T stoch_value = curand_normal(&local_state); T aw = fabs(w) / amax;
-                     T sig = (p0 + aw * p1 + aw * aw * p2) * stddev;
+                     T stoch_value = curand_normal(&local_state);
 
+                     T aw = fabs(w) / amax; T sig = (p0 + aw * p1 + aw * aw * p2) * stddev;
                      new_weights[i] = w + amax * sig * stoch_value;);
 }
 
@@ -224,13 +272,13 @@ __global__ void kernelModifyWeightsDropConnections(
 
 // ctor
 template <typename T>
-WeightModifierCuda<T>::WeightModifierCuda(CudaContext *context, int x_size, int d_size)
+WeightModifierCuda<T>::WeightModifierCuda(CudaContextPtr context, int x_size, int d_size)
     : context_(context), x_size_(x_size), d_size_(d_size), size_(x_size * d_size),
       enable_during_test_(false) {}
 
 template <typename T>
 void WeightModifierCuda<T>::apply(
-    T *new_weights, const T *weights, const WeightModifierParameter &wmpar) {
+    T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar) {
 
   int nthreads = context_->getNThreads();
   auto s = context_->getStream();
@@ -307,17 +355,38 @@ void WeightModifierCuda<T>::apply(
   }
 
   case WeightModifierType::Poly: {
-    if (wmpar.std_dev > 0) {
+    int n_coeffs = wmpar.coeffs.size();
+    if (wmpar.std_dev > 0 && n_coeffs > 0) {
 
-      kernelModifyWeightsProgNoise<T><<<nblocks, nthreads, 0, s>>>(
-          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev, wmpar.coeff0,
-          wmpar.coeff1, wmpar.coeff2, wmpar.assumed_wmax, amax,
-          context_->getRandomStates(nblocks * nthreads));
+      if (n_coeffs <= 3) {
+
+        kernelModifyWeightsProgNoise<T><<<nblocks, nthreads, 0, s>>>(
+            size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev,
+            wmpar.coeffs.at(0), (n_coeffs > 1) ? wmpar.coeffs.at(1) : (T)0.0,
+            (n_coeffs > 2) ? wmpar.coeffs.at(2) : (T)0.0, wmpar.assumed_wmax, amax,
+            context_->getRandomStates(nblocks * nthreads));
+
+      } else {
+        // n-poly
+
+        if (wmpar.coeffs.size() != coeffs_.size() || dev_coeffs_ == nullptr) {
+          dev_coeffs_ = RPU::make_unique<CudaArray<T>>(context_, n_coeffs, wmpar.coeffs.data());
+          coeffs_ = wmpar.coeffs;
+          context_->synchronize();
+        } else if (coeffs_ != wmpar.coeffs) {
+          dev_coeffs_->assign(wmpar.coeffs.data());
+          coeffs_ = wmpar.coeffs;
+        }
+
+        kernelModifyWeightsProgNoiseN<T><<<nblocks, nthreads, 0, s>>>(
+            size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev, n_coeffs,
+            dev_coeffs_->getData(), wmpar.assumed_wmax, amax,
+            context_->getRandomStates(nblocks * nthreads));
+      }
       done = true;
     }
     break;
   }
-
   case WeightModifierType::DiscretizeAddNormal: {
     if (wmpar.res > 0 || wmpar.std_dev > 0) {
 

@@ -12,8 +12,8 @@
 
 #include "cuda_math_util.h"
 #include "io_iterator.h"
+#include "rpu_cub.h"
 #include "weight_clipper_cuda.h"
-#include <cub/cub.cuh>
 
 namespace RPU {
 
@@ -51,7 +51,7 @@ __global__ void kernelAClipSqrt(T *values, int size, T *a, T sigma, T max_clip) 
 
 // ctor
 template <typename T>
-WeightClipperCuda<T>::WeightClipperCuda(CudaContext *context, int x_size, int d_size)
+WeightClipperCuda<T>::WeightClipperCuda(CudaContextPtr context, int x_size, int d_size)
     : context_(context), x_size_(x_size), d_size_(d_size), size_(x_size * d_size) {
 
   T *tmp = nullptr;

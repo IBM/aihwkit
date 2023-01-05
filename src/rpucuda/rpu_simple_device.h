@@ -30,7 +30,7 @@ template <typename T> class AbstractRPUDevice;
 template <typename T> class SimpleRPUDevice;
 
 // register all available devices [better to use registry at some point]
-enum DeviceUpdateType {
+enum class DeviceUpdateType {
   Undefined,
   FloatingPoint,
   ConstantStep,
@@ -43,7 +43,9 @@ enum DeviceUpdateType {
   MixedPrec,
   PowStep,
   BufferedTransfer,
-  PiecewiseStep
+  PiecewiseStep,
+  SoftBoundsReference,
+  PowStepReference
 };
 
 // inherit from Simple
@@ -120,7 +122,7 @@ public:
     return std::unique_ptr<AbstractRPUDevice<T>>(clone());
   };
   virtual void getDPNames(std::vector<std::string> &names) const = 0;
-  virtual void getDeviceParameter(std::vector<T *> &data_ptrs) const = 0;
+  virtual void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) = 0;
   virtual void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) = 0;
   virtual int getHiddenWeightsCount() const = 0;
   virtual void setHiddenWeights(const std::vector<T> &data) = 0;
@@ -164,6 +166,7 @@ public:
   virtual bool onSetWeights(T **weights) = 0;
   virtual DeviceUpdateType implements() const = 0;
   virtual bool hasDirectUpdate() const { return false; };
+  virtual bool usesUpdateParameter() const { return !hasDirectUpdate(); };
   virtual void doDirectVectorUpdate(
       T **weights,
       const T *x_input,
@@ -206,7 +209,7 @@ public:
   SimpleRPUDevice<T> *clone() const override { return new SimpleRPUDevice<T>(*this); }
 
   void getDPNames(std::vector<std::string> &names) const override { names.clear(); };
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override{};
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override{};
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override{};
   int getHiddenWeightsCount() const override { return 0; };
   void setHiddenWeights(const std::vector<T> &data) override{};

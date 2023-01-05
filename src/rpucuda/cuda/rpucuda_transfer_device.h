@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "forward_backward_pass.h"
 #include "io_manager.h"
 #include "pulsed_weight_updater.h"
 #include "rpu_transfer_device.h"
@@ -24,8 +25,8 @@ template <typename T> class TransferRPUDeviceCuda : public VectorRPUDeviceCuda<T
 
 public:
   explicit TransferRPUDeviceCuda(){};
-  // explicit TransferRPUDeviceCuda(CudaContext * c, int x_size, int d_size);
-  explicit TransferRPUDeviceCuda(CudaContext *c, const TransferRPUDevice<T> &other);
+  // explicit TransferRPUDeviceCuda(CudaContextPtr  c, int x_size, int d_size);
+  explicit TransferRPUDeviceCuda(CudaContextPtr c, const TransferRPUDevice<T> &other);
 
   ~TransferRPUDeviceCuda(){};
   TransferRPUDeviceCuda(const TransferRPUDeviceCuda<T> &other);
@@ -37,10 +38,10 @@ public:
     using std::swap;
     swap(static_cast<VectorRPUDeviceCuda<T> &>(a), static_cast<VectorRPUDeviceCuda<T> &>(b));
 
-    swap(a.transfer_tmp_, b.transfer_tmp_);
     swap(a.transfer_vecs_, b.transfer_vecs_);
     swap(a.transfer_iom_, b.transfer_iom_);
     swap(a.transfer_pwu_, b.transfer_pwu_);
+    swap(a.transfer_fb_pass_, b.transfer_fb_pass_);
     swap(a.current_slice_indices_, b.current_slice_indices_);
     swap(a.fully_hidden_, b.fully_hidden_);
   };
@@ -55,7 +56,7 @@ public:
 
   void runUpdateKernel(
       pwukp_t<T> kpars,
-      CudaContext *up_context,
+      CudaContextPtr up_context,
       T *dev_weights,
       int m_batch,
       const BitLineMaker<T> *blm,
@@ -64,13 +65,15 @@ public:
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
-      uint32_t *d_counts_chunk = nullptr) override;
+      uint32_t *d_counts_chunk = nullptr,
+      const ChoppedWeightOutput<T> *cwo = nullptr) override;
 
   virtual void transfer(
       int to_device_idx,
       int from_device_idx,
       const PulsedUpdateMetaParameter<T> &current_up,
-      const T current_lr);
+      const T current_sgd_lr,
+      const T current_count_lr);
 
   void decayWeights(T *dev_weights, bool bias_no_decay) override;
   void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override;
@@ -86,6 +89,7 @@ public:
       int from_device_idx,
       int i_slice_start,
       const T lr,
+      const T count_lr,
       const T *x_input,
       const int n_vec,
       const PulsedUpdateMetaParameter<T> &up);
@@ -97,6 +101,7 @@ public:
       int m_batch,
       const T lr,
       const PulsedUpdateMetaParameter<T> &up);
+
   virtual void readMatrix(int device_idx, const T *in_vec, T *out_vec, int m_batch, T alpha);
 
   pwukpvec_t<T> getUpdateKernels(
@@ -106,21 +111,22 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
 
-  T getPulseCountLearningRate(T learning_rate) override;
+  T getPulseCountLearningRate(
+      T learning_rate, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) override;
 
 protected:
-  void reduceToWeights(CudaContext *c, T *dev_weights) override;
+  void reduceToWeights(CudaContextPtr c, T *dev_weights) override;
+  virtual int
+  getTransferEvery(int device_idx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const;
 
-  std::unique_ptr<CudaArray<T>> transfer_tmp_ = nullptr; // no need to copy
   std::unique_ptr<CudaArray<T>> transfer_vecs_ = nullptr;
   std::unique_ptr<InputOutputManager<T>> transfer_iom_ = nullptr;
   std::unique_ptr<PulsedWeightUpdater<T>> transfer_pwu_ = nullptr;
+  std::unique_ptr<ForwardBackwardPassIOManagedCuda<T>> transfer_fb_pass_ = nullptr;
   std::vector<int> current_slice_indices_;
   bool fully_hidden_ = false;
 
 private:
-  int getTransferEvery(int device_idx, int m_batch) const;
-
   void initialize(bool transfer_columns);
 };
 

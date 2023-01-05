@@ -18,7 +18,7 @@
 #include <chrono>
 #include <memory>
 #include <random>
-//#include "test_helper.h"
+// #include "test_helper.h"
 
 #define TOLERANCE 1e-5
 
@@ -112,7 +112,7 @@ TEST_P(RPUDeviceTestFixture, createDevice) {
 
   rpu_device = this->dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
   ASSERT_TRUE(rpu_device != nullptr);
-  rpu_device->dispInfo();
+  // rpu_device->dispInfo();
 
   delete rpu_device;
 }
@@ -156,7 +156,7 @@ TEST_P(RPUDeviceTestFixture, refreshWeights) {
 
   rpu_device = dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
   rpu_device->onSetWeights(this->weights);
-  rpu_device->dispInfo();
+  // rpu_device->dispInfo();
 
   num_t **wp = rpu_device->getPosWeights();
   num_t **wn = rpu_device->getNegWeights();
@@ -197,7 +197,7 @@ TEST_P(RPUDeviceTestFixture, refreshWeights) {
 TEST_P(RPUDeviceTestFixture, doSparseUpdate) {
   rpu_device = this->dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
   rpu_device->onSetWeights(this->weights);
-  rpu_device->dispInfo();
+  // rpu_device->dispInfo();
 
   rpu_device->initUpdateCycle(this->weights, this->up, 1.0, 1);
   rpu_device->doSparseUpdate(
@@ -218,7 +218,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdate) {
 TEST_P(RPUDeviceTestFixture, doSparseUpdateInvert) {
   rpu_device = this->dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
   rpu_device->onSetWeights(this->weights);
-  rpu_device->dispInfo();
+  // rpu_device->dispInfo();
 
   rpu_device->initUpdateCycle(this->weights, this->up, 1.0, 1);
   rpu_device->invert();

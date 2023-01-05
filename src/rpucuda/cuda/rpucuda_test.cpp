@@ -36,7 +36,6 @@ public:
   void SetUp() {
 
     context = &context_container;
-
     is_test = true;
 
     x_size = 99;
@@ -83,12 +82,10 @@ public:
   }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUSimple<T>> layer_simple;
   std::unique_ptr<RPUCudaSimple<T>> culayer_simple;
   std::vector<T> x_vec, x_vec2, d_vec, d_vec2, x1, x2, d1, d2, rx, rd;
-
   std::unique_ptr<CudaArray<T>> x_cuvec;
   std::unique_ptr<CudaArray<T>> d_cuvec;
   int x_size;
@@ -100,7 +97,7 @@ public:
 class RPUCudaSimpleTestFixtureBatch : public ::testing::TestWithParam<bool> {
 public:
   void SetUp() {
-    context = new CudaContext();
+    context = &context_container;
 
     is_test = true;
 
@@ -148,12 +145,13 @@ public:
     d_vec2.resize(d_size * m_batch);
   }
 
-  void TearDown() { delete context; }
+  void TearDown() {}
 
+  CudaContext context_container{-1, false};
+  CudaContextPtr context;
   std::unique_ptr<RPUSimple<num_t>> layer_simple;
   std::unique_ptr<RPUCudaSimple<num_t>> culayer_simple;
   std::vector<num_t> x_vec, x_vec2, d_vec, d_vec2, x1, x2, d1, d2, rx, rd;
-
   std::unique_ptr<CudaArray<num_t>> x_cuvec;
   std::unique_ptr<CudaArray<num_t>> d_cuvec;
   int x_size;
@@ -161,8 +159,6 @@ public:
   int repeats;
   int m_batch;
   int is_test;
-
-  CudaContext *context;
 };
 
 // types
@@ -685,14 +681,6 @@ TEST_P(RPUCudaSimpleTestFixtureBatch, ForwardMatrixBatchBias) {
     for (int j = 0; j < (this->x_size) * this->m_batch; j++) {
       this->rx[j] = this->x1[j];
     }
-    std::cout << "\n\n --------------------------- \nTEST\n\n";
-    for (int j = 0; j < m_batch; j++) {
-      for (int i = 0; i < this->x_size; i++) {
-        std::cout << this->rx[i + j * this->x_size] << ", ";
-      }
-      std::cout << " | \n";
-    }
-    std::cout << " ---------------------------\n\n\n";
   }
   this->x_vec = this->rx;
 

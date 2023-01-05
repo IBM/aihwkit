@@ -21,15 +21,15 @@ namespace RPU {
 template <typename T> class WeightModifierCuda {
 
 public:
-  explicit WeightModifierCuda(CudaContext *context, int x_size, int d_size);
+  explicit WeightModifierCuda(CudaContextPtr context, int x_size, int d_size);
   WeightModifierCuda(){};
 
-  void apply(T *new_weights, const T *weights, const WeightModifierParameter &wmpar);
+  void apply(T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar);
 
   inline bool enableDuringTest() { return enable_during_test_; };
 
 private:
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
   int x_size_ = 0;
   int d_size_ = 0;
   int size_ = 0;
@@ -40,6 +40,8 @@ private:
   std::unique_ptr<Maximizer<T>> row_amaximizer_ = nullptr;
   std::unique_ptr<Maximizer<T>> row_maximizer_ = nullptr;
   std::unique_ptr<Maximizer<T>> row_minimizer_ = nullptr;
+  std::vector<T> coeffs_;
+  std::unique_ptr<CudaArray<T>> dev_coeffs_ = nullptr;
 };
 
 } // namespace RPU

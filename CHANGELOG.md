@@ -15,6 +15,18 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+
+* Reset tiles method (\#456)
+* Added many new analog MAC non-linearties (forward / backward pass) (#456)
+* Polynomial weight noise for hardware-aware training (\#456)
+* Remap functionality for hardware-aware training (\#456)
+* Input range estimation for InferenceRPUConfig (\#456)
+* CUDA syncs now always, added non-blocking option if not wished (\#456)
+* Fitting utility for fitting any device model to conductance measurements (\#456)
+* Added ``PowStepReferenceDevice`` for easy subtraction of symmetry
+  point (\#456)
+* Added ``SoftBoundsReferenceDevice`` for easy subtraction of symmetry
+  point (\#456)
 * Added stand-alone functions for applying inference drift to any model (\#419)
 * Example 24: analog inference and hardware-aware training on BERT (\#440)
 * Example 23: how to use ``AnalogTile`` directly to implement an
@@ -39,6 +51,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* ``RPUCuda`` backend update with many fixes (\#456)
 * Missing zero-grad call in example 02 (\#446)
 * Indexing error in ``OneSidedDevice`` for CPU (\#447)
 * Analog summary error when model is on cuda device. (\#392)
@@ -63,6 +76,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
+* Pylint / mypy / pycodestyle / protobuf version bump (\#456)
+* All configs related classes can now be imported from
+  ``aihwkit.simulator.config`` (\#456)
 * Weight noise visualization now shows the programming noise and drift
   noise difference. (\#389)
 * Concatenate the gradients before applying to the tile update

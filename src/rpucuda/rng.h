@@ -79,8 +79,8 @@ public:
 
   RNG(const RNG<T> &);
   RNG<T> &operator=(const RNG<T> &);
-  RNG(RNG<T> &&);
-  RNG<T> &operator=(RNG<T> &&);
+  RNG(RNG<T> &&) noexcept;
+  RNG<T> &operator=(RNG<T> &&) noexcept;
 
   friend void swap(RNG<T> &a, RNG<T> &b) noexcept {
     using std::swap;

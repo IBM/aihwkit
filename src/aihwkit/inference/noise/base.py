@@ -13,7 +13,7 @@
 
 """Base class for the phenomenological noise models for inference."""
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from torch import Tensor
 from torch.autograd import no_grad
 
@@ -26,7 +26,7 @@ class BaseNoiseModel:
 
     def __init__(
             self,
-            g_converter: BaseConductanceConverter = None
+            g_converter: Optional[BaseConductanceConverter] = None
     ):
         self.g_converter = g_converter or SinglePairConductanceConverter()
 

@@ -139,8 +139,6 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
         self.unregister_parameter('weight')
-        if self.analog_bias:
-            self.unregister_parameter('bias')
 
     def get_split_sizes(self, size: int, split_max_size: int, group_size: int = 1) -> List[int]:
         """ Computed the split sizes across channels.
@@ -313,7 +311,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             bias: Optional[Tensor] = None,
             force_exact: bool = False,
             apply_weight_scaling: bool = True,
-            weight_scaling_omega: float = None
+            weight_scaling_omega: Optional[float] = None
     ) -> None:
         """Set the weight (and bias) with given Tensors.
 

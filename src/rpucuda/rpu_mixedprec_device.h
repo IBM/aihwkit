@@ -93,8 +93,8 @@ public:
 
   MixedPrecRPUDevice(const MixedPrecRPUDevice<T> &);
   MixedPrecRPUDevice<T> &operator=(const MixedPrecRPUDevice<T> &);
-  MixedPrecRPUDevice(MixedPrecRPUDevice<T> &&);
-  MixedPrecRPUDevice<T> &operator=(MixedPrecRPUDevice<T> &&);
+  MixedPrecRPUDevice(MixedPrecRPUDevice<T> &&) noexcept;
+  MixedPrecRPUDevice<T> &operator=(MixedPrecRPUDevice<T> &&) noexcept;
 
   friend void swap(MixedPrecRPUDevice<T> &a, MixedPrecRPUDevice<T> &b) noexcept {
     using std::swap;

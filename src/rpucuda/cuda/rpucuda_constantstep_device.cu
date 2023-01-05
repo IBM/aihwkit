@@ -34,7 +34,7 @@ template <typename T> struct UpdateFunctorConstantStepLargeNoise {
     UNUSED(global_par);
     UNUSED(par_1);
     UNUSED(par_2);
-
+    // negative > 0 means going up here ...
     // here we assume that noise_std_dw>0 at least
     T wmax = par_4.z;                                   // [2];
     T wmin = par_4.x;                                   //[0];
@@ -81,18 +81,17 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
                     T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
     v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedFunctor<
                     T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+                    T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
 
   } else {
     // use summing approximation is save in this case
     // Update functor and kernels are in pwu_kernels.h
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStep<T>, 1>>
             ARGS(Functor));
-
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+                    T, UpdateFunctorConstantStep<T>, 1>> ARGS(Functor));
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
             Functor));
@@ -100,6 +99,11 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
     v.push_back(
         RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
             Functor));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
+
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
   }
 
   return v;

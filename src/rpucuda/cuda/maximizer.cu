@@ -15,14 +15,14 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <random>
 
 #include "cuda_math_util.h"
 #include "cuda_util.h"
-#include <cub/cub.cuh>
-
 #include "io_iterator.h"
+#include "rpu_cub.h"
 
 namespace RPU {
 
@@ -159,14 +159,14 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   for (int i = 0; i <= m_batch; i++) {
     offsets[i] = i * size;
   }
-
-  CudaContext c(-1, false);
-  CudaArray<T> dev_in(&c, size * m_batch, indata);
-  CudaArray<float> dev_max_values(&c, m_batch);
+  auto c_container = CudaContext(-1, false);
+  CudaContextPtr c = &c_container;
+  CudaArray<T> dev_in(c, size * m_batch, indata);
+  CudaArray<float> dev_max_values(c, m_batch);
   dev_max_values.setConst(0);
-  CudaArray<float> dev_max_values0(&c, m_batch);
+  CudaArray<float> dev_max_values0(c, m_batch);
 
-  CudaArray<int> dev_offsets(&c, m_batch + 1, offsets);
+  CudaArray<int> dev_offsets(c, m_batch + 1, offsets);
 
   CUDA_CALL(cudaPeekAtLastError());
   CUDA_CALL(cudaDeviceSynchronize());
@@ -176,7 +176,7 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   for (int i = 0; i < size * m_batch; i++) {
     tmp[i] = i + 1;
   }
-  CudaArray<int> dev_in_index(&c, size * m_batch, tmp);
+  CudaArray<int> dev_in_index(c, size * m_batch, tmp);
   CUDA_CALL(cudaDeviceSynchronize());
 
   IndexReader<T> idx_reader(dev_in.getData());
@@ -198,14 +198,14 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   size_t temp_storage_bytes = 0;
   RPU::cub::DeviceSegmentedReduce::Reduce(
       d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
-      dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c.getStream());
+      dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c->getStream());
   // Allocate temporary storage
   cudaMalloc(&d_temp_storage, temp_storage_bytes);
   CUDA_CALL(cudaDeviceSynchronize());
 
-  int nthreads = c.getNThreads();
-  int nblocks = c.getNBlocks(size * m_batch, nthreads);
-  cudaStream_t s = c.getStream();
+  int nthreads = c->getNThreads();
+  int nblocks = c->getNBlocks(size * m_batch, nthreads);
+  cudaStream_t s = c->getStream();
 
   CUDA_TIMING_INIT;
   CUDA_TIMING_START(c);
@@ -232,7 +232,7 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
     // Fast Segmented reduction (much faster than loop from outside)
     RPU::cub::DeviceSegmentedReduce::Reduce(
         d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
-        dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c.getStream());
+        dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c->getStream());
   }
 
   CUDA_TIMING_STOP(c, "Max Batch");
@@ -262,7 +262,7 @@ template void debugMaxBatched<float>(float const *, int, int, bool, float *);
   }
 
 template <typename T>
-Maximizer<T>::Maximizer(CudaContext *c, int size, bool abs_if)
+Maximizer<T>::Maximizer(CudaContextPtr c, int size, bool abs_if)
     : size_{size}, context_{c}, buffer_m_batch_{0}, abs_if_{abs_if} {
   // initialize for m_batch=1
   dev_max_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);

@@ -28,18 +28,29 @@
 
 #include "cublas_v2.h"
 
+#define RPU_BUFFER_IN 0
+#define RPU_BUFFER_OUT 1
+#define RPU_BUFFER_BIAS 2
+#define RPU_BUFFER_WEIGHT 3
+#define RPU_BUFFER_POS_NEG_IN 4
+#define RPU_BUFFER_POS_NEG_OUT 5
+#define RPU_BUFFER_TEMP_0 6
+#define RPU_BUFFER_TEMP_1 7
+#define RPU_BUFFER_TEMP_2 8
+#define RPU_BUFFER_TEMP_3 9
+#define RPU_BUFFER_TEMP_4 10
+#define RPU_BUFFER_DEVICE_0 11
+#define RPU_BUFFER_DEVICE_1 12
+#define RPU_BUFFER_CWO 13
+
+#define RPU_MAX_BUFFER 15
+
 #define BOLD_ON "\033[1m"
 #define BOLD_OFF "\033[0m"
 #define RED_ON "\033[0;31m"
 #define GREEN_ON "\033[0;32m"
 #define BLUE_ON "\033[0;34m"
 #define COLOR_OFF "\033[0m"
-
-#undef CUB_NS_PREFIX
-#undef CUB_NS_POSTFIX
-#define CUB_NS_PREFIX namespace RPU {
-#define CUB_NS_POSTFIX }
-#define CUB_NS_QUALIFIER ::RPU::cub
 
 #define CUBLAS_CALL(X)                                                                             \
   if (X != CUBLAS_STATUS_SUCCESS) {                                                                \
@@ -141,16 +152,16 @@
   CUDA_CALL(cudaEventCreate(&timing_stop));                                                        \
   float milliseconds = 0;
 
-#define CUDA_TIMING_START(CONTEXT) CUDA_CALL(cudaEventRecord(timing_start, (CONTEXT).getStream()));
+#define CUDA_TIMING_START(CONTEXT) CUDA_CALL(cudaEventRecord(timing_start, (CONTEXT)->getStream()));
 
 #define CUDA_TIMING_STOP_NO_OUTPUT(CONTEXT)                                                        \
-  CUDA_CALL(cudaEventRecord(timing_stop, (CONTEXT).getStream()));                                  \
+  CUDA_CALL(cudaEventRecord(timing_stop, (CONTEXT)->getStream()));                                 \
   CUDA_CALL(cudaEventSynchronize(timing_stop));                                                    \
   cudaEventElapsedTime(&milliseconds, timing_start, timing_stop);
 
 #define CUDA_TIMING_STOP(CONTEXT, TXT)                                                             \
   CUDA_TIMING_STOP_NO_OUTPUT(CONTEXT)                                                              \
-  std::cout << "\t" << GREEN_ON << TXT << ": " << milliseconds << " msec" << COLOR_OFF << "\n";
+  std::cout << "\t" << BOLD_ON << TXT << ": " << milliseconds << " msec" << BOLD_OFF << "\n";
 
 #define CUDA_TIMING_DESTROY                                                                        \
   CUDA_CALL(cudaEventDestroy(timing_start));                                                       \
@@ -186,7 +197,9 @@
   template OUT_T FUNC(SliceInputIterator<true, NUM_T> ARGS);                                       \
   template OUT_T FUNC(SliceInputIterator<false, NUM_T> ARGS);                                      \
   template OUT_T FUNC(IndexReaderSliceInputIterator<true, NUM_T> ARGS);                            \
-  template OUT_T FUNC(IndexReaderSliceInputIterator<false, NUM_T> ARGS);
+  template OUT_T FUNC(IndexReaderSliceInputIterator<false, NUM_T> ARGS);                           \
+  template OUT_T FUNC(DiagInputIterator<NUM_T, chop_t> ARGS);                                      \
+  template OUT_T FUNC(EyeInputIterator<NUM_T> ARGS);
 
 #define RPU_GEN_OITER_TEMPLATES(NUM_T, OUT_T, FUNC, ARGS)                                          \
   template OUT_T FUNC(PermuterTransOutputIterator<NUM_T> ARGS);                                    \
@@ -202,12 +215,12 @@
 
 #define TRANSPOSE_X2D(IDX, X_SIZE, D_SIZE) ((IDX % X_SIZE) * D_SIZE + (IDX / X_SIZE))
 
+extern int64_t rpu_global_mem_counter;
+
 namespace RPU {
 
-static int64_t global_mem_counter = 0;
-static std::mutex global_mem_counter_mutex;
-
 typedef uint32_t kagg_t; // K aggregate type
+typedef int8_t chop_t;   // chopper type
 
 class CublasEnvironment {
 
@@ -238,8 +251,39 @@ private:
 };
 
 template <typename T> class CudaArray;
+class CudaContext;
+typedef CudaContext *CudaContextPtr;
 
-class CudaContext {
+template <typename T> class CudaBuffer {
+public:
+  CudaBuffer(){};
+  CudaBuffer(const CudaBuffer<T> &);
+  CudaBuffer &operator=(const CudaBuffer<T> &);
+  CudaBuffer(CudaBuffer<T> &&);
+  CudaBuffer<T> &operator=(CudaBuffer<T> &&);
+  ~CudaBuffer() = default;
+
+  friend void swap(CudaBuffer<T> &a, CudaBuffer<T> &b) noexcept {
+    using std::swap;
+    const std::lock_guard<std::recursive_mutex> locka(a.mutex_);
+    const std::lock_guard<std::recursive_mutex> lockb(b.mutex_);
+    swap(a.buffer_, b.buffer_);
+  }
+
+  T *get(CudaContextPtr context, int size);
+  void release();
+
+  const CudaArray<T> *getCudaArray() {
+    const std::lock_guard<std::recursive_mutex> lock(mutex_);
+    return &*buffer_;
+  };
+
+private:
+  std::unique_ptr<CudaArray<T>> buffer_ = nullptr;
+  std::recursive_mutex mutex_;
+};
+
+class CudaContext : public std::enable_shared_from_this<CudaContext>, public Context {
 
 public:
   explicit CudaContext() : CudaContext(-1){};
@@ -260,6 +304,9 @@ public:
     swap(a.gpu_id_, b.gpu_id_);
     swap(a.stream_id_, b.stream_id_);
     swap(a.streams_, b.streams_);
+    swap(a.shared_stream_id_, b.shared_stream_id_);
+    swap(a.shared_streams_, b.shared_streams_);
+
     swap(a.env_, b.env_);
     swap(a.rng_, b.rng_);
 
@@ -270,8 +317,14 @@ public:
     swap(a.non_blocking_, b.non_blocking_);
     swap(a.event_, b.event_);
     swap(a.prop_, b.prop_);
-    swap(a.allocated_mem_, b.allocated_mem_);
+
     swap(a.shared_random_states_, b.shared_random_states_);
+    swap(a.shared_float_buffer_, b.shared_float_buffer_);
+    swap(a.shared_double_buffer_, b.shared_double_buffer_);
+
+    swap(a.random_states_, b.random_states_);
+    swap(a.float_buffer_, b.float_buffer_);
+    swap(a.double_buffer_, b.double_buffer_);
   }
 
   void synchronizeDevice() const;
@@ -279,13 +332,14 @@ public:
       const; // synchronizes whole context (if multiple streams are used explicitly)
   void synchronizeStream(int idx) const; // individual stream
   void synchronizeStream() const;        // current stream
-  void synchronizeWith(CudaContext *c) const;
-  void synchronizeWith(CudaContext *ca, CudaContext *cb) const;
-  inline void synchronize() const { this->synchronizeStream(); }; // default current stream only
+  void synchronizeWith(CudaContextPtr c) const;
+  void synchronizeWith(CudaContextPtr ca, CudaContextPtr cb) const;
+  void synchronize() const override { this->synchronizeStream(); }; // default current stream only
 
   int getNBlocks(int size, int nthreads = RPU_THREADS_PER_BLOCK) const;
   int getNStrideBlocks(int size, int nthreads = RPU_THREADS_PER_BLOCK) const;
-  inline int getNThreads() const { return RPU_THREADS_PER_BLOCK; };
+  inline int getNThreads() const { return MIN(RPU_THREADS_PER_BLOCK, maxThreadsPerBlock()); };
+  inline int getNThreads(int n) const { return MIN((n + 31) / 32 * 32, getNThreads()); };
   inline cudaStream_t getStream() const {
     enforceDeviceId();
     return streams_[stream_id_];
@@ -293,7 +347,9 @@ public:
   inline cudaStream_t getStream(int idx);
   void enforceDeviceId() const;
 
-  void setStream(cudaStream_t s);
+  void setExternalStream(cudaStream_t s); // for external stream meanagement
+  void releaseExternalStream();           // to be called to release the set external stream
+
   inline cublasHandle_t getBlasHandle() const { return env_->getHandle(); }
 #ifdef RPU_WITH_CUBLAS_DEVICE
   inline cublasHandle_t *getBlasDeviceHandle() const { return env_->getDeviceHandle(); }
@@ -305,10 +361,14 @@ public:
   void randUniform(float *dev_array, int size);
   void setRandomSeed(unsigned long long rseed);
 
+  template <typename T> T *getSharedBuffer(int id, int size);
+  template <typename T> void releaseSharedBuffer(int id);
+  template <typename T> void printSharedBuffer(int id, int size);
+
   void recordEvent();
-  void waitEvent(CudaContext *wait_on_context);
+  void waitEvent(CudaContextPtr wait_on_context);
   void waitEvent(cudaEvent_t e);
-  void recordWaitEvent(CudaContext *wait_on_context);
+  void recordWaitEvent(CudaContextPtr wait_on_context);
   void recordWaitEvent(cudaStream_t s);
   void recordWaitEvent(cudaStream_t s, cudaEvent_t e);
 
@@ -324,17 +384,13 @@ public:
 
   curandState_t *getRandomStates(int size = 0);
 
-  void addToMemCounter(int64_t n_bytes);
-  void subtractMemCounter(int64_t n_bytes);
-
-  inline int64_t getAllocatedMem() { return allocated_mem_; }
-
-  int64_t getTotalMem() { return global_mem_counter; }
-
 private:
   int gpu_id_ = 0;
   int stream_id_ = 0;
+  int shared_stream_id_ = 0;
+  std::recursive_mutex shared_mutex_;
   std::vector<cudaStream_t> streams_ = {};
+  std::vector<cudaStream_t> shared_streams_ = {};
   CublasEnvironment *env_ = nullptr;
   curandGenerator_t rng_ = nullptr;
   bool rng_created_ = false;
@@ -342,17 +398,25 @@ private:
   bool non_blocking_ = true;
   cudaEvent_t event_ = nullptr;
   cudaDeviceProp *prop_ = nullptr;
+
   std::vector<std::unique_ptr<CudaArray<curandState_t>>> shared_random_states_ = {};
+  std::vector<std::unique_ptr<CudaArray<curandState_t>>> random_states_ = {};
+  std::vector<std::vector<CudaBuffer<float>>> shared_float_buffer_ = {};
+  std::vector<std::vector<CudaBuffer<double>>> shared_double_buffer_ = {};
+  std::vector<std::vector<CudaBuffer<float>>> float_buffer_ = {};
+  std::vector<std::vector<CudaBuffer<double>>> double_buffer_ = {};
+
   void init();
-  int64_t allocated_mem_ = 0;
 };
 
 template <typename T> class CudaArray {
 
 public:
-  explicit CudaArray(CudaContext *c);
-  explicit CudaArray(CudaContext *c, int n);
-  explicit CudaArray(CudaContext *c, int n, const T *host_array);
+  CudaArray(){};
+  explicit CudaArray(CudaContextPtr c);
+  explicit CudaArray(CudaContextPtr c, int n);
+  explicit CudaArray(CudaContextPtr c, int n, const T *host_array);
+  CudaArray(CudaContextPtr c, const std::vector<T> &host_vector);
   ~CudaArray();
 
   CudaArray(const CudaArray<T> &);
@@ -383,11 +447,12 @@ public:
   void setShared(T *device_array);
 
   void copyTo(T *host_array) const;
+  void copyTo(std::vector<T> &host_vector) const;
 
   void setConst(T set_value);
 
-  T *getDataSafe(CudaContext *c);
-  inline CudaContext *getContext() const { return context_; };
+  T *getDataSafe(CudaContextPtr c);
+  inline CudaContextPtr getContext() const { return context_; };
   inline void synchronize() { context_->synchronize(); };
 
   inline int getSize() const { return size_; };
@@ -401,6 +466,7 @@ public:
   int getLD() const { return (((int)this->getPitch()) / sizeof(T)); }
 
   void printValues(int nmax = 0) const;
+  void printNZValues(int nmax = 0) const;
 
 private:
   bool shared_if_ = false;
@@ -410,7 +476,7 @@ private:
   int width_ = 0;
   int height_ = 0;
 
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
 };
 
 void resetCuda(int gpu_id = -1);
@@ -418,7 +484,7 @@ void resetCuda(int gpu_id = -1);
 // helper for random init
 void curandSetup(CudaArray<curandState_t> &, unsigned long long rseed = 0, bool same_seed = false);
 void curandSetup(
-    CudaContext *c,
+    CudaContextPtr c,
     std::unique_ptr<CudaArray<curandState_t>> &dev_states,
     int n,
     unsigned long long rseed = 0,

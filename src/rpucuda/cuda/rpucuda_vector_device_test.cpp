@@ -125,7 +125,7 @@ public:
 
     setAdditionalValues(&vp, value);
 
-    vp.print();
+    // vp.print();
     num_t lr = 1;
 
     layer_pulsed = RPU::make_unique<RPUPulsed<num_t>>(x_size, d_size);
@@ -133,13 +133,13 @@ public:
     layer_pulsed->populateParameter(&p, &vp);
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
-    layer_pulsed->disp();
+    // layer_pulsed->disp();
 
     this->layer_pulsed->getWeights(refweights[0]);
 
     // culayer
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->disp();
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
@@ -174,13 +174,6 @@ public:
     this->d_vec = this->rd;
 
     this->context->synchronizeDevice();
-
-    std::cout << "RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    this->culayer_pulsed->printRPUParameter(3, 3);
-    std::cout << "RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-    this->layer_pulsed->printRPUParameter(3, 3);
 
     // update
     int nK32 = (K + 32) / 32;
@@ -230,11 +223,6 @@ public:
       this->context->synchronizeDevice();
     }
 
-    std::cout << "W results for RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    std::cout << "W results for RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-
     num_t **cuweights = this->culayer_pulsed->getWeights();
     num_t **weights = this->layer_pulsed->getWeights();
     this->context->synchronizeDevice();
@@ -261,15 +249,12 @@ public:
   void TearDown() { Array_2D_Free(refweights); }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<num_t>> culayer_pulsed;
   std::vector<num_t> x_vec, d_vec, rx, rd;
-
   std::unique_ptr<CudaArray<num_t>> x_cuvec;
   std::unique_ptr<CudaArray<num_t>> d_cuvec;
-
   int x_size;
   int d_size;
   int m_batch;

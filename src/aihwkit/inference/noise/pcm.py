@@ -10,6 +10,8 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=too-many-instance-attributes
+
 """Phenomenological noise models for PCM devices for inference."""
 
 from copy import deepcopy
@@ -83,9 +85,10 @@ class PCMLikeNoiseModel(BaseNoiseModel):
     def __str__(self) -> str:
         return ('{}(prog_coeff={}, g_converter={}, g_max={:1.2f}, t_read={}, '
                 't_0={:1.2f}, prog_noise_scale={}, '
-                'read_noise_scale={}, drift_scale={})').format(
+                'read_noise_scale={}, drift_scale={})').format(  # type: ignore
                     self.__class__.__name__, self.prog_coeff, self.g_converter,
-                    self.g_max, self.t_read, self.t_0, self.prog_noise_scale,
+                    self.g_max,
+                    self.t_read, self.t_0, self.prog_noise_scale,
                     self.read_noise_scale, self.drift_scale)
 
     @no_grad()

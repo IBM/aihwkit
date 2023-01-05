@@ -18,9 +18,16 @@ from enum import Enum
 from typing import Any, Optional
 
 from aihwkit.cloud.client.exceptions import ExperimentStatusError
-from aihwkit.cloud.converter.definitions.input_file_pb2 import TrainingInput
-from aihwkit.cloud.converter.definitions.i_input_file_pb2 import InferenceInput
-from aihwkit.cloud.converter.definitions.output_file_pb2 import TrainingOutput
+# pylint: disable=no-name-in-module,import-error
+from aihwkit.cloud.converter.definitions.input_file_pb2 import (  # type: ignore[attr-defined]
+     TrainingInput
+)
+from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: ignore[attr-defined]
+     InferenceInput
+)
+from aihwkit.cloud.converter.definitions.output_file_pb2 import (  # type: ignore[attr-defined]
+     TrainingOutput
+)
 from aihwkit.cloud.converter.v1.training import BasicTrainingConverter, BasicTrainingResultConverter
 from aihwkit.cloud.converter.v1.inferencing import BasicInferencingConverter
 # from aihwkit.experiments import BasicTraining, BasicInferencing

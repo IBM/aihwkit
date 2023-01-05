@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,21 +25,28 @@ namespace RPU {
 template <typename T>
 void BufferedTransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const {
 
-  TransferRPUDeviceMetaParameter<T>::printToStream(ss);
-
-  ss << "--- Parameters special to BufferedTransfer --- " << std::endl;
   // thres
-  ss << "\tthres_scale:\t\t";
+  ss << "\t thres_scale:\t\t";
   ss << thres_scale;
   ss << std::endl;
 
-  ss << "\tstep:\t\t\t";
-  ss << step;
-  ss << std::endl;
+  if (step != (T)1.0) {
+    ss << "\t step:\t\t\t";
+    ss << step;
+    ss << std::endl;
+  }
+  if (momentum != (T)0.0) {
+    ss << "\t momentum:\t\t";
+    ss << momentum;
+    ss << std::endl;
+  }
 
-  ss << "\tmomentum:\t\t";
-  ss << momentum;
-  ss << std::endl;
+  if (forget_buffer) {
+    ss << "\t forget_buffer:\t\t";
+    ss << forget_buffer;
+    ss << std::endl;
+  }
+  TransferRPUDeviceMetaParameter<T>::printToStream(ss);
 };
 
 template <typename T>
@@ -95,14 +102,15 @@ BufferedTransferRPUDevice<T>::operator=(const BufferedTransferRPUDevice<T> &othe
 
 // move constructor
 template <typename T>
-BufferedTransferRPUDevice<T>::BufferedTransferRPUDevice(BufferedTransferRPUDevice<T> &&other) {
+BufferedTransferRPUDevice<T>::BufferedTransferRPUDevice(
+    BufferedTransferRPUDevice<T> &&other) noexcept {
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
 BufferedTransferRPUDevice<T> &
-BufferedTransferRPUDevice<T>::operator=(BufferedTransferRPUDevice<T> &&other) {
+BufferedTransferRPUDevice<T>::operator=(BufferedTransferRPUDevice<T> &&other) noexcept {
   TransferRPUDevice<T>::operator=(std::move(other));
   transfer_buffer_vec_ = std::move(transfer_buffer_vec_);
 
@@ -118,7 +126,7 @@ void BufferedTransferRPUDevice<T>::populate(
 
   TransferRPUDevice<T>::populate(p, rng);
 
-  transfer_buffer_vec_.resize(this->n_devices_ - 1);
+  transfer_buffer_vec_.resize((size_t)this->n_devices_ - 1);
 
   // init buffers
   for (int k = 0; k < this->n_devices_ - 1; k++) {
@@ -137,6 +145,9 @@ void BufferedTransferRPUDevice<T>::readAndUpdate(
     const int n_vec,
     const T reset_prob_in,
     const int i_slice_start) {
+
+  UNUSED(reset_prob_in);
+
   if (lr == (T)0.0) {
     return;
   }
@@ -157,34 +168,38 @@ void BufferedTransferRPUDevice<T>::readAndUpdate(
   T step = par.step;
   T lr_abs = fabs(lr);
   T *v_out = this->transfer_tmp_.data();
-
-  int max_steps = this->transfer_pwu_->getUpPar().desired_BL;
+  bool forget_buffer = par.forget_buffer;
+  T max_steps = (T)this->transfer_pwu_->getUpPar().desired_BL;
 
   // buffer weight is x_size major, we need to write out_size
   bool use_cols = par.transfer_columns;
   int w_inc = use_cols ? in_size : 1;
 
   // forward / update
-  for (int i = 0; i < n_vec; i++) {
+  for (size_t i = 0; i < (size_t)n_vec; i++) {
 
-    const T *v_in = vec + i * in_size;
+    const T *v_in = vec + (size_t)i * in_size;
 
-    // first read into d (will overwrite d)
+    // first read from previous device
     this->readVector(from_device_idx, v_in, v_out, 1.0);
 
     // add into to FP buffer
     T *fp_w = transfer_buffer_vec_[from_device_idx].data();
-    int i_w = use_cols ? i_slice_start + i : this->x_size_ * (i_slice_start + i);
+    int i_w = use_cols ? i_slice_start + (int)i : this->x_size_ * (i_slice_start + (int)i);
 
     int non_zero_count = 0;
-
     PRAGMA_SIMD
-    for (int j = 0; j < out_size; j++) {
+    for (size_t j = 0; j < (size_t)out_size; j++) {
       T omega = fp_w[i_w];
-      omega += v_out[j] * lr_abs; // multiplied with transfer LR
+      omega += v_out[j] * lr_abs;
 
-      T n_steps = MAX(MIN(truncf(omega / buffer_granularity), max_steps), -max_steps);
-      fp_w[i_w] = omega - sub_momentum * n_steps * buffer_granularity;
+      T n_steps = MAX(MIN((T)trunc(omega / buffer_granularity), max_steps), -max_steps);
+
+      if (forget_buffer) {
+        fp_w[i_w] = (n_steps != 0) ? omega * par.momentum : omega;
+      } else {
+        fp_w[i_w] = (n_steps != 0) ? omega - sub_momentum * n_steps * buffer_granularity : omega;
+      }
 
       non_zero_count += ((int)n_steps) != 0;
 
@@ -211,7 +226,7 @@ void BufferedTransferRPUDevice<T>::getDPNames(std::vector<std::string> &names) c
 }
 
 template <typename T>
-void BufferedTransferRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+void BufferedTransferRPUDevice<T>::getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) {
 
   std::vector<std::string> names;
   getDPNames(names);
@@ -220,7 +235,7 @@ void BufferedTransferRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptr
     RPU_FATAL("Expected " << names.size() << " data pointers!");
   }
 
-  TransferRPUDevice<T>::getDeviceParameter(data_ptrs);
+  TransferRPUDevice<T>::getDeviceParameter(weights, data_ptrs);
 
   int add_n = this->n_devices_ - 1;
   size_t m = names.size() - add_n;
@@ -254,18 +269,20 @@ void BufferedTransferRPUDevice<T>::setHiddenWeights(const std::vector<T> &data) 
   TransferRPUDevice<T>::setHiddenWeights(data);
 
   // lastly,  set the FP buffers
-  int add_n = this->n_devices_ - 1;
-  int offset = (getHiddenWeightsCount() - add_n) * this->size_;
-  for (int k = 0; k < add_n; k++) {
+  size_t size = this->size_;
+  size_t add_n = (size_t)this->n_devices_ - 1;
+  size_t offset = (getHiddenWeightsCount() - add_n) * size;
 
-    if (data.size() < (size_t)offset + this->size_) {
+  for (size_t k = 0; k < add_n; k++) {
+
+    if (data.size() < (size_t)offset + size) {
       RPU_FATAL("Size mismatch for hidden weights.");
     }
 
-    for (int i = 0; i < this->size_; i++) {
+    for (size_t i = 0; i < size; i++) {
       transfer_buffer_vec_[k][i] = data[offset + i];
     }
-    offset += this->size_;
+    offset += size;
   }
 }
 

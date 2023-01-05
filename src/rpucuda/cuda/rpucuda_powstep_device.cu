@@ -109,6 +109,9 @@ pwukpvec_t<T> PowStepRPUDeviceCuda<T>::getUpdateKernels(
   v.push_back(RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorPowStep<T>, 1>> ARGS);
   v.push_back(
       RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorPowStep<T>, 1>> ARGS);
+  v.push_back(
+      RPU::make_unique<
+          PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorPowStep<T>, 1>> ARGS);
   return v;
 }
 

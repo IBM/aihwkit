@@ -14,14 +14,9 @@
 
 # pylint: disable=too-many-instance-attributes
 
-from typing import List
-from dataclasses import dataclass, field
-from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from dataclasses import dataclass
 from aihwkit.simulator.configs.devices import (
-    ConstantStepDevice, ExpStepDevice, LinearStepDevice, SoftBoundsDevice, OneSidedUnitCell
-)
-from aihwkit.simulator.presets.utils import (
-    PresetIOParameters, PresetUpdateParameters
+    ConstantStepDevice, ExpStepDevice, LinearStepDevice, SoftBoundsDevice
 )
 
 
@@ -354,23 +349,3 @@ class PCMPresetDevice(ExpStepDevice):
     # reset behavior
     reset: float = 0.01
     reset_dtod: float = 0.02
-
-
-@dataclass
-class PCMPresetUnitCell(OneSidedUnitCell):
-    """A unit cell that is comprised of two uni-directional PCM devices of
-    opposite sign (see :class:`~PCMPresetDevice`).
-
-    Check for refresh is performed after each mini-batch update. See
-    :class:`~aihwkit.simulator.configs.device.OneSidedUnitCell` for
-    details on the refresh implementation.
-    """
-
-    unit_cell_devices: List = field(
-        default_factory=lambda: [PCMPresetDevice(), PCMPresetDevice()])
-
-    refresh_every: int = 1
-    units_in_mbatch: bool = True
-    refresh_forward: IOParameters = field(default_factory=PresetIOParameters)
-    refresh_update: UpdateParameters = field(
-        default_factory=lambda: PresetUpdateParameters(desired_bl=31))

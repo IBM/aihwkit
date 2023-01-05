@@ -187,9 +187,11 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
   T weight_granularity = rpu_device->getWeightGranularity();
 
   // pulsed device update
-  rpu_device->initUpdateCycle(weights, up_, learning_rate, m_batch_info);
+  rpu_device->initUpdateCycle(
+      weights, up_, learning_rate, m_batch_info, x_input, x_inc, d_input, d_inc);
   // potentially modify the LR from the device side
-  T pc_learning_rate = rpu_device->getPulseCountLearningRate(learning_rate);
+
+  T pc_learning_rate = rpu_device->getPulseCountLearningRate(learning_rate, m_batch_info, up_);
 
   if (sblm_->supports(up_.pulse_type)) {
     // envoke sparse bit line maker to get the counts and indices
@@ -317,7 +319,8 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDeviceAndCounts(
   test_helper::getSparseCountsFromCounts(d_indices, d_counts, d_counts32, BL, this->d_size_);
 
   // pulsed device update
-  rpu_device->initUpdateCycle(weights, up_, learning_rate, m_batch_info);
+  rpu_device->initUpdateCycle(
+      weights, up_, learning_rate, m_batch_info, x_input, x_inc, d_input, d_inc);
 
   // sblm_->printCounts(BL);
   // for info: in BLM (cuda) makeCounts is additional info for debugging the bit line makers

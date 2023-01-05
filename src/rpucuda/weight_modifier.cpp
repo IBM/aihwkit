@@ -35,7 +35,7 @@ template <typename T> void WeightModifier<T>::dropConnections(T *weights, T prob
 
 template <typename T>
 void WeightModifier<T>::apply(
-    T *new_weights, const T *weights, const WeightModifierParameter &wmpar) {
+    T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar) {
 
   // just copy always if not in-place [also handles WeightModifierType::Copy]
   if (new_weights != weights) {
@@ -50,7 +50,7 @@ void WeightModifier<T>::apply(
   }
   enable_during_test_ = wmpar.enable_during_test;
 
-  T amax = wmpar.assumed_wmax; // assumed max
+  T amax = (T)wmpar.assumed_wmax; // assumed max
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
     amax = 0.0;
     PRAGMA_SIMD
@@ -75,7 +75,7 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::Discretize: {
 
-    const T res = wmpar.res;
+    const T res = (T)wmpar.res;
     if (res > 0) {
       const bool sto_round = wmpar.sto_round;
       PRAGMA_SIMD
@@ -89,7 +89,7 @@ void WeightModifier<T>::apply(
   case WeightModifierType::MultNormal: {
 
     if (wmpar.std_dev > 0) {
-      const T std = wmpar.std_dev * amax;
+      const T std = (T)wmpar.std_dev * amax;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
         T w = new_weights[i];
@@ -101,7 +101,7 @@ void WeightModifier<T>::apply(
   case WeightModifierType::AddNormal: {
 
     if (wmpar.std_dev > 0) {
-      const T std = wmpar.std_dev * amax;
+      const T std = (T)wmpar.std_dev * amax;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
         new_weights[i] += std * rw_rng_.sampleGauss();
@@ -113,30 +113,31 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::Poly: {
 
-    if (wmpar.std_dev > 0) {
+    if (wmpar.std_dev > 0 && wmpar.coeffs.size() > (size_t)0) {
       const T std = wmpar.std_dev;
-      const T p0 = wmpar.coeff0;
-      const T p1 = wmpar.coeff1;
-      const T p2 = wmpar.coeff2;
-
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
         T aw = fabs(new_weights[i]) / amax;
-        T sig = std * (p0 + p1 * aw + p2 * aw * aw);
+        T paw = 1;
+        T sig = wmpar.coeffs.at(0);
+        for (size_t j = 1; j < wmpar.coeffs.size(); j++) {
+          paw *= aw;
+          sig += wmpar.coeffs.at(j) * paw;
+        }
+        sig *= std;
         new_weights[i] += amax * sig * rw_rng_.sampleGauss();
       }
     }
-
     break;
   }
 
   case WeightModifierType::DoReFa: {
 
-    const T res = wmpar.res;
+    const T res = (T)wmpar.res;
 
     if (res > 0) {
       const bool sto_round = wmpar.sto_round;
-      const T scale = fabs(wmpar.dorefa_clip / tanh(amax));
+      const T scale = (T)fabs(wmpar.dorefa_clip / tanh(amax));
 
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
@@ -150,8 +151,8 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::DiscretizeAddNormal: {
 
-    const T res = wmpar.res;
-    const T std = wmpar.std_dev * amax;
+    const T res = (T)wmpar.res;
+    const T std = (T)wmpar.std_dev * amax;
 
     if (res > 0 || std > 0) {
       const bool sto_round = wmpar.sto_round;
@@ -172,7 +173,7 @@ void WeightModifier<T>::apply(
   }
 
   if (wmpar.pdrop > 0.0) {
-    dropConnections(new_weights, wmpar.pdrop);
+    dropConnections(new_weights, (T)wmpar.pdrop);
   }
 
   if (wmpar.copy_last_column) {

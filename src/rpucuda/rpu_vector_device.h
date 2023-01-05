@@ -37,8 +37,8 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
 
   VectorRPUDeviceMetaParameter(const VectorRPUDeviceMetaParameter<T> &);
   VectorRPUDeviceMetaParameter<T> &operator=(const VectorRPUDeviceMetaParameter<T> &);
-  VectorRPUDeviceMetaParameter(VectorRPUDeviceMetaParameter<T> &&);
-  VectorRPUDeviceMetaParameter<T> &operator=(VectorRPUDeviceMetaParameter<T> &&);
+  VectorRPUDeviceMetaParameter(VectorRPUDeviceMetaParameter<T> &&) noexcept;
+  VectorRPUDeviceMetaParameter<T> &operator=(VectorRPUDeviceMetaParameter<T> &&) noexcept;
 
   friend void
   swap(VectorRPUDeviceMetaParameter<T> &a, VectorRPUDeviceMetaParameter<T> &b) noexcept {
@@ -97,6 +97,13 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     }
     return weight_granularity;
   }
+  T calcNumStates() const override {
+    T num_states = 0.0;
+    for (size_t k = 0; k < vec_par.size(); k++) {
+      num_states += vec_par[k]->calcNumStates() / vec_par.size();
+    }
+    return num_states;
+  }
 
   void printToStream(std::stringstream &ss) const override {
     ss << this->getName();
@@ -120,7 +127,7 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     ss << " (" << first_update_idx << ")]" << std::endl;
     ss << std::endl;
     for (size_t k = 0; k < vec_par.size(); k++) {
-      ss << "Device Parameter " << k << ": " << vec_par[k]->getName() << std::endl;
+      ss << "\t\bDevice Parameter " << k << ": " << vec_par[k]->getName() << std::endl;
       vec_par[k]->printToStream(ss);
     }
   };
@@ -138,8 +145,8 @@ public:
 
   VectorRPUDevice(const VectorRPUDevice<T> &);
   VectorRPUDevice<T> &operator=(const VectorRPUDevice<T> &);
-  VectorRPUDevice(VectorRPUDevice<T> &&);
-  VectorRPUDevice<T> &operator=(VectorRPUDevice<T> &&);
+  VectorRPUDevice(VectorRPUDevice<T> &&) noexcept;
+  VectorRPUDevice<T> &operator=(VectorRPUDevice<T> &&) noexcept;
 
   friend void swap(VectorRPUDevice<T> &a, VectorRPUDevice<T> &b) noexcept {
     using std::swap;
@@ -155,7 +162,7 @@ public:
   }
 
   void getDPNames(std::vector<std::string> &names) const override;
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
@@ -165,8 +172,7 @@ public:
   void printDP(int x_cunt, int d_count) const override;
   void printToStream(std::stringstream &ss) const override { this->getPar().printToStream(ss); };
   void disp(std::stringstream &ss) const override {
-    ss << "Device " << this->getPar().getName() << " [" << this->x_size_ << "," << this->d_size_
-       << "]\n";
+    ss << this->getPar().getName() << " [" << this->x_size_ << "," << this->d_size_ << "]\n";
   };
 
   VectorRPUDeviceMetaParameter<T> &getPar() const override {
@@ -192,7 +198,14 @@ public:
 
   bool onSetWeights(T **weights) override;
   void initUpdateCycle(
-      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
+      T **weights,
+      const PulsedUpdateMetaParameter<T> &up,
+      T current_lr,
+      int m_batch_info,
+      const T *x_input = nullptr,
+      const int x_inc = 1,
+      const T *d_input = nullptr,
+      const int d_inc = 1) override;
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
 

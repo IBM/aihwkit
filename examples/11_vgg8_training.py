@@ -33,9 +33,9 @@ from torchvision import datasets, transforms
 # Imports from aihwkit.
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.presets.configs import GokmenVlasovPreset
+from aihwkit.simulator.presets import GokmenVlasovPreset
+from aihwkit.simulator.configs import MappingParameter
 from aihwkit.simulator.rpu_base import cuda
-from aihwkit.simulator.configs.utils import MappingParameter
 
 # Check device
 USE_CUDA = 0

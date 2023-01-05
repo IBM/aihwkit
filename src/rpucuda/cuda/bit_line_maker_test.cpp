@@ -350,9 +350,8 @@ public:
     delete[] x_counts;
     delete[] d_counts;
   }
-
   CudaContext context_container{-1, false};
-  CudaContext *context;
+  CudaContextPtr context;
   int nK32;
   int x_size;
   int d_size;
@@ -587,13 +586,13 @@ TEST_P(BitLineMakerParTestFixture, BitlineMakerBatch) {
   context->synchronize();
 
   CUDA_TIMING_INIT;
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   blm->makeCounts(curx->getData(), curd->getData(), up, dw_min, lr, m_batch, trans, trans, trans);
 
   if (trans) {
-    CUDA_TIMING_STOP((*this->context), "Get Counts Batch [trans]");
+    CUDA_TIMING_STOP((this->context), "Get Counts Batch [trans]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "Get Counts Batch");
+    CUDA_TIMING_STOP((this->context), "Get Counts Batch");
   }
   if (up.update_bl_management)
     std::cout << "Update Management/ Update BL Management is on \n";
