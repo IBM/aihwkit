@@ -12,19 +12,19 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## Unreleased
+## [0.7.0] - 2023/01/04
 
 ### Added
 * Added stand-alone functions for applying inference drift to any model (\#419)
-* Example 24: analog inference and hardware-aware training on BERT (\#440)
-* Example 23: how to use ``AnalogTile`` directly to implement an
+* Added Example 24: analog inference and hardware-aware training on BERT (\#440)
+* Added Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
-* Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
-* Notebook for exploring analog sensitivities. (\#380)
+* Added Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
+* Added a new notebook for exploring analog sensitivities. (\#380)
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
 * Inference experiment and runners. (\#410)
 * Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
-* Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests
+* Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests.
 * Enabling comparisons of ``RPUConfig`` instances. (\#410)
 * Specific use-defined function for layer-wise setting for RPUConfigs
   in conversions. (\#412)
@@ -32,18 +32,18 @@ The format is based on [Keep a Changelog], and this project adheres to
 * New `remap` parameter field and functionality in
   ``InferenceRPUConfig`` (\#423).
 * Tile-level weight getter and setter have `apply_weight_scaling`
-  argument (\#423)
-* Pre- and post update / backward / forward methods in `BaseTile` for
+  argument. (\#423)
+* Pre and post update / backward / forward methods in `BaseTile` for
   easier user-defined modification of pre and/or post-processings of a tile. (\#423)
 * Type-checking for `RPUConfig` fields. (\#424)
 
 ### Fixed
 
-* Missing zero-grad call in example 02 (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU (\#447)
+* Missing zero-grad call in example 02. (\#446)
+* Indexing error in ``OneSidedDevice`` for CPU. (\#447)
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
-* Weights that were not contiguous could have set wrongly. (\#388)
+* Weights that were not contiguous could have been set wrongly. (\#388)
 * Programming noise would not be applied if drift compensation was not
   used. (\#389)
 * Loading a new model state dict for inference does not overwrite the noise
@@ -64,14 +64,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Changed
 
 * Weight noise visualization now shows the programming noise and drift
-  noise difference. (\#389)
+  noise differences. (\#389)
 * Concatenate the gradients before applying to the tile update
   function (some speedup for CUDA expected). (\#390)
 * Drift compensation uses eye instead of ones for readout. (\#412)
 * `weight_scaling_omega_columnwise` parameter in `MappingParameter` is now called
   `weight_scaling_columnwise`. (\#423)
 * Tile-level weight getter and setter now use Tensors instead of numpy
-  arrays (\#423)
+  arrays. (\#423)
 * Output scaling and mapping scales are now distiniguished, only the
   former is learnable. (\#423)
 * Renamed `learn_out_scaling_alpha` parameter in `MappingParameter` to
@@ -85,7 +85,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Removed
 
 * The `_scaled` versions of the weight getter and setter methods are
-removed (\#423)
+removed. (\#423)
 
 
 ## [0.6.0] - 2022/05/16
