@@ -224,7 +224,8 @@ class TileTest(ParametrizedTestCase):
         if not hasattr(rpu_config.device, 'lifetime'):
             if hasattr(rpu_config.device, 'unit_cell_devices') \
                and hasattr(rpu_config.device.unit_cell_devices[-1], 'lifetime'):
-                rpu_config.device.unit_cell_devices[-1].lifetime = 100.
+                for idx, _ in enumerate(rpu_config.device.unit_cell_devices):
+                    rpu_config.device.unit_cell_devices[idx].lifetime = 100.
             else:
                 raise SkipTest('This device does not support lifetime')
         else:
