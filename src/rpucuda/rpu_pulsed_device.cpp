@@ -674,8 +674,13 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
       //--------------------
       // decay
       {
-        T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * rng->sampleGauss());
-        w_decay_scale_[i][j] = t > 1.0 ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
+        if (par.lifetime > (T)0.0) {
+          T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * rng->sampleGauss());
+          w_decay_scale_[i][j] = (t > 1.0) ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
+        } else {
+          // meaning no decay
+          w_decay_scale_[i][j] = (T)1.0;
+        }
       }
     }
   }
