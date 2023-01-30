@@ -51,14 +51,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
-<<<<<<< HEAD
+* Decay fix for compound devices (\#463)
 * ``RPUCuda`` backend update with many fixes (\#456)
 * Missing zero-grad call in example 02 (\#446)
 * Indexing error in ``OneSidedDevice`` for CPU (\#447)
-=======
-* Missing zero-grad call in example 02. (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU. (\#447)
->>>>>>> 25158a2da88b714aaa60a7672fa32d01cce14443
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have been set wrongly. (\#388)
@@ -443,7 +439,10 @@ removed. (\#423)
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.4.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0
+[0.6.0]: https://github.com/IBM/aihwkit/compare/v0.5.1..0.6.0
+[0.5.1]: https://github.com/IBM/aihwkit/compare/v0.4.0..v0.5.1
 [0.4.0]: https://github.com/IBM/aihwkit/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/IBM/aihwkit/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
