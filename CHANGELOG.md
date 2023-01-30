@@ -439,7 +439,10 @@ removed. (\#423)
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.4.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0
+[0.6.0]: https://github.com/IBM/aihwkit/compare/v0.5.1..0.6.0
+[0.5.1]: https://github.com/IBM/aihwkit/compare/v0.4.0..v0.5.1
 [0.4.0]: https://github.com/IBM/aihwkit/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/IBM/aihwkit/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
