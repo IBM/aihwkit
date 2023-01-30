@@ -51,6 +51,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* Decay fix for compound devices (\#463)
 * ``RPUCuda`` backend update with many fixes (\#456)
 * Missing zero-grad call in example 02 (\#446)
 * Indexing error in ``OneSidedDevice`` for CPU (\#447)
