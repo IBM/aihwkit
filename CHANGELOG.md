@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [0.7.0] - 2023/01/04
+## [0.7.0] - 2023/01/30
 
 ### Added
 
@@ -21,31 +21,31 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Polynomial weight noise for hardware-aware training (\#456)
 * Remap functionality for hardware-aware training (\#456)
 * Input range estimation for InferenceRPUConfig (\#456)
-* CUDA syncs now always, added non-blocking option if not wished (\#456)
+* CUDA always syncs and added non-blocking option if not wished (\#456)
 * Fitting utility for fitting any device model to conductance measurements (\#456)
 * Added ``PowStepReferenceDevice`` for easy subtraction of symmetry
   point (\#456)
 * Added ``SoftBoundsReferenceDevice`` for easy subtraction of symmetry
   point (\#456)
 * Added stand-alone functions for applying inference drift to any model (\#419)
-* Added Example 24: analog inference and hardware-aware training on BERT (\#440)
+* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task (\#440)
 * Added Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
 * Added Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
 * Added a new notebook for exploring analog sensitivities. (\#380)
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
-* Inference experiment and runners. (\#410)
+* Inference cloud experiment and runners. (\#410)
 * Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
 * Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests.
 * Enabling comparisons of ``RPUConfig`` instances. (\#410)
-* Specific use-defined function for layer-wise setting for RPUConfigs
+* Specific user-defined function for layer-wise setting for RPUConfigs
   in conversions. (\#412)
 * Added stochastic rounding options for ``MixedPrecisionCompound``. (\#418)
 * New `remap` parameter field and functionality in
   ``InferenceRPUConfig`` (\#423).
 * Tile-level weight getter and setter have `apply_weight_scaling`
   argument. (\#423)
-* Pre and post update / backward / forward methods in `BaseTile` for
+* Pre and post-update / backward / forward methods in `BaseTile` for
   easier user-defined modification of pre and/or post-processings of a tile. (\#423)
 * Type-checking for `RPUConfig` fields. (\#424)
 
@@ -97,7 +97,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Deprecated
 
-* Input `weight_scaling_omega` argument to layers is deprecated. (\#423)
+* Input `weight_scaling_omega` argument in analog layers is deprecated. (\#423)
 
 ### Removed
 
