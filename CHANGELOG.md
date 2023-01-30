@@ -51,14 +51,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
-<<<<<<< HEAD
 * ``RPUCuda`` backend update with many fixes (\#456)
 * Missing zero-grad call in example 02 (\#446)
 * Indexing error in ``OneSidedDevice`` for CPU (\#447)
-=======
-* Missing zero-grad call in example 02. (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU. (\#447)
->>>>>>> 25158a2da88b714aaa60a7672fa32d01cce14443
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have been set wrongly. (\#388)
