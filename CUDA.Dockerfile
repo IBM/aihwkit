@@ -44,7 +44,7 @@ RUN groupadd -g ${GROUPID} ${USERNAME} && \
 USER ${USERNAME}
 WORKDIR /home/${USERNAME}
 
-ARG PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu118
+ARG PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu117
 
 # Install python packages as your user
 RUN pip install --no-cache-dir --upgrade pip && \
