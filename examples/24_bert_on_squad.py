@@ -15,14 +15,14 @@
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 """
-# pylint: disable=invalid-name, too-many-locals, import-error
+# pylint: disable=invalid-name
+# pylint: disable=too-many-locals
 
 from datetime import datetime
 import argparse
 import collections
-import os
-
 import numpy as np
+import os
 
 from transformers.integrations import TensorBoardCallback
 
@@ -34,10 +34,14 @@ from transformers import (
     DefaultDataCollator,
 )
 
+import torch
 from torch.utils.tensorboard import SummaryWriter
+import torch.multiprocessing as mp
 
 from evaluate import load
 from datasets import load_dataset
+
+import wandb
 
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
@@ -92,8 +96,6 @@ PARSER.add_argument("-l", "--learning_rate",
 ARGS = PARSER.parse_args()
 
 if ARGS.wandb:
-    import wandb
-
     # Define weights noise sweep configuration
     SWEEP_CONFIG = {
         "method": "random",
@@ -112,9 +114,8 @@ else:
     os.environ["WANDB_DISABLED"] = "true"
 
 # max length and stride specific to pretrained model
-MAX_LENGTH = 320
-DOC_STRIDE = 128
-
+MAX_LENGTH = 160
+DOC_STRIDE = 64
 
 def create_ideal_rpu_config(g_max=160, tile_size=256):
     """Create RPU Config with ideal conditions"""
@@ -168,7 +169,7 @@ def create_model(rpu_config):
     try:
         model = AutoModelForQuestionAnswering.from_pretrained(ARGS.checkpoint_dir)
         is_checkpoint_model = True
-    except EnvironmentError:
+    except:
         model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
 
     if not ARGS.digital:
@@ -454,16 +455,17 @@ def create_optimizer(model):
     return optimizer
 
 
-def make_trainer(model, optimizer, tokenized_data):
+def make_trainer(model, optimizer, tokenized_data, rank):
     """Create the Huggingface Trainer"""
     training_args = TrainingArguments(
         output_dir="./",
         save_strategy="no",
         per_device_train_batch_size=4,
         per_device_eval_batch_size=4,
-        num_train_epochs=3,
+        num_train_epochs=1,
         weight_decay=0.01,
-        no_cuda=False,
+        local_rank=rank,
+        ddp_find_unused_parameters=False
     )
 
     collator = DefaultDataCollator()
@@ -543,30 +545,54 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
         write_metrics(f1, exact_match, t_inference)
 
 
-def main():
+def example(rank, world_size, model, is_checkpoint_model, squad, tokenized_data, eval_data, optimizer):
     """Provide the lambda function for WandB sweep. If WandB is not used, then this
     is what is executed in the job
     """
-    if ARGS.wandb:
-        wandb.init()
+    os.environ["RANK"] = str(rank)
+    os.environ["WORLD_SIZE"] = str(world_size)
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
 
-    # Define RPU configuration and use it to create model and tokenizer
-    rpu_config = create_ideal_rpu_config() if ARGS.ideal else create_rpu_config(w_noise=ARGS.noise)
-    model, is_checkpoint_model = create_model(rpu_config)
-    squad, tokenized_data, eval_data = create_datasets()
-    optimizer = create_optimizer(model)
-    trainer, writer = make_trainer(model, optimizer, tokenized_data)
+    trainer, writer = make_trainer(model, optimizer, tokenized_data, rank)
 
     # Do hw-aware training if in analog domain and the model isn't loaded from
     # an existing checkpoint
     if ARGS.train_hwa and not ARGS.digital and not is_checkpoint_model:
         trainer.train()
-        trainer.save_model(ARGS.checkpoint_dir)
 
     do_inference(model, trainer, squad, eval_data, writer)
 
+def main():
+    n_gpus_available = torch.cuda.device_count()
+    assert n_gpus_available >= 2, f"Requires at least 2 gpus to run, got {n_gpus_availble}"
 
-if ARGS.wandb:
-    wandb.agent(SWEEP_ID, function=main, count=4)
-else:
-    main()
+    mp.set_sharing_strategy("file_system")
+
+    rpu_config = create_ideal_rpu_config() if ARGS.ideal else create_rpu_config(w_noise=ARGS.noise)
+    model, is_checkpoint_model = create_model(rpu_config)
+
+    # Define RPU configuration and use it to create model and tokenizer
+    squad, tokenized_data, eval_data = create_datasets()
+    optimizer = create_optimizer(model)
+
+    mp.spawn(
+        example, 
+        args=(
+            n_gpus_available,
+            model,
+            is_checkpoint_model,
+            squad,
+            tokenized_data,
+            eval_data,
+            optimizer),
+        nprocs=n_gpus_available, join=True)
+
+    torch.save(model.state_dict(), ARGS.checkpoint_dir)
+
+if __name__ == "__main__":
+    if ARGS.wandb:
+        wandb.init()
+        wandb.agent(SWEEP_ID, function=main, count=4)
+    else:
+        main()
