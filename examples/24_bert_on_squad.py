@@ -15,8 +15,7 @@
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 """
-# pylint: disable=invalid-name
-# pylint: disable=too-many-locals
+# pylint: disable=invalid-name, too-many-locals, import-error
 
 from datetime import datetime
 import argparse
@@ -169,7 +168,7 @@ def create_model(rpu_config):
     try:
         model = AutoModelForQuestionAnswering.from_pretrained(ARGS.checkpoint_dir)
         is_checkpoint_model = True
-    except:
+    except EnvironmentError:
         model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
 
     if not ARGS.digital:
