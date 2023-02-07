@@ -227,9 +227,9 @@ The image can be built via::
     --build-arg USERID=(id -u $USER) \
     --build-arg GROUPID=(id -g $USER) \
     --build-arg CUDA_ARCH=${CUDA_ARCH} \
-    --build-arg CUDA_VER=11.7 \
+    --build-arg CUDA_VER=11.8.0 \
     --build-arg UBUNTU_VER=22.04 \
-    --build-arg PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu116 \
+    --build-arg PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu117 \
     --file CUDA.Dockerfile .
 
 If building your image against a different CUDA or PyTorch version, please
