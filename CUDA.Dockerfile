@@ -1,9 +1,9 @@
 # Build argumnets
-ARG CUDA_VER=11.7
+ARG CUDA_VER=11.8.0
 ARG UBUNTU_VER=22.04
 
 # Download the base image
-FROM nvidia/cuda:${CUDA_VER}.1-devel-ubuntu${UBUNTU_VER}
+FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER}
 # you can check for all available images at https://hub.docker.com/r/nvidia/cuda/tags
 
 # Install as root
@@ -44,11 +44,11 @@ RUN groupadd -g ${GROUPID} ${USERNAME} && \
 USER ${USERNAME}
 WORKDIR /home/${USERNAME}
 
-ARG PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu116
+ARG PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu117
 
 # Install python packages as your user
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir pybind11 scikit-build protobuf==3.20.2 && \
+    pip install --no-cache-dir pybind11 scikit-build protobuf>=4.21.6 && \
     pip install --no-cache-dir torch torchvision torchaudio --extra-index-url ${PYTORCH_PIP_URL} && \
 # Set path of python packages
     echo 'export PATH=$HOME/.local/bin:$PATH' >> /home/${USERNAME}/.bashrc
