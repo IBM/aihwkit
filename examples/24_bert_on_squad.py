@@ -564,7 +564,7 @@ def example(rank, world_size, model, is_checkpoint_model, squad, tokenized_data,
 
 def main():
     n_gpus_available = torch.cuda.device_count()
-    assert n_gpus_available >= 2, f"Requires at least 2 gpus to run, got {n_gpus_availble}"
+    assert n_gpus_available >= 2, f"Requires at least 2 gpus to run, got {n_gpus_available}"
 
     mp.set_sharing_strategy("file_system")
 
