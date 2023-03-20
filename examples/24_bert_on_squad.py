@@ -74,7 +74,7 @@ PARSER.add_argument(
     action="store_true",
 )
 PARSER.add_argument("-w", "--wandb", help="Add to use wandb", action="store_true")
-PARSER.add_argument("-n", "--noise", help="Weight noise", default=0.0175, type=float)
+PARSER.add_argument("-n", "--noise", help="Modifier noise", default=0.1, type=float)
 PARSER.add_argument(
     "-r",
     "--run_name",
@@ -104,7 +104,7 @@ if ARGS.wandb:
     # Define weights noise sweep configuration
     SWEEP_CONFIG = {
         "method": "random",
-        "name": "weight noise sweep",
+        "name": "modifier noise sweep",
         "metric": {"goal": "maximize", "name": "exact_match"},
         "parameters": {"modifier_noise": {"values": [0, 0.05, 0.1, 0.2]}},
     }
@@ -157,7 +157,7 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
             digital_bias=True,
             learn_out_scaling=True,
             weight_scaling_omega=1.0,
-            out_scaling_columnwise=False,
+            out_scaling_columnwise=True,
             weight_scaling_columnwise=True,
             max_input_size=tile_size,
             max_output_size=0,
@@ -189,7 +189,7 @@ def create_model(rpu_config):
 
     if not ARGS.digital:
         model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
-        model.remap_weights()
+        model.remap_analog_weights()
 
     print(model)
     return model, is_checkpoint_model
@@ -372,7 +372,7 @@ def postprocess_predictions(
     predictions = collections.OrderedDict()
 
     print(
-        f"Post-processing {len(examples)} example predictions"
+        f"Post-processing {len(examples)} example predictions "
         f"split into {len(features)} features."
     )
 
