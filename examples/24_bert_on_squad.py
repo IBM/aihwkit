@@ -44,7 +44,11 @@ from aihwkit.simulator.configs import (
     WeightModifierType,
     WeightClipType,
     WeightNoiseType,
-    BoundManagementType
+    BoundManagementType,
+    NoiseManagementType,
+    WeightClipParameter,
+    WeightModifierParameter,
+    MappingParameter,
 )
 
 from aihwkit.simulator.presets import PresetIOParameters
@@ -60,34 +64,37 @@ TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 # Parse some arguments
 PARSER = argparse.ArgumentParser("Analog BERT on SQuAD example")
-PARSER.add_argument("-d", "--digital",
-                    help="Add to use digital inference",
-                    action="store_true")
-PARSER.add_argument("-i", "--ideal",
-                    help="Add to use ideal config instead of default noisy one",
-                    action="store_true")
-PARSER.add_argument("-w", "--wandb",
-                    help="Add to use wandb",
-                    action="store_true")
-PARSER.add_argument("-n", "--noise",
-                    help="Weight noise",
-                    default=0.0175,
-                    type=float)
-PARSER.add_argument("-r", "--run_name",
-                    help="Tensorboard run name",
-                    default=datetime.now().strftime("%Y%m%d-%H%M%S"),
-                    type=str)
-PARSER.add_argument("-t", "--train_hwa",
-                    help="Use Hardware-Aware training",
-                    action="store_true")
-PARSER.add_argument("-c", "--checkpoint_dir",
-                    help="Directory specifying where to load/save a checkpoint",
-                    default="./saved",
-                    type=str)
-PARSER.add_argument("-l", "--learning_rate",
-                    help="Learning rate for training",
-                    default=2e-4,
-                    type=float)
+PARSER.add_argument(
+    "-d", "--digital", help="Add to use digital inference", action="store_true"
+)
+PARSER.add_argument(
+    "-i",
+    "--ideal",
+    help="Add to use ideal config instead of default noisy one",
+    action="store_true",
+)
+PARSER.add_argument("-w", "--wandb", help="Add to use wandb", action="store_true")
+PARSER.add_argument("-n", "--noise", help="Weight noise", default=0.0175, type=float)
+PARSER.add_argument(
+    "-r",
+    "--run_name",
+    help="Tensorboard run name",
+    default=datetime.now().strftime("%Y%m%d-%H%M%S"),
+    type=str,
+)
+PARSER.add_argument(
+    "-t", "--train_hwa", help="Use Hardware-Aware training", action="store_true"
+)
+PARSER.add_argument(
+    "-c",
+    "--checkpoint_dir",
+    help="Directory specifying where to load/save a checkpoint",
+    default="./saved",
+    type=str,
+)
+PARSER.add_argument(
+    "-l", "--learning_rate", help="Learning rate for training", default=2e-4, type=float
+)
 
 ARGS = PARSER.parse_args()
 
@@ -98,13 +105,8 @@ if ARGS.wandb:
     SWEEP_CONFIG = {
         "method": "random",
         "name": "weight noise sweep",
-        "metric": {
-            "goal": "maximize",
-            "name": "exact_match"
-        },
-        "parameters": {
-            "weight_noise": {"values": [0, 0.00875, 0.0175, 0.035, 0.07]}
-        }
+        "metric": {"goal": "maximize", "name": "exact_match"},
+        "parameters": {"modifier_noise": {"values": [0, 0.05, 0.1, 0.2]}},
     }
 
     SWEEP_ID = wandb.sweep(sweep=SWEEP_CONFIG, project="bert-weight-noise-experiment")
@@ -116,49 +118,63 @@ MAX_LENGTH = 320
 DOC_STRIDE = 128
 
 
-def create_ideal_rpu_config(g_max=160, tile_size=256):
+def create_ideal_rpu_config(tile_size=512):
     """Create RPU Config with ideal conditions"""
-    rpu_config = InferenceRPUConfig()
-    rpu_config.clip.type = WeightClipType.FIXED_VALUE
-    rpu_config.clip.fixed_value = 1.0
-    rpu_config.modifier.rel_to_actual_wmax = True
-    rpu_config.mapping.digital_bias = True
-    rpu_config.mapping.learn_out_scaling_alpha = True
-    rpu_config.mapping.weight_scaling_omega = 1
-    rpu_config.mapping.weight_scaling_omega_columnwise = True
-    rpu_config.mapping.max_input_size = tile_size
-    rpu_config.mapping.max_output_size = 255
-    rpu_config.forward.is_perfect = True
-    rpu_config.noise_model = PCMLikeNoiseModel(g_max=g_max, prog_noise_scale=0, read_noise_scale=0)
-    rpu_config.drift_compensation = GlobalDriftCompensation()
+    rpu_config = InferenceRPUConfig(
+        mapping=MappingParameter(
+            digital_bias=True,
+            learn_out_scaling=True,
+            weight_scaling_omega=1.0,
+            out_scaling_columnwise=False,
+            weight_scaling_columnwise=True,
+            max_input_size=tile_size,
+            max_output_size=0,
+        ),
+        forward=PresetIOParameters(is_perfect=True),
+        noise_model=PCMLikeNoiseModel(
+            prog_noise_scale=0.0,
+            read_noise_scale=0.0,
+            drift_scale=0.0,
+        ),
+        drift_compensation=None,
+    )
     return rpu_config
 
 
-def create_rpu_config(w_noise, g_max=160, tile_size=256, dac_res=256, adc_res=256):
+def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     """Create RPU Config emulated typical PCM Device"""
     if ARGS.wandb:
-        w_noise = wandb.config.weight_noise
+        modifier_noise = wandb.config.modifier_noise
 
-    rpu_config = InferenceRPUConfig()
-    rpu_config.clip.type = WeightClipType.FIXED_VALUE
-    rpu_config.clip.fixed_value = 1.0
-    rpu_config.modifier.rel_to_actual_wmax = True
-    rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
-    rpu_config.modifier.std_dev = 0.1
-    rpu_config.mapping.digital_bias = True
-    rpu_config.mapping.learn_out_scaling_alpha = True
-    rpu_config.mapping.weight_scaling_omega = 1
-    rpu_config.mapping.weight_scaling_omega_columnwise = True
-    rpu_config.mapping.max_input_size = tile_size
-    rpu_config.mapping.max_output_size = 255
-    rpu_config.forward = PresetIOParameters()
-    rpu_config.forward.w_noise_type = WeightNoiseType.PCM_READ
-    rpu_config.forward.w_noise = w_noise
-    rpu_config.forward.inp_res = 1/dac_res
-    rpu_config.forward.out_res = 1/adc_res
-    rpu_config.forward.bound_management = BoundManagementType.ITERATIVE
-    rpu_config.noise_model = PCMLikeNoiseModel(g_max=g_max)
-    rpu_config.drift_compensation = GlobalDriftCompensation()
+    rpu_config = InferenceRPUConfig(
+        clip=WeightClipParameter(type=WeightClipType.FIXED_VALUE, fixed_value=1.0),
+        modifier=WeightModifierParameter(
+            rel_to_actual_wmax=True,
+            type=WeightModifierType.ADD_NORMAL,
+            std_dev=modifier_noise,
+        ),
+        mapping=MappingParameter(
+            digital_bias=True,
+            learn_out_scaling=True,
+            weight_scaling_omega=1.0,
+            out_scaling_columnwise=False,
+            weight_scaling_columnwise=True,
+            max_input_size=tile_size,
+            max_output_size=0,
+        ),
+        forward=PresetIOParameters(
+            w_noise_type=WeightNoiseType.PCM_READ,
+            w_noise=0.0175,
+            inp_res=dac_res,
+            out_res=adc_res,
+            out_bound=10.0,
+            out_noise=0.04,
+            bound_management=BoundManagementType.ITERATIVE,
+            noise_management=NoiseManagementType.ABS_MAX,
+        ),
+        noise_model=PCMLikeNoiseModel(),
+        drift_compensation=GlobalDriftCompensation(),
+    )
     return rpu_config
 
 
@@ -173,9 +189,9 @@ def create_model(rpu_config):
 
     if not ARGS.digital:
         model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
+        model.remap_weights()
 
     print(model)
-
     return model, is_checkpoint_model
 
 
@@ -254,8 +270,10 @@ def preprocess_train(dataset):
 
             # Detect if the answer is out of the span
             # (in which case this feature is labeled with the CLS index).
-            if not (offsets[token_start_index][0] <= start_char
-                    and offsets[token_end_index][1] >= end_char):
+            if not (
+                offsets[token_start_index][0] <= start_char
+                and offsets[token_end_index][1] >= end_char
+            ):
                 tokenized_dataset["start_positions"].append(cls_index)
                 tokenized_dataset["end_positions"].append(cls_index)
             else:
@@ -263,8 +281,10 @@ def preprocess_train(dataset):
                 # token_end_index to the two ends of the answer.
                 # Note: we could go after the last offset
                 # if the answer is the last word (edge case).
-                while (token_start_index < len(offsets)
-                       and offsets[token_start_index][0] <= start_char):
+                while (
+                    token_start_index < len(offsets)
+                    and offsets[token_start_index][0] <= start_char
+                ):
                     token_start_index += 1
                 tokenized_dataset["start_positions"].append(token_start_index - 1)
                 while offsets[token_end_index][1] >= end_char:
@@ -330,14 +350,12 @@ def preprocess_validation(dataset):
 
 
 def postprocess_predictions(
-    examples,
-    features,
-    raw_predictions,
-    n_best_size=20,
-    max_answer_length=30
+    examples, features, raw_predictions, n_best_size=20, max_answer_length=30
 ):
     """Postprocess raw predictions"""
-    features.set_format(type=features.format["type"], columns=list(features.features.keys()))
+    features.set_format(
+        type=features.format["type"], columns=list(features.features.keys())
+    )
     all_start_logits, all_end_logits = raw_predictions
 
     # Map examples ids to index
@@ -353,8 +371,10 @@ def postprocess_predictions(
     # The dictionaries we have to fill
     predictions = collections.OrderedDict()
 
-    print(f"Post-processing {len(examples)} example predictions"
-          f"split into {len(features)} features.")
+    print(
+        f"Post-processing {len(examples)} example predictions"
+        f"split into {len(features)} features."
+    )
 
     # Loop over all examples
     for example_index, example in enumerate(examples):
@@ -377,8 +397,10 @@ def postprocess_predictions(
             offset_mapping = features[feature_index]["offset_mapping"]
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1:-n_best_size - 1:-1].tolist()
-            end_indexes = np.argsort(end_logits)[-1:-n_best_size - 1:-1].tolist()
+            start_indexes = np.argsort(start_logits)[
+                -1 : -n_best_size - 1 : -1
+            ].tolist()
+            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are
@@ -394,7 +416,10 @@ def postprocess_predictions(
 
                     # Don't consider answers with a length
                     # that is either < 0 or > max_answer_length.
-                    if end_index < start_index or end_index - start_index + 1 > max_answer_length:
+                    if (
+                        end_index < start_index
+                        or end_index - start_index + 1 > max_answer_length
+                    ):
                         continue
 
                     # Map the start token to the index of the start of that token in the context
@@ -408,13 +433,15 @@ def postprocess_predictions(
                     valid_answers.append(
                         {
                             "score": start_logits[start_index] + end_logits[end_index],
-                            "text": context[start_char:end_char]
+                            "text": context[start_char:end_char],
                         }
                     )
 
         # If we have valid answers, choose the best one
         if len(valid_answers) > 0:
-            best_answer = sorted(valid_answers, key=lambda x: x["score"], reverse=True)[0]
+            best_answer = sorted(valid_answers, key=lambda x: x["score"], reverse=True)[
+                0
+            ]
         else:
             # In the very rare edge case we have not a single non-null prediction,
             # we create a fake prediction to avoid
@@ -434,13 +461,13 @@ def create_datasets():
     # Preprocessing changes number of samples, so we need to remove some columns so
     # the data updates properly
     tokenized_data = squad.map(
-                        preprocess_train,
-                        batched=True,
-                        remove_columns=squad["train"].column_names)
+        preprocess_train, batched=True, remove_columns=squad["train"].column_names
+    )
     eval_data = squad["validation"].map(
-                        preprocess_validation,
-                        batched=True,
-                        remove_columns=squad["validation"].column_names)
+        preprocess_validation,
+        batched=True,
+        remove_columns=squad["validation"].column_names,
+    )
 
     return squad, tokenized_data, eval_data
 
@@ -462,7 +489,7 @@ def make_trainer(model, optimizer, tokenized_data):
         per_device_train_batch_size=4,
         per_device_eval_batch_size=4,
         num_train_epochs=3,
-        weight_decay=0.01,
+        weight_decay=0.001,
         no_cuda=False,
     )
 
@@ -479,29 +506,35 @@ def make_trainer(model, optimizer, tokenized_data):
         eval_dataset=tokenized_data["validation"],
         tokenizer=TOKENIZER,
         optimizers=(optimizer, None),
-        callbacks=[TensorBoardCallback(writer)]
+        callbacks=[TensorBoardCallback(writer)],
     )
 
     return trainer, writer
 
 
-def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9):
+def do_inference(
+    model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9
+):
     """Perform inference experiment at weight noise level specified at runtime.
     SQuAD exact match and f1 metrics are captured in Tensorboard
     """
+
     # Helper functions
     def predict():
         # Perform inference + evaluate metric here
         raw_predictions = trainer.predict(eval_data)
         predictions = postprocess_predictions(
-            squad["validation"],
-            eval_data,
-            raw_predictions.predictions)
+            squad["validation"], eval_data, raw_predictions.predictions
+        )
 
         # Format to list of dicts instead of a large dict
-        formatted_preds = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
+        formatted_preds = [
+            {"id": k, "prediction_text": v} for k, v in predictions.items()
+        ]
 
-        out_metric = metric.compute(predictions=formatted_preds, references=ground_truth)
+        out_metric = metric.compute(
+            predictions=formatted_preds, references=ground_truth
+        )
 
         return out_metric["f1"], out_metric["exact_match"]
 
@@ -511,35 +544,35 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
         writer.add_scalar("val/exact_match", exact_match, t_inference)
 
         if ARGS.wandb:
-            wandb.log({
-                "t_inference": t_inference,
-                "f1": f1,
-                "exact_match": exact_match,
-            })
+            wandb.log(
+                {"t_inference": t_inference, "f1": f1, "exact_match": exact_match}
+            )
 
-        print(f"Exact match: {exact_match: .2f}\t"
-              f"F1: {f1: .2f}\t"
-              f"Drift: {t_inference: .2e}")
+        print(
+            f"Exact match: {exact_match: .2f}\t"
+            f"F1: {f1: .2f}\t"
+            f"Drift: {t_inference: .2e}"
+        )
 
     model.eval()
 
     metric = load("squad")
 
-    ground_truth = [{"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]]
+    ground_truth = [
+        {"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]
+    ]
 
-    t_inference_list = np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
+    t_inference_list = np.logspace(
+        0, np.log10(float(max_inference_time)), n_times
+    ).tolist()
 
     # Get the initial metrics
     f1, exact_match = predict()
     write_metrics(f1, exact_match, 0.0)
 
     for t_inference in t_inference_list:
-        # Only drift and recalculate metrics if in analog
-        if not ARGS.digital:
-            model.drift_analog_weights(t_inference)
-
-            f1, exact_match = predict()
-
+        model.drift_analog_weights(t_inference)
+        f1, exact_match = predict()
         write_metrics(f1, exact_match, t_inference)
 
 
@@ -551,8 +584,13 @@ def main():
         wandb.init()
 
     # Define RPU configuration and use it to create model and tokenizer
-    rpu_config = create_ideal_rpu_config() if ARGS.ideal else create_rpu_config(w_noise=ARGS.noise)
+    if ARGS.ideal:
+        rpu_config = create_ideal_rpu_config()
+    else:
+        rpu_config = create_rpu_config(modifier_noise=ARGS.noise)
+
     model, is_checkpoint_model = create_model(rpu_config)
+
     squad, tokenized_data, eval_data = create_datasets()
     optimizer = create_optimizer(model)
     trainer, writer = make_trainer(model, optimizer, tokenized_data)
