@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [0.7.0] - 2023/01/04
+## [0.7.0] - 2023/01/30
 
 ### Added
 
@@ -28,7 +28,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added ``SoftBoundsReferenceDevice`` for easy subtraction of symmetry
   point (\#456)
 * Added stand-alone functions for applying inference drift to any model (\#419)
-* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task (\#* Added Example 23: how to use ``AnalogTile`` directly to implement an
+* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task (\#440)
+* Added Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
 * Added Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
 * Added a new notebook for exploring analog sensitivities. (\#380)
@@ -50,8 +51,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
-* Missing zero-grad call in example 02. (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU. (\#447)
+* Decay fix for compound devices (\#463)
+* ``RPUCuda`` backend update with many fixes (\#456)
+* Missing zero-grad call in example 02 (\#446)
+* Indexing error in ``OneSidedDevice`` for CPU (\#447)
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have been set wrongly. (\#388)
