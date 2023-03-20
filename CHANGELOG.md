@@ -21,44 +21,37 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Polynomial weight noise for hardware-aware training (\#456)
 * Remap functionality for hardware-aware training (\#456)
 * Input range estimation for InferenceRPUConfig (\#456)
-* CUDA syncs now always, added non-blocking option if not wished (\#456)
+* CUDA always syncs and added non-blocking option if not wished (\#456)
 * Fitting utility for fitting any device model to conductance measurements (\#456)
 * Added ``PowStepReferenceDevice`` for easy subtraction of symmetry
   point (\#456)
 * Added ``SoftBoundsReferenceDevice`` for easy subtraction of symmetry
   point (\#456)
 * Added stand-alone functions for applying inference drift to any model (\#419)
-* Added Example 24: analog inference and hardware-aware training on BERT (\#440)
-* Added Example 23: how to use ``AnalogTile`` directly to implement an
+* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task (\#* Added Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
 * Added Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
 * Added a new notebook for exploring analog sensitivities. (\#380)
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
-* Inference experiment and runners. (\#410)
+* Inference cloud experiment and runners. (\#410)
 * Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
 * Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests.
 * Enabling comparisons of ``RPUConfig`` instances. (\#410)
-* Specific use-defined function for layer-wise setting for RPUConfigs
+* Specific user-defined function for layer-wise setting for RPUConfigs
   in conversions. (\#412)
 * Added stochastic rounding options for ``MixedPrecisionCompound``. (\#418)
 * New `remap` parameter field and functionality in
   ``InferenceRPUConfig`` (\#423).
 * Tile-level weight getter and setter have `apply_weight_scaling`
   argument. (\#423)
-* Pre and post update / backward / forward methods in `BaseTile` for
+* Pre and post-update / backward / forward methods in `BaseTile` for
   easier user-defined modification of pre and/or post-processings of a tile. (\#423)
 * Type-checking for `RPUConfig` fields. (\#424)
 
 ### Fixed
 
-<<<<<<< HEAD
-* ``RPUCuda`` backend update with many fixes (\#456)
-* Missing zero-grad call in example 02 (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU (\#447)
-=======
 * Missing zero-grad call in example 02. (\#446)
 * Indexing error in ``OneSidedDevice`` for CPU. (\#447)
->>>>>>> 25158a2da88b714aaa60a7672fa32d01cce14443
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have been set wrongly. (\#388)
@@ -101,7 +94,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Deprecated
 
-* Input `weight_scaling_omega` argument to layers is deprecated. (\#423)
+* Input `weight_scaling_omega` argument in analog layers is deprecated. (\#423)
 
 ### Removed
 
@@ -443,7 +436,10 @@ removed. (\#423)
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.4.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0
+[0.6.0]: https://github.com/IBM/aihwkit/compare/v0.5.1..0.6.0
+[0.5.1]: https://github.com/IBM/aihwkit/compare/v0.4.0..v0.5.1
 [0.4.0]: https://github.com/IBM/aihwkit/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/IBM/aihwkit/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
