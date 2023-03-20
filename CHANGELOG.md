@@ -12,96 +12,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [0.7.0] - 2023/01/04
-
-### Added
-
-* Reset tiles method (\#456)
-* Added many new analog MAC non-linearties (forward / backward pass) (#456)
-* Polynomial weight noise for hardware-aware training (\#456)
-* Remap functionality for hardware-aware training (\#456)
-* Input range estimation for InferenceRPUConfig (\#456)
-* CUDA always syncs and added non-blocking option if not wished (\#456)
-* Fitting utility for fitting any device model to conductance measurements (\#456)
-* Added ``PowStepReferenceDevice`` for easy subtraction of symmetry
-  point (\#456)
-* Added ``SoftBoundsReferenceDevice`` for easy subtraction of symmetry
-  point (\#456)
-* Added stand-alone functions for applying inference drift to any model (\#419)
-* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task (\#* Added Example 23: how to use ``AnalogTile`` directly to implement an
-  analog matrix-vector product without using pytorch modules. (\#393)
-* Added Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
-* Added a new notebook for exploring analog sensitivities. (\#380)
-* Remapping functionality for ``InferenceRPUConfig``. (\#388)
-* Inference cloud experiment and runners. (\#410)
-* Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
-* Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests.
-* Enabling comparisons of ``RPUConfig`` instances. (\#410)
-* Specific user-defined function for layer-wise setting for RPUConfigs
-  in conversions. (\#412)
-* Added stochastic rounding options for ``MixedPrecisionCompound``. (\#418)
-* New `remap` parameter field and functionality in
-  ``InferenceRPUConfig`` (\#423).
-* Tile-level weight getter and setter have `apply_weight_scaling`
-  argument. (\#423)
-* Pre and post-update / backward / forward methods in `BaseTile` for
-  easier user-defined modification of pre and/or post-processings of a tile. (\#423)
-* Type-checking for `RPUConfig` fields. (\#424)
-
-### Fixed
-
-* Missing zero-grad call in example 02. (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU. (\#447)
-* Analog summary error when model is on cuda device. (\#392)
-* Index error when loading the state dict with a model use previously. (\#387)
-* Weights that were not contiguous could have been set wrongly. (\#388)
-* Programming noise would not be applied if drift compensation was not
-  used. (\#389)
-* Loading a new model state dict for inference does not overwrite the noise
-  model setting. (\#410)
-* Avoid ``AnalogContext`` copying of self pointers. (\#410)
-* Fix issue that drift compensation is not applied to conv-layers. (\#412)
-* Fix issue that noise modifiers are not applied to conv-layers. (\#412)
-* The CPU ``AnalogConv2d`` layer now uses unfolded convolutions instead of
-  indexed covolutions (that are efficient only for GPUs). (\#415)
-* Fix issue that write noise hidden weights are not transferred to
-  pytorch when using ``get_hidden_parameters`` in case of CUDA. (\#417)
-* Learning rate scaling due to output scales. (\#423)
-* `WeightModifiers` of the `InferenceRPUConfig` are no longer called
-  in the forward pass, but instead in the `post_update_step`
-  method to avoid issues with repeated forward calls. (\#423)
-* Fix training `learn_out_scales` issue after checkpoint load. (\#434)
-
-### Changed
-
-* Pylint / mypy / pycodestyle / protobuf version bump (\#456)
-* All configs related classes can now be imported from
-  ``aihwkit.simulator.config`` (\#456)
-* Weight noise visualization now shows the programming noise and drift
-  noise differences. (\#389)
-* Concatenate the gradients before applying to the tile update
-  function (some speedup for CUDA expected). (\#390)
-* Drift compensation uses eye instead of ones for readout. (\#412)
-* `weight_scaling_omega_columnwise` parameter in `MappingParameter` is now called
-  `weight_scaling_columnwise`. (\#423)
-* Tile-level weight getter and setter now use Tensors instead of numpy
-  arrays. (\#423)
-* Output scaling and mapping scales are now distiniguished, only the
-  former is learnable. (\#423)
-* Renamed `learn_out_scaling_alpha` parameter in `MappingParameter` to
-  `learn_out_scaling` and columnwise learning has a separate switch
-  `out_scaling_columnwise`. (\#423)
-
-### Deprecated
-
-* Input `weight_scaling_omega` argument in analog layers is deprecated. (\#423)
-
-### Removed
-
-* The `_scaled` versions of the weight getter and setter methods are
-removed. (\#423)
-
-
 ## [0.6.0] - 2022/05/16
 
 ### Added
@@ -110,14 +20,10 @@ removed. (\#423)
 * Out scaling factors can be learnt even if weight scaling omega was set to 0. (\#360)
 * Reverse up / down option for ``LinearStepDevice``. (\#361)
 * Generic Analog RNN classes (LSTM, RNN, GRU) uni or bidirectional. (\#358)
-* Added new ``PiecewiseStepDevice`` where the update-step response
-  function can be arbitrarily defined by the user in a piece-wise
-  linear manner. It can be conveniently used to fit any experimental
-  device data. (\#356)
-* Several enhancements to the public documentations: added a new
-  section for hw-aware training, refreshed the reference API doc, and
-  added the newly supported LSTM layers and the mapped conv
-  layers. (\#374)
+* Added new ``PiecewiseStepDevice`` where the update-step response function can be arbitrarily defined by the user
+  in a piece-wise linear manner. It can be conveniently used to fit any experimental device data. (\#356)
+* Several enhancements to the public documentations: added a new section for hw-aware training, refreshed the reference API doc, 
+  and added the newly supported LSTM layers and the mapped conv layers. (\#374)
 
 ### Fixed
 
@@ -131,7 +37,6 @@ removed. (\#423)
 * The lowest supported Python version is now `3.7`, as `3.6` has reached
   end-of-life. Additionally, the library now officially supports Python
   `3.10`. (\#368)
-
 
 ## [0.5.1] - 2022/01/27
 
@@ -436,10 +341,7 @@ removed. (\#423)
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.7.0...HEAD
-[0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0
-[0.6.0]: https://github.com/IBM/aihwkit/compare/v0.5.1..0.6.0
-[0.5.1]: https://github.com/IBM/aihwkit/compare/v0.4.0..v0.5.1
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/IBM/aihwkit/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/IBM/aihwkit/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1
