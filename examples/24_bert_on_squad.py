@@ -189,7 +189,7 @@ def create_model(rpu_config):
 
     if not ARGS.digital:
         model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
-        model.remap_weights()
+        model.remap_analog_weights()
 
     print(model)
     return model, is_checkpoint_model
