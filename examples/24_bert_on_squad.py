@@ -34,6 +34,7 @@ from transformers import (
     DefaultDataCollator,
 )
 
+from torch import save as torch_save, load as torch_load
 from torch.utils.tensorboard import SummaryWriter
 
 from evaluate import load
@@ -86,10 +87,14 @@ PARSER.add_argument(
     "-t", "--train_hwa", help="Use Hardware-Aware training", action="store_true"
 )
 PARSER.add_argument(
+    "-L", "--load", help="Use when loadiung from training checkpoint", action="store_true"
+)
+
+PARSER.add_argument(
     "-c",
-    "--checkpoint_dir",
-    help="Directory specifying where to load/save a checkpoint",
-    default="./saved",
+    "--checkpoint",
+    help="File name specifying where to load/save a checkpoint",
+    default="./saved_chkpt.pth",
     type=str,
 )
 PARSER.add_argument(
@@ -180,19 +185,15 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
 
 def create_model(rpu_config):
     """Return Question Answering model and whether or not it was loaded from a checkpoint"""
-    is_checkpoint_model = False
-    try:
-        model = AutoModelForQuestionAnswering.from_pretrained(ARGS.checkpoint_dir)
-        is_checkpoint_model = True
-    except EnvironmentError:
-        model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
+
+    model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
 
     if not ARGS.digital:
         model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
         model.remap_analog_weights()
 
     print(model)
-    return model, is_checkpoint_model
+    return model
 
 
 # Some examples in the dataset may have contexts that exceed the maximum input length
@@ -587,18 +588,21 @@ def main():
     else:
         rpu_config = create_rpu_config(modifier_noise=ARGS.noise)
 
-    model, is_checkpoint_model = create_model(rpu_config)
+    model = create_model(rpu_config)
 
     squad, tokenized_data, eval_data = create_datasets()
     optimizer = create_optimizer(model)
     trainer, writer = make_trainer(model, optimizer, tokenized_data)
 
+    if ARGS.load:
+        print(f"Load model from '{ARGS.checkpoint}'.")
+        model.load_state_dict(torch_load(ARGS.checkpoint))
+
     # Do hw-aware training if in analog domain and the model isn't loaded from
     # an existing checkpoint
-    if ARGS.train_hwa and not ARGS.digital and not is_checkpoint_model:
+    if ARGS.train_hwa and not ARGS.digital and not ARGS.load:
         trainer.train()
-        trainer.save_model(ARGS.checkpoint_dir)
-
+        torch_save(model.state_dict(), ARGS.checkpoint)
     do_inference(model, trainer, squad, eval_data, writer)
 
 
