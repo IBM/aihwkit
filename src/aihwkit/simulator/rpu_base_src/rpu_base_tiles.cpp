@@ -190,58 +190,6 @@ void declare_rpu_tiles(py::module &m) {
            Args:
                weights: ``[d_size, x_size]`` weight matrix.
            )pbdoc")
-
-      .def(
-          "get_weights_realistic",
-          [](Class &self) {
-            torch::Tensor weights = torch::empty({self.getDSize(), self.getXSize()});
-
-            // Call RPU function.
-            std::lock_guard<std::mutex> lock(self.mutex_);
-            self.getWeightsReal(weights.data_ptr<T>());
-            return weights;
-          },
-          R"pbdoc(
-           Return the tile weights.
-
-           Return the tile weights by using the forward pass. This is the hardware realistic
-           version of reading out the weights.
-
-           Returns:
-               tensor: the ``[d_size, x_size]`` weight matrix.
-           )pbdoc")
-
-      .def(
-          "set_weights_realistic",
-          [](Class &self, torch::Tensor weights, int n_loops = 10) {
-            // Validate the weights dimensions.
-            if (weights.dim() != 2 || weights.size(0) != self.getDSize() ||
-                weights.size(1) != self.getXSize()) {
-              throw std::runtime_error(
-                  "Invalid weights dimensions: expected [" + std::to_string(self.getDSize()) + "," +
-                  std::to_string(self.getXSize()) + "] tensor");
-            }
-
-            auto cpu_weights = weights.detach().cpu().contiguous();
-            CHECK_CONTIGUOUS(cpu_weights);
-
-            // Call RPU function.
-            std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.setWeightsReal(cpu_weights.data_ptr<T>(), n_loops);
-          },
-          py::arg("weights"), py::arg("n_loops") = 10,
-          R"pbdoc(
-           Set the tile weights by using the forward/update pass.
-
-           Set the tile weights to the ``weights`` parameter by using the forward/update
-           pass. This is the hardware realistic version for handling setting of the weights.
-
-           Args:
-               weights: ``[d_size, x_size]`` weight matrix.
-               n_loops: number of times the columns of the weights are set in a closed-loop manner.
-                   A value of ``1`` means that all columns in principle receive enough pulses to
-                   change from ``w_min`` to ``w_max``.
-           )pbdoc")
       .def(
           "set_shared_weights",
           [](Class &self, torch::Tensor &weights) {

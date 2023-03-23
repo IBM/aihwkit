@@ -320,13 +320,3 @@ class AnalogTileTest(ParametrizedTestCase):
         input_weights = Tensor([[6, 5, 4], [3, 2, 1]])
         cpp_tile.set_weights(input_weights)
         self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
-
-    def test_setters_weights_realistic(self):
-        """Check setting and getting the weights."""
-        python_tile = self.get_tile(2, 3)
-        cpp_tile = python_tile.tile
-
-        # Set weights using Tensors.
-        input_weights = Tensor([[6, 5, 4], [3, 2, 1]])
-        cpp_tile.set_weights_realistic(input_weights, 10)
-        self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
