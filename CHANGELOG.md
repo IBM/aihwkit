@@ -50,7 +50,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Type-checking for `RPUConfig` fields. (\#424)
 
 ### Fixed
-* Realistic read / write behavior was not applicable to all tiles (\#489) 
+* Realistic read / write behavior was broken for some tiles (\#489) 
 * Decay fix for compound devices (\#463)
 * ``RPUCuda`` backend update with many fixes (\#456)
 * Missing zero-grad call in example 02 (\#446)
@@ -76,6 +76,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fix training `learn_out_scales` issue after checkpoint load. (\#434)
 
 ### Changed
+* Torch minimal version has changed to version 1.9 (\#489)
 * Realistic read / write is now achieved by `read_weights` and `program_weights` functionality which replace the `get/set_weights_realistic` methods (\#489)
 * Pylint / mypy / pycodestyle / protobuf version bump (\#456)
 * All configs related classes can now be imported from
@@ -101,6 +102,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Removed
 
+* The tile methods `get/set_weights_realistic` are removed. (\#489) 
 * The `_scaled` versions of the weight getter and setter methods are
 removed. (\#423)
 
