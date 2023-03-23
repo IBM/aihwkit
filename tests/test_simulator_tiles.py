@@ -450,3 +450,51 @@ class TileTest(ParametrizedTestCase):
 
         if field:
             self.assertEqual(new_hidden_parameters[field][1][1], 0.8)
+
+    def test_program_weights(self):
+        """Tests whether weight programming is performed"""
+        rpu_config = self.get_rpu_config()
+        if hasattr(rpu_config, 'forward'):
+            rpu_config.forward.is_perfect = True  # avoid additional reading noise
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        weights = Tensor([[0.1, 0.2, 0.3], [0.4, -0.5, -0.6]])
+        biases = Tensor([-0.1, 0.2])
+        w_amax = 0.6
+
+        analog_tile.set_learning_rate(0.123)
+        analog_tile.set_weights(weights, biases)
+
+        tolerance = 0.05
+        analog_tile.program_weights()
+        tile_weights, tile_biases = analog_tile.get_weights()
+
+        self.assertNotAlmostEqualTensor(tile_weights, weights)
+        if analog_tile.bias:
+            self.assertNotAlmostEqualTensor(tile_biases, biases)
+
+        # but should be close
+        if analog_tile.bias:
+            deviation = (tile_biases - biases).abs().sum() + (tile_weights - weights).abs().sum()
+            deviation /= weights.numel() + biases.numel()
+            self.assertTrue(deviation / w_amax < tolerance)
+        else:
+            self.assertTrue((tile_weights - weights).abs().mean() / w_amax < tolerance)
+
+    def test_read_weights(self):
+        """Tests whether weight reading is performed"""
+        rpu_config = self.get_rpu_config()
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        weights = Tensor([[0.1, 0.2, 0.3], [0.4, -0.5, -0.6]])
+        biases = Tensor([-0.1, 0.2])
+        w_amax = 0.6
+
+        analog_tile.set_weights(weights, biases)
+
+        tile_weights, tile_biases = analog_tile.read_weights()
+
+        tolerance = 0.1
+        self.assertTrue((tile_weights - weights).abs().mean() / w_amax < tolerance)
+        if analog_tile.bias:
+            self.assertTrue((tile_biases - biases).abs().mean() / w_amax < tolerance)
