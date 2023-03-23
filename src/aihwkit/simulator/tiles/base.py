@@ -11,7 +11,7 @@
 # that they have been altered from the originals.
 
 """High level analog tiles (base)."""
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines, wrong-import-position
 
 from collections import OrderedDict
 from typing import (
@@ -19,18 +19,21 @@ from typing import (
     Tuple, TypeVar, Union, TYPE_CHECKING, Any
 )
 from copy import deepcopy
-
 from numpy.typing import ArrayLike
 from numpy import array
 
 from torch import (
-    Tensor, stack, zeros, as_tensor, cat, unsqueeze, squeeze, ones,
-    float32, from_numpy, full, clamp, zeros_like
+    Tensor, stack, zeros, as_tensor, cat,
+    unsqueeze, squeeze, ones,
+    float32, from_numpy, full, clamp,
+    zeros_like, eye, randn,
 )
+
 from torch import device as torch_device
 from torch import max as torch_max
 from torch.nn import Parameter
 from torch.autograd import no_grad
+from torch.linalg import lstsq
 
 from aihwkit.simulator.rpu_base import tiles
 from aihwkit.exceptions import TileError, ConfigError
@@ -112,6 +115,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         # create analog context
         self.analog_ctx = AnalogContext(self)
+
+        # Helpers.
+        self.reference_combined_weights = None  # type: Optional[Tensor]
 
         # init input / output processing
         self.init_learned_out_scales()
@@ -401,7 +407,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         Note:
            This setting is **not** hardware realistic. Use the
-           :meth:`set_weights_realistic` for a realistic weight transfer.
+           :meth:`program_weights` for a realistic weight transfer.
 
         Args:
             weights: ``[out_size, in_size]`` weight matrix.
@@ -422,64 +428,13 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Returns:
             None.
         """
-
+        self.reference_combined_weights = None
         combined_weights = self._combine_weights(weights, biases)
 
         if apply_weight_scaling:
             combined_weights = self.apply_weight_scaling(combined_weights,
                                                          weight_scaling_omega)
         return self.tile.set_weights(combined_weights)
-
-    def set_weights_realistic(
-            self,
-            weights: Tensor,
-            biases: Optional[Tensor] = None,
-            apply_weight_scaling: bool = False,
-            weight_scaling_omega: Optional[float] = None,
-            n_loops: int = 10,
-    ) -> None:
-        """Set the tile weights (and biases) in a realistic manner by using the forward
-        and update pass.
-
-        Sets the internal tile weights to the specified values, and also the
-        internal tile biases if the tile was set to use bias (via
-        ``self.bias``).
-
-        Args:
-            weights: ``[out_size, in_size]`` weight matrix.
-            biases: ``[out_size]`` bias vector. This parameter is required if
-                ``self.bias`` is ``True``, and ignored otherwise.
-            apply_weight_scaling: Whether to rescale the given weight matrix
-                and populate the digital output scaling factors as
-                specified in the configuration
-                :class:`~aihwkit.configs.utils.MappingParameter`. A
-                new ``weight_scaling_omega`` can be given. Note that
-                this will overwrite the existing digital out scaling
-                factors.
-            weight_scaling_omega: The weight scaling omega factor (see
-                :class:`~aihwkit.configs.utils.MappingParameter`). If
-                given explicitly here, it will overwrite the value in
-                the mapping field.
-            n_loops: number of times the columns of the weights are set in a
-                closed-loop manner.
-                A value of ``1`` means that all columns in principle receive
-                enough pulses to change from ``w_min`` to ``w_max``.
-
-        Returns:
-            None.
-
-        Raises:
-            ValueError: if the tile has bias but ``bias`` has not been
-                specified.
-        """
-
-        combined_weights = self._combine_weights(weights, biases)
-
-        if apply_weight_scaling:
-            combined_weights = self.apply_weight_scaling(combined_weights,
-                                                         weight_scaling_omega)
-
-        return self.tile.set_weights_realistic(combined_weights, n_loops)
 
     def get_weights(self, apply_weight_scaling: bool = False
                     ) -> Tuple[Tensor, Optional[Tensor]]:
@@ -495,7 +450,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         Note:
              This is **not** a hardware realistic weight readout. Use
-            :meth:`get_weights_realistic` for a realistic transfer.
+            :meth:`read_weights` for a realistic transfer.
 
         Args:
             apply_weight_scaling: Whether to return the weights with the
@@ -526,28 +481,106 @@ class BaseTile(Generic[RPUConfigGeneric]):
             return weights * alpha.view(-1, 1), biases * alpha if self.bias else None
         return weights, biases
 
-    def get_weights_realistic(self, apply_weight_scaling: bool = False
-                              ) -> Tuple[Tensor, Optional[Tensor]]:
-        """Get the tile weights (and biases) in a realistic manner
+    @no_grad()
+    def program_weights(self, from_reference: bool = True,
+                        x_values: Optional[Tensor] = None,
+                        learning_rate: float = 0.1,
+                        max_iter: int = 10000,
+                        tolerance: Optional[float] = 0.01,
+                        w_init: Union[float, Tensor] = 0.01) -> None:
+        """Programm the target weights into the conductances using the
+        pulse update defined.
+
+        Programming is done using the defined tile-update (e.g. SGD)
+        and matching inputs (`x_values` by default `eye`).
+
+        Args:
+
+            from_reference: Whether to use weights from reference
+                (those that were initally set with `set_weights`) or
+                the current weights.
+            x_values: Values to use for the read-and verify. If none
+                are given, unit-vectors are used
+            learning_rate: Learning rate of the optimization
+            max_iter: max number of batches for the iterative programming
+            tolerance: Stop the iteration loop early if the mean
+                output deviation is below this number. Given in
+                relation to the max output.
+            w_init: initial weight matrix to start from. If given as
+                float, weights are set uniform random in `[-w_init,
+                w_init]`. This init weight is given directly in
+                normalized conductance units and should include the
+                bias row if existing.
+        """
+
+        if not from_reference or self.reference_combined_weights is None:
+            self.reference_combined_weights = self.tile.get_weights()
+        target_weights = self.reference_combined_weights
+
+        if x_values is None:
+            x_values = eye(self.tile.get_x_size())
+        x_values = x_values.to(self.device)
+        target_values = x_values @ target_weights.to(self.device).T
+
+        target_max = target_values.abs().max().item()
+        if isinstance(w_init, Tensor):
+            self.tile.set_weights(w_init)
+        else:
+            self.tile.set_weights_uniform_random(-w_init, w_init)
+
+        lr_save = self.tile.get_learning_rate()
+        self.tile.set_learning_rate(learning_rate)
+
+        for _ in range(max_iter):
+            y = self.tile.forward(x_values, False)
+            error = y - target_values
+            if tolerance is not None and (error.abs().mean().item()
+                                          / target_max) < tolerance:
+                break
+            self.tile.update(x_values, error, False)
+
+        self.tile.set_learning_rate(lr_save)
+
+    @no_grad()
+    def read_weights(self,
+                     apply_weight_scaling: bool = False,
+                     x_values: Optional[Tensor] = None,
+                     over_sampling: int = 10
+                     ) -> Tuple[Tensor, Optional[Tensor]]:
+        """Reads the weights (and biases) in a realistic manner
         by using the forward pass for weights readout.
 
         Gets the tile weights and extracts the mathematical weight
         matrix and biases (if present, by determined by the ``self.bias``
         parameter).
 
+        The weight will not be directly read, but linearly estimated
+        using random inputs using the analog forward pass.
+
         Note:
-             The returned weight is a copy of the internal weights (not a
-             pointer) and is always on CPU and detached.
+
+            If the tile includes digital periphery (e.g. out scaling),
+            these will be applied. Thus this weight is the logical
+            weights that correspond to the weights in an FP network.
+
+        Note:
+            weights are estimated using the ``lstsq`` solver from torch.
 
         Args:
-            apply_weight_scaling: Whether to return the weights with the
-                (digital) output scaling factors applied. Note the
-                "logical" weights of the layer which the DNN is
-                effectively using are those with the output scales
-                applied. If ``apply_weight_scaling`` is set to False, then
-                only the weight values that is programmed onto the
-                crossbar array are returned, without applying the
-                digital scales.
+            apply_weight_scaling: Whether to rescale the given weight matrix
+                and populate the digital output scaling factors as
+                specified in the configuration
+                :class:`~aihwkit.configs.utils.MappingParameter`. A
+                new ``weight_scaling_omega`` can be given. Note that
+                this will overwrite the existing digital out scaling
+                factors.
+
+            x_values: Values to use for estimating the matrix. If
+                not given, inputs are standard normal vectors.
+
+            over_sampling: If ``x_values`` is not given,
+                ``over_sampling * in_size`` random vectors are used
+                for the estimation
 
         Returns:
             a tuple where the first item is the ``[out_size, in_size]`` weight
@@ -555,17 +588,31 @@ class BaseTile(Generic[RPUConfigGeneric]):
             or ``None`` if the tile is set not to use bias.
 
         """
-        # Retrieve the internal weights (and potentially biases) matrix.
-        combined_weights = self.tile.get_weights_realistic()
-        weights, biases = self._separate_weights(combined_weights)
+
+        if x_values is None:
+            x_values = randn(self.in_size * over_sampling, self.in_size,
+                             device=self.device,
+                             dtype=float32)
+        else:
+            x_values = x_values.to(self.device)
+
+        y_values = self.forward(x_values, is_test=True)
+
+        # calculate pseudo inverse (with bias, if necessary)
+        if self.bias:
+            ones_column = ones(self.in_size * over_sampling, 1,
+                               device=self.device, dtype=float32)
+            x_values = cat([x_values, ones_column], axis=1)
+
+        est_weights = lstsq(x_values, y_values).solution.T.cpu()
+        weights, biases = self._separate_weights(est_weights)
 
         if not apply_weight_scaling:
-            return weights, biases
-
-        alpha = self.get_scales()
-        if alpha is not None:
-            alpha = alpha.detach().cpu()
-            return weights * alpha.view(-1, 1), biases * alpha if self.bias else None
+            # we de-apply (devide) because we want to use the full self.forward above
+            alpha = self.get_scales()
+            if alpha is not None:
+                alpha = alpha.detach().cpu()
+                return weights / alpha.view(-1, 1), biases / alpha if self.bias else None
         return weights, biases
 
     def apply_weight_scaling(

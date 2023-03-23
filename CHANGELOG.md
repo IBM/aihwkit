@@ -15,9 +15,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## [0.7.0] - 2023/01/30
 
 ### Added
-
+* Read weights is done with least-square estimation method (\#489)
 * Reset tiles method (\#456)
-* Added many new analog MAC non-linearties (forward / backward pass) (#456)
+* Added many new analog MAC non-linearties (forward / backward pass) (\#456)
 * Polynomial weight noise for hardware-aware training (\#456)
 * Remap functionality for hardware-aware training (\#456)
 * Input range estimation for InferenceRPUConfig (\#456)
@@ -50,7 +50,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Type-checking for `RPUConfig` fields. (\#424)
 
 ### Fixed
-
+* Realistic read / write behavior was broken for some tiles (\#489) 
 * Decay fix for compound devices (\#463)
 * ``RPUCuda`` backend update with many fixes (\#456)
 * Missing zero-grad call in example 02 (\#446)
@@ -76,7 +76,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fix training `learn_out_scales` issue after checkpoint load. (\#434)
 
 ### Changed
-
+* Torch minimal version has changed to version 1.9 (\#489)
+* Realistic read / write is now achieved by `read_weights` and `program_weights` functionality which replace the `get/set_weights_realistic` methods (\#489)
 * Pylint / mypy / pycodestyle / protobuf version bump (\#456)
 * All configs related classes can now be imported from
   ``aihwkit.simulator.config`` (\#456)
@@ -101,6 +102,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Removed
 
+* The tile methods `get/set_weights_realistic` are removed. (\#489) 
 * The `_scaled` versions of the weight getter and setter methods are
 removed. (\#423)
 

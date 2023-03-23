@@ -271,17 +271,14 @@ class AnalogModuleBase(Module):
         shape = [self.out_features, self.in_features]
         weight = weight.clone().reshape(shape)
 
+        analog_tiles[0].set_weights(
+            weight, bias if self.analog_bias else None,
+            apply_weight_scaling,
+            weight_scaling_omega)
+
         realistic = self.realistic_read_write and not force_exact
         if realistic:
-            analog_tiles[0].set_weights_realistic(
-                weight, bias if self.analog_bias else None,
-                apply_weight_scaling,
-                weight_scaling_omega)
-        else:
-            analog_tiles[0].set_weights(
-                weight, bias if self.analog_bias else None,
-                apply_weight_scaling,
-                weight_scaling_omega)
+            analog_tiles[0].program_weights()
 
         if bias is not None and self.digital_bias:
             with no_grad():
@@ -331,7 +328,7 @@ class AnalogModuleBase(Module):
 
         realistic = self.realistic_read_write and not force_exact
         if realistic:
-            weight, analog_bias = analog_tiles[0].get_weights_realistic(
+            weight, analog_bias = analog_tiles[0].read_weights(
                 apply_weight_scaling)
         else:
             weight, analog_bias = analog_tiles[0].get_weights(
@@ -608,8 +605,7 @@ class AnalogModuleBase(Module):
             raise ModuleError('program_analog_weights can only be applied in '
                               'evaluation mode')
         for analog_tile in self.analog_tiles():
-            if isinstance(analog_tile, InferenceTile):
-                analog_tile.program_weights()
+            analog_tile.program_weights()
 
     def extra_repr(self) -> str:
         """Set the extra representation of the module.

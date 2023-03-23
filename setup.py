@@ -18,7 +18,7 @@ from setuptools import find_packages
 from skbuild import setup
 
 INSTALL_REQUIRES = [
-    'torch{}'.format(os.getenv('TORCH_VERSION_SPECIFIER', '>=1.7')),
+    'torch{}'.format(os.getenv('TORCH_VERSION_SPECIFIER', '>=1.9')),
     'torchvision',
     'scipy',
     'requests>=2.25,<3',

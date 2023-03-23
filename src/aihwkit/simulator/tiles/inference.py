@@ -67,7 +67,6 @@ class InferenceTile(AnalogTile):
         self.alpha = ones((1,))
 
         # Helpers.
-        self.reference_combined_weights = None  # type: Optional[Tensor]
         self.programmed_weights = None  # type: Optional[Tensor]
         self.nu_drift_list = None  # type: Optional[List[Tensor]]
 
@@ -139,6 +138,7 @@ class InferenceTile(AnalogTile):
         Args:
             from_reference: Whether to use weights from reference
         """
+        # pylint: disable=arguments-differ
 
         if not from_reference or self.reference_combined_weights is None:
             self.reference_combined_weights = Tensor(self.tile.get_weights())
@@ -171,7 +171,7 @@ class InferenceTile(AnalogTile):
                 where the devices might drift and accumulate noise. See
                 noise model used for details.
         """
-        # pylint: disable=arguments-differ,arguments-renamed
+        # pylint: disable=arguments-differ, arguments-renamed
 
         if self.programmed_weights is None:
             self.program_weights()
