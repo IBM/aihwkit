@@ -12,23 +12,25 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [0.7.0] - 2023/01/30
+## Added
+* Updated the CLI Cloud runner code to support inference experiment result. (\#491)
+## [0.7.0] - 2023/01/04
 
 ### Added
-* Read weights is done with least-square estimation method (\#489)
+* Read weights is done with least-square estimation method. (\#489)
 * Reset tiles method (\#456)
-* Added many new analog MAC non-linearties (forward / backward pass) (\#456)
-* Polynomial weight noise for hardware-aware training (\#456)
-* Remap functionality for hardware-aware training (\#456)
-* Input range estimation for InferenceRPUConfig (\#456)
-* CUDA always syncs and added non-blocking option if not wished (\#456)
-* Fitting utility for fitting any device model to conductance measurements (\#456)
+* Added many new analog MAC non-linearties (forward / backward pass). (\#456)
+* Polynomial weight noise for hardware-aware training. (\#456)
+* Remap functionality for hardware-aware training. (\#456)
+* Input range estimation for InferenceRPUConfig. (\#456)
+* CUDA always syncs and added non-blocking option if not wished. (\#456)
+* Fitting utility for fitting any device model to conductance measurements. (\#456)
 * Added ``PowStepReferenceDevice`` for easy subtraction of symmetry
-  point (\#456)
+  point. (\#456)
 * Added ``SoftBoundsReferenceDevice`` for easy subtraction of symmetry
-  point (\#456)
-* Added stand-alone functions for applying inference drift to any model (\#419)
-* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task (\#440)
+  point. (\#456)
+* Added stand-alone functions for applying inference drift to any model. (\#419)
+* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task. (\#440)
 * Added Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
 * Added Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
@@ -50,11 +52,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Type-checking for `RPUConfig` fields. (\#424)
 
 ### Fixed
-* Realistic read / write behavior was broken for some tiles (\#489) 
-* Decay fix for compound devices (\#463)
-* ``RPUCuda`` backend update with many fixes (\#456)
-* Missing zero-grad call in example 02 (\#446)
-* Indexing error in ``OneSidedDevice`` for CPU (\#447)
+
+* Realistic read / write behavior was broken for some tiles. (\#489)
+* Decay fix for compound devices. (\#463)
+* ``RPUCuda`` backend update with many fixes. (\#456)
+* Missing zero-grad call in example 02. (\#446)
+* Indexing error in ``OneSidedDevice`` for CPU. (\#447)
 * Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
 * Weights that were not contiguous could have been set wrongly. (\#388)
@@ -76,11 +79,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fix training `learn_out_scales` issue after checkpoint load. (\#434)
 
 ### Changed
-* Torch minimal version has changed to version 1.9 (\#489)
-* Realistic read / write is now achieved by `read_weights` and `program_weights` functionality which replace the `get/set_weights_realistic` methods (\#489)
+
+* Torch minimal version has changed to version 1.9. (\#489)
+* Realistic read / write is now achieved by `read_weights` and
+  `program_weights`. (\#489)
 * Pylint / mypy / pycodestyle / protobuf version bump (\#456)
 * All configs related classes can now be imported from
-  ``aihwkit.simulator.config`` (\#456)
+  ``aihwkit.simulator.config``. (\#456)
 * Weight noise visualization now shows the programming noise and drift
   noise differences. (\#389)
 * Concatenate the gradients before applying to the tile update
@@ -102,7 +107,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Removed
 
-* The tile methods `get/set_weights_realistic` are removed. (\#489) 
+* The tile methods `get/set_weights_realistic` are removed. (\#489)
 * The `_scaled` versions of the weight getter and setter methods are
 removed. (\#423)
 
