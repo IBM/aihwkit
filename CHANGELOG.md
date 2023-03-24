@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## Added
+* Updated the CLI Cloud runner code to support inference experiment result. (\#491)
 ## [0.7.0] - 2023/01/04
 
 ### Added
