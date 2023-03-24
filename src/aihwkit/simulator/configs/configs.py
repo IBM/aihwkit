@@ -13,18 +13,21 @@
 """Configurations for resistive processing units."""
 
 from dataclasses import dataclass, field
-from typing import ClassVar, Type, Optional, Union, TYPE_CHECKING
+from typing import ClassVar, Type, Optional
 
 from aihwkit.simulator.configs.devices import (
-    ConstantStepDevice, FloatingPointDevice, IdealDevice, PulsedDevice,
-    UnitCell, DigitalRankUpdateCell
+    ConstantStepDevice, FloatingPointDevice, IdealDevice, PulsedDevice
+)
+from aihwkit.simulator.configs.compounds import (
+    DigitalRankUpdateCell, UnitCell,
 )
 from aihwkit.simulator.configs.helpers import (
     _PrintableMixin, tile_parameters_to_bindings
 )
 from aihwkit.simulator.configs.utils import (
     IOParameters, PulseType, UpdateParameters, WeightClipParameter,
-    WeightModifierParameter, WeightRemapParameter, MappingParameter
+    WeightModifierParameter, WeightRemapParameter,
+    MapableRPU, PrePostProcessingRPU
 )
 from aihwkit.inference import (
     BaseDriftCompensation, BaseNoiseModel, GlobalDriftCompensation,
@@ -33,32 +36,9 @@ from aihwkit.inference import (
 from aihwkit.simulator.rpu_base import devices
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
 
-if TYPE_CHECKING:
-    from aihwkit.nn.modules.linear import AnalogLinear
-    from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
-
 
 @dataclass
-class MapableRPU(_PrintableMixin):
-    """Defines the mapping parameters and utility factories"""
-
-    mapping: MappingParameter = field(default_factory=MappingParameter)
-    """Parameter related to mapping weights to tiles for supporting modules."""
-
-    def get_linear(self) -> Union[Type['AnalogLinear'], Type['AnalogLinearMapped']]:
-        """Returns a AnalogLinear module as specified """
-        # pylint: disable=import-outside-toplevel
-        # need to import here to avoid circular imports
-        from aihwkit.nn.modules.linear import AnalogLinear
-        from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
-
-        if self.mapping.max_input_size > 0 or self.mapping.max_output_size > 0:
-            return AnalogLinearMapped
-        return AnalogLinear
-
-
-@dataclass
-class FloatingPointRPUConfig(MapableRPU, _PrintableMixin):
+class FloatingPointRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     """Configuration for a floating point resistive processing unit."""
 
     tile_class: ClassVar[Type] = FloatingPointTile
@@ -69,7 +49,7 @@ class FloatingPointRPUConfig(MapableRPU, _PrintableMixin):
 
 
 @dataclass
-class SingleRPUConfig(MapableRPU, _PrintableMixin):
+class SingleRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -95,7 +75,7 @@ class SingleRPUConfig(MapableRPU, _PrintableMixin):
 
 
 @dataclass
-class UnitCellRPUConfig(MapableRPU, _PrintableMixin):
+class UnitCellRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -121,7 +101,7 @@ class UnitCellRPUConfig(MapableRPU, _PrintableMixin):
 
 
 @dataclass
-class InferenceRPUConfig(MapableRPU, _PrintableMixin):
+class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     """Configuration for an analog tile that is used only for inference.
 
     Training is done in *hardware-aware* manner, thus using only the
@@ -227,7 +207,7 @@ class InferenceRPUConfig(MapableRPU, _PrintableMixin):
 
 
 @dataclass
-class DigitalRankUpdateRPUConfig(MapableRPU, _PrintableMixin):
+class DigitalRankUpdateRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     """Configuration for an analog (unit cell) resistive processing unit
     where the rank update is done in digital.
 

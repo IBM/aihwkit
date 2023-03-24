@@ -15,11 +15,11 @@
 from torch import ones, Tensor
 from torch.nn.functional import mse_loss
 
-from aihwkit.simulator.configs.devices import (
-    TransferCompound,
-    ReferenceUnitCell,
-    SoftBoundsDevice
+from aihwkit.simulator.configs.devices import SoftBoundsDevice
+from aihwkit.simulator.configs.compounds import (
+    TransferCompound, ReferenceUnitCell,
 )
+
 from aihwkit.simulator.configs.configs import UnitCellRPUConfig
 from aihwkit.optim import AnalogSGD
 

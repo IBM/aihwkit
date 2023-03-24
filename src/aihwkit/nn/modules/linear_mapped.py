@@ -129,9 +129,6 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         # Unregister weight/bias as a parameter but keep for sync
         self.unregister_parameter('weight')
 
-        if self.analog_bias:
-            self.unregister_parameter('bias')
-
     def get_split_sizes(self, size: int, split_max_size: int) -> List[int]:
         """ Computed the split sizes.
 
@@ -200,16 +197,14 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                 out_end += out_size
 
                 tile_weight = weight[out_start:out_end, in_start:in_end]
+
+                analog_tile.set_weights(
+                    tile_weight, None,
+                    apply_weight_scaling,
+                    weight_scaling_omega)
+
                 if realistic:
-                    analog_tile.set_weights_realistic(
-                        tile_weight, None,
-                        apply_weight_scaling,
-                        weight_scaling_omega)
-                else:
-                    analog_tile.set_weights(
-                        tile_weight, None,
-                        apply_weight_scaling,
-                        weight_scaling_omega)
+                    analog_tile.program_weights()
 
                 out_start = out_end
             in_start = in_end
@@ -259,7 +254,7 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             in_tile_weight = []
             for analog_tile in in_tiles:
                 if realistic:
-                    tile_weight, _ = analog_tile.get_weights_realistic(apply_weight_scaling)
+                    tile_weight, _ = analog_tile.read_weights(apply_weight_scaling)
                 else:
                     tile_weight, _ = analog_tile.get_weights(apply_weight_scaling)
                 in_tile_weight.append(tile_weight)

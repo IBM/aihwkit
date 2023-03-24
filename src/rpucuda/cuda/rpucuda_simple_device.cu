@@ -23,6 +23,8 @@
 #include "rpucuda_onesided_device.h"
 #include "rpucuda_piecewisestep_device.h"
 #include "rpucuda_powstep_device.h"
+#include "rpucuda_powstep_reference_device.h"
+#include "rpucuda_softbounds_reference_device.h"
 #include "rpucuda_transfer_device.h"
 #include "rpucuda_vector_device.h"
 
@@ -34,7 +36,7 @@ namespace RPU {
 /* static function to create the corresponing cuda device from the CPU device*/
 template <typename T>
 AbstractRPUDeviceCuda<T> *
-AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> &rpu_device) {
+AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T> &rpu_device) {
   switch (rpu_device.getPar().implements()) {
   case DeviceUpdateType::ConstantStep:
     return new ConstantStepRPUDeviceCuda<T>(
@@ -60,9 +62,15 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> 
     return new MixedPrecRPUDeviceCuda<T>(c, static_cast<const MixedPrecRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::PowStep:
     return new PowStepRPUDeviceCuda<T>(c, static_cast<const PowStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::PowStepReference:
+    return new PowStepReferenceRPUDeviceCuda<T>(
+        c, static_cast<const PowStepReferenceRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::PiecewiseStep:
     return new PiecewiseStepRPUDeviceCuda<T>(
         c, static_cast<const PiecewiseStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::SoftBoundsReference:
+    return new SoftBoundsReferenceRPUDeviceCuda<T>(
+        c, static_cast<const SoftBoundsReferenceRPUDevice<T> &>(rpu_device));
   default:
     RPU_FATAL("Pulsed device type not implemented in CUDA. Maybe not added to createFrom in "
               "rpucuda_simple_device.cu?");
@@ -70,8 +78,8 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContext *c, const AbstractRPUDevice<T> 
 }
 
 template <typename T>
-std::unique_ptr<AbstractRPUDeviceCuda<T>>
-AbstractRPUDeviceCuda<T>::createFromUnique(CudaContext *c, const AbstractRPUDevice<T> &rpu_device) {
+std::unique_ptr<AbstractRPUDeviceCuda<T>> AbstractRPUDeviceCuda<T>::createFromUnique(
+    CudaContextPtr c, const AbstractRPUDevice<T> &rpu_device) {
   return std::unique_ptr<AbstractRPUDeviceCuda<T>>(
       AbstractRPUDeviceCuda<T>::createFrom(c, rpu_device));
 }
@@ -85,7 +93,7 @@ template class AbstractRPUDeviceCuda<double>;
 /* SimpleRPUDeviceCuda*/
 
 template <typename T>
-void SimpleRPUDeviceCuda<T>::initialize(CudaContext *c, int x_size, int d_size) {
+void SimpleRPUDeviceCuda<T>::initialize(CudaContextPtr c, int x_size, int d_size) {
   context_ = c;
   x_size_ = x_size;
   d_size_ = d_size;
@@ -98,12 +106,13 @@ void SimpleRPUDeviceCuda<T>::initialize(CudaContext *c, int x_size, int d_size) 
 }
 
 template <typename T>
-SimpleRPUDeviceCuda<T>::SimpleRPUDeviceCuda(CudaContext *c, int x_size, int d_size) {
+SimpleRPUDeviceCuda<T>::SimpleRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size) {
   initialize(c, x_size, d_size);
 };
 
 template <typename T>
-SimpleRPUDeviceCuda<T>::SimpleRPUDeviceCuda(CudaContext *c, const SimpleRPUDevice<T> &rpu_device) {
+SimpleRPUDeviceCuda<T>::SimpleRPUDeviceCuda(
+    CudaContextPtr c, const SimpleRPUDevice<T> &rpu_device) {
   initialize(c, rpu_device.getXSize(), rpu_device.getDSize());
   populateFrom(rpu_device);
 };
@@ -123,6 +132,7 @@ template <typename T>
 SimpleRPUDeviceCuda<T> &SimpleRPUDeviceCuda<T>::operator=(const SimpleRPUDeviceCuda<T> &other) {
   SimpleRPUDeviceCuda<T> tmp(other);
   swap(*this, tmp);
+  this->context_->synchronize();
   return *this;
 };
 

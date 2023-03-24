@@ -24,10 +24,10 @@ from torch.nn.functional import mse_loss
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import DigitalRankUpdateRPUConfig
-from aihwkit.simulator.configs.devices import (
-    MixedPrecisionCompound,
-    SoftBoundsDevice)
+from aihwkit.simulator.configs import (
+    DigitalRankUpdateRPUConfig, MixedPrecisionCompound,
+    SoftBoundsDevice
+)
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).

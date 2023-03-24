@@ -10,6 +10,8 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=no-name-in-module, import-error
+
 """Mappings for version 1 of the AIHW Composer format."""
 
 from collections import namedtuple
@@ -22,7 +24,9 @@ from torch.nn import (
 )
 from torchvision.datasets import FashionMNIST, SVHN
 
-from aihwkit.cloud.converter.definitions.onnx_common_pb2 import AttributeProto
+from aihwkit.cloud.converter.definitions.onnx_common_pb2 import (  # type: ignore[attr-defined]
+    AttributeProto
+)
 from aihwkit.cloud.converter.exceptions import ConversionError
 from aihwkit.nn import AnalogConv2d, AnalogLinear
 from aihwkit.optim import AnalogSGD

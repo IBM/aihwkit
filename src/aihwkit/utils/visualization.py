@@ -24,7 +24,7 @@ extras mechanism::
 # mypy: disallow-untyped-calls=False
 
 from copy import deepcopy
-from typing import Any, Tuple, Union
+from typing import Any, Tuple, Union, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -39,7 +39,8 @@ from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.configs import (
     SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 )
-from aihwkit.simulator.configs.devices import PulsedDevice, UnitCell
+from aihwkit.simulator.configs.devices import PulsedDevice
+from aihwkit.simulator.configs.compounds import UnitCell
 from aihwkit.simulator.configs.utils import (
     BoundManagementType, IOParameters, NoiseManagementType, PulseType,
     UpdateParameters, WeightNoiseType
@@ -121,7 +122,7 @@ def plot_pulse_response(
         plt.title('{} (without cycle/read noise)'
                   .format(analog_tile.rpu_config.device.__class__.__name__))
     plt.ylabel('Weight [conductance]')
-    plt.xlabel('Pulse number #')
+    plt.xlabel('Pulse number \\#')
 
     return w_trace
 
@@ -348,7 +349,7 @@ def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> i
 def plot_response_overview(
         rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig],
         n_loops: int = 5,
-        n_steps: int = None,
+        n_steps: Optional[int] = None,
         n_traces: int = 5,
         use_cuda: bool = False,
         smoothness: float = 0.1
@@ -430,7 +431,7 @@ def plot_device(device: Union[PulsedDevice, UnitCell], w_noise: float = 0.0, **k
 def plot_device_compact(
         device: Union[PulsedDevice, UnitCell],
         w_noise: float = 0.0,
-        n_steps: int = None,
+        n_steps: Optional[int] = None,
         n_traces: int = 3,
         use_cuda: bool = False,
 ) -> Figure:
@@ -487,7 +488,7 @@ def plot_device_compact(
     axis = figure.add_subplot(1, 1, 1)
     axis.plot(w_trace, linewidth=1)
     axis.set_title(analog_tile.rpu_config.device.__class__.__name__)
-    axis.set_xlabel('Pulse number #')
+    axis.set_xlabel('Pulse number \\#')
     limit = np.abs(w_trace).max()*1.2
     axis.set_ylim(-limit, limit)
     axis.set_xlim(0, total_iters-1)
@@ -597,9 +598,9 @@ def plot_device_symmetry(
     plt.grid(True)
 
 
-def plot_weight_drift(noise_model: BaseNoiseModel = None,
-                      t_inference_list: ndarray = None,
-                      w_inits: ndarray = None,
+def plot_weight_drift(noise_model: Optional[BaseNoiseModel] = None,
+                      t_inference_list: Optional[ndarray] = None,
+                      w_inits: Optional[ndarray] = None,
                       n_repeats: int = 25) -> None:
     """Plots the weight drift behavior of a given noise model over time.
 

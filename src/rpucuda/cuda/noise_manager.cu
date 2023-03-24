@@ -20,7 +20,7 @@
 
 #include "cuda_math_util.h"
 #include "cuda_util.h"
-#include <cub/cub.cuh>
+#include "rpu_cub.h"
 
 #include "io_iterator.h"
 
@@ -197,7 +197,7 @@ __global__ void kernelAbsMaxSingleMomentum(float *ravg, const float *amax, T dec
   KNAME<InputIteratorT, T><<<nblocks, nthreads, SHARED_MEM, s>>> ARGS;
 
 template <typename T>
-NoiseManager<T>::NoiseManager(CudaContext *c, int size)
+NoiseManager<T>::NoiseManager(CudaContextPtr c, int size)
     : size_(size), context_(c), buffer_m_batch_(0), last_m_batch_(0), const_set_if_(false) {
   // initialize for m_batch=1
   dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);
@@ -393,8 +393,9 @@ void NoiseManager<T>::compute(
 
     kernelAbsMaxNPSum<T><<<nblocks, nthreads, 0, s>>>(
         dev_scale_values_->getData(), m_batch, this->amaximizer_->getMaxValues(),
-        dev_psum_values_->getDataConst(), dev_nsum_values_->getDataConst(), io.out_bound,
-        io.nm_assumed_wmax, io.inp_res > 0 ? io.max_bm_res / io.inp_res : 1.0);
+        dev_psum_values_->getDataConst(), dev_nsum_values_->getDataConst(),
+        isinf(io.out_bound) ? (T)1.0 : io.out_bound, io.nm_assumed_wmax,
+        io.inp_res > 0 ? io.max_bm_res / io.inp_res : 1.0);
     return;
   }
 

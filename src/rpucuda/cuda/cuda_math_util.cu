@@ -35,7 +35,7 @@ namespace math {
 
 template <>
 void gemm<float>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const bool TransA,
     const bool TransB,
     const int M,
@@ -60,7 +60,7 @@ void gemm<float>(
 
 template <>
 void gemm<double>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const bool TransA,
     const bool TransB,
     const int M,
@@ -83,7 +83,7 @@ void gemm<double>(
 };
 
 template <>
-int iamax<float>(const CudaContext *context, const int N, const float *X, const int incX) {
+int iamax<float>(const CudaContextPtr context, const int N, const float *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
   RPU_SET_CUBLAS_POINTER_MODE_HOST;
   int result = 0;
@@ -93,7 +93,7 @@ int iamax<float>(const CudaContext *context, const int N, const float *X, const 
 };
 
 template <>
-int iamax<double>(const CudaContext *context, const int N, const double *X, const int incX) {
+int iamax<double>(const CudaContextPtr context, const int N, const double *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
   RPU_SET_CUBLAS_POINTER_MODE_HOST;
   int result;
@@ -104,7 +104,7 @@ int iamax<double>(const CudaContext *context, const int N, const double *X, cons
 
 template <>
 void copy<float>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const int N,
     const float *X,
     const int incX,
@@ -116,7 +116,7 @@ void copy<float>(
 
 template <>
 void copy<double>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const int N,
     const double *X,
     const int incX,
@@ -128,7 +128,7 @@ void copy<double>(
 
 template <>
 void scal<float>(
-    const CudaContext *context, const int N, const float alpha, float *X, const int incX) {
+    const CudaContextPtr context, const int N, const float alpha, float *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
   RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasSscal(handle, N, &alpha, X, incX));
@@ -137,7 +137,7 @@ void scal<float>(
 
 template <>
 void scal<double>(
-    const CudaContext *context, const int N, const double alpha, double *X, const int incX) {
+    const CudaContextPtr context, const int N, const double alpha, double *X, const int incX) {
   RPU_GET_CUBLAS_HANDLE;
   RPU_SET_CUBLAS_POINTER_MODE_HOST;
   CUBLAS_CALL(cublasDscal(handle, N, &alpha, X, incX));
@@ -146,7 +146,7 @@ void scal<double>(
 
 template <>
 void nrm2<float>(
-    const CudaContext *context, const int N, const float *X, const int incX, float *res) {
+    const CudaContextPtr context, const int N, const float *X, const int incX, float *res) {
   RPU_GET_CUBLAS_HANDLE;
   RPU_SET_CUBLAS_POINTER_MODE_DEVICE;
   CUBLAS_CALL(cublasSnrm2(handle, N, X, incX, res));
@@ -155,7 +155,7 @@ void nrm2<float>(
 
 template <>
 void nrm2<double>(
-    const CudaContext *context, const int N, const double *X, const int incX, double *res) {
+    const CudaContextPtr context, const int N, const double *X, const int incX, double *res) {
   RPU_GET_CUBLAS_HANDLE;
   RPU_SET_CUBLAS_POINTER_MODE_DEVICE;
   CUBLAS_CALL(cublasDnrm2(handle, N, X, incX, res));
@@ -164,7 +164,7 @@ void nrm2<double>(
 
 template <>
 void gemv<float>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const bool TransA,
     const int M,
     const int N,
@@ -185,7 +185,7 @@ void gemv<float>(
 }
 template <>
 void gemv<double>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const bool TransA,
     const int M,
     const int N,
@@ -206,7 +206,7 @@ void gemv<double>(
 
 template <>
 void ger<float>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const int M,
     const int N,
     const float alpha,
@@ -224,7 +224,7 @@ void ger<float>(
 
 template <>
 void ger<double>(
-    const CudaContext *context,
+    const CudaContextPtr context,
     const int M,
     const int N,
     const double alpha,
@@ -242,38 +242,40 @@ void ger<double>(
 
 // W += A
 template <typename T> __global__ void kernelElemAdd(T *dev_W, const int size, const T *dev_A) {
-
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_W[idx] += dev_A[idx]; }
 }
+
 template <typename T>
-void elemadd(const CudaContext *context, T *dev_W, const int size, const T *dev_A) {
+void elemadd(const CudaContextPtr context, T *dev_W, const int size, const T *dev_A) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemAdd<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A);
 }
-template void elemadd<float>(const CudaContext *, float *, const int, const float *);
+template void elemadd<float>(const CudaContextPtr, float *, const int, const float *);
 #ifdef RPU_USE_DOUBLE
-template void elemadd<double>(const CudaContext *, double *, const int, const double *);
+template void elemadd<double>(const CudaContextPtr, double *, const int, const double *);
 #endif
 
 // W = W.*W
-template <typename T> __global__ void kernelElemPow2(T *dev_W, const int size) {
+template <typename T> __global__ void kernelElemPow2(T *dev_W, const int size, const T *W_in) {
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
-    T x = dev_W[idx];
+    T x = W_in[idx];
     dev_W[idx] = x * x;
   }
 }
-template <typename T> void elempow2(const CudaContext *context, T *dev_W, const int size) {
+template <typename T>
+void elempow2(const CudaContextPtr context, T *dev_W, const int size, const T *dev_W_in) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
-  kernelElemPow2<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size);
+  kernelElemPow2<T><<<nblocks, nthreads, 0, context->getStream()>>>(
+      dev_W, size, dev_W_in == nullptr ? dev_W : dev_W_in);
 }
-template void elempow2<float>(const CudaContext *, float *, const int);
+template void elempow2<float>(const CudaContextPtr, float *, const int, const float *);
 #ifdef RPU_USE_DOUBLE
-template void elempow2<double>(const CudaContext *, double *, const int);
+template void elempow2<double>(const CudaContextPtr, double *, const int, const double *);
 #endif
 
 // V = abs(W )
@@ -282,15 +284,15 @@ template <typename T> __global__ void kernelElemAbs(T *dev_V, const T *dev_W, co
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_V[idx] = fabs(dev_W[idx]); }
 }
 template <typename T>
-void elemabs(const CudaContext *context, T *dev_V, const T *dev_W, const int size) {
+void elemabs(const CudaContextPtr context, T *dev_V, const T *dev_W, const int size) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemAbs<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_V, dev_W, size);
 }
-template void elemabs<float>(const CudaContext *, float *, const float *, const int);
+template void elemabs<float>(const CudaContextPtr, float *, const float *, const int);
 #ifdef RPU_USE_DOUBLE
-template void elemabs<double>(const CudaContext *, double *, const double *, const int);
+template void elemabs<double>(const CudaContextPtr, double *, const double *, const int);
 #endif
 
 // W += beta*A
@@ -308,19 +310,19 @@ __global__ void kernelElemAddScale(T *dev_W, const int size, const T_A *dev_A, c
 }
 template <typename T, typename T_A>
 void elemaddscale(
-    const CudaContext *context, T *dev_W, const int size, const T_A *dev_A, const T beta) {
+    const CudaContextPtr context, T *dev_W, const int size, const T_A *dev_A, const T beta) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemAddScale<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, beta);
 }
 template void
-elemaddscale<float, float>(const CudaContext *, float *, const int, const float *, const float);
+elemaddscale<float, float>(const CudaContextPtr, float *, const int, const float *, const float);
 #ifdef RPU_USE_DOUBLE
 template void elemaddscale<double, double>(
-    const CudaContext *, double *, const int, const double *, const double);
+    const CudaContextPtr, double *, const int, const double *, const double);
 template void
-elemaddscale<double, float>(const CudaContext *, double *, const int, const float *, const double);
+elemaddscale<double, float>(const CudaContextPtr, double *, const int, const float *, const double);
 #endif
 
 // W += A.*B
@@ -338,17 +340,17 @@ __global__ void kernelElemAddScale(T *dev_W, const int size, const T *dev_A, con
 }
 template <typename T>
 void elemaddscale(
-    const CudaContext *context, T *dev_W, const int size, const T *dev_A, const T *dev_B) {
+    const CudaContextPtr context, T *dev_W, const int size, const T *dev_A, const T *dev_B) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemAddScale<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_B);
 }
 template void
-elemaddscale<float>(const CudaContext *, float *, const int, const float *, const float *);
+elemaddscale<float>(const CudaContextPtr, float *, const int, const float *, const float *);
 #ifdef RPU_USE_DOUBLE
 template void
-elemaddscale<double>(const CudaContext *, double *, const int, const double *, const double *);
+elemaddscale<double>(const CudaContextPtr, double *, const int, const double *, const double *);
 #endif
 
 // W += sat(A.*B)
@@ -357,6 +359,7 @@ __global__ void
 kernelElemASB02(T *dev_W, const int size, const T_A *dev_A, const T *dev_B, float *dev_4params) {
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+
     T w = dev_W[idx];
     T a = dev_A[idx];
     T b = dev_B[idx];
@@ -372,7 +375,7 @@ kernelElemASB02(T *dev_W, const int size, const T_A *dev_A, const T *dev_B, floa
 }
 template <typename T, typename T_A>
 void elemasb02(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *dev_W,
     const int size,
     const T_A *dev_A,
@@ -384,18 +387,18 @@ void elemasb02(
       <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_B, dev_4params);
 }
 template void elemasb02<float, float>(
-    const CudaContext *, float *, const int, const float *, const float *, float *);
+    const CudaContextPtr, float *, const int, const float *, const float *, float *);
 #ifdef RPU_USE_DOUBLE
 template void elemasb02<double, double>(
-    const CudaContext *, double *, const int, const double *, const double *, float *);
+    const CudaContextPtr, double *, const int, const double *, const double *, float *);
 template void elemasb02<double, float>(
-    const CudaContext *, double *, const int, const float *, const double *, float *);
+    const CudaContextPtr, double *, const int, const float *, const double *, float *);
 #endif
 
-// sat(W *= A)
+// sat(W *= A) (w/shift)
 template <typename T>
-__global__ void
-kernelElemScale(T *dev_W, const int size, const T *dev_A, float *dev_4params, const T *dev_shift) {
+__global__ void kernelElemScaleSat(
+    T *dev_W, const int size, const T *dev_A, float *dev_4params, const T *dev_shift) {
 
   bool with_shift = dev_shift != nullptr;
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
@@ -412,9 +415,22 @@ kernelElemScale(T *dev_W, const int size, const T *dev_A, float *dev_4params, co
     dev_W[idx] = w;
   }
 }
+// W *= A (w/shift)
+template <typename T>
+__global__ void kernelElemScale(T *dev_W, const int size, const T *dev_A, const T *dev_shift) {
+  bool with_shift = dev_shift != nullptr;
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = dev_W[idx];
+    T a = dev_A[idx];
+    T s = with_shift ? dev_shift[idx] : 0.0;
+    w = (w - s) * a + s;
+    dev_W[idx] = w;
+  }
+}
+
 template <typename T>
 void elemscale(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *dev_W,
     const int size,
     const T *dev_A,
@@ -423,20 +439,48 @@ void elemscale(
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
-  kernelElemScale<T>
-      <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_4params, dev_shift);
+  if (dev_4params != nullptr) {
+    kernelElemScaleSat<T><<<nblocks, nthreads, 0, context->getStream()>>>(
+        dev_W, size, dev_A, dev_4params, dev_shift);
+  } else {
+    kernelElemScale<T>
+        <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_shift);
+  }
 }
 template void
-elemscale<float>(const CudaContext *, float *, const int, const float *, float *, const float *);
+elemscale<float>(const CudaContextPtr, float *, const int, const float *, float *, const float *);
 #ifdef RPU_USE_DOUBLE
 template void elemscale<double>(
-    const CudaContext *, double *, const int, const double *, float *, const double *);
+    const CudaContextPtr, double *, const int, const double *, float *, const double *);
+#endif
+
+// C = A.*B
+template <typename T>
+__global__ void kernelElemMul(T *dev_C, const int size, const T *dev_A, const T *dev_B) {
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_C[idx] = dev_A[idx] * dev_B[idx]; }
+}
+
+template <typename T>
+void elemmul(
+    const CudaContextPtr context, T *dev_C, const int size, const T *dev_A, const T *dev_B) {
+
+  int nthreads = context->getNThreads();
+  int nblocks = context->getNBlocks(size, nthreads);
+  kernelElemMul<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_C, size, dev_A, dev_B);
+}
+template void
+elemmul<float>(const CudaContextPtr, float *, const int, const float *, const float *);
+#ifdef RPU_USE_DOUBLE
+template void
+elemmul<double>(const CudaContextPtr, double *, const int, const double *, const double *);
 #endif
 
 // sat(W)
 template <typename T> __global__ void kernelElemSat(T *dev_W, const int size, float *dev_4params) {
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+
     T w = dev_W[idx];
     float4 parij = reinterpret_cast<float4 *>(dev_4params)[idx];
     // check bounds
@@ -446,15 +490,15 @@ template <typename T> __global__ void kernelElemSat(T *dev_W, const int size, fl
   }
 }
 template <typename T>
-void elemsat(const CudaContext *context, T *dev_W, const int size, float *dev_4params) {
+void elemsat(const CudaContextPtr context, T *dev_W, const int size, float *dev_4params) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemSat<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_4params);
 }
-template void elemsat<float>(const CudaContext *, float *, const int, float *);
+template void elemsat<float>(const CudaContextPtr, float *, const int, float *);
 #ifdef RPU_USE_DOUBLE
-template void elemsat<double>(const CudaContext *, double *, const int, float *);
+template void elemsat<double>(const CudaContextPtr, double *, const int, float *);
 #endif
 
 // sat(W *= 1+(A-1)*alpha)
@@ -464,12 +508,12 @@ __global__ void kernelElemScaleAlpha(
     const int size,
     const T *dev_A,
     float *dev_4params,
-    const T alpha_in,
+    const T alpha,
     const T *dev_shift) {
 
-  volatile T alpha = alpha_in;
   bool with_shift = dev_shift != nullptr;
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+
     T w = dev_W[idx];
     T a = dev_A[idx];
     T s = with_shift ? dev_shift[idx] : 0.0;
@@ -487,7 +531,7 @@ __global__ void kernelElemScaleAlpha(
 }
 template <typename T>
 void elemscalealpha(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *dev_W,
     const int size,
     const T *dev_A,
@@ -501,10 +545,10 @@ void elemscalealpha(
       dev_W, size, dev_A, dev_4params, alpha, dev_shift);
 }
 template void elemscalealpha<float>(
-    const CudaContext *, float *, const int, const float *, float *, const float, const float *);
+    const CudaContextPtr, float *, const int, const float *, float *, const float, const float *);
 #ifdef RPU_USE_DOUBLE
 template void elemscalealpha<double>(
-    const CudaContext *,
+    const CudaContextPtr,
     double *,
     const int,
     const double *,
@@ -524,15 +568,15 @@ template <typename T> __global__ void kernelElemAddCopy(T *dev_W, T *dev_A, cons
   }
 }
 template <typename T>
-void elemaddcopy(const CudaContext *context, T *dev_W, T *dev_A, const int size) {
+void elemaddcopy(const CudaContextPtr context, T *dev_W, T *dev_A, const int size) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemAddCopy<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, dev_A, size);
 }
-template void elemaddcopy<float>(const CudaContext *, float *, float *, const int);
+template void elemaddcopy<float>(const CudaContextPtr, float *, float *, const int);
 #ifdef RPU_USE_DOUBLE
-template void elemaddcopy<double>(const CudaContext *, double *, double *, const int);
+template void elemaddcopy<double>(const CudaContextPtr, double *, double *, const int);
 #endif
 
 // W = sat(W+A), A = W
@@ -540,6 +584,7 @@ template <typename T>
 __global__ void kernelElemAddCopySat(T *dev_W, T *dev_A, const int size, const float *dev_4params) {
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+
     T w = dev_W[idx];
     T a = dev_A[idx];
     const float4 parij = reinterpret_cast<const float4 *>(dev_4params)[idx];
@@ -554,7 +599,7 @@ __global__ void kernelElemAddCopySat(T *dev_W, T *dev_A, const int size, const f
 }
 template <typename T>
 void elemaddcopysat(
-    const CudaContext *context, T *dev_W, T *dev_A, const int size, const float *dev_4params) {
+    const CudaContextPtr context, T *dev_W, T *dev_A, const int size, const float *dev_4params) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
@@ -562,10 +607,10 @@ void elemaddcopysat(
       <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, dev_A, size, dev_4params);
 }
 template void
-elemaddcopysat<float>(const CudaContext *, float *, float *, const int, const float *);
+elemaddcopysat<float>(const CudaContextPtr, float *, float *, const int, const float *);
 #ifdef RPU_USE_DOUBLE
 template void
-elemaddcopysat<double>(const CudaContext *, double *, double *, const int, const float *);
+elemaddcopysat<double>(const CudaContextPtr, double *, double *, const int, const float *);
 #endif
 
 // MSK = P<thres
@@ -580,11 +625,15 @@ __global__ void kernelElemResetSat(
     const T thres,
     const float *dev_4params) {
 
+  bool with_A = dev_A != nullptr;
+  bool with_B = dev_B != nullptr;
+  bool with_P = dev_P != nullptr;
+
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
     T th = thres;
-    T p = dev_P[idx];
-    T a = dev_A[idx]; // load a bit more ?
-    T b = dev_B[idx];
+    T a = (with_A) ? dev_A[idx] : (float)0.0;
+    float p = (with_P) ? dev_P[idx] : (float)0.0;
+    float b = (with_B) ? dev_B[idx] : (float)0.0;
     T w = dev_W[idx];
     const float4 parij = reinterpret_cast<const float4 *>(dev_4params)[idx];
 
@@ -599,7 +648,7 @@ __global__ void kernelElemResetSat(
 }
 template <typename T>
 void elemresetsat(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *dev_W,
     const int size,
     const T *dev_A,
@@ -614,7 +663,7 @@ void elemresetsat(
       dev_W, size, dev_A, dev_B, dev_P, thres, dev_4params);
 }
 template void elemresetsat<float>(
-    const CudaContext *,
+    const CudaContextPtr,
     float *,
     const int,
     const float *,
@@ -624,7 +673,7 @@ template void elemresetsat<float>(
     const float *);
 #ifdef RPU_USE_DOUBLE
 template void elemresetsat<double>(
-    const CudaContext *,
+    const CudaContextPtr,
     double *,
     const int,
     const double *,
@@ -640,7 +689,7 @@ template void elemresetsat<double>(
 template <typename T>
 __global__ void kernelElemResetSatMsk(
     T *weights,
-    const int size_in,
+    const int size,
     const char *msk,
     const T *reset_bias,
     const T reset_std_in,
@@ -649,7 +698,6 @@ __global__ void kernelElemResetSatMsk(
 
   volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
   T reset_std = reset_std_in;
-  int size = size_in;
   int total_threads = blockDim.x * gridDim.x;
   curandState_t local_state;
   bool with_bias = reset_bias != nullptr;
@@ -684,7 +732,7 @@ __global__ void kernelElemResetSatMsk(
 #undef RESET_TOLERANCE
 template <typename T>
 void elemresetsatmsk(
-    CudaContext *context,
+    CudaContextPtr context,
     T *W,
     const int size,
     const char *msk,
@@ -700,10 +748,10 @@ void elemresetsatmsk(
       context->getRandomStates(nblocks * nthreads));
 }
 template void elemresetsatmsk<float>(
-    CudaContext *, float *, const int, const char *, const float *, const float, const float *x);
+    CudaContextPtr, float *, const int, const char *, const float *, const float, const float *x);
 #ifdef RPU_USE_DOUBLE
 template void elemresetsatmsk<double>(
-    CudaContext *, double *, const int, const char *, const double *, const double, const float *);
+    CudaContextPtr, double *, const int, const char *, const double *, const double, const float *);
 #endif
 
 // A = W - A_in; W = A_in;
@@ -718,22 +766,38 @@ __global__ void kernelElemSubCopy(T *dev_W, T *dev_A, const int size, const T sc
   }
 }
 template <typename T>
-void elemsubcopy(const CudaContext *context, T *dev_W, T *dev_A, const int size, const T scale) {
+void elemsubcopy(const CudaContextPtr context, T *dev_W, T *dev_A, const int size, const T scale) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemSubCopy<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, dev_A, size, scale);
 }
-template void elemsubcopy<float>(const CudaContext *, float *, float *, const int, const float);
+template void elemsubcopy<float>(const CudaContextPtr, float *, float *, const int, const float);
 #ifdef RPU_USE_DOUBLE
-template void elemsubcopy<double>(const CudaContext *, double *, double *, const int, const double);
+template void
+elemsubcopy<double>(const CudaContextPtr, double *, double *, const int, const double);
 #endif
 
 // set all elements to a
 template <typename T> __global__ void kernelSetConstAlpha(T *values, int size, T alpha) {
-
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = alpha; }
 }
+
+template <typename T>
+void elemconst(const CudaContextPtr context, T *X, const int size, const T alpha) {
+  int nthreads = context->getNThreads();
+  int nblocks = context->getNBlocks(size, nthreads);
+  kernelSetConstAlpha<<<nblocks, nthreads, 0, context->getStream()>>>(X, size, alpha);
+}
+template void elemconst<float>(const CudaContextPtr, float *, const int, const float);
+#ifdef RPU_USE_DOUBLE
+template void elemconst<double>(const CudaContextPtr, double *, const int, const double);
+#endif
+template void elemconst<uint32_t>(const CudaContextPtr, uint32_t *, const int, const uint32_t);
+template void elemconst<uint64_t>(const CudaContextPtr, uint64_t *, const int, const uint64_t);
+template void elemconst<int>(const CudaContextPtr, int *, const int, const int);
+template void elemconst<char>(const CudaContextPtr, char *, const int, const char);
+template void elemconst<int8_t>(const CudaContextPtr, int8_t *, const int, const int8_t);
 
 template <typename T>
 void elemconst(const CudaContext *context, T *X, const int size, const T alpha) {
@@ -752,58 +816,60 @@ template void elemconst<char>(const CudaContext *, char *, const int, const char
 
 // w = max(min(w,|a|),-|a|)
 template <typename T> __global__ void kernelAClip(T *values, int size, T abs_a) {
-
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MIN(MAX(values[idx], -abs_a), abs_a); }
 }
 
-template <typename T> void aclip(const CudaContext *context, T *W, const int size, const T a) {
+template <typename T> void aclip(const CudaContextPtr context, T *W, const int size, const T a) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelAClip<<<nblocks, nthreads, 0, context->getStream()>>>(W, size, fabs(a));
 }
-template void aclip<float>(const CudaContext *, float *, const int, const float);
+template void aclip<float>(const CudaContextPtr, float *, const int, const float);
 #ifdef RPU_USE_DOUBLE
-template void aclip<double>(const CudaContext *, double *, const int, const double);
+template void aclip<double>(const CudaContextPtr, double *, const int, const double);
 #endif
 
 // w = max(w,a)
-template <typename T> __global__ void kernelElemmax(T *values, int size, T a) {
-
-  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MAX(values[idx], a); }
+template <typename T> __global__ void kernelElemmax(T *values, int size, T a, const T *in_values) {
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MAX(in_values[idx], a); }
 }
 
-template <typename T> void elemmax(const CudaContext *context, T *W, const int size, const T a) {
+template <typename T>
+void elemmax(const CudaContextPtr context, T *W, const int size, const T a, const T *in_values) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
-  kernelElemmax<<<nblocks, nthreads, 0, context->getStream()>>>(W, size, a);
+  kernelElemmax<<<nblocks, nthreads, 0, context->getStream()>>>(
+      W, size, a, in_values != nullptr ? in_values : W);
 }
-template void elemmax<float>(const CudaContext *, float *, const int, const float);
+template void elemmax<float>(const CudaContextPtr, float *, const int, const float, const float *);
 #ifdef RPU_USE_DOUBLE
-template void elemmax<double>(const CudaContext *, double *, const int, const double);
+template void
+elemmax<double>(const CudaContextPtr, double *, const int, const double, const double *);
 #endif
 
 // w = min(w,a)
-template <typename T> __global__ void kernelElemmin(T *values, int size, T a) {
-
-  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MIN(values[idx], a); }
+template <typename T> __global__ void kernelElemmin(T *values, int size, T a, const T *in_values) {
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) { values[idx] = MIN(in_values[idx], a); }
 }
 
-template <typename T> void elemmin(const CudaContext *context, T *W, const int size, const T a) {
+template <typename T>
+void elemmin(const CudaContextPtr context, T *W, const int size, const T a, const T *in_values) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
-  kernelElemmin<<<nblocks, nthreads, 0, context->getStream()>>>(W, size, a);
+  kernelElemmin<<<nblocks, nthreads, 0, context->getStream()>>>(
+      W, size, a, in_values != nullptr ? in_values : W);
 }
-template void elemmin<float>(const CudaContext *, float *, const int, const float);
+template void elemmin<float>(const CudaContextPtr, float *, const int, const float, const float *);
 #ifdef RPU_USE_DOUBLE
-template void elemmin<double>(const CudaContext *, double *, const int, const double);
+template void
+elemmin<double>(const CudaContextPtr, double *, const int, const double, const double *);
 #endif
 
 // w = w<a?0:w elementwise
 template <typename T> __global__ void kernelElemSetBelowZero(T *values, int size, T a) {
-
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
     T v = values[idx];
     values[idx] = v < a ? (T)0.0 : v;
@@ -811,15 +877,15 @@ template <typename T> __global__ void kernelElemSetBelowZero(T *values, int size
 }
 
 template <typename T>
-void elemsetbelowzero(const CudaContext *context, T *W, const int size, const T a) {
+void elemsetbelowzero(const CudaContextPtr context, T *W, const int size, const T a) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemSetBelowZero<<<nblocks, nthreads, 0, context->getStream()>>>(W, size, a);
 }
-template void elemsetbelowzero<float>(const CudaContext *, float *, const int, const float);
+template void elemsetbelowzero<float>(const CudaContextPtr, float *, const int, const float);
 #ifdef RPU_USE_DOUBLE
-template void elemsetbelowzero<double>(const CudaContext *, double *, const int, const double);
+template void elemsetbelowzero<double>(const CudaContextPtr, double *, const int, const double);
 #endif
 
 // w[j] = a*A[j] + b*B[j]
@@ -837,16 +903,14 @@ __global__ void kernelElemSub(T *dev_W, const int size, const T *dev_A, const T 
 
 template <typename T>
 __global__ void kernelElemWeightedSum(
-    T *dev_W, const int size, const T *dev_A, const T a_in, const T *dev_B, const T b_in) {
+    T *dev_W, const int size, const T *dev_A, const T a, const T *dev_B, const T b) {
 
-  T a = a_in;
-  T b = b_in;
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) { dev_W[idx] = a * dev_A[idx] + b * dev_B[idx]; }
 }
 
 template <typename T>
 void elemweightedsum(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *dev_W,
     const int size,
     const T *dev_A,
@@ -868,7 +932,7 @@ void elemweightedsum(
   }
 }
 template void elemweightedsum<float>(
-    const CudaContext *,
+    const CudaContextPtr,
     float *,
     const int,
     const float *,
@@ -877,7 +941,7 @@ template void elemweightedsum<float>(
     const float);
 #ifdef RPU_USE_DOUBLE
 template void elemweightedsum<double>(
-    const CudaContext *,
+    const CudaContextPtr,
     double *,
     const int,
     const double *,
@@ -892,7 +956,6 @@ __global__ void kernelElemAverage(T *dev_W, const int size, T **dev_Ms, const in
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
     T w = 0;
-
     for (int i = 0; i < m; i++) {
       const T *w1 = dev_Ms[i];
       w += w1[idx];
@@ -902,15 +965,15 @@ __global__ void kernelElemAverage(T *dev_W, const int size, T **dev_Ms, const in
 }
 
 template <typename T>
-void elemaverage(const CudaContext *context, T *dev_W, const int size, T **dev_Ms, const int m) {
+void elemaverage(const CudaContextPtr context, T *dev_W, const int size, T **dev_Ms, const int m) {
 
   int nthreads = context->getNThreads();
   int nblocks = context->getNBlocks(size, nthreads);
   kernelElemAverage<T><<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_Ms, m);
 }
-template void elemaverage<float>(const CudaContext *, float *, const int, float **, const int);
+template void elemaverage<float>(const CudaContextPtr, float *, const int, float **, const int);
 #ifdef RPU_USE_DOUBLE
-template void elemaverage<double>(const CudaContext *, double *, const int, double **, const int);
+template void elemaverage<double>(const CudaContextPtr, double *, const int, double **, const int);
 #endif
 
 // permute (1,3,2)
@@ -947,7 +1010,7 @@ __global__ void kernelPermute132Bias(
 
 template <typename T>
 void permute132(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *X_out,
     const T *X_in,
     const int d1,
@@ -962,10 +1025,10 @@ void permute132(
 }
 
 template void permute132<float>(
-    const CudaContext *, float *, const float *, const int, const int, const int, const bool);
+    const CudaContextPtr, float *, const float *, const int, const int, const int, const bool);
 #ifdef RPU_USE_DOUBLE
 template void permute132<double>(
-    const CudaContext *, double *, const double *, const int, const int, const int, const bool);
+    const CudaContextPtr, double *, const double *, const int, const int, const int, const bool);
 #endif
 
 // copy with bias
@@ -998,7 +1061,7 @@ __global__ void kernelCopyBias(T *dest_values, const T *source_values, int size,
 
 template <typename T>
 void makeBias(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *x_with_bias,
     const T *x_without_bias,
     const int x_size,
@@ -1021,18 +1084,18 @@ void makeBias(
   }
 }
 template void
-makeBias<float>(const CudaContext *, float *, const float *, const int, const int, const bool);
+makeBias<float>(const CudaContextPtr, float *, const float *, const int, const int, const bool);
 template void
-makeBias<int>(const CudaContext *, int *, const int *, const int, const int, const bool);
+makeBias<int>(const CudaContextPtr, int *, const int *, const int, const int, const bool);
 #ifdef RPU_USE_DOUBLE
 template void
-makeBias<double>(const CudaContext *, double *, const double *, const int, const int, const bool);
+makeBias<double>(const CudaContextPtr, double *, const double *, const int, const int, const bool);
 #endif
 
 // copy without bias (backward)
 template <typename T>
 void copyWithoutBias(
-    const CudaContext *context,
+    const CudaContextPtr context,
     T *x_without_bias,
     const T *x_with_bias,
     const int x_size,
@@ -1064,11 +1127,65 @@ void copyWithoutBias(
 }
 
 template void copyWithoutBias<float>(
-    const CudaContext *, float *, const float *, const int, const int, const bool);
+    const CudaContextPtr, float *, const float *, const int, const int, const bool);
 #ifdef RPU_USE_DOUBLE
 template void copyWithoutBias<double>(
-    const CudaContext *, double *, const double *, const int, const int, const bool);
+    const CudaContextPtr, double *, const double *, const int, const int, const bool);
 #endif
+
+// addWithIterator
+template <typename OutputIteratorT, typename T>
+__global__ void kernelAddWithIterator(
+    OutputIteratorT out_tensor, const T *in_tensor_a, const T *in_tensor_b, const int sz_all) {
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, sz_all) { out_tensor[idx] = in_tensor_a[idx] + in_tensor_b[idx]; }
+}
+
+template <typename OutputIteratorT, typename T>
+void addWithIterator(
+    const CudaContextPtr context,
+    OutputIteratorT out_tensor,
+    const T *in_tensor_a,
+    const T *in_tensor_b,
+    const int total_input_size) {
+
+  int nthreads = context->getNThreads();
+  int nblocks = context->getNBlocks(total_input_size, nthreads);
+
+  kernelAddWithIterator<OutputIteratorT, T><<<nblocks, nthreads, 0, context->getStream()>>>(
+      out_tensor, in_tensor_a, in_tensor_b, total_input_size);
+}
+
+#define RPU_CMU_DEFINE_AWI(OUTPUTITER, T)                                                          \
+  template void addWithIterator<OUTPUTITER, T>(                                                    \
+      const CudaContextPtr, OUTPUTITER, const T *, const T *, const int);
+
+#define TRANS_FLOAT(TRANS) TRANS, float
+RPU_CMU_DEFINE_AWI(float *, float);
+RPU_CMU_DEFINE_AWI(PermuterTransOutputIterator<float>, float);
+RPU_CMU_DEFINE_AWI(IndexReaderOutputIterator<float>, float);
+RPU_CMU_DEFINE_AWI(IndexReaderTransOutputIterator<float>, float);
+RPU_CMU_DEFINE_AWI(IndexReaderSliceOutputIterator<TRANS_FLOAT(true)>, float);
+RPU_CMU_DEFINE_AWI(IndexReaderSliceOutputIterator<TRANS_FLOAT(false)>, float);
+RPU_CMU_DEFINE_AWI(SliceOutputIterator<TRANS_FLOAT(true)>, float);
+RPU_CMU_DEFINE_AWI(SliceOutputIterator<TRANS_FLOAT(false)>, float);
+
+#undef TRANS_FLOAT
+
+#ifdef RPU_USE_DOUBLE
+#define TRANS_DOUBLE(TRANS) TRANS, double
+RPU_CMU_DEFINE_AWI(double *, double);
+RPU_CMU_DEFINE_AWI(PermuterTransOutputIterator<double>, double);
+RPU_CMU_DEFINE_AWI(IndexReaderOutputIterator<double>, double);
+RPU_CMU_DEFINE_AWI(IndexReaderTransOutputIterator<double>, double);
+RPU_CMU_DEFINE_AWI(IndexReaderSliceOutputIterator<TRANS_DOUBLE(true)>, double);
+RPU_CMU_DEFINE_AWI(IndexReaderSliceOutputIterator<TRANS_DOUBLE(false)>, double);
+RPU_CMU_DEFINE_AWI(SliceOutputIterator<TRANS_DOUBLE(true)>, double);
+RPU_CMU_DEFINE_AWI(SliceOutputIterator<TRANS_DOUBLE(false)>, double);
+#undef TRANS_DOUBLE
+#endif
+
+#undef RPU_CMU_DEFINE_CWI
 
 // copyWithIterator
 template <typename OutputIteratorT, typename InputIteratorT>
@@ -1080,7 +1197,7 @@ __global__ void kernelCopyWithIterator(
 
 template <typename OutputIteratorT, typename InputIteratorT>
 void copyWithIterator(
-    const CudaContext *context,
+    const CudaContextPtr context,
     OutputIteratorT out_tensor,
     InputIteratorT in_tensor,
     const int total_input_size) {
@@ -1094,8 +1211,9 @@ void copyWithIterator(
 
 #define RPU_CMU_DEFINE_CWI(OUTPUTITER, INPUTITER)                                                  \
   template void copyWithIterator<OUTPUTITER, INPUTITER>(                                           \
-      const CudaContext *, OUTPUTITER, INPUTITER, const int);
+      const CudaContextPtr, OUTPUTITER, INPUTITER, const int);
 #define TRANS_FLOAT(TRANS) TRANS, float
+#define COMMA ,
 
 RPU_CMU_DEFINE_CWI(float *, const float *);
 RPU_CMU_DEFINE_CWI(float *, float *);
@@ -1106,6 +1224,8 @@ RPU_CMU_DEFINE_CWI(float *, IndexReaderSliceInputIterator<TRANS_FLOAT(true)>);
 RPU_CMU_DEFINE_CWI(float *, IndexReaderSliceInputIterator<TRANS_FLOAT(false)>);
 RPU_CMU_DEFINE_CWI(float *, SliceInputIterator<TRANS_FLOAT(true)>);
 RPU_CMU_DEFINE_CWI(float *, SliceInputIterator<TRANS_FLOAT(false)>);
+RPU_CMU_DEFINE_CWI(float *, DiagInputIterator<float COMMA chop_t>);
+RPU_CMU_DEFINE_CWI(float *, EyeInputIterator<float>);
 RPU_CMU_DEFINE_CWI(PermuterTransOutputIterator<float>, const float *);
 RPU_CMU_DEFINE_CWI(IndexReaderOutputIterator<float>, const float *);
 RPU_CMU_DEFINE_CWI(IndexReaderTransOutputIterator<float>, const float *);
@@ -1127,6 +1247,8 @@ RPU_CMU_DEFINE_CWI(double *, IndexReaderSliceInputIterator<TRANS_DOUBLE(true)>);
 RPU_CMU_DEFINE_CWI(double *, IndexReaderSliceInputIterator<TRANS_DOUBLE(false)>);
 RPU_CMU_DEFINE_CWI(double *, SliceInputIterator<TRANS_DOUBLE(true)>);
 RPU_CMU_DEFINE_CWI(double *, SliceInputIterator<TRANS_DOUBLE(false)>);
+RPU_CMU_DEFINE_CWI(double *, DiagInputIterator<double COMMA chop_t>);
+RPU_CMU_DEFINE_CWI(double *, EyeInputIterator<double>);
 RPU_CMU_DEFINE_CWI(PermuterTransOutputIterator<double>, const double *);
 RPU_CMU_DEFINE_CWI(IndexReaderOutputIterator<double>, const double *);
 RPU_CMU_DEFINE_CWI(IndexReaderTransOutputIterator<double>, const double *);

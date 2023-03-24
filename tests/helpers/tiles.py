@@ -22,9 +22,12 @@ from aihwkit.simulator.configs.devices import (
     ExpStepDevice,
     SoftBoundsDevice,
     SoftBoundsPmaxDevice,
+    SoftBoundsReferenceDevice,
     PowStepDevice,
+    PowStepReferenceDevice,
     PiecewiseStepDevice,
-    IOParameters,
+)
+from aihwkit.simulator.configs.compounds import (
     OneSidedUnitCell,
     VectorUnitCell,
     TransferCompound,
@@ -32,6 +35,8 @@ from aihwkit.simulator.configs.devices import (
     ReferenceUnitCell,
     MixedPrecisionCompound,
 )
+from aihwkit.simulator.configs.utils import IOParameters
+
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
     InferenceRPUConfig,
@@ -158,6 +163,21 @@ class SoftBoundsPmax:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs)
 
 
+class SoftBoundsReference:
+    """AnalogTile with SoftBoundsPmaxDevice."""
+
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=SoftBoundsReferenceDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
 class ExpStep:
     """AnalogTile with ExpStepDevice."""
 
@@ -182,6 +202,20 @@ class PowStep:
 
     def get_rpu_config(self):
         return SingleRPUConfig(device=PowStepDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+
+
+class PowStepReference(PowStep):
+    """AnalogTile with PowStepDevice."""
+    simulator_tile_class = tiles.AnalogTile
+    first_hidden_field = 'max_bound'
+    use_cuda = False
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=PowStepReferenceDevice(w_max_dtod=0, w_min_dtod=0))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -476,6 +510,21 @@ class SoftBoundsPmaxCuda:
         return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
+class SoftBoundsReferenceCuda:
+    """AnalogTile with SoftBoundsReferenceDevice."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=SoftBoundsReferenceDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
 class ExpStepCuda:
     """AnalogTile with ExpStepDevice."""
 
@@ -500,6 +549,21 @@ class PowStepCuda:
 
     def get_rpu_config(self):
         return SingleRPUConfig(device=PowStepDevice(w_max_dtod=0, w_min_dtod=0))
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class PowStepReferenceCuda:
+    """AnalogTile with PowStepReferenceDevice."""
+
+    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    first_hidden_field = 'max_bound'
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return SingleRPUConfig(device=PowStepReferenceDevice(w_max_dtod=0, w_min_dtod=0))
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()

@@ -51,8 +51,8 @@ class AnalogFunctionBase(Function):
 
         # Invoke the forward pass in the tile instance.
         if use_indexed:
-            return analog_tile.forward_indexed(input_, is_test)
-        return analog_tile.forward(input_, is_test)
+            return analog_tile.forward_indexed(input_, is_test, ctx)
+        return analog_tile.forward(input_, is_test, ctx)
 
     @staticmethod
     def backward(
@@ -62,7 +62,7 @@ class AnalogFunctionBase(Function):
         """Execute the backward pass in the analog tile."""
         analog_ctx = ctx.analog_ctx
         analog_tile = analog_ctx.analog_tile
-        input_, = ctx.saved_tensors
+        input_ = ctx.saved_tensors[0]
 
         shared_weights_grad = None
         use_indexed = analog_ctx.use_indexed
@@ -72,9 +72,9 @@ class AnalogFunctionBase(Function):
 
         # Call the backward function in the tile instance.
         if use_indexed:
-            grad_input = analog_tile.backward_indexed(grad_output)
+            grad_input = analog_tile.backward_indexed(grad_output, ctx)
         else:
-            grad_input = analog_tile.backward(grad_output)
+            grad_input = analog_tile.backward(grad_output, ctx)
 
         if analog_ctx.use_torch_update:
             # Grad computed directly (for inference training)

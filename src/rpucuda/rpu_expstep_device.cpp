@@ -42,11 +42,11 @@ inline void update_once(
     T z = (T)2.0 * w / b_diff * es_a + es_b;
 
     if (sign > 0) {
-      T y_down = MAX((T)1 - es_A_down * expf(es_gamma_down * (-z)), (T)0);
+      T y_down = MAX((T)1.0 - (T)es_A_down * exp(es_gamma_down * (-z)), (T)0.0);
       w -= y_down * ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_down;
 
     } else {
-      T y_up = MAX(1 - es_A_up * expf(es_gamma_up * z), (T)0);
+      T y_up = MAX((T)1.0 - (T)es_A_up * exp(es_gamma_up * z), (T)0.0);
       w += y_up * ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_up;
     }
 
@@ -86,11 +86,11 @@ inline void update_once_complex_noise(
     T dw;
 
     if (sign > 0) {
-      T y_down = MAX((T)1 - es_A_down * expf(es_gamma_down * (-z)), (T)0);
+      T y_down = MAX((T)1.0 - (T)es_A_down * exp(es_gamma_down * (-z)), (T)0);
       dw = -y_down * scale_down;
 
     } else {
-      T y_up = MAX(1 - es_A_up * expf(es_gamma_up * z), (T)0);
+      T y_up = MAX((T)1.0 - (T)es_A_up * exp(es_gamma_up * z), (T)0);
       dw = y_up * scale_up;
     }
 

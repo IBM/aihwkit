@@ -22,6 +22,7 @@
 #include "rpucuda_powstep_device.h"
 #include "rpucuda_pulsed.h"
 #include "rpucuda_pulsed_device.h"
+#include "rpucuda_softbounds_reference_device.h"
 #include "utility_functions.h"
 #include "gtest/gtest.h"
 #include <chrono>
@@ -48,12 +49,17 @@ template <> void specific_settings(PiecewiseStepRPUDeviceMetaParameter<num_t> &p
   par.piecewise_down_vec = std::vector<num_t>{0.5, 0.3, 2.0, 0.6, 0.3};
 };
 
+template <> void specific_settings(SoftBoundsReferenceRPUDeviceMetaParameter<num_t> &par) {
+  par.reference_mean = 0.1;
+  par.reference_std = 0.4;
+  par.subtract_symmetry_point = true;
+};
+
 template <typename DeviceParT> class RPUDeviceTestFixture : public ::testing::Test {
 public:
   void SetUp() {
 
     context = &context_container;
-
     this->x_size = 53;
     this->d_size = 43;
     this->K = 10;
@@ -116,7 +122,7 @@ public:
       p.up.desired_BL = 5 * K;
     }
 
-    dp.print();
+    // dp.print();
 
     num_t lr = 0.05;
 
@@ -125,13 +131,13 @@ public:
     layer_pulsed->populateParameter(&p, &dp);
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
-    layer_pulsed->disp();
+    // layer_pulsed->disp();
 
     this->layer_pulsed->getWeights(refweights[0]);
 
     // culayer
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->disp();
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
@@ -166,13 +172,6 @@ public:
 
     this->context->synchronizeDevice();
 
-    std::cout << "RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    this->culayer_pulsed->printRPUParameter(3, 3);
-    std::cout << "RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-    this->layer_pulsed->printRPUParameter(3, 3);
-
     // update
     int nK32 = (K + 32) / 32;
     uint32_t *x_counts32 = new uint32_t[this->x_size * nK32];
@@ -205,11 +204,6 @@ public:
       this->context->synchronizeDevice();
     }
 
-    std::cout << "W results for RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    std::cout << "W results for RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-
     num_t **cuweights = this->culayer_pulsed->getWeights();
     num_t **weights = this->layer_pulsed->getWeights();
     this->context->synchronizeDevice();
@@ -237,8 +231,7 @@ public:
   void TearDown() { Array_2D_Free(refweights); }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<num_t>> culayer_pulsed;
   std::vector<num_t> x_vec, d_vec, rx, rd;
@@ -259,7 +252,8 @@ typedef ::testing::Types<
     ExpStepRPUDeviceMetaParameter<num_t>,
     PowStepRPUDeviceMetaParameter<num_t>,
     ConstantStepRPUDeviceMetaParameter<num_t>,
-    PiecewiseStepRPUDeviceMetaParameter<num_t>>
+    PiecewiseStepRPUDeviceMetaParameter<num_t>,
+    SoftBoundsReferenceRPUDeviceMetaParameter<num_t>>
 
     MetaPar;
 

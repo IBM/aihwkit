@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,8 +20,10 @@
 #include "rpu_onesided_device.h"
 #include "rpu_piecewisestep_device.h"
 #include "rpu_powstep_device.h"
+#include "rpu_powstep_reference_device.h"
 #include "rpu_pulsed.h"
 #include "rpu_simple_device.h"
+#include "rpu_softbounds_reference_device.h"
 #include "rpu_transfer_device.h"
 #include "rpu_vector_device.h"
 #include "weight_clipper.h"

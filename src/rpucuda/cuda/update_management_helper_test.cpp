@@ -84,11 +84,12 @@ TYPED_TEST(UMHTestFixture, TranslateBatchOrder64) {
 
 TYPED_TEST(UMHTestFixture, computeScaleAndK) {
 
-  CudaContext c{-1, false};
-  UpdateManagementHelper<TypeParam> umh(&c, this->size, this->size);
-  CudaArray<TypeParam> cu_x(&c, this->size * this->m_batch, this->x1);
-  CudaArray<TypeParam> cu_d(&c, this->size * this->m_batch, this->d1);
-  c.synchronize();
+  CudaContext context_container{-1, false};
+  CudaContextPtr c = &context_container;
+  UpdateManagementHelper<TypeParam> umh(c, this->size, this->size);
+  CudaArray<TypeParam> cu_x(c, this->size * this->m_batch, this->x1);
+  CudaArray<TypeParam> cu_d(c, this->size * this->m_batch, this->d1);
+  c->synchronize();
 
   TypeParam dw_min = 0.001;
   TypeParam lr = 0.01;
@@ -100,16 +101,16 @@ TYPED_TEST(UMHTestFixture, computeScaleAndK) {
       cu_x.getData(), cu_d.getData(), dw_min, lr,
       true, // update_management,
       true, // update_bl_management,
-      this->m_batch, x_trans, d_trans, BL);
+      this->m_batch, x_trans, d_trans, BL, 1.0, 1.0);
 
-  c.synchronize();
+  c->synchronize();
   TypeParam *scale_val = new TypeParam[this->m_batch];
   int *K_val = new int[this->m_batch];
 
   umh.getScaleValues(scale_val);
   umh.getKValues(K_val);
 
-  c.synchronize();
+  c->synchronize();
   // reference:
   for (int i_batch = 0; i_batch < this->m_batch; i_batch++) {
 

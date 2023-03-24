@@ -103,11 +103,11 @@ public:
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
 
-    layer_pulsed->disp();
+    // layer_pulsed->disp();
 
     // culayer
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->disp();
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
@@ -138,9 +138,8 @@ public:
     d_vec_batch.resize(m_batch * d_size);
     d_vec2_batch.resize(m_batch * d_size);
   }
-
   CudaContext context_container{-1, false};
-  CudaContext *context;
+  CudaContextPtr context;
 
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<num_t>> culayer_pulsed;
@@ -166,13 +165,6 @@ TYPED_TEST_CASE(RPUCudaExpstepStateTestFixture, Tios);
 
 #define RPU_TEST_UPDATE(CUFUN, FUN, NLOOP)                                                         \
   this->context->synchronizeDevice();                                                              \
-  this->culayer_pulsed->printWeights(3, 3);                                                        \
-  this->layer_pulsed->printWeights(3, 3);                                                          \
-                                                                                                   \
-  std::cout << "RPU Cuda:\n";                                                                      \
-  this->culayer_pulsed->printRPUParameter(2, 5);                                                   \
-  std::cout << "RPU:\n";                                                                           \
-  this->layer_pulsed->printRPUParameter(2, 5);                                                     \
                                                                                                    \
   int n = this->x_size * this->d_size;                                                             \
   num_t **refweights = Array_2D_Get<num_t>(this->d_size, this->x_size);                            \

@@ -139,8 +139,6 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
         # Unregister weight/bias as a parameter but keep it as a
         # field (needed for syncing still)
         self.unregister_parameter('weight')
-        if self.analog_bias:
-            self.unregister_parameter('bias')
 
     def get_split_sizes(self, size: int, split_max_size: int, group_size: int = 1) -> List[int]:
         """ Computed the split sizes across channels.
@@ -313,7 +311,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             bias: Optional[Tensor] = None,
             force_exact: bool = False,
             apply_weight_scaling: bool = True,
-            weight_scaling_omega: float = None
+            weight_scaling_omega: Optional[float] = None
     ) -> None:
         """Set the weight (and bias) with given Tensors.
 
@@ -366,18 +364,13 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
                 tile_weight = in_weight[out_start:out_end, :]
                 out_start = out_end
 
+                analog_tile.set_weights(
+                    tile_weight, None,
+                    apply_weight_scaling,
+                    weight_scaling_omega
+                )
                 if realistic:
-                    analog_tile.set_weights_realistic(
-                        tile_weight, None,
-                        apply_weight_scaling,
-                        weight_scaling_omega
-                    )
-                else:
-                    analog_tile.set_weights(
-                        tile_weight, None,
-                        apply_weight_scaling,
-                        weight_scaling_omega
-                    )
+                    analog_tile.program_weights()
 
         self._sync_weights_from_tile()
 
@@ -423,7 +416,7 @@ class _AnalogConvNdMapped(AnalogModuleBase, _ConvNd):
             in_tile_weight = []
             for analog_tile in in_tiles:
                 if realistic:
-                    tile_weight, _ = analog_tile.get_weights_realistic(apply_weight_scaling)
+                    tile_weight, _ = analog_tile.read_weights(apply_weight_scaling)
                 else:
                     tile_weight, _ = analog_tile.get_weights(apply_weight_scaling)
                 in_tile_weight.append(tile_weight)

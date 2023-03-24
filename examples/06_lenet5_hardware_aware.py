@@ -31,9 +31,10 @@ from torchvision import datasets, transforms
 # Imports from aihwkit.
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    WeightRemapType, WeightModifierType, WeightClipType
+from aihwkit.simulator.configs import (
+    InferenceRPUConfig,
+    WeightRemapType, WeightModifierType, WeightClipType,
+    NoiseManagementType, BoundManagementType
 )
 from aihwkit.inference import PCMLikeNoiseModel
 from aihwkit.simulator.rpu_base import cuda
@@ -359,7 +360,7 @@ os.makedirs(RESULTS, exist_ok=True)
 manual_seed(1)
 
 # Training parameters
-N_EPOCHS = 10
+N_EPOCHS = 30
 BATCH_SIZE = 50
 LEARNING_RATE = 0.1
 
@@ -370,7 +371,7 @@ training_data, valid_data = load_images(BATCH_SIZE)
 # the inference/training pass
 my_rpu_config = InferenceRPUConfig()
 my_rpu_config.mapping.digital_bias = True
-my_rpu_config.mapping.out_scaling_columnwise = False
+my_rpu_config.mapping.out_scaling_columnwise = True
 my_rpu_config.mapping.learn_out_scaling = True
 my_rpu_config.mapping.weight_scaling_omega = 1.0
 my_rpu_config.mapping.weight_scaling_columnwise = False
@@ -380,13 +381,23 @@ my_rpu_config.remap.type = WeightRemapType.CHANNELWISE_SYMMETRIC
 my_rpu_config.clip.type = WeightClipType.LAYER_GAUSSIAN
 my_rpu_config.clip.sigma = 2.5
 
+# train input clipping
+my_rpu_config.forward.noise_management = NoiseManagementType.NONE
+my_rpu_config.forward.bound_management = BoundManagementType.NONE
+my_rpu_config.forward.out_bound = 10.0  # quite restrictive
+my_rpu_config.pre_post.input_range.enable = True
+my_rpu_config.pre_post.input_range.manage_output_clipping = True
+my_rpu_config.pre_post.input_range.decay = 0.001
+my_rpu_config.pre_post.input_range.input_min_percentage = 0.95
+my_rpu_config.pre_post.input_range.output_min_percentage = 0.95
+
 my_rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
 my_rpu_config.modifier.std_dev = 0.1
 
 # Prepare the model.
 analog_model = create_analog_network(my_rpu_config)
 if USE_CUDA:
-    analog_model.cuda()
+    analog_model = analog_model.cuda()
 print(analog_model)
 
 opt = create_sgd_optimizer(analog_model, LEARNING_RATE)

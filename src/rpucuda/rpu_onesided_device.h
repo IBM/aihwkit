@@ -106,8 +106,6 @@ public:
 
   void invert();
   virtual const T *getRefreshVecs() const { return refresh_vecs_.data(); };
-  void initUpdateCycle(
-      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
 
@@ -125,6 +123,9 @@ public:
   virtual T **getNegWeights() { return this->getWeightVec()[g_minus_]; };
 
   inline uint64_t getRefreshCount() const { return refresh_counter_; };
+  inline const ForwardBackwardPassIOManaged<T> &getRefreshFBPass() const {
+    return *refresh_fb_pass_;
+  };
 
 protected:
   void populate(const OneSidedRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);

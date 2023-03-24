@@ -32,7 +32,7 @@ template <typename T> struct UpdateFunctorLinearStepMult {
       curandState &local_state) {
 
     UNUSED(global_params_count); // fixed
-
+    // negative > 0 means going up here ...
     T uw_std = *write_noise_std;
     T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        //[3], [1]
     T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); // [1],[0]
@@ -75,7 +75,7 @@ template <typename T> struct UpdateFunctorLinearStepMult {
     // add update write noise onto apparent weight
     if (uw_std > 0) {
       T stoch_value = curand_normal(&local_state);
-      apparent_weight = persistent_weight + uw_std * stoch_value;
+      apparent_weight = w + uw_std * stoch_value;
     }
   }
 };
@@ -134,7 +134,7 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
     // add update write noise onto apparent weight
     if (uw_std > 0) {
       T stoch_value = curand_normal(&local_state);
-      apparent_weight = persistent_weight + uw_std * stoch_value;
+      apparent_weight = w + uw_std * stoch_value;
     }
   }
 };
@@ -159,6 +159,8 @@ pwukpvec_t<T> LinearStepRPUDeviceCuda<T>::getUpdateKernels(
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
             ARGS);
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+                    T, UpdateFunctorLinearStepMult<T>, 1>> ARGS);
 
   } else {
 
@@ -170,6 +172,8 @@ pwukpvec_t<T> LinearStepRPUDeviceCuda<T>::getUpdateKernels(
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
             ARGS);
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+                    T, UpdateFunctorLinearStepAdd<T>, 1>> ARGS);
   }
   return v;
 }

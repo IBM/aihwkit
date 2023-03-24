@@ -30,10 +30,13 @@ enum BLMOutputFormat {
   UI32BO64 // translate mode, first UI32 than compressed into BO64
 };
 
+template <typename T> class ChoppedWeightOutput;
+template <typename T> struct ChoppedWeightOutputParameter;
+
 template <typename T> class BitLineMaker {
 
 public:
-  explicit BitLineMaker(CudaContext *c, int x_size, int d_size);
+  explicit BitLineMaker(CudaContextPtr c, int x_size, int d_size);
 
   template <typename XInputIteratorT, typename DInputIteratorT>
   void makeCounts(
@@ -49,6 +52,10 @@ public:
       const int use_bo64 = 0,
       const bool implicit_pulses = false);
 
+  inline int usesBo64() const {
+    return (format_ == BLMOutputFormat::BO64 || format_ == BLMOutputFormat::UI32BO64);
+  };
+
   BLMOutputFormat getFormat(int use_bo64, bool implicit_pulses);
 
   T *getXData() const;
@@ -59,7 +66,7 @@ public:
 
   uint64_t *getXCountsBo64Data() const;
   uint64_t *getDCountsBo64Data() const;
-  kagg_t *getKnData(bool ublm) const;
+  kagg_t *getKnData(bool ublm, int m_batch) const;
   int getBo64Batch(int m_batch) const;
 
   void copyXCountsToHost(uint32_t *dest) const;
@@ -72,17 +79,33 @@ public:
     return (BL == buffer_BL_) && (m_batch <= buffer_m_batch_);
   }
   inline int getNK32Current() const { return current_BL_ / 32 + 1; };
-  void getCountsDebug(uint32_t *x_counts, uint32_t *d_counts);
+  inline int getCurrentBL() const { return current_BL_; };
+  inline int getCurrentMBatch() const { return current_m_batch_; };
+  inline int getCurrentUBLM() const { return current_ublm_; };
+  inline int getCurrentUM() const { return current_um_; };
   void getFPCounts(T *x_counts, T *d_counts);
-
   inline T getCurrentLR() const { return current_lr_; };
-  // helper for debug
-  UpdateManagementHelper<T> *getUmh() const { return &*umh_; };
-
   void initializeBLBuffers(int m_batch, int BL, int use_bo64, bool implicit_pulses);
 
+  // helper for debug
+  void getCountsDebug(uint32_t *x_counts, uint32_t *d_counts);
+  void getAccCountsDebug(
+      ChoppedWeightOutput<T> *cwo,
+      std::vector<T> &weights,
+      std::vector<T> &weights_output,
+      std::vector<T> &weights_batch,
+      const PulsedUpdateMetaParameter<T> &up,
+      T dw_min,
+      bool flexible_in_size,
+      bool verbose);
+
+  UpdateManagementHelper<T> *getUmh() const { return &*umh_; };
+  void getAverageAbsMax(T &m_x, T &m_d) const;
+  void getAverageLogAbsMax(T &m_x, T &m_d) const;
+  void getAbsMax(T &m_x, T &m_d) const;
+
 private:
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
   int x_size_ = 0;
   int d_size_ = 0;
   int nthreads_ = 0;
@@ -91,8 +114,15 @@ private:
   int current_BL_ = 0;
   T current_lr_ = 0;
   int buffer_m_batch_ = 0;
+  int current_m_batch_ = 0;
+  bool current_out_trans_ = false;
+  bool current_ublm_ = false;
+  bool current_um_ = false;
   BLMOutputFormat format_ = BLMOutputFormat::NotSet;
 
+  // TODO: use shared buffers for some of these? However, need to be
+  // careful with async update and multiple uses of counts in some
+  // devices
   std::unique_ptr<CudaArray<T>> dev_x_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_d_ = nullptr;
 
@@ -100,8 +130,6 @@ private:
   std::unique_ptr<CudaArray<uint32_t>> dev_d_counts_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_x_counts_bo64_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_d_counts_bo64_ = nullptr;
-
-  std::shared_ptr<CudaArray<curandState_t>> dev_states_ = nullptr;
 
   std::unique_ptr<UpdateManagementHelper<T>> umh_ = nullptr;
 };

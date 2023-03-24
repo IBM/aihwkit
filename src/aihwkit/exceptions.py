@@ -25,6 +25,10 @@ class TileError(AihwkitException):
     """Exceptions related to analog tiles."""
 
 
+class ArgumentError(AihwkitException):
+    """Exceptions related to wrong arguments."""
+
+
 class CudaError(AihwkitException):
     """Exceptions related to CUDA."""
 

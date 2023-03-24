@@ -11,10 +11,10 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_math_util.h"
 #include "io_iterator.h"
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_mixedprec_device.h"
-#include <cub/cub.cuh>
 #include <memory>
 
 namespace RPU {
@@ -26,12 +26,12 @@ namespace RPU {
 
 */
 template <typename T>
-MixedPrecRPUDeviceCuda<T>::MixedPrecRPUDeviceCuda(CudaContext *c, int x_size, int d_size)
+MixedPrecRPUDeviceCuda<T>::MixedPrecRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size)
     : MixedPrecRPUDeviceBaseCuda<T>(c, x_size, d_size){};
 
 template <typename T>
 MixedPrecRPUDeviceCuda<T>::MixedPrecRPUDeviceCuda(
-    CudaContext *c, const MixedPrecRPUDevice<T> &rpu_device)
+    CudaContextPtr c, const MixedPrecRPUDevice<T> &rpu_device)
     : MixedPrecRPUDeviceCuda<T>(c, rpu_device.getXSize(), rpu_device.getDSize()) {
   populateFrom(rpu_device);
 };
@@ -56,6 +56,7 @@ MixedPrecRPUDeviceCuda<T> &
 MixedPrecRPUDeviceCuda<T>::operator=(const MixedPrecRPUDeviceCuda<T> &other) {
   MixedPrecRPUDeviceCuda<T> tmp(other);
   swap(*this, tmp);
+  this->context_->synchronize();
   return *this;
 };
 

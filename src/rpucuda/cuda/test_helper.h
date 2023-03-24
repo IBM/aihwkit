@@ -28,6 +28,7 @@ int debugKernelUpdateW(
     T dw_min_std,
     T bound,
     T *timings);
+
 template <typename T>
 int debugKernelUpdateWBatch(
     T *weights,
@@ -59,6 +60,6 @@ int debugKernelUpdateWBatchShared(
     T bound,
     int kernel_type,
     T *timings);
-
 } // namespace test_helper
 } // namespace RPU
+  // namespace RPU

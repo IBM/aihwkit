@@ -516,6 +516,23 @@ tiki-taka v2 algorithm that achieves better performance than SGD.
 Here it is illustrated how the analog tiles can be directly used to
 implement an analog mat-vec (without a pytorch layer).
 
+## Example 24: [`24_bert_on_squad.py`]
+
+This example is adapted from
+https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
+
+The example loads a pre-trained BERT model trained on
+the SQuAD dataset. It then applies `convert_to_analog()`
+to examine the effects of `drift_analog_weights()` on inference performance at
+different weight noise levels. Tensorboard is used to display the SQuAD
+metrics evaluated using the model at various times after training completed.
+
+Commandline arguments can be used to control certain options.
+For example:
+`python /path/to/aihwkit/examples/24_bert_on_squad.py -n 0.1 -r "run 1" -l 0.0005 -t`
+to set the weight noise to 0.1, name the run in Tensorboard "run 1",
+set the learning rate to 0.0005, and do hardware-aware training
+
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
@@ -560,3 +577,4 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`21_fit_device_data.py`]: 21_fit_device_data.py
 [`22_war_and_peace_lstm.py`]: 22_war_and_peace_lstm.py
 [`23_using_analog_tile_as_matrix.py`]: 23_using_analog_tile_as_matrix.py
+[`24_bert_on_squad.py`]: 24_bert_on_squad.py

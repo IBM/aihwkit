@@ -22,21 +22,19 @@ void declare_rpu_tiles(py::module &m) {
   using Class = RPU::RPUSimple<T>;
   using ClassPulsed = RPU::RPUPulsed<T>;
 
-  py::class_<RPU::WeightModifierParameter>(m, "WeightModifierParameter")
+  py::class_<RPU::WeightModifierParameter<T>>(m, "WeightModifierParameter")
       .def(py::init<>())
-      .def_readwrite("std_dev", &RPU::WeightModifierParameter::std_dev)
-      .def_readwrite("res", &RPU::WeightModifierParameter::res)
-      .def_readwrite("sto_round", &RPU::WeightModifierParameter::sto_round)
-      .def_readwrite("dorefa_clip", &RPU::WeightModifierParameter::dorefa_clip)
-      .def_readwrite("pdrop", &RPU::WeightModifierParameter::pdrop)
-      .def_readwrite("enable_during_test", &RPU::WeightModifierParameter::enable_during_test)
-      .def_readwrite("copy_last_column", &RPU::WeightModifierParameter::copy_last_column)
-      .def_readwrite("rel_to_actual_wmax", &RPU::WeightModifierParameter::rel_to_actual_wmax)
-      .def_readwrite("assumed_wmax", &RPU::WeightModifierParameter::assumed_wmax)
-      .def_readwrite("coeff0", &RPU::WeightModifierParameter::coeff0)
-      .def_readwrite("coeff1", &RPU::WeightModifierParameter::coeff1)
-      .def_readwrite("coeff2", &RPU::WeightModifierParameter::coeff2)
-      .def_readwrite("type", &RPU::WeightModifierParameter::type);
+      .def_readwrite("std_dev", &RPU::WeightModifierParameter<T>::std_dev)
+      .def_readwrite("res", &RPU::WeightModifierParameter<T>::res)
+      .def_readwrite("sto_round", &RPU::WeightModifierParameter<T>::sto_round)
+      .def_readwrite("dorefa_clip", &RPU::WeightModifierParameter<T>::dorefa_clip)
+      .def_readwrite("pdrop", &RPU::WeightModifierParameter<T>::pdrop)
+      .def_readwrite("enable_during_test", &RPU::WeightModifierParameter<T>::enable_during_test)
+      .def_readwrite("copy_last_column", &RPU::WeightModifierParameter<T>::copy_last_column)
+      .def_readwrite("rel_to_actual_wmax", &RPU::WeightModifierParameter<T>::rel_to_actual_wmax)
+      .def_readwrite("assumed_wmax", &RPU::WeightModifierParameter<T>::assumed_wmax)
+      .def_readwrite("type", &RPU::WeightModifierParameter<T>::type)
+      .def_readwrite("coeffs", &RPU::WeightModifierParameter<T>::coeffs);
 
   py::enum_<RPU::WeightModifierType>(m, "WeightModifierType")
       .value("Copy", RPU::WeightModifierType::Copy)
@@ -192,58 +190,6 @@ void declare_rpu_tiles(py::module &m) {
            Args:
                weights: ``[d_size, x_size]`` weight matrix.
            )pbdoc")
-
-      .def(
-          "get_weights_realistic",
-          [](Class &self) {
-            torch::Tensor weights = torch::empty({self.getDSize(), self.getXSize()});
-
-            // Call RPU function.
-            std::lock_guard<std::mutex> lock(self.mutex_);
-            self.getWeightsReal(weights.data_ptr<T>());
-            return weights;
-          },
-          R"pbdoc(
-           Return the tile weights.
-
-           Return the tile weights by using the forward pass. This is the hardware realistic
-           version of reading out the weights.
-
-           Returns:
-               tensor: the ``[d_size, x_size]`` weight matrix.
-           )pbdoc")
-
-      .def(
-          "set_weights_realistic",
-          [](Class &self, torch::Tensor weights, int n_loops = 10) {
-            // Validate the weights dimensions.
-            if (weights.dim() != 2 || weights.size(0) != self.getDSize() ||
-                weights.size(1) != self.getXSize()) {
-              throw std::runtime_error(
-                  "Invalid weights dimensions: expected [" + std::to_string(self.getDSize()) + "," +
-                  std::to_string(self.getXSize()) + "] tensor");
-            }
-
-            auto cpu_weights = weights.detach().cpu().contiguous();
-            CHECK_CONTIGUOUS(cpu_weights);
-
-            // Call RPU function.
-            std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.setWeightsReal(cpu_weights.data_ptr<T>(), n_loops);
-          },
-          py::arg("weights"), py::arg("n_loops") = 10,
-          R"pbdoc(
-           Set the tile weights by using the forward/update pass.
-
-           Set the tile weights to the ``weights`` parameter by using the forward/update
-           pass. This is the hardware realistic version for handling setting of the weights.
-
-           Args:
-               weights: ``[d_size, x_size]`` weight matrix.
-               n_loops: number of times the columns of the weights are set in a closed-loop manner.
-                   A value of ``1`` means that all columns in principle receive enough pulses to
-                   change from ``w_min`` to ``w_max``.
-           )pbdoc")
       .def(
           "set_shared_weights",
           [](Class &self, torch::Tensor &weights) {
@@ -387,7 +333,7 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "modify_weights",
-          [](Class &self, ::RPU::WeightModifierParameter &wmpar) {
+          [](Class &self, ::RPU::WeightModifierParameter<T> &wmpar) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.modifyFBWeights(wmpar);
           },
@@ -436,7 +382,7 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "forward",
           [](Class &self, const torch::Tensor &x_input_, bool bias = false, bool x_trans = false,
-             bool d_trans = false, bool is_test = false) {
+             bool d_trans = false, bool is_test = false, bool non_blocking = false) {
             auto x_input = x_input_.contiguous();
             CHECK_TORCH_INPUT(x_input);
 
@@ -474,7 +420,7 @@ void declare_rpu_tiles(py::module &m) {
             return d_output;
           },
           py::arg("x_input"), py::arg("bias") = false, py::arg("x_trans") = false,
-          py::arg("d_trans") = false, py::arg("is_test") = false,
+          py::arg("d_trans") = false, py::arg("is_test") = false, py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product (forward pass).
 
@@ -505,7 +451,7 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "backward",
           [](Class &self, const torch::Tensor &d_input_, bool bias = false, bool d_trans = false,
-             bool x_trans = false) {
+             bool x_trans = false, bool non_blocking = false) {
             auto d_input = d_input_.contiguous();
             CHECK_TORCH_INPUT(d_input);
 
@@ -543,7 +489,7 @@ void declare_rpu_tiles(py::module &m) {
             return x_output;
           },
           py::arg("d_input"), py::arg("bias") = false, py::arg("d_trans") = false,
-          py::arg("x_trans") = false,
+          py::arg("x_trans") = false, py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the transposed dot product (backward pass).
 
@@ -570,7 +516,8 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "update",
           [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_,
-             bool bias = false, bool x_trans = false, bool d_trans = false) {
+             bool bias = false, bool x_trans = false, bool d_trans = false,
+             bool non_blocking = false) {
             auto d_input = d_input_.contiguous();
             auto x_input = x_input_.contiguous();
 
@@ -617,7 +564,7 @@ void declare_rpu_tiles(py::module &m) {
                 x_trans, d_trans);
           },
           py::arg("x_input"), py::arg("d_input"), py::arg("bias"), py::arg("d_trans") = false,
-          py::arg("x_trans") = false,
+          py::arg("x_trans") = false, py::arg("non_blocking") = false,
           R"pbdoc(
            Compute an n-rank update.
 
@@ -643,7 +590,7 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "forward_indexed",
           [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_tensor_,
-             bool is_test = false) {
+             bool is_test = false, bool non_blocking = false) {
             auto x_input = x_input_.contiguous();
             auto d_tensor = d_tensor_.contiguous();
             CHECK_TORCH_INPUT(x_input);
@@ -660,6 +607,7 @@ void declare_rpu_tiles(py::module &m) {
             return d_tensor;
           },
           py::arg("x_input"), py::arg("d_tensor"), py::arg("is_test") = false,
+          py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (forward pass).
 
@@ -676,7 +624,8 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "backward_indexed",
-          [](Class &self, const torch::Tensor &d_input_, const torch::Tensor &x_tensor_) {
+          [](Class &self, const torch::Tensor &d_input_, const torch::Tensor &x_tensor_,
+             bool non_blocking = false) {
             auto d_input = d_input_.contiguous();
             auto x_tensor = x_tensor_.contiguous();
             CHECK_TORCH_INPUT(d_input);
@@ -692,7 +641,7 @@ void declare_rpu_tiles(py::module &m) {
                 d_image_size, N, true);
             return x_tensor;
           },
-          py::arg("d_input"), py::arg("x_tensor"),
+          py::arg("d_input"), py::arg("x_tensor"), py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
@@ -708,7 +657,8 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "update_indexed",
-          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_) {
+          [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_,
+             bool non_blocking = false) {
             auto x_input = x_input_.contiguous();
             auto d_input = d_input_.contiguous();
             CHECK_TORCH_INPUT(x_input);
@@ -723,7 +673,7 @@ void declare_rpu_tiles(py::module &m) {
                 x_input.template data_ptr<T>(), d_input.template data_ptr<T>(), x_input.numel(),
                 d_image_size, N, true);
           },
-          py::arg("x_input"), py::arg("d_input"),
+          py::arg("x_input"), py::arg("d_input"), py::arg("non_blocking") = false,
           R"pbdoc(
            Compute the dot product using an index matrix (backward pass).
 
@@ -754,7 +704,7 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "has_matrix_indices", [](Class &self) { return self.hasMatrixIndices(); },
           R"pbdoc(
-           Returns whether the index matrix necessary for the  ``*_indexed`` functionality 
+           Returns whether the index matrix necessary for the  ``*_indexed`` functionality
            has been set.
 
            Caution:

@@ -13,6 +13,7 @@
 #pragma once
 
 #include "cuda_util.h"
+#include "forward_backward_pass.h"
 #include "pulsed_weight_updater.h"
 #include "rpu_pulsed.h"
 #include "rpucuda.h"
@@ -30,8 +31,8 @@ template <typename T> class RPUCudaPulsed : public RPUCudaSimple<T> {
 
 public:
   explicit RPUCudaPulsed(){}; // dummy
-  explicit RPUCudaPulsed(CudaContext *c, int x_size, int d_size);
-  explicit RPUCudaPulsed(CudaContext *c, RPUPulsed<T> &o);
+  explicit RPUCudaPulsed(CudaContextPtr c, int x_size, int d_size);
+  explicit RPUCudaPulsed(CudaContextPtr c, RPUPulsed<T> &o);
   explicit RPUCudaPulsed(cudaStream_t s, int x_size, int d_size);
   explicit RPUCudaPulsed(cudaStream_t s, RPUPulsed<T> &o);
 
@@ -60,20 +61,19 @@ public:
     swap(a.dev_up_x_vector_inc1_, b.dev_up_x_vector_inc1_);
     swap(a.dev_up_d_vector_inc1_, b.dev_up_d_vector_inc1_);
 
-    swap(a.dev_batch_buffer_d_size_, b.dev_batch_buffer_d_size_);
-    swap(a.dev_batch_buffer_x_size_, b.dev_batch_buffer_x_size_);
-
     swap(a.size_, b.size_);
 
     swap(a.f_iom_, b.f_iom_);
     swap(a.b_iom_, b.b_iom_);
     swap(a.up_pwu_, b.up_pwu_);
+    swap(a.fb_pass_, b.fb_pass_);
   }
 
   void printToStream(std::stringstream &ss) const override;
   void printParametersToStream(std::stringstream &ss) const override {
     getMetaPar().printToStream(ss);
     if (getMetaPar().up.pulse_type != PulseType::None) {
+      ss << "Device:" << std::endl;
       rpu_device_->printToStream(ss);
     }
   };
@@ -156,6 +156,7 @@ public:
   void clipWeights(T clip) override;
   void clipWeights(const WeightClipParameter &wclpar) override;
 
+  void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
   void resetCols(int start_col, int n_cols, T reset_prob) override;
 
   void setLearningRate(T rate) override;
@@ -167,7 +168,7 @@ public:
   void applyWeightUpdate(T *dw_and_current_weights_out) override;
 
   void getDeviceParameterNames(std::vector<std::string> &names) const override;
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
+  void getDeviceParameter(std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
 
   int getHiddenUpdateIdx() const override;
@@ -197,9 +198,13 @@ protected:
   std::unique_ptr<InputOutputManager<T>> f_iom_ = nullptr;
   std::unique_ptr<InputOutputManager<T>> b_iom_ = nullptr;
   std::unique_ptr<PulsedWeightUpdater<T>> up_pwu_ = nullptr;
+  std::unique_ptr<ForwardBackwardPassIOManagedCuda<T>> fb_pass_ = nullptr;
 
 private:
   PulsedMetaParameter<T> par_;
+
+  std::unique_ptr<CudaArray<T>> dev_decay_scale_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_diffusion_rate_ = nullptr;
 
   // forward
   std::unique_ptr<CudaArray<T>> dev_f_x_vector_inc1_ = nullptr;
@@ -214,10 +219,6 @@ private:
   std::unique_ptr<CudaArray<T>> dev_up_d_vector_inc1_ = nullptr;
 
   int size_ = 0;
-
-  // shared forward/update
-  std::shared_ptr<CudaArray<T>> dev_batch_buffer_x_size_ = nullptr;
-  std::shared_ptr<CudaArray<T>> dev_batch_buffer_d_size_ = nullptr;
 
   template <typename InputIteratorT, typename OutputIteratorT>
   inline void forwardMatrixIterator(
@@ -235,7 +236,6 @@ private:
       XInputIteratorT X_input, DInputIteratorT D_input, int m_batch, bool x_trans, bool d_trans);
 
   void initialize();
-  void checkBatchBuffers(const int m_batch);
   void initFrom(RPUPulsed<T> &rpu);
 };
 

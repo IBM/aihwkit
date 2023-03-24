@@ -108,7 +108,9 @@ class AnalogContext(Parameter):
         Returns:
             self
         """
-        self.analog_tile.cpu()  # will raise an error if not possile
+        super().cpu()
+        if self.analog_tile is not None:
+            self.analog_tile = self.analog_tile.cpu()  # will raise an error if not possile
         return self
 
     def to(self, *args: Any, **kwargs: Any) -> 'AnalogContext':

@@ -10,6 +10,8 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=no-name-in-module,import-error
+
 """Converter for `BasicTraining` Experiment."""
 
 from typing import Any, Dict, List
@@ -21,14 +23,16 @@ from aihwkit.cloud.converter.exceptions import ConversionError
 from aihwkit.cloud.converter.v1.mappings import InverseMappings, Mappings
 from aihwkit.experiments.experiments.training import BasicTraining
 
-from aihwkit.cloud.converter.definitions.input_file_pb2 import (
+from aihwkit.cloud.converter.definitions.input_file_pb2 import (   # type: ignore[attr-defined]
     TrainingInput, Dataset, Training
 )
-from aihwkit.cloud.converter.definitions.common_pb2 import (
+from aihwkit.cloud.converter.definitions.common_pb2 import (    # type: ignore[attr-defined]
     LayerOrActivationFunction, LossFunctionProto, Network, LayerProto,
     ActivationFunctionProto, OptimizerProto, Version
 )
-from aihwkit.cloud.converter.definitions.onnx_common_pb2 import AttributeProto
+from aihwkit.cloud.converter.definitions.onnx_common_pb2 import (  # type: ignore[attr-defined]
+    AttributeProto
+)
 from aihwkit.nn import AnalogSequential
 
 
@@ -83,7 +87,7 @@ class BasicTrainingConverter:
 
     @staticmethod
     def _dataset_to_proto(dataset: type, batch_size: int) -> Any:
-        if dataset not in Mappings.datasets.keys():
+        if dataset not in Mappings.datasets:
             raise ConversionError('Unsupported dataset: {}'.format(dataset))
 
         return Dataset(
@@ -123,7 +127,7 @@ class BasicTrainingConverter:
             learning_rate: float,
             loss_function: _Loss
     ) -> Any:
-        if loss_function not in Mappings.loss_functions.keys():
+        if loss_function not in Mappings.loss_functions:
             raise ConversionError('Unsupported loss function: {}'.format(loss_function))
 
         # Build optimizer manually.

@@ -41,8 +41,9 @@ template <typename T> struct MixedPrecRPUDeviceBaseMetaParameter : SimpleRPUDevi
   MixedPrecRPUDeviceBaseMetaParameter() = default;
   MixedPrecRPUDeviceBaseMetaParameter(const MixedPrecRPUDeviceBaseMetaParameter<T> &);
   MixedPrecRPUDeviceBaseMetaParameter<T> &operator=(const MixedPrecRPUDeviceBaseMetaParameter<T> &);
-  MixedPrecRPUDeviceBaseMetaParameter(MixedPrecRPUDeviceBaseMetaParameter<T> &&);
-  MixedPrecRPUDeviceBaseMetaParameter<T> &operator=(MixedPrecRPUDeviceBaseMetaParameter<T> &&);
+  MixedPrecRPUDeviceBaseMetaParameter(MixedPrecRPUDeviceBaseMetaParameter<T> &&) noexcept;
+  MixedPrecRPUDeviceBaseMetaParameter<T> &
+  operator=(MixedPrecRPUDeviceBaseMetaParameter<T> &&) noexcept;
   ~MixedPrecRPUDeviceBaseMetaParameter() = default;
 
   friend void swap(
@@ -87,8 +88,8 @@ public:
 
   MixedPrecRPUDeviceBase(const MixedPrecRPUDeviceBase<T> &);
   MixedPrecRPUDeviceBase<T> &operator=(const MixedPrecRPUDeviceBase<T> &);
-  MixedPrecRPUDeviceBase(MixedPrecRPUDeviceBase<T> &&);
-  MixedPrecRPUDeviceBase<T> &operator=(MixedPrecRPUDeviceBase<T> &&);
+  MixedPrecRPUDeviceBase(MixedPrecRPUDeviceBase<T> &&) noexcept;
+  MixedPrecRPUDeviceBase<T> &operator=(MixedPrecRPUDeviceBase<T> &&) noexcept;
 
   friend void swap(MixedPrecRPUDeviceBase<T> &a, MixedPrecRPUDeviceBase<T> &b) noexcept {
     using std::swap;
@@ -115,11 +116,11 @@ public:
 
   void printDP(int x_count, int d_count) const override;
   void getDPNames(std::vector<std::string> &names) const override;
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
-
+  bool usesUpdateParameter() const override { return true; };
   bool onSetWeights(T **weights) override;
 
   void decayWeights(T **weights, bool bias_no_decay) override;

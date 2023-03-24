@@ -27,26 +27,19 @@ enum class WeightModifierType {
   Poly
 };
 
-// no template. Just double
-struct WeightModifierParameter {
-
-  double std_dev = 0.0;
-  double res = 0.1;
+template <typename T> struct WeightModifierParameter {
+  T std_dev = 0.0;
+  T res = 0.1;
   bool sto_round = false;
-  double dorefa_clip = 0.6;
-  double pdrop = 0.0;
+  T dorefa_clip = 0.6;
+  T pdrop = 0.0;
   bool enable_during_test = false;
   bool copy_last_column = false;
   bool rel_to_actual_wmax = true;
-  double assumed_wmax = 1.0;
-
-  // expects to gmax normalized norm_prog_coeff.
-  // [0.26348 / 25.0, 0.0768, -0.001877 * 25.0]
-  double coeff0 = 0.26348 / 25.0;
-  double coeff1 = 0.0768;
-  double coeff2 = -0.001877 * 25.0;
+  T assumed_wmax = 1.0;
 
   WeightModifierType type = WeightModifierType::Copy;
+  std::vector<T> coeffs = {0.26348 / 25.0, 0.0768, -0.001877 * 25.0};
 
   inline std::string getTypeName() const {
     switch (type) {
@@ -96,7 +89,9 @@ struct WeightModifierParameter {
       ss << "\t dorefa clip:\t\t" << dorefa_clip << std::endl;
     }
     if (type == WeightModifierType::Poly) {
-      ss << "\t coeff0,1,2:\t\t" << coeff0 << ", " << coeff1 << ", " << coeff2 << std::endl;
+      for (int i = 0; i < (int)coeffs.size(); i++) {
+        ss << "\t coeff [" << i << "]:\t" << coeffs[i] << std::endl;
+      }
     }
     if (type == WeightModifierType::Discretize || type == WeightModifierType::DiscretizeAddNormal ||
         type == WeightModifierType::DoReFa) {
@@ -125,7 +120,7 @@ public:
   WeightModifier(){};
 
   /* buffers the weight changes and redraws the drop connection*/
-  void apply(T *new_weights, const T *weights, const WeightModifierParameter &wmpar);
+  void apply(T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar);
 
   inline bool enableDuringTest() { return enable_during_test_; };
 

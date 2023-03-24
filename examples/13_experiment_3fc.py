@@ -29,8 +29,9 @@ from torchvision.datasets import FashionMNIST
 from aihwkit.experiments import BasicTraining
 from aihwkit.experiments.runners import LocalRunner
 from aihwkit.nn import AnalogLinear, AnalogSequential
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs import (
+    SingleRPUConfig, ConstantStepDevice
+)
 from aihwkit.simulator.rpu_base import cuda
 
 # Check device

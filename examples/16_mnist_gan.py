@@ -52,7 +52,7 @@ from aihwkit.simulator.rpu_base import cuda
 # optimizer used (e.g. mixed precision or full analog update)
 
 # As an example we use a mixed precision preset using an ECRAM device model
-from aihwkit.simulator.configs.utils import MappingParameter
+from aihwkit.simulator.configs import MappingParameter
 mapping = MappingParameter(weight_scaling_omega=0.8)
 RPU_CONFIG = MixedPrecisionEcRamMOPreset(mapping=mapping)
 

@@ -24,9 +24,9 @@ from torch.nn.functional import mse_loss
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    WeightNoiseType, WeightClipType, WeightModifierType)
+from aihwkit.simulator.configs import (
+    InferenceRPUConfig, WeightNoiseType, WeightClipType, WeightModifierType
+)
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.simulator.rpu_base import cuda
 
@@ -52,6 +52,8 @@ rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
 
 # drift compensation
 rpu_config.drift_compensation = GlobalDriftCompensation()
+
+print(rpu_config)
 
 model = AnalogLinear(4, 2, bias=True,
                      rpu_config=rpu_config)

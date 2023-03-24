@@ -13,6 +13,7 @@
 #pragma once
 
 #include "cuda_math_util.h"
+#include <iterator>
 
 namespace RPU {
 
@@ -25,6 +26,29 @@ struct BatchSkipper {
 
 template <typename T> struct Power2 {
   __device__ __forceinline__ T operator()(const T &a) const { return T(a * a); }
+};
+
+template <typename T> class LogInputIterator {
+
+public:
+  typedef LogInputIterator<T> self_type;
+  typedef int difference_type;
+  typedef T value_type;
+  typedef T *pointer;
+  typedef T reference;
+  typedef std::input_iterator_tag iterator_category;
+
+  __host__ __device__ __forceinline__ LogInputIterator(const T *data) { data_ = data; }
+  __host__ __device__ __forceinline__ T operator[](int idx) const {
+    T x = data_[idx];
+    return (x > (T)0.0) ? (T)__logf((T)x) : (T)0.0;
+  }
+
+  __host__ __device__ __forceinline__ self_type operator+(int n) const {
+    self_type retval(data_ + n);
+    return retval;
+  }
+  const T *data_;
 };
 
 template <typename T> class NegateInputIterator {
@@ -73,6 +97,62 @@ public:
   const T *data_;
   T indicator_;
   T scale_;
+};
+
+template <typename T, typename DataT> class DiagInputIterator {
+public:
+  typedef DiagInputIterator<T, DataT> self_type;
+  typedef int difference_type;
+  typedef T value_type;
+  typedef T *pointer;
+  typedef T reference;
+  typedef std::input_iterator_tag iterator_category;
+
+  __host__ __device__ __forceinline__ DiagInputIterator(const DataT *data, int dim, int offset) {
+    data_ = data;
+    dim_ = dim;
+    offset_ = offset;
+  }
+
+  __host__ __device__ __forceinline__ T operator[](int idx) const {
+    int i = idx + offset_;
+    return (i % dim_ == i / dim_) ? static_cast<T>(data_[idx / dim_]) : static_cast<T>(0);
+  }
+  __host__ __device__ __forceinline__ self_type operator+(int shift_n) const {
+    self_type retval(data_, dim_, shift_n + offset_);
+    return retval;
+  }
+
+  const DataT *data_;
+  int dim_;
+  int offset_;
+};
+
+template <typename T> class EyeInputIterator {
+public:
+  typedef EyeInputIterator<T> self_type;
+  typedef int difference_type;
+  typedef T value_type;
+  typedef T *pointer;
+  typedef T reference;
+  typedef std::input_iterator_tag iterator_category;
+
+  __host__ __device__ __forceinline__ EyeInputIterator(const int n, const int offset) {
+    n_ = n;
+    n2_ = n * n;
+    offset_ = offset;
+  }
+  __host__ __device__ __forceinline__ T operator[](int idx) const {
+    int i = (idx + offset_) % n2_;
+    return static_cast<T>(i % n_ == i / n_);
+  }
+
+  __host__ __device__ __forceinline__ self_type operator+(int shift_n) const {
+    self_type retval(n_, shift_n + offset_);
+    return retval;
+  }
+  int n_, n2_;
+  int offset_;
 };
 
 // Iterators

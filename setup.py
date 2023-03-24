@@ -18,12 +18,12 @@ from setuptools import find_packages
 from skbuild import setup
 
 INSTALL_REQUIRES = [
-    'torch{}'.format(os.getenv('TORCH_VERSION_SPECIFIER', '>=1.7')),
+    'torch{}'.format(os.getenv('TORCH_VERSION_SPECIFIER', '>=1.9')),
     'torchvision',
     'scipy',
     'requests>=2.25,<3',
     'numpy>=1.19',
-    'protobuf>=3.13.0,<4',
+    'protobuf>=4.21.6',
 ]
 
 def get_version() -> str:
@@ -75,6 +75,14 @@ setup(
     python_requires='>=3.7',
     zip_safe=False,
     extras_require={
-        'visualization': ['matplotlib>=3.0']
+        'visualization': ['matplotlib>=3.0'],
+        'fitting': ['lmfit'],
+        'bert': [
+            'transformers',
+            'evaluate',
+            'datasets',
+            'wandb',
+            'tensorboard',
+        ],
     }
 )

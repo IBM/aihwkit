@@ -38,7 +38,7 @@ WEIGHT_TEMPLATE_URL = "https://github.com/IBM-AI-Hardware-Center/Composer/raw/ma
 
 def download(url: str, destination: str) -> None:
     """Helper for downloading a file from url"""
-    response = requests_get(url)
+    response = requests_get(url, timeout=30.0)
     with open(destination, "wb") as file_:
         file_.write(response.content)
 
@@ -203,7 +203,7 @@ class BasicInferencing(Experiment):
 
             if self.remap_weights:
                 for module in model.analog_modules():
-                    module.remap_weights(1.0)
+                    module.remap_weights()
 
         return model.to(device)
 

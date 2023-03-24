@@ -14,9 +14,9 @@
 
 # Convenience imports for easier access to the classes.
 
-from aihwkit.simulator.tiles.analog import AnalogTile, CudaAnalogTile
+from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.tiles.floating_point import (
-    FloatingPointTile, CudaFloatingPointTile
+    FloatingPointTile
 )
-from aihwkit.simulator.tiles.inference import InferenceTile, CudaInferenceTile
+from aihwkit.simulator.tiles.inference import InferenceTile

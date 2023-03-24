@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 
 from aihwkit.utils.visualization import plot_device
 
-from aihwkit.simulator.presets.devices import (
+from aihwkit.simulator.presets import (
     ReRamSBPresetDevice, ReRamESPresetDevice, CapacitorPresetDevice,
     EcRamPresetDevice, IdealizedPresetDevice, EcRamMOPresetDevice,
     PCMPresetUnitCell,

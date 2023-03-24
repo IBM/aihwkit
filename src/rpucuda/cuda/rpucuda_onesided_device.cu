@@ -24,17 +24,9 @@ namespace RPU {
 
 */
 
-template <typename T> void OneSidedRPUDeviceCuda<T>::initialize() {
-  refresh_pwu_ =
-      RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
-  refresh_iom_ =
-      RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
-  this->context_->synchronize();
-}
-
 template <typename T>
 OneSidedRPUDeviceCuda<T>::OneSidedRPUDeviceCuda(
-    CudaContext *c, const OneSidedRPUDevice<T> &rpu_device) {
+    CudaContextPtr c, const OneSidedRPUDevice<T> &rpu_device) {
   this->context_ = c;
   populateFrom(rpu_device); // use populate to call parent
 };
@@ -47,24 +39,34 @@ OneSidedRPUDeviceCuda<T>::OneSidedRPUDeviceCuda(const OneSidedRPUDeviceCuda<T> &
   g_minus_ = other.g_minus_;
   refresh_counter_ = other.refresh_counter_;
 
-  refresh_pwu_ = nullptr;
-  refresh_iom_ = nullptr;
   if (other.refresh_pwu_) {
-    initialize();
+    refresh_pwu_ =
+        RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
   }
+
+  if (other.refresh_iom_) {
+    refresh_iom_ =
+        RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
+  }
+
+  // only fb_pass needs copy
+  if (other.refresh_fb_pass_) {
+    refresh_fb_pass_ =
+        RPU::make_unique<ForwardBackwardPassIOManagedCuda<T>>(*other.refresh_fb_pass_);
+  }
+
   dev_refresh_vecs_ = nullptr;
   if (other.dev_refresh_vecs_) {
     dev_refresh_vecs_ =
         RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * this->x_size_);
     dev_refresh_vecs_->assign(*other.dev_refresh_vecs_);
-    this->context_->synchronize();
   }
   dev_reduce_weightening_inverted_ = nullptr;
   if (other.dev_reduce_weightening_inverted_ != nullptr) {
     dev_reduce_weightening_inverted_ = RPU::make_unique<CudaArray<T>>(this->context_, 2);
     dev_reduce_weightening_inverted_->assign(*other.dev_reduce_weightening_inverted_);
-    dev_reduce_weightening_inverted_->synchronize();
   }
+  this->context_->synchronize();
 };
 
 // copy assignment
@@ -73,6 +75,7 @@ OneSidedRPUDeviceCuda<T> &
 OneSidedRPUDeviceCuda<T>::operator=(const OneSidedRPUDeviceCuda<T> &other) {
   OneSidedRPUDeviceCuda<T> tmp(other);
   swap(*this, tmp);
+  this->context_->synchronize();
   return *this;
 };
 
@@ -89,12 +92,14 @@ OneSidedRPUDeviceCuda<T> &OneSidedRPUDeviceCuda<T>::operator=(OneSidedRPUDeviceC
 
   refresh_pwu_ = std::move(other.refresh_pwu_);
   refresh_iom_ = std::move(other.refresh_iom_);
+  refresh_fb_pass_ = std::move(other.refresh_fb_pass_);
   dev_refresh_vecs_ = std::move(other.dev_refresh_vecs_);
 
   refresh_counter_ = other.refresh_counter_;
   g_plus_ = other.g_plus_;
   g_minus_ = other.g_minus_;
   dev_reduce_weightening_inverted_ = std::move(other.dev_reduce_weightening_inverted_);
+
   return *this;
 };
 
@@ -107,6 +112,15 @@ void OneSidedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
   }
 
   VectorRPUDeviceCuda<T>::populateFrom(rpu_device_in);
+
+  refresh_pwu_ =
+      RPU::make_unique<PulsedWeightUpdater<T>>(this->context_, this->x_size_, this->d_size_);
+  refresh_iom_ =
+      RPU::make_unique<InputOutputManager<T>>(this->context_, this->x_size_, this->d_size_);
+  refresh_fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManagedCuda<T>>(
+      this->context_, this->x_size_, this->d_size_);
+  refresh_fb_pass_->populateFrom(rpu_device->getRefreshFBPass().getFBParameter());
+  this->context_->synchronize();
 
   rpu_device->getGIndices(g_plus_, g_minus_);
   dev_refresh_vecs_ = RPU::make_unique<CudaArray<T>>(
@@ -210,9 +224,6 @@ template <typename T> int OneSidedRPUDeviceCuda<T>::refreshWeights() {
   if (dev_refresh_counters_ == nullptr) {
     dev_refresh_counters_ = RPU::make_unique<CudaArray<int>>(this->context_, 2);
   }
-  if (refresh_pwu_ == nullptr) {
-    initialize();
-  }
 
   int nthreads = this->context_->getNThreads();
   if (!nblocks_batch_max_) {
@@ -228,13 +239,13 @@ template <typename T> int OneSidedRPUDeviceCuda<T>::refreshWeights() {
   T lower_thres = par.refresh_lower_thres;
 
   // 1. we need forward "readout" of full weight matrix, once for pos, once for neg
-  RPU::detail::forwardMatrixIteratorIOManaged(
-      this->context_, weights_p, dev_refresh_vecs_->getDataConst(), this->x_size_, false,
+  refresh_fb_pass_->forwardMatrixIterator(
+      weights_p, dev_refresh_vecs_->getDataConst(), this->x_size_, false,
       dev_refresh_tmp_p_->getData(), this->d_size_, false, this->x_size_, (T)1.0, *refresh_iom_,
       par.refresh_io, false);
 
-  RPU::detail::forwardMatrixIteratorIOManaged(
-      this->context_, weights_m, dev_refresh_vecs_->getDataConst(), this->x_size_, false,
+  refresh_fb_pass_->forwardMatrixIterator(
+      weights_m, dev_refresh_vecs_->getDataConst(), this->x_size_, false,
       dev_refresh_tmp_m_->getData(), this->d_size_, false, this->x_size_, (T)1.0, *refresh_iom_,
       par.refresh_io, false);
 
@@ -297,7 +308,7 @@ pwukpvec_t<T> OneSidedRPUDeviceCuda<T>::getUpdateKernels(
 template <typename T>
 void OneSidedRPUDeviceCuda<T>::runUpdateKernel(
     pwukp_t<T> kpars,
-    CudaContext *up_context,
+    CudaContextPtr up_context,
     T *dev_weights,
     int m_batch,
     const BitLineMaker<T> *blm,
@@ -306,25 +317,28 @@ void OneSidedRPUDeviceCuda<T>::runUpdateKernel(
     curandState_t *dev_states,
     int one_sided,
     uint32_t *x_counts_chunk,
-    uint32_t *d_counts_chunk) {
+    uint32_t *d_counts_chunk,
+    const ChoppedWeightOutput<T> *cwo) {
   // calling kpars->run(..,this,..) directly should cause error
   // because difference derived from abstract device..
   DEBUG_OUT("start run update kernel.");
   DEBUG_CALL(kpars->print(););
-
-  const auto &par = getPar();
-
   if (one_sided != 0) {
     RPU_FATAL("Cannot use one_sided here.");
   }
+  if (cwo) {
+    RPU_FATAL("Cannot use CWO here.");
+  }
+
+  const auto &par = getPar();
   bool same_context = par.same_context;
 
   if (!same_context) {
     up_context->recordEvent();
   }
 
-  CudaContext *cp = up_context;
-  CudaContext *cm = up_context;
+  CudaContextPtr cp = up_context;
+  CudaContextPtr cm = up_context;
 
   if (!same_context) {
     cp = &*this->context_vec_[g_plus_];
