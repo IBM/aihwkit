@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,13 +27,25 @@ from aihwkit.experiments.experiments.inferencing import (  # type: ignore[import
     BasicInferencing
 )
 from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (   # type: ignore[attr-defined]
-    InferenceInput, Dataset, Inferencing, NoiseModelProto, PCMProto, GenericProto, AnalogProto
+    InferenceInput,
+    Dataset,
+    Inferencing,
+    NoiseModelProto,
+    PCMProto, GenericProto,
+    AnalogProto
 )
 
 from aihwkit.cloud.converter.definitions.i_common_pb2 import (   # type: ignore[attr-defined]
-    LayerOrActivationFunction, Network, LayerProto,
-    ActivationFunctionProto, Version
+    LayerOrActivationFunction,
+    Network,
+    LayerProto,
+    ActivationFunctionProto,
+    Version
 )
+from aihwkit.cloud.converter.definitions.i_output_file_pb2 import (  # type: ignore[attr-defined]
+    InferenceRunsProto, InferenceResultsProto, InferencingOutput
+)
+
 from aihwkit.nn import AnalogSequential
 
 from aihwkit.cloud.converter.v1.analog_info import AnalogInfo
@@ -310,49 +322,124 @@ class BasicInferencingConverter:
 
 
 class BasicInferencingResultConverter:
-    """Converter for `BasicInverencing` results."""
+    """Converter for `BasicInferencing` results."""
 
-    # pylint: disable=too-few-public-methods
+    def to_proto(self, results: Dict) -> Any:
+        """Convert a result to its InferenceOutput object in i_output_file protobuf"""
 
-    def from_proto(self, results: Any) -> Any:
+        version = self._version_to_proto()
+        inference_runs = self._runs_to_proto(results['inference_runs'])
+
+        return InferencingOutput(
+            version=version,
+            inference_runs=inference_runs
+        )
+
+    @staticmethod
+    def to_json_from_pb(inference_input: Any) -> Dict:
+        """Convert a result to its json representation (inverse of to_proto())"""
+
+        # Create an InferenceRunsProto object
+        i_runs = inference_input.inference_runs  # type: ignore
+
+        results = []        # this is a list
+
+        # loop through all the results and append directly to InferenceRunsProto field
+        for result in i_runs.inference_results:
+            results.append(
+                {
+                    't_inference': result.t_inference,
+                    'avg_accuracy': result.avg_accuracy,
+                    'std_accuracy': result.std_accuracy,
+                    'avg_error': result.avg_error,
+                    'avg_loss': result.avg_loss
+                }
+            )
+
+        # need to add 'inference_runs' dictionary key and value because to_proto() input
+        #   contained a leading index.
+        inference_runs = {
+            'inference_runs': {
+                'inference_repeat': i_runs.inference_repeat,
+                'is_partial': i_runs.is_partial,
+                'time_elapsed': i_runs.time_elapsed,
+                'inference_results': results
+            }
+        }
+        return inference_runs
+
+    @staticmethod
+    def result_from_proto(inference_input: Any) -> List[Dict]:
+        """Convert a result to its json representation (inverse of to_proto())"""
+
+        # Create an InferenceRunsProto object
+        i_runs = inference_input.inference_runs  # type: ignore
+
+        results = []        # this is a list
+
+        # loop through all the results and append directly to InferenceRunsProto field
+        for result in i_runs.inference_results:
+            results.append(
+                {
+                    't_inference': result.t_inference,
+                    'avg_accuracy': result.avg_accuracy,
+                    'std_accuracy': result.std_accuracy,
+                    'avg_error': result.avg_error,
+                    'avg_loss': result.avg_loss
+                }
+            )
+
+        return results
+
+    @staticmethod
+    def to_json(results: Dict) -> Dict:
         """Convert a result to its json representation."""
 
-        return {
+        # concatenate the results dict to a static one
+        return dict({
             'version': {
                 'schema': 1,
                 'opset': 1
-            },
-            'epochs': self._epochs_from_proto(results)
-        }
+            }}, **results)
+
+    # Methods for converting to proto.
 
     @staticmethod
-    def to_json() -> Dict:
-        """Converts dictionary and converts it to a output_file compliant json dictionary"""
-
-        version = {
-            'version': {
-                'schema': 1,
-                'opset': 1
-            }
-        }
-
-        # will probably need to return {**base, **extra}
-        #   comes from:
-        #   aihw-experience-validator-python/aihwx_validator/converters/json/i_converter.py
-
-        return version
+    def _version_to_proto() -> Dict:
+        return Version(
+            schema=1,
+            opset=1
+        )
 
     @staticmethod
-    def _epochs_from_proto(epochs_proto: Any) -> List[Dict]:
-        epochs = []
-        for epoch in epochs_proto.epochs:
-            epoch_dict = {
-                'epoch': epoch.epoch,
-                'metrics': {}
-            }
-            for metric in epoch.metrics:
-                epoch_dict['metrics'][metric.name] = metric.f
+    def _runs_to_proto(results: Dict) -> Any:
+        """converts results dictionary to protobuf InferenceRunsProto object"""
 
-            epochs.append(epoch_dict)
+        # There are 4 fields in InferenceRunsProto, 3 are scalar
+        inference_repeat = results['inference_repeat']
+        is_partial = results['is_partial']
+        time_elapsed = results['time_elapsed']
 
-        return epochs
+        # Create object with constructor specifying the scalar values only
+        irp = InferenceRunsProto(
+                inference_repeat=inference_repeat,
+                is_partial=is_partial,
+                time_elapsed=time_elapsed)
+
+        # inference_results field is an array in protobuf and a list of
+        #    dictionaries in the passed results
+
+        # Build the InferenceResultsProto objects by appending each
+        #    to the InferenceRunsProto object field
+        i_results = results['inference_results']
+        for result in i_results:
+            irp.inference_results.append(       # pylint: disable=no-member
+               InferenceResultsProto(
+                   t_inference=result['t_inference'],
+                   avg_accuracy=result['avg_accuracy'],
+                   std_accuracy=result['std_accuracy'],
+                   avg_error=result['avg_error'],
+                   avg_loss=result['avg_loss']
+               ))
+
+        return irp
