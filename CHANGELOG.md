@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
+* Updated the VERSION.txt to 0.7.1. (\#493)
 * Updated the CLI Cloud runner code to support inference experiment result. (\#491)
 * Read weights is done with least-square estimation method. (\#489)
 
