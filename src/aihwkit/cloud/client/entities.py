@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,8 +28,13 @@ from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: igno
 from aihwkit.cloud.converter.definitions.output_file_pb2 import (  # type: ignore[attr-defined]
      TrainingOutput
 )
+from aihwkit.cloud.converter.definitions.i_output_file_pb2 import (  # type: ignore[attr-defined]
+     InferencingOutput
+)
 from aihwkit.cloud.converter.v1.training import BasicTrainingConverter, BasicTrainingResultConverter
-from aihwkit.cloud.converter.v1.inferencing import BasicInferencingConverter
+from aihwkit.cloud.converter.v1.inferencing import (
+     BasicInferencingConverter, BasicInferencingResultConverter
+)
 # from aihwkit.experiments import BasicTraining, BasicInferencing
 
 
@@ -109,16 +114,24 @@ class CloudExperiment:
             raise ExperimentStatusError('Output cannot be retrieved unless the '
                                         'experiment is completed')
 
-        # Fetch the protobuf output.
-        output_ = self._api_client.output_get(self.job.output_id)  # type: ignore
-
-        # Convert from protobuf.
-        training_output = TrainingOutput()
-        training_output.ParseFromString(output_)
-        converter = BasicTrainingResultConverter()
-        output = converter.from_proto(training_output)
-
-        return output['epochs']
+        if self.category == CloudExperimentCategory.BASIC_TRAINING:
+            # Fetch the protobuf output.
+            output_ = self._api_client.output_get(self.job.output_id)  # type: ignore
+            # Convert from protobuf.
+            training_output = TrainingOutput()
+            training_output.ParseFromString(output_)
+            converter = BasicTrainingResultConverter()
+            output = converter.from_proto(training_output)
+            result = output['epochs']
+        if self.category == CloudExperimentCategory.BASIC_INFERENCE:
+            output_ = self._api_client.output_get(self.job.output_id)  # type: ignore
+            # Convert from protobuf.
+            inferencing_output = InferencingOutput()
+            inferencing_output.ParseFromString(output_)
+            iconverter = BasicInferencingResultConverter()
+            i_output = iconverter.result_from_proto(inferencing_output)
+            result = i_output
+        return result
 
     def status(self) -> CloudJobStatus:
         """Return the status of the experiment."""
