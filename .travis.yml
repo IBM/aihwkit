@@ -57,17 +57,17 @@ build_deploy_common: &build_deploy_common
 
 jobs:
   include:
-  - name: "Compile and test. Python 3.8"
+  - name: "Compile and test. Python 3.10"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.8"
+    python: "3.10"
     env:
       - TEST_DATASET=true
 
-  - name: "Compile and lint. Python 3.8"
+  - name: "Compile and lint. Python 3.10"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.8"
+    python: "3.10"
     script:
       - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
       - make pycodestyle
@@ -96,7 +96,7 @@ jobs:
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.13.0'"
       - CIBW_BEFORE_BUILD="pip install torch==1.13.0 torchvision==0.14.0 && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
-      - CIBW_BUILD="cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64"
+      - CIBW_BUILD="cp38-manylinux_x86_64 cp39-manylinux_x86_64"
     before_install:
       - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
@@ -106,7 +106,7 @@ jobs:
       - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.9, 3.10, 3.11 on OS X"
+  - name: "Build wheel for Python 3.8, 3.9 on OS X"
     os: osx
     osx_image: xcode12.4
     stage: Build wheels
@@ -120,7 +120,7 @@ jobs:
       # Use a specific torch version.
       - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.13.0'"
       - CIBW_BEFORE_BUILD="pip install torch==1.13.0 torchvision==0.14.0 && pip install ./delocate && pip install -r requirements.txt"
-      - CIBW_BUILD="cp39-macosx_x86_64 cp310-macosx_x86_64 cp311-macosx_x86_64"
+      - CIBW_BUILD="cp38-macosx_x86_64 cp39-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
     install:
