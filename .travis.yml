@@ -83,6 +83,11 @@ jobs:
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.10"
+    
+  - name: "Compile and test. Python 3.11"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.11" 
 
   - name: "Build wheel for Python 3.9, 3.10, 3.11 on Linux x86_64"
     os: linux
