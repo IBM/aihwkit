@@ -84,7 +84,7 @@ jobs:
     stage: Test multiple python versions
     python: "3.10"
     
-   - name: "Compile and test. Python 3.11"
+  - name: "Compile and test. Python 3.11"
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.11" 
