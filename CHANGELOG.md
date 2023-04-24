@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 
 ### Fixed
+* Fixed compilation error for CUDA 12.1. (\#499) 
 
 ### Changed
 
