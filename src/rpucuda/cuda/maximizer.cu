@@ -198,7 +198,7 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   size_t temp_storage_bytes = 0;
   RPU::cub::DeviceSegmentedReduce::Reduce(
       d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
-      dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c->getStream());
+      dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, (T)0.0, c->getStream());
   // Allocate temporary storage
   cudaMalloc(&d_temp_storage, temp_storage_bytes);
   CUDA_CALL(cudaDeviceSynchronize());
@@ -232,7 +232,7 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
     // Fast Segmented reduction (much faster than loop from outside)
     RPU::cub::DeviceSegmentedReduce::Reduce(
         d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
-        dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c->getStream());
+        dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, (T)0.0, c->getStream());
   }
 
   CUDA_TIMING_STOP(c, "Max Batch");
@@ -270,7 +270,7 @@ Maximizer<T>::Maximizer(CudaContextPtr c, int size, bool abs_if)
   if (abs_if_) {
     RPU::cub::DeviceReduce::Reduce(
         nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(), size_,
-        max_abs_op_, 0, context_->getStream());
+        max_abs_op_, (T)0.0, context_->getStream());
   } else {
     RPU::cub::DeviceReduce::Max(
         nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(), size_,
@@ -302,7 +302,7 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
     if (abs_if_) {
       RPU::cub::DeviceSegmentedReduce::Reduce(
           nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(),
-          m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, max_abs_op_, 0,
+          m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, max_abs_op_, (T)0.0,
           context_->getStream());
     } else {
       RPU::cub::DeviceSegmentedReduce::Max(
@@ -339,7 +339,7 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
     if (abs_if_) {
       RPU::cub::DeviceReduce::Reduce(
           (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(), size_,
-          max_abs_op_, (T)0, s);
+          max_abs_op_, (T)0.0, s);
     } else {
       RPU::cub::DeviceReduce::Max(
           (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(), size_,
