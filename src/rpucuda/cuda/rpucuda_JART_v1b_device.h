@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2022 Forschungszentrum Jülich GmbH, Zhenming Yu. All Rights reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,40 +28,40 @@ public:
       JARTv1bRPUDeviceCuda,
       JARTv1bRPUDevice,
       /*ctor body*/
-      dev_ldet_A = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
+      dev_ldisc_A = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
       dev_device_parameters = RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT);
       ,
       /*dtor body*/
       ,
       /*copy body*/
-      dev_ldet_A->assign(*other.dev_ldet_A);
+      dev_ldisc_A->assign(*other.dev_ldisc_A);
       dev_device_parameters->assign(*other.dev_device_parameters);
       ,
       /*move assigment body*/
-      dev_ldet_A = std::move(other.dev_ldet_A);
+      dev_ldisc_A = std::move(other.dev_ldisc_A);
       dev_device_parameters = std::move(other.dev_device_parameters);
       ,
       /*swap body*/
-      swap(a.dev_ldet_A, b.dev_ldet_A);
+      swap(a.dev_ldisc_A, b.dev_ldisc_A);
       swap(a.dev_device_parameters, b.dev_device_parameters);
       ,
       /*host copy from cpu (rpu_device). Parent device params are copyied automatically*/
       int d_size = this->d_size_;
       int x_size = this->x_size_;
-      T **device_specific_ldet_cuda = rpu_device.getldet();
+      T **device_specific_ldisc_cuda = rpu_device.getldisc();
       T **device_specific_A_cuda = rpu_device.getA();
-      float *tmp_ldet_A = new float[2 * this->size_];
+      float *tmp_ldisc_A = new float[2 * this->size_];
 
       for (int i = 0; i < d_size; ++i) {
         for (int j = 0; j < x_size; ++j) {
           int kk = j * (d_size * 2) + 2 * i;
           // tmp_slope[kk] = w_slope_down[i][j];
           // tmp_slope[kk + 1] = w_slope_up[i][j];
-          tmp_ldet_A[kk] = device_specific_ldet_cuda[i][j];
-          tmp_ldet_A[kk + 1] = device_specific_A_cuda[i][j];
+          tmp_ldisc_A[kk] = device_specific_ldisc_cuda[i][j];
+          tmp_ldisc_A[kk + 1] = device_specific_A_cuda[i][j];
         }
       }
-      dev_ldet_A->assign(tmp_ldet_A);
+      dev_ldisc_A->assign(tmp_ldisc_A);
 
       const auto &par = getPar();
       T *tmp_global_pars = new T[DEVICE_PARAMETER_COUNT]();
@@ -86,8 +86,8 @@ public:
       tmp_global_pars[17] = par.Nplug;
       tmp_global_pars[18] = par.a_ny0;
       tmp_global_pars[19] = par.dWa;
-      tmp_global_pars[20] = par.Rth_negative;
-      tmp_global_pars[21] = par.Rth_positive;
+      tmp_global_pars[20] = par.Rth_negative_coefficient;
+      tmp_global_pars[21] = par.Rth_positive_coefficient;
       tmp_global_pars[22] = par.RseriesTiOx;
       tmp_global_pars[23] = par.R0;
       tmp_global_pars[24] = par.V_series_coefficient;
@@ -107,20 +107,20 @@ public:
       tmp_global_pars[37] = par.Ndiscmin_std;
       tmp_global_pars[38] = par.Ndiscmin_ctoc_upper_bound_old;
       tmp_global_pars[39] = par.Ndiscmin_ctoc_lower_bound_old;
-      tmp_global_pars[40] = par.ldet_std;
-      tmp_global_pars[41] = par.ldet_std_slope;
-      tmp_global_pars[42] = par.ldet_ctoc_upper_bound_old;
-      tmp_global_pars[43] = par.ldet_ctoc_lower_bound_old;
-      tmp_global_pars[44] = par.rdet_std;
-      tmp_global_pars[45] = par.rdet_std_slope;
-      tmp_global_pars[46] = par.rdet_ctoc_upper_bound_old;
-      tmp_global_pars[47] = par.rdet_ctoc_lower_bound_old;
+      tmp_global_pars[40] = par.ldisc_std;
+      tmp_global_pars[41] = par.ldisc_std_slope;
+      tmp_global_pars[42] = par.ldisc_ctoc_upper_bound_old;
+      tmp_global_pars[43] = par.ldisc_ctoc_lower_bound_old;
+      tmp_global_pars[44] = par.rdisc_std;
+      tmp_global_pars[45] = par.rdisc_std_slope;
+      tmp_global_pars[46] = par.rdisc_ctoc_upper_bound_old;
+      tmp_global_pars[47] = par.rdisc_ctoc_lower_bound_old;
 
       dev_device_parameters = nullptr;
       dev_device_parameters = RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT, tmp_global_pars);
 
       this->context_->synchronize();
-      delete[] tmp_ldet_A;
+      delete[] tmp_ldisc_A;
       delete[] tmp_global_pars;
       
 
@@ -156,7 +156,7 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
   T *getGlobalParamsData() override { return dev_device_parameters->getData(); };
-  float *get2ParamsData() override { return dev_ldet_A->getData(); };
+  float *get2ParamsData() override { return dev_ldisc_A->getData(); };
   T *get1ParamsData() override {
     return this->dev_persistent_weights_->getData();
   };
@@ -176,7 +176,7 @@ public:
   // void setWeights(const T *weightsptr) override;
 
 private:
-  std::unique_ptr<CudaArray<float>> dev_ldet_A = nullptr;
+  std::unique_ptr<CudaArray<float>> dev_ldisc_A = nullptr;
   std::unique_ptr<CudaArray<T>> dev_device_parameters = nullptr;
 };
 
