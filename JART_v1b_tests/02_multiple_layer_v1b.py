@@ -27,8 +27,7 @@ from torch.nn import Sequential
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import JARTv1bDevice
+import JART_v1b_tests.yaml_loader as yaml_loader
 from aihwkit.simulator.rpu_base import cuda
 
 import argparse
@@ -41,29 +40,7 @@ if args.config:
 else:
     config_file = "noise_free.yml"
 
-split = config_file.split(".")
-if len(split) == 2:
-    job_type = split[0]
-else:
-    job_type = config_file
-
-import yaml
-stream = open(config_file, "r")
-config_dictionary = yaml.safe_load(stream)
-project_name = config_dictionary["project_name"]
-CUDA_Enabled = config_dictionary["USE_CUDA"]
-USE_wandb = config_dictionary["USE_wandb"]
-USE_0_initialization= config_dictionary["USE_0_initialization"]
-USE_bias= config_dictionary["USE_bias"]
-del config_dictionary["USE_0_initialization"]
-del config_dictionary["project_name"]
-del config_dictionary["USE_wandb"]
-
-if "Repeat_Times" in config_dictionary:
-    Repeat_Times = config_dictionary["Repeat_Times"]
-    del config_dictionary["Repeat_Times"]
-else:
-    Repeat_Times = 1
+job_type, project_name, CUDA_Enabled, USE_wandb, USE_0_initialization, USE_bias, Repeat_Times, config_dictionary, JART_rpu_config = yaml_loader.from_yaml(config_file)
 
 for repeat in range(Repeat_Times):
     if USE_wandb:
