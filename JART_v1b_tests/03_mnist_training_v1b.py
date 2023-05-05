@@ -46,6 +46,9 @@ else:
 
 job_type, project_name, CUDA_Enabled, USE_wandb, USE_0_initialization, USE_bias, Repeat_Times, config_dictionary, JART_rpu_config = yaml_loader.from_yaml(config_file)
 
+if USE_wandb:
+    import wandb
+
 # Network definition.
 INPUT_SIZE = 784
 HIDDEN_SIZES = [256, 128]
@@ -207,7 +210,6 @@ def main():
 
     for repeat in range(Repeat_Times):
         if USE_wandb:
-            import wandb
             wandb.init(project=project_name, group="Fully Connected MNIST", job_type=job_type)
             wandb.config.update(config_dictionary)
         train_dataset, validation_dataset = load_images()

@@ -35,7 +35,7 @@ args = parser.parse_args()
 if args.config:
     config_file = args.config
 else:
-    config_file = "noise_free.yml"
+    config_file = "basic_test_CUDA.yml"
 
 job_type, project_name, CUDA_Enabled, USE_wandb, USE_0_initialization, USE_bias, Repeat_Times, config_dictionary, JART_rpu_config = yaml_loader.from_yaml(config_file)
 
@@ -70,9 +70,7 @@ for repeat in range(Repeat_Times):
     weights = model.get_weights()[0][0][0]
     if USE_wandb:
         wandb.log({"Weight": weights, "epoch": 0})
-    else:
-        print('Epoch {} - Weight: {:.16f}'.format(
-            0, weights))
+    print('Epoch {} - Weight: {:.16f}'.format(0, weights))
 
     for epoch in range(config_dictionary["epochs"]):
         # Add the training Tensor to the model (input).
@@ -86,9 +84,7 @@ for repeat in range(Repeat_Times):
         weights = model.get_weights()[0][0][0]
         if USE_wandb:
             wandb.log({"Weight": weights, "epoch": (epoch+1)})
-        else:
-            print('Epoch {} - Weight: {:.16f}'.format(
-                (epoch+1), weights))
+        print('Epoch {} - Weight: {:.16f}'.format((epoch+1), weights))
     
     if USE_wandb:
         wandb.finish()

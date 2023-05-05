@@ -169,10 +169,14 @@ template <typename T> struct UpdateFunctorJARTv1b {
     /* NOTE: These values do random walks,
              use refference to change the recorded values.
     */ 
-    T &device_specific_Ndiscmin_cuda = par_4.y; // [1]
-    T &device_specific_Ndiscmax_cuda = par_4.w; // [3]
-    T &device_specific_ldisc_cuda = par_2.x; // [0]
-    T &device_specific_A_cuda = par_2.y; // [1]
+    // T &device_specific_Ndiscmin_cuda = par_4.y; // [1]
+    // T &device_specific_Ndiscmax_cuda = par_4.w; // [3]
+    // T &device_specific_ldisc_cuda = par_2.x; // [0]
+    // T &device_specific_A_cuda = par_2.y; // [1]
+    T device_specific_Ndiscmin_cuda = par_4.y; // [1]
+    T device_specific_Ndiscmax_cuda = par_4.w; // [3]
+    T device_specific_ldisc_cuda = par_2.x; // [0]
+    T device_specific_A_cuda = par_2.y; // [1]
 
     T &w = apparent_weight;
     T &Ndisc = persistent_weight;
@@ -220,8 +224,8 @@ template <typename T> struct UpdateFunctorJARTv1b {
         }
         // TODO: BUG: applying these noise will result in PyTorch not receving the updated weights.
         // T ratio = Ndisc_double;
-        // ratio = (ratio-Ndisc)/(Ndiscmax-Ndisc);
-        // apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldisc, A, Ndiscmax_std, Ndiscmin_std, ldisc_std, rdisc_std, ldisc_std_slope, rdisc_std_slope, local_state,
+        // ratio = (ratio-Ndisc)/(device_specific_Ndiscmax_cuda-Ndisc);
+        // apply_cycle_to_cycle_noise(ratio, device_specific_Ndiscmax_cuda, device_specific_Ndiscmin_cuda, device_specific_ldisc_cuda, device_specific_A_cuda, Ndiscmax_std, Ndiscmin_std, ldisc_std, rdisc_std, ldisc_std_slope, rdisc_std_slope, local_state,
         //                            Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
         //                            ldisc_ctoc_upper_bound, ldisc_ctoc_lower_bound, rdisc_ctoc_upper_bound, rdisc_ctoc_lower_bound);
         Ndisc_double = MIN(Ndisc_double, max_bound);
@@ -257,8 +261,8 @@ template <typename T> struct UpdateFunctorJARTv1b {
         }
         // TODO: BUG: applying these noise will result in PyTorch not receving the updated weights.
         // T ratio = Ndisc_double;
-        // ratio = (Ndisc-ratio)/(Ndisc-Ndiscmin);
-        // apply_cycle_to_cycle_noise(ratio, Ndiscmax, Ndiscmin, ldisc, A, Ndiscmax_std, Ndiscmin_std, ldisc_std, rdisc_std, ldisc_std_slope, rdisc_std_slope, local_state,
+        // ratio = (Ndisc-ratio)/(Ndisc-device_specific_Ndiscmin_cuda);
+        // apply_cycle_to_cycle_noise(ratio, device_specific_Ndiscmax_cuda, device_specific_Ndiscmin_cuda, device_specific_ldisc_cuda, device_specific_A_cuda, Ndiscmax_std, Ndiscmin_std, ldisc_std, rdisc_std, ldisc_std_slope, rdisc_std_slope, local_state,
         //                            Ndiscmax_ctoc_upper_bound, Ndiscmax_ctoc_lower_bound, Ndiscmin_ctoc_upper_bound, Ndiscmin_ctoc_lower_bound,
         //                            ldisc_ctoc_upper_bound, ldisc_ctoc_lower_bound, rdisc_ctoc_upper_bound, rdisc_ctoc_lower_bound);
         Ndisc_double = MAX(Ndisc_double, min_bound);
@@ -266,10 +270,7 @@ template <typename T> struct UpdateFunctorJARTv1b {
         Ndisc = Ndisc_double;
       }
     }
-    // TODO: BUG: Removing this delay or the print line will result in PyTorch not receving the updated weights.
-    // printf("w after update %.20f\n", apparent_weight);
-    uint32_t ns = 1;
-    __nanosleep(ns);
+    __syncthreads();
   }
 };
 
