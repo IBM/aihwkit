@@ -1,7 +1,7 @@
-aihwkit.inference.compensation.drift module
+aihwkit.experiments.runners.i\_local module
 ===========================================
 
-.. automodule:: aihwkit.inference.compensation.drift
+.. automodule:: aihwkit.experiments.runners.i_local
    :members:
    :undoc-members:
    :show-inheritance:

@@ -1,7 +1,7 @@
-aihwkit.inference.compensation.drift module
+aihwkit.experiments.runners.i\_cloud module
 ===========================================
 
-.. automodule:: aihwkit.inference.compensation.drift
+.. automodule:: aihwkit.experiments.runners.i_cloud
    :members:
    :undoc-members:
    :show-inheritance:

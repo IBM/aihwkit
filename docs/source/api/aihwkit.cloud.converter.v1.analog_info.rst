@@ -1,7 +1,7 @@
-aihwkit.simulator.tiles.floating\_point module
+aihwkit.cloud.converter.v1.analog\_info module
 ==============================================
 
-.. automodule:: aihwkit.simulator.tiles.floating_point
+.. automodule:: aihwkit.cloud.converter.v1.analog_info
    :members:
    :undoc-members:
    :show-inheritance:

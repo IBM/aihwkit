@@ -13,4 +13,5 @@ Submodules
    :maxdepth: 4
 
    aihwkit.experiments.experiments.base
+   aihwkit.experiments.experiments.inferencing
    aihwkit.experiments.experiments.training

@@ -1,6 +1,36 @@
 Advanced installation guide
 ===========================
 
+Install the aihwkit conda package
+---------------------------------
+
+At this time, the conda package is only available for the Linux environment. You can use the
+following steps as an example for how to install the aihwkit conda package. 
+
+.. note::
+
+    We are working on publishing the package in conda-forge channel.  Until then, you need to download the package for installation.
+
+Download the aihwkit conda package tar file::
+
+    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-condapkg.tar
+
+Untar the file to a directory such as $HOME/aihwkit-condapkg
+Create a conda environment::
+
+    $ conda create -n aihwkit
+    $ conda activate aihwkit
+
+Install one of the conda packages.  For example:
+
+  - CPU::
+
+    $ conda install python=3.9 aihwkit -c conda-forge -c file:/$HOME/aihwkit-condapkg
+
+  - GPU::
+
+    $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
+
 Compilation
 -----------
 

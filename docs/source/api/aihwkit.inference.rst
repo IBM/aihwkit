@@ -15,3 +15,11 @@ Subpackages
    aihwkit.inference.compensation
    aihwkit.inference.converter
    aihwkit.inference.noise
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   aihwkit.inference.utils

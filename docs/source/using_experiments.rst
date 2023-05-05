@@ -4,18 +4,19 @@ Using Experiments
 Since version ``0.3``, the toolkit includes support for running ``Experiments``.
 An **Experiment** represents a high-level use case, such as training a neural
 network, in a compact form that allows for easily running the experiment and
-variations of it with ease both locally and remotely.
+variations of it with ease both locally and in the cloud.
 
 Experiments
 -----------
 
 The following types of Experiments are available:
 
-=================================================================  ========
-Tile class                                                         Description
-=================================================================  ========
-:class:`~aihwkit.experiments.experiments.training.BasicTraining`    Simple training of a neural network
-=================================================================  ========
+=====================================================================  ========
+Tile class                                                             Description
+=====================================================================  ========
+:class:`~aihwkit.experiments.experiments.training.BasicTraining`       Simple training of a neural network
+:class:`~aihwkit.experiments.experiments.training.BasicInferencing`    Simple inference of a neural network
+=====================================================================  ========
 
 Creating an Experiment
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -49,7 +50,7 @@ define the characteristics of the training (``dataset``, ``model``,
 ``batch_size``, ``loss_function``, ``epochs``, ``learning_rate``).
 
 The created Experiment contains the definition of the operation to be performed,
-but is not executed automatically: that is the role of the ``Runners``.
+but is not executed automatically.  That is the role of the ``Runners``.
 
 Runners
 -------
@@ -60,12 +61,14 @@ retrieving its results.
 
 The following types of Runners are available:
 
-========================================================  ========
-Tile class                                                Description
-========================================================  ========
-:class:`~aihwkit.experiments.runners.local.LocalRunner`   Runner for executing experiments locally
-:class:`~aihwkit.experiments.runners.cloud.CloudRunner`   Runner for executing experiments in the cloud
-========================================================  ========
+===================================================================  ========
+Tile class                                                           Description
+===================================================================  ========
+:class:`~aihwkit.experiments.runners.local.LocalRunner`              Runner for executing a training experiments locally
+:class:`~aihwkit.experiments.runners.cloud.CloudRunner`              Runner for executing a training experiments in the cloud
+:class:`~aihwkit.experiments.runners.i_local.InferenceLocalRunner`   Runner for executing an inference experiments locally
+:class:`~aihwkit.experiments.runners.i_cloud.InferenceCloudRunner`   Runner for executing an inference experiments in the cloud
+===================================================================  ========
 
 Running an Experiment Locally
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -159,6 +162,17 @@ run experiments in the cloud:
     [cloud]
     api_token = YOUR_API_TOKEN
 
+3. You may need to download the SSL certificates and add them to the certificate store.
+   
+   - https://cacerts.digicert.com/DigiCertGlobalRootCA.crt.pem
+   - https://cacerts.digicert.com/DigiCertTLSRSASHA2562020CA1-1.crt.pem
+   - Append the certificates to the cacert.pem file
+
+.. note::
+
+   You can run the following command to find the location of the cacert.pem file
+
+   $ python -c "import certifi; print(certifi.where())“
 
 Running an Experiment in the cloud
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -224,6 +238,8 @@ Retrieving a previous cloud experiment
 The list of experiments previously executed in the cloud can be retrieved via::
 
     cloud_experiments = my_cloud_runner.list_experiments()
+
+Please see https://github.com/IBM/aihwkit/tree/master/notebooks/cli for the experiment example notebooks.
 
 
 .. _AIHW Composer: https://aihw-composer.draco.res.ibm.com/

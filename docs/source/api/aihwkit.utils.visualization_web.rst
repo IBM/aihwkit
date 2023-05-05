@@ -1,7 +1,7 @@
-aihwkit.inference.converter.base module
+aihwkit.utils.visualization\_web module
 =======================================
 
-.. automodule:: aihwkit.inference.converter.base
+.. automodule:: aihwkit.utils.visualization_web
    :members:
    :undoc-members:
    :show-inheritance:
