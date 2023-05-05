@@ -29,7 +29,7 @@ __device__ __forceinline__ T map_Ndisc_to_weight(
     const T &j_0,
     const T &k0,
     const T &Original_Ndiscmin) {
-  T read_current = g_read/(pow((1+h_read*pow((Ndisc/Original_Ndiscmin),-j_0)),1/k0));
+  T read_current = g_read/(__powf((1+h_read*__powf((Ndisc/Original_Ndiscmin),-j_0)),1/k0));
   T weight = (read_current-current_min)*current_to_weight_ratio+weight_min_bound;
   return weight;
 }
@@ -84,12 +84,12 @@ __device__ __forceinline__ void apply_cycle_to_cycle_noise(
   if ((rdisc_std > (T)0.0)||(rdisc_std_slope > (T)0.0)) {
     T stoch_value_1 = 2*curand_uniform(&local_state)-1;
     T stoch_value_2 = 2*curand_uniform(&local_state)-1;
-    T rdisc = pow(A/M_PI, 0.5) * (1 + rdisc_std * stoch_value_1 + ratio * rdisc_std_slope * stoch_value_2);
+    T rdisc = sqrtf(A/M_PI) * (1 + rdisc_std * stoch_value_1 + ratio * rdisc_std_slope * stoch_value_2);
     if (rdisc_ctoc_upper_bound > (T)0.0) {
       rdisc = MIN(rdisc, rdisc_ctoc_upper_bound);
     }
     rdisc = MAX(rdisc, rdisc_ctoc_lower_bound);
-    A = M_PI*pow(rdisc,2.0);
+    A = M_PI*rdisc*rdisc;
   }
 }
 
@@ -194,31 +194,35 @@ template <typename T> struct UpdateFunctorJARTv1b {
 
     if (negative > 0) {
       if (Ndisc_double < max_bound){
+        T gamma_V_disk_coefficient_A = gamma_coefficient/(V_disk_coefficient*device_specific_A_cuda);
+        T R = RseriesTiOx + R0;
+        T Rth_negative_coefficient_A = Rth_negative_coefficient/device_specific_A_cuda;
+        T a_ny0_l = a_ny0/device_specific_ldisc_cuda;
+        T half_pi = M_PI/2.0;
+
         for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
-          T I_mem = -alpha_SET-beta_SET/(pow((1.0+pow((c_SET/Ndisc),d_SET)),f_SET));
+          T I_mem = -alpha_SET-beta_SET/(__powf((1.0+__powf((c_SET/Ndisc_double),d_SET)),f_SET));
 
           // NOTE: V_disk = I_mem*(ldisc/(V_disk_coefficient*A*Ndisc))
           // NOTE: Eion = V_disk/ldisc
-          T Eion = I_mem/(V_disk_coefficient*device_specific_A_cuda*Ndisc_double);
-
           // NOTE: T gamma = gamma_coefficient*Eion
-          T gamma = gamma_coefficient*Eion;
+          T gamma = gamma_V_disk_coefficient_A*I_mem/Ndisc_double;
           
           // NOTE: V - V_series = V_disk+V_plug+V_Schottky
-          T V_other_than_series = pulse_voltage_SET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
+          T V_other_than_series = pulse_voltage_SET - (I_mem*(R + V_series_coefficient*I_mem*I_mem));
 
-          T Treal = T0 + I_mem*V_other_than_series*Rth_negative_coefficient/device_specific_A_cuda;
+          T Treal = T0 + I_mem*V_other_than_series*Rth_negative_coefficient_A;
 
           // NOTE: dWamin = dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean - dWa_difference
           // NOTE: dWamax = dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean + dWa_difference
-          T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
-          T dWa_difference = dWa*((gamma*M_PI)/2.0);
+          T dWa_mean = dWa*(sqrtf(1.0-gamma*gamma)+gamma*asinf(gamma));
+          T dWa_difference = dWa*(gamma*half_pi);
 
           T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
           T c_v0 = (Nplug+Ndisc_double)/2.0;
-          T F_limit = 1.0-pow((Ndisc_double/device_specific_Ndiscmax_cuda),10.0);
-          T dNdt = -(c_v0*a_ny0*F_limit*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldisc_cuda;
+          T F_limit = 1.0-__powf((Ndisc_double/device_specific_Ndiscmax_cuda),10.0);
+          T dNdt = -c_v0*a_ny0_l*F_limit*(__expf(-(dWa_mean - dWa_difference)/denominator)-__expf(-(dWa_mean + dWa_difference)/denominator));
 
           Ndisc_double = Ndisc_double + dNdt*base_time_step;
         }
@@ -235,27 +239,32 @@ template <typename T> struct UpdateFunctorJARTv1b {
     
     }else{
       if (Ndisc_double > min_bound){
+        T gamma_V_disk_coefficient_l = gamma_coefficient/lcell;
+        T R = RseriesTiOx + R0;
+        T Rth_positive_coefficient_A = Rth_positive_coefficient/device_specific_A_cuda;
+        T half_pi = M_PI/2.0;
+
         for (int i_updates = 0; i_updates < pulse_counter; i_updates++) {
-          T I_mem = g_RESET/(pow((1+h_RESET*pow((Ndisc/Original_Ndiscmin),-j_0)),1.0/k0));
+          T I_mem = g_RESET/(__powf((1+h_RESET*__powf((Ndisc_double/Original_Ndiscmin),-j_0)),1.0/k0));
           
           // NOTE: V - V_series = V_disk+V_plug+V_Schottky
-          T V_other_than_series = pulse_voltage_RESET - (I_mem*(RseriesTiOx + R0 + V_series_coefficient*I_mem*I_mem));
+          T V_other_than_series = pulse_voltage_RESET - (I_mem*(R + V_series_coefficient*I_mem*I_mem));
 
           // NOTE: T gamma = gamma_coefficient*Eion
-          T gamma = gamma_coefficient*V_other_than_series/lcell;
+          T gamma = gamma_V_disk_coefficient_l*V_other_than_series;
 
-          T Treal = T0 + I_mem*V_other_than_series*Rth_positive_coefficient/device_specific_A_cuda;
+          T Treal = T0 + I_mem*V_other_than_series*Rth_positive_coefficient_A;
 
           // NOTE: dWamin = dWa_f = dWa*(sqrt(1.0-pow(gamma,2.0))-(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean - dWa_difference
           // NOTE: dWamax = dWa_r = dWa*(sqrt(1.0-pow(gamma,2.0))+(gamma*M_PI)/2+gamma*asin(gamma)) = dWa_mean + dWa_difference
-          T dWa_mean = dWa*(sqrt(1.0-pow(gamma,2.0))+gamma*asin(gamma));
-          T dWa_difference = dWa*((gamma*M_PI)/2.0);
+          T dWa_mean = dWa*(sqrtf(1.0-gamma*gamma)+gamma*asinf(gamma));
+          T dWa_difference = dWa*(gamma*half_pi);
 
           T denominator = PHYSICAL_PARAMETER_kb_over_e*Treal;
 
           T c_v0 = (Nplug+Ndisc_double)/2.0;
-          T F_limit = 1.0-pow((device_specific_Ndiscmin_cuda/Ndisc_double),10.0);
-          T dNdt = -(c_v0*a_ny0*F_limit*(exp(-(dWa_mean - dWa_difference)/denominator)-exp(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldisc_cuda;
+          T F_limit = 1.0-__powf((device_specific_Ndiscmin_cuda/Ndisc_double),10.0);
+          T dNdt = -(c_v0*a_ny0*F_limit*(__expf(-(dWa_mean - dWa_difference)/denominator)-__expf(-(dWa_mean + dWa_difference)/denominator)))/device_specific_ldisc_cuda;
 
           Ndisc_double = Ndisc_double + dNdt*base_time_step;
         }
@@ -315,7 +324,7 @@ __global__ void kernelMapWeightToNdisc(
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
     T current = (weights[idx]-weight_min_bound)*weight_to_current_ratio+current_min;
-    Ndiscs[idx] = pow(((pow((g_read/current), k0)-1.0)/(h_read)),1.0/(-j_0))*Ndiscmin;
+    Ndiscs[idx] = __powf(((__powf((g_read/current), k0)-1.0)/(h_read)),1.0/(-j_0))*Ndiscmin;
     }
 }
 

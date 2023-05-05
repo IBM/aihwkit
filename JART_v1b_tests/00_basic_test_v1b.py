@@ -35,7 +35,7 @@ args = parser.parse_args()
 if args.config:
     config_file = args.config
 else:
-    config_file = "basic_test_CUDA.yml"
+    config_file = "noise_free_test_CUDA.yml"
 
 job_type, project_name, CUDA_Enabled, USE_wandb, USE_0_initialization, USE_bias, Repeat_Times, config_dictionary, JART_rpu_config = yaml_loader.from_yaml(config_file)
 
