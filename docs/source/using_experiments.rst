@@ -4,7 +4,7 @@ Using Experiments
 Since version ``0.3``, the toolkit includes support for running ``Experiments``.
 An **Experiment** represents a high-level use case, such as training a neural
 network, in a compact form that allows for easily running the experiment and
-variations of it with ease both locally and in the cloud.
+variations of it with ease both locally, in the cloud and its variations.
 
 Experiments
 -----------
@@ -64,10 +64,10 @@ The following types of Runners are available:
 ===================================================================  ========
 Tile class                                                           Description
 ===================================================================  ========
-:class:`~aihwkit.experiments.runners.local.LocalRunner`              Runner for executing a training experiments locally
-:class:`~aihwkit.experiments.runners.cloud.CloudRunner`              Runner for executing a training experiments in the cloud
-:class:`~aihwkit.experiments.runners.i_local.InferenceLocalRunner`   Runner for executing an inference experiments locally
-:class:`~aihwkit.experiments.runners.i_cloud.InferenceCloudRunner`   Runner for executing an inference experiments in the cloud
+:class:`~aihwkit.experiments.runners.local.LocalRunner`              Runner for executing training experiments locally
+:class:`~aihwkit.experiments.runners.cloud.CloudRunner`              Runner for executing training experiments in the cloud
+:class:`~aihwkit.experiments.runners.i_local.InferenceLocalRunner`   Runner for executing inference experiments locally
+:class:`~aihwkit.experiments.runners.i_cloud.InferenceCloudRunner`   Runner for executing inference experiments in the cloud
 ===================================================================  ========
 
 Running an Experiment Locally
