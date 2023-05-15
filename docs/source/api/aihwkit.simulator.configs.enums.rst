@@ -1,7 +1,7 @@
-aihwkit.nn.modules.conv\_mapped module
+aihwkit.simulator.configs.enums module
 ======================================
 
-.. automodule:: aihwkit.nn.modules.conv_mapped
+.. automodule:: aihwkit.simulator.configs.enums
    :members:
    :undoc-members:
    :show-inheritance:

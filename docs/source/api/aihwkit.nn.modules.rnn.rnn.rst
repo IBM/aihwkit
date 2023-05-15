@@ -5,4 +5,3 @@ aihwkit.nn.modules.rnn.rnn module
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: randn, zeros, arange, cat, ones

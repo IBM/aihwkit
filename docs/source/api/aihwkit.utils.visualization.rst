@@ -5,4 +5,3 @@ aihwkit.utils.visualization module
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: from_numpy, ones, eye

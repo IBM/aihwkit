@@ -1,7 +1,7 @@
-aihwkit.optim.context module
+aihwkit.utils.fitting module
 ============================
 
-.. automodule:: aihwkit.optim.context
+.. automodule:: aihwkit.utils.fitting
    :members:
    :undoc-members:
    :show-inheritance:

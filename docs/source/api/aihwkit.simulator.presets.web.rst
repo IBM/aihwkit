@@ -1,7 +1,7 @@
-aihwkit.nn.modules.rnn.layers module
+aihwkit.simulator.presets.web module
 ====================================
 
-.. automodule:: aihwkit.nn.modules.rnn.layers
+.. automodule:: aihwkit.simulator.presets.web
    :members:
    :undoc-members:
    :show-inheritance:

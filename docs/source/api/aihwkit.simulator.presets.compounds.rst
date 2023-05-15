@@ -1,7 +1,7 @@
-aihwkit.inference.compensation.base module
+aihwkit.simulator.presets.compounds module
 ==========================================
 
-.. automodule:: aihwkit.inference.compensation.base
+.. automodule:: aihwkit.simulator.presets.compounds
    :members:
    :undoc-members:
    :show-inheritance:

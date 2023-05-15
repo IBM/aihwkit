@@ -1,7 +1,7 @@
-aihwkit.nn.modules.conv module
+aihwkit.inference.utils module
 ==============================
 
-.. automodule:: aihwkit.nn.modules.conv
+.. automodule:: aihwkit.inference.utils
    :members:
    :undoc-members:
    :show-inheritance:
