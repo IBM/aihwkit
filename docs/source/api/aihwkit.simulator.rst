@@ -14,13 +14,4 @@ Subpackages
 
    aihwkit.simulator.configs
    aihwkit.simulator.presets
-   aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
-
-Submodules
-----------
-
-.. toctree::
-   :maxdepth: 4
-
-   aihwkit.inference

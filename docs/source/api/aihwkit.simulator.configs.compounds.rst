@@ -1,7 +1,7 @@
-aihwkit.simulator.rpu\_base.devices module
+aihwkit.simulator.configs.compounds module
 ==========================================
 
-.. automodule:: aihwkit.simulator.rpu_base.devices
+.. automodule:: aihwkit.simulator.configs.compounds
    :members:
    :undoc-members:
    :show-inheritance:

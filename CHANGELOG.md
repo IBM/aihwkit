@@ -12,8 +12,19 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-
 ## [Unreleased]
+
+### Added
+
+### Fixed
+* Fixed compilation error for CUDA 12.1. (\#500) 
+
+### Changed
+
+### Removed
+
+
+## [0.7.1] - 2023/03/24
 
 ### Added
 
@@ -33,7 +44,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Removed
 
 * The tile methods `get/set_weights_realistic` are removed. (\#489)
-
 
 
 ## [0.7.0] - 2023/01/04
@@ -462,7 +472,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.7.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/IBM/aihwkit/compare/v0.7.0..v0.7.1
 [0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0
 [0.6.0]: https://github.com/IBM/aihwkit/compare/v0.5.1..0.6.0
 [0.5.1]: https://github.com/IBM/aihwkit/compare/v0.4.0..v0.5.1

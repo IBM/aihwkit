@@ -213,7 +213,7 @@ NoiseManager<T>::NoiseManager(CudaContextPtr c, int size)
   size_t temp_storage_bytes = 0;
   RPU::cub::DeviceReduce::Reduce(
       nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(), size_,
-      nsum_op_, 0, context_->getStream());
+      nsum_op_, (T)0.0, context_->getStream());
 
   dev_v_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
   context_->synchronize();
