@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,12 +20,8 @@ from typing import ClassVar, List, Type, Union, TYPE_CHECKING
 from warnings import warn
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.configs.helpers import (
-    _PrintableMixin, parameters_to_bindings
-)
-from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters
-)
+from aihwkit.simulator.configs.helpers import _PrintableMixin, parameters_to_bindings
+from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 from aihwkit.simulator.configs.enums import VectorUnitCellUpdatePolicy
 from aihwkit.simulator.rpu_base import devices
 
@@ -39,7 +35,7 @@ class UnitCell(_PrintableMixin):
 
     bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
 
-    bindings_ignore: ClassVar[List] = ['diffusion', 'lifetime']
+    bindings_ignore: ClassVar[List] = ["diffusion", "lifetime"]
 
     unit_cell_devices: List = field(default_factory=list)
     """Devices that compose this unit cell."""
@@ -68,6 +64,7 @@ class UnitCell(_PrintableMixin):
 # Specific devices based on ``unit cell``.
 ###############################################################################
 
+
 @dataclass
 class VectorUnitCell(UnitCell):
     """Abstract resistive device that combines multiple pulsed resistive
@@ -90,7 +87,7 @@ class VectorUnitCell(UnitCell):
     Useful only for ``VectorUnitCellUpdatePolicy.SINGLE_FIXED``.
     """
 
-    gamma_vec: List[float] = field(default_factory=list, metadata={'hide_if': []})
+    gamma_vec: List[float] = field(default_factory=list, metadata={"hide_if": []})
     """Weighting of the unit cell devices to reduce to final weight.
 
     User-defined weightening can be given as a list if factors. If not
@@ -103,12 +100,12 @@ class VectorUnitCell(UnitCell):
         vector_parameters = parameters_to_bindings(self)
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         for param in self.unit_cell_devices:
             device_parameters = param.as_bindings()
             if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError('Could not add unit cell device parameter')
+                raise ConfigError("Could not add unit cell device parameter")
 
         return vector_parameters
 
@@ -149,8 +146,9 @@ class ReferenceUnitCell(UnitCell):
     first_update_idx: int = 0
     """Device that receives the update."""
 
-    gamma_vec: List[float] = field(default_factory=lambda: [1., -1.],
-                                   metadata={'hide_if': [1., -1.]})
+    gamma_vec: List[float] = field(
+        default_factory=lambda: [1.0, -1.0], metadata={"hide_if": [1.0, -1.0]}
+    )
     """Weighting of the unit cell devices to reduce to final weight.
 
     Note:
@@ -163,20 +161,22 @@ class ReferenceUnitCell(UnitCell):
         vector_parameters = parameters_to_bindings(self)
 
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         if len(self.unit_cell_devices) > 2:
             self.unit_cell_devices = self.unit_cell_devices[:2]
         elif len(self.unit_cell_devices) == 1:
-            self.unit_cell_devices = [self.unit_cell_devices[0],
-                                      deepcopy(self.unit_cell_devices[0])]
+            self.unit_cell_devices = [
+                self.unit_cell_devices[0],
+                deepcopy(self.unit_cell_devices[0]),
+            ]
         elif len(self.unit_cell_devices) != 2:
-            raise ConfigError('ReferenceUnitCell expects two unit_cell_devices')
+            raise ConfigError("ReferenceUnitCell expects two unit_cell_devices")
 
         for param in self.unit_cell_devices:
             device_parameters = param.as_bindings()
             if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError('Could not add unit cell device parameter')
+                raise ConfigError("Could not add unit cell device parameter")
 
         return vector_parameters
 
@@ -249,8 +249,7 @@ class OneSidedUnitCell(UnitCell):
     refresh_lower_thres: float = 0.25
     """Lower threshold for determining the refresh, see above."""
 
-    refresh_forward: IOParameters = field(
-        default_factory=IOParameters)
+    refresh_forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameters that define the read during a refresh event.
 
     :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters`
@@ -277,13 +276,13 @@ class OneSidedUnitCell(UnitCell):
         """Return a representation of this instance as a simulator
         bindings object."""
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         onesided_parameters = parameters_to_bindings(self)
         device_parameter0 = self.unit_cell_devices[0].as_bindings()
 
         if len(self.unit_cell_devices) == 0 or len(self.unit_cell_devices) > 2:
-            raise ConfigError('Need 1 or 2 unit_cell_devices')
+            raise ConfigError("Need 1 or 2 unit_cell_devices")
 
         if len(self.unit_cell_devices) == 1:
             device_parameter1 = device_parameter0
@@ -292,11 +291,13 @@ class OneSidedUnitCell(UnitCell):
 
         # need to be exactly 2 and same parameters
         if not onesided_parameters.append_parameter(device_parameter0):
-            raise ConfigError('Could not add unit cell device parameter')
+            raise ConfigError("Could not add unit cell device parameter")
 
         if not onesided_parameters.append_parameter(device_parameter1):
-            raise ConfigError('Could not add unit cell device parameter ' +
-                              '(both devices need to be of the same type)')
+            raise ConfigError(
+                "Could not add unit cell device parameter "
+                + "(both devices need to be of the same type)"
+            )
 
         return onesided_parameters
 
@@ -306,9 +307,10 @@ class DifferenceUnitCell(OneSidedUnitCell):
     """Deprecated alias to ``OneSidedUnitCell``."""
 
     def __post__init__(self) -> None:
-        warn('The DifferenceUnitCell class is deprecated. Please use '
-             'OneSidedUnitCell instead.',
-             DeprecationWarning)
+        warn(
+            "The DifferenceUnitCell class is deprecated. Please use OneSidedUnitCell instead.",
+            DeprecationWarning,
+        )
 
 
 @dataclass
@@ -374,8 +376,7 @@ class TransferCompound(UnitCell):
     .. math:: g^{n-1} W_0 + g^{n-2} W_1 + \ldots + g^0  W_{n-1}
     """
 
-    gamma_vec: List[float] = field(default_factory=list,
-                                   metadata={'hide_if': []})
+    gamma_vec: List[float] = field(default_factory=list, metadata={"hide_if": []})
     """User-defined weightening.
 
     User-defined weightening can be given as a list if weights in which case
@@ -403,8 +404,7 @@ class TransferCompound(UnitCell):
     """Whether to set the transfer rate of the last device (which is applied to
     itself) to zero."""
 
-    transfer_every_vec: List[float] = field(default_factory=list,
-                                            metadata={'hide_if': []})
+    transfer_every_vec: List[float] = field(default_factory=list, metadata={"hide_if": []})
     """Transfer cycles lengths.
 
     A list of :math:`n` entries, to explicitly set the transfer cycles lengths.
@@ -476,8 +476,7 @@ class TransferCompound(UnitCell):
         applied internally.
     """
 
-    transfer_lr_vec: List[float] = field(default_factory=list,
-                                         metadata={'hide_if': []})
+    transfer_lr_vec: List[float] = field(default_factory=list, metadata={"hide_if": []})
     """Transfer LR for each individual transfer in the device chain can be
     given."""
 
@@ -487,8 +486,7 @@ class TransferCompound(UnitCell):
     ie. whether to scale the transfer LR with the current LR of the SGD.
     """
 
-    transfer_forward: IOParameters = field(
-        default_factory=IOParameters)
+    transfer_forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameters that define the read of a transfer event.
 
     :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters` that define the read
@@ -496,8 +494,7 @@ class TransferCompound(UnitCell):
     or whether transfer is done using a ADC/DAC etc.
     """
 
-    transfer_update: UpdateParameters = field(
-        default_factory=UpdateParameters)
+    transfer_update: UpdateParameters = field(default_factory=UpdateParameters)
     """Update parameters that define the type of update used for each transfer
     event.
 
@@ -508,7 +505,7 @@ class TransferCompound(UnitCell):
     def as_bindings(self) -> devices.TransferResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
         if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
+            raise ConfigError("unit_cell_devices should be a list of devices")
 
         n_devices = len(self.unit_cell_devices)
 
@@ -518,11 +515,11 @@ class TransferCompound(UnitCell):
         param_slow = self.unit_cell_devices[1].as_bindings()
 
         if not transfer_parameters.append_parameter(param_fast):
-            raise ConfigError('Could not add unit cell device parameter')
+            raise ConfigError("Could not add unit cell device parameter")
 
         for _ in range(n_devices - 1):
             if not transfer_parameters.append_parameter(param_slow):
-                raise ConfigError('Could not add unit cell device parameter')
+                raise ConfigError("Could not add unit cell device parameter")
 
         return transfer_parameters
 
@@ -582,8 +579,10 @@ class BufferedTransferCompound(TransferCompound):
     """
 
     transfer_update: UpdateParameters = field(
-        default_factory=lambda: UpdateParameters(desired_bl=1, update_bl_management=False,
-                                                 update_management=False))
+        default_factory=lambda: UpdateParameters(
+            desired_bl=1, update_bl_management=False, update_management=False
+        )
+    )
     """Update parameters that define the type of update used for each transfer
     event.
 
@@ -596,6 +595,7 @@ class BufferedTransferCompound(TransferCompound):
 # Specific compound-devices with digital rank update
 ###############################################################################
 
+
 @dataclass
 class DigitalRankUpdateCell(_PrintableMixin):
     """Parameters that modify the behavior of the digital rank update cell.
@@ -607,13 +607,11 @@ class DigitalRankUpdateCell(_PrintableMixin):
 
     bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
 
-    bindings_ignore: ClassVar[List] = ['diffusion', 'lifetime']
+    bindings_ignore: ClassVar[List] = ["diffusion", "lifetime"]
 
-    device: Union['PulsedDevice',
-                  OneSidedUnitCell,
-                  VectorUnitCell,
-                  ReferenceUnitCell] = field(
-                      default_factory=VectorUnitCell)
+    device: Union["PulsedDevice", OneSidedUnitCell, VectorUnitCell, ReferenceUnitCell] = field(
+        default_factory=VectorUnitCell
+    )
     """(Analog) device that are used for forward and backward."""
 
     construction_seed: int = 0
@@ -739,6 +737,6 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
         param_device = self.device.as_bindings()
 
         if not mixed_prec_parameter.set_device_parameter(param_device):
-            raise ConfigError('Could not add device parameter')
+            raise ConfigError("Could not add device parameter")
 
         return mixed_prec_parameter

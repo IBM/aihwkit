@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,45 +18,62 @@ from collections import namedtuple
 from typing import Any, Dict
 
 from torch.nn import (
-    BCELoss, BatchNorm2d, Conv2d, ConvTranspose2d, CrossEntropyLoss, Flatten,
-    LeakyReLU, Linear, LogSigmoid, LogSoftmax, MSELoss, MaxPool2d, NLLLoss,
-    ReLU, Sigmoid, Softmax, Tanh
+    BCELoss,
+    BatchNorm2d,
+    Conv2d,
+    ConvTranspose2d,
+    CrossEntropyLoss,
+    Flatten,
+    LeakyReLU,
+    Linear,
+    LogSigmoid,
+    LogSoftmax,
+    MSELoss,
+    MaxPool2d,
+    NLLLoss,
+    ReLU,
+    Sigmoid,
+    Softmax,
+    Tanh,
 )
 from torchvision.datasets import FashionMNIST, SVHN  # type: ignore[import]
 
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.presets.web import (
-    WebComposerInferenceRPUConfig, OldWebComposerInferenceRPUConfig)
+    WebComposerInferenceRPUConfig,
+    OldWebComposerInferenceRPUConfig,
+)
 
-from aihwkit.cloud.converter.definitions.i_onnx_common_pb2 import (   # type: ignore[attr-defined]
-    AttributeProto
+from aihwkit.cloud.converter.definitions.i_onnx_common_pb2 import (  # type: ignore[attr-defined]
+    AttributeProto,
 )
 from aihwkit.cloud.converter.exceptions import ConversionError
-from aihwkit.nn import (
-    AnalogConv2d, AnalogConv2dMapped,
-    AnalogLinear, AnalogLinearMapped
-)
+from aihwkit.nn import AnalogConv2d, AnalogConv2dMapped, AnalogLinear, AnalogLinearMapped
 from aihwkit.optim import AnalogSGD
 from aihwkit.cloud.converter.v1.rpu_config_info import RPUconfigInfo
 
 
-Type = namedtuple('Type', ['attribute_type', 'field', 'fn'])
+Type = namedtuple("Type", ["attribute_type", "field", "fn"])
 
 # pylint: disable=no-member
 TYPES = {
-    int: Type(AttributeProto.AttributeType.INT, 'i', lambda x: x),  # type: ignore
-    bool: Type(AttributeProto.AttributeType.BOOL, 'b', lambda x: x),  # type: ignore
-    str: Type(AttributeProto.AttributeType.STRING, 's',  # type: ignore
-              lambda x: x.encode('utf-8')),
-    float: Type(AttributeProto.AttributeType.FLOAT, 'f', lambda x: x)  # type: ignore
+    int: Type(AttributeProto.AttributeType.INT, "i", lambda x: x),  # type: ignore
+    bool: Type(AttributeProto.AttributeType.BOOL, "b", lambda x: x),  # type: ignore
+    str: Type(
+        AttributeProto.AttributeType.STRING, "s", lambda x: x.encode("utf-8")  # type: ignore
+    ),
+    float: Type(AttributeProto.AttributeType.FLOAT, "f", lambda x: x),  # type: ignore
 }
 
 TYPES_LISTS = {
-    int: Type(AttributeProto.AttributeType.INTS, 'ints', lambda x: x),  # type: ignore
-    bool: Type(AttributeProto.AttributeType.BOOLS, 'bools', lambda x: x),  # type: ignore
-    str: Type(AttributeProto.AttributeType.STRINGS, 'strings',  # type: ignore
-              lambda x: [y.encode('utf-8') for y in x]),
-    float: Type(AttributeProto.AttributeType.FLOATS, 'floats', lambda x: x)  # type: ignore
+    int: Type(AttributeProto.AttributeType.INTS, "ints", lambda x: x),  # type: ignore
+    bool: Type(AttributeProto.AttributeType.BOOLS, "bools", lambda x: x),  # type: ignore
+    str: Type(
+        AttributeProto.AttributeType.STRINGS,
+        "strings",  # type: ignore
+        lambda x: [y.encode("utf-8") for y in x],
+    ),
+    float: Type(AttributeProto.AttributeType.FLOATS, "floats", lambda x: x),  # type: ignore
 }
 # pylint: enable=no-member
 
@@ -64,11 +81,7 @@ TYPES_LISTS = {
 class Function:
     """Mapping for a function-like entity."""
 
-    def __init__(
-            self,
-            id_: str,
-            args: Dict
-    ):
+    def __init__(self, id_: str, args: Dict):
         self.id_ = id_
         self.args = args
 
@@ -103,7 +116,6 @@ class Function:
         kwargs = {}
 
         for argument in source.arguments:
-
             if argument.name not in self.args:
                 continue
 
@@ -141,16 +153,16 @@ class LayerFunction(Function):
 
         Raises ConversionError
         """
-        if field == 'bias':
-            return getattr(source, 'bias', None) is not None
-        if field == 'rpu_config':
+        if field == "bias":
+            return getattr(source, "bias", None) is not None
+        if field == "rpu_config":
             # preset_cls = type(source.analog_tile.rpu_config)
             analog_tile = next(source.analog_tiles())
             preset_cls = type(analog_tile.rpu_config)
             if preset_cls not in Mappings.presets:
-                raise ConversionError('Invalid rpu_config in layer: '
-                                      f'{preset_cls} not '
-                                      'among the presets')
+                raise ConversionError(
+                    "Invalid rpu_config in layer: " f"{preset_cls} not among the presets"
+                )
             return Mappings.presets[preset_cls]
         return super().get_field_value_to_proto(source, field, default)
 
@@ -159,13 +171,11 @@ class LayerFunction(Function):
 
         Raises ConversionError
         """
-        if source.name == 'rpu_config':
-
+        if source.name == "rpu_config":
             if not isinstance(default, RPUconfigInfo):
-                raise ConversionError('Expect an new RPUconfigInfo as '
-                                      'default for layer creation.')
+                raise ConversionError("Expect an new RPUconfigInfo as default for layer creation.")
 
-            return {'rpu_config': default.create_inference_rpu_config(self.id_)}
+            return {"rpu_config": default.create_inference_rpu_config(self.id_)}
 
         return super().get_argument_from_proto(source, field, default)
 
@@ -173,121 +183,109 @@ class LayerFunction(Function):
 class Mappings:
     """Mappings between Python entities and AIHW format."""
 
-    datasets = {
-        FashionMNIST: 'fashion_mnist',
-        SVHN: 'svhn'
-    }
+    datasets = {FashionMNIST: "fashion_mnist", SVHN: "svhn"}
 
     layers = {
-        AnalogConv2d: LayerFunction('AnalogConv2d', {
-            'in_channels': int,
-            'out_channels': int,
-            'kernel_size': [int],
-            'stride': [int],
-            'padding': [int],
-            'dilation': [int],
-            'bias': bool,
-            'rpu_config': str,
-        }),
-        AnalogConv2dMapped: LayerFunction('AnalogConv2dMapped', {
-            'in_channels': int,
-            'out_channels': int,
-            'kernel_size': [int],
-            'stride': [int],
-            'padding': [int],
-            'dilation': [int],
-            'bias': bool,
-            'rpu_config': str,
-        }),
-        AnalogLinear: LayerFunction('AnalogLinear', {
-            'in_features': int,
-            'out_features': int,
-            'bias': bool,
-            'rpu_config': str,
-        }),
-        AnalogLinearMapped: LayerFunction('AnalogLinearMapped', {
-            'in_features': int,
-            'out_features': int,
-            'bias': bool,
-            'rpu_config': str,
-        }),
-        BatchNorm2d: LayerFunction('BatchNorm2d', {
-            'num_features': int
-        }),
-        Conv2d: LayerFunction('Conv2d', {
-            'in_channels': int,
-            'out_channels': int,
-            'kernel_size': [int],
-            'stride': [int],
-            'padding': [int],
-            'dilation': [int],
-            'bias': bool
-        }),
-        ConvTranspose2d: LayerFunction('ConvTranspose2d', {
-            'in_channels': int,
-            'out_channels': int,
-            'kernel_size': [int],
-            'stride': [int],
-            'padding': [int],
-            'output_padding': [int],
-            'dilation': [int],
-            'bias': bool
-        }),
-        Flatten: LayerFunction('Flatten', {}),
-        Linear: LayerFunction('Linear', {
-            'in_features': int,
-            'out_features': int,
-            'bias': bool
-        }),
-        MaxPool2d: LayerFunction('MaxPool2d', {
-            'kernel_size': int,
-            'stride': int,
-            'padding': int,
-            'dilation': int,
-            'ceil_mode': bool
-        })
+        AnalogConv2d: LayerFunction(
+            "AnalogConv2d",
+            {
+                "in_channels": int,
+                "out_channels": int,
+                "kernel_size": [int],
+                "stride": [int],
+                "padding": [int],
+                "dilation": [int],
+                "bias": bool,
+                "rpu_config": str,
+            },
+        ),
+        AnalogConv2dMapped: LayerFunction(
+            "AnalogConv2dMapped",
+            {
+                "in_channels": int,
+                "out_channels": int,
+                "kernel_size": [int],
+                "stride": [int],
+                "padding": [int],
+                "dilation": [int],
+                "bias": bool,
+                "rpu_config": str,
+            },
+        ),
+        AnalogLinear: LayerFunction(
+            "AnalogLinear",
+            {"in_features": int, "out_features": int, "bias": bool, "rpu_config": str},
+        ),
+        AnalogLinearMapped: LayerFunction(
+            "AnalogLinearMapped",
+            {"in_features": int, "out_features": int, "bias": bool, "rpu_config": str},
+        ),
+        BatchNorm2d: LayerFunction("BatchNorm2d", {"num_features": int}),
+        Conv2d: LayerFunction(
+            "Conv2d",
+            {
+                "in_channels": int,
+                "out_channels": int,
+                "kernel_size": [int],
+                "stride": [int],
+                "padding": [int],
+                "dilation": [int],
+                "bias": bool,
+            },
+        ),
+        ConvTranspose2d: LayerFunction(
+            "ConvTranspose2d",
+            {
+                "in_channels": int,
+                "out_channels": int,
+                "kernel_size": [int],
+                "stride": [int],
+                "padding": [int],
+                "output_padding": [int],
+                "dilation": [int],
+                "bias": bool,
+            },
+        ),
+        Flatten: LayerFunction("Flatten", {}),
+        Linear: LayerFunction("Linear", {"in_features": int, "out_features": int, "bias": bool}),
+        MaxPool2d: LayerFunction(
+            "MaxPool2d",
+            {"kernel_size": int, "stride": int, "padding": int, "dilation": int, "ceil_mode": bool},
+        ),
     }
 
     activation_functions = {
-        LeakyReLU: Function('LeakyReLU', {
-            'negative_slope': float
-        }),
-        LogSigmoid: Function('LogSigmoid', {}),
-        LogSoftmax: Function('LogSoftmax', {
-            'dim': int
-        }),
-        ReLU: Function('ReLU', {}),
-        Sigmoid: Function('Sigmoid', {}),
-        Softmax: Function('Softmax', {
-            'dim': int
-        }),
-        Tanh: Function('Tanh', {})
+        LeakyReLU: Function("LeakyReLU", {"negative_slope": float}),
+        LogSigmoid: Function("LogSigmoid", {}),
+        LogSoftmax: Function("LogSoftmax", {"dim": int}),
+        ReLU: Function("ReLU", {}),
+        Sigmoid: Function("Sigmoid", {}),
+        Softmax: Function("Softmax", {"dim": int}),
+        Tanh: Function("Tanh", {}),
     }
 
     loss_functions = {
-        BCELoss: Function('BCELoss', {}),
-        CrossEntropyLoss: Function('CrossEntropyLoss', {}),
-        MSELoss: Function('MSELoss', {}),
-        NLLLoss: Function('NLLLoss', {})
+        BCELoss: Function("BCELoss", {}),
+        CrossEntropyLoss: Function("CrossEntropyLoss", {}),
+        MSELoss: Function("MSELoss", {}),
+        NLLLoss: Function("NLLLoss", {}),
     }
 
-    optimizers = {
-        AnalogSGD: Function('AnalogSGD', {
-            'lr': float
-        })
-    }
+    optimizers = {AnalogSGD: Function("AnalogSGD", {"lr": float})}
 
     presets = {
-        InferenceRPUConfig: 'InferenceRPUConfig',
-        OldWebComposerInferenceRPUConfig: 'OldWebComposerInferenceRPUConfig',
-        WebComposerInferenceRPUConfig: 'WebComposerInferenceRPUConfig',
+        InferenceRPUConfig: "InferenceRPUConfig",
+        OldWebComposerInferenceRPUConfig: "OldWebComposerInferenceRPUConfig",
+        WebComposerInferenceRPUConfig: "WebComposerInferenceRPUConfig",
     }
 
 
 def build_inverse_mapping(mapping: Dict) -> Dict:
     """Create the inverse mapping between Python entities and AIHW Composer formats."""
-    return {value if not isinstance(value, Function) else value.id_: key
-            for key, value in mapping.items()}
+    return {
+        value if not isinstance(value, Function) else value.id_: key
+        for key, value in mapping.items()
+    }
 
 
 class InverseMappings:

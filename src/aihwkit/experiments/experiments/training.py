@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -48,13 +48,13 @@ class BasicTraining(Experiment):
     """
 
     def __init__(
-            self,
-            dataset: Type[Dataset],
-            model: Module,
-            batch_size: int = 64,
-            loss_function: type = NLLLoss,
-            epochs: int = 30,
-            learning_rate: float = 0.05
+        self,
+        dataset: Type[Dataset],
+        model: Module,
+        batch_size: int = 64,
+        loss_function: type = NLLLoss,
+        epochs: int = 30,
+        learning_rate: float = 0.05,
     ):
         """Create a new ``BasicTraining``.
 
@@ -77,9 +77,9 @@ class BasicTraining(Experiment):
 
     def get_dataset_arguments(self, dataset: type) -> Tuple[Dict, Dict]:
         """Return the dataset constructor arguments for specifying subset."""
-        if dataset in (SVHN, ):
-            return {'split': 'train'}, {'split': 'test'}
-        return {'train': True}, {'train': False}
+        if dataset in (SVHN,):
+            return {"split": "train"}, {"split": "test"}
+        return {"train": True}, {"train": False}
 
     def get_dataset_transform(self, dataset: type) -> Any:
         """Return the dataset transform."""
@@ -98,11 +98,11 @@ class BasicTraining(Experiment):
         return transform
 
     def get_data_loaders(
-            self,
-            dataset: type,
-            batch_size: int,
-            max_elements_train: int = 0,
-            dataset_root: str = '/tmp/datasets'
+        self,
+        dataset: type,
+        batch_size: int,
+        max_elements_train: int = 0,
+        dataset_root: str = "/tmp/datasets",
     ) -> Tuple[DataLoader, DataLoader]:
         """Return `DataLoaders` for the selected dataset.
 
@@ -134,11 +134,7 @@ class BasicTraining(Experiment):
 
         return training_loader, validation_loader
 
-    def get_optimizer(
-            self,
-            learning_rate: float,
-            model: Module
-    ) -> Optimizer:
+    def get_optimizer(self, learning_rate: float, model: Module) -> Optimizer:
         """Return the `Optimizer` for the experiment.
 
         Args:
@@ -154,12 +150,12 @@ class BasicTraining(Experiment):
         return optimizer
 
     def training_step(
-            self,
-            training_loader: DataLoader,
-            model: Module,
-            optimizer: Optimizer,
-            loss_function: _Loss,
-            device: torch_device
+        self,
+        training_loader: DataLoader,
+        model: Module,
+        optimizer: Optimizer,
+        loss_function: _Loss,
+        device: torch_device,
     ) -> None:
         """Run a single training step.
 
@@ -189,16 +185,16 @@ class BasicTraining(Experiment):
             # Optimize weights.
             optimizer.step()
 
-            self._call_hook(Signals.TRAIN_EPOCH_BATCH_END,
-                            batch_image_count,
-                            loss.item()*batch_image_count)
+            self._call_hook(
+                Signals.TRAIN_EPOCH_BATCH_END, batch_image_count, loss.item() * batch_image_count
+            )
 
     def validation_step(
-            self,
-            validation_loader: DataLoader,
-            model: Module,
-            loss_function: _Loss,
-            device: torch_device
+        self,
+        validation_loader: DataLoader,
+        model: Module,
+        loss_function: _Loss,
+        device: torch_device,
     ) -> None:
         """Run a single evaluation step.
 
@@ -224,20 +220,22 @@ class BasicTraining(Experiment):
             batch_image_count = labels.size(0)
             batch_correct_count = (predicted == labels).sum().item()
 
-            self._call_hook(Signals.VALIDATION_EPOCH_BATCH_END,
-                            batch_image_count,
-                            batch_correct_count,
-                            loss.item()*batch_image_count)
+            self._call_hook(
+                Signals.VALIDATION_EPOCH_BATCH_END,
+                batch_image_count,
+                batch_correct_count,
+                loss.item() * batch_image_count,
+            )
 
     def train(
-            self,
-            training_loader: DataLoader,
-            validation_loader: DataLoader,
-            model: Module,
-            optimizer: Optimizer,
-            loss_function: _Loss,
-            epochs: int,
-            device: torch_device
+        self,
+        training_loader: DataLoader,
+        validation_loader: DataLoader,
+        model: Module,
+        optimizer: Optimizer,
+        loss_function: _Loss,
+        epochs: int,
+        device: torch_device,
     ) -> List[Dict]:
         """Run the training loop.
 
@@ -258,39 +256,36 @@ class BasicTraining(Experiment):
         for epoch_number in range(epochs):
             self._call_hook(Signals.EPOCH_START, epoch_number)
             self._call_hook(Signals.TRAIN_EPOCH_START, epoch_number)
-            self.training_step(training_loader,
-                               model,
-                               optimizer,
-                               loss_function,
-                               device)
+            self.training_step(training_loader, model, optimizer, loss_function, device)
             self._call_hook(Signals.TRAIN_EPOCH_END)
 
             self._call_hook(Signals.VALIDATION_EPOCH_START, epoch_number)
-            self.validation_step(validation_loader,
-                                 model,
-                                 loss_function,
-                                 device)
+            self.validation_step(validation_loader, model, loss_function, device)
             self._call_hook(Signals.VALIDATION_EPOCH_END)
 
-            epoch_results = {'epoch': epoch_number}
+            epoch_results = {"epoch": epoch_number}
             epoch_results.update(self._call_hook(Signals.EPOCH_END))
             results.append(epoch_results)
 
         return results
 
-    def run(self, max_elements: int = 0,
-            dataset_root: str = '/tmp/data',
-            device: Optional[torch_device] = None) -> List[Dict]:
-        """ Sets up and runs the training.
+    def run(
+        self,
+        max_elements: int = 0,
+        dataset_root: str = "/tmp/data",
+        device: Optional[torch_device] = None,
+    ) -> List[Dict]:
+        """Sets up and runs the training.
 
         Results are returned and the internal model is updated.
         """
 
         # Build the objects needed for training.
         training_loader, validation_loader = self.get_data_loaders(
-            self.dataset, self.batch_size,
+            self.dataset,
+            self.batch_size,
             max_elements_train=max_elements,
-            dataset_root=dataset_root
+            dataset_root=dataset_root,
         )
 
         optimizer = self.get_optimizer(self.learning_rate, self.model)
@@ -300,25 +295,29 @@ class BasicTraining(Experiment):
         if device:
             model = model.to(device)
 
-        results = self.train(training_loader,
-                             validation_loader,
-                             model,
-                             optimizer,
-                             self.loss_function(),
-                             self.epochs,
-                             device)
+        results = self.train(
+            training_loader,
+            validation_loader,
+            model,
+            optimizer,
+            self.loss_function(),
+            self.epochs,
+            device,
+        )
         self.model = model  # update the stored model with the trained one
         return results
 
     def __str__(self) -> str:
         """Return a string representation of a BasicTraining experiment."""
-        return ('{}(dataset={}, batch_size={}, loss_function={}, epochs={}, '
-                'learning_rate={}, model={})'.format(
-                    self.__class__.__name__,
-                    getattr(self.dataset, '__name__', self.dataset),
-                    self.batch_size,
-                    getattr(self.loss_function, '__name__', self.loss_function),
-                    self.epochs,
-                    self.learning_rate,
-                    self.model
-                ))
+        return (
+            "{}(dataset={}, batch_size={}, loss_function={}, epochs={}, "
+            "learning_rate={}, model={})".format(
+                self.__class__.__name__,
+                getattr(self.dataset, "__name__", self.dataset),
+                self.batch_size,
+                getattr(self.loss_function, "__name__", self.loss_function),
+                self.epochs,
+                self.learning_rate,
+                self.model,
+            )
+        )

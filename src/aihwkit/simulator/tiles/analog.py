@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,9 +22,7 @@ from aihwkit.simulator.rpu_base import cuda, tiles
 from aihwkit.simulator.tiles.base import BaseTile
 
 if TYPE_CHECKING:
-    from aihwkit.simulator.configs import (
-        InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
-    )
+    from aihwkit.simulator.configs import InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 
 
 class AnalogTile(BaseTile):
@@ -181,27 +179,26 @@ class AnalogTile(BaseTile):
     """
 
     def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            rpu_config: Optional[Union['SingleRPUConfig', 'UnitCellRPUConfig',
-                                       'InferenceRPUConfig']] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False,
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: Optional[
+            Union["SingleRPUConfig", "UnitCellRPUConfig", "InferenceRPUConfig"]
+        ] = None,
+        bias: bool = False,
+        in_trans: bool = False,
+        out_trans: bool = False,
     ):
         if not rpu_config:
             # Import `SingleRPUConfig` dynamically to avoid import cycles.
             # pylint: disable=import-outside-toplevel
             from aihwkit.simulator.configs import SingleRPUConfig
+
             rpu_config = SingleRPUConfig()
 
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'BaseTile':
+    def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "BaseTile":
         """Return a copy of this tile in CUDA memory.
 
         Args:
@@ -214,12 +211,12 @@ class AnalogTile(BaseTile):
             CudaError: if the library has not been compiled with CUDA.
         """
         if not cuda.is_compiled():
-            raise CudaError('aihwkit has not been compiled with CUDA support')
+            raise CudaError("aihwkit has not been compiled with CUDA support")
 
-        device = torch_device('cuda', cuda_device(device).idx)
+        device = torch_device("cuda", cuda_device(device).idx)
 
         if self.is_cuda and device != self.device:
-            raise CudaError('Cannot switch CUDA devices of existing Cuda tiles')
+            raise CudaError("Cannot switch CUDA devices of existing Cuda tiles")
 
         if isinstance(self.tile, tiles.AnalogTile):
             with cuda_device(device):
@@ -234,10 +231,10 @@ class AnalogTile(BaseTile):
         return self
 
     def _create_simulator_tile(
-            self,
-            x_size: int,
-            d_size: int,
-            rpu_config: Union['SingleRPUConfig', 'UnitCellRPUConfig', 'InferenceRPUConfig']
+        self,
+        x_size: int,
+        d_size: int,
+        rpu_config: Union["SingleRPUConfig", "UnitCellRPUConfig", "InferenceRPUConfig"],
     ) -> tiles.AnalogTile:
         """Create a simulator tile.
 

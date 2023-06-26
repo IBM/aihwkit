@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -14,19 +14,27 @@
 # pylint: disable=too-many-lines, wrong-import-position
 
 from collections import OrderedDict
-from typing import (
-    Dict, Generic, List, Optional,
-    Tuple, TypeVar, Union, TYPE_CHECKING, Any
-)
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union, TYPE_CHECKING, Any
 from copy import deepcopy
 from numpy.typing import ArrayLike
 from numpy import array
 
 from torch import (
-    Tensor, stack, zeros, as_tensor, cat,
-    unsqueeze, squeeze, ones,
-    float32, from_numpy, full, clamp,
-    zeros_like, eye, randn,
+    Tensor,
+    stack,
+    zeros,
+    as_tensor,
+    cat,
+    unsqueeze,
+    squeeze,
+    ones,
+    float32,
+    from_numpy,
+    full,
+    clamp,
+    zeros_like,
+    eye,
+    randn,
 )
 
 from torch import device as torch_device
@@ -39,29 +47,29 @@ from aihwkit.simulator.rpu_base import tiles
 from aihwkit.exceptions import TileError, ConfigError
 from aihwkit.optim.context import AnalogContext
 
-RPUConfigGeneric = TypeVar('RPUConfigGeneric')
+RPUConfigGeneric = TypeVar("RPUConfigGeneric")
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs.utils import MappingParameter, InputRangeParameter
 
 
 class AnalogTileStateNames:  # pylint: disable=too-few-public-methods
-    """ Class defining analog tile state name constants.
+    """Class defining analog tile state name constants.
 
     Caution:
        Do *not* edit. Some names are attribute names of the tile.
     """
 
-    WEIGHTS = 'analog_tile_weights'
-    HIDDEN_PARAMETERS = 'analog_tile_hidden_parameters'
-    HIDDEN_PARAMETER_NAMES = 'analog_tile_hidden_parameter_names'
-    CLASS = 'analog_tile_class'
-    LR = 'analog_lr'
-    SHARED_WEIGHTS = 'shared_weights'
-    CONTEXT = 'analog_ctx'
-    OUT_SCALING = 'out_scaling_alpha'
-    MAPPING_SCALES = 'mapping_scales'
-    RPU_CONFIG = 'rpu_config'
+    WEIGHTS = "analog_tile_weights"
+    HIDDEN_PARAMETERS = "analog_tile_hidden_parameters"
+    HIDDEN_PARAMETER_NAMES = "analog_tile_hidden_parameter_names"
+    CLASS = "analog_tile_class"
+    LR = "analog_lr"
+    SHARED_WEIGHTS = "shared_weights"
+    CONTEXT = "analog_ctx"
+    OUT_SCALING = "out_scaling_alpha"
+    MAPPING_SCALES = "mapping_scales"
+    RPU_CONFIG = "rpu_config"
 
 
 class BaseTile(Generic[RPUConfigGeneric]):
@@ -75,16 +83,17 @@ class BaseTile(Generic[RPUConfigGeneric]):
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
     """
+
     # pylint: disable=too-many-instance-attributes,too-many-public-methods
 
     def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            rpu_config: RPUConfigGeneric,
-            bias: bool = True,
-            in_trans: bool = False,
-            out_trans: bool = False
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: RPUConfigGeneric,
+        bias: bool = True,
+        in_trans: bool = False,
+        out_trans: bool = False,
     ):
         self.out_size = out_size
         self.in_size = in_size
@@ -110,7 +119,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.tile.set_learning_rate(0.01)
         self.tile.set_weights_uniform_random(-0.01, 0.01)
 
-        self.device = torch_device('cpu')
+        self.device = torch_device("cpu")
         self.is_cuda = False
 
         # create analog context
@@ -179,21 +188,19 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         SN = AnalogTileStateNames
         current_dict[SN.WEIGHTS] = self.tile.get_weights()
-        current_dict[SN.HIDDEN_PARAMETERS] \
-            = self.tile.get_hidden_parameters().data
-        current_dict[SN.HIDDEN_PARAMETER_NAMES] \
-            = self.tile.get_hidden_parameter_names()
+        current_dict[SN.HIDDEN_PARAMETERS] = self.tile.get_hidden_parameters().data
+        current_dict[SN.HIDDEN_PARAMETER_NAMES] = self.tile.get_hidden_parameter_names()
         current_dict[SN.CLASS] = self.__class__.__name__
         current_dict[SN.LR] = self.tile.get_learning_rate()
-        current_dict.pop('tile', None)
+        current_dict.pop("tile", None)
 
         # don't save device. Will be determined by loading object
-        current_dict.pop('stream', None)
-        current_dict.pop('is_cuda', None)
-        current_dict.pop('device', None)
+        current_dict.pop("stream", None)
+        current_dict.pop("is_cuda", None)
+        current_dict.pop("device", None)
 
         # this is should not be saved.
-        current_dict.pop('image_sizes', None)
+        current_dict.pop("image_sizes", None)
 
         return current_dict
 
@@ -215,12 +222,12 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # attributes that were not saved in getstate
         SN = AnalogTileStateNames
         current_dict = state.copy()
-        current_dict.pop('image_sizes', None)  # should not be saved
+        current_dict.pop("image_sizes", None)  # should not be saved
         weights = current_dict.pop(SN.WEIGHTS)
 
         hidden_parameters = current_dict.pop(SN.HIDDEN_PARAMETERS)
         hidden_parameters_names = current_dict.pop(SN.HIDDEN_PARAMETER_NAMES, [])
-        alpha_scale = current_dict.pop('analog_alpha_scale', None)  # legacy
+        alpha_scale = current_dict.pop("analog_alpha_scale", None)  # legacy
         tile_class = current_dict.pop(SN.CLASS, self.__class__.__name__)
         analog_lr = current_dict.pop(SN.LR, 0.01)
         analog_ctx = current_dict.pop(SN.CONTEXT)
@@ -230,16 +237,16 @@ class BaseTile(Generic[RPUConfigGeneric]):
         mapping_scales = current_dict.pop(SN.MAPPING_SCALES, None)
         learned_out_scales = current_dict.pop(SN.OUT_SCALING, None)
 
-        current_dict.pop('noise_model', None)  # legacy
-        current_dict.pop('drift_compensation', None)  # legacy
+        current_dict.pop("noise_model", None)  # legacy
+        current_dict.pop("drift_compensation", None)  # legacy
 
         # legacy
-        if 'non_blocking' not in current_dict:
-            current_dict['non_blocking'] = False
+        if "non_blocking" not in current_dict:
+            current_dict["non_blocking"] = False
 
         self.__dict__.update(current_dict)
 
-        self.device = torch_device('cpu')
+        self.device = torch_device("cpu")
         self.is_cuda = False
         # get the current map location from analog_ctx (which is restored)
         to_device = analog_ctx.device
@@ -253,15 +260,17 @@ class BaseTile(Generic[RPUConfigGeneric]):
         # Check for tile mismatch
         if tile_class != self.__class__.__name__:
             raise TileError(
-                'Mismatch of tile class: {} versus {}. Can only load analog '
-                'state from the same tile class.'.format(self.__class__.__name__, tile_class))
+                "Mismatch of tile class: {} versus {}. Can only load analog "
+                "state from the same tile class.".format(self.__class__.__name__, tile_class)
+            )
 
         self.tile = self._create_simulator_tile(x_size, d_size, self.rpu_config)
         names = self.tile.get_hidden_parameter_names()
         if len(hidden_parameters_names) > 0 and names != hidden_parameters_names:
             # Check whether names match
-            raise TileError('Mismatch with loaded analog state: '
-                            'Hidden parameter structure is unexpected.')
+            raise TileError(
+                "Mismatch with loaded analog state: Hidden parameter structure is unexpected."
+            )
         if not isinstance(weights, Tensor):
             weights = from_numpy(array(weights))
         self.tile.set_weights(weights)
@@ -317,7 +326,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
             self.set_mapping_scales(alpha_scale)
 
-        if to_device.type.startswith('cuda'):
+        if to_device.type.startswith("cuda"):
             self.cuda(to_device)
 
         if alpha_scale is not None:
@@ -331,10 +340,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             self.set_mapping_scales(alpha_scale)
 
     def _create_simulator_tile(
-            self,
-            x_size: int,
-            d_size: int,
-            rpu_config: RPUConfigGeneric
+        self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
     ) -> Union[tiles.FloatingPointTile, tiles.AnalogTile]:
         """Create a simulator tile.
 
@@ -348,9 +354,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         raise NotImplementedError
 
-    def _combine_weights(self, weights: Union[Tensor, ArrayLike],
-                         biases: Optional[Union[Tensor, ArrayLike]] = None) -> Tensor:
-        """ Helper to combines weights and biases
+    def _combine_weights(
+        self, weights: Union[Tensor, ArrayLike], biases: Optional[Union[Tensor, ArrayLike]] = None
+    ) -> Tensor:
+        """Helper to combines weights and biases
 
         In any case, a detached cpu weight and bias copy will be returned.
 
@@ -372,7 +379,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         if self.bias:
             # Create a ``[out_size, in_size (+ 1)]`` matrix.
             if biases is None:
-                raise ValueError('Analog tile has a bias, but no bias given')
+                raise ValueError("Analog tile has a bias, but no bias given")
 
             if not isinstance(biases, Tensor):
                 biases = from_numpy(array(biases))
@@ -383,8 +390,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return weights
 
     def _separate_weights(self, combined_weights: Tensor) -> Tuple[Tensor, Optional[Tensor]]:
-        """ Helper to separate the combined weights and biases
-        """
+        """Helper to separate the combined weights and biases"""
         # Split the internal weights (and potentially biases) matrix.
         if self.bias:
             # combined_weights is [out_size, in_size (+ 1)].
@@ -393,11 +399,11 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return combined_weights, None
 
     def set_weights(
-            self,
-            weights: Tensor,
-            biases: Optional[Tensor] = None,
-            apply_weight_scaling: bool = False,
-            weight_scaling_omega: Optional[float] = None
+        self,
+        weights: Tensor,
+        biases: Optional[Tensor] = None,
+        apply_weight_scaling: bool = False,
+        weight_scaling_omega: Optional[float] = None,
     ) -> None:
         """Set the tile weights (and biases).
 
@@ -432,12 +438,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
         combined_weights = self._combine_weights(weights, biases)
 
         if apply_weight_scaling:
-            combined_weights = self.apply_weight_scaling(combined_weights,
-                                                         weight_scaling_omega)
+            combined_weights = self.apply_weight_scaling(combined_weights, weight_scaling_omega)
         return self.tile.set_weights(combined_weights)
 
-    def get_weights(self, apply_weight_scaling: bool = False
-                    ) -> Tuple[Tensor, Optional[Tensor]]:
+    def get_weights(self, apply_weight_scaling: bool = False) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the tile weights (and biases).
 
         Gets the tile weights and extracts the mathematical weight
@@ -482,12 +486,15 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return weights, biases
 
     @no_grad()
-    def program_weights(self, from_reference: bool = True,
-                        x_values: Optional[Tensor] = None,
-                        learning_rate: float = 0.1,
-                        max_iter: int = 10000,
-                        tolerance: Optional[float] = 0.01,
-                        w_init: Union[float, Tensor] = 0.01) -> None:
+    def program_weights(
+        self,
+        from_reference: bool = True,
+        x_values: Optional[Tensor] = None,
+        learning_rate: float = 0.1,
+        max_iter: int = 10000,
+        tolerance: Optional[float] = 0.01,
+        w_init: Union[float, Tensor] = 0.01,
+    ) -> None:
         """Programm the target weights into the conductances using the
         pulse update defined.
 
@@ -534,19 +541,19 @@ class BaseTile(Generic[RPUConfigGeneric]):
         for _ in range(max_iter):
             y = self.tile.forward(x_values, False)
             error = y - target_values
-            if tolerance is not None and (error.abs().mean().item()
-                                          / target_max) < tolerance:
+            if tolerance is not None and (error.abs().mean().item() / target_max) < tolerance:
                 break
             self.tile.update(x_values, error, False)
 
         self.tile.set_learning_rate(lr_save)
 
     @no_grad()
-    def read_weights(self,
-                     apply_weight_scaling: bool = False,
-                     x_values: Optional[Tensor] = None,
-                     over_sampling: int = 10
-                     ) -> Tuple[Tensor, Optional[Tensor]]:
+    def read_weights(
+        self,
+        apply_weight_scaling: bool = False,
+        x_values: Optional[Tensor] = None,
+        over_sampling: int = 10,
+    ) -> Tuple[Tensor, Optional[Tensor]]:
         """Reads the weights (and biases) in a realistic manner
         by using the forward pass for weights readout.
 
@@ -590,9 +597,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
 
         if x_values is None:
-            x_values = randn(self.in_size * over_sampling, self.in_size,
-                             device=self.device,
-                             dtype=float32)
+            x_values = randn(
+                self.in_size * over_sampling, self.in_size, device=self.device, dtype=float32
+            )
         else:
             x_values = x_values.to(self.device)
 
@@ -600,8 +607,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         # calculate pseudo inverse (with bias, if necessary)
         if self.bias:
-            ones_column = ones(self.in_size * over_sampling, 1,
-                               device=self.device, dtype=float32)
+            ones_column = ones(self.in_size * over_sampling, 1, device=self.device, dtype=float32)
             x_values = cat([x_values, ones_column], axis=1)
 
         est_weights = lstsq(x_values, y_values).solution.T.cpu()
@@ -616,9 +622,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return weights, biases
 
     def apply_weight_scaling(
-            self,
-            combined_weights: Tensor,
-            weight_scaling_omega: Optional[float] = None
+        self, combined_weights: Tensor, weight_scaling_omega: Optional[float] = None
     ) -> Tensor:
         r"""Set the tile weights (and biases) in a scaled fashion.
 
@@ -655,7 +659,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         # Prepare the array expected by the pybind function, appending the
         # biases row if needed.
-        if not hasattr(self.rpu_config, 'mapping'):
+        if not hasattr(self.rpu_config, "mapping"):
             return combined_weights
 
         mapping = self.rpu_config.mapping  # type: MappingParameter
@@ -707,10 +711,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         if isinstance(mapping_scales, float):
             if self.mapping_scales is None:
-                self.mapping_scales = ones((1, ),
-                                           dtype=float32,
-                                           device=self.device,
-                                           requires_grad=False)
+                self.mapping_scales = ones(
+                    (1,), dtype=float32, device=self.device, requires_grad=False
+                )
             self.mapping_scales[:] = mapping_scales
             return
 
@@ -728,7 +731,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Note:
             This method is called from the constructor.
         """
-        if not hasattr(self.rpu_config, 'mapping'):
+        if not hasattr(self.rpu_config, "mapping"):
             self.set_mapping_scales(None)
             return
 
@@ -736,15 +739,11 @@ class BaseTile(Generic[RPUConfigGeneric]):
         mapping_scales = None
         if mapping.weight_scaling_omega:
             if mapping.weight_scaling_columnwise:
-                mapping_scales = ones((self.out_size, ),
-                                      dtype=float32,
-                                      device=self.device,
-                                      requires_grad=False)
+                mapping_scales = ones(
+                    (self.out_size,), dtype=float32, device=self.device, requires_grad=False
+                )
             else:
-                mapping_scales = ones((1, ),
-                                      dtype=float32,
-                                      device=self.device,
-                                      requires_grad=False)
+                mapping_scales = ones((1,), dtype=float32, device=self.device, requires_grad=False)
         self.set_mapping_scales(mapping_scales)
 
     @no_grad()
@@ -758,17 +757,19 @@ class BaseTile(Generic[RPUConfigGeneric]):
             enabled but not supported.
         """
         self.input_range = None
-        if not hasattr(self.rpu_config, 'pre_post'):
+        if not hasattr(self.rpu_config, "pre_post"):
             return
 
         ir_params = self.rpu_config.pre_post.input_range  # type: InputRangeParameter
         if ir_params.enable:
             self.input_range_update_idx = 0
-            self.input_range = full((1,), ir_params.init_value, dtype=float32,
-                                    device=self.device, requires_grad=True)
+            self.input_range = full(
+                (1,), ir_params.init_value, dtype=float32, device=self.device, requires_grad=True
+            )
 
-            if (ir_params.manage_output_clipping
-                    and not ir_params.supports_manage_output_clipping(self.rpu_config)):
+            if ir_params.manage_output_clipping and not ir_params.supports_manage_output_clipping(
+                self.rpu_config
+            ):
                 raise ConfigError("RPU Config does not support `manage_output_clipping`.")
 
     @no_grad()
@@ -786,7 +787,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
     @no_grad()
     def get_scales(self) -> Optional[Tensor]:
-        """ Set all scales with a new scale.
+        """Set all scales with a new scale.
 
         Returns:
             Scale tensor if any scale exist else None.
@@ -822,21 +823,19 @@ class BaseTile(Generic[RPUConfigGeneric]):
             This method is called from the constructor.
         """
 
-        if not hasattr(self.rpu_config, 'mapping'):
+        if not hasattr(self.rpu_config, "mapping"):
             return
 
         mapping = self.rpu_config.mapping  # type: ignore
         if mapping.learn_out_scaling:
             if mapping.out_scaling_columnwise:
-                self.out_scaling_alpha = ones((self.out_size, ),
-                                              dtype=float32,
-                                              device=self.device,
-                                              requires_grad=True)
+                self.out_scaling_alpha = ones(
+                    (self.out_size,), dtype=float32, device=self.device, requires_grad=True
+                )
             else:
-                self.out_scaling_alpha = ones((1, ),
-                                              dtype=float32,
-                                              device=self.device,
-                                              requires_grad=True)
+                self.out_scaling_alpha = ones(
+                    (1,), dtype=float32, device=self.device, requires_grad=True
+                )
 
     @no_grad()
     def set_learned_out_scales(self, alpha: Union[Tensor, float]) -> None:
@@ -864,8 +863,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         else:
             self.out_scaling_alpha = squeeze(as_tensor(alpha)).to(self.device)
 
-    def apply_out_scaling(self, values: Tensor,
-                          tensor_view: Optional[Tuple[int, ...]] = None) -> Tensor:
+    def apply_out_scaling(
+        self, values: Tensor, tensor_view: Optional[Tuple[int, ...]] = None
+    ) -> Tensor:
         """Apply the learned out scaling to the given tensor.
 
         Args:
@@ -877,14 +877,15 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         if self.out_scaling_alpha is not None:
             if tensor_view is None:
-                tensor_view = self._get_tensor_view(values.dim(),
-                                                    0 if self.out_trans else values.dim() - 1)
+                tensor_view = self._get_tensor_view(
+                    values.dim(), 0 if self.out_trans else values.dim() - 1
+                )
             return values * self.out_scaling_alpha.view(*tensor_view)
         return values
 
     @no_grad()
     def apply_input_range(self, values: Tensor, update_from_data: bool = False) -> Tensor:
-        """ Apply the input clipping.
+        """Apply the input clipping.
 
         Args:
             values: tensor to clip
@@ -900,15 +901,17 @@ class BaseTile(Generic[RPUConfigGeneric]):
             ir_params = self.rpu_config.pre_post.input_range  # type: ignore
             idx = self.input_range_update_idx
             if idx < ir_params.init_from_data:
-                self.input_range.data = (self.input_range.data * idx
-                                         + ir_params.init_std_alpha * values.std()
-                                         ) / (idx + 1)
+                self.input_range.data = (
+                    self.input_range.data * idx + ir_params.init_std_alpha * values.std()
+                ) / (idx + 1)
                 self.input_range_update_idx += 1
 
         self.input_range.data = self.input_range.data.abs()
-        return clamp(values,
-                     min=-self.input_range.item(),  # pylint: disable=invalid-unary-operand-type
-                     max=self.input_range.item())
+        return clamp(
+            values,
+            min=-self.input_range.item(),  # pylint: disable=invalid-unary-operand-type
+            max=self.input_range.item(),
+        )
 
     def set_learning_rate(self, learning_rate: float) -> None:
         """Set the tile learning rate.
@@ -975,10 +978,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
     @no_grad()
     def reset_columns(
-            self,
-            start_column_idx: int = 0,
-            num_columns: int = 1,
-            reset_prob: float = 1.0
+        self, start_column_idx: int = 0, num_columns: int = 1, reset_prob: float = 1.0
     ) -> None:
         r"""Reset (a number of) columns according to the reset parameters of the tile.
 
@@ -1001,10 +1001,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return self.tile.reset_columns(start_column_idx, num_columns, reset_prob)
 
     @no_grad()
-    def reset(
-            self,
-            reset_prob: float = 1.0
-    ) -> None:
+    def reset(self, reset_prob: float = 1.0) -> None:
         r"""Reset the updated device tile according to the reset parameters of the tile.
 
         Resets the weights with device-to-device and cycle-to-cycle
@@ -1023,7 +1020,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         """
         return self.tile.reset_columns(0, -1, reset_prob)
 
-    def cpu(self) -> 'BaseTile':
+    def cpu(self) -> "BaseTile":
         """Return a copy of this tile in CPU memory.
 
         Returns:
@@ -1040,10 +1037,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
         self.__setstate__(state_dict)
         return self
 
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'BaseTile':
+    def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "BaseTile":
         """Return a copy of this tile in CUDA memory."""
         raise NotImplementedError
 
@@ -1062,8 +1056,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return tuple(tensor_view)
 
     @no_grad()
-    def pre_forward(self, x_input: Tensor, dim: int,
-                    is_test: bool = False, ctx: Any = None) -> Tensor:
+    def pre_forward(
+        self, x_input: Tensor, dim: int, is_test: bool = False, ctx: Any = None
+    ) -> Tensor:
         """Operations before the actual forward step for pre processing.
 
         By default, this is an no-op. However, it could be overridden
@@ -1084,10 +1079,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         return x_input
 
     @no_grad()
-    def post_forward(self, x_output: Tensor,
-                     dim: int,
-                     is_test: bool = False,
-                     ctx: Any = None) -> Tensor:
+    def post_forward(
+        self, x_output: Tensor, dim: int, is_test: bool = False, ctx: Any = None
+    ) -> Tensor:
         """Operations after the actual forward step for post processing.
 
         Args:
@@ -1145,14 +1139,13 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         """
         # We use no-grad as we do it explicitly in the optimizer.
-        x_input = self.pre_forward(x_input,
-                                   0 if self.in_trans else x_input.dim() - 1,
-                                   is_test, ctx)
-        x_output = self.tile.forward(x_input, self.bias, self.in_trans,
-                                     self.out_trans, is_test, self.non_blocking)
-        return self.post_forward(x_output,
-                                 0 if self.out_trans else x_output.dim() - 1,
-                                 is_test, ctx)
+        x_input = self.pre_forward(x_input, 0 if self.in_trans else x_input.dim() - 1, is_test, ctx)
+        x_output = self.tile.forward(
+            x_input, self.bias, self.in_trans, self.out_trans, is_test, self.non_blocking
+        )
+        return self.post_forward(
+            x_output, 0 if self.out_trans else x_output.dim() - 1, is_test, ctx
+        )
 
     @no_grad()
     def pre_backward(self, d_input: Tensor, dim: int, ctx: Any = None) -> Tensor:
@@ -1193,7 +1186,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
 
         if self.input_range is not None and ctx is not None:
             # compute gradient of the clip
-            x_input,  = ctx.saved_tensors
+            (x_input,) = ctx.saved_tensors
             ir_params = self.rpu_config.pre_post.input_range  # type: ignore
 
             upper_thres = x_input >= self.input_range
@@ -1209,14 +1202,20 @@ class BaseTile(Generic[RPUConfigGeneric]):
             grad *= ir_params.gradient_scale
 
             if ir_params.manage_output_clipping:
-                output_percentage = getattr(ctx, 'output_percentage', 1.0)
-                grad -= (1.0 - output_percentage) * self.input_range * (
-                    output_percentage < ir_params.output_min_percentage)
+                output_percentage = getattr(ctx, "output_percentage", 1.0)
+                grad -= (
+                    (1.0 - output_percentage)
+                    * self.input_range
+                    * (output_percentage < ir_params.output_min_percentage)
+                )
 
             if ir_params.decay > 0:
                 percentage = (x_input.abs() < self.input_range).float().mean()
-                grad += ir_params.decay * self.input_range * (
-                    percentage > ir_params.input_min_percentage)
+                grad += (
+                    ir_params.decay
+                    * self.input_range
+                    * (percentage > ir_params.input_min_percentage)
+                )
 
             if self.input_range.grad is None:
                 self.input_range.grad = grad
@@ -1236,16 +1235,16 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Returns:
             torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
         """
-        d_input = self.pre_backward(d_input, 0 if self.out_trans else d_input.dim() - 1,
-                                    ctx)
-        d_output = self.tile.backward(d_input, self.bias, self.out_trans, self.in_trans,
-                                      self.non_blocking)
-        return self.post_backward(d_output, 0 if self.in_trans else d_output.dim() - 1,
-                                  ctx)
+        d_input = self.pre_backward(d_input, 0 if self.out_trans else d_input.dim() - 1, ctx)
+        d_output = self.tile.backward(
+            d_input, self.bias, self.out_trans, self.in_trans, self.non_blocking
+        )
+        return self.post_backward(d_output, 0 if self.in_trans else d_output.dim() - 1, ctx)
 
     @no_grad()
-    def pre_update(self, x_input: Tensor, x_dim: int,
-                   d_input: Tensor, d_dim: int) -> Tuple[Tensor, Tensor]:
+    def pre_update(
+        self, x_input: Tensor, x_dim: int, d_input: Tensor, d_dim: int
+    ) -> Tuple[Tensor, Tensor]:
         """Operations before the actual update step for pre processing.
 
         Be default, if the mapping scales are used, the ``d_input``
@@ -1292,12 +1291,15 @@ class BaseTile(Generic[RPUConfigGeneric]):
         Returns:
             None
         """
-        x_input, d_input = self.pre_update(x_input,
-                                           0 if self.in_trans else x_input.dim() - 1,
-                                           d_input,
-                                           0 if self.out_trans else d_input.dim() - 1)
-        return self.tile.update(x_input, d_input, self.bias,
-                                self.in_trans, self.out_trans, self.non_blocking)
+        x_input, d_input = self.pre_update(
+            x_input,
+            0 if self.in_trans else x_input.dim() - 1,
+            d_input,
+            0 if self.out_trans else d_input.dim() - 1,
+        )
+        return self.tile.update(
+            x_input, d_input, self.bias, self.in_trans, self.out_trans, self.non_blocking
+        )
 
     def get_hidden_parameters(self) -> OrderedDict:
         """Get the hidden parameters of the tile.
@@ -1347,8 +1349,9 @@ class BaseTile(Generic[RPUConfigGeneric]):
         hidden_parameters = stack(list(ordered_parameters.values()), dim=0)
         names = self.tile.get_hidden_parameter_names()
         if names != list(ordered_parameters.keys()):
-            raise TileError('Mismatch with loaded analog state:'
-                            'Hidden parameter structure is unexpected.')
+            raise TileError(
+                "Mismatch with loaded analog state: Hidden parameter structure is unexpected."
+            )
 
         self.tile.set_hidden_parameters(hidden_parameters)
 
@@ -1411,18 +1414,19 @@ class BaseTile(Generic[RPUConfigGeneric]):
             TileError: if the tile uses transposition.
         """
         if len(image_sizes) not in (3, 5, 7):
-            raise ValueError('image_sizes expects 3, 5 or 7 sizes '
-                             '[C_in, (D_in), H_in, (W_in), (D_out), H_out, (W_out)]')
+            raise ValueError(
+                "image_sizes expects 3, 5 or 7 sizes "
+                "[C_in, (D_in), H_in, (W_in), (D_out), H_out, (W_out)]"
+            )
 
         if self.in_trans or self.out_trans:
-            raise TileError('Transposed indexed versions not supported (assumes NC(D)HW)')
+            raise TileError("Transposed indexed versions not supported (assumes NC(D)HW)")
 
         self.image_sizes = image_sizes
         self.tile.set_matrix_indices(indices)
 
     @no_grad()
-    def forward_indexed(self, x_input: Tensor, is_test: bool = False,
-                        ctx: Any = None) -> Tensor:
+    def forward_indexed(self, x_input: Tensor, is_test: bool = False, ctx: Any = None) -> Tensor:
         """Perform the forward pass for convolutions.
 
         Depending on the input tensor size it performs the forward pass for a
@@ -1441,8 +1445,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
                 ``self.images_sizes`` does not have a valid dimennion.
         """
         if not self.image_sizes:
-            raise TileError('self.image_sizes is not initialized. Please use '
-                            'set_indexed()')
+            raise TileError("self.image_sizes is not initialized. Please use set_indexed()")
 
         n_batch = x_input.size(0)
         channel_out = self.out_size
@@ -1457,7 +1460,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
             _, _, _, _, depth_out, height_out, width_out = self.image_sizes
             d_tensor = x_input.new_empty((n_batch, channel_out, depth_out, height_out, width_out))
         else:
-            raise TileError('self.image_sizes length is not 3, 5 or 7')
+            raise TileError("self.image_sizes length is not 3, 5 or 7")
 
         x_input = self.pre_forward(x_input, 1, is_test, ctx)
         x_output = self.tile.forward_indexed(x_input, d_tensor, is_test, self.non_blocking)
@@ -1482,8 +1485,7 @@ class BaseTile(Generic[RPUConfigGeneric]):
                 ``self.images_sizes`` does not have a valid dimennion.
         """
         if not self.image_sizes:
-            raise TileError('self.image_sizes is not initialized. Please use '
-                            'set_indexed()')
+            raise TileError("self.image_sizes is not initialized. Please use set_indexed()")
 
         n_batch = d_input.size(0)
 
@@ -1494,11 +1496,10 @@ class BaseTile(Generic[RPUConfigGeneric]):
             channel_in, height_in, width_in, _, _ = self.image_sizes
             x_tensor = d_input.new_empty((n_batch, channel_in, height_in, width_in))
         elif len(self.image_sizes) == 7:
-            channel_in, depth_in, height_in, width_in, _, _, _ \
-                = self.image_sizes
+            channel_in, depth_in, height_in, width_in, _, _, _ = self.image_sizes
             x_tensor = d_input.new_empty((n_batch, channel_in, depth_in, height_in, width_in))
         else:
-            raise TileError('self.image_sizes length is not 3, 5 or 7')
+            raise TileError("self.image_sizes length is not 3, 5 or 7")
 
         d_input = self.pre_backward(d_input, 1, ctx)
         d_output = self.tile.backward_indexed(d_input, x_tensor, self.non_blocking)

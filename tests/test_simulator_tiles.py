@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -19,69 +19,96 @@ from unittest import SkipTest
 from torch import Tensor, zeros, ones
 
 from aihwkit.simulator.configs.configs import UnitCellRPUConfig
-from aihwkit.simulator.configs.compounds import (
-    VectorUnitCell, ReferenceUnitCell
-)
+from aihwkit.simulator.configs.compounds import VectorUnitCell, ReferenceUnitCell
 from aihwkit.simulator.configs.enums import (
-    VectorUnitCellUpdatePolicy, NoiseManagementType, BoundManagementType
+    VectorUnitCellUpdatePolicy,
+    NoiseManagementType,
+    BoundManagementType,
 )
 from aihwkit.simulator.configs.utils import PrePostProcessingRPU
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
-    FloatingPoint, Ideal, ConstantStep, LinearStep, SoftBounds,
-    ExpStep, Vector, OneSided, Transfer, BufferedTransfer, MixedPrecision,
-    PiecewiseStep, PiecewiseStepCuda,
-    Inference, Reference, FloatingPointCuda, IdealCuda, ConstantStepCuda,
-    LinearStepCuda, SoftBoundsCuda, ExpStepCuda, VectorCuda, OneSidedCuda,
-    TransferCuda, BufferedTransferCuda, InferenceCuda, ReferenceCuda,
-    MixedPrecisionCuda, PowStep, PowStepCuda,
-    PowStepReference, PowStepReferenceCuda,
-    SoftBoundsReference, SoftBoundsReferenceCuda,
+    FloatingPoint,
+    Ideal,
+    ConstantStep,
+    LinearStep,
+    SoftBounds,
+    ExpStep,
+    Vector,
+    OneSided,
+    Transfer,
+    BufferedTransfer,
+    MixedPrecision,
+    PiecewiseStep,
+    PiecewiseStepCuda,
+    Inference,
+    Reference,
+    FloatingPointCuda,
+    IdealCuda,
+    ConstantStepCuda,
+    LinearStepCuda,
+    SoftBoundsCuda,
+    ExpStepCuda,
+    VectorCuda,
+    OneSidedCuda,
+    TransferCuda,
+    BufferedTransferCuda,
+    InferenceCuda,
+    ReferenceCuda,
+    MixedPrecisionCuda,
+    PowStep,
+    PowStepCuda,
+    PowStepReference,
+    PowStepReferenceCuda,
+    SoftBoundsReference,
+    SoftBoundsReferenceCuda,
 )
 from .helpers.testcases import SKIP_CUDA_TESTS
 
 TOL = 1e-6
 
 
-@parametrize_over_tiles([
-    FloatingPoint,
-    Ideal,
-    ConstantStep,
-    LinearStep,
-    ExpStep,
-    SoftBounds,
-    SoftBoundsReference,
-    Vector,
-    OneSided,
-    Transfer,
-    BufferedTransfer,
-    MixedPrecision,
-    Inference,
-    Reference,
-    PowStep,
-    PowStepReference,
-    PiecewiseStep,
-    PiecewiseStepCuda,
-    FloatingPointCuda,
-    IdealCuda,
-    ConstantStepCuda,
-    LinearStepCuda,
-    ExpStepCuda,
-    PowStepCuda,
-    PowStepReferenceCuda,
-    PiecewiseStepCuda,
-    SoftBoundsCuda,
-    SoftBoundsReferenceCuda,
-    VectorCuda,
-    OneSidedCuda,
-    TransferCuda,
-    BufferedTransferCuda,
-    MixedPrecisionCuda,
-    InferenceCuda,
-    ReferenceCuda,
-])
+@parametrize_over_tiles(
+    [
+        FloatingPoint,
+        Ideal,
+        ConstantStep,
+        LinearStep,
+        ExpStep,
+        SoftBounds,
+        SoftBoundsReference,
+        Vector,
+        OneSided,
+        Transfer,
+        BufferedTransfer,
+        MixedPrecision,
+        Inference,
+        Reference,
+        PowStep,
+        PowStepReference,
+        PiecewiseStep,
+        PiecewiseStepCuda,
+        FloatingPointCuda,
+        IdealCuda,
+        ConstantStepCuda,
+        LinearStepCuda,
+        ExpStepCuda,
+        PowStepCuda,
+        PowStepReferenceCuda,
+        PiecewiseStepCuda,
+        SoftBoundsCuda,
+        SoftBoundsReferenceCuda,
+        VectorCuda,
+        OneSidedCuda,
+        TransferCuda,
+        BufferedTransferCuda,
+        MixedPrecisionCuda,
+        InferenceCuda,
+        ReferenceCuda,
+    ]
+)
 class TileTest(ParametrizedTestCase):
     """Test floating point tile."""
 
@@ -105,8 +132,9 @@ class TileTest(ParametrizedTestCase):
 
         # Assert over learning rate.
         self.assertAlmostEqual(analog_tile.get_learning_rate(), learning_rate)
-        self.assertAlmostEqual(analog_tile.get_learning_rate(),
-                               analog_tile.tile.get_learning_rate())
+        self.assertAlmostEqual(
+            analog_tile.get_learning_rate(), analog_tile.tile.get_learning_rate()
+        )
 
         # Assert over weights and biases.
         tile_weights, tile_biases = analog_tile.get_weights()
@@ -134,8 +162,9 @@ class TileTest(ParametrizedTestCase):
 
         # Assert over learning rate.
         self.assertAlmostEqual(analog_tile.get_learning_rate(), learning_rate)
-        self.assertAlmostEqual(analog_tile.get_learning_rate(),
-                               analog_tile.tile.get_learning_rate())
+        self.assertAlmostEqual(
+            analog_tile.get_learning_rate(), analog_tile.tile.get_learning_rate()
+        )
 
         # Assert over weights and biases.
         tile_weights, tile_biases = analog_tile.get_weights()
@@ -159,10 +188,8 @@ class TileTest(ParametrizedTestCase):
         if field:
             # Check that one of the parameters is correct.
             self.assertIn(field, hidden_parameters.keys())
-            self.assertEqual(hidden_parameters[field].shape,
-                             (4, 5))
-            self.assertTrue(all(abs(val - 0.6) < TOL for val in
-                                hidden_parameters[field].flatten()))
+            self.assertEqual(hidden_parameters[field].shape, (4, 5))
+            self.assertTrue(all(abs(val - 0.6) < TOL for val in hidden_parameters[field].flatten()))
 
     def test_set_hidden_parameters(self):
         """Test setting hidden parameters."""
@@ -182,8 +209,7 @@ class TileTest(ParametrizedTestCase):
         new_hidden_parameters = analog_tile.get_hidden_parameters()
 
         # Compare old and new hidden parameters tensors.
-        for (_, old), (_, new) in zip(hidden_parameters.items(),
-                                      new_hidden_parameters.items()):
+        for (_, old), (_, new) in zip(hidden_parameters.items(), new_hidden_parameters.items()):
             self.assertTrue(old.allclose(new))
 
         if field:
@@ -193,12 +219,13 @@ class TileTest(ParametrizedTestCase):
         """Tests whether post update diffusion is performed"""
         rpu_config = self.get_rpu_config()
 
-        if not hasattr(rpu_config.device, 'diffusion'):
-            if hasattr(rpu_config.device, 'unit_cell_devices') \
-               and hasattr(rpu_config.device.unit_cell_devices[-1], 'diffusion'):
+        if not hasattr(rpu_config.device, "diffusion"):
+            if hasattr(rpu_config.device, "unit_cell_devices") and hasattr(
+                rpu_config.device.unit_cell_devices[-1], "diffusion"
+            ):
                 rpu_config.device.unit_cell_devices[-1].diffusion = 0.323
             else:
-                raise SkipTest('This device does not support diffusion')
+                raise SkipTest("This device does not support diffusion")
         else:
             rpu_config.device.diffusion = 0.323
 
@@ -221,15 +248,16 @@ class TileTest(ParametrizedTestCase):
         """Tests whether post update decay is performed"""
         rpu_config = self.get_rpu_config()
 
-        if not hasattr(rpu_config.device, 'lifetime'):
-            if hasattr(rpu_config.device, 'unit_cell_devices') \
-               and hasattr(rpu_config.device.unit_cell_devices[-1], 'lifetime'):
+        if not hasattr(rpu_config.device, "lifetime"):
+            if hasattr(rpu_config.device, "unit_cell_devices") and hasattr(
+                rpu_config.device.unit_cell_devices[-1], "lifetime"
+            ):
                 for idx, _ in enumerate(rpu_config.device.unit_cell_devices):
-                    rpu_config.device.unit_cell_devices[idx].lifetime = 100.
+                    rpu_config.device.unit_cell_devices[idx].lifetime = 100.0
             else:
-                raise SkipTest('This device does not support lifetime')
+                raise SkipTest("This device does not support lifetime")
         else:
-            rpu_config.device.lifetime = 100.
+            rpu_config.device.lifetime = 100.0
 
         analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
 
@@ -250,8 +278,9 @@ class TileTest(ParametrizedTestCase):
         """Tests hidden update index"""
         rpu_config = self.get_rpu_config()
 
-        if not isinstance(rpu_config, UnitCellRPUConfig) \
-           or not isinstance(rpu_config.device, (VectorUnitCell, ReferenceUnitCell)):
+        if not isinstance(rpu_config, UnitCellRPUConfig) or not isinstance(
+            rpu_config.device, (VectorUnitCell, ReferenceUnitCell)
+        ):
             analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=False)
             index = analog_tile.get_hidden_update_index()
             self.assertEqual(index, 0)
@@ -276,10 +305,8 @@ class TileTest(ParametrizedTestCase):
             weights_0 = Tensor([[0.1, 0.2, 0.3], [0.4, -0.5, -0.6]])
             analog_tile.tile.set_weights(weights_0)
             hidden_par = analog_tile.get_hidden_parameters()
-            self.assertTensorAlmostEqual(hidden_par['hidden_weights_0'],
-                                         weights_0)
-            self.assertTensorAlmostEqual(hidden_par['hidden_weights_1'],
-                                         zeros((2, 3)))
+            self.assertTensorAlmostEqual(hidden_par["hidden_weights_0"], weights_0)
+            self.assertTensorAlmostEqual(hidden_par["hidden_weights_1"], zeros((2, 3)))
 
             # set weights index 1
             analog_tile.set_hidden_update_index(1)
@@ -288,10 +315,8 @@ class TileTest(ParametrizedTestCase):
 
             hidden_par = analog_tile.get_hidden_parameters()
 
-            self.assertTensorAlmostEqual(hidden_par['hidden_weights_0'],
-                                         weights_0)
-            self.assertTensorAlmostEqual(hidden_par['hidden_weights_1'],
-                                         weights_1)
+            self.assertTensorAlmostEqual(hidden_par["hidden_weights_0"], weights_0)
+            self.assertTensorAlmostEqual(hidden_par["hidden_weights_1"], weights_1)
 
             # update
             analog_tile.set_hidden_update_index(1)
@@ -304,19 +329,21 @@ class TileTest(ParametrizedTestCase):
 
             hidden_par_after = analog_tile.get_hidden_parameters()
 
-            self.assertTensorAlmostEqual(hidden_par['hidden_weights_0'],
-                                         hidden_par_after['hidden_weights_0'])
-            self.assertNotAlmostEqualTensor(hidden_par['hidden_weights_1'],
-                                            hidden_par_after['hidden_weights_1'])
+            self.assertTensorAlmostEqual(
+                hidden_par["hidden_weights_0"], hidden_par_after["hidden_weights_0"]
+            )
+            self.assertNotAlmostEqualTensor(
+                hidden_par["hidden_weights_1"], hidden_par_after["hidden_weights_1"]
+            )
 
     def test_input_range(self):
         """Tests whether input range is applied"""
         rpu_config = self.get_rpu_config()
 
         if not isinstance(rpu_config, PrePostProcessingRPU):
-            raise SkipTest('This device does not support input range learning')
+            raise SkipTest("This device does not support input range learning")
 
-        if hasattr(rpu_config, 'forward'):
+        if hasattr(rpu_config, "forward"):
             rpu_config.forward.noise_management = NoiseManagementType.NONE
             rpu_config.forward.bound_management = BoundManagementType.NONE
         rpu_config.pre_post.input_range.enable = True
@@ -337,10 +364,10 @@ class TileTest(ParametrizedTestCase):
         self.assertEqual(outputs.max().item(), -3.0)
 
     def test_cuda_to_cpu(self):
-        """ test the copy to CPU from cuda """
+        """test the copy to CPU from cuda"""
 
         if not self.use_cuda or SKIP_CUDA_TESTS:
-            raise SkipTest('CUDA tile needed')
+            raise SkipTest("CUDA tile needed")
 
         out_size = 2
         in_size = 3
@@ -372,8 +399,9 @@ class TileTest(ParametrizedTestCase):
         self.assertNotEqual(analog_tile.tile.__class__, self.simulator_tile_class)
         # Assert over learning rate.
         self.assertAlmostEqual(analog_tile.get_learning_rate(), learning_rate)
-        self.assertAlmostEqual(analog_tile.get_learning_rate(),
-                               analog_tile.tile.get_learning_rate())
+        self.assertAlmostEqual(
+            analog_tile.get_learning_rate(), analog_tile.tile.get_learning_rate()
+        )
 
         # Assert over weights and biases.
         tile_weights, tile_biases = analog_tile.get_weights()
@@ -386,18 +414,17 @@ class TileTest(ParametrizedTestCase):
         new_hidden_parameters = cuda_analog_tile.get_hidden_parameters()
 
         # Compare old and new hidden parameters tensors.
-        for (_, old), (_, new) in zip(hidden_parameters.items(),
-                                      new_hidden_parameters.items()):
+        for (_, old), (_, new) in zip(hidden_parameters.items(), new_hidden_parameters.items()):
             self.assertTrue(old.allclose(new))
 
         if field:
             self.assertEqual(new_hidden_parameters[field][1][1], 0.8)
 
     def test_cpu_to_cuda(self):
-        """ test the copy to CUDA from CPU"""
+        """test the copy to CUDA from CPU"""
 
         if self.use_cuda or SKIP_CUDA_TESTS:
-            raise SkipTest('CUDA tile needed')
+            raise SkipTest("CUDA tile needed")
 
         out_size = 2
         in_size = 3
@@ -430,8 +457,9 @@ class TileTest(ParametrizedTestCase):
 
         # Assert over learning rate.
         self.assertAlmostEqual(analog_tile.get_learning_rate(), learning_rate)
-        self.assertAlmostEqual(analog_tile.get_learning_rate(),
-                               analog_tile.tile.get_learning_rate())
+        self.assertAlmostEqual(
+            analog_tile.get_learning_rate(), analog_tile.tile.get_learning_rate()
+        )
 
         # Assert over weights and biases.
         tile_weights, tile_biases = analog_tile.get_weights()
@@ -444,8 +472,7 @@ class TileTest(ParametrizedTestCase):
         new_hidden_parameters = cpu_analog_tile.get_hidden_parameters()
 
         # Compare old and new hidden parameters tensors.
-        for (_, old), (_, new) in zip(hidden_parameters.items(),
-                                      new_hidden_parameters.items()):
+        for (_, old), (_, new) in zip(hidden_parameters.items(), new_hidden_parameters.items()):
             self.assertTrue(old.allclose(new))
 
         if field:
@@ -454,7 +481,7 @@ class TileTest(ParametrizedTestCase):
     def test_program_weights(self):
         """Tests whether weight programming is performed"""
         rpu_config = self.get_rpu_config()
-        if hasattr(rpu_config, 'forward'):
+        if hasattr(rpu_config, "forward"):
             rpu_config.forward.is_perfect = True  # avoid additional reading noise
         analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
 

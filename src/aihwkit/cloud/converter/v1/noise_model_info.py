@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -14,7 +14,7 @@
 
 # pylint: disable=no-name-in-module,import-error
 from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: ignore[attr-defined]
-    NoiseModelProto
+    NoiseModelProto,
 )
 
 
@@ -22,16 +22,16 @@ from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: igno
 class NoiseModelInfo:
     """Data only class for fields from protobuf NoiseModelProto message"""
 
-    PCM = 'pcm'
-    GENERIC = 'generic'
+    PCM = "pcm"
+    GENERIC = "generic"
 
     def __init__(self, nm_proto: NoiseModelProto):  # type: ignore[valid-type]
         """Constructor for this class"""
 
-        type_ = nm_proto.WhichOneof('item')  # type: ignore[attr-defined]
+        type_ = nm_proto.WhichOneof("item")  # type: ignore[attr-defined]
 
         info = None
-        if type_ == 'pcm':
+        if type_ == "pcm":
             # pcm does NOT have 2 extra fields
             info = nm_proto.pcm  # type: ignore[attr-defined]
         else:
@@ -58,8 +58,9 @@ class NoiseModelInfo:
     def _assert_generic(self) -> None:
         """Check is device is generic"""
 
-        assert self.device_id == self.GENERIC, \
-            "device_id does not have value '{}'".format(self.GENERIC)
+        assert self.device_id == self.GENERIC, "device_id does not have value '{}'".format(
+            self.GENERIC
+        )
 
     @property
     def drift_mean(self) -> float:
@@ -74,4 +75,6 @@ class NoiseModelInfo:
 
         self._assert_generic()
         return self._drift_std
+
+
 # pylint: enable=too-many-instance-attributes

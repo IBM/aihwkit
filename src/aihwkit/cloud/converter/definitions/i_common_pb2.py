@@ -6,6 +6,7 @@ from google.protobuf.internal import builder as _builder
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import symbol_database as _symbol_database
+
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -14,31 +15,32 @@ _sym_db = _symbol_database.Default()
 from . import i_onnx_common_pb2 as i__onnx__common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0ei_common.proto\x12\x11\x61ihwx.inferencing\x1a\x13i_onnx_common.proto\"R\n\x0eOptimizerProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\"R\n\x0ePrimitiveProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\"R\n\x0eTransformProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\"\x85\x01\n\nLayerProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\x12\x35\n\nstate_dict\x18\x03 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\"[\n\x17\x41\x63tivationFunctionProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\"\x9e\x01\n\x19LayerOrActivationFunction\x12I\n\x13\x61\x63tivation_function\x18\x01 \x01(\x0b\x32*.aihwx.inferencing.ActivationFunctionProtoH\x00\x12.\n\x05layer\x18\x02 \x01(\x0b\x32\x1d.aihwx.inferencing.LayerProtoH\x00\x42\x06\n\x04item\"R\n\x0eSchedulerProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\"U\n\x11LossFunctionProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\"c\n\x07Network\x12\x1a\n\x12weight_template_id\x18\x01 \x02(\t\x12<\n\x06layers\x18\x02 \x03(\x0b\x32,.aihwx.inferencing.LayerOrActivationFunction\"(\n\x07Version\x12\x0e\n\x06schema\x18\x01 \x02(\x03\x12\r\n\x05opset\x18\x02 \x02(\x03')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n\x0ei_common.proto\x12\x11\x61ihwx.inferencing\x1a\x13i_onnx_common.proto"R\n\x0eOptimizerProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto"R\n\x0ePrimitiveProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto"R\n\x0eTransformProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto"\x85\x01\n\nLayerProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto\x12\x35\n\nstate_dict\x18\x03 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto"[\n\x17\x41\x63tivationFunctionProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto"\x9e\x01\n\x19LayerOrActivationFunction\x12I\n\x13\x61\x63tivation_function\x18\x01 \x01(\x0b\x32*.aihwx.inferencing.ActivationFunctionProtoH\x00\x12.\n\x05layer\x18\x02 \x01(\x0b\x32\x1d.aihwx.inferencing.LayerProtoH\x00\x42\x06\n\x04item"R\n\x0eSchedulerProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto"U\n\x11LossFunctionProto\x12\n\n\x02id\x18\x01 \x02(\t\x12\x34\n\targuments\x18\x02 \x03(\x0b\x32!.aihwx.inferencing.AttributeProto"c\n\x07Network\x12\x1a\n\x12weight_template_id\x18\x01 \x02(\t\x12<\n\x06layers\x18\x02 \x03(\x0b\x32,.aihwx.inferencing.LayerOrActivationFunction"(\n\x07Version\x12\x0e\n\x06schema\x18\x01 \x02(\x03\x12\r\n\x05opset\x18\x02 \x02(\x03'
+)
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'i_common_pb2', globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "i_common_pb2", globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
-
-  DESCRIPTOR._options = None
-  _OPTIMIZERPROTO._serialized_start=58
-  _OPTIMIZERPROTO._serialized_end=140
-  _PRIMITIVEPROTO._serialized_start=142
-  _PRIMITIVEPROTO._serialized_end=224
-  _TRANSFORMPROTO._serialized_start=226
-  _TRANSFORMPROTO._serialized_end=308
-  _LAYERPROTO._serialized_start=311
-  _LAYERPROTO._serialized_end=444
-  _ACTIVATIONFUNCTIONPROTO._serialized_start=446
-  _ACTIVATIONFUNCTIONPROTO._serialized_end=537
-  _LAYERORACTIVATIONFUNCTION._serialized_start=540
-  _LAYERORACTIVATIONFUNCTION._serialized_end=698
-  _SCHEDULERPROTO._serialized_start=700
-  _SCHEDULERPROTO._serialized_end=782
-  _LOSSFUNCTIONPROTO._serialized_start=784
-  _LOSSFUNCTIONPROTO._serialized_end=869
-  _NETWORK._serialized_start=871
-  _NETWORK._serialized_end=970
-  _VERSION._serialized_start=972
-  _VERSION._serialized_end=1012
+    DESCRIPTOR._options = None
+    _OPTIMIZERPROTO._serialized_start = 58
+    _OPTIMIZERPROTO._serialized_end = 140
+    _PRIMITIVEPROTO._serialized_start = 142
+    _PRIMITIVEPROTO._serialized_end = 224
+    _TRANSFORMPROTO._serialized_start = 226
+    _TRANSFORMPROTO._serialized_end = 308
+    _LAYERPROTO._serialized_start = 311
+    _LAYERPROTO._serialized_end = 444
+    _ACTIVATIONFUNCTIONPROTO._serialized_start = 446
+    _ACTIVATIONFUNCTIONPROTO._serialized_end = 537
+    _LAYERORACTIVATIONFUNCTION._serialized_start = 540
+    _LAYERORACTIVATIONFUNCTION._serialized_end = 698
+    _SCHEDULERPROTO._serialized_start = 700
+    _SCHEDULERPROTO._serialized_end = 782
+    _LOSSFUNCTIONPROTO._serialized_start = 784
+    _LOSSFUNCTIONPROTO._serialized_end = 869
+    _NETWORK._serialized_start = 871
+    _NETWORK._serialized_end = 970
+    _VERSION._serialized_start = 972
+    _VERSION._serialized_end = 1012
 # @@protoc_insertion_point(module_scope)

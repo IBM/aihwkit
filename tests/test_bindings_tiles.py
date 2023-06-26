@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -29,19 +29,13 @@ from aihwkit.simulator.configs.utils import IOParameters, DriftParameter
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase, SKIP_CUDA_TESTS
-from .helpers.tiles import (FloatingPoint, ConstantStep,
-                            FloatingPointCuda, ConstantStepCuda)
+from .helpers.tiles import FloatingPoint, ConstantStep, FloatingPointCuda, ConstantStepCuda
 
 if not SKIP_CUDA_TESTS:
     init()
 
 
-@parametrize_over_tiles([
-    FloatingPoint,
-    ConstantStep,
-    FloatingPointCuda,
-    ConstantStepCuda
-])
+@parametrize_over_tiles([FloatingPoint, ConstantStep, FloatingPointCuda, ConstantStepCuda])
 class BindingsTilesTest(ParametrizedTestCase):
     """Tests the basic functionality of FloatingPoint and Analog tiles."""
 
@@ -49,18 +43,19 @@ class BindingsTilesTest(ParametrizedTestCase):
     def set_init_weights(python_tile):
         """Generate and set the weight init."""
         init_weights = from_numpy(
-            uniform(-0.5, 0.5, size=(python_tile.out_size, python_tile.in_size)))
+            uniform(-0.5, 0.5, size=(python_tile.out_size, python_tile.in_size))
+        )
         python_tile.set_weights(init_weights)
 
     def get_noisefree_tile(self, out_size, in_size):
         """Return a tile of the specified dimensions with noisiness turned off."""
         rpu_config = None
 
-        if 'FloatingPoint' not in self.parameter:
+        if "FloatingPoint" not in self.parameter:
             rpu_config = SingleRPUConfig(
                 forward=IOParameters(is_perfect=True),
                 backward=IOParameters(is_perfect=True),
-                device=IdealDevice()
+                device=IdealDevice(),
             )
 
         python_tile = self.get_tile(out_size, in_size, rpu_config)
@@ -70,12 +65,10 @@ class BindingsTilesTest(ParametrizedTestCase):
 
     def get_custom_tile(self, out_size, in_size, **parameters):
         """Return a tile with custom parameters for the resistive device."""
-        if 'FloatingPoint' in self.parameter:
-            rpu_config = FloatingPointRPUConfig(
-                device=FloatingPointDevice(**parameters))
+        if "FloatingPoint" in self.parameter:
+            rpu_config = FloatingPointRPUConfig(device=FloatingPointDevice(**parameters))
         else:
-            rpu_config = SingleRPUConfig(
-                device=ConstantStepDevice(**parameters))
+            rpu_config = SingleRPUConfig(device=ConstantStepDevice(**parameters))
 
         python_tile = self.get_tile(out_size, in_size, rpu_config)
         self.set_init_weights(python_tile)
@@ -103,14 +96,14 @@ class BindingsTilesTest(ParametrizedTestCase):
         decay_rate = 0.1
 
         # Use custom parameters for the tile.
-        python_tile = self.get_custom_tile(2, 3, lifetime=1.0/decay_rate)
+        python_tile = self.get_custom_tile(2, 3, lifetime=1.0 / decay_rate)
         cpp_tile = python_tile.tile
 
         init_weights = cpp_tile.get_weights().numpy()
         cpp_tile.decay_weights(1.0)
         weights = cpp_tile.get_weights().numpy()
 
-        assert_array_almost_equal(weights, init_weights*(1.0 - decay_rate))
+        assert_array_almost_equal(weights, init_weights * (1.0 - decay_rate))
 
     def test_diffuse_weights(self):
         """Check diffusing the weights."""
@@ -125,8 +118,8 @@ class BindingsTilesTest(ParametrizedTestCase):
         weights = cpp_tile.get_weights().numpy()
 
         deviation_std = std((weights - init_weights).flatten())
-        self.assertLess(deviation_std, 1.1*diffusion_rate)
-        self.assertGreater(deviation_std, 0.9*diffusion_rate)
+        self.assertLess(deviation_std, 1.1 * diffusion_rate)
+        self.assertGreater(deviation_std, 0.9 * diffusion_rate)
 
     def test_drift_weights(self):
         """Check drifting the weights."""
@@ -141,7 +134,7 @@ class BindingsTilesTest(ParametrizedTestCase):
         cpp_tile.drift_weights(delta_t)
         weights = cpp_tile.get_weights()
 
-        assert_array_almost_equal(weights, init_weights*(delta_t)**(-nu))
+        assert_array_almost_equal(weights, init_weights * (delta_t) ** (-nu))
 
     def test_mimic_rpu_mac(self):
         """Check using the update, forward and backward functions."""
@@ -155,8 +148,8 @@ class BindingsTilesTest(ParametrizedTestCase):
 
         cpp_tile.set_learning_rate(lr)
 
-        x_t = from_numpy(uniform(-1.2, 1.2, size=(m_batch, n_cols)).astype('float32'))
-        d_t = from_numpy(uniform(-0.1, 0.1, size=(m_batch, n_rows)).astype('float32'))
+        x_t = from_numpy(uniform(-1.2, 1.2, size=(m_batch, n_cols)).astype("float32"))
+        d_t = from_numpy(uniform(-0.1, 0.1, size=(m_batch, n_rows)).astype("float32"))
 
         init_weights = cpp_tile.get_weights()
 
@@ -177,14 +170,14 @@ class BindingsTilesTest(ParametrizedTestCase):
         # Perform update.
         cpp_tile.update(x_t, d_t, bias=False)
         post_rank_weights = cpp_tile.get_weights()
-        ref_weights = init_weights - lr*dot(d_t.cpu().T, x_t.cpu())
+        ref_weights = init_weights - lr * dot(d_t.cpu().T, x_t.cpu())
 
         assert_array_almost_equal(post_rank_weights, ref_weights)
 
     def test_cuda_instantiation(self):
         """Test whether cuda weights are copied correctly."""
         if not self.use_cuda or SKIP_CUDA_TESTS:
-            raise SkipTest('not compiled with CUDA support')
+            raise SkipTest("not compiled with CUDA support")
 
         python_tile = self.get_tile(10, 12)
         init_weights = python_tile.tile.get_weights()
@@ -194,9 +187,7 @@ class BindingsTilesTest(ParametrizedTestCase):
         assert_array_almost_equal(init_weights, init_weights_cuda)
 
 
-@parametrize_over_tiles([
-    FloatingPoint, FloatingPointCuda
-])
+@parametrize_over_tiles([FloatingPoint, FloatingPointCuda])
 class FloatingPointTileTest(ParametrizedTestCase):
     """Test `rpu_base.FloatingPointTile` functionality."""
 
@@ -206,17 +197,17 @@ class FloatingPointTileTest(ParametrizedTestCase):
         cpp_tile = python_tile.tile
 
         # Set weights using Tensors.
-        input_weights = Tensor([[1., 2., 3.], [4., 5., 6.]])
+        input_weights = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         cpp_tile.set_weights(input_weights)
         assert_array_equal(cpp_tile.get_weights(), input_weights)
 
         # Set weights using numpy (via python tile).
-        input_weights = array([[1., 2., 3.], [4., 5., 6.]])
+        input_weights = array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         python_tile.set_weights(input_weights)
         assert_array_equal(cpp_tile.get_weights(), input_weights)
 
         # Set weights using Lists (via python tile).
-        input_weights = [[1., 2., 3.], [4., 5., 6.]]
+        input_weights = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
         python_tile.set_weights(input_weights)
         assert_array_equal(cpp_tile.get_weights(), input_weights)
 
@@ -226,7 +217,7 @@ class FloatingPointTileTest(ParametrizedTestCase):
         cpp_tile = python_tile.tile
 
         # Set weights using Tensors.
-        input_weights = Tensor([[1., 2., 3.], [4., 5., 6.]])
+        input_weights = Tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         cpp_tile.set_weights(input_weights)
         assert_array_equal(cpp_tile.get_weights(), input_weights)
 
@@ -238,7 +229,7 @@ class FloatingPointTileTest(ParametrizedTestCase):
 
         python_tile = self.get_tile(out_size, in_size)
         init_weights = python_tile.get_weights()[0]
-        x_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [in_size]).astype('float32'))
+        x_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [in_size]).astype("float32"))
 
         if python_tile.is_cuda:
             x_t = x_t.cuda()
@@ -260,7 +251,7 @@ class FloatingPointTileTest(ParametrizedTestCase):
 
         python_tile = self.get_tile(out_size, in_size)
         init_weights = python_tile.get_weights()[0].cpu().numpy()
-        d_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [out_size]).astype('float32'))
+        d_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [out_size]).astype("float32"))
 
         if python_tile.is_cuda:
             d_t = d_t.cuda()
@@ -285,8 +276,8 @@ class FloatingPointTileTest(ParametrizedTestCase):
         init_weights = python_tile.get_weights()[0].numpy()
         python_tile.set_learning_rate(lr)
 
-        x_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [in_size]).astype('float32'))
-        d_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [out_size]).astype('float32'))
+        x_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [in_size]).astype("float32"))
+        d_t = from_numpy(uniform(-0.1, 0.1, size=add_shape + [out_size]).astype("float32"))
 
         if python_tile.is_cuda:
             x_t = x_t.cuda()
@@ -301,13 +292,11 @@ class FloatingPointTileTest(ParametrizedTestCase):
         d_t = d_t.detach().cpu().numpy()
         d_t = reshape(d_t, [-1, out_size])
 
-        ref_weights = init_weights - lr*dot(d_t.T, x_t)
+        ref_weights = init_weights - lr * dot(d_t.T, x_t)
         assert_array_almost_equal(updated_weights, ref_weights)
 
 
-@parametrize_over_tiles([
-    ConstantStep, ConstantStepCuda
-])
+@parametrize_over_tiles([ConstantStep, ConstantStepCuda])
 class AnalogTileTest(ParametrizedTestCase):
     """Test `rpu_base.AnalogTile` functionality."""
 

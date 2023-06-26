@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -33,10 +33,12 @@ model = resnet34()
 print(model)
 
 # Define device and chip configuration used in the RPU tile
-mapping = MappingParameter(max_input_size=512,  # analog tile size
-                           max_output_size=512,
-                           digital_bias=True,
-                           weight_scaling_omega=0.6)  # whether to use analog or digital bias
+mapping = MappingParameter(
+    max_input_size=512,  # analog tile size
+    max_output_size=512,
+    digital_bias=True,
+    weight_scaling_omega=0.6,
+)  # whether to use analog or digital bias
 # Choose any preset or RPU configuration here
 rpu_config = TikiTakaReRamSBPreset(mapping=mapping)
 

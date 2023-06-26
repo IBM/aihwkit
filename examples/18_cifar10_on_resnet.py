@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,14 +41,14 @@ from aihwkit.simulator.rpu_base import cuda
 USE_CUDA = 0
 if cuda.is_compiled():
     USE_CUDA = 1
-DEVICE = device('cuda' if USE_CUDA else 'cpu')
+DEVICE = device("cuda" if USE_CUDA else "cpu")
 
 # Path to store datasets
-PATH_DATASET = os.path.join(os.getcwd(), 'data', 'DATASET')
+PATH_DATASET = os.path.join(os.getcwd(), "data", "DATASET")
 
 # Path to store results
-RESULTS = os.path.join(os.getcwd(), 'results', 'RESNET')
-WEIGHT_PATH = os.path.join(RESULTS, 'example_18_model_weight.pth')
+RESULTS = os.path.join(os.getcwd(), "results", "RESNET")
+WEIGHT_PATH = os.path.join(RESULTS, "example_18_model_weight.pth")
 
 # Training parameters
 SEED = 1
@@ -79,7 +79,7 @@ class ResidualBlock(nn.Module):
             self.convskip = None
 
     def forward(self, x):
-        """ Forward pass"""
+        """Forward pass"""
         y = F.relu(self.bn1(self.conv1(x)))
         y = self.bn2(self.conv2(y))
         if self.convskip:
@@ -112,23 +112,20 @@ def create_model():
 
     block_per_layers = (3, 4, 6, 3)
     base_channel = 16
-    channel = (base_channel, 2*base_channel, 4*base_channel)
+    channel = (base_channel, 2 * base_channel, 4 * base_channel)
 
     l0 = nn.Sequential(
         nn.Conv2d(3, channel[0], kernel_size=3, stride=1, padding=1),
         nn.BatchNorm2d(channel[0]),
-        nn.ReLU()
+        nn.ReLU(),
     )
 
-    l1 = nn.Sequential(*concatenate_layer_blocks(channel[0], channel[0], block_per_layers[0],
-                                                 first_layer=True))
+    l1 = nn.Sequential(
+        *concatenate_layer_blocks(channel[0], channel[0], block_per_layers[0], first_layer=True)
+    )
     l2 = nn.Sequential(*concatenate_layer_blocks(channel[0], channel[1], block_per_layers[1]))
     l3 = nn.Sequential(*concatenate_layer_blocks(channel[1], channel[2], block_per_layers[2]))
-    l4 = nn.Sequential(
-        nn.AdaptiveAvgPool2d((1, 1)),
-        nn.Flatten(),
-        nn.Linear(channel[2], N_CLASSES)
-    )
+    l4 = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten(), nn.Linear(channel[2], N_CLASSES))
 
     return nn.Sequential(l0, l1, l2, l3, l4)
 
@@ -137,13 +134,11 @@ def load_images():
     """Load images for train from torchvision datasets.
 
     Returns:
-        Dataset, Dataset: train data and validation data
-"""
+        Dataset, Dataset: train data and validation data"""
     mean = Tensor([0.4914, 0.4822, 0.4465])
     std = Tensor([0.2470, 0.2435, 0.2616])
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize(mean, std)])
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
     train_set = datasets.CIFAR10(PATH_DATASET, download=True, train=True, transform=transform)
     val_set = datasets.CIFAR10(PATH_DATASET, download=True, train=False, transform=transform)
     train_data = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
@@ -232,8 +227,8 @@ def test_evaluation(validation_data, model, criterion):
         _, predicted = torch_max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
-        accuracy = predicted_ok/total_images*100
-        error = (1-predicted_ok/total_images)*100
+        accuracy = predicted_ok / total_images * 100
+        error = (1 - predicted_ok / total_images) * 100
 
     epoch_loss = total_loss / len(validation_data.dataset)
 
@@ -270,16 +265,19 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
             # Validate_step
             with no_grad():
                 model, valid_loss, error, accuracy = test_evaluation(
-                    validation_data, model, criterion)
+                    validation_data, model, criterion
+                )
                 valid_losses.append(valid_loss)
                 test_error.append(error)
 
-            print(f'{datetime.now().time().replace(microsecond=0)} --- '
-                  f'Epoch: {epoch}\t'
-                  f'Train loss: {train_loss:.4f}\t'
-                  f'Valid loss: {valid_loss:.4f}\t'
-                  f'Test error: {error:.2f}%\t'
-                  f'Test accuracy: {accuracy:.2f}%\t')
+            print(
+                f"{datetime.now().time().replace(microsecond=0)} --- "
+                f"Epoch: {epoch}\t"
+                f"Train loss: {train_loss:.4f}\t"
+                f"Valid loss: {valid_loss:.4f}\t"
+                f"Test error: {error:.2f}%\t"
+                f"Test accuracy: {accuracy:.2f}%\t"
+            )
 
     return model, optimizer
 
@@ -308,18 +306,17 @@ def main():
     optimizer = create_sgd_optimizer(model, LEARNING_RATE)
     criterion = nn.CrossEntropyLoss()
 
-    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
-          f'Started ResNet Training')
+    print(f"\n{datetime.now().time().replace(microsecond=0)} --- " f"Started ResNet Training")
 
-    model, optimizer = training_loop(model, criterion, optimizer, train_data, validation_data,
-                                     N_EPOCHS)
+    model, optimizer = training_loop(
+        model, criterion, optimizer, train_data, validation_data, N_EPOCHS
+    )
 
-    print(f'{datetime.now().time().replace(microsecond=0)} --- '
-          f'Completed ResNet Training')
+    print(f"{datetime.now().time().replace(microsecond=0)} --- " f"Completed ResNet Training")
 
     save(model.state_dict(), WEIGHT_PATH)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Execute only if run as the entry point into the program
     main()

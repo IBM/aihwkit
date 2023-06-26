@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -85,12 +85,13 @@ class ConstantStep:
     """AnalogTile with ConstantStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
-        return SingleRPUConfig(device=ConstantStepDevice(w_max_dtod=0, w_min_dtod=0,
-                                                         up_down_dtod=0.0))
+        return SingleRPUConfig(
+            device=ConstantStepDevice(w_max_dtod=0, w_min_dtod=0, up_down_dtod=0.0)
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -100,14 +101,22 @@ class ConstantStep:
 class IdealizedConstantStep:
     """AnalogTile with ConstantStepDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
-        rpu_config = SingleRPUConfig(device=ConstantStepDevice(
-            w_max_dtod=0, w_min_dtod=0, dw_min_std=0.0, dw_min=0.0001, dw_min_dtod=0.0,
-            up_down_dtod=0.0, w_max=1.0, w_min=-1.0)
+        rpu_config = SingleRPUConfig(
+            device=ConstantStepDevice(
+                w_max_dtod=0,
+                w_min_dtod=0,
+                dw_min_std=0.0,
+                dw_min=0.0001,
+                dw_min_dtod=0.0,
+                up_down_dtod=0.0,
+                w_max=1.0,
+                w_min=-1.0,
+            )
         )
         rpu_config.forward.is_perfect = True
         rpu_config.backward.is_perfect = True
@@ -122,7 +131,7 @@ class LinearStep:
     """AnalogTile with LinearStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -137,7 +146,7 @@ class SoftBounds:
     """AnalogTile with SoftBoundsDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -152,7 +161,7 @@ class SoftBoundsPmax:
     """AnalogTile with SoftBoundsPmaxDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -167,7 +176,7 @@ class SoftBoundsReference:
     """AnalogTile with SoftBoundsPmaxDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -182,7 +191,7 @@ class ExpStep:
     """AnalogTile with ExpStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -197,7 +206,7 @@ class PowStep:
     """AnalogTile with PowStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -210,8 +219,9 @@ class PowStep:
 
 class PowStepReference(PowStep):
     """AnalogTile with PowStepDevice."""
+
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -226,7 +236,7 @@ class PiecewiseStep:
     """AnalogTile with PiecewiseStepDevice."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
@@ -241,15 +251,18 @@ class Vector:
     """AnalogTile with VectorUnitCell."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound_0'
+    first_hidden_field = "max_bound_0"
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=VectorUnitCell(
-            unit_cell_devices=[
-                ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
-                ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
-            ]))
+        return UnitCellRPUConfig(
+            device=VectorUnitCell(
+                unit_cell_devices=[
+                    ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
+                    ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
+                ]
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -260,15 +273,18 @@ class Reference:
     """AnalogTile with ReferenceUnitCell."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound_0'
+    first_hidden_field = "max_bound_0"
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=ReferenceUnitCell(
-            unit_cell_devices=[
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
-            ]))
+        return UnitCellRPUConfig(
+            device=ReferenceUnitCell(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ]
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -279,14 +295,15 @@ class OneSided:
     """AnalogTile with OneSidedUnitCell."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound_0'
+    first_hidden_field = "max_bound_0"
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=OneSidedUnitCell(
-            unit_cell_devices=[
-                ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
-            ]))
+        return UnitCellRPUConfig(
+            device=OneSidedUnitCell(
+                unit_cell_devices=[ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)]
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -297,20 +314,21 @@ class Transfer:
     """AnalogTile with TransferCompound."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound_0'
+    first_hidden_field = "max_bound_0"
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=TransferCompound(
-            unit_cell_devices=[
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
-            ],
-            transfer_forward=IOParameters(is_perfect=True),
-            transfer_every=1,
-            gamma=0.1
-
-        ))
+        return UnitCellRPUConfig(
+            device=TransferCompound(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ],
+                transfer_forward=IOParameters(is_perfect=True),
+                transfer_every=1,
+                gamma=0.1,
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -321,20 +339,21 @@ class BufferedTransfer:
     """AnalogTile with BufferedTransferCompound."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound_0'
+    first_hidden_field = "max_bound_0"
     use_cuda = False
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=BufferedTransferCompound(
-            unit_cell_devices=[
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
-            ],
-            transfer_forward=IOParameters(is_perfect=True),
-            transfer_every=1,
-            gamma=0.1
-
-        ))
+        return UnitCellRPUConfig(
+            device=BufferedTransferCompound(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ],
+                transfer_forward=IOParameters(is_perfect=True),
+                transfer_every=1,
+                gamma=0.1,
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -345,14 +364,14 @@ class MixedPrecision:
     """AnalogTile with MixedPrecisionCompound."""
 
     simulator_tile_class = tiles.AnalogTile
-    first_hidden_field = 'max_bound'
+    first_hidden_field = "max_bound"
     use_cuda = False
 
     def get_rpu_config(self):
         return DigitalRankUpdateRPUConfig(
             device=MixedPrecisionCompound(
-                device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                transfer_every=1),
+                device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0), transfer_every=1
+            )
         )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
@@ -399,7 +418,7 @@ class InferenceLearnOutScaling:
 class FloatingPointCuda:
     """FloatingPointTile."""
 
-    simulator_tile_class = getattr(tiles, 'CudaFloatingPointTile', None)
+    simulator_tile_class = getattr(tiles, "CudaFloatingPointTile", None)
     first_hidden_field = None
     use_cuda = True
 
@@ -414,7 +433,7 @@ class FloatingPointCuda:
 class IdealCuda:
     """AnalogTile with IdealDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
     first_hidden_field = None
     use_cuda = True
 
@@ -432,8 +451,8 @@ class IdealCuda:
 class ConstantStepCuda:
     """AnalogTile with ConstantStepDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -447,14 +466,22 @@ class ConstantStepCuda:
 class IdealizedConstantStepCuda:
     """AnalogTile with ConstantStepDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
-        rpu_config = SingleRPUConfig(device=ConstantStepDevice(
-            w_max_dtod=0, w_min_dtod=0, dw_min_std=0.0, dw_min=0.0001, dw_min_dtod=0.0,
-            up_down_dtod=0.0, w_max=1.0, w_min=-1.0)
+        rpu_config = SingleRPUConfig(
+            device=ConstantStepDevice(
+                w_max_dtod=0,
+                w_min_dtod=0,
+                dw_min_std=0.0,
+                dw_min=0.0001,
+                dw_min_dtod=0.0,
+                up_down_dtod=0.0,
+                w_max=1.0,
+                w_min=-1.0,
+            )
         )
         rpu_config.forward.is_perfect = True
         rpu_config.backward.is_perfect = True
@@ -468,8 +495,8 @@ class IdealizedConstantStepCuda:
 class LinearStepCuda:
     """AnalogTile with LinearStepDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -483,8 +510,8 @@ class LinearStepCuda:
 class SoftBoundsCuda:
     """AnalogTile with SoftBoundsDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -498,8 +525,8 @@ class SoftBoundsCuda:
 class SoftBoundsPmaxCuda:
     """AnalogTile with SoftBoundsPmaxDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -513,8 +540,8 @@ class SoftBoundsPmaxCuda:
 class SoftBoundsReferenceCuda:
     """AnalogTile with SoftBoundsReferenceDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -528,8 +555,8 @@ class SoftBoundsReferenceCuda:
 class ExpStepCuda:
     """AnalogTile with ExpStepDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -543,8 +570,8 @@ class ExpStepCuda:
 class PowStepCuda:
     """AnalogTile with PowStepDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -558,8 +585,8 @@ class PowStepCuda:
 class PowStepReferenceCuda:
     """AnalogTile with PowStepReferenceDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -573,8 +600,8 @@ class PowStepReferenceCuda:
 class PiecewiseStepCuda:
     """AnalogTile with PiecewiseStepDevice."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
@@ -588,16 +615,19 @@ class PiecewiseStepCuda:
 class VectorCuda:
     """AnalogTile with VectorUnitCell."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound_0'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound_0"
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=VectorUnitCell(
-            unit_cell_devices=[
-                ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
-                ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
-            ]))
+        return UnitCellRPUConfig(
+            device=VectorUnitCell(
+                unit_cell_devices=[
+                    ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
+                    ConstantStepDevice(w_max_dtod=0, w_min_dtod=0),
+                ]
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -607,16 +637,19 @@ class VectorCuda:
 class ReferenceCuda:
     """AnalogTile with ReferenceUnitCell."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound_0'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound_0"
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=ReferenceUnitCell(
-            unit_cell_devices=[
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
-            ]))
+        return UnitCellRPUConfig(
+            device=ReferenceUnitCell(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ]
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -626,15 +659,16 @@ class ReferenceCuda:
 class OneSidedCuda:
     """AnalogTile with OneSidedUnitCell."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound_0'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound_0"
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=OneSidedUnitCell(
-            unit_cell_devices=[
-                ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)
-            ]))
+        return UnitCellRPUConfig(
+            device=OneSidedUnitCell(
+                unit_cell_devices=[ConstantStepDevice(w_max_dtod=0, w_min_dtod=0)]
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -644,20 +678,22 @@ class OneSidedCuda:
 class TransferCuda:
     """AnalogTile with TransferCompound."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound_0'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound_0"
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=TransferCompound(
-            unit_cell_devices=[
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
-            ],
-            transfer_forward=IOParameters(is_perfect=True),
-            transfer_every=1,
-            gamma=0.1
-        ))
+        return UnitCellRPUConfig(
+            device=TransferCompound(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ],
+                transfer_forward=IOParameters(is_perfect=True),
+                transfer_every=1,
+                gamma=0.1,
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -667,20 +703,22 @@ class TransferCuda:
 class BufferedTransferCuda:
     """AnalogTile with BufferedTransferCompound."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound_0'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound_0"
     use_cuda = True
 
     def get_rpu_config(self):
-        return UnitCellRPUConfig(device=BufferedTransferCompound(
-            unit_cell_devices=[
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0)
-            ],
-            transfer_forward=IOParameters(is_perfect=True),
-            transfer_every=1,
-            gamma=0.1
-        ))
+        return UnitCellRPUConfig(
+            device=BufferedTransferCompound(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ],
+                transfer_forward=IOParameters(is_perfect=True),
+                transfer_every=1,
+                gamma=0.1,
+            )
+        )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
@@ -690,15 +728,15 @@ class BufferedTransferCuda:
 class MixedPrecisionCuda:
     """AnalogTile with MixedPrecisionCompound."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
-    first_hidden_field = 'max_bound'
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
+    first_hidden_field = "max_bound"
     use_cuda = True
 
     def get_rpu_config(self):
         return DigitalRankUpdateRPUConfig(
             device=MixedPrecisionCompound(
-                device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
-                transfer_every=1),
+                device=SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0), transfer_every=1
+            )
         )
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
@@ -709,7 +747,7 @@ class MixedPrecisionCuda:
 class InferenceCuda:
     """Inference tile."""
 
-    simulator_tile_class = getattr(tiles, 'CudaAnalogTile', None)
+    simulator_tile_class = getattr(tiles, "CudaAnalogTile", None)
     first_hidden_field = None
     use_cuda = True
 

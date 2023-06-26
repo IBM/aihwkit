@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,15 +23,22 @@ from aihwkit.cloud.converter.exceptions import ConversionError
 from aihwkit.cloud.converter.v1.mappings import InverseMappings, Mappings
 from aihwkit.experiments.experiments.training import BasicTraining
 
-from aihwkit.cloud.converter.definitions.input_file_pb2 import (   # type: ignore[attr-defined]
-    TrainingInput, Dataset, Training
+from aihwkit.cloud.converter.definitions.input_file_pb2 import (  # type: ignore[attr-defined]
+    TrainingInput,
+    Dataset,
+    Training,
 )
-from aihwkit.cloud.converter.definitions.common_pb2 import (    # type: ignore[attr-defined]
-    LayerOrActivationFunction, LossFunctionProto, Network, LayerProto,
-    ActivationFunctionProto, OptimizerProto, Version
+from aihwkit.cloud.converter.definitions.common_pb2 import (  # type: ignore[attr-defined]
+    LayerOrActivationFunction,
+    LossFunctionProto,
+    Network,
+    LayerProto,
+    ActivationFunctionProto,
+    OptimizerProto,
+    Version,
 )
 from aihwkit.cloud.converter.definitions.onnx_common_pb2 import (  # type: ignore[attr-defined]
-    AttributeProto
+    AttributeProto,
 )
 from aihwkit.nn import AnalogSequential
 
@@ -42,18 +49,14 @@ class BasicTrainingConverter:
     def to_proto(self, experiment: BasicTraining) -> Any:
         """Convert an `Experiment` to its protobuf representation."""
         version = self._version_to_proto()
-        dataset = self._dataset_to_proto(experiment.dataset,
-                                         experiment.batch_size)
+        dataset = self._dataset_to_proto(experiment.dataset, experiment.batch_size)
         network = self._model_to_proto(experiment.model)
-        training = self._training_to_proto(experiment.epochs,
-                                           experiment.learning_rate,
-                                           experiment.loss_function)
+        training = self._training_to_proto(
+            experiment.epochs, experiment.learning_rate, experiment.loss_function
+        )
 
         training_input = TrainingInput(
-            version=version,
-            dataset=dataset,
-            network=network,
-            training=training
+            version=version, dataset=dataset, network=network, training=training
         )
 
         return training_input
@@ -73,37 +76,31 @@ class BasicTrainingConverter:
             batch_size=batch_size,
             loss_function=loss_function,
             epochs=epochs,
-            learning_rate=learning_rate
+            learning_rate=learning_rate,
         )
 
     # Methods for converting to proto.
 
     @staticmethod
     def _version_to_proto() -> Any:
-        return Version(
-            schema=1,
-            opset=1
-        )
+        return Version(schema=1, opset=1)
 
     @staticmethod
     def _dataset_to_proto(dataset: type, batch_size: int) -> Any:
         if dataset not in Mappings.datasets:
-            raise ConversionError('Unsupported dataset: {}'.format(dataset))
+            raise ConversionError("Unsupported dataset: {}".format(dataset))
 
-        return Dataset(
-            dataset_id=Mappings.datasets[dataset],
-            batch_size=batch_size
-        )
+        return Dataset(dataset_id=Mappings.datasets[dataset], batch_size=batch_size)
 
     @staticmethod
     def _model_to_proto(model: Module) -> Any:
         if not isinstance(model, AnalogSequential):
-            raise ConversionError('Unsupported model: only AnalogSequential is supported')
+            raise ConversionError("Unsupported model: only AnalogSequential is supported")
 
         children_types = {type(layer) for layer in model.children()}
         valid_types = set(Mappings.layers.keys()) | set(Mappings.activation_functions.keys())
         if children_types - valid_types:
-            raise ConversionError('Unsupported layers: {}'.format(children_types - valid_types))
+            raise ConversionError("Unsupported layers: {}".format(children_types - valid_types))
 
         network = Network()
         for child in model.children():
@@ -115,34 +112,32 @@ class BasicTrainingConverter:
             else:
                 item = LayerOrActivationFunction(
                     activation_function=Mappings.activation_functions[child_type].to_proto(
-                        child, ActivationFunctionProto)
+                        child, ActivationFunctionProto
+                    )
                 )
             network.layers.extend([item])
 
         return network
 
     @staticmethod
-    def _training_to_proto(
-            epochs: int,
-            learning_rate: float,
-            loss_function: _Loss
-    ) -> Any:
+    def _training_to_proto(epochs: int, learning_rate: float, loss_function: _Loss) -> Any:
         if loss_function not in Mappings.loss_functions:
-            raise ConversionError('Unsupported loss function: {}'.format(loss_function))
+            raise ConversionError("Unsupported loss function: {}".format(loss_function))
 
         # Build optimizer manually.
-        optimizer = OptimizerProto(id='AnalogSGD')
+        optimizer = OptimizerProto(id="AnalogSGD")
         optimizer.arguments.append(
             AttributeProto(
-                name='lr',
-                type=AttributeProto.AttributeType.FLOAT,  # type: ignore
-                f=learning_rate))
+                name="lr", type=AttributeProto.AttributeType.FLOAT, f=learning_rate  # type: ignore
+            )
+        )
 
         training = Training(
             epochs=epochs,
             optimizer=optimizer,
             loss_function=Mappings.loss_functions[loss_function].to_proto(
-                loss_function(), LossFunctionProto)
+                loss_function(), LossFunctionProto
+            ),
         )
 
         return training
@@ -153,14 +148,14 @@ class BasicTrainingConverter:
     def _model_from_proto(model_proto: Any) -> Module:
         layers = []
         for layer_proto in model_proto.layers:
-            if layer_proto.WhichOneof('item') == 'layer':
+            if layer_proto.WhichOneof("item") == "layer":
                 layer_cls = InverseMappings.layers[layer_proto.layer.id]
-                layer = Mappings.layers[layer_cls].from_proto(
-                    layer_proto.layer, layer_cls)
+                layer = Mappings.layers[layer_cls].from_proto(layer_proto.layer, layer_cls)
             else:
                 layer_cls = InverseMappings.activation_functions[layer_proto.activation_function.id]
                 layer = Mappings.activation_functions[layer_cls].from_proto(
-                    layer_proto.activation_function, layer_cls)
+                    layer_proto.activation_function, layer_cls
+                )
 
             layers.append(layer)
 
@@ -169,29 +164,21 @@ class BasicTrainingConverter:
 
 class BasicTrainingResultConverter:
     """Converter for `BasicTraining` results."""
+
     # pylint: disable=too-few-public-methods
 
     def from_proto(self, results: Any) -> Any:
         """Convert a result to its json representation."""
-        return {
-            'version': {
-                'schema': 1,
-                'opset': 1
-            },
-            'epochs': self._epochs_from_proto(results)
-        }
+        return {"version": {"schema": 1, "opset": 1}, "epochs": self._epochs_from_proto(results)}
 
     # Methods for converting from proto.
     @staticmethod
     def _epochs_from_proto(epochs_proto: Any) -> List[Dict]:
         epochs = []
         for epoch in epochs_proto.epochs:
-            epoch_dict = {
-                'epoch': epoch.epoch,
-                'metrics': {}
-            }
+            epoch_dict = {"epoch": epoch.epoch, "metrics": {}}
             for metric in epoch.metrics:
-                epoch_dict['metrics'][metric.name] = metric.f
+                epoch_dict["metrics"][metric.name] = metric.f
 
             epochs.append(epoch_dict)
 

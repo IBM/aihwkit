@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -29,11 +29,8 @@ class ResponseError(CloudError):
         super().__init__(str(self))
 
     def __str__(self) -> str:
-        return '{} {} for url: {} {}'.format(
-            self.response.status_code,
-            self.response.reason,
-            self.response.request.method,
-            self.url
+        return "{} {} for url: {} {}".format(
+            self.response.status_code, self.response.reason, self.response.request.method, self.url
         )
 
     @staticmethod
@@ -50,7 +47,7 @@ class ApiResponseError(ResponseError):
         """Remove sensitive parts from an url."""
         parts = urlparse(url)
 
-        return '{}{}'.format(parts.path, '?...' if parts.query else '')
+        return "{}{}".format(parts.path, "?..." if parts.query else "")
 
 
 class InvalidResponseFieldError(CloudError):

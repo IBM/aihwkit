@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,19 +18,19 @@ from dataclasses import dataclass, field
 from typing import ClassVar, List, Type
 from numpy import exp
 
-from aihwkit.simulator.configs.helpers import (
-    _PrintableMixin, parameters_to_bindings
-)
-from aihwkit.simulator.configs.utils import (
-    DriftParameter, SimpleDriftParameter
-)
+from aihwkit.simulator.configs.helpers import _PrintableMixin, parameters_to_bindings
+from aihwkit.simulator.configs.utils import DriftParameter, SimpleDriftParameter
 from aihwkit.simulator.rpu_base import devices
 
 # legacy
 from aihwkit.simulator.configs.compounds import (  # pylint: disable=unused-import
-    VectorUnitCell, ReferenceUnitCell,
-    OneSidedUnitCell, DifferenceUnitCell, TransferCompound,
-    BufferedTransferCompound, MixedPrecisionCompound
+    VectorUnitCell,
+    ReferenceUnitCell,
+    OneSidedUnitCell,
+    DifferenceUnitCell,
+    TransferCompound,
+    BufferedTransferCompound,
+    MixedPrecisionCompound,
 )
 
 
@@ -160,8 +160,9 @@ class PulsedDevice(_PrintableMixin):
     diffusion_dtod: float = 0.0
     """Device-to device variation of diffusion rate in relative units."""
 
-    drift: DriftParameter = field(default_factory=DriftParameter,
-                                  metadata={'hide_if': DriftParameter()})
+    drift: DriftParameter = field(
+        default_factory=DriftParameter, metadata={"hide_if": DriftParameter()}
+    )
     """Parameter governing a power-law drift."""
 
     dw_min: float = 0.001
@@ -286,6 +287,7 @@ class PulsedDevice(_PrintableMixin):
 ###############################################################################
 # Specific devices based on ``pulsed``.
 ###############################################################################
+
 
 @dataclass
 class IdealDevice(_PrintableMixin):
@@ -618,7 +620,7 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     p_max: int = 1000
     """Number of pulses to drive the synapse from ``range_min`` to ``range_max``."""
 
-    alpha: float = 0.001/2
+    alpha: float = 0.001 / 2
     r"""The slope of the soft bounds model :math:`dw \propto \alpha w` for both
     up and down direction."""
 
@@ -630,19 +632,19 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     """Value of the weight for :math:`P_max` number of up pulses."""
 
     #  these values will be set from the above, so we hide it.
-    w_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    w_max: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    dw_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    up_down: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
+    w_min: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    w_max: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    dw_min: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    up_down: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
 
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
         params = SoftBoundsDevice()
         for key, value in self.__dict__.items():
-            if key not in ['range_min', 'range_max', 'alpha', 'p_max']:
+            if key not in ["range_min", "range_max", "alpha", "p_max"]:
                 setattr(params, key, value)
 
-        b_factor = (self.range_max - self.range_min)/(1 - exp(-self.p_max * self.alpha))
+        b_factor = (self.range_max - self.range_min) / (1 - exp(-self.p_max * self.alpha))
         params.w_min = self.range_min
         params.w_max = self.range_min + b_factor
         params.dw_min = b_factor * self.alpha
