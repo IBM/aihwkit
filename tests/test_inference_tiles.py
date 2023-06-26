@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -38,10 +38,7 @@ from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import Inference, InferenceCuda
 
 
-@parametrize_over_tiles([
-    Inference,
-    InferenceCuda
-])
+@parametrize_over_tiles([Inference, InferenceCuda])
 class InferenceTileTest(ParametrizedTestCase):
     """Inference model tests."""
 
@@ -53,7 +50,7 @@ class InferenceTileTest(ParametrizedTestCase):
 
         # Define a single-layer network, using a constant step device type.
         rpu_config = self.get_rpu_config()
-        rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
+        rpu_config.forward.out_res = -1.0  # Turn off (output) ADC discretization.
         rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
         rpu_config.forward.w_noise = 0.02
         rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
@@ -117,7 +114,6 @@ class InferenceTileTest(ParametrizedTestCase):
         opt_torch = SGD(model_torch.parameters(), lr=0.1)
 
         for _ in range(100):
-
             # inference
             opt.zero_grad()
             pred = model(x)
@@ -156,7 +152,7 @@ class InferenceTileTest(ParametrizedTestCase):
 
         pred_last = pred_before
         model.eval()
-        for t_inference in [0., 1., 20., 1000., 1e5]:
+        for t_inference in [0.0, 1.0, 20.0, 1000.0, 1e5]:
             model.drift_analog_weights(t_inference)
             pred_drift = model(x)
             self.assertNotAlmostEqualTensor(pred_last, pred_drift)
@@ -239,18 +235,20 @@ class InferenceTileTest(ParametrizedTestCase):
         scales = analog_tile.get_mapping_scales()
         self.assertTensorAlmostEqual(scales, expected_scales)
 
-    @parameterized.expand([
-        ('none', None,),
-        ('dorefa', WeightModifierType.DOREFA,),
-        ('mult_normal', WeightModifierType.MULT_NORMAL,),
-        ('poly', WeightModifierType.POLY, [1., 3.]),
-        ('polyN', WeightModifierType.POLY, [0.1, 0.2, 0.2, 0.3]),
-        ('discretize', WeightModifierType.DISCRETIZE,),
-        ('add_normal', WeightModifierType.DISCRETIZE_ADD_NORMAL,),
-    ])
-    def test_post_forward_modifier_types(self, _,
-                                         modifier_type: 'WeightModifierType',
-                                         coeffs: Optional[List] = None):
+    @parameterized.expand(
+        [
+            ("none", None),
+            ("dorefa", WeightModifierType.DOREFA),
+            ("mult_normal", WeightModifierType.MULT_NORMAL),
+            ("poly", WeightModifierType.POLY, [1.0, 3.0]),
+            ("polyN", WeightModifierType.POLY, [0.1, 0.2, 0.2, 0.3]),
+            ("discretize", WeightModifierType.DISCRETIZE),
+            ("add_normal", WeightModifierType.DISCRETIZE_ADD_NORMAL),
+        ]
+    )
+    def test_post_forward_modifier_types(
+        self, _, modifier_type: "WeightModifierType", coeffs: Optional[List] = None
+    ):
         """Tests whether modifier is performed."""
         rpu_config = self.get_rpu_config()
         rpu_config.drift_compensation = None
@@ -291,8 +289,7 @@ class InferenceTileTest(ParametrizedTestCase):
 
     @staticmethod
     def get_modifier(
-            modifier_type: Optional[WeightModifierType],
-            coeffs: Optional[List] = None,
+        modifier_type: Optional[WeightModifierType], coeffs: Optional[List] = None
     ) -> Optional[WeightModifierParameter]:
         """Returns the modifier parameter."""
         if modifier_type is None:
@@ -307,7 +304,7 @@ class InferenceTileTest(ParametrizedTestCase):
             res=0.132,
             coeffs=coeffs,
             rel_to_actual_wmax=False,
-            assumed_wmax=1.0
+            assumed_wmax=1.0,
         )
 
         if modifier_type == WeightModifierType.COPY:

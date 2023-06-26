@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -40,10 +40,10 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
 
 # Check device
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Path where the datasets will be stored.
-PATH_DATASET = os.path.join('data', 'DATASET')
+PATH_DATASET = os.path.join("data", "DATASET")
 
 # Network definition.
 INPUT_SIZE = 784
@@ -55,17 +55,17 @@ EPOCHS = 30
 BATCH_SIZE = 64
 
 
-def init_process(rank, size, fn, backend='nccl'):
-    """ Initialize the distributed environment. """
+def init_process(rank, size, fn, backend="nccl"):
+    """Initialize the distributed environment."""
     print("init process: ", rank)
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '29411'
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "29411"
     dist.init_process_group(backend, rank=rank, world_size=size)
     fn()
 
 
 def cleanup():
-    """ Destroy distributed processes once they are complete. """
+    """Destroy distributed processes once they are complete."""
     dist.destroy_process_group()
 
 
@@ -76,27 +76,26 @@ def load_images():
     transform = transforms.Compose([transforms.ToTensor()])
 
     # Load the images.
-    train_set = datasets.MNIST(PATH_DATASET,
-                               download=True, train=True, transform=transform)
+    train_set = datasets.MNIST(PATH_DATASET, download=True, train=True, transform=transform)
 
-    val_set = datasets.MNIST(PATH_DATASET,
-                             download=True, train=False, transform=transform)
+    val_set = datasets.MNIST(PATH_DATASET, download=True, train=False, transform=transform)
 
-    train_sampler = torch.utils.data.DistributedSampler(train_set, num_replicas=size, rank=rank,
-                                                        shuffle=True, seed=42)
+    train_sampler = torch.utils.data.DistributedSampler(
+        train_set, num_replicas=size, rank=rank, shuffle=True, seed=42
+    )
 
-    train_data = torch.utils.data.DataLoader(train_set,
-                                             batch_size=BATCH_SIZE,
-                                             shuffle=False,
-                                             num_workers=size,
-                                             sampler=train_sampler,
-                                             pin_memory=True)
+    train_data = torch.utils.data.DataLoader(
+        train_set,
+        batch_size=BATCH_SIZE,
+        shuffle=False,
+        num_workers=size,
+        sampler=train_sampler,
+        pin_memory=True,
+    )
 
-    validation_data = torch.utils.data.DataLoader(val_set,
-                                                  batch_size=BATCH_SIZE,
-                                                  shuffle=True,
-                                                  num_workers=size,
-                                                  pin_memory=True)
+    validation_data = torch.utils.data.DataLoader(
+        val_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=size, pin_memory=True
+    )
 
     return train_data, validation_data
 
@@ -113,15 +112,12 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         nn.Module: created analog model
     """
     model = AnalogSequential(
-        AnalogLinear(input_size, hidden_sizes[0], True,
-                     rpu_config=InferenceRPUConfig()),
+        AnalogLinear(input_size, hidden_sizes[0], True, rpu_config=InferenceRPUConfig()),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[0], hidden_sizes[1], True,
-                     rpu_config=InferenceRPUConfig()),
+        AnalogLinear(hidden_sizes[0], hidden_sizes[1], True, rpu_config=InferenceRPUConfig()),
         nn.Sigmoid(),
-        AnalogLinearMapped(hidden_sizes[1], output_size, True,
-                           rpu_config=InferenceRPUConfig()),
-        nn.LogSoftmax(dim=1)
+        AnalogLinearMapped(hidden_sizes[1], output_size, True, rpu_config=InferenceRPUConfig()),
+        nn.LogSoftmax(dim=1),
     )
 
     return model
@@ -150,7 +146,7 @@ def train(model, train_set):
     """
     rank = dist.get_rank()
     size = dist.get_world_size()
-    device = torch.device('cuda', rank)
+    device = torch.device("cuda", rank)
 
     classifier = nn.NLLLoss()
     optimizer = create_sgd_optimizer(model)
@@ -186,7 +182,7 @@ def train(model, train_set):
 
         if rank == 0:
             train_loss = total_loss.item() / total_images.item()
-            print('Epoch {} - Training loss: {:.16f}'.format(epoch_number, train_loss))
+            print("Epoch {} - Training loss: {:.16f}".format(epoch_number, train_loss))
 
         # Decay learning rate if needed.
         scheduler.step()
@@ -195,7 +191,7 @@ def train(model, train_set):
 
     if rank == 0:
         avg_train_time = torch.mean(torch.cat(total_time, 0))
-        print('\nAverage Training Time (s) = {}'.format(avg_train_time))
+        print("\nAverage Training Time (s) = {}".format(avg_train_time))
 
 
 def test_evaluation(model, val_set):
@@ -207,7 +203,7 @@ def test_evaluation(model, val_set):
     """
     rank = dist.get_rank()
     size = dist.get_world_size()
-    device = torch.device('cuda', rank)
+    device = torch.device("cuda", rank)
 
     # Setup counter of images predicted to 0.
     predicted_ok = 0
@@ -234,14 +230,14 @@ def test_evaluation(model, val_set):
 
     if rank == 0:
         acc = torch.mean(torch.cat(acc_list, 0))
-        print('\nNumber Of Images Tested = {}'.format(total_images))
-        print('Model Accuracy = {}'.format(acc))
+        print("\nNumber Of Images Tested = {}".format(total_images))
+        print("Model Accuracy = {}".format(acc))
 
 
 def main():
     """Train a PyTorch analog model with the MNIST dataset."""
     rank = dist.get_rank()
-    device = torch.device('cuda', rank)
+    device = torch.device("cuda", rank)
 
     # Load datasets.
     train_dataset, validation_dataset = load_images()
@@ -267,7 +263,7 @@ def main():
     cleanup()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Execute only if run as the entry point into the program
     world_size = 2
     print("Device count: ", world_size)

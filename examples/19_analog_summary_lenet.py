@@ -21,19 +21,19 @@ rpu_config.mapping.max_output_size = 256
 
 channel = [16, 32, 512, 128]
 model = nn.Sequential(
-        nn.Conv2d(in_channels=1, out_channels=channel[0], kernel_size=5, stride=1),
-        nn.Tanh(),
-        nn.MaxPool2d(kernel_size=2),
-        nn.Conv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=5, stride=1),
-        nn.Tanh(),
-        nn.MaxPool2d(kernel_size=2),
-        nn.Tanh(),
-        nn.Flatten(),
-        nn.Linear(in_features=channel[2], out_features=channel[3]),
-        nn.Tanh(),
-        nn.Linear(in_features=channel[3], out_features=10),
-        nn.LogSoftmax(dim=1)
-    )
+    nn.Conv2d(in_channels=1, out_channels=channel[0], kernel_size=5, stride=1),
+    nn.Tanh(),
+    nn.MaxPool2d(kernel_size=2),
+    nn.Conv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=5, stride=1),
+    nn.Tanh(),
+    nn.MaxPool2d(kernel_size=2),
+    nn.Tanh(),
+    nn.Flatten(),
+    nn.Linear(in_features=channel[2], out_features=channel[3]),
+    nn.Tanh(),
+    nn.Linear(in_features=channel[3], out_features=10),
+    nn.LogSoftmax(dim=1),
+)
 
 analog_model = convert_to_analog_mapped(model, rpu_config=rpu_config)
 

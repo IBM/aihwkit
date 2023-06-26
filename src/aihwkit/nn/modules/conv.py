@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,11 +27,23 @@ from aihwkit.simulator.configs import SingleRPUConfig
 class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     """Base class for convolution layers."""
 
-    __constants__ = ['stride', 'padding', 'dilation', 'groups',
-                     'padding_mode', 'output_padding', 'in_channels',
-                     'out_channels', 'kernel_size', 'in_features', 'out_features',
-                     'realistic_read_write',
-                     'digital_bias', 'analog_bias', 'use_bias']
+    __constants__ = [
+        "stride",
+        "padding",
+        "dilation",
+        "groups",
+        "padding_mode",
+        "output_padding",
+        "in_channels",
+        "out_channels",
+        "kernel_size",
+        "in_features",
+        "out_features",
+        "realistic_read_write",
+        "digital_bias",
+        "analog_bias",
+        "use_bias",
+    ]
     in_channels: int
     out_channels: int
     kernel_size: Tuple[int, ...]
@@ -52,33 +64,44 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     use_bias: bool
 
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            kernel_size: Tuple[int, ...],
-            stride: Tuple[int, ...],
-            padding: Tuple[int, ...],
-            dilation: Tuple[int, ...],
-            transposed: bool,
-            output_padding: Tuple[int, ...],
-            groups: int,
-            bias: bool,
-            padding_mode: str,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[bool] = None,
-            use_indexed: Optional[bool] = None
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Tuple[int, ...],
+        stride: Tuple[int, ...],
+        padding: Tuple[int, ...],
+        dilation: Tuple[int, ...],
+        transposed: bool,
+        output_padding: Tuple[int, ...],
+        groups: int,
+        bias: bool,
+        padding_mode: str,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+        weight_scaling_omega: Optional[bool] = None,
+        use_indexed: Optional[bool] = None,
     ):
         # pylint: disable=too-many-arguments, too-many-locals
         if groups != 1:
-            raise ValueError('Only one group is supported')
-        if padding_mode != 'zeros':
+            raise ValueError("Only one group is supported")
+        if padding_mode != "zeros":
             raise ValueError('Only "zeros" padding mode is supported')
 
         # Call super() after tile creation, including ``reset_parameters``.
-        _ConvNd.__init__(self, in_channels, out_channels, kernel_size, stride,
-                         padding, dilation, transposed, output_padding, groups, bias,
-                         padding_mode)
+        _ConvNd.__init__(
+            self,
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            transposed,
+            output_padding,
+            groups,
+            bias,
+            padding_mode,
+        )
 
         # Create the tile and set the analog.
         if rpu_config is None:
@@ -92,7 +115,7 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             out_channels,
             bias,
             realistic_read_write,
-            rpu_config.mapping
+            rpu_config.mapping,
         )
         self.analog_tile = self._setup_tile(rpu_config)
 
@@ -106,28 +129,23 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
         self.use_indexed = use_indexed
 
         self.fold_indices = Tensor().detach()
-        self.register_helper('fold_indices')
+        self.register_helper("fold_indices")
         self.input_size = 0
-        self.register_helper('input_size')
+        self.register_helper("input_size")
         self.tensor_view = (-1,)  # type: Tuple[int, ...]
 
         # Unregister weight/bias as a parameter but keep it for syncs
-        self.unregister_parameter('weight')
+        self.unregister_parameter("weight")
         if self.analog_bias:
-            self.unregister_parameter('bias')
+            self.unregister_parameter("bias")
 
-    def get_tile_size(
-            self,
-            in_channels: int,
-            groups: int,
-            kernel_size: Tuple[int, ...]
-    ) -> int:
+    def get_tile_size(self, in_channels: int, groups: int, kernel_size: Tuple[int, ...]) -> int:
         """Calculate the tile size."""
         raise NotImplementedError
 
     def get_image_size(self, size: int, i: int) -> int:
         """Calculate the output image sizes."""
-        nom = (size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1)
+        nom = size + 2 * self.padding[i] - self.dilation[i] * (self.kernel_size[i] - 1) - 1
         return nom // self.stride[i] + 1
 
     def reset_parameters(self) -> None:
@@ -139,12 +157,14 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
     def _recalculate_indexes(self, x_input: Tensor) -> None:
         """Calculate and set the indexes of the analog tile."""
 
-        self.fold_indices, image_sizes, self.input_size = \
-            self._calculate_indexes(x_input, self.in_channels)
+        self.fold_indices, image_sizes, self.input_size = self._calculate_indexes(
+            x_input, self.in_channels
+        )
         self.analog_tile.set_indexed(self.fold_indices, image_sizes)
 
-    def _calculate_indexes(self, x_input: Tensor,
-                           in_channels: int) -> Tuple[Tensor, List[int], int]:
+    def _calculate_indexes(
+        self, x_input: Tensor, in_channels: int
+    ) -> Tuple[Tensor, List[int], int]:
         """Calculate and return the fold indexes and sizes.
 
         Args:
@@ -167,28 +187,40 @@ class _AnalogConvNd(AnalogModuleBase, _ConvNd):
             self._recalculate_indexes(x_input)
 
         return AnalogIndexedFunction.apply(
-            self.analog_tile.get_analog_ctx(), x_input,
-            self.analog_tile.shared_weights, not self.training)
+            self.analog_tile.get_analog_ctx(),
+            x_input,
+            self.analog_tile.shared_weights,
+            not self.training,
+        )
 
     def _forward_unfold(self, x_input: Tensor) -> Tensor:
-        """Forward using explicit unfolding (more suitable for CPUs) """
+        """Forward using explicit unfolding (more suitable for CPUs)"""
         im_shape = x_input.shape
-        x_input_ = unfold(x_input, kernel_size=self.kernel_size, dilation=self.dilation,
-                          padding=self.padding, stride=self.stride).transpose(1, 2)
+        x_input_ = unfold(
+            x_input,
+            kernel_size=self.kernel_size,
+            dilation=self.dilation,
+            padding=self.padding,
+            stride=self.stride,
+        ).transpose(1, 2)
 
         out = AnalogFunction.apply(
-            self.analog_tile.get_analog_ctx(), x_input_,
-            self.analog_tile.shared_weights, not self.training).transpose(1, 2)
+            self.analog_tile.get_analog_ctx(),
+            x_input_,
+            self.analog_tile.shared_weights,
+            not self.training,
+        ).transpose(1, 2)
 
-        out_size = (im_shape[2] + 2 * self.padding[0]
-                    - self.dilation[0] * (self.kernel_size[0] - 1) - 1) // self.stride[0] + 1
+        out_size = (
+            im_shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1
+        ) // self.stride[0] + 1
         return out.view(im_shape[0], self.out_channels, out_size, -1)
 
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
 
         if self.use_indexed is None:
-            use_indexed = self.analog_tile.device.type == 'cuda'
+            use_indexed = self.analog_tile.device.type == "cuda"
         else:
             use_indexed = self.use_indexed
 
@@ -236,22 +268,23 @@ class AnalogConv1d(_AnalogConvNd):
             :class:`aihwkit.simulator.configs.utils.MappingParameter`
             instead to specify weight scaling
     """
+
     # pylint: disable=abstract-method
 
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            kernel_size: Union[int, Tuple],
-            stride: Union[int, Tuple] = 1,
-            padding: Union[int, Tuple] = 0,
-            dilation: Union[int, Tuple] = 1,
-            groups: int = 1,
-            bias: bool = True,
-            padding_mode: str = 'zeros',
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[bool] = None
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Union[int, Tuple],
+        stride: Union[int, Tuple] = 1,
+        padding: Union[int, Tuple] = 0,
+        dilation: Union[int, Tuple] = 1,
+        groups: int = 1,
+        bias: bool = True,
+        padding_mode: str = "zeros",
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+        weight_scaling_omega: Optional[bool] = None,
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _single(kernel_size)
@@ -260,23 +293,35 @@ class AnalogConv1d(_AnalogConvNd):
         dilation = _single(dilation)
 
         if dilation != _single(1):
-            raise ValueError('Only dilation = 1 is supported')
+            raise ValueError("Only dilation = 1 is supported")
 
         super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
-            False, _single(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega, True
+            in_channels,
+            out_channels,
+            kernel_size,  # type: ignore
+            stride,  # type: ignore
+            padding,  # type: ignore
+            dilation,  # type: ignore
+            False,
+            _single(0),
+            groups,
+            bias,
+            padding_mode,
+            rpu_config,
+            realistic_read_write,
+            weight_scaling_omega,
+            True,
         )
 
         self.tensor_view = (-1, 1)
 
     @classmethod
     def from_digital(
-            cls,
-            module: Conv1d,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-    ) -> 'AnalogConv1d':
+        cls,
+        module: Conv1d,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+    ) -> "AnalogConv1d":
         """Return an AnalogConv1d layer from a torch Conv1d layer.
 
         Args:
@@ -294,33 +339,30 @@ class AnalogConv1d(_AnalogConvNd):
         Returns:
             an AnalogConv1d layer based on the digital Conv1d ``module``.
         """
-        analog_module = cls(module.in_channels,
-                            module.out_channels,
-                            module.kernel_size,
-                            module.stride,
-                            module.padding,
-                            module.dilation,
-                            module.groups,
-                            module.bias is not None,
-                            module.padding_mode,
-                            rpu_config,
-                            realistic_read_write,
-                            )
+        analog_module = cls(
+            module.in_channels,
+            module.out_channels,
+            module.kernel_size,
+            module.stride,
+            module.padding,
+            module.dilation,
+            module.groups,
+            module.bias is not None,
+            module.padding_mode,
+            rpu_config,
+            realistic_read_write,
+        )
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module
 
-    def get_tile_size(
-            self,
-            in_channels: int,
-            groups: int,
-            kernel_size: Tuple[int, ...]
-    ) -> int:
+    def get_tile_size(self, in_channels: int, groups: int, kernel_size: Tuple[int, ...]) -> int:
         """Calculate the tile size."""
         return (in_channels // groups) * kernel_size[0]
 
-    def _calculate_indexes(self, x_input: Tensor,
-                           in_channels: int) -> Tuple[Tensor, List[int], int]:
+    def _calculate_indexes(
+        self, x_input: Tensor, in_channels: int
+    ) -> Tuple[Tensor, List[int], int]:
         """Calculate and return the fold indexes and sizes.
 
         Args:
@@ -339,8 +381,9 @@ class AnalogConv1d(_AnalogConvNd):
         shape = [1] + [1] + list(x_input.shape[2:])
         fold_indices = fold_indices.reshape(*shape)
         if not all(item == 0 for item in self.padding):
-            fold_indices = pad(fold_indices, pad=[self.padding[0], self.padding[0]],
-                               mode='constant', value=0)
+            fold_indices = pad(
+                fold_indices, pad=[self.padding[0], self.padding[0]], mode="constant", value=0
+            )
         unfolded = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]).clone()
         fold_indices = unfolded.reshape(-1, self.kernel_size[0]).transpose(0, 1).flatten().round()
 
@@ -404,23 +447,24 @@ class AnalogConv2d(_AnalogConvNd):
             None (default), it will use implicit indexing for CUDA and
             explicit unfolding for CPU
     """
+
     # pylint: disable=abstract-method
 
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            kernel_size: Union[int, Tuple],
-            stride: Union[int, Tuple] = 1,
-            padding: Union[int, Tuple] = 0,
-            dilation: Union[int, Tuple] = 1,
-            groups: int = 1,
-            bias: bool = True,
-            padding_mode: str = 'zeros',
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[bool] = None,
-            use_indexed: Optional[bool] = None
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Union[int, Tuple],
+        stride: Union[int, Tuple] = 1,
+        padding: Union[int, Tuple] = 0,
+        dilation: Union[int, Tuple] = 1,
+        groups: int = 1,
+        bias: bool = True,
+        padding_mode: str = "zeros",
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+        weight_scaling_omega: Optional[bool] = None,
+        use_indexed: Optional[bool] = None,
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _pair(kernel_size)
@@ -429,20 +473,32 @@ class AnalogConv2d(_AnalogConvNd):
         dilation = _pair(dilation)
 
         super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
-            False, _pair(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega, use_indexed
+            in_channels,
+            out_channels,
+            kernel_size,  # type: ignore
+            stride,  # type: ignore
+            padding,  # type: ignore
+            dilation,  # type: ignore
+            False,
+            _pair(0),
+            groups,
+            bias,
+            padding_mode,
+            rpu_config,
+            realistic_read_write,
+            weight_scaling_omega,
+            use_indexed,
         )
 
         self.tensor_view = (-1, 1, 1)
 
     @classmethod
     def from_digital(
-            cls,
-            module: Conv2d,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-    ) -> 'AnalogConv2d':
+        cls,
+        module: Conv2d,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+    ) -> "AnalogConv2d":
         """Return an AnalogConv2d layer from a torch Conv2d layer.
 
         Args:
@@ -460,33 +516,30 @@ class AnalogConv2d(_AnalogConvNd):
         Returns:
             an AnalogConv2d layer based on the digital Conv2d ``module``.
         """
-        analog_module = cls(module.in_channels,
-                            module.out_channels,
-                            module.kernel_size,
-                            module.stride,
-                            module.padding,
-                            module.dilation,
-                            module.groups,
-                            module.bias is not None,
-                            module.padding_mode,
-                            rpu_config,
-                            realistic_read_write,
-                            )
+        analog_module = cls(
+            module.in_channels,
+            module.out_channels,
+            module.kernel_size,
+            module.stride,
+            module.padding,
+            module.dilation,
+            module.groups,
+            module.bias is not None,
+            module.padding_mode,
+            rpu_config,
+            realistic_read_write,
+        )
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module
 
-    def get_tile_size(
-            self,
-            in_channels: int,
-            groups: int,
-            kernel_size: Tuple[int, ...]
-    ) -> int:
+    def get_tile_size(self, in_channels: int, groups: int, kernel_size: Tuple[int, ...]) -> int:
         """Calculate the tile size."""
         return (in_channels // groups) * kernel_size[0] * kernel_size[1]
 
-    def _calculate_indexes(self, x_input: Tensor,
-                           in_channels: int) -> Tuple[Tensor, List[int], int]:
+    def _calculate_indexes(
+        self, x_input: Tensor, in_channels: int
+    ) -> Tuple[Tensor, List[int], int]:
         """Calculate and return the fold indexes and sizes.
 
         Args:
@@ -504,11 +557,18 @@ class AnalogConv2d(_AnalogConvNd):
         fold_indices = arange(2, input_size + 2, dtype=float64).detach()
         shape = [1] + list(x_input.shape[1:])
         fold_indices = fold_indices.reshape(*shape)
-        fold_indices = unfold(fold_indices,
-                              kernel_size=self.kernel_size,
-                              stride=self.stride,
-                              padding=self.padding,
-                              dilation=self.dilation).flatten().round().to(dtype=int32)
+        fold_indices = (
+            unfold(
+                fold_indices,
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+            )
+            .flatten()
+            .round()
+            .to(dtype=int32)
+        )
 
         if self.analog_bias:
             out_image_size = fold_indices.numel() // (self.kernel_size[0] * self.kernel_size[1])
@@ -558,22 +618,23 @@ class AnalogConv3d(_AnalogConvNd):
             :class:`aihwkit.simulator.configs.utils.MappingParameter`
             instead to specify weight scaling
     """
+
     # pylint: disable=abstract-method
 
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            kernel_size: Union[int, Tuple],
-            stride: Union[int, Tuple] = 1,
-            padding: Union[int, Tuple] = 0,
-            dilation: Union[int, Tuple] = 1,
-            groups: int = 1,
-            bias: bool = True,
-            padding_mode: str = 'zeros',
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[bool] = None
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Union[int, Tuple],
+        stride: Union[int, Tuple] = 1,
+        padding: Union[int, Tuple] = 0,
+        dilation: Union[int, Tuple] = 1,
+        groups: int = 1,
+        bias: bool = True,
+        padding_mode: str = "zeros",
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+        weight_scaling_omega: Optional[bool] = None,
     ):
         # pylint: disable=too-many-arguments
         kernel_size = _triple(kernel_size)
@@ -582,23 +643,35 @@ class AnalogConv3d(_AnalogConvNd):
         dilation = _triple(dilation)
 
         if dilation != _triple(1):
-            raise ValueError('Only dilation = 1 is supported')
+            raise ValueError("Only dilation = 1 is supported")
 
         super().__init__(
-            in_channels, out_channels, kernel_size, stride, padding, dilation,  # type: ignore
-            False, _triple(0), groups, bias, padding_mode,
-            rpu_config, realistic_read_write, weight_scaling_omega, True
+            in_channels,
+            out_channels,
+            kernel_size,  # type: ignore
+            stride,  # type: ignore
+            padding,  # type: ignore
+            dilation,  # type: ignore
+            False,
+            _triple(0),
+            groups,
+            bias,
+            padding_mode,
+            rpu_config,
+            realistic_read_write,
+            weight_scaling_omega,
+            True,
         )
 
         self.tensor_view = (-1, 1, 1, 1)
 
     @classmethod
     def from_digital(
-            cls,
-            module: Conv3d,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-    ) -> 'AnalogConv3d':
+        cls,
+        module: Conv3d,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+    ) -> "AnalogConv3d":
         """Return an AnalogConv3d layer from a torch Conv3d layer.
 
         Args:
@@ -616,34 +689,30 @@ class AnalogConv3d(_AnalogConvNd):
         Returns:
             an AnalogConv3d layer based on the digital Conv3d ``module``.
         """
-        analog_module = cls(module.in_channels,
-                            module.out_channels,
-                            module.kernel_size,
-                            module.stride,
-                            module.padding,
-                            module.dilation,
-                            module.groups,
-                            module.bias is not None,
-                            module.padding_mode,
-                            rpu_config,
-                            realistic_read_write,
-                            )
+        analog_module = cls(
+            module.in_channels,
+            module.out_channels,
+            module.kernel_size,
+            module.stride,
+            module.padding,
+            module.dilation,
+            module.groups,
+            module.bias is not None,
+            module.padding_mode,
+            rpu_config,
+            realistic_read_write,
+        )
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module
 
-    def get_tile_size(
-            self,
-            in_channels: int,
-            groups: int,
-            kernel_size: Tuple[int, ...]
-    ) -> int:
+    def get_tile_size(self, in_channels: int, groups: int, kernel_size: Tuple[int, ...]) -> int:
         """Calculate the tile size."""
-        return (in_channels // groups) * (
-                kernel_size[0] * kernel_size[1] * kernel_size[2])
+        return (in_channels // groups) * (kernel_size[0] * kernel_size[1] * kernel_size[2])
 
-    def _calculate_indexes(self, x_input: Tensor,
-                           in_channels: int) -> Tuple[Tensor, List[int], int]:
+    def _calculate_indexes(
+        self, x_input: Tensor, in_channels: int
+    ) -> Tuple[Tensor, List[int], int]:
         """Calculate and return the fold indexes and sizes.
 
         Args:
@@ -659,21 +728,38 @@ class AnalogConv3d(_AnalogConvNd):
         input_size = x_input.numel() / x_input.size(0)
 
         # pytorch just always uses NCDHW order
-        fold_indices = arange(2, x_input.size(2) * x_input.size(3) * x_input.size(4) + 2,
-                              dtype=float64).detach()
+        fold_indices = arange(
+            2, x_input.size(2) * x_input.size(3) * x_input.size(4) + 2, dtype=float64
+        ).detach()
         shape = [1] + [1] + list(x_input.shape[2:])
         fold_indices = fold_indices.reshape(*shape)
         if not all(item == 0 for item in self.padding):
-            fold_indices = pad(fold_indices, pad=[
-                self.padding[2], self.padding[2],
-                self.padding[1], self.padding[1],
-                self.padding[0], self.padding[0]], mode='constant', value=0)
-        unfolded = fold_indices.unfold(2, self.kernel_size[0], self.stride[0]). \
-            unfold(3, self.kernel_size[1], self.stride[1]). \
-            unfold(4, self.kernel_size[2], self.stride[2]).clone()
+            fold_indices = pad(
+                fold_indices,
+                pad=[
+                    self.padding[2],
+                    self.padding[2],
+                    self.padding[1],
+                    self.padding[1],
+                    self.padding[0],
+                    self.padding[0],
+                ],
+                mode="constant",
+                value=0,
+            )
+        unfolded = (
+            fold_indices.unfold(2, self.kernel_size[0], self.stride[0])
+            .unfold(3, self.kernel_size[1], self.stride[1])
+            .unfold(4, self.kernel_size[2], self.stride[2])
+            .clone()
+        )
 
-        fold_indices = unfolded.reshape(-1, self.kernel_size[0] * self.kernel_size[1] *
-                                        self.kernel_size[2]).transpose(0, 1).flatten().round()
+        fold_indices = (
+            unfolded.reshape(-1, self.kernel_size[0] * self.kernel_size[1] * self.kernel_size[2])
+            .transpose(0, 1)
+            .flatten()
+            .round()
+        )
 
         # concatenate the matrix index for different channels
         fold_indices_orig = fold_indices.clone()
@@ -688,9 +774,9 @@ class AnalogConv3d(_AnalogConvNd):
         fold_indices = fold_indices.to(dtype=int32)
 
         if self.analog_bias:
-            out_image_size = fold_indices.numel() // (self.kernel_size[0] *
-                                                      self.kernel_size[1] *
-                                                      self.kernel_size[2])
+            out_image_size = fold_indices.numel() // (
+                self.kernel_size[0] * self.kernel_size[1] * self.kernel_size[2]
+            )
             fold_indices = cat((fold_indices, ones(out_image_size, dtype=int32)), 0)
 
         fold_indices = fold_indices.to(x_input.device)

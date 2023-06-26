@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -12,9 +12,7 @@
 
 """Analog Modules that contain children Modules."""
 
-from typing import (
-    Callable, Optional, Union, Any, NamedTuple, Tuple, TYPE_CHECKING, Generator
-)
+from typing import Callable, Optional, Union, Any, NamedTuple, Tuple, TYPE_CHECKING, Generator
 from collections import OrderedDict
 
 from torch import device as torch_device
@@ -43,9 +41,10 @@ class AnalogSequential(Sequential):
         layers. If using regular containers, please be aware that operations
         need to be applied manually to the children analog layers when needed.
     """
+
     # pylint: disable=abstract-method
 
-    def _apply_to_analog(self, fn: Callable) -> 'AnalogSequential':
+    def _apply_to_analog(self, fn: Callable) -> "AnalogSequential":
         """Apply a function to all the analog layers in this module.
 
         Args:
@@ -59,7 +58,7 @@ class AnalogSequential(Sequential):
 
         return self
 
-    def apply_to_analog_modules(self, fn: Callable) -> 'AnalogSequential':
+    def apply_to_analog_modules(self, fn: Callable) -> "AnalogSequential":
         """Apply a function to all the analog modules.
 
         Args:
@@ -73,7 +72,7 @@ class AnalogSequential(Sequential):
 
         return self
 
-    def apply_to_analog_tiles(self, fn: Callable) -> 'AnalogSequential':
+    def apply_to_analog_tiles(self, fn: Callable) -> "AnalogSequential":
         """Apply a function to all the analog tiles of all layers in this module.
 
         Example::
@@ -108,29 +107,21 @@ class AnalogSequential(Sequential):
             if isinstance(module, AnalogModuleBase):
                 yield name, module
 
-    def cpu(
-            self
-    ) -> 'AnalogSequential':
+    def cpu(self) -> "AnalogSequential":
         super().cpu()
 
         self._apply_to_analog(lambda m: m.cpu())
 
         return self
 
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'AnalogSequential':
+    def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "AnalogSequential":
         super().cuda(device)
 
         self._apply_to_analog(lambda m: m.cuda(device))
 
         return self
 
-    def to(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'AnalogSequential':
+    def to(self, device: Optional[Union[torch_device, str, int]] = None) -> "AnalogSequential":
         """Move and/or cast the parameters, buffers and analog tiles.
 
         Note:
@@ -149,15 +140,15 @@ class AnalogSequential(Sequential):
 
         super().to(device)
 
-        if device.type == 'cuda':
+        if device.type == "cuda":
             self._apply_to_analog(lambda m: m.cuda(device))
-        elif device.type == 'cpu':
+        elif device.type == "cpu":
             self._apply_to_analog(lambda m: m.cpu())
 
         return self
 
     def get_analog_tile_device(self) -> Union[torch_device, str, int]:
-        """ Return the devices used by the analog tiles.
+        """Return the devices used by the analog tiles.
 
         Returns:
             device: torch device
@@ -169,8 +160,7 @@ class AnalogSequential(Sequential):
         devices = []
         dev_name = []
 
-        self._apply_to_analog(
-            lambda mod: devices.extend(mod.get_analog_tile_devices()))
+        self._apply_to_analog(lambda mod: devices.extend(mod.get_analog_tile_devices()))
 
         for name in devices:
             dev_name.append(str(name))
@@ -182,10 +172,12 @@ class AnalogSequential(Sequential):
 
         return device
 
-    def load_state_dict(self,  # pylint: disable=arguments-differ
-                        state_dict: 'OrderedDict[str, Tensor]',
-                        strict: bool = True,
-                        load_rpu_config: bool = True) -> NamedTuple:
+    def load_state_dict(
+        self,  # pylint: disable=arguments-differ
+        state_dict: "OrderedDict[str, Tensor]",
+        strict: bool = True,
+        load_rpu_config: bool = True,
+    ) -> NamedTuple:
         """Specializes torch's ``load_state_dict`` to add a flag whether to
         load the RPU config from the saved state.
 
@@ -236,8 +228,9 @@ class AnalogSequential(Sequential):
             if isinstance(module, AnalogModuleBase):
                 for analog_tile in module.analog_tiles():
                     if analog_tile.shared_weights is None:
-                        raise ModuleError("DDP is only supported with shared weights"
-                                          "(e.g. InferenceTile)")
+                        raise ModuleError(
+                            "DDP is only supported with shared weights (e.g. InferenceTile)"
+                        )
                 exclude_list += [module.ANALOG_CTX_PREFIX, module.ANALOG_STATE_PREFIX]
         exclude_list = list(set(exclude_list))
         params = self.state_dict().keys()
@@ -269,8 +262,7 @@ class AnalogSequential(Sequential):
 
         """
 
-        self._apply_to_analog(lambda m: m.remap_weights(
-            weight_scaling_omega=weight_scaling_omega))
+        self._apply_to_analog(lambda m: m.remap_weights(weight_scaling_omega=weight_scaling_omega))
 
     def drift_analog_weights(self, t_inference: float = 0.0) -> None:
         """(Program) and drift all analog inference layers of a given model.
@@ -282,8 +274,7 @@ class AnalogSequential(Sequential):
             ModuleError: if the layer is not in evaluation mode.
         """
         if self.training:
-            raise ModuleError('drift_analog_weights can only be applied in '
-                              'evaluation mode')
+            raise ModuleError("drift_analog_weights can only be applied in evaluation mode")
 
         self._apply_to_analog(lambda m: m.drift_analog_weights(t_inference))
 
@@ -294,14 +285,13 @@ class AnalogSequential(Sequential):
             ModuleError: if the layer is not in evaluation mode.
         """
         if self.training:
-            raise ModuleError('program_analog_weights can only be applied in '
-                              'evaluation mode')
+            raise ModuleError("program_analog_weights can only be applied in evaluation mode")
 
         self._apply_to_analog(lambda m: m.program_analog_weights())
 
     @classmethod
-    def from_digital(cls, module: Sequential,  # pylint: disable=unused-argument
-                     *args: Any,
-                     **kwargs: Any) -> 'AnalogSequential':
+    def from_digital(
+        cls, module: Sequential, *args: Any, **kwargs: Any  # pylint: disable=unused-argument
+    ) -> "AnalogSequential":
         """Construct AnalogSequential in-place from Sequential."""
         return cls(OrderedDict(mod for mod in module.named_children()))

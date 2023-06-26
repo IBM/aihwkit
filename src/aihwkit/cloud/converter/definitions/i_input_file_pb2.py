@@ -6,6 +6,7 @@ from google.protobuf.internal import builder as _builder
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import symbol_database as _symbol_database
+
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -14,25 +15,26 @@ _sym_db = _symbol_database.Default()
 from . import i_common_pb2 as i__common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12i_input_file.proto\x12\x11\x61ihwx.inferencing\x1a\x0ei_common.proto\"1\n\x07\x44\x61taset\x12\x12\n\ndataset_id\x18\x01 \x02(\t\x12\x12\n\nbatch_size\x18\x02 \x01(\x03\"F\n\x0b\x41nalogProto\x12\x1d\n\x15output_noise_strength\x18\x01 \x02(\x02\x12\x0b\n\x03\x61\x64\x63\x18\x02 \x01(\x03\x12\x0b\n\x03\x64\x61\x63\x18\x03 \x01(\x03\"\xe9\x01\n\x08PCMProto\x12\x16\n\tdevice_id\x18\x01 \x02(\t:\x03pcm\x12\x1f\n\x17programming_noise_scale\x18\x02 \x02(\x02\x12\x18\n\x10read_noise_scale\x18\x03 \x02(\x02\x12\x13\n\x0b\x64rift_scale\x18\x04 \x02(\x02\x12\x1a\n\x12\x64rift_compensation\x18\x05 \x02(\x08\x12\x1d\n\x15poly_first_order_coef\x18\x06 \x02(\x02\x12\x1e\n\x16poly_second_order_coef\x18\x07 \x02(\x02\x12\x1a\n\x12poly_constant_coef\x18\x08 \x02(\x02\"\x98\x02\n\x0cGenericProto\x12\x1a\n\tdevice_id\x18\x01 \x02(\t:\x07generic\x12\x1f\n\x17programming_noise_scale\x18\x02 \x02(\x02\x12\x18\n\x10read_noise_scale\x18\x03 \x02(\x02\x12\x13\n\x0b\x64rift_scale\x18\x04 \x02(\x02\x12\x1a\n\x12\x64rift_compensation\x18\x05 \x02(\x08\x12\x1d\n\x15poly_first_order_coef\x18\x06 \x02(\x02\x12\x1e\n\x16poly_second_order_coef\x18\x07 \x02(\x02\x12\x1a\n\x12poly_constant_coef\x18\x08 \x02(\x02\x12\x12\n\ndrift_mean\x18\t \x02(\x02\x12\x11\n\tdrift_std\x18\n \x02(\x02\"y\n\x0fNoiseModelProto\x12*\n\x03pcm\x18\x01 \x01(\x0b\x32\x1b.aihwx.inferencing.PCMProtoH\x00\x12\x32\n\x07generic\x18\x02 \x01(\x0b\x32\x1f.aihwx.inferencing.GenericProtoH\x00\x42\x06\n\x04item\"\xb3\x01\n\x0bInferencing\x12\x19\n\x11inference_repeats\x18\x01 \x02(\x03\x12\x16\n\x0einference_time\x18\x02 \x02(\x03\x12\x33\n\x0b\x61nalog_info\x18\x03 \x02(\x0b\x32\x1e.aihwx.inferencing.AnalogProto\x12<\n\x10noise_model_info\x18\x04 \x02(\x0b\x32\".aihwx.inferencing.NoiseModelProto\"\xcc\x01\n\x0eInferenceInput\x12+\n\x07version\x18\x01 \x02(\x0b\x32\x1a.aihwx.inferencing.Version\x12+\n\x07\x64\x61taset\x18\x02 \x02(\x0b\x32\x1a.aihwx.inferencing.Dataset\x12+\n\x07network\x18\x03 \x02(\x0b\x32\x1a.aihwx.inferencing.Network\x12\x33\n\x0binferencing\x18\x04 \x02(\x0b\x32\x1e.aihwx.inferencing.Inferencing')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n\x12i_input_file.proto\x12\x11\x61ihwx.inferencing\x1a\x0ei_common.proto"1\n\x07\x44\x61taset\x12\x12\n\ndataset_id\x18\x01 \x02(\t\x12\x12\n\nbatch_size\x18\x02 \x01(\x03"F\n\x0b\x41nalogProto\x12\x1d\n\x15output_noise_strength\x18\x01 \x02(\x02\x12\x0b\n\x03\x61\x64\x63\x18\x02 \x01(\x03\x12\x0b\n\x03\x64\x61\x63\x18\x03 \x01(\x03"\xe9\x01\n\x08PCMProto\x12\x16\n\tdevice_id\x18\x01 \x02(\t:\x03pcm\x12\x1f\n\x17programming_noise_scale\x18\x02 \x02(\x02\x12\x18\n\x10read_noise_scale\x18\x03 \x02(\x02\x12\x13\n\x0b\x64rift_scale\x18\x04 \x02(\x02\x12\x1a\n\x12\x64rift_compensation\x18\x05 \x02(\x08\x12\x1d\n\x15poly_first_order_coef\x18\x06 \x02(\x02\x12\x1e\n\x16poly_second_order_coef\x18\x07 \x02(\x02\x12\x1a\n\x12poly_constant_coef\x18\x08 \x02(\x02"\x98\x02\n\x0cGenericProto\x12\x1a\n\tdevice_id\x18\x01 \x02(\t:\x07generic\x12\x1f\n\x17programming_noise_scale\x18\x02 \x02(\x02\x12\x18\n\x10read_noise_scale\x18\x03 \x02(\x02\x12\x13\n\x0b\x64rift_scale\x18\x04 \x02(\x02\x12\x1a\n\x12\x64rift_compensation\x18\x05 \x02(\x08\x12\x1d\n\x15poly_first_order_coef\x18\x06 \x02(\x02\x12\x1e\n\x16poly_second_order_coef\x18\x07 \x02(\x02\x12\x1a\n\x12poly_constant_coef\x18\x08 \x02(\x02\x12\x12\n\ndrift_mean\x18\t \x02(\x02\x12\x11\n\tdrift_std\x18\n \x02(\x02"y\n\x0fNoiseModelProto\x12*\n\x03pcm\x18\x01 \x01(\x0b\x32\x1b.aihwx.inferencing.PCMProtoH\x00\x12\x32\n\x07generic\x18\x02 \x01(\x0b\x32\x1f.aihwx.inferencing.GenericProtoH\x00\x42\x06\n\x04item"\xb3\x01\n\x0bInferencing\x12\x19\n\x11inference_repeats\x18\x01 \x02(\x03\x12\x16\n\x0einference_time\x18\x02 \x02(\x03\x12\x33\n\x0b\x61nalog_info\x18\x03 \x02(\x0b\x32\x1e.aihwx.inferencing.AnalogProto\x12<\n\x10noise_model_info\x18\x04 \x02(\x0b\x32".aihwx.inferencing.NoiseModelProto"\xcc\x01\n\x0eInferenceInput\x12+\n\x07version\x18\x01 \x02(\x0b\x32\x1a.aihwx.inferencing.Version\x12+\n\x07\x64\x61taset\x18\x02 \x02(\x0b\x32\x1a.aihwx.inferencing.Dataset\x12+\n\x07network\x18\x03 \x02(\x0b\x32\x1a.aihwx.inferencing.Network\x12\x33\n\x0binferencing\x18\x04 \x02(\x0b\x32\x1e.aihwx.inferencing.Inferencing'
+)
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'i_input_file_pb2', globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "i_input_file_pb2", globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
-
-  DESCRIPTOR._options = None
-  _DATASET._serialized_start=57
-  _DATASET._serialized_end=106
-  _ANALOGPROTO._serialized_start=108
-  _ANALOGPROTO._serialized_end=178
-  _PCMPROTO._serialized_start=181
-  _PCMPROTO._serialized_end=414
-  _GENERICPROTO._serialized_start=417
-  _GENERICPROTO._serialized_end=697
-  _NOISEMODELPROTO._serialized_start=699
-  _NOISEMODELPROTO._serialized_end=820
-  _INFERENCING._serialized_start=823
-  _INFERENCING._serialized_end=1002
-  _INFERENCEINPUT._serialized_start=1005
-  _INFERENCEINPUT._serialized_end=1209
+    DESCRIPTOR._options = None
+    _DATASET._serialized_start = 57
+    _DATASET._serialized_end = 106
+    _ANALOGPROTO._serialized_start = 108
+    _ANALOGPROTO._serialized_end = 178
+    _PCMPROTO._serialized_start = 181
+    _PCMPROTO._serialized_end = 414
+    _GENERICPROTO._serialized_start = 417
+    _GENERICPROTO._serialized_end = 697
+    _NOISEMODELPROTO._serialized_start = 699
+    _NOISEMODELPROTO._serialized_end = 820
+    _INFERENCING._serialized_start = 823
+    _INFERENCING._serialized_end = 1002
+    _INFERENCEINPUT._serialized_start = 1005
+    _INFERENCEINPUT._serialized_end = 1209
 # @@protoc_insertion_point(module_scope)

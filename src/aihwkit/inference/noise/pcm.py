@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -57,23 +57,23 @@ class PCMLikeNoiseModel(BaseNoiseModel):
     """
 
     def __init__(
-            self,
-            prog_coeff: Optional[List[float]] = None,
-            g_converter: Optional[BaseConductanceConverter] = None,
-            g_max: Optional[float] = None,
-            t_read: float = 250.0e-9,
-            t_0: float = 20.0,
-            prog_noise_scale: float = 1.0,
-            read_noise_scale: float = 1.0,
-            drift_scale: float = 1.0,
+        self,
+        prog_coeff: Optional[List[float]] = None,
+        g_converter: Optional[BaseConductanceConverter] = None,
+        g_max: Optional[float] = None,
+        t_read: float = 250.0e-9,
+        t_0: float = 20.0,
+        prog_noise_scale: float = 1.0,
+        read_noise_scale: float = 1.0,
+        drift_scale: float = 1.0,
     ):
         g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
 
-        self.g_max = getattr(self.g_converter, 'g_max', g_max)
+        self.g_max = getattr(self.g_converter, "g_max", g_max)
 
         if self.g_max is None:
-            raise ValueError('g_max cannot be established from g_converter')
+            raise ValueError("g_max cannot be established from g_converter")
 
         self.prog_coeff = [0.26348, 1.9650, -1.1731] if prog_coeff is None else prog_coeff
         self.t_0 = t_0
@@ -83,13 +83,21 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         self.drift_scale = drift_scale
 
     def __str__(self) -> str:
-        return ('{}(prog_coeff={}, g_converter={}, g_max={:1.2f}, t_read={}, '
-                't_0={:1.2f}, prog_noise_scale={}, '
-                'read_noise_scale={}, drift_scale={})').format(  # type: ignore
-                    self.__class__.__name__, self.prog_coeff, self.g_converter,
-                    self.g_max,
-                    self.t_read, self.t_0, self.prog_noise_scale,
-                    self.read_noise_scale, self.drift_scale)
+        return (
+            "{}(prog_coeff={}, g_converter={}, g_max={:1.2f}, t_read={}, "
+            "t_0={:1.2f}, prog_noise_scale={}, "
+            "read_noise_scale={}, drift_scale={})"
+        ).format(  # type: ignore
+            self.__class__.__name__,
+            self.prog_coeff,
+            self.g_converter,
+            self.g_max,
+            self.t_read,
+            self.t_0,
+            self.prog_noise_scale,
+            self.read_noise_scale,
+            self.drift_scale,
+        )
 
     @no_grad()
     def apply_programming_noise_to_conductance(self, g_target: Tensor) -> Tensor:
@@ -124,10 +132,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-            self,
-            g_prog: Tensor,
-            nu_drift: Tensor,
-            t_inference: float
+        self, g_prog: Tensor, nu_drift: Tensor, t_inference: float
     ) -> Tensor:
         """Apply the noise and drift up to the assumed inference time
         point based on PCM measurements."""
@@ -135,17 +140,19 @@ class PCMLikeNoiseModel(BaseNoiseModel):
 
         # drift
         if t > self.t_0:
-            g_drift = g_prog * ((t / self.t_0) ** (- nu_drift))
+            g_drift = g_prog * ((t / self.t_0) ** (-nu_drift))
         else:
             g_drift = g_prog
 
         # expected accumulated 1/f noise since start of programming at t=0
         if t > 0:
-            q_s = (0.0088 / ((torch_abs(g_prog) /
-                              self.g_max) ** 0.65).clamp(min=1e-3)).clamp(max=0.2)
+            q_s = (0.0088 / ((torch_abs(g_prog) / self.g_max) ** 0.65).clamp(min=1e-3)).clamp(
+                max=0.2
+            )
             sig_noise = q_s * sqrt(numpy_log((t + self.t_read) / (2 * self.t_read)))
-            g_final = g_drift + torch_abs(g_drift) * self.read_noise_scale \
-                * sig_noise * randn_like(g_prog)
+            g_final = g_drift + torch_abs(g_drift) * self.read_noise_scale * sig_noise * randn_like(
+                g_prog
+            )
         else:
             g_final = g_prog
 

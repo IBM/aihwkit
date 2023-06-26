@@ -6,6 +6,7 @@ from google.protobuf.internal import builder as _builder
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import symbol_database as _symbol_database
+
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -14,17 +15,18 @@ _sym_db = _symbol_database.Default()
 from . import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10input_file.proto\x12\x05\x61ihwx\x1a\x0c\x63ommon.proto\"\\\n\x07\x44\x61taset\x12\x12\n\ndataset_id\x18\x01 \x02(\t\x12)\n\ntransforms\x18\x02 \x03(\x0b\x32\x15.aihwx.TransformProto\x12\x12\n\nbatch_size\x18\x03 \x01(\x05\"\x9f\x01\n\x08Training\x12(\n\toptimizer\x18\x01 \x02(\x0b\x32\x15.aihwx.OptimizerProto\x12(\n\tscheduler\x18\x02 \x01(\x0b\x32\x15.aihwx.SchedulerProto\x12/\n\rloss_function\x18\x03 \x01(\x0b\x32\x18.aihwx.LossFunctionProto\x12\x0e\n\x06\x65pochs\x18\x04 \x01(\x05\"\x95\x01\n\rTrainingInput\x12\x1f\n\x07version\x18\x01 \x02(\x0b\x32\x0e.aihwx.Version\x12\x1f\n\x07\x64\x61taset\x18\x02 \x02(\x0b\x32\x0e.aihwx.Dataset\x12\x1f\n\x07network\x18\x03 \x02(\x0b\x32\x0e.aihwx.Network\x12!\n\x08training\x18\x04 \x02(\x0b\x32\x0f.aihwx.Training')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n\x10input_file.proto\x12\x05\x61ihwx\x1a\x0c\x63ommon.proto"\\\n\x07\x44\x61taset\x12\x12\n\ndataset_id\x18\x01 \x02(\t\x12)\n\ntransforms\x18\x02 \x03(\x0b\x32\x15.aihwx.TransformProto\x12\x12\n\nbatch_size\x18\x03 \x01(\x05"\x9f\x01\n\x08Training\x12(\n\toptimizer\x18\x01 \x02(\x0b\x32\x15.aihwx.OptimizerProto\x12(\n\tscheduler\x18\x02 \x01(\x0b\x32\x15.aihwx.SchedulerProto\x12/\n\rloss_function\x18\x03 \x01(\x0b\x32\x18.aihwx.LossFunctionProto\x12\x0e\n\x06\x65pochs\x18\x04 \x01(\x05"\x95\x01\n\rTrainingInput\x12\x1f\n\x07version\x18\x01 \x02(\x0b\x32\x0e.aihwx.Version\x12\x1f\n\x07\x64\x61taset\x18\x02 \x02(\x0b\x32\x0e.aihwx.Dataset\x12\x1f\n\x07network\x18\x03 \x02(\x0b\x32\x0e.aihwx.Network\x12!\n\x08training\x18\x04 \x02(\x0b\x32\x0f.aihwx.Training'
+)
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'input_file_pb2', globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "input_file_pb2", globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
-
-  DESCRIPTOR._options = None
-  _DATASET._serialized_start=41
-  _DATASET._serialized_end=133
-  _TRAINING._serialized_start=136
-  _TRAINING._serialized_end=295
-  _TRAININGINPUT._serialized_start=298
-  _TRAININGINPUT._serialized_end=447
+    DESCRIPTOR._options = None
+    _DATASET._serialized_start = 41
+    _DATASET._serialized_end = 133
+    _TRAINING._serialized_start = 136
+    _TRAINING._serialized_end = 295
+    _TRAININGINPUT._serialized_start = 298
+    _TRAININGINPUT._serialized_end = 447
 # @@protoc_insertion_point(module_scope)

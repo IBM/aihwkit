@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,13 +41,13 @@ from aihwkit.simulator.rpu_base import cuda
 USE_CUDA = 0
 if cuda.is_compiled():
     USE_CUDA = 1
-DEVICE = device('cuda' if USE_CUDA else 'cpu')
+DEVICE = device("cuda" if USE_CUDA else "cpu")
 
 # Path to store datasets
-PATH_DATASET = os.path.join('data', 'DATASET')
+PATH_DATASET = os.path.join("data", "DATASET")
 
 # Path to store results
-RESULTS = os.path.join(os.getcwd(), 'results', 'VGG8')
+RESULTS = os.path.join(os.getcwd(), "results", "VGG8")
 
 
 # Training parameters
@@ -69,12 +69,11 @@ def load_images():
     mean = Tensor([0.4377, 0.4438, 0.4728])
     std = Tensor([0.1980, 0.2010, 0.1970])
 
-    print(f'Normalization data: ({mean},{std})')
+    print(f"Normalization data: ({mean},{std})")
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize(mean, std)])
-    train_set = datasets.SVHN(PATH_DATASET, download=True, split='train', transform=transform)
-    val_set = datasets.SVHN(PATH_DATASET, download=True, split='test', transform=transform)
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
+    train_set = datasets.SVHN(PATH_DATASET, download=True, split="train", transform=transform)
+    val_set = datasets.SVHN(PATH_DATASET, download=True, split="test", transform=transform)
     train_data = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
     validation_data = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
 
@@ -93,38 +92,62 @@ def create_analog_network():
     model = AnalogSequential(
         nn.Conv2d(in_channels=3, out_channels=channel[0], kernel_size=3, stride=1, padding=1),
         nn.ReLU(),
-        AnalogConv2d(in_channels=channel[0], out_channels=channel[0], kernel_size=3, stride=1,
-                     padding=1,
-                     rpu_config=RPU_CONFIG),
+        AnalogConv2d(
+            in_channels=channel[0],
+            out_channels=channel[0],
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            rpu_config=RPU_CONFIG,
+        ),
         nn.BatchNorm2d(channel[0]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
-        AnalogConv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=3, stride=1,
-                     padding=1,
-                     rpu_config=RPU_CONFIG),
+        AnalogConv2d(
+            in_channels=channel[0],
+            out_channels=channel[1],
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            rpu_config=RPU_CONFIG,
+        ),
         nn.ReLU(),
-        AnalogConv2d(in_channels=channel[1], out_channels=channel[1], kernel_size=3, stride=1,
-                     padding=1,
-                     rpu_config=RPU_CONFIG),
+        AnalogConv2d(
+            in_channels=channel[1],
+            out_channels=channel[1],
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            rpu_config=RPU_CONFIG,
+        ),
         nn.BatchNorm2d(channel[1]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
-        AnalogConv2d(in_channels=channel[1], out_channels=channel[2], kernel_size=3, stride=1,
-                     padding=1,
-                     rpu_config=RPU_CONFIG),
+        AnalogConv2d(
+            in_channels=channel[1],
+            out_channels=channel[2],
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            rpu_config=RPU_CONFIG,
+        ),
         nn.ReLU(),
-        AnalogConv2d(in_channels=channel[2], out_channels=channel[2], kernel_size=3, stride=1,
-                     padding=1,
-                     rpu_config=RPU_CONFIG),
+        AnalogConv2d(
+            in_channels=channel[2],
+            out_channels=channel[2],
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            rpu_config=RPU_CONFIG,
+        ),
         nn.BatchNorm2d(channel[2]),
         nn.ReLU(),
         nn.MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1),
         nn.Flatten(),
-        AnalogLinear(in_features=16 * channel[2], out_features=fc_size,
-                     rpu_config=RPU_CONFIG),
+        AnalogLinear(in_features=16 * channel[2], out_features=fc_size, rpu_config=RPU_CONFIG),
         nn.ReLU(),
         nn.Linear(in_features=fc_size, out_features=N_CLASSES),
-        nn.LogSoftmax(dim=1)
+        nn.LogSoftmax(dim=1),
     )
     return model
 
@@ -208,8 +231,8 @@ def test_evaluation(validation_data, model, criterion):
         _, predicted = torch_max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
-        accuracy = predicted_ok/total_images*100
-        error = (1-predicted_ok/total_images)*100
+        accuracy = predicted_ok / total_images * 100
+        error = (1 - predicted_ok / total_images) * 100
 
     epoch_loss = total_loss / len(validation_data.dataset)
 
@@ -247,16 +270,19 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
             # Validate_step
             with no_grad():
                 model, valid_loss, error, accuracy = test_evaluation(
-                    validation_data, model, criterion)
+                    validation_data, model, criterion
+                )
                 valid_losses.append(valid_loss)
                 test_error.append(error)
 
-            print(f'{datetime.now().time().replace(microsecond=0)} --- '
-                  f'Epoch: {epoch}\t'
-                  f'Train loss: {train_loss:.4f}\t'
-                  f'Valid loss: {valid_loss:.4f}\t'
-                  f'Test error: {error:.2f}%\t'
-                  f'Test accuracy: {accuracy:.2f}%\t')
+            print(
+                f"{datetime.now().time().replace(microsecond=0)} --- "
+                f"Epoch: {epoch}\t"
+                f"Train loss: {train_loss:.4f}\t"
+                f"Valid loss: {valid_loss:.4f}\t"
+                f"Test error: {error:.2f}%\t"
+                f"Test accuracy: {accuracy:.2f}%\t"
+            )
 
     # Save results and plot figures
     np.savetxt(os.path.join(RESULTS, "Test_error.csv"), test_error, delimiter=",")
@@ -275,24 +301,24 @@ def plot_results(train_losses, valid_losses, test_error):
         valid_losses (List): validation losses as calculated in the training_loop
         test_error (List): test error as calculated in the training_loop
     """
-    fig = plt.plot(train_losses, 'r-s', valid_losses, 'b-o')
-    plt.title('aihwkit VGG8')
-    plt.legend(fig[:2], ['Training Losses', 'Validation Losses'])
-    plt.xlabel('Epoch number')
-    plt.ylabel('Loss [A.U.]')
-    plt.grid(which='both', linestyle='--')
-    plt.savefig(os.path.join(RESULTS, 'test_losses.png'))
+    fig = plt.plot(train_losses, "r-s", valid_losses, "b-o")
+    plt.title("aihwkit VGG8")
+    plt.legend(fig[:2], ["Training Losses", "Validation Losses"])
+    plt.xlabel("Epoch number")
+    plt.ylabel("Loss [A.U.]")
+    plt.grid(which="both", linestyle="--")
+    plt.savefig(os.path.join(RESULTS, "test_losses.png"))
     plt.close()
 
-    fig = plt.plot(test_error, 'r-s')
-    plt.title('aihwkit VGG8')
-    plt.legend(fig[:1], ['Test Error'])
-    plt.xlabel('Epoch number')
-    plt.ylabel('Test Error [%]')
-    plt.yscale('log')
+    fig = plt.plot(test_error, "r-s")
+    plt.title("aihwkit VGG8")
+    plt.legend(fig[:1], ["Test Error"])
+    plt.xlabel("Epoch number")
+    plt.ylabel("Test Error [%]")
+    plt.yscale("log")
     plt.ylim((5e-1, 1e2))
-    plt.grid(which='both', linestyle='--')
-    plt.savefig(os.path.join(RESULTS, 'test_error.png'))
+    plt.grid(which="both", linestyle="--")
+    plt.savefig(os.path.join(RESULTS, "test_error.png"))
     plt.close()
 
 
@@ -312,20 +338,19 @@ def main():
         model.cuda()
     print(model)
 
-    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
-          f'Started Vgg8 Example')
+    print(f"\n{datetime.now().time().replace(microsecond=0)} --- " f"Started Vgg8 Example")
 
     optimizer = create_sgd_optimizer(model, LEARNING_RATE)
 
     criterion = nn.CrossEntropyLoss()
 
-    model, optimizer, _ = training_loop(model, criterion, optimizer, train_data, validation_data,
-                                        N_EPOCHS)
+    model, optimizer, _ = training_loop(
+        model, criterion, optimizer, train_data, validation_data, N_EPOCHS
+    )
 
-    print(f'{datetime.now().time().replace(microsecond=0)} --- '
-          f'Completed Vgg8 Example')
+    print(f"{datetime.now().time().replace(microsecond=0)} --- " f"Completed Vgg8 Example")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Execute only if run as the entry point into the program
     main()

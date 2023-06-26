@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,10 +28,10 @@ class LocalRunner(Runner):
 
     Class that allows executing Experiments locally.
     """
+
     # pylint: disable=too-few-public-methods
 
-    def __init__(self,
-                 device: Optional[torch_device] = None):
+    def __init__(self, device: Optional[torch_device] = None):
         """Create a new ``LocalRunner``.
 
         Args:
@@ -40,11 +40,11 @@ class LocalRunner(Runner):
         self.device = device
 
     def run(  # type: ignore[override]
-            self,
-            experiment: BasicTraining,
-            max_elements_train: int = 0,
-            dataset_root: str = '/tmp/datasets',
-            stdout: bool = False,
+        self,
+        experiment: BasicTraining,
+        max_elements_train: int = 0,
+        dataset_root: str = "/tmp/datasets",
+        stdout: bool = False,
     ) -> List[Dict]:
         """Run a single Experiment.
 
@@ -78,15 +78,16 @@ class LocalRunner(Runner):
         experiment.add_hook(Signals.EPOCH_END, metric.receive_epoch_end)
         experiment.add_hook(Signals.TRAIN_EPOCH_END, metric.receive_train_epoch_end)
         experiment.add_hook(Signals.TRAIN_EPOCH_BATCH_END, metric.receive_train_epoch_batch_end)
-        experiment.add_hook(Signals.VALIDATION_EPOCH_BATCH_END,
-                            metric.receive_validation_epoch_batch_end)
+        experiment.add_hook(
+            Signals.VALIDATION_EPOCH_BATCH_END, metric.receive_validation_epoch_batch_end
+        )
         experiment.add_hook(Signals.VALIDATION_EPOCH_END, metric.receive_validation_epoch_end)
 
         # Download the dataset if needed.
         if experiment.dataset == FashionMNIST:
             _ = experiment.dataset(dataset_root, download=True)
         elif experiment.dataset == SVHN:
-            _ = experiment.dataset(dataset_root, download=True, split='train')
-            _ = experiment.dataset(dataset_root, download=True, split='test')
+            _ = experiment.dataset(dataset_root, download=True, split="train")
+            _ = experiment.dataset(dataset_root, download=True, split="test")
 
         return experiment.run(max_elements_train, dataset_root, self.device)

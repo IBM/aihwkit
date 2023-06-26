@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,7 +16,10 @@ import warnings
 from aihwkit.inference import *  # pylint: disable=unused-wildcard-import, wildcard-import
 
 warnings.warn(
-    FutureWarning("\n\nThe `aihwkit.simulator.noise_models` module has been superseded "
-                  "by the `aihwkit.inference` module. "
-                  "Please replace `from aihwkit.simulator.noise_models import ...` "
-                  "with `from aihwkit.inference import ...` in your import statement.\n"))
+    FutureWarning(
+        "\n\nThe `aihwkit.simulator.noise_models` module has been superseded "
+        "by the `aihwkit.inference` module. "
+        "Please replace `from aihwkit.simulator.noise_models import ...` "
+        "with `from aihwkit.inference import ...` in your import statement.\n"
+    )
+)

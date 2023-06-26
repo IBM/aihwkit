@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,22 +16,28 @@ from dataclasses import dataclass, field
 from typing import ClassVar, Type, Optional
 
 from aihwkit.simulator.configs.devices import (
-    ConstantStepDevice, FloatingPointDevice, IdealDevice, PulsedDevice
+    ConstantStepDevice,
+    FloatingPointDevice,
+    IdealDevice,
+    PulsedDevice,
 )
-from aihwkit.simulator.configs.compounds import (
-    DigitalRankUpdateCell, UnitCell,
-)
-from aihwkit.simulator.configs.helpers import (
-    _PrintableMixin, tile_parameters_to_bindings
-)
+from aihwkit.simulator.configs.compounds import DigitalRankUpdateCell, UnitCell
+from aihwkit.simulator.configs.helpers import _PrintableMixin, tile_parameters_to_bindings
 from aihwkit.simulator.configs.utils import (
-    IOParameters, PulseType, UpdateParameters, WeightClipParameter,
-    WeightModifierParameter, WeightRemapParameter,
-    MapableRPU, PrePostProcessingRPU
+    IOParameters,
+    PulseType,
+    UpdateParameters,
+    WeightClipParameter,
+    WeightModifierParameter,
+    WeightRemapParameter,
+    MapableRPU,
+    PrePostProcessingRPU,
 )
 from aihwkit.inference import (
-    BaseDriftCompensation, BaseNoiseModel, GlobalDriftCompensation,
-    PCMLikeNoiseModel
+    BaseDriftCompensation,
+    BaseNoiseModel,
+    GlobalDriftCompensation,
+    PCMLikeNoiseModel,
 )
 from aihwkit.simulator.rpu_base import devices
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
@@ -111,6 +117,7 @@ class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     During inference, statistical models of programming, drift
     and read noise can be used.
     """
+
     # pylint: disable=too-many-instance-attributes
 
     tile_class: ClassVar[Type] = InferenceTile
@@ -143,7 +150,8 @@ class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     """
 
     drift_compensation: Optional[BaseDriftCompensation] = field(
-        default_factory=GlobalDriftCompensation)
+        default_factory=GlobalDriftCompensation
+    )
     """For compensating the drift during inference only."""
 
     clip: WeightClipParameter = field(default_factory=WeightClipParameter)
@@ -185,19 +193,16 @@ class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     # The following fields are not included in `__init__`, and should be
     # treated as read-only.
 
-    device: IdealDevice = field(default_factory=IdealDevice,
-                                init=False)
+    device: IdealDevice = field(default_factory=IdealDevice, init=False)
     """Parameter that modify the behavior of the pulsed device: ideal device."""
 
     backward: IOParameters = field(
-        default_factory=lambda: IOParameters(is_perfect=True),
-        init=False
+        default_factory=lambda: IOParameters(is_perfect=True), init=False
     )
     """Input-output parameter setting for the backward direction: perfect."""
 
     update: UpdateParameters = field(
-        default_factory=lambda: UpdateParameters(pulse_type=PulseType.NONE),
-        init=False
+        default_factory=lambda: UpdateParameters(pulse_type=PulseType.NONE), init=False
     )
     """Parameter for the update behavior: ``NONE`` pulse type."""
 

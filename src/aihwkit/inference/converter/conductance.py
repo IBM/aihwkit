@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -37,24 +37,20 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
             the logical zero of the weights will be mapped to.
     """
 
-    def __init__(
-            self,
-            g_max: Optional[float] = None,
-            g_min: Optional[float] = None
-    ):
+    def __init__(self, g_max: Optional[float] = None, g_min: Optional[float] = None):
         self.g_max = 25.0 if g_max is None else g_max
         self.g_min = 0.0 if g_min is None else g_min
         self.scale_ratio = None
 
-        if self.g_max < 0.:
-            raise ValueError('g_max should be a positive value')
-        if self.g_min < 0.:
-            raise ValueError('g_min should be a positive value')
+        if self.g_max < 0.0:
+            raise ValueError("g_max should be a positive value")
+        if self.g_min < 0.0:
+            raise ValueError("g_min should be a positive value")
         if self.g_min > self.g_max:
-            raise ValueError('g_min should be smaller than g_max')
+            raise ValueError("g_min should be smaller than g_max")
 
     def __str__(self) -> str:
-        return '{}(g_max={:1.2f}, g_min={:1.2f})'.format(
+        return "{}(g_max={:1.2f}, g_min={:1.2f})".format(
             self.__class__.__name__, self.g_max, self.g_min
         )
 
@@ -64,20 +60,23 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
         scale_ratio = (self.g_max - self.g_min) / abs_max.clamp(min=_ZERO_CLIP)
         scaled_weights = weights * scale_ratio
 
-        conductances = [scaled_weights.clamp(min=0.0, max=self.g_max) + self.g_min,
-                        (- scaled_weights).clamp(min=0.0, max=self.g_max) + self.g_min]
-        params = {'scale_ratio': scale_ratio}
+        conductances = [
+            scaled_weights.clamp(min=0.0, max=self.g_max) + self.g_min,
+            (-scaled_weights).clamp(min=0.0, max=self.g_max) + self.g_min,
+        ]
+        params = {"scale_ratio": scale_ratio}
 
         return conductances, params
 
     @no_grad()
     def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
         if len(conductances) != 2:
-            raise ValueError('conductances must contain exactly two elements')
-        if 'scale_ratio' not in params:
-            raise ValueError('params do not contain scale_ratio')
+            raise ValueError("conductances must contain exactly two elements")
+        if "scale_ratio" not in params:
+            raise ValueError("params do not contain scale_ratio")
 
-        weights = ((conductances[0] - self.g_min) -
-                   (conductances[1] - self.g_min)) / params['scale_ratio']
+        weights = ((conductances[0] - self.g_min) - (conductances[1] - self.g_min)) / params[
+            "scale_ratio"
+        ]
 
         return weights

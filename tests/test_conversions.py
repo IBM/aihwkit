@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,10 +28,10 @@ from aihwkit.nn.conversion import convert_to_analog
 from .helpers.testcases import ParametrizedTestCase
 
 
-@parameterized_class([
-    {'use_cuda': False, 'name': 'CPU'},
-    {'use_cuda': True, 'name': 'CUDA'},
-], class_name_func=lambda cls, _, params_dict: '%s%s' % (cls.__name__, params_dict['name']))
+@parameterized_class(
+    [{"use_cuda": False, "name": "CPU"}, {"use_cuda": True, "name": "CUDA"}],
+    class_name_func=lambda cls, _, params_dict: "%s%s" % (cls.__name__, params_dict["name"]),
+)
 class ConversionLayerTest(ParametrizedTestCase):
     """Linear layer abstractions tests."""
 
@@ -56,14 +56,7 @@ class ConversionLayerTest(ParametrizedTestCase):
         y_b = Tensor([[0.3], [0.6]])
 
         manual_seed(4321)
-        model = Sequential(
-            Linear(4, 3),
-            Linear(3, 3),
-            Sequential(
-                Linear(3, 1),
-                Linear(1, 1)
-            )
-        )
+        model = Sequential(Linear(4, 3), Linear(3, 3), Sequential(Linear(3, 1), Linear(1, 1)))
         if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
@@ -80,39 +73,37 @@ class ConversionLayerTest(ParametrizedTestCase):
         """Test converting sequential and linear."""
 
         def specfun(name, _, rpu_config):
-            """special layer """
-            if name in ['0', '2.1']:
+            """special layer"""
+            if name in ["0", "2.1"]:
                 return InferenceRPUConfig()
             return rpu_config
 
-        model = Sequential(
-            Linear(4, 3),
-            Linear(3, 3),
-            Sequential(
-                Linear(3, 1),
-                Linear(1, 1)
-            )
-        )
+        model = Sequential(Linear(4, 3), Linear(3, 3), Sequential(Linear(3, 1), Linear(1, 1)))
         if self.use_cuda:
             model = model.cuda()
 
-        analog_model = convert_to_analog(model, FloatingPointRPUConfig(),
-                                         specific_rpu_config_fun=specfun)
+        analog_model = convert_to_analog(
+            model, FloatingPointRPUConfig(), specific_rpu_config_fun=specfun
+        )
         self.assertEqual(analog_model[0].__class__, AnalogLinear)
-        self.assertEqual(next(analog_model[0].analog_tiles()).rpu_config.__class__,
-                         InferenceRPUConfig)
-        self.assertEqual(next(analog_model[2][1].analog_tiles()).rpu_config.__class__,
-                         InferenceRPUConfig)
-        self.assertEqual(next(analog_model[1].analog_tiles()).rpu_config.__class__,
-                         FloatingPointRPUConfig)
-        self.assertEqual(next(analog_model[2][0].analog_tiles()).rpu_config.__class__,
-                         FloatingPointRPUConfig)
+        self.assertEqual(
+            next(analog_model[0].analog_tiles()).rpu_config.__class__, InferenceRPUConfig
+        )
+        self.assertEqual(
+            next(analog_model[2][1].analog_tiles()).rpu_config.__class__, InferenceRPUConfig
+        )
+        self.assertEqual(
+            next(analog_model[1].analog_tiles()).rpu_config.__class__, FloatingPointRPUConfig
+        )
+        self.assertEqual(
+            next(analog_model[2][0].analog_tiles()).rpu_config.__class__, FloatingPointRPUConfig
+        )
 
     def test_conversion_torchvision_resnet(self):
         """Test converting resnet model from torchvision."""
         model = resnet18()
         if self.use_cuda:
-            raise SkipTest('Skipping for CUDA.')
+            raise SkipTest("Skipping for CUDA.")
 
         analog_model = convert_to_analog(model, FloatingPointRPUConfig())
         self.assertEqual(analog_model.conv1.__class__, AnalogConv2d)
@@ -123,7 +114,7 @@ class ConversionLayerTest(ParametrizedTestCase):
         """Test converting resnet model from torchvision"""
         model = alexnet()
         if self.use_cuda:
-            raise SkipTest('Skipping for CUDA.')
+            raise SkipTest("Skipping for CUDA.")
 
         analog_model = convert_to_analog(model, FloatingPointRPUConfig())
         self.assertEqual(analog_model.features[0].__class__, AnalogConv2d)

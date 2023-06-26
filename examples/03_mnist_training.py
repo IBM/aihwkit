@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -39,10 +39,10 @@ from aihwkit.simulator.rpu_base import cuda
 USE_CUDA = 0
 if cuda.is_compiled():
     USE_CUDA = 1
-DEVICE = torch.device('cuda' if USE_CUDA else 'cpu')
+DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
 
 # Path where the datasets will be stored.
-PATH_DATASET = os.path.join('data', 'DATASET')
+PATH_DATASET = os.path.join("data", "DATASET")
 
 # Network definition.
 INPUT_SIZE = 784
@@ -59,14 +59,10 @@ def load_images():
     transform = transforms.Compose([transforms.ToTensor()])
 
     # Load the images.
-    train_set = datasets.MNIST(PATH_DATASET,
-                               download=True, train=True, transform=transform)
-    val_set = datasets.MNIST(PATH_DATASET,
-                             download=True, train=False, transform=transform)
-    train_data = torch.utils.data.DataLoader(
-        train_set, batch_size=BATCH_SIZE, shuffle=True)
-    validation_data = torch.utils.data.DataLoader(
-        val_set, batch_size=BATCH_SIZE, shuffle=True)
+    train_set = datasets.MNIST(PATH_DATASET, download=True, train=True, transform=transform)
+    val_set = datasets.MNIST(PATH_DATASET, download=True, train=False, transform=transform)
+    train_data = torch.utils.data.DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    validation_data = torch.utils.data.DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=True)
 
     return train_data, validation_data
 
@@ -83,15 +79,27 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         nn.Module: created analog model
     """
     model = AnalogSequential(
-        AnalogLinear(input_size, hidden_sizes[0], True,
-                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
+        AnalogLinear(
+            input_size,
+            hidden_sizes[0],
+            True,
+            rpu_config=SingleRPUConfig(device=ConstantStepDevice()),
+        ),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[0], hidden_sizes[1], True,
-                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
+        AnalogLinear(
+            hidden_sizes[0],
+            hidden_sizes[1],
+            True,
+            rpu_config=SingleRPUConfig(device=ConstantStepDevice()),
+        ),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[1], output_size, True,
-                     rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
-        nn.LogSoftmax(dim=1)
+        AnalogLinear(
+            hidden_sizes[1],
+            output_size,
+            True,
+            rpu_config=SingleRPUConfig(device=ConstantStepDevice()),
+        ),
+        nn.LogSoftmax(dim=1),
     )
 
     if USE_CUDA:
@@ -148,13 +156,12 @@ def train(model, train_set):
 
             total_loss += loss.item()
 
-        print('Epoch {} - Training loss: {:.16f}'.format(
-            epoch_number, total_loss / len(train_set)))
+        print("Epoch {} - Training loss: {:.16f}".format(epoch_number, total_loss / len(train_set)))
 
         # Decay learning rate if needed.
         scheduler.step()
 
-    print('\nTraining Time (s) = {}'.format(time()-time_init))
+    print("\nTraining Time (s) = {}".format(time() - time_init))
 
 
 def test_evaluation(model, val_set):
@@ -182,8 +189,8 @@ def test_evaluation(model, val_set):
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
 
-    print('\nNumber Of Images Tested = {}'.format(total_images))
-    print('Model Accuracy = {}'.format(predicted_ok/total_images))
+    print("\nNumber Of Images Tested = {}".format(total_images))
+    print("Model Accuracy = {}".format(predicted_ok / total_images))
 
 
 def main():
@@ -201,6 +208,6 @@ def main():
     test_evaluation(model, validation_dataset)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Execute only if run as the entry point into the program.
     main()

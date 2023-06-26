@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -29,11 +29,7 @@ class ObjectStorageSession(Session):
     """Session handler for requests to object storage."""
 
     def request(  # type: ignore
-            self,
-            method: str,
-            url: Union[str, bytes, Text],
-            *args: Any,
-            **kwargs: Any
+        self, method: str, url: Union[str, bytes, Text], *args: Any, **kwargs: Any
     ) -> Any:
         """Construct a Request, prepares it and sends it.
 
@@ -72,12 +68,7 @@ class ApiSession(Session):
     token.
     """
 
-    def __init__(
-            self,
-            api_url: str,
-            api_token: str,
-            verify: bool = True
-    ):
+    def __init__(self, api_url: str, api_token: str, verify: bool = True):
         super().__init__()
 
         self.api_url = api_url
@@ -88,19 +79,15 @@ class ApiSession(Session):
 
         self.jwt_token = None  # type: Optional[str]
 
-        self.headers.update({'User-Agent': 'aihwkit/{}'.format(__version__)})
+        self.headers.update({"User-Agent": "aihwkit/{}".format(__version__)})
 
     def update_jwt_token(self, jwt_token: str) -> None:
         """Set the jwt token for the session."""
         self.jwt_token = jwt_token
-        self.headers.update({'Authorization': 'Bearer {}'.format(jwt_token)})
+        self.headers.update({"Authorization": "Bearer {}".format(jwt_token)})
 
     def request(  # type: ignore
-            self,
-            method: str,
-            url: Union[str, bytes, Text],
-            *args: Any,
-            **kwargs: Any
+        self, method: str, url: Union[str, bytes, Text], *args: Any, **kwargs: Any
     ) -> Any:
         """Construct a Request, prepares it and sends it.
 
@@ -117,7 +104,7 @@ class ApiSession(Session):
             ApiResponseError: if the response did not have a valid status code.
         """
         # pylint: disable=signature-differs
-        full_url = '{}/{}'.format(self.api_url, str(url))
+        full_url = "{}/{}".format(self.api_url, str(url))
 
         response = super().request(method, full_url, *args, **kwargs)
 

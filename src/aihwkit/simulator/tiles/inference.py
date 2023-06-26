@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,20 +41,20 @@ class InferenceTile(AnalogTile):
     """
 
     def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            rpu_config: Optional['InferenceRPUConfig'] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False,
-            shared_weights: bool = True,
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: Optional["InferenceRPUConfig"] = None,
+        bias: bool = False,
+        in_trans: bool = False,
+        out_trans: bool = False,
+        shared_weights: bool = True,
     ):
-
         if not rpu_config:
             # Import `InferenceRPUConfig` dynamically to avoid import cycles.
             # pylint: disable=import-outside-toplevel
             from aihwkit.simulator.configs import InferenceRPUConfig
+
             rpu_config = InferenceRPUConfig()
 
         # CAUTION: one cannot save parts of the RPUConfig as
@@ -73,8 +73,9 @@ class InferenceTile(AnalogTile):
         super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
 
         if shared_weights:
-            self.shared_weights = zeros(out_size, in_size + int(bias),
-                                        requires_grad=True)  # type: Tensor
+            self.shared_weights = zeros(
+                out_size, in_size + int(bias), requires_grad=True
+            )  # type: Tensor
             self.ensure_shared_weights()
 
     @no_grad()
@@ -93,10 +94,9 @@ class InferenceTile(AnalogTile):
         remap = self.rpu_config.remap  # type: ignore
         if remap.type != WeightRemapType.NONE:
             # needs to be always out_size
-            mapping_scales = ones((self.out_size, ),
-                                  dtype=float32,
-                                  device=self.device,
-                                  requires_grad=False)
+            mapping_scales = ones(
+                (self.out_size,), dtype=float32, device=self.device, requires_grad=False
+            )
             self.set_mapping_scales(mapping_scales)
 
     @no_grad()
@@ -114,15 +114,19 @@ class InferenceTile(AnalogTile):
             return None
 
         if self.drift_readout_tensor is None or reset_if:
-            self.drift_readout_tensor = self.rpu_config.drift_compensation.get_readout_tensor(
-                self.tile.get_x_size()).detach().to(self.device)
+            self.drift_readout_tensor = (
+                self.rpu_config.drift_compensation.get_readout_tensor(self.tile.get_x_size())
+                .detach()
+                .to(self.device)
+            )
             if self.in_trans:
                 self.drift_readout_tensor = self.drift_readout_tensor.tranpose(0, 1).clone()
 
         # We need to take the bias as a common column here, also we do
         # not want to use indexed.
-        return self.tile.forward(self.drift_readout_tensor, False,
-                                 self.in_trans, self.out_trans, True)
+        return self.tile.forward(
+            self.drift_readout_tensor, False, self.in_trans, self.out_trans, True
+        )
 
     @no_grad()
     def program_weights(self, from_reference: bool = True) -> None:
@@ -143,9 +147,10 @@ class InferenceTile(AnalogTile):
         if not from_reference or self.reference_combined_weights is None:
             self.reference_combined_weights = Tensor(self.tile.get_weights())
 
-        self.programmed_weights, self.nu_drift_list = \
-            self.rpu_config.noise_model.apply_programming_noise(
-                self.reference_combined_weights)
+        (
+            self.programmed_weights,
+            self.nu_drift_list,
+        ) = self.rpu_config.noise_model.apply_programming_noise(self.reference_combined_weights)
 
         self.tile.set_weights(self.programmed_weights)
 
@@ -154,10 +159,7 @@ class InferenceTile(AnalogTile):
             self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(forward_output)
 
     @no_grad()
-    def drift_weights(
-            self,
-            t_inference: float = 0.0
-    ) -> None:
+    def drift_weights(self, t_inference: float = 0.0) -> None:
         """Programs and drifts the current reference weights.
 
         The current weight reference is either the current weights or
@@ -177,19 +179,21 @@ class InferenceTile(AnalogTile):
             self.program_weights()
 
         drifted_weights = self.rpu_config.noise_model.apply_drift_noise(
-            self.programmed_weights, self.nu_drift_list, t_inference)
+            self.programmed_weights, self.nu_drift_list, t_inference
+        )
         self.tile.set_weights(drifted_weights)
 
         if self.rpu_config.drift_compensation is not None:
             forward_output = self._forward_drift_readout_tensor()
             self.alpha = self.rpu_config.drift_compensation.apply(
-                forward_output,
-                self.drift_baseline).to(self.device)
+                forward_output, self.drift_baseline
+            ).to(self.device)
 
     @no_grad()
-    def post_forward(self, x_output: Tensor, dim: int, is_test: bool = False,
-                     ctx: Any = None) -> Tensor:
-        """Operations after the actual forward step for post processing """
+    def post_forward(
+        self, x_output: Tensor, dim: int, is_test: bool = False, ctx: Any = None
+    ) -> Tensor:
+        """Operations after the actual forward step for post processing"""
 
         x_output = super().post_forward(x_output, dim, is_test, ctx)
 
@@ -217,7 +221,9 @@ class InferenceTile(AnalogTile):
         # pylint: disable=import-outside-toplevel
         from aihwkit.simulator.configs.helpers import parameters_to_bindings
         from aihwkit.simulator.configs.utils import (
-            WeightClipType, WeightModifierType, WeightRemapType
+            WeightClipType,
+            WeightModifierType,
+            WeightRemapType,
         )
 
         super().post_update_step()
@@ -237,15 +243,14 @@ class InferenceTile(AnalogTile):
             self.set_scales(scales)
 
         # update the forward / backward modified weights here
-        if (self.rpu_config.modifier.type != WeightModifierType.COPY or
-                self.rpu_config.modifier.pdrop > 0.0):
+        if (
+            self.rpu_config.modifier.type != WeightModifierType.COPY
+            or self.rpu_config.modifier.pdrop > 0.0
+        ):
             weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
             self.tile.modify_weights(weight_modify_params)
 
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'BaseTile':
+    def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "BaseTile":
         """Return a copy of this tile in CUDA memory.
 
         Args:
@@ -260,9 +265,9 @@ class InferenceTile(AnalogTile):
         super().cuda(device)
 
         self.alpha = self.alpha.cuda(device)
-        self.shared_weights.data = zeros(self.tile.get_x_size(),
-                                         self.tile.get_d_size(),
-                                         requires_grad=True).cuda(device)
+        self.shared_weights.data = zeros(
+            self.tile.get_x_size(), self.tile.get_d_size(), requires_grad=True
+        ).cuda(device)
         self.ensure_shared_weights()
 
         return self

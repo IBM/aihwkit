@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -11,10 +11,7 @@
 # that they have been altered from the originals.
 
 """Base class for analog Modules."""
-from typing import (
-    Any, Dict, List, Optional, Tuple, NamedTuple, Union,
-    Generator, TYPE_CHECKING
-)
+from typing import Any, Dict, List, Optional, Tuple, NamedTuple, Union, Generator, TYPE_CHECKING
 from copy import deepcopy
 from warnings import warn
 
@@ -31,13 +28,20 @@ if TYPE_CHECKING:
     from aihwkit.simulator.tiles import BaseTile
     from collections import OrderedDict
     from aihwkit.simulator.configs.configs import (
-        FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
-        UnitCellRPUConfig, DigitalRankUpdateRPUConfig
+        FloatingPointRPUConfig,
+        InferenceRPUConfig,
+        SingleRPUConfig,
+        UnitCellRPUConfig,
+        DigitalRankUpdateRPUConfig,
     )
 
-RPUConfigAlias = Union['FloatingPointRPUConfig', 'SingleRPUConfig',
-                       'UnitCellRPUConfig', 'InferenceRPUConfig',
-                       'DigitalRankUpdateRPUConfig']
+RPUConfigAlias = Union[
+    "FloatingPointRPUConfig",
+    "SingleRPUConfig",
+    "UnitCellRPUConfig",
+    "InferenceRPUConfig",
+    "DigitalRankUpdateRPUConfig",
+]
 
 
 class AnalogModuleBase(Module):
@@ -67,20 +71,21 @@ class AnalogModuleBase(Module):
             for setting initial weights and during reading of the weights.
         mapping: Configuration of the hardware architecture (e.g. tile size).
     """
+
     # pylint: disable=abstract-method, too-many-instance-attributes
-    ANALOG_CTX_PREFIX: str = 'analog_ctx_'
-    ANALOG_SHARED_WEIGHT_PREFIX: str = 'analog_shared_weights_'
-    ANALOG_STATE_PREFIX: str = 'analog_tile_state_'
-    ANALOG_OUT_SCALING_ALPHA_PREFIX: str = 'analog_out_scaling_alpha_'
-    ANALOG_INPUT_RANGE_PREFIX: str = 'analog_input_range_'
+    ANALOG_CTX_PREFIX: str = "analog_ctx_"
+    ANALOG_SHARED_WEIGHT_PREFIX: str = "analog_shared_weights_"
+    ANALOG_STATE_PREFIX: str = "analog_tile_state_"
+    ANALOG_OUT_SCALING_ALPHA_PREFIX: str = "analog_out_scaling_alpha_"
+    ANALOG_INPUT_RANGE_PREFIX: str = "analog_input_range_"
 
     def __init__(
-            self,
-            in_features: int,
-            out_features: int,
-            bias: bool,
-            realistic_read_write: bool = False,
-            mapping: Optional[MappingParameter] = None,
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool,
+        realistic_read_write: bool = False,
+        mapping: Optional[MappingParameter] = None,
     ) -> None:
         # pylint: disable=super-init-not-called
         self._analog_tile_counter = 0
@@ -99,13 +104,14 @@ class AnalogModuleBase(Module):
         self.out_features = out_features
 
     def register_helper(self, name: str) -> None:
-        """Register a helper name that is not saved to the state dict """
+        """Register a helper name that is not saved to the state dict"""
 
         if name not in self._registered_helper_parameter:
             self._registered_helper_parameter.append(name)
 
-    def register_analog_tile(self, tile: 'BaseTile', name: Optional[str] = None,
-                             update_only: bool = False) -> None:
+    def register_analog_tile(
+        self, tile: "BaseTile", name: Optional[str] = None, update_only: bool = False
+    ) -> None:
         """Register the analog context of the tile.
 
         Note:
@@ -163,21 +169,21 @@ class AnalogModuleBase(Module):
         delattr(self, param_name)
         setattr(self, param_name, param_data)
 
-    def analog_tiles(self) -> Generator['BaseTile', None, None]:
-        """ Generator to loop over all registered analog tiles of the module """
+    def analog_tiles(self) -> Generator["BaseTile", None, None]:
+        """Generator to loop over all registered analog tiles of the module"""
         for param in self.parameters():
             if isinstance(param, AnalogContext):
                 yield param.analog_tile
 
-    def named_analog_tiles(self) -> Generator[Tuple[str, 'BaseTile'], None, None]:
-        """ Generator to loop over all registered analog tiles of the module with names. """
+    def named_analog_tiles(self) -> Generator[Tuple[str, "BaseTile"], None, None]:
+        """Generator to loop over all registered analog tiles of the module with names."""
         for name, param in self.named_parameters():
             if isinstance(param, AnalogContext):
                 new_name = name.split(self.ANALOG_CTX_PREFIX)[-1]
                 yield (new_name, param.analog_tile)
 
     def get_analog_tile_devices(self) -> List[Optional[Union[torch_device, str, int]]]:
-        """ Return a list of the devices used by the analog tiles.
+        """Return a list of the devices used by the analog tiles.
 
         Returns:
             List of torch devices
@@ -191,12 +197,9 @@ class AnalogModuleBase(Module):
            Number of registered tiles
 
         """
-        return getattr(self, '_analog_tile_counter', 0)
+        return getattr(self, "_analog_tile_counter", 0)
 
-    def _setup_tile(
-            self,
-            rpu_config: RPUConfigAlias,
-    ) -> 'BaseTile':
+    def _setup_tile(self, rpu_config: RPUConfigAlias) -> "BaseTile":
         """Create a single analog tile with the given RPU configuration.
 
         Create an analog tile to be used for the basis of this layer
@@ -216,16 +219,17 @@ class AnalogModuleBase(Module):
         # pylint: disable=protected-access
 
         # Create the tile.
-        return rpu_config.tile_class(self.out_features, self.in_features, rpu_config,
-                                     bias=self.analog_bias)
+        return rpu_config.tile_class(
+            self.out_features, self.in_features, rpu_config, bias=self.analog_bias
+        )
 
     def set_weights(
-            self,
-            weight: Tensor,
-            bias: Optional[Tensor] = None,
-            force_exact: bool = False,
-            apply_weight_scaling: bool = True,
-            weight_scaling_omega: Optional[float] = None
+        self,
+        weight: Tensor,
+        bias: Optional[Tensor] = None,
+        force_exact: bool = False,
+        apply_weight_scaling: bool = True,
+        weight_scaling_omega: Optional[float] = None,
     ) -> None:
         """Set the weight (and bias) values with given tensors.
 
@@ -272,9 +276,8 @@ class AnalogModuleBase(Module):
         weight = weight.clone().reshape(shape)
 
         analog_tiles[0].set_weights(
-            weight, bias if self.analog_bias else None,
-            apply_weight_scaling,
-            weight_scaling_omega)
+            weight, bias if self.analog_bias else None, apply_weight_scaling, weight_scaling_omega
+        )
 
         realistic = self.realistic_read_write and not force_exact
         if realistic:
@@ -287,9 +290,7 @@ class AnalogModuleBase(Module):
         self._sync_weights_from_tile()
 
     def get_weights(
-            self,
-            force_exact: bool = False,
-            apply_weight_scaling: bool = True,
+        self, force_exact: bool = False, apply_weight_scaling: bool = True
     ) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the weight (and bias) tensors.
 
@@ -328,11 +329,9 @@ class AnalogModuleBase(Module):
 
         realistic = self.realistic_read_write and not force_exact
         if realistic:
-            weight, analog_bias = analog_tiles[0].read_weights(
-                apply_weight_scaling)
+            weight, analog_bias = analog_tiles[0].read_weights(apply_weight_scaling)
         else:
-            weight, analog_bias = analog_tiles[0].get_weights(
-                apply_weight_scaling)
+            weight, analog_bias = analog_tiles[0].get_weights(apply_weight_scaling)
 
         digital_bias = None
         if self.digital_bias:
@@ -399,19 +398,21 @@ class AnalogModuleBase(Module):
         Update the internal tile weights with an exact copy of the values of
         the ``self.weight`` and ``self.bias`` Parameters.
         """
-        self.set_weights(self.weight, self.bias if self.analog_bias else None,
-                         force_exact=True)
+        self.set_weights(self.weight, self.bias if self.analog_bias else None, force_exact=True)
 
-    def _set_load_rpu_config_state(self, load_rpu_config: bool = True,
-                                   strict_rpu_config_check: bool = True) -> None:
+    def _set_load_rpu_config_state(
+        self, load_rpu_config: bool = True, strict_rpu_config_check: bool = True
+    ) -> None:
         self._load_rpu_config = load_rpu_config
         self._strict_rpu_config_check = strict_rpu_config_check
 
-    def load_state_dict(self,  # pylint: disable=arguments-differ
-                        state_dict: 'OrderedDict[str, Tensor]',
-                        strict: bool = True,
-                        load_rpu_config: bool = True,
-                        strict_rpu_config_check: bool = True) -> NamedTuple:
+    def load_state_dict(
+        self,  # pylint: disable=arguments-differ
+        state_dict: "OrderedDict[str, Tensor]",
+        strict: bool = True,
+        load_rpu_config: bool = True,
+        strict_rpu_config_check: bool = True,
+    ) -> NamedTuple:
         """Specializes torch's ``load_state_dict`` to add a flag whether to
         load the RPU config from the saved state.
 
@@ -462,14 +463,15 @@ class AnalogModuleBase(Module):
             self.register_analog_tile(analog_tile, name, update_only=True)
 
     def _load_from_state_dict(
-            self,
-            state_dict: Dict,
-            prefix: str,
-            local_metadata: Dict,
-            strict: bool,
-            missing_keys: List[str],
-            unexpected_keys: List[str],
-            error_msgs: List[str]) -> None:
+        self,
+        state_dict: Dict,
+        prefix: str,
+        local_metadata: Dict,
+        strict: bool,
+        missing_keys: List[str],
+        unexpected_keys: List[str],
+        error_msgs: List[str],
+    ) -> None:
         """Copy parameters and buffers from `state_dict` into only this
         module, but not its descendants.
 
@@ -485,35 +487,41 @@ class AnalogModuleBase(Module):
         for name, analog_tile in list(self.named_analog_tiles()):
             key = prefix + self.ANALOG_STATE_PREFIX + name
             if key not in state_dict:  # legacy
-                key = prefix + 'analog_tile_state'
+                key = prefix + "analog_tile_state"
 
             if key in state_dict:
                 analog_state = state_dict.pop(key).copy()
 
                 if not self._load_rpu_config:
-
                     if self._strict_rpu_config_check:
-                        if not isinstance(analog_tile.rpu_config,
-                                          type(analog_state['rpu_config'])):
-                            raise ModuleError("RPU config mismatch during loading: "
-                                              "Tried to replace "
-                                              f"{analog_state['rpu_config'].__class__.__name__} "
-                                              f"with {analog_tile.rpu_config.__class__.__name__}")
+                        if not isinstance(analog_tile.rpu_config, type(analog_state["rpu_config"])):
+                            raise ModuleError(
+                                "RPU config mismatch during loading: "
+                                "Tried to replace "
+                                f"{analog_state['rpu_config'].__class__.__name__} "
+                                f"with {analog_tile.rpu_config.__class__.__name__}"
+                            )
 
-                    if hasattr(analog_state['rpu_config'], 'mapping'):
-                        old_mapping = analog_state['rpu_config'].mapping
+                    if hasattr(analog_state["rpu_config"], "mapping"):
+                        old_mapping = analog_state["rpu_config"].mapping
                         new_mapping = analog_tile.rpu_config.mapping
-                        if (old_mapping.max_input_size != new_mapping.max_input_size
-                                or old_mapping.max_output_size != new_mapping.max_output_size
-                                or old_mapping.digital_bias != new_mapping.digital_bias
-                                or (old_mapping.out_scaling_columnwise
-                                    != new_mapping.out_scaling_columnwise)):
-                            raise ModuleError("MappingParameter mismatch during loading: "
-                                              "Tried to replace "
-                                              f"{old_mapping} "
-                                              f"with {new_mapping}")
+                        if (
+                            old_mapping.max_input_size != new_mapping.max_input_size
+                            or old_mapping.max_output_size != new_mapping.max_output_size
+                            or old_mapping.digital_bias != new_mapping.digital_bias
+                            or (
+                                old_mapping.out_scaling_columnwise
+                                != new_mapping.out_scaling_columnwise
+                            )
+                        ):
+                            raise ModuleError(
+                                "MappingParameter mismatch during loading: "
+                                "Tried to replace "
+                                f"{old_mapping} "
+                                f"with {new_mapping}"
+                            )
 
-                    analog_state['rpu_config'] = analog_tile.rpu_config
+                    analog_state["rpu_config"] = analog_tile.rpu_config
                 analog_tile.__setstate__(analog_state)
 
                 # update registered parameters
@@ -533,8 +541,7 @@ class AnalogModuleBase(Module):
                 rm_keys.append(key)
 
         # legacy
-        for part in [self.ANALOG_SHARED_WEIGHT_PREFIX,
-                     self.ANALOG_OUT_SCALING_ALPHA_PREFIX]:
+        for part in [self.ANALOG_SHARED_WEIGHT_PREFIX, self.ANALOG_OUT_SCALING_ALPHA_PREFIX]:
             for key in state_dict:
                 if part in key:
                     rm_keys.append(key)
@@ -544,12 +551,11 @@ class AnalogModuleBase(Module):
                 state_dict.pop(key)
 
         super()._load_from_state_dict(
-           state_dict, prefix, local_metadata, strict, missing_keys,
-           unexpected_keys, error_msgs)
+            state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
+        )
 
         # legacy
-        for part in [self.ANALOG_SHARED_WEIGHT_PREFIX,
-                     self.ANALOG_OUT_SCALING_ALPHA_PREFIX]:
+        for part in [self.ANALOG_SHARED_WEIGHT_PREFIX, self.ANALOG_OUT_SCALING_ALPHA_PREFIX]:
             for key in missing_keys:
                 if part in key:
                     rm_keys.append(key)
@@ -560,17 +566,14 @@ class AnalogModuleBase(Module):
                 missing_keys.remove(key)
 
     def state_dict(  # pylint: disable=arguments-differ
-            self,
-            destination: Any = None,
-            prefix: str = '',
-            keep_vars: bool = False
+        self, destination: Any = None, prefix: str = "", keep_vars: bool = False
     ) -> Dict:
         """Return a dictionary containing a whole state of the module."""
         self._sync_weights_from_tile()
 
-        current_state = super().state_dict(destination=destination,
-                                           prefix=prefix,
-                                           keep_vars=keep_vars)
+        current_state = super().state_dict(
+            destination=destination, prefix=prefix, keep_vars=keep_vars
+        )
 
         for name, analog_tile in self.named_analog_tiles():
             analog_state = analog_tile.__getstate__()
@@ -589,8 +592,7 @@ class AnalogModuleBase(Module):
             ModuleError: if the layer is not in evaluation mode.
         """
         if self.training:
-            raise ModuleError('drift_analog_weights can only be applied in '
-                              'evaluation mode')
+            raise ModuleError("drift_analog_weights can only be applied in evaluation mode")
         for analog_tile in self.analog_tiles():
             if isinstance(analog_tile, InferenceTile):
                 analog_tile.drift_weights(t_inference)
@@ -602,8 +604,7 @@ class AnalogModuleBase(Module):
             ModuleError: if the layer is not in evaluation mode.
         """
         if self.training:
-            raise ModuleError('program_analog_weights can only be applied in '
-                              'evaluation mode')
+            raise ModuleError("program_analog_weights can only be applied in evaluation mode")
         for analog_tile in self.analog_tiles():
             analog_tile.program_weights()
 
@@ -615,18 +616,18 @@ class AnalogModuleBase(Module):
         """
         output = super().extra_repr()
         if self.realistic_read_write:
-            output += ', realistic_read_write={}'.format(self.realistic_read_write)
+            output += ", realistic_read_write={}".format(self.realistic_read_write)
         if self.analog_bias:
-            output += ', analog bias'
+            output += ", analog bias"
         if self.digital_bias:
-            output += ', digital bias'
+            output += ", digital bias"
 
         return output
 
-    def _set_weight_scaling_omega(self, rpu_config: RPUConfigAlias,
-                                  weight_scaling_omega: Optional[float] = None
-                                  ) -> RPUConfigAlias:
-        """ Sets the weight scaling omega and raises a FutureWarning.
+    def _set_weight_scaling_omega(
+        self, rpu_config: RPUConfigAlias, weight_scaling_omega: Optional[float] = None
+    ) -> RPUConfigAlias:
+        """Sets the weight scaling omega and raises a FutureWarning.
 
         Args:
             rpu_config: dtto
@@ -640,10 +641,14 @@ class AnalogModuleBase(Module):
         """
 
         if weight_scaling_omega is not None:
-            warn(FutureWarning("weight_scaling_omega argument to the layer module "
-                               "construction will be removed in future. "
-                               "Use aihwkit.simulator.configs.utils.MappingParameter "
-                               "instead to specify weight scaling."))
+            warn(
+                FutureWarning(
+                    "weight_scaling_omega argument to the layer module "
+                    "construction will be removed in future. "
+                    "Use aihwkit.simulator.configs.utils.MappingParameter "
+                    "instead to specify weight scaling."
+                )
+            )
             rpu_config = deepcopy(rpu_config)
             rpu_config.mapping.weight_scaling_omega = weight_scaling_omega
 

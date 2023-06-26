@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,10 +28,10 @@ class InferenceLocalRunner(Runner):
 
     Class that allows executing Experiments locally.
     """
+
     # pylint: disable=too-few-public-methods
 
-    def __init__(self,
-                 device: Optional[torch_device] = None):
+    def __init__(self, device: Optional[torch_device] = None):
         """Create a new ``InferenceLocalRunner``.
 
         Args:
@@ -40,11 +40,11 @@ class InferenceLocalRunner(Runner):
         self.device = device
 
     def run(  # type: ignore[override]
-            self,
-            experiment: BasicInferencing,
-            max_elements: int = 0,
-            dataset_root: str = '/tmp/datasets',
-            stdout: bool = False,
+        self,
+        experiment: BasicInferencing,
+        max_elements: int = 0,
+        dataset_root: str = "/tmp/datasets",
+        stdout: bool = False,
     ) -> Dict:
         """Run a single Experiment.
 
@@ -81,8 +81,8 @@ class InferenceLocalRunner(Runner):
         if experiment.dataset == FashionMNIST:
             _ = experiment.dataset(dataset_root, download=True)
         elif experiment.dataset == SVHN:
-            _ = experiment.dataset(dataset_root, download=True, split='train')
-            _ = experiment.dataset(dataset_root, download=True, split='test')
+            _ = experiment.dataset(dataset_root, download=True, split="train")
+            _ = experiment.dataset(dataset_root, download=True, split="test")
 
         # Invoke the inference step
         return experiment.run(max_elements, dataset_root, self.device)
