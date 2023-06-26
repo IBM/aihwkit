@@ -15,15 +15,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## [Unreleased]
 
 
-
-
-
-
-
-
-
-
-
 ### Added
 
 * New analog in-memory training algorithms: Chopped Tiki-taka II (\#512)
@@ -60,14 +51,14 @@ The format is based on [Keep a Changelog], and this project adheres to
   (`output_noise_std`) (\#512)
 * Plotting utility for weight errors (\#512)
 * `per_batch_sample` weight noise injections for `TorchInferenceRPUConfig` (\#512)
-	
-	
-	
+
+
 ### Fixed
+
 * Fixed compilation error for CUDA 12.1. (\#500)
 * Realistic read weights could have applied the scales wrongly (\#512)
 
-	
+
 ### Changed
 
 * Major re-organization of `AnalogTiles` for increased modularity
@@ -84,7 +75,6 @@ The format is based on [Keep a Changelog], and this project adheres to
   versions. `utils.legacy_load` provides a way to load old checkpoints. (\#512)
 
 
-	
 ### Removed
 
 * `realistic_read_write` is removed from some high-level function. Use
