@@ -129,6 +129,9 @@ public:
   inline const DriftParameter<T> &getPar() const { return par_; };
   inline int getSize() const { return size_; };
 
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+
 protected:
   int size_ = 0;
   bool active_ = false;

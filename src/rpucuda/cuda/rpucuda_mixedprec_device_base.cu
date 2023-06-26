@@ -153,6 +153,52 @@ void MixedPrecRPUDeviceBaseCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu
 }
 
 template <typename T>
+void MixedPrecRPUDeviceBaseCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  SimpleRPUDeviceCuda<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  rpucuda_device_->dumpExtra(state, "rpucuda_device");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+  noise_manager_x_->dumpExtra(state, "noise_manager_x");
+  noise_manager_d_->dumpExtra(state, "noise_manager_d");
+
+  RPU::insert(state, "current_update_index", current_update_index_);
+  RPU::insert(state, "current_row_index", current_row_index_);
+  RPU::insert(state, "granularity", granularity_);
+
+  RPU::insert(state, "dev_avg_sparsity", dev_avg_sparsity_);
+  RPU::insert(state, "dev_sparsity_d", dev_sparsity_d_);
+  RPU::insert(state, "dev_sparsity_x", dev_sparsity_x_);
+
+  // dev_transfer_d_vecs not handled (generated on the fly)
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void MixedPrecRPUDeviceBaseCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  SimpleRPUDeviceCuda<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+  using V = std::vector<T>;
+
+  rpucuda_device_->loadExtra(state, "rpucuda_device", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+  noise_manager_x_->loadExtra(state, "noise_manager_x", strict);
+  noise_manager_d_->loadExtra(state, "noise_manager_d", strict);
+
+  RPU::load(state, "granularity", granularity_, strict);
+  RPU::load(state, "current_row_index", current_row_index_, strict);
+  RPU::load(state, "current_update_index", current_update_index_, strict);
+
+  RPU::load(this->context_, state, "dev_avg_sparsity", dev_avg_sparsity_, strict);
+  RPU::load(this->context_, state, "dev_sparsity_d", dev_sparsity_d_, strict);
+  RPU::load(this->context_, state, "dev_sparsity_x", dev_sparsity_x_, strict);
+}
+
+template <typename T>
 __global__ void kernelAddSparsity(
     T *sparsity,
     const T *x_sparsity,
@@ -176,14 +222,14 @@ void MixedPrecRPUDeviceBaseCuda<T>::computeSparsityPartly(
     // init
     current_zero_size_ = size;
     size_t temp_storage_bytes = 0;
-    RPU::cub::DeviceReduce::Sum(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
         nullptr, temp_storage_bytes, input_values, sparsity, size, this->context_->getStream());
     dev_zc_temp_storage_ = RPU::make_unique<CudaArray<char>>(this->context_, temp_storage_bytes);
   }
 
   // Run sum-reduction (use T as output)
   size_t temp_storage_bytes = dev_zc_temp_storage_->getSize();
-  RPU::cub::DeviceReduce::Sum(
+  RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       dev_zc_temp_storage_->getData(), temp_storage_bytes, input_values, sparsity, size,
       this->context_->getStream());
 }

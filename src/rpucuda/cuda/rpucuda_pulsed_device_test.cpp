@@ -17,6 +17,7 @@
 #include "rpu_pulsed.h"
 #include "rpucuda_constantstep_device.h"
 #include "rpucuda_expstep_device.h"
+#include "rpucuda_hidden_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_piecewisestep_device.h"
 #include "rpucuda_powstep_device.h"
@@ -248,6 +249,7 @@ public:
 
 // types
 typedef ::testing::Types<
+    HiddenStepRPUDeviceMetaParameter<num_t>,
     LinearStepRPUDeviceMetaParameter<num_t>,
     ExpStepRPUDeviceMetaParameter<num_t>,
     PowStepRPUDeviceMetaParameter<num_t>,

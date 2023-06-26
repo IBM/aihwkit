@@ -176,6 +176,18 @@ void elemresetsat(
     T thres,
     const float *dev_4params);
 
+// MSK = P<thres
+// W(MSK) = A(MSK) + B(MSK)
+template <typename T>
+void elemreset(
+    const CudaContextPtr context,
+    T *W,
+    const int size,
+    const T *A,
+    const float *B, // float for random
+    const float *P, // float for random
+    T thres);
+
 // MSK != 0
 // W(MSK) = sat(reset_bias(MSK) + std*randn())
 template <typename T>

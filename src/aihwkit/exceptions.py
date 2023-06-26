@@ -25,6 +25,10 @@ class TileError(AihwkitException):
     """Exceptions related to analog tiles."""
 
 
+class TileModuleError(TileError):
+    """Exceptions related to analog tile modules."""
+
+
 class ArgumentError(AihwkitException):
     """Exceptions related to wrong arguments."""
 
@@ -35,6 +39,14 @@ class CudaError(AihwkitException):
 
 class ConfigError(AihwkitException):
     """Exceptions related to tile configuration."""
+
+
+class AnalogBiasConfigError(ConfigError):
+    """Exception that analog bias is wrongly set."""
+
+
+class TorchTileConfigError(ConfigError):
+    """Exceptions related to torch tile configuration."""
 
 
 class CloudError(AihwkitException):

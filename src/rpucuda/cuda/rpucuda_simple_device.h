@@ -50,10 +50,13 @@ public:
   virtual bool hasDirectUpdate() const = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
   virtual void setHiddenUpdateIdx(int idx){};
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) = 0;
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) = 0;
   virtual void populateFrom(const AbstractRPUDevice<T> &rpu_device) = 0;
   virtual DeviceUpdateType implements() const = 0;
   virtual bool isPulsedDevice() const { return false; };
   virtual AbstractRPUDeviceCuda<T> *clone() const = 0;
+  virtual std::vector<uint64_t> getPulseCounters() const { return std::vector<uint64_t>(); };
   std::unique_ptr<AbstractRPUDeviceCuda<T>> cloneUnique() const {
     return std::unique_ptr<AbstractRPUDeviceCuda<T>>(clone());
   };
@@ -83,8 +86,13 @@ public:
     swap(a.context_, b.context_);
     swap(a.x_size_, b.x_size_);
     swap(a.d_size_, b.d_size_);
+    swap(a.size_, b.size_);
     swap(a.par_storage_, b.par_storage_);
     swap(a.wdrifter_cuda_, b.wdrifter_cuda_);
+    swap(a.dev_reset_nrnd_, b.dev_reset_nrnd_);
+    swap(a.dev_reset_flag_, b.dev_reset_flag_);
+    swap(a.rnd_context_, b.rnd_context_);
+    swap(a.dev_diffusion_nrnd_, b.dev_diffusion_nrnd_);
   };
 
   // implement abstract functions
@@ -97,9 +105,7 @@ public:
   void driftWeights(T *dev_weights, T time_since_epoch) override;
   void diffuseWeights(T *dev_weights) override;
   void clipWeights(T *dev_weights, T clip) override;
-  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override {
-    RPU_FATAL("Not supported by simple device.");
-  };
+  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override;
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override;
   void
   populateFrom(const AbstractRPUDevice<T> &rpu_device) override; // need to be called by derived
@@ -122,19 +128,24 @@ public:
       const PulsedUpdateMetaParameter<T> &up,
       T *x_buffer = nullptr,
       T *d_buffer = nullptr) override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
+  void initDiffusionRnd();
+  void initRndContext();
+  void initResetRnd();
+
   int x_size_ = 0;
   int d_size_ = 0;
   int size_ = 0;
   CudaContextPtr context_;
 
   std::unique_ptr<WeightDrifterCuda<T>> wdrifter_cuda_ = nullptr;
-  // these are helpers and not copied
-  void initDiffusionRnd();
-  void initRndContext();
   std::unique_ptr<CudaContext> rnd_context_;
   std::unique_ptr<CudaArray<float>> dev_diffusion_nrnd_ = nullptr;
+  std::unique_ptr<CudaArray<float>> dev_reset_nrnd_ = nullptr;
+  std::unique_ptr<CudaArray<float>> dev_reset_flag_ = nullptr;
 
 private:
   std::unique_ptr<AbstractRPUDeviceMetaParameter<T>> par_storage_;

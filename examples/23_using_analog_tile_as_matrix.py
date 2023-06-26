@@ -43,7 +43,7 @@ d_values = randn(t, n)
 # create analog tile (a single crossbar array)
 analog_tile = AnalogTile(matrix.shape[0], matrix.shape[1], rpu_config)
 analog_tile.set_weights(matrix)  # set weights
-analog_tile.program_weights()  # set realistically
+# analog_tile.program_weights()  # set realistically, slow
 
 if DEVICE.type == "cuda":
     analog_tile = analog_tile.cuda(DEVICE)

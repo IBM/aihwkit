@@ -14,4 +14,6 @@ Submodules
 
    aihwkit.utils.analog_info
    aihwkit.utils.fitting
+   aihwkit.utils.legacy
    aihwkit.utils.visualization
+   aihwkit.utils.visualization_web

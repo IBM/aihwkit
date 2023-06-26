@@ -17,7 +17,11 @@
 
 namespace RPU {
 
-enum class WeightRemapType { None, LayerwiseSymmetric, ChannelwiseSymmetric };
+enum class WeightRemapType {
+  None,
+  LayerwiseSymmetric,
+  ChannelwiseSymmetric,
+};
 
 // no template. Just double
 struct WeightRemapParameter {
@@ -71,6 +75,9 @@ public:
   /* in-place remap of weights */
   void apply(
       T *weights, T current_lr, const WeightRemapParameter &wmpar, T *scales, T *biases = nullptr);
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
 
 private:
   std::vector<T> max_values_;

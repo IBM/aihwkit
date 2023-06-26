@@ -79,6 +79,9 @@ template <typename T> void IOMetaParameter<T>::initializeForForward(int x_size, 
     if (v_offset_vec.size() > 0 && v_offset_vec.size() != (size_t)d_size) {
       RPU_FATAL("Size mismatch in user-defined v_offsets for forward.");
     }
+    if (v_offset_vec.size() > 0 && v_offset_vec.size() != (size_t)d_size) {
+      RPU_FATAL("Size mismatch in user-defined v_offsets for forward.");
+    }
   }
   UNUSED(x_size);
 }

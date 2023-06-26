@@ -194,6 +194,86 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
   return *this;
 }
 
+template <typename T>
+void RPUCudaSimple<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  context_->synchronize();
+
+  RPUSimple<T>::dumpExtra(extra, prefix);
+  RPU::state_t state;
+
+  if (this->use_delayed_update_) {
+    RPU::insert(state, "dev_weights_buffer", dev_weights_buffer_);
+  }
+  RPU::insert(state, "dev_fb_weights", dev_fb_weights_);
+
+  if (dev_fb_weights_) {
+    fb_wmodifier_cuda_->dumpExtra(state, "fb_wmodifier_cuda");
+  }
+  if (wdrifter_cuda_) {
+    wdrifter_cuda_->dumpExtra(state, "wdrifter_cuda");
+  }
+  if (wremapper_cuda_) {
+    wremapper_cuda_->dumpExtra(state, "wremapper_cuda");
+  }
+  if (wclipper_cuda_) {
+    wclipper_cuda_->dumpExtra(state, "wclipper_cuda");
+  }
+  RPU::insertWithPrefix(extra, state, prefix);
+
+  // extern not handled
+  // tmp buffers not needed
+}
+
+template <typename T>
+void RPUCudaSimple<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+  using V = std::vector<T>;
+  context_->synchronize();
+
+  RPUSimple<T>::loadExtra(extra, prefix, strict);
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  if (this->use_delayed_update_) {
+    RPU::load(context_, state, "dev_weights_buffer", dev_weights_buffer_, strict);
+  }
+  if (state.count("dev_fb_weights")) {
+    RPU::load(context_, state, "dev_fb_weights", dev_fb_weights_, strict);
+  }
+
+  if (dev_fb_weights_) {
+    if (!fb_wmodifier_cuda_) {
+      fb_wmodifier_cuda_ =
+          RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
+    }
+    fb_wmodifier_cuda_->loadExtra(state, "fb_wmodifier_cuda", strict);
+  }
+
+  if (state.count("wdrifter_cuda")) {
+    if (!wdrifter_cuda_) {
+      auto wd = WeightDrifter<T>(this->x_size_ * this->d_size_, this->getPar().drift);
+      wdrifter_cuda_ =
+          RPU::make_unique<WeightDrifterCuda<T>>(this->context_, wd, this->x_size_, this->d_size_);
+    }
+    wdrifter_cuda_->loadExtra(state, "wdrifter_cuda", strict);
+  }
+
+  if (state.count("wremapper_cuda")) {
+    if (!wremapper_cuda_) {
+      wremapper_cuda_ =
+          RPU::make_unique<WeightRemapperCuda<T>>(context_, this->x_size_, this->d_size_);
+    }
+    wremapper_cuda_->loadExtra(state, "wremapper_cuda", strict);
+  }
+
+  if (state.count("wclipper_cuda")) {
+    if (!wclipper_cuda_) {
+      wclipper_cuda_ =
+          RPU::make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+    }
+    wclipper_cuda_->loadExtra(state, "wclipper_cuda", strict);
+  }
+}
+
 /***************************************************************************************/
 template <typename T> void RPUCudaSimple<T>::copyWeightsToHost(T *weightsptr) const {
   // copies the weights to the host and returns weight pointer, without changing the simple weights
@@ -337,7 +417,7 @@ void RPUCudaSimple<T>::copyFromVectorBiasBuffer(T *x_output_without_bias, int x_
 
 /*********************************************************************************/
 template <typename T>
-void RPUCudaSimple<T>::getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, int dim3) {
+void RPUCudaSimple<T>::getTensorBuffer(T **x_tensor_ptr, T **d_tensor_ptr, int m_batch, int dim3) {
   int x_size = this->getXSize();
   int d_size = this->getDSize();
 
@@ -347,8 +427,8 @@ void RPUCudaSimple<T>::getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, 
     dev_temp_tensor_ = RPU::make_unique<CudaArray<T>>(context_, n);
     this->context_->synchronize();
   }
-  *x_tensor = dev_temp_tensor_->getData();
-  *d_tensor = *x_tensor + (x_size)*dim3 * m_batch;
+  *x_tensor_ptr = dev_temp_tensor_->getData();
+  *d_tensor_ptr = *x_tensor_ptr + (x_size)*dim3 * m_batch;
 }
 
 template <typename T>
@@ -661,8 +741,6 @@ template <typename T> void RPUCudaSimple<T>::diffuseWeights() {
   rnd_diffusion_context_->randNormal(
       dev_diffusion_nrnd_->getData(), dev_diffusion_nrnd_->getSize());
 }
-
-/***********************************************************************/
 
 template <typename T> void RPUCudaSimple<T>::setDeltaWeights(T *dw_extern) {
 

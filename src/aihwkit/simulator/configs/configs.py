@@ -12,8 +12,12 @@
 
 """Configurations for resistive processing units."""
 
+# pylint: disable=too-few-public-methods
+
 from dataclasses import dataclass, field
-from typing import ClassVar, Type, Optional
+from typing import ClassVar, Type, Optional, Union
+
+from aihwkit.simulator.parameters.base import PrePostProcessingRPU, MappableRPU
 
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
@@ -21,17 +25,14 @@ from aihwkit.simulator.configs.devices import (
     IdealDevice,
     PulsedDevice,
 )
-from aihwkit.simulator.configs.compounds import DigitalRankUpdateCell, UnitCell
-from aihwkit.simulator.configs.helpers import _PrintableMixin, tile_parameters_to_bindings
-from aihwkit.simulator.configs.utils import (
+from aihwkit.simulator.configs.compounds import DigitalRankUpdateCell, UnitCell, TransferCompound
+from aihwkit.simulator.parameters.utils import (
     IOParameters,
     PulseType,
     UpdateParameters,
     WeightClipParameter,
     WeightModifierParameter,
     WeightRemapParameter,
-    MapableRPU,
-    PrePostProcessingRPU,
 )
 from aihwkit.inference import (
     BaseDriftCompensation,
@@ -40,26 +41,34 @@ from aihwkit.inference import (
     PCMLikeNoiseModel,
 )
 from aihwkit.simulator.rpu_base import devices
-from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
+from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile, TorchInferenceTile
+from aihwkit.simulator.tiles.torch_tile import TorchSimulatorTile
+from aihwkit.simulator.tiles.array import TileModuleArray
 
 
 @dataclass
-class FloatingPointRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
+class FloatingPointRPUConfig(MappableRPU, PrePostProcessingRPU):
     """Configuration for a floating point resistive processing unit."""
 
     tile_class: ClassVar[Type] = FloatingPointTile
     """Tile class that correspond to this RPUConfig."""
+
+    tile_array_class: ClassVar[Type] = TileModuleArray
+    """Tile class used for mapped logical tile arrays."""
 
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
     """Parameter that modify the behavior of the pulsed device."""
 
 
 @dataclass
-class SingleRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
+class SingleRPUConfig(MappableRPU, PrePostProcessingRPU):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
     """Tile class that correspond to this RPUConfig."""
+
+    tile_array_class: ClassVar[Type] = TileModuleArray
+    """Tile class used for mapped logical tile arrays."""
 
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
@@ -75,21 +84,20 @@ class SingleRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     update: UpdateParameters = field(default_factory=UpdateParameters)
     """Parameter for the update behavior."""
 
-    def as_bindings(self) -> devices.AnalogTileParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        return tile_parameters_to_bindings(self)
-
 
 @dataclass
-class UnitCellRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
+class UnitCellRPUConfig(MappableRPU, PrePostProcessingRPU):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
     """Tile class that correspond to this RPUConfig."""
 
+    tile_array_class: ClassVar[Type] = TileModuleArray
+    """Tile class used for mapped logical tile arrays."""
+
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
-    device: UnitCell = field(default_factory=UnitCell)
+    device: Union[UnitCell, TransferCompound] = field(default_factory=UnitCell)
     """Parameter that modify the behavior of the pulsed device."""
 
     forward: IOParameters = field(default_factory=IOParameters)
@@ -101,13 +109,41 @@ class UnitCellRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     update: UpdateParameters = field(default_factory=UpdateParameters)
     """Parameter for the parallel analog update behavior."""
 
-    def as_bindings(self) -> devices.AnalogTileParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        return tile_parameters_to_bindings(self)
+
+@dataclass
+class DigitalRankUpdateRPUConfig(MappableRPU, PrePostProcessingRPU):
+    """Configuration for an analog (unit cell) resistive processing unit
+    where the rank update is done in digital.
+
+    Note that for forward and backward, an analog crossbar is still
+    used, and during update the digitally computed rank update is
+    transferred to the analog crossbar using pulses.
+    """
+
+    tile_class: ClassVar[Type] = AnalogTile
+    """Tile class that correspond to this RPUConfig."""
+
+    tile_array_class: ClassVar[Type] = TileModuleArray
+    """Tile class used for mapped logical tile arrays."""
+
+    bindings_class: ClassVar[Type] = devices.AnalogTileParameter
+
+    device: DigitalRankUpdateCell = field(default_factory=DigitalRankUpdateCell)
+    """Parameter that modify the behavior of the pulsed device."""
+
+    forward: IOParameters = field(default_factory=IOParameters)
+    """Input-output parameter setting for the forward direction."""
+
+    backward: IOParameters = field(default_factory=IOParameters)
+    """Input-output parameter setting for the backward direction."""
+
+    update: UpdateParameters = field(default_factory=UpdateParameters)
+    """Parameter for the analog part of the update, that is the transfer
+    from the digital buffer to the devices."""
 
 
 @dataclass
-class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
+class InferenceRPUConfig(MappableRPU, PrePostProcessingRPU):
     """Configuration for an analog tile that is used only for inference.
 
     Training is done in *hardware-aware* manner, thus using only the
@@ -123,6 +159,9 @@ class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     tile_class: ClassVar[Type] = InferenceTile
     """Tile class that correspond to this RPUConfig."""
 
+    tile_array_class: ClassVar[Type] = TileModuleArray
+    """Tile class used for mapped logical tile arrays."""
+
     bindings_class: ClassVar[Type] = devices.AnalogTileParameter
 
     forward: IOParameters = field(default_factory=IOParameters)
@@ -137,7 +176,6 @@ class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
         inference. In addition, materials effects such as drift and
         programming noise can be enabled during inference by
         specifying the ``noise_model``
-
     """
 
     noise_model: BaseNoiseModel = field(default_factory=PCMLikeNoiseModel)
@@ -146,7 +184,6 @@ class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     This noise models establishes a phenomenological model of the
     material which is applied to the weights during inference only, when
     ``program_analog_weights`` or ``drift_analog_weights`` is called.
-
     """
 
     drift_compensation: Optional[BaseDriftCompensation] = field(
@@ -206,39 +243,35 @@ class InferenceRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
     )
     """Parameter for the update behavior: ``NONE`` pulse type."""
 
-    def as_bindings(self) -> devices.AnalogTileParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        return tile_parameters_to_bindings(self)
+    def compatible_with(self, tile_class_name: str) -> bool:
+        if tile_class_name in ["TorchInferenceTile"]:
+            return True
+        return tile_class_name == self.tile_class.__name__
 
 
 @dataclass
-class DigitalRankUpdateRPUConfig(MapableRPU, PrePostProcessingRPU, _PrintableMixin):
-    """Configuration for an analog (unit cell) resistive processing unit
-    where the rank update is done in digital.
+class TorchInferenceRPUConfig(InferenceRPUConfig):
+    """TorchInference configuration.
 
-    Note that for forward and backward, an analog crossbar is still
-    used, and during update the digitally computed rank update is
-    transferred to the analog crossbar using pulses.
+    This configuration defaults to a tile module implementation that
+    supported a subset of functions of the ``InferenceRPUConfig`` but
+    uses native torch instead of the RPUCuda library for simulating
+    the analog MVM.
+
+    The advantage is that autograd is more fully supported and
+    hardware aware training is more flexible to be modified. However,
+    some nonidealities are not supported.
+
+    Note:
+
+        For features that are not supported a ``NotImplementedError`` or a
+        ``TorchTileConfigError`` is raised.
     """
 
-    tile_class: ClassVar[Type] = AnalogTile
+    simulator_tile_class: ClassVar[Type] = TorchSimulatorTile
+
+    tile_class: ClassVar[Type] = TorchInferenceTile
     """Tile class that correspond to this RPUConfig."""
 
-    bindings_class: ClassVar[Type] = devices.AnalogTileParameter
-
-    device: DigitalRankUpdateCell = field(default_factory=DigitalRankUpdateCell)
-    """Parameter that modify the behavior of the pulsed device."""
-
-    forward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the forward direction."""
-
-    backward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the backward direction."""
-
-    update: UpdateParameters = field(default_factory=UpdateParameters)
-    """Parameter for the analog part of the update, that is the transfer
-    from the digital buffer to the devices."""
-
-    def as_bindings(self) -> devices.AnalogTileParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        return tile_parameters_to_bindings(self)
+    tile_array_class: ClassVar[Type] = TileModuleArray
+    """Tile class used for mapped logical tile arrays."""

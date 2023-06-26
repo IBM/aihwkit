@@ -216,7 +216,6 @@ for i in range(BATCH_SIZE):
 y_in = torch.stack(y_in_2d, dim=0).transpose(0, 1).unsqueeze(2)
 y_out = torch.stack(y_out_2d, dim=0).transpose(0, 1).unsqueeze(2)
 
-
 if WITH_EMBEDDING:
     if WITH_BIDIR:
         model = AnalogBidirRNNNetwork()
@@ -228,7 +227,7 @@ else:
     else:
         model = AnalogRNNNetwork_noEmbedding()
 
-model = model.to(DEVICE)
+model.to(DEVICE)
 optimizer = AnalogSGD(model.parameters(), lr=LEARNING_RATE)
 optimizer.regroup_param_groups(model)
 criterion = nn.MSELoss()

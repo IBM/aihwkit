@@ -168,8 +168,10 @@ public:
   void setHiddenWeights(const std::vector<T> &data) override;
   int getHiddenUpdateIdx() const override;
   void setHiddenUpdateIdx(int idx) override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
-  void printDP(int x_cunt, int d_count) const override;
+  void printDP(int x_count, int d_count) const override;
   void printToStream(std::stringstream &ss) const override { this->getPar().printToStream(ss); };
   void disp(std::stringstream &ss) const override {
     ss << this->getPar().getName() << " [" << this->x_size_ << "," << this->d_size_ << "]\n";
@@ -224,7 +226,7 @@ protected:
   T ***weights_vec_ = nullptr;
   std::vector<T> reduce_weightening_;
   int current_device_idx_ = 0;
-  unsigned long current_update_idx_ = 0;
+  uint64_t current_update_idx_ = 0;
   RealWorldRNG<T> rw_rng_{0};
 
   virtual int resetCounters(bool force = false);

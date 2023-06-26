@@ -18,12 +18,10 @@
 # pylint: disable=invalid-name, too-many-locals, import-error
 
 from datetime import datetime
-import argparse
-import collections
-import os
-
-import numpy as np
-
+from argparse import ArgumentParser
+from os import environ
+from collections import OrderedDict, defaultdict
+from numpy import log10, logspace, argsort
 from transformers.integrations import TensorBoardCallback
 
 from transformers import (
@@ -64,7 +62,7 @@ MODEL_NAME = "csarron/bert-base-uncased-squad-v1"
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 # Parse some arguments
-PARSER = argparse.ArgumentParser("Analog BERT on SQuAD example")
+PARSER = ArgumentParser("Analog BERT on SQuAD example")
 PARSER.add_argument("-d", "--digital", help="Add to use digital inference", action="store_true")
 PARSER.add_argument(
     "-i",
@@ -112,7 +110,7 @@ if ARGS.wandb:
 
     SWEEP_ID = wandb.sweep(sweep=SWEEP_CONFIG, project="bert-weight-noise-experiment")
 else:
-    os.environ["WANDB_DISABLED"] = "true"
+    environ["WANDB_DISABLED"] = "true"
 
 # max length and stride specific to pretrained model
 MAX_LENGTH = 320
@@ -350,14 +348,14 @@ def postprocess_predictions(
     example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
 
     # Create dict of lists, mapping example indices with corresponding feature indices
-    features_per_example = collections.defaultdict(list)
+    features_per_example = defaultdict(list)
 
     for i, feature in enumerate(features):
         # For each example, take example_id, map to corresponding index
         features_per_example[example_id_to_index[feature["example_id"]]].append(i)
 
     # The dictionaries we have to fill
-    predictions = collections.OrderedDict()
+    predictions = OrderedDict()
 
     print(
         f"Post-processing {len(examples)} example predictions "
@@ -385,8 +383,8 @@ def postprocess_predictions(
             offset_mapping = features[feature_index]["offset_mapping"]
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
-            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            start_indexes = argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            end_indexes = argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are
@@ -527,7 +525,7 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
 
     ground_truth = [{"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]]
 
-    t_inference_list = np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
+    t_inference_list = logspace(0, log10(float(max_inference_time)), n_times).tolist()
 
     # Get the initial metrics
     f1, exact_match = predict()

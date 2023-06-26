@@ -141,10 +141,13 @@ private:
   void initialize(int x_size, int d_size);
   void freeContainers();
 
+  // handled in base
+  T **chi_ = nullptr;
+
+  // temporary
   std::vector<T> qx_;
   std::vector<T> qd_;
   std::vector<int> qx_index_;
-  T **chi_ = nullptr;
 };
 
 } // namespace RPU

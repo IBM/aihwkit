@@ -16,10 +16,14 @@
 #include <memory>
 
 #include "rpucuda_buffered_transfer_device.h"
+#include "rpucuda_chopped_transfer_device.h"
 #include "rpucuda_constantstep_device.h"
+#include "rpucuda_dynamic_transfer_device.h"
 #include "rpucuda_expstep_device.h"
+#include "rpucuda_hidden_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_mixedprec_device.h"
+#include "rpucuda_mixedprec_int_device.h"
 #include "rpucuda_onesided_device.h"
 #include "rpucuda_piecewisestep_device.h"
 #include "rpucuda_powstep_device.h"
@@ -41,6 +45,9 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
   case DeviceUpdateType::ConstantStep:
     return new ConstantStepRPUDeviceCuda<T>(
         c, static_cast<const ConstantStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::HiddenStep:
+    return new HiddenStepRPUDeviceCuda<T>(
+        c, static_cast<const HiddenStepRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::LinearStep:
   case DeviceUpdateType::SoftBounds:
     return new LinearStepRPUDeviceCuda<T>(
@@ -60,6 +67,9 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
     return new SimpleRPUDeviceCuda<T>(c, static_cast<const SimpleRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::MixedPrec:
     return new MixedPrecRPUDeviceCuda<T>(c, static_cast<const MixedPrecRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::MixedPrecInt:
+    return new MixedPrecIntRPUDeviceCuda<T>(
+        c, static_cast<const MixedPrecIntRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::PowStep:
     return new PowStepRPUDeviceCuda<T>(c, static_cast<const PowStepRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::PowStepReference:
@@ -68,6 +78,12 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
   case DeviceUpdateType::PiecewiseStep:
     return new PiecewiseStepRPUDeviceCuda<T>(
         c, static_cast<const PiecewiseStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::ChoppedTransfer:
+    return new ChoppedTransferRPUDeviceCuda<T>(
+        c, static_cast<const ChoppedTransferRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::DynamicTransfer:
+    return new DynamicTransferRPUDeviceCuda<T>(
+        c, static_cast<const DynamicTransferRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::SoftBoundsReference:
     return new SoftBoundsReferenceRPUDeviceCuda<T>(
         c, static_cast<const SoftBoundsReferenceRPUDevice<T> &>(rpu_device));
@@ -126,6 +142,8 @@ SimpleRPUDeviceCuda<T>::SimpleRPUDeviceCuda(const SimpleRPUDeviceCuda<T> &other)
   if (other.wdrifter_cuda_) {
     wdrifter_cuda_ = RPU::make_unique<WeightDrifterCuda<T>>(*other.wdrifter_cuda_);
   }
+
+  // rnd buffers are not copied.
 };
 
 template <typename T>
@@ -146,7 +164,33 @@ SimpleRPUDeviceCuda<T> &SimpleRPUDeviceCuda<T>::operator=(SimpleRPUDeviceCuda<T>
   initialize(other.context_, other.x_size_, other.d_size_);
   par_storage_ = std::move(other.par_storage_);
   wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
+
+  dev_reset_nrnd_ = std::move(dev_reset_nrnd_);
+  dev_reset_flag_ = std::move(dev_reset_flag_);
+  rnd_context_ = std::move(rnd_context_);
+  dev_diffusion_nrnd_ = std::move(dev_diffusion_nrnd_);
+
   return *this;
+};
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+  context_->synchronize();
+  if (wdrifter_cuda_) {
+    wdrifter_cuda_->dumpExtra(state, "wdrifter_cuda");
+    RPU::insertWithPrefix(extra, state, prefix);
+  }
+}
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  context_->synchronize();
+  if (wdrifter_cuda_) {
+    auto state = RPU::selectWithPrefix(extra, prefix);
+    wdrifter_cuda_->loadExtra(state, "wdrifter", strict);
+  }
 };
 
 template <typename T>
@@ -262,6 +306,79 @@ template <typename T> void SimpleRPUDeviceCuda<T>::clipWeights(T *weights, T cli
 
   if (clip >= 0) {
     RPU::math::aclip<T>(context_, weights, size_, clip);
+  }
+}
+template <typename T> void SimpleRPUDeviceCuda<T>::initResetRnd() {
+
+  if (this->rnd_context_ == nullptr) {
+    this->initRndContext();
+  }
+  dev_reset_nrnd_ =
+      RPU::make_unique<CudaArray<float>>(&*this->rnd_context_, (this->size_ + 31) / 32 * 32);
+  dev_reset_flag_ =
+      RPU::make_unique<CudaArray<float>>(&*this->rnd_context_, (this->size_ + 31) / 32 * 32);
+  dev_reset_flag_->setConst(0);
+  this->rnd_context_->synchronize();
+}
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in, T reset_prob) {
+  // col-major in CUDA.
+
+  T *w = weights;
+
+  int n_cols = (n_cols_in >= 0) ? n_cols_in : this->x_size_;
+
+  int n = n_cols * this->d_size_;
+  int offset = start_col * this->d_size_;
+  bool with_flag = false;
+  bool with_nrnd = false;
+
+  if (getPar().reset_std > 0) {
+    if (dev_reset_nrnd_ == nullptr) {
+      initResetRnd();
+    }
+    this->rnd_context_->randNormal(
+        dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
+    with_nrnd = true;
+  }
+  if (reset_prob < 1) {
+    if (dev_reset_flag_ == nullptr) {
+      initResetRnd();
+    }
+    this->rnd_context_->randUniform(dev_reset_flag_->getData(), n_cols * this->d_size_);
+    with_flag = true;
+  }
+  if (with_flag || with_nrnd) {
+    this->context_->recordWaitEvent(this->rnd_context_->getStream());
+  }
+
+  if (n >= this->size_) {
+    // reset whole matrix
+    RPU::math::elemreset<T>(
+        this->context_, w, this->size_, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob);
+
+  } else if (offset + n <= this->size_) {
+    // one pass enough
+    RPU::math::elemreset<T>(
+        this->context_, w + offset, n, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob);
+  } else {
+    // two passes
+    int m = this->size_ - offset;
+
+    RPU::math::elemreset<T>(
+        this->context_, w + offset, m, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob);
+
+    RPU::math::elemreset<T>(
+        this->context_, w, n - m, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() + m : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() + m : nullptr, reset_prob);
   }
 }
 

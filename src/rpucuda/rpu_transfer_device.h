@@ -213,6 +213,8 @@ public:
   inline const ForwardBackwardPassIOManaged<T> &getTransferFBPass() const {
     return *transfer_fb_pass_;
   };
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
   void populate(const TransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);

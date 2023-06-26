@@ -21,6 +21,7 @@ namespace RPU {
 template <typename T> class MVParameter {
 
 public:
+  std::vector<T> out_noise_values;
   std::vector<T> v_offset;
   std::vector<T> w_asymmetry;
   std::vector<T> out_nonlinearity;
@@ -80,6 +81,9 @@ public:
       const T beta,
       const bool transpose);
 
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+
 protected:
   int x_size_ = 0;
   int d_size_ = 0;
@@ -112,6 +116,9 @@ public:
 
     // others are tmps so far
   }
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   void forwardVector(
       T **weights,

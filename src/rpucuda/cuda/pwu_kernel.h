@@ -1504,6 +1504,114 @@ __global__ void kernelUpdateWBatchSharedWeightOutputFunctor(
   RPU_UWBS_CLOSE_STRIDE_LOOP;
 }
 
+/* Pulse counter*/
+template <typename T, int one_sided, typename count_t, bool x_trans, bool d_trans>
+__global__ void kernelPulseCounter(
+    uint64_t *pos_pulses,
+    uint64_t *neg_pulses,
+    count_t *x_counts,
+    int x_size,
+    count_t *d_counts,
+    int d_size,
+    int nK32_in,
+    int m_batch_in,
+    kagg_t *Kn = nullptr) {
+  int m_batch = m_batch_in;
+  if (Kn != nullptr) {
+    m_batch = ((*Kn) + 31) / 32; // overwrite m_batch in case of BO64 UBLM
+  }
+  volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  const int total_threads = blockDim.x * gridDim.x;
+
+  const int xsz = x_size;
+  const int dsz = d_size;
+  const int sz = xsz * dsz;
+  const int nK32 = nK32_in;
+  count_t *xptr, *dptr;
+
+  uint64_t n_pos = 0;
+  uint64_t n_neg = 0;
+
+  const int x_count_offset = xsz * nK32;
+  const int d_count_offset = dsz * nK32;
+
+  for (int i_stride = 0; i_stride < sz; i_stride += total_threads) {
+
+    int idx = tid + i_stride;
+
+    if (idx < sz) { // stride over all elements of W
+
+      int dIdx = idx % dsz; // first d
+      int xIdx = idx / dsz;
+
+      n_pos = pos_pulses[idx];
+      n_neg = neg_pulses[idx];
+
+      uint32_t sum_n = 0;
+      uint32_t last_negative = 0;
+
+      for (int i_batch = 0; i_batch < m_batch; i_batch++) {
+
+        xptr = &x_counts[getIdxToLoad<x_trans>(i_batch, xIdx, xsz, m_batch, x_count_offset)];
+        dptr = &d_counts[getIdxToLoad<d_trans>(i_batch, dIdx, dsz, m_batch, d_count_offset)];
+
+        bool mixed;
+        uint32_t negative;
+        uint32_t n;
+
+        getNfromCount<one_sided, count_t>(n, negative, mixed, xptr, dptr, nK32, xsz, dsz);
+
+        if (mixed) {
+          for (int i_bit = 0; i_bit < 32; i_bit++) {
+            uint32_t bit_n = testBit(n, i_bit) ? 1 : 0;
+            if (bit_n != 0) {
+              uint32_t bit_neg = testBit(negative, i_bit) ? 1 : 0;
+              if (bit_neg == last_negative) {
+                sum_n += 1;
+              } else {
+                if (sum_n > 0) {
+                  if (last_negative) {
+                    n_neg += sum_n;
+                  } else {
+                    n_pos += sum_n;
+                  }
+                }
+                sum_n = 1;
+                last_negative = bit_neg;
+              }
+            }
+          }
+        } else {
+          if ((n == 0) || (last_negative == negative)) {
+            sum_n += n;
+          } else {
+            if (sum_n > 0) {
+              if (last_negative) {
+                n_neg += sum_n;
+              } else {
+                n_pos += sum_n;
+              }
+            }
+            sum_n = n;
+            last_negative = negative;
+          }
+        }
+
+      } // batch
+      // last update
+      if (sum_n > 0) {
+        if (last_negative) {
+          n_neg += sum_n;
+        } else {
+          n_pos += sum_n;
+        }
+      }
+      pos_pulses[idx] = n_pos;
+      neg_pulses[idx] = n_neg;
+    }
+  }
+}
+
 } // namespace RPU
 #undef RPU_SAVE_WEIGHT_OUTPUT
 #undef RPU_FUNCTOR_LOAD_PARAMS

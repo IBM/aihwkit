@@ -99,6 +99,7 @@ void backwardMatrix(
 template <typename T> class MVParameterCuda {
 public:
   MVParameterCuda(){};
+  CudaArray<T> out_noise_values;
   CudaArray<T> v_offset;
   CudaArray<T> w_asymmetry;
   CudaArray<T> out_nonlinearity;
@@ -106,6 +107,7 @@ public:
 
   friend void swap(MVParameterCuda<T> &a, MVParameterCuda<T> &b) noexcept {
     using std::swap;
+    swap(a.out_noise_values, b.out_noise_values);
     swap(a.v_offset, b.v_offset);
     swap(a.w_asymmetry, b.w_asymmetry);
     swap(a.out_nonlinearity_factor, b.out_nonlinearity_factor);
@@ -147,6 +149,8 @@ public:
     swap(a.context_, b.context_);
     swap(a.fb_pars_, b.fb_pars_);
   }
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
   void populateFrom(const FBParameter<T> &fb_pars_host);
   bool checkFlexibleInSize(const IOMetaParameter<T> &io) {
@@ -295,8 +299,16 @@ protected:
 private:
   inline void
   applyOutputWeightNoise(InputOutputManager<T> &iom, const bool out_trans, const bool tranposed);
+
+  inline void applyOutputNoiseOtoO(
+      InputOutputManager<T> &iom,
+      const MVParameterCuda<T> &mv_pars,
+      const bool out_trans,
+      const bool tranposed);
+
   inline void applyOutputPCMReadNoise(
       const T *dev_weights, InputOutputManager<T> &iom, const bool out_trans, const bool tranposed);
+
   inline void applyIrDrop(
       const T *dev_weights,
       InputOutputManager<T> &iom,
@@ -313,6 +325,10 @@ private:
     auto io = iom.getIO();
     if (io.hasNLCalibration()) {
       applyOutputNonLinearity(iom, mv_pars, out_trans, transposed);
+    }
+    if (io.out_noise_std > (T)0.0) {
+      applyOutputNoiseOtoO(iom, mv_pars, out_trans, transposed);
+      return iom.applyToOutput(out_values, out_trans, false);
     }
     return iom.applyToOutput(out_values, out_trans);
   }

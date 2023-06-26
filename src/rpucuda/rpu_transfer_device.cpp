@@ -663,6 +663,42 @@ void TransferRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector
   }
 }
 
+template <typename T>
+void TransferRPUDevice<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  VectorRPUDevice<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  RPU::insert(state, "current_slice_indices", current_slice_indices_);
+
+  // RPU::insert(state, "transfer_vecs", transfer_vecs_);
+  RPU::insert(state, "transfer_every", transfer_every_);
+
+  transfer_fb_pass_->dumpExtra(state, "transfer_fb_pass");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void TransferRPUDevice<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  VectorRPUDevice<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "current_slice_indices", current_slice_indices_, strict);
+  if (state.count("transfer_vecs")) {
+    RPU::load(state, "transfer_vecs", transfer_vecs_, strict);
+  }
+  if (state.count("transfer_every")) {
+    RPU::load(state, "transfer_every", transfer_every_, strict);
+  }
+  transfer_fb_pass_->loadExtra(state, "transfer_fb_pass", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+}
+
 #undef COMMA
 #undef LOOP_WITH_HIDDEN
 

@@ -12,15 +12,16 @@
 
 """ Analog cells for RNNs. """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Type
 from collections import namedtuple
 
 from torch import Tensor, sigmoid, tanh, zeros, cat
 
 from aihwkit.nn.modules.container import AnalogSequential
+from aihwkit.nn.modules.linear import AnalogLinear
 
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.nn.modules.base import RPUConfigAlias
+from aihwkit.simulator.configs.configs import InferenceRPUConfig
+from aihwkit.simulator.parameters.base import RPUConfigBase
 
 LSTMState = namedtuple("LSTMState", ["hx", "cx"])
 
@@ -33,8 +34,8 @@ class AnalogVanillaRNNCell(AnalogSequential):
         hidden_size: in_features and out_features size for W_hh matrix
         bias: whether to use a bias row on the analog tile or not
         rpu_config: configuration for an analog resistive processing unit
-        realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and read out of weights
+        tile_module_class: Class for the analog tile module (default
+            will be specified from the ``RPUConfig``).
     """
 
     # pylint: disable=abstract-method
@@ -43,8 +44,8 @@ class AnalogVanillaRNNCell(AnalogSequential):
         input_size: int,
         hidden_size: int,
         bias: bool,
-        rpu_config: Optional[RPUConfigAlias] = None,
-        realistic_read_write: bool = False,
+        rpu_config: Optional[RPUConfigBase] = None,
+        tile_module_class: Optional[Type] = None,
     ):
         super().__init__()
 
@@ -54,20 +55,8 @@ class AnalogVanillaRNNCell(AnalogSequential):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = rpu_config.get_linear()(
-            input_size,
-            hidden_size,
-            bias=bias,
-            rpu_config=rpu_config,
-            realistic_read_write=realistic_read_write,
-        )
-        self.weight_hh = rpu_config.get_linear()(
-            hidden_size,
-            hidden_size,
-            bias=bias,
-            rpu_config=rpu_config,
-            realistic_read_write=realistic_read_write,
-        )
+        self.weight_ih = AnalogLinear(input_size, hidden_size, bias, rpu_config, tile_module_class)
+        self.weight_hh = AnalogLinear(hidden_size, hidden_size, bias, rpu_config, tile_module_class)
 
     def get_zero_state(self, batch_size: int) -> Tensor:
         """Returns a zeroed state.
@@ -99,8 +88,8 @@ class AnalogLSTMCell(AnalogSequential):
         hidden_size: in_features and out_features size for W_hh matrix
         bias: whether to use a bias row on the analog tile or not
         rpu_config: configuration for an analog resistive processing unit
-        realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and read out of weights
+        tile_module_class: Class for the analog tile module (default
+            will be specified from the ``RPUConfig``).
     """
 
     # pylint: disable=abstract-method
@@ -110,8 +99,8 @@ class AnalogLSTMCell(AnalogSequential):
         input_size: int,
         hidden_size: int,
         bias: bool,
-        rpu_config: Optional[RPUConfigAlias] = None,
-        realistic_read_write: bool = False,
+        rpu_config: Optional[RPUConfigBase] = None,
+        tile_module_class: Optional[Type] = None,
     ):
         super().__init__()
 
@@ -121,19 +110,11 @@ class AnalogLSTMCell(AnalogSequential):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = rpu_config.get_linear()(
-            input_size,
-            4 * hidden_size,
-            bias=bias,
-            rpu_config=rpu_config,
-            realistic_read_write=realistic_read_write,
+        self.weight_ih = AnalogLinear(
+            input_size, 4 * hidden_size, bias, rpu_config, tile_module_class
         )
-        self.weight_hh = rpu_config.get_linear()(
-            hidden_size,
-            4 * hidden_size,
-            bias=bias,
-            rpu_config=rpu_config,
-            realistic_read_write=realistic_read_write,
+        self.weight_hh = AnalogLinear(
+            hidden_size, 4 * hidden_size, bias, rpu_config, tile_module_class
         )
 
     def get_zero_state(self, batch_size: int) -> Tensor:
@@ -178,8 +159,8 @@ class AnalogLSTMCellCombinedWeight(AnalogSequential):
         hidden_size: The number of features in the hidden state `h`
         bias: whether to use a bias row on the analog tile or not.
         rpu_config: resistive processing unit configuration.
-        realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and during reading of the weights.
+        tile_module_class: Class for the analog tile module (default
+            will be specified from the ``RPUConfig``).
     """
 
     # pylint: disable=abstract-method
@@ -189,8 +170,8 @@ class AnalogLSTMCellCombinedWeight(AnalogSequential):
         input_size: int,
         hidden_size: int,
         bias: bool,
-        rpu_config: Optional[RPUConfigAlias] = None,
-        realistic_read_write: bool = False,
+        rpu_config: Optional[RPUConfigBase] = None,
+        tile_module_class: Optional[Type] = None,
     ):
         super().__init__()
 
@@ -200,12 +181,8 @@ class AnalogLSTMCellCombinedWeight(AnalogSequential):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight = rpu_config.get_linear()(
-            input_size + hidden_size,
-            4 * hidden_size,
-            bias=bias,
-            rpu_config=rpu_config,
-            realistic_read_write=realistic_read_write,
+        self.weight = AnalogLinear(
+            input_size + hidden_size, 4 * hidden_size, bias, rpu_config, tile_module_class
         )
 
     def get_zero_state(self, batch_size: int) -> Tensor:
@@ -251,8 +228,8 @@ class AnalogGRUCell(AnalogSequential):
         hidden_size: in_features and out_features size for W_hh matrix
         bias: whether to use a bias row on the analog tile or not
         rpu_config: configuration for an analog resistive processing unit
-        realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and read out of weights
+        tile_module_class: Class for the analog tile module (default
+            will be specified from the ``RPUConfig``).
     """
 
     # pylint: disable=abstract-method
@@ -262,8 +239,8 @@ class AnalogGRUCell(AnalogSequential):
         input_size: int,
         hidden_size: int,
         bias: bool,
-        rpu_config: Optional[RPUConfigAlias] = None,
-        realistic_read_write: bool = False,
+        rpu_config: Optional[RPUConfigBase] = None,
+        tile_module_class: Optional[Type] = None,
     ):
         super().__init__()
 
@@ -273,19 +250,11 @@ class AnalogGRUCell(AnalogSequential):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.weight_ih = rpu_config.get_linear()(
-            input_size,
-            3 * hidden_size,
-            bias=bias,
-            rpu_config=rpu_config,
-            realistic_read_write=realistic_read_write,
+        self.weight_ih = AnalogLinear(
+            input_size, 3 * hidden_size, bias, rpu_config, tile_module_class
         )
-        self.weight_hh = rpu_config.get_linear()(
-            hidden_size,
-            3 * hidden_size,
-            bias=bias,
-            rpu_config=rpu_config,
-            realistic_read_write=realistic_read_write,
+        self.weight_hh = AnalogLinear(
+            hidden_size, 3 * hidden_size, bias, rpu_config, tile_module_class
         )
 
     def get_zero_state(self, batch_size: int) -> Tensor:

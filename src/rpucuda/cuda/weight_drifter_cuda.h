@@ -37,6 +37,9 @@ public:
   void saturate(T *weights, float *dev_4params);
   const T *getNu() const { return dev_nu_ == nullptr ? nullptr : dev_nu_->getDataConst(); };
 
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+
 protected:
   CudaContextPtr context_ = nullptr;
   int size_ = 0;

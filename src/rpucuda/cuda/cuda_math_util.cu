@@ -683,6 +683,68 @@ template void elemresetsat<double>(
     const float *);
 #endif
 
+// MSK = P<thres
+// W(MSK) = A(MSK) + B(MSK)
+template <typename T>
+__global__ void kernelElemReset(
+    T *dev_W,
+    const int size,
+    const T *dev_A,
+    const float *dev_B,
+    const float *dev_P,
+    const T thres) {
+
+  bool with_A = dev_A != nullptr;
+  bool with_B = dev_B != nullptr;
+  bool with_P = dev_P != nullptr;
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T th = thres;
+    T a = (with_A) ? dev_A[idx] : (float)0.0;
+    float p = (with_P) ? dev_P[idx] : (float)0.0;
+    float b = (with_B) ? dev_B[idx] : (float)0.0;
+    T w = dev_W[idx];
+
+    if (p < th) {
+      w = a + b;
+      dev_W[idx] = w;
+    }
+  }
+}
+template <typename T>
+void elemreset(
+    const CudaContextPtr context,
+    T *dev_W,
+    const int size,
+    const T *dev_A,
+    const float *dev_B,
+    const float *dev_P,
+    T thres) {
+
+  int nthreads = context->getNThreads();
+  int nblocks = context->getNBlocks(size, nthreads);
+  kernelElemReset<T>
+      <<<nblocks, nthreads, 0, context->getStream()>>>(dev_W, size, dev_A, dev_B, dev_P, thres);
+}
+template void elemreset<float>(
+    const CudaContextPtr,
+    float *,
+    const int,
+    const float *,
+    const float *,
+    const float *,
+    const float);
+#ifdef RPU_USE_DOUBLE
+template void elemreset<double>(
+    const CudaContextPtr,
+    double *,
+    const int,
+    const double *,
+    const float *,
+    const float *,
+    const double);
+#endif
+
 // MSK != 0
 // W(MSK) = sat(reset_bias(MSK) + std*randn())
 #define RESET_TOLERANCE 1e-6

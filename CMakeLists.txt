@@ -17,6 +17,7 @@ option(USE_CUDA "Build with CUDA support" $ENV{USE_CUDA})
 option(RPU_DEBUG "Enable debug printing" OFF)
 option(RPU_USE_FASTMOD "Use fast mod" ON)
 option(RPU_USE_FASTRAND "Use fastrand" OFF)
+option(RPU_USE_TORCH_BUFFERS "Use torch buffers for RPUCuda" ON)
 
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
 set(RPU_CUDA_ARCHITECTURES "60;70;75;80" CACHE STRING "Target CUDA architectures")
@@ -25,8 +26,7 @@ set(RPU_CUDA_ARCHITECTURES "60;70;75;80" CACHE STRING "Target CUDA architectures
 set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
                            CUDA_RESOLVE_DEVICE_SYMBOLS ON
                            CUDA_SEPARABLE_COMPILATION ON
-                           CXX_STANDARD 11
-                           POSITION_INDEPENDENT_CODE ON)
+                           CXX_STANDARD 14)
 
 # Append the virtualenv library path to cmake.
 if(DEFINED ENV{VIRTUAL_ENV})
@@ -43,7 +43,7 @@ include(cmake/dependencies_test.cmake)
 # Set compilation flags.
 if(WIN32)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2")
-  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD 14)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-narrowing -Wno-strict-overflow")
@@ -65,8 +65,8 @@ if(WIN32)
   target_link_libraries(RPU_CPU c10.lib torch_cpu.lib)
 endif()
 
-set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 11
-                                         POSITION_INDEPENDENT_CODE ON)
+set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 14
+  POSITION_INDEPENDENT_CODE ON)
 
 if(USE_CUDA)
   add_subdirectory(src/rpucuda/cuda)
@@ -81,13 +81,18 @@ if(USE_CUDA)
   set_target_properties(RPU_GPU PROPERTIES ${CUDA_TARGET_PROPERTIES})
   set_property(TARGET RPU_GPU PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
 
+  if (RPU_USE_TORCH_BUFFERS)
+    add_compile_definitions(RPU_TORCH_CUDA_BUFFERS)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=186")
+  endif(RPU_USE_TORCH_BUFFERS)
+
   if(${CUDAToolkit_VERSION_MAJOR} LESS 11)
     # The "cub" target only exists if cub was downloaded during build.
     if(TARGET cub)
         add_dependencies(RPU_GPU cub)
     endif()
   endif()
-
 endif(USE_CUDA)
 
 # Add aihwkit targets.

@@ -455,9 +455,9 @@ __global__ void kernelOutputManagementBatch(
       local_nm_scale = nm_scale_values[bidx];
     }
 
-    APPLY_ASYMMETRY;
-
     ADD_NOISE;
+
+    APPLY_ASYMMETRY;
 
     DISCRETIZE_VALUE_STOCH;
 
@@ -505,9 +505,9 @@ __global__ void kernelOutputBoundManagement(
   STRIDE_LOOP(
       size, value * osc,
 
-      APPLY_ASYMMETRY;
-
       ADD_NOISE;
+
+      APPLY_ASYMMETRY;
 
       DISCRETIZE_VALUE_STOCH;
 
@@ -575,9 +575,9 @@ __global__ void kernelOutputBoundManagementBatch(
       int sidx = trans ? (idx % m_batch) : (idx / size);
       T local_scale = scale_values[sidx];
 
-      APPLY_ASYMMETRY;
-
       ADD_NOISE;
+
+      APPLY_ASYMMETRY;
 
       DISCRETIZE_VALUE_STOCH;
 
@@ -840,7 +840,7 @@ void InputOutputManager<T>::applyToInput(InputIteratorT dev_input) {
 template <typename T>
 template <typename OutputIteratorT>
 bool InputOutputManager<T>::applyToOutputWithBoundManagement(
-    OutputIteratorT dev_output, const bool out_trans) {
+    OutputIteratorT dev_output, const bool out_trans, const bool with_out_noise) {
 
   cudaStream_t s = context_->getStream();
   int m_batch = temp_m_batch_;
@@ -850,9 +850,9 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
   if (m_batch == RPU_IO_USE_SINGLE_BATCH_VERSION) {
     int nblocks_om = getOutBlocks();
     kernelOutputBoundManagement<<<nblocks_om, nthreads_, 0, s>>>(
-        dev_output, temp_output_applied_, out_size_, io_->out_noise, dev_scale_values_->getData(),
-        -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round, temp_out_scale_,
-        io_->bm_test_negative_bound, io_->out_asymmetry,
+        dev_output, temp_output_applied_, out_size_, with_out_noise ? io_->out_noise : (T)0.0,
+        dev_scale_values_->getData(), -io_->out_bound, io_->out_bound, io_->out_res,
+        io_->out_sto_round, temp_out_scale_, io_->bm_test_negative_bound, io_->out_asymmetry,
         context_->getRandomStates(MIN(nblocks_om * nthreads_, out_size_)),
         dev_any_exceeded_->getData());
   } else {
@@ -862,8 +862,8 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
         dev_scale_values_->getData(),
         dev_bound_exceeded_->getData(), // out
         dev_any_exceeded_->getData(),   // out
-        io_->out_noise, -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round,
-        temp_out_scale_, io_->bm_test_negative_bound, io_->out_asymmetry,
+        with_out_noise ? io_->out_noise : (T)0.0, -io_->out_bound, io_->out_bound, io_->out_res,
+        io_->out_sto_round, temp_out_scale_, io_->bm_test_negative_bound, io_->out_asymmetry,
         context_->getRandomStates(MIN(nblocks_om_batch * nthreads_, out_size_ * m_batch)));
   }
 
@@ -875,7 +875,8 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
 
 template <typename T>
 template <typename OutputIteratorT>
-bool InputOutputManager<T>::applyToOutput(OutputIteratorT dev_output, const bool out_trans) {
+bool InputOutputManager<T>::applyToOutput(
+    OutputIteratorT dev_output, const bool out_trans, const bool with_out_noise) {
 
   if (io_->isPerfect()) {
     // short-cut (still need to copy though to apply the iterator)
@@ -889,7 +890,7 @@ bool InputOutputManager<T>::applyToOutput(OutputIteratorT dev_output, const bool
   if (io_->bound_management != BoundManagementType::None) {
 
     // bound management
-    return applyToOutputWithBoundManagement(dev_output, out_trans);
+    return applyToOutputWithBoundManagement(dev_output, out_trans, with_out_noise);
 
   } else {
 
@@ -905,17 +906,18 @@ bool InputOutputManager<T>::applyToOutput(OutputIteratorT dev_output, const bool
       int nblocks_om = MIN(context_->getNBlocks(out_size_, nthreads_), nblocks_batch_max_);
       LAUNCH_NM_KERNEL(
           kernelOutputManagement, OutputIteratorT, nblocks_om,
-          (dev_output, temp_output_applied_, out_size_, io_->out_noise, nm_scale_values,
-           -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round, temp_out_scale_,
-           io_->out_asymmetry, context_->getRandomStates(MIN(nblocks_om * nthreads_, out_size_))));
+          (dev_output, temp_output_applied_, out_size_, with_out_noise ? io_->out_noise : (T)0.0,
+           nm_scale_values, -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round,
+           temp_out_scale_, io_->out_asymmetry,
+           context_->getRandomStates(MIN(nblocks_om * nthreads_, out_size_))));
 
     } else {
       // batched
       LAUNCH_NM_KERNEL(
           kernelOutputManagementBatch, OutputIteratorT, nblocks_om_batch,
           (dev_output, temp_output_applied_, out_size_, m_batch, out_trans, nm_scale_values,
-           io_->out_noise, -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round,
-           temp_out_scale_, io_->out_asymmetry,
+           with_out_noise ? io_->out_noise : (T)0.0, -io_->out_bound, io_->out_bound, io_->out_res,
+           io_->out_sto_round, temp_out_scale_, io_->out_asymmetry,
            context_->getRandomStates(MIN(nblocks_om_batch * nthreads_, out_size_ * m_batch))));
     }
 
@@ -923,8 +925,31 @@ bool InputOutputManager<T>::applyToOutput(OutputIteratorT dev_output, const bool
   }
 }
 
+template <typename T>
+void InputOutputManager<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  context_->synchronize();
+  RPU::state_t state;
+
+  noise_manager_->dumpExtra(state, "noise_manager");
+  // output_maximizer_->dumpExtra(state, "output_maximizer");
+
+  // will not handle buffers in to store data between applyToInput and applyToOutput
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void InputOutputManager<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  context_->synchronize();
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  noise_manager_->loadExtra(state, "noise_manager", strict);
+  // output_maximizer_->loadExtra(state, "output_maximizer", strict);
+}
+
 // init necessary templates..
-#define OARG(NUM_T) , const bool
+#define OARG(NUM_T) , const bool, const bool
 #define IARG(NUM_T)                                                                                \
   , const IOMetaParameter<NUM_T> &, const int, const int, const bool, const NUM_T, const bool
 

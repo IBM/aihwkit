@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass
 
-from aihwkit.simulator.configs.utils import (
+from aihwkit.simulator.parameters.utils import (
     BoundManagementType,
     IOParameters,
     NoiseManagementType,
@@ -48,9 +48,9 @@ class PresetIOParameters(IOParameters):
 
     Finally, we assume by default that the device is run with bound
     management (see
-    :class:`~aihwkit.simulator.config.utils.BoundManagementType`) and
+    :class:`~aihwkit.simulator.parameters.enums.BoundManagementType`) and
     noise management (see
-    :class:`~aihwkit.simulator.config.utils.NoiseManagementType`)
+    :class:`~aihwkit.simulator.parameters.enums.NoiseManagementType`)
     turned on to `ITERATIVE` and `ABS_MAX`, respectively.
     """
 
@@ -92,3 +92,34 @@ class PresetUpdateParameters(UpdateParameters):
     pulse_type: PulseType = PulseType.STOCHASTIC_COMPRESSED
     update_bl_management: bool = True  # Dynamically adjusts pulse train length (max 31).
     update_management: bool = True
+
+
+@dataclass
+class StandardIOParameters(IOParameters):
+    r"""Preset for the forward and backward pass parameters.
+
+    Preset that is more aligned with the the forward pass of
+    :class:`~aihwkit.simulator.presets.configs.StandardHWATrainingPreset`,
+    as it assumes the same DAC/ ADC resolution, output bound and
+    output noise (see also `Rasch et al. ArXiv 2023`_ for a discussion)
+
+    However, here, noise and bound mangement is turned on by default,
+    and IR-drop as well as short-term weight noise is set to 0 by
+    default.
+
+    .. _`Rasch et al. ArXiv 2023`: https://arxiv.org/abs/2302.08469
+    """
+
+    bound_management: BoundManagementType = BoundManagementType.ITERATIVE
+    noise_management: NoiseManagementType = NoiseManagementType.ABS_MAX
+
+    inp_res: float = 1.0 / (2**8 - 2)  # 8 bit DAC.
+    inp_sto_round: bool = False
+
+    out_bound: float = 10.0
+    out_noise: float = 0.04
+    out_res: float = 1.0 / (2**8 - 2)  # 8 bit ADC.
+
+    # No read noise by default.
+    w_noise: float = 0.0
+    w_noise_type: WeightNoiseType = WeightNoiseType.NONE

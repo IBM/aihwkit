@@ -131,6 +131,34 @@ template <typename T> WeightDrifterCuda<T>::WeightDrifterCuda(const WeightDrifte
 }
 
 template <typename T>
+void WeightDrifterCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+
+  RPU::insert(state, "active", active_);
+  RPU::insert(state, "current_t", current_t_);
+  RPU::insert(state, "dev_previous_weights", dev_previous_weights_);
+  RPU::insert(state, "dev_w0", dev_w0_);
+  RPU::insert(state, "dev_t", dev_t_);
+  RPU::insert(state, "dev_nu", dev_nu_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void WeightDrifterCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(context_, state, "dev_previous_weights", dev_previous_weights_, strict);
+  RPU::load(context_, state, "dev_w0", dev_w0_, strict);
+  RPU::load(context_, state, "dev_t", dev_t_, strict);
+  RPU::load(context_, state, "dev_nu", dev_nu_, strict);
+  RPU::load(state, "current_t", current_t_, strict);
+  RPU::load(state, "active", active_, strict);
+}
+
+template <typename T>
 void WeightDrifterCuda<T>::populateFrom(const WeightDrifter<T> &wd, int x_size, int d_size) {
   // only copies the parameter from nu. Other parameters are set when set to active.
 

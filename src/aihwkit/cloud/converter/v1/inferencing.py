@@ -10,19 +10,17 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=no-name-in-module, import-error
+
 """Converters for `BasicInferencing` Experiment."""
 
 from typing import Any, Dict, List
-
-# from collections import OrderedDict
-
 from torch.nn import Module, NLLLoss
 
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.cloud.converter.exceptions import ConversionError
 from aihwkit.cloud.converter.v1.i_mappings import InverseMappings, Mappings
 
-# pylint: disable=no-name-in-module,import-error
 from aihwkit.experiments.experiments.inferencing import BasicInferencing  # type: ignore[import]
 from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: ignore[attr-defined]
     InferenceInput,

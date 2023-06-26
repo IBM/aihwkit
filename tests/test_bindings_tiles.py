@@ -25,7 +25,7 @@ from aihwkit.simulator.rpu_base import tiles
 
 from aihwkit.simulator.configs import FloatingPointRPUConfig, SingleRPUConfig
 from aihwkit.simulator.configs.devices import FloatingPointDevice, ConstantStepDevice, IdealDevice
-from aihwkit.simulator.configs.utils import IOParameters, DriftParameter
+from aihwkit.simulator.parameters.utils import IOParameters, DriftParameter
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase, SKIP_CUDA_TESTS

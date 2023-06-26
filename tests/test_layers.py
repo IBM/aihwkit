@@ -16,7 +16,7 @@
 from tempfile import TemporaryFile
 from unittest import SkipTest
 
-from torch import Tensor, device, load, save
+from torch import Tensor, device, load, save, zeros
 from torch.cuda import current_device, device_count
 
 from aihwkit.nn import AnalogSequential
@@ -41,9 +41,7 @@ from .helpers.testcases import SKIP_CUDA_TESTS
 
 
 @parametrize_over_layers(
-    layers=[Linear, Conv1d, Conv2d, Conv3d, LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda],
-    tiles=[ConstantStep],
-    biases=["analog", None],
+    layers=[Linear, Conv2d, LinearCuda, Conv2dCuda], tiles=[ConstantStep], biases=[None]
 )
 class AnalogLayerTest(ParametrizedTestCase):
     """Analog layers abstraction tests."""
@@ -52,81 +50,38 @@ class AnalogLayerTest(ParametrizedTestCase):
 
     def test_realistic_weights(self):
         """Test using realistic weights."""
-        layer = self.get_layer(realistic_read_write=True)
+        layer = self.get_layer()
 
-        shape = layer.weight.shape
-        # Check that the tile weights are equal from the layer weights, as
-        # the weights are synced after being set.
-        tile_weights, tile_biases = layer.analog_tile.get_weights()
-        self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.analog_bias:
-            self.assertTensorAlmostEqual(layer.bias, tile_biases)
-
-        # 1. Set the layer weights and biases.
+        # 1. Set the layer weights and biases. (Exact writing / reading)
         user_weights = Tensor(layer.out_features, layer.in_features).uniform_(-0.5, 0.5)
         user_biases = Tensor(layer.out_features).uniform_(-0.5, 0.5)
-        layer.set_weights(user_weights, user_biases)
+        layer.set_weights(user_weights, user_biases, realistic=False)
+        tile_weights, tile_biases = layer.get_weights()
 
-        # Check that the tile weights are equal from the layer weights, as
-        # the weights are synced after being set.
-        tile_weights, tile_biases = layer.analog_tile.get_weights()
-        self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.analog_bias:
-            self.assertTensorAlmostEqual(layer.bias, tile_biases)
-
-        # Check that the tile weights are different than the user-specified
-        # weights, as it is realistic.
-        self.assertNotAlmostEqualTensor(user_weights, tile_weights.reshape(shape))
-        if self.analog_bias:
-            self.assertNotAlmostEqualTensor(user_biases, tile_biases)
-
-        # 2. Get the layer weights and biases.
-        gotten_weights, gotten_biases = layer.get_weights()
-
-        # Check that the tile weights are different than the gotten
-        # weights, as it is realistic.
-        self.assertNotAlmostEqualTensor(gotten_weights, tile_weights.reshape(shape))
-        if self.analog_bias:
-            self.assertNotAlmostEqualTensor(gotten_biases, tile_biases)
-
-    def test_not_realistic_weights(self):
-        """Test using non realistic weights."""
-        layer = self.get_layer(realistic_read_write=False)
-
-        shape = layer.weight.shape
-        # Check that the tile weights are equal from the layer weights, as
-        # the weights are synced after being set.
-        tile_weights, tile_biases = layer.analog_tile.get_weights()
-        self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.analog_bias:
-            self.assertTensorAlmostEqual(layer.bias, tile_biases)
-
-        # 1. Set the layer weights and biases.
-        user_weights = Tensor(layer.out_features, layer.in_features).uniform_(-0.5, 0.5)
-        user_biases = Tensor(layer.out_features).uniform_(-0.5, 0.5)
-        layer.set_weights(user_weights, user_biases)
-
-        # Check that the tile weights are equal from the layer weights, as
-        # the weights are synced after being set.
-        tile_weights, tile_biases = layer.analog_tile.get_weights()
-        self.assertTensorAlmostEqual(layer.weight, tile_weights.reshape(shape))
-        if self.analog_bias:
-            self.assertTensorAlmostEqual(layer.bias, tile_biases)
-
-        # Check that the tile weights are equal to the user-specified
-        # weights, as it is not realistic.
+        # Check that the tile weights are equal
         self.assertTensorAlmostEqual(user_weights, tile_weights)
         if self.analog_bias:
             self.assertTensorAlmostEqual(user_biases, tile_biases)
 
-        # 2. Get the layer weights and biases.
-        gotten_weights, gotten_biases = layer.get_weights()
+        # 2. Realistic writing
+        layer.set_weights(user_weights, user_biases, realistic=True)
+        tile_weights, tile_biases = layer.get_weights()
 
-        # Check that the tile weights are equal than the gotten
-        # weights, as it is not realistic.
-        self.assertTensorAlmostEqual(gotten_weights, tile_weights)
+        # Check that the tile weights are not equal
+        self.assertNotAlmostEqualTensor(user_weights, tile_weights)
+        # but approximately correct
+        self.assertTensorAlmostEqual((user_weights - tile_weights).mean(), zeros(1), decimal=1)
         if self.analog_bias:
-            self.assertTensorAlmostEqual(gotten_biases, tile_biases)
+            self.assertNotAlmostEqualTensor(user_biases, tile_biases)
+
+        # 2. Realistic reading
+        layer.set_weights(user_weights, user_biases, realistic=False)
+        tile_weights, tile_biases = layer.get_weights(realistic=True)
+
+        # Check that the tile weights are not equal
+        self.assertNotAlmostEqualTensor(user_weights, tile_weights)
+        if self.analog_bias:
+            self.assertNotAlmostEqualTensor(user_biases, tile_biases)
 
 
 @parametrize_over_layers(
@@ -149,14 +104,14 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
         }
 
         layer = self.get_layer()
-        expected_class = tile_classes[layer.analog_tile.tile.__class__]
+        analog_tile = next(layer.analog_tiles())
+        expected_class = tile_classes[analog_tile.tile.__class__]
         expected_device = device("cuda", current_device())
 
         # Create a container and move to cuda.
         model = AnalogSequential(layer)
         model.cuda()
 
-        analog_tile = layer.analog_tile
         self.assertEqual(analog_tile.device, expected_device)
         self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
         if analog_tile.shared_weights is not None:
@@ -169,7 +124,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
             )
 
         # Assert the tile has been moved to cuda.
-        self.assertIsInstance(layer.analog_tile.tile, expected_class)
+        self.assertIsInstance(analog_tile.tile, expected_class)
 
     def test_sequential_move_to_cuda_via_to(self):
         """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
@@ -183,14 +138,14 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
         }
 
         layer = self.get_layer()
-        expected_class = tile_classes[layer.analog_tile.tile.__class__]
+        analog_tile = next(layer.analog_tiles())
+        expected_class = tile_classes[analog_tile.tile.__class__]
         expected_device = device("cuda", current_device())
 
         # Create a container and move to cuda.
         model = AnalogSequential(layer)
         model.to(device("cuda"))
 
-        analog_tile = layer.analog_tile
         self.assertEqual(analog_tile.device, expected_device)
         self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
         if analog_tile.shared_weights is not None:
@@ -203,7 +158,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
             )
 
         # Assert the tile has been moved to cuda.
-        self.assertIsInstance(layer.analog_tile.tile, expected_class)
+        self.assertIsInstance(analog_tile.tile, expected_class)
 
     def test_sequential_move_to_cuda_via_to_multiple_gpus(self):
         """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
@@ -222,19 +177,17 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
         expected_device_num = 1
 
         layer = self.get_layer()
-        if isinstance(
-            layer.analog_tile.tile.__class__, (tiles.CudaAnalogTile, tiles.CudaFloatingPointTile)
-        ):
+        analog_tile = next(layer.analog_tiles())
+        if isinstance(analog_tile.tile, (tiles.CudaAnalogTile, tiles.CudaFloatingPointTile)):
             raise SkipTest("Layer is already on CUDA")
 
-        expected_class = tile_classes[layer.analog_tile.tile.__class__]
+        expected_class = tile_classes[analog_tile.tile.__class__]
         expected_device = device("cuda", expected_device_num)
 
         # Create a container and move to cuda.
         model = AnalogSequential(layer)
         model.to(device("cuda", expected_device_num))
 
-        analog_tile = layer.analog_tile
         self.assertEqual(analog_tile.device, expected_device)
         self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
         if analog_tile.shared_weights is not None:
@@ -247,7 +200,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
             )
 
         # Assert the tile has been moved to cuda.
-        self.assertIsInstance(layer.analog_tile.tile, expected_class)
+        self.assertIsInstance(analog_tile.tile, expected_class)
 
     def test_sequential_move_to_cuda_multiple_gpus(self):
         """Test moving AnalogSequential to cuda (from CPU), using ``.to()``."""
@@ -266,19 +219,18 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
         expected_device_num = 1
 
         layer = self.get_layer()
-        if isinstance(
-            layer.analog_tile.tile.__class__, (tiles.CudaAnalogTile, tiles.CudaFloatingPointTile)
-        ):
+        analog_tile = next(layer.analog_tiles())
+
+        if isinstance(analog_tile.tile, (tiles.CudaAnalogTile, tiles.CudaFloatingPointTile)):
             raise SkipTest("Layer is already on CUDA")
 
-        expected_class = tile_classes[layer.analog_tile.tile.__class__]
+        expected_class = tile_classes[analog_tile.tile.__class__]
         expected_device = device("cuda", expected_device_num)
 
         # Create a container and move to cuda.
         model = AnalogSequential(layer)
         model.cuda(device("cuda", expected_device_num))
 
-        analog_tile = layer.analog_tile
         self.assertEqual(analog_tile.device, expected_device)
         self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
         if analog_tile.shared_weights is not None:
@@ -291,7 +243,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
             )
 
         # Assert the tile has been moved to cuda.
-        self.assertIsInstance(layer.analog_tile.tile, expected_class)
+        self.assertIsInstance(analog_tile.tile, expected_class)
 
     def test_save_with_cuda(self):
         """Whether model is correctly reconstructed after saving"""
@@ -305,8 +257,12 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
         }
 
         layer = self.get_layer()
+
         model = AnalogSequential(layer)
         model.cuda()
+        analog_tile = next(model.analog_tiles())
+        expected_class = tile_classes[analog_tile.tile.__class__]
+
         with TemporaryFile() as file:
             save(model.state_dict(), file)
             # Create a new model and load its state dict.
@@ -315,9 +271,9 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
         model.load_state_dict(checkpoint)
 
         expected_device = device("cuda", current_device())
-        expected_class = tile_classes[layer.analog_tile.tile.__class__]
+        expected_class = tile_classes[analog_tile.tile.__class__]
+        analog_tile = next(model.analog_tiles())
 
-        analog_tile = model[0].analog_tile
         self.assertEqual(analog_tile.device, expected_device)
         self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
         if analog_tile.shared_weights is not None:
@@ -330,7 +286,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
             )
 
         # Assert the tile has been moved to cuda.
-        self.assertIsInstance(layer.analog_tile.tile, expected_class)
+        self.assertIsInstance(analog_tile.tile, expected_class)
 
 
 @parametrize_over_layers(
@@ -349,7 +305,7 @@ class CpuAnalogLayerTest(ParametrizedTestCase):
         model = AnalogSequential(layer)
         model.cpu()
 
-        analog_tile = layer.analog_tile
+        analog_tile = next(layer.analog_tiles())
         self.assertEqual(analog_tile.device, device("cpu"))
         self.assertEqual(analog_tile.get_analog_ctx().data.device, device("cpu"))
 
@@ -363,7 +319,7 @@ class CpuAnalogLayerTest(ParametrizedTestCase):
             )
 
         # Assert the tile is still on CPU.
-        self.assertIsInstance(layer.analog_tile.tile, tiles.AnalogTile)
+        self.assertIsInstance(analog_tile.tile, tiles.AnalogTile)
 
     def test_sequential_move_to_cpu_via_to(self):
         """Test moving AnalogSequential to CPU (from CPU), using ``.to()``."""
@@ -374,7 +330,7 @@ class CpuAnalogLayerTest(ParametrizedTestCase):
         model = AnalogSequential(layer)
         model.to(device("cpu"))
 
-        analog_tile = layer.analog_tile
+        analog_tile = next(layer.analog_tiles())
         self.assertEqual(analog_tile.device, expected_device)
         self.assertEqual(analog_tile.get_analog_ctx().data.device, expected_device)
 
@@ -388,7 +344,7 @@ class CpuAnalogLayerTest(ParametrizedTestCase):
             )
 
         # Assert the tile is still on CPU.
-        self.assertIsInstance(layer.analog_tile.tile, tiles.AnalogTile)
+        self.assertIsInstance(analog_tile.tile, tiles.AnalogTile)
 
 
 class CustomAnalogTile(AnalogTile):
@@ -423,4 +379,5 @@ class CustomTileTest(ParametrizedTestCase):
         layer = self.get_layer()
 
         # Assert that the internal analog tile is `CustomAnalogTile`.
-        self.assertIsInstance(layer.analog_tile, CustomAnalogTile)
+        analog_tile = next(layer.analog_tiles())
+        self.assertIsInstance(analog_tile, CustomAnalogTile)

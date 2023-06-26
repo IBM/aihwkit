@@ -66,6 +66,44 @@ void ForwardBackwardPass<T>::gemv(
   }
 }
 
+template <typename T>
+void ForwardBackwardPass<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPU::state_t state;
+
+  RPU::insert(state, "fwd.v_offset", fb_pars_.fwd.v_offset);
+  RPU::insert(state, "fwd.w_asymmetry", fb_pars_.fwd.w_asymmetry);
+  RPU::insert(state, "fwd.out_nonlinearity", fb_pars_.fwd.out_nonlinearity);
+  RPU::insert(state, "fwd.out_nonlinearity_factor", fb_pars_.fwd.out_nonlinearity_factor);
+  RPU::insert(state, "fwd.out_noise_values", fb_pars_.fwd.out_noise_values);
+
+  RPU::insert(state, "bwd.v_offset", fb_pars_.bwd.v_offset);
+  RPU::insert(state, "bwd.w_asymmetry", fb_pars_.bwd.w_asymmetry);
+  RPU::insert(state, "bwd.out_nonlinearity", fb_pars_.bwd.out_nonlinearity);
+  RPU::insert(state, "bwd.out_nonlinearity_factor", fb_pars_.bwd.out_nonlinearity_factor);
+  RPU::insert(state, "bwd.out_noise_values", fb_pars_.bwd.out_noise_values);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void ForwardBackwardPass<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+  RPU::load(state, "fwd.v_offset", fb_pars_.fwd.v_offset, strict);
+  RPU::load(state, "fwd.w_asymmetry", fb_pars_.fwd.w_asymmetry, strict);
+  RPU::load(state, "fwd.out_nonlinearity", fb_pars_.fwd.out_nonlinearity, strict);
+  RPU::load(state, "fwd.out_nonlinearity_factor", fb_pars_.fwd.out_nonlinearity_factor, strict);
+  RPU::load(state, "fwd.out_noise_values", fb_pars_.fwd.out_noise_values, strict);
+
+  RPU::load(state, "bwd.v_offset", fb_pars_.bwd.v_offset, strict);
+  RPU::load(state, "bwd.w_asymmetry", fb_pars_.bwd.w_asymmetry, strict);
+  RPU::load(state, "bwd.out_nonlinearity", fb_pars_.bwd.out_nonlinearity, strict);
+  RPU::load(state, "bwd.out_nonlinearity_factor", fb_pars_.bwd.out_nonlinearity_factor, strict);
+  RPU::load(state, "bwd.out_noise_values", fb_pars_.bwd.out_noise_values, strict);
+}
+
 template class ForwardBackwardPass<float>;
 #ifdef RPU_USE_DOUBLE
 template class ForwardBackwardPass<double>;
@@ -265,6 +303,15 @@ void ForwardBackwardPassIOManaged<T>::populateFBParameter(
 
       for (size_t i = 0; i < size; i++) {
         mv_pars.w_asymmetry[i] = ((T)1.0 + io.w_read_asymmetry_dtod * rng_->sampleGauss());
+      }
+    }
+
+    if (io.out_noise_std > (T)0.0) {
+      mv_pars.out_noise_values.resize(out_size);
+
+      for (size_t i = 0; i < out_size; i++) {
+        mv_pars.out_noise_values[i] =
+            std::fabs(io.out_noise * ((T)1.0 + io.out_noise_std * rng_->sampleGauss()));
       }
     }
   };
@@ -629,11 +676,10 @@ template <
 inline bool finalizeOutputImplStage5(ARGS) {
   int idx = 0;
   bool bound_test_passed = true;
-  T bound = io.out_bound > 0 ? io.out_bound : std::numeric_limits<T>::infinity();
-  T noise = io.out_noise;
-  T asymmetry_scale = ((T)1.0 - io.out_asymmetry);
-  T res = io.out_res;
-  T nlf = mv_pars.out_nonlinearity_factor;
+  const T bound = io.out_bound > 0 ? io.out_bound : std::numeric_limits<T>::infinity();
+  const T asymmetry_scale = ((T)1.0 - io.out_asymmetry);
+  const T res = io.out_res;
+  const T nlf = mv_pars.out_nonlinearity_factor;
 
   PRAGMA_SIMD
   for (int i = 0; i < out_size; ++i) {
@@ -650,7 +696,8 @@ inline bool finalizeOutputImplStage5(ARGS) {
     }
 
     if (with_noise) {
-      value += noise * rng->sampleGauss();
+      const T noise_std = io.out_noise_std > (T)0.0 ? mv_pars.out_noise_values[i] : io.out_noise;
+      value += noise_std * rng->sampleGauss();
     }
 
     value = getDiscretizedValueSR<sto_round_if>(value, res, *rng);
@@ -704,7 +751,7 @@ inline bool finalizeOutputImplStage2(ARGS) {
 }
 
 template <typename T, bool with_asymmetry> inline bool finalizeOutputImplStage1(ARGS) {
-  if (io.out_noise > (T)0.0) {
+  if (io.out_noise > (T)0.0 || io.out_noise_std > (T)0.0) {
     return finalizeOutputImplStage2<T, true, with_asymmetry>(ARGS_CALL);
   } else {
     return finalizeOutputImplStage2<T, true, with_asymmetry>(ARGS_CALL);
@@ -982,6 +1029,26 @@ void ForwardBackwardPassIOManaged<T>::backwardVector(
   }
 };
 #undef CHECK_INPUT_BOUNDS
+
+template <typename T>
+void ForwardBackwardPassIOManaged<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  ForwardBackwardPass<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+  RPU::insert(state, "aux_nm_value", aux_nm_value_);
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void ForwardBackwardPassIOManaged<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  ForwardBackwardPass<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+  RPU::load(state, "aux_nm_value", aux_nm_value_, strict);
+}
 
 template class ForwardBackwardPassIOManaged<float>;
 #ifdef RPU_USE_DOUBLE

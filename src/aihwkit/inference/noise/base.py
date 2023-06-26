@@ -113,9 +113,19 @@ class BaseNoiseModel:
         return noisy_weights
 
     @no_grad()
-    def generate_drift_coefficients(self, g_target: Tensor) -> Tensor:
-        """Generate drift coefficients ``nu`` based on the target conductances."""
-        raise NotImplementedError
+    def generate_drift_coefficients(self, g_target: Tensor) -> Optional[Tensor]:
+        """Generate drift coefficients.
+
+        Generate coefficients once and passed through when
+        long-term noise and drift is applied. Typical `nu_drift`.
+
+        Args:
+            g_target: Target conductances
+
+        Returns:
+            When not overriden, it simply returns None.
+        """
+        # pylint: disable=unused-argument
 
     @no_grad()
     def apply_programming_noise_to_conductance(self, g_target: Tensor) -> Tensor:
@@ -132,7 +142,7 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-        self, g_prog: Tensor, nu_drift: Tensor, t_inference: float
+        self, g_prog: Tensor, nu_drift: Optional[Tensor], t_inference: float
     ) -> Tensor:
         r"""Apply the noise and drift up to the assumed inference time point.
 

@@ -50,6 +50,20 @@ from .configs import (
     TTv2EcRamPreset,
     TTv2EcRamMOPreset,
     TTv2IdealizedPreset,
+    # c-TTv2 configs.
+    ChoppedTTv2ReRamESPreset,
+    ChoppedTTv2ReRamSBPreset,
+    ChoppedTTv2CapacitorPreset,
+    ChoppedTTv2EcRamPreset,
+    ChoppedTTv2EcRamMOPreset,
+    ChoppedTTv2IdealizedPreset,
+    # AGAD configs.
+    AGADReRamESPreset,
+    AGADReRamSBPreset,
+    AGADCapacitorPreset,
+    AGADEcRamPreset,
+    AGADEcRamMOPreset,
+    AGADIdealizedPreset,
     # MixedPrecision configs.
     MixedPrecisionReRamESPreset,
     MixedPrecisionReRamSBPreset,
@@ -60,6 +74,8 @@ from .configs import (
     MixedPrecisionGokmenVlasovPreset,
     MixedPrecisionPCMPreset,
 )
+from .inference import StandardHWATrainingPreset
+
 from .devices import (
     ReRamESPresetDevice,
     ReRamSBPresetDevice,
@@ -69,6 +85,8 @@ from .devices import (
     IdealizedPresetDevice,
     GokmenVlasovPresetDevice,
     PCMPresetDevice,
+    ReRamArrayOMPresetDevice,
+    ReRamArrayHfO2PresetDevice,
 )
 from .compounds import PCMPresetUnitCell
-from .utils import PresetIOParameters, PresetUpdateParameters
+from .utils import PresetIOParameters, StandardIOParameters, PresetUpdateParameters

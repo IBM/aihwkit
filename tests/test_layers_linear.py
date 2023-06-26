@@ -12,8 +12,9 @@
 
 """Tests for linear layer."""
 
-from numpy.testing import assert_array_almost_equal
+from unittest import SkipTest
 
+from numpy.testing import assert_array_almost_equal
 from torch import Tensor, manual_seed
 from torch.nn import Sequential, Linear as torchLinear
 from torch.nn.functional import mse_loss
@@ -21,7 +22,7 @@ from torch.optim import SGD
 
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig, FloatingPointRPUConfig
-from aihwkit.simulator.configs.utils import (
+from aihwkit.simulator.parameters.utils import (
     MappingParameter,
     WeightModifierType,
     WeightModifierParameter,
@@ -37,12 +38,12 @@ from aihwkit.nn import AnalogSequential, AnalogLinear
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, IdealizedConstantStep, Inference
+from .helpers.tiles import FloatingPoint, IdealizedConstantStep, Inference, TorchInference, Custom
 
 
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
-    tiles=[FloatingPoint, IdealizedConstantStep, Inference],
+    tiles=[FloatingPoint, IdealizedConstantStep, Inference, TorchInference, Custom],
     biases=["analog", "digital", None],
 )
 class LinearLayerTest(ParametrizedTestCase):
@@ -140,7 +141,7 @@ class LinearLayerTest(ParametrizedTestCase):
         if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
-            model = model.cuda()
+            model.cuda()
 
         initial_loss = loss_func(model(x_b), y_b)
         self.train_model(model, loss_func, x_b, y_b)
@@ -158,7 +159,7 @@ class LinearLayerTest(ParametrizedTestCase):
         if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
-            model = model.cuda()
+            model.cuda()
 
         initial_loss = loss_func(model(x_b), y_b)
         self.train_model(model, loss_func, x_b, y_b)
@@ -173,13 +174,14 @@ class LinearLayerTest(ParametrizedTestCase):
 
         manual_seed(4321)
         model = Sequential(self.get_layer(4, 3), self.get_layer(3, 1))
-        if not isinstance(model[0].analog_tile.rpu_config, InferenceRPUConfig):
+        if not isinstance(model[0].analog_module.rpu_config, InferenceRPUConfig):
             return
 
-        manual_seed(4321)
         rpu_config = FloatingPointRPUConfig(
             mapping=MappingParameter(digital_bias=self.digital_bias)
         )
+
+        manual_seed(4321)
         model2 = AnalogSequential(
             AnalogLinear(4, 3, rpu_config=rpu_config, bias=self.bias),
             AnalogLinear(3, 1, rpu_config=rpu_config, bias=self.bias),
@@ -233,11 +235,12 @@ class LinearLayerTest(ParametrizedTestCase):
         loss.backward()
         opt.step()
 
-        if not layer1.analog_tile.get_analog_ctx().use_torch_update:
-            self.assertAlmostEqual(layer1.analog_tile.get_learning_rate(), new_lr)
+        if not layer1.analog_module.get_analog_ctx().use_torch_update:
+            self.assertAlmostEqual(layer1.analog_module.get_learning_rate(), new_lr)
 
     def test_learning_rate_update_fn(self):
         """Check the learning rate update is applied to tile."""
+
         layer1 = self.get_layer(2, 3)
         layer2 = self.get_layer(3, 1)
 
@@ -252,8 +255,11 @@ class LinearLayerTest(ParametrizedTestCase):
 
         opt.set_learning_rate(new_lr)
 
-        self.assertAlmostEqual(layer1.analog_tile.get_learning_rate(), new_lr)
-        self.assertAlmostEqual(layer2.analog_tile.get_learning_rate(), new_lr)
+        if layer1.analog_module.analog_ctx.use_torch_update:
+            raise SkipTest("Not supported")
+
+        self.assertAlmostEqual(layer1.analog_module.get_learning_rate(), new_lr)
+        self.assertAlmostEqual(layer2.analog_module.get_learning_rate(), new_lr)
 
     def test_out_scaling_learning(self):
         """Check if out scales are learning."""
@@ -278,20 +284,20 @@ class LinearLayerTest(ParametrizedTestCase):
             y_b = y_b.cuda()
             model = model.cuda()
 
-        initial_out_scaling_0 = model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = model[1].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_0 = model[0].analog_module.get_learned_out_scales().clone()
+        initial_out_scaling_1 = model[1].analog_module.get_learned_out_scales().clone()
 
         self.train_model(model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = model[0].analog_tile.get_learned_out_scales().data.clone()
-        learned_out_scaling_1 = model[1].analog_tile.get_learned_out_scales().data.clone()
+        learned_out_scaling_0 = model[0].analog_module.get_learned_out_scales().data.clone()
+        learned_out_scaling_1 = model[1].analog_module.get_learned_out_scales().data.clone()
 
         self.assertEqual(initial_out_scaling_0.numel(), 1)
-        self.assertIsNotNone(model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(model[0].analog_module.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
 
         self.assertEqual(initial_out_scaling_0.numel(), 1)
-        self.assertIsNotNone(model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(model[1].analog_module.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
         self.assertEqual(initial_out_scaling_0.numel(), 1)
 
@@ -318,24 +324,26 @@ class LinearLayerTest(ParametrizedTestCase):
             y_b = y_b.cuda()
             model = model.cuda()
 
-        initial_out_scaling_0 = model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = model[1].analog_tile.get_learned_out_scales().clone()
+        initial_out_scaling_0 = model[0].analog_module.get_learned_out_scales().clone()
+        initial_out_scaling_1 = model[1].analog_module.get_learned_out_scales().clone()
 
         self.train_model(model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = model[0].analog_tile.get_learned_out_scales().clone()
-        learned_out_scaling_1 = model[1].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_0 = model[0].analog_module.get_learned_out_scales().clone()
+        learned_out_scaling_1 = model[1].analog_module.get_learned_out_scales().clone()
 
         self.assertGreaterEqual(initial_out_scaling_0.numel(), 1)
-        self.assertIsNotNone(model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(model[0].analog_module.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
 
         self.assertGreaterEqual(initial_out_scaling_1.numel(), 1)
-        self.assertIsNotNone(model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(model[1].analog_module.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
 
-@parametrize_over_layers(layers=[Linear, LinearCuda], tiles=[Inference], biases=["digital"])
+@parametrize_over_layers(
+    layers=[Linear, LinearCuda], tiles=[Inference, TorchInference], biases=["digital"]
+)
 class LinearLayerInferenceTest(ParametrizedTestCase):
     """Linear layer abstractions tests for inference."""
 
@@ -397,13 +405,15 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
 
         x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
 
-        rpu_config = InferenceRPUConfig(
-            mapping=MappingParameter(
-                weight_scaling_omega=0.0, learn_out_scaling=False, weight_scaling_columnwise=False
-            ),
-            modifier=WeightModifierParameter(type=WeightModifierType.ADD_NORMAL, std_dev=1.0),
-            forward=IOParameters(is_perfect=True),
+        rpu_config = self.get_rpu_config()
+
+        rpu_config.mapping.weight_scaling_omega = 0.0
+        rpu_config.mapping.learn_out_scaling = False
+        rpu_config.mapping.weight_scaling_columnwise = False
+        rpu_config.modifier = WeightModifierParameter(
+            type=WeightModifierType.ADD_NORMAL, std_dev=1.0
         )
+        rpu_config.forward = IOParameters(is_perfect=True)
 
         model = AnalogSequential(
             self.get_layer(4, 2, rpu_config=rpu_config), self.get_layer(2, 1, rpu_config=rpu_config)
@@ -435,15 +445,15 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
 
         x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
 
-        rpu_config = InferenceRPUConfig(
-            mapping=MappingParameter(
-                weight_scaling_omega=0.0, learn_out_scaling=False, weight_scaling_columnwise=False
-            ),
-            forward=IOParameters(is_perfect=True),
-            drift_compensation=GlobalDriftCompensation(),
-            noise_model=StateIndependentNoiseModel(
-                prog_noise_scale=0.0, read_noise_scale=0.0, drift_nu_std=0.0, drift_nu_mean=0.1
-            ),
+        rpu_config = self.get_rpu_config()
+
+        rpu_config.mapping.weight_scaling_omega = 0.0
+        rpu_config.mapping.learn_out_scaling = False
+        rpu_config.mapping.weight_scaling_columnwise = False
+        rpu_config.forward = IOParameters(is_perfect=True)
+        rpu_config.drift_compensation = GlobalDriftCompensation()
+        rpu_config.noise_model = StateIndependentNoiseModel(
+            prog_noise_scale=0.0, read_noise_scale=0.0, drift_nu_std=0.0, drift_nu_mean=0.1
         )
 
         model = AnalogSequential(
@@ -459,8 +469,8 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
 
         if self.use_cuda:
             x_b = x_b.cuda()
-            model = model.cuda()
-            model_without = model_without.cuda()
+            model_without.cuda()
+            model.cuda()
 
         model.eval()
         y_before = model(x_b)

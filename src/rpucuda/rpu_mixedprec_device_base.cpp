@@ -241,6 +241,43 @@ void MixedPrecRPUDeviceBase<T>::populate(
   }
 }
 
+template <typename T>
+void MixedPrecRPUDeviceBase<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  SimpleRPUDevice<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  rpu_device_->dumpExtra(state, "rpu_device");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+
+  RPU::insert(state, "granularity", granularity_);
+  RPU::insert(state, "transfer_tmp", transfer_tmp_);
+  RPU::insert(state, "current_row_index", current_row_index_);
+  RPU::insert(state, "current_update_index", current_update_index_);
+  RPU::insert(state, "avg_sparsity", avg_sparsity_);
+
+  // transfer_d_vecs not handled (generated on the fly)
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void MixedPrecRPUDeviceBase<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  SimpleRPUDevice<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  rpu_device_->loadExtra(state, "rpu_device", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+
+  RPU::load(state, "granularity", granularity_, strict);
+  RPU::load(state, "transfer_tmp", transfer_tmp_, strict);
+  RPU::load(state, "current_row_index", current_row_index_, strict);
+  RPU::load(state, "current_update_index", current_update_index_, strict);
+  RPU::load(state, "avg_sparsity", avg_sparsity_, strict);
+}
+
 /*********************************************************************************/
 /* transfer */
 

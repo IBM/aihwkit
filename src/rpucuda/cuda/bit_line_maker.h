@@ -103,6 +103,8 @@ public:
   void getAverageAbsMax(T &m_x, T &m_d) const;
   void getAverageLogAbsMax(T &m_x, T &m_d) const;
   void getAbsMax(T &m_x, T &m_d) const;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
 private:
   CudaContextPtr context_ = nullptr;

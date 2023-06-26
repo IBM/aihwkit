@@ -56,6 +56,8 @@ RPUPulsed<T> *PulsedMetaParameter<T>::createRPUArray(
     int x_size, int d_size, AbstractRPUDeviceMetaParameter<T> *dp) {
   auto *rpu = new RPUPulsed<T>(x_size, d_size);
   rpu->populateParameter(this, dp);
+  rpu->setWeightsUniformRandom(-0.1, 0.1);
+  rpu->setLearningRate(0.1);
   return rpu;
 };
 
@@ -400,6 +402,32 @@ template <typename T> void RPUPulsed<T>::setFBParameter(FBParameter<T> &fb_pars)
 };
 
 /*********************************************************************************/
+/* dump / load state */
+
+template <typename T> void RPUPulsed<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPUSimple<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  pwu_->dumpExtra(state, "pwu");
+  fb_pass_->dumpExtra(state, "fb_pass");
+  rpu_device_->dumpExtra(state, "rpu_device");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void RPUPulsed<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  RPUSimple<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  pwu_->loadExtra(state, "pwu", strict);
+  fb_pass_->loadExtra(state, "fb_pass", strict);
+  rpu_device_->loadExtra(state, "rpu_device", strict);
+}
 
 /*********************************************************************************/
 

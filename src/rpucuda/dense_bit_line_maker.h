@@ -55,6 +55,10 @@ public:
   void printCounts(int max_n) const;
   bool supports(RPU::PulseType pulse_type) const;
 
+  /* Ignore the buffer / counts, as they will be generated anew each sample.*/
+  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+
 private:
   void freeContainers();
   void allocateContainers();
