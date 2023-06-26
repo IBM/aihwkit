@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,14 +27,17 @@ class InferenceLocalMetric:
 
     def receive_repeat_start(self, repeat: int) -> None:
         """Hook for `INFERENCE_REPEAT_START`."""
-        self.current_repeat = {
-                "number": repeat,
-                "inference_results": []
-        }
+        self.current_repeat = {"number": repeat, "inference_results": []}
 
-    def receive_repeat_end(self, t_inference_array: list, avg_acc_arr: list,
-                           std_acc_arr: list, avg_err_arr: list, avg_loss_arr: list,
-                           inference_repeats: int) -> Dict:
+    def receive_repeat_end(
+        self,
+        t_inference_array: list,
+        avg_acc_arr: list,
+        std_acc_arr: list,
+        avg_err_arr: list,
+        avg_loss_arr: list,
+        inference_repeats: int,
+    ) -> Dict:
         """Hook for `INFERENCE_REPEAT_END`."""
 
         inf_results = []
@@ -44,11 +47,12 @@ class InferenceLocalMetric:
         # Create the dict entry for the items in the arrays.
         for i in range(n_inference):
             new_dict = {
-                    "t_inference": t_inference_array[i],
-                    "avg_accuracy": avg_acc_arr[i],
-                    "std_accuracy": std_acc_arr[i],
-                    "avg_error": avg_err_arr[i],
-                    "avg_loss": avg_loss_arr[i]}
+                "t_inference": t_inference_array[i],
+                "avg_accuracy": avg_acc_arr[i],
+                "std_accuracy": std_acc_arr[i],
+                "avg_error": avg_err_arr[i],
+                "avg_loss": avg_loss_arr[i],
+            }
             inf_results.append(new_dict)
 
         repeat = self.current_repeat["number"] + 1
@@ -56,10 +60,10 @@ class InferenceLocalMetric:
         is_partial = bool(repeat < inference_repeats)
         partial = {
             "inference_runs": {
-                    "inference_repeat": repeat,
-                    "is_partial": is_partial,
-                    "time_elapsed": time_elapsed,
-                    "inference_results":  inf_results
+                "inference_repeat": repeat,
+                "is_partial": is_partial,
+                "time_elapsed": time_elapsed,
+                "inference_results": inf_results,
             }
         }
 

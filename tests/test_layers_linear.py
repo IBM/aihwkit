@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,8 +22,11 @@ from torch.optim import SGD
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.utils import (
-    MappingParameter, WeightModifierType, WeightModifierParameter, IOParameters,
-    WeightRemapType
+    MappingParameter,
+    WeightModifierType,
+    WeightModifierParameter,
+    IOParameters,
+    WeightRemapType,
 )
 from aihwkit.inference.compensation.drift import GlobalDriftCompensation
 from aihwkit.inference.noise.custom import StateIndependentNoiseModel
@@ -40,7 +43,7 @@ from .helpers.tiles import FloatingPoint, IdealizedConstantStep, Inference
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
     tiles=[FloatingPoint, IdealizedConstantStep, Inference],
-    biases=['analog', 'digital', None]
+    biases=["analog", "digital", None],
 )
 class LinearLayerTest(ParametrizedTestCase):
     """Linear layer abstractions tests."""
@@ -48,7 +51,7 @@ class LinearLayerTest(ParametrizedTestCase):
     @staticmethod
     def train_model(model, loss_func, x_b, y_b, **kwargs):
         """Train the model."""
-        opt = AnalogSGD(model.parameters(), lr=0.5,  **kwargs)
+        opt = AnalogSGD(model.parameters(), lr=0.5, **kwargs)
         opt.regroup_param_groups(model)
 
         epochs = 100
@@ -133,10 +136,7 @@ class LinearLayerTest(ParametrizedTestCase):
         y_b = Tensor([[0.3], [0.6]])
 
         manual_seed(4321)
-        model = Sequential(
-            self.get_layer(4, 2),
-            self.get_layer(2, 1)
-        )
+        model = Sequential(self.get_layer(4, 2), self.get_layer(2, 1))
         if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
@@ -154,11 +154,7 @@ class LinearLayerTest(ParametrizedTestCase):
         y_b = Tensor([[0.3], [0.6]])
 
         manual_seed(4321)
-        model = Sequential(
-            self.get_layer(4, 3),
-            torchLinear(3, 3),
-            self.get_layer(3, 1)
-        )
+        model = Sequential(self.get_layer(4, 3), torchLinear(3, 3), self.get_layer(3, 1))
         if self.use_cuda:
             x_b = x_b.cuda()
             y_b = y_b.cuda()
@@ -176,10 +172,7 @@ class LinearLayerTest(ParametrizedTestCase):
         y_b = Tensor([[0.3], [0.6]])
 
         manual_seed(4321)
-        model = Sequential(
-            self.get_layer(4, 3),
-            self.get_layer(3, 1),
-        )
+        model = Sequential(self.get_layer(4, 3), self.get_layer(3, 1))
         if not isinstance(model[0].analog_tile.rpu_config, InferenceRPUConfig):
             return
 
@@ -189,7 +182,7 @@ class LinearLayerTest(ParametrizedTestCase):
         )
         model2 = AnalogSequential(
             AnalogLinear(4, 3, rpu_config=rpu_config, bias=self.bias),
-            AnalogLinear(3, 1, rpu_config=rpu_config, bias=self.bias)
+            AnalogLinear(3, 1, rpu_config=rpu_config, bias=self.bias),
         )
 
         if self.use_cuda:
@@ -233,7 +226,7 @@ class LinearLayerTest(ParametrizedTestCase):
 
         new_lr = 0.07
         for param_group in opt.param_groups:
-            param_group['lr'] = new_lr
+            param_group["lr"] = new_lr
 
         pred = model(x_b)
         loss = loss_func(pred, y_b)
@@ -271,14 +264,14 @@ class LinearLayerTest(ParametrizedTestCase):
 
         manual_seed(4321)
 
-        rpu_config = InferenceRPUConfig(mapping=MappingParameter(
-            weight_scaling_omega=0.6,
-            learn_out_scaling=True,
-            out_scaling_columnwise=False))
+        rpu_config = InferenceRPUConfig(
+            mapping=MappingParameter(
+                weight_scaling_omega=0.6, learn_out_scaling=True, out_scaling_columnwise=False
+            )
+        )
 
         model = Sequential(
-            self.get_layer(4, 2, rpu_config=rpu_config),
-            self.get_layer(2, 1, rpu_config=rpu_config)
+            self.get_layer(4, 2, rpu_config=rpu_config), self.get_layer(2, 1, rpu_config=rpu_config)
         )
         if self.use_cuda:
             x_b = x_b.cuda()
@@ -311,14 +304,14 @@ class LinearLayerTest(ParametrizedTestCase):
 
         manual_seed(4321)
 
-        rpu_config = InferenceRPUConfig(mapping=MappingParameter(
-            weight_scaling_omega=0.6,
-            learn_out_scaling=True,
-            weight_scaling_columnwise=True))
+        rpu_config = InferenceRPUConfig(
+            mapping=MappingParameter(
+                weight_scaling_omega=0.6, learn_out_scaling=True, weight_scaling_columnwise=True
+            )
+        )
 
         model = Sequential(
-            self.get_layer(4, 2, rpu_config=rpu_config),
-            self.get_layer(2, 1, rpu_config=rpu_config)
+            self.get_layer(4, 2, rpu_config=rpu_config), self.get_layer(2, 1, rpu_config=rpu_config)
         )
         if self.use_cuda:
             x_b = x_b.cuda()
@@ -342,11 +335,7 @@ class LinearLayerTest(ParametrizedTestCase):
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
 
-@parametrize_over_layers(
-    layers=[Linear, LinearCuda],
-    tiles=[Inference],
-    biases=['digital']
-)
+@parametrize_over_layers(layers=[Linear, LinearCuda], tiles=[Inference], biases=["digital"])
 class LinearLayerInferenceTest(ParametrizedTestCase):
     """Linear layer abstractions tests for inference."""
 
@@ -367,14 +356,12 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
         rpu_config.mapping.weight_scaling_columnwise = False
 
         analog_model = Sequential(
-            self.get_layer(4, 3, rpu_config=rpu_config),
-            self.get_layer(3, 1, rpu_config=rpu_config),
+            self.get_layer(4, 3, rpu_config=rpu_config), self.get_layer(3, 1, rpu_config=rpu_config)
         )
 
         manual_seed(4321)
         torch_model = Sequential(
-            torchLinear(4, 3, bias=self.bias),
-            torchLinear(3, 1, bias=self.bias)
+            torchLinear(4, 3, bias=self.bias), torchLinear(3, 1, bias=self.bias)
         )
 
         if self.use_cuda:
@@ -387,8 +374,7 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
 
         # train analog model with AnalogSGD
         LinearLayerTest.train_model(analog_model, loss_func, x_b, y_b)
-        self.assertLess(loss_func(analog_model(x_b), y_b).detach().cpu().numpy(),
-                        initial_loss)
+        self.assertLess(loss_func(analog_model(x_b), y_b).detach().cpu().numpy(), initial_loss)
 
         # check remapping
         tile_weights = analog_model[0].get_weights(apply_weight_scaling=False)[0]
@@ -397,8 +383,7 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
         # train torch model with SGD
         initial_loss2 = loss_func(torch_model(x_b), y_b).detach().cpu().numpy()
         LinearLayerTest.train_model_torch(torch_model, loss_func, x_b, y_b)
-        self.assertLess(loss_func(torch_model(x_b), y_b).detach().cpu().numpy(),
-                        initial_loss)
+        self.assertLess(loss_func(torch_model(x_b), y_b).detach().cpu().numpy(), initial_loss)
 
         # should be same
         final_loss = loss_func(analog_model(x_b), y_b).detach().cpu().numpy()
@@ -408,26 +393,20 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
         assert_array_almost_equal(final_loss, final_loss2)
 
     def test_inference_modifier(self):
-        """ tests whether modifier are used """
+        """tests whether modifier are used"""
 
         x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
 
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
-                weight_scaling_omega=0.0,
-                learn_out_scaling=False,
-                weight_scaling_columnwise=False
+                weight_scaling_omega=0.0, learn_out_scaling=False, weight_scaling_columnwise=False
             ),
-            modifier=WeightModifierParameter(
-                type=WeightModifierType.ADD_NORMAL,
-                std_dev=1.0,
-            ),
-            forward=IOParameters(is_perfect=True)
+            modifier=WeightModifierParameter(type=WeightModifierType.ADD_NORMAL, std_dev=1.0),
+            forward=IOParameters(is_perfect=True),
         )
 
         model = AnalogSequential(
-            self.get_layer(4, 2, rpu_config=rpu_config),
-            self.get_layer(2, 1, rpu_config=rpu_config)
+            self.get_layer(4, 2, rpu_config=rpu_config), self.get_layer(2, 1, rpu_config=rpu_config)
         )
         if self.use_cuda:
             x_b = x_b.cuda()
@@ -452,35 +431,28 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
         self.assertTensorAlmostEqual(y_eval2, y_eval1)
 
     def test_drift_compensation(self):
-        """ tests whether drift compensation is performed """
+        """tests whether drift compensation is performed"""
 
         x_b = Tensor([[0.1, 0.2, 0.3, 0.4], [0.2, 0.4, 0.3, 0.1]])
 
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
-                weight_scaling_omega=0.0,
-                learn_out_scaling=False,
-                weight_scaling_columnwise=False
+                weight_scaling_omega=0.0, learn_out_scaling=False, weight_scaling_columnwise=False
             ),
             forward=IOParameters(is_perfect=True),
             drift_compensation=GlobalDriftCompensation(),
             noise_model=StateIndependentNoiseModel(
-                prog_noise_scale=0.0,
-                read_noise_scale=0.0,
-                drift_nu_std=0.0,
-                drift_nu_mean=0.1,
-            )
+                prog_noise_scale=0.0, read_noise_scale=0.0, drift_nu_std=0.0, drift_nu_mean=0.1
+            ),
         )
 
         model = AnalogSequential(
-            self.get_layer(4, 2, rpu_config=rpu_config),
-            self.get_layer(2, 1, rpu_config=rpu_config)
+            self.get_layer(4, 2, rpu_config=rpu_config), self.get_layer(2, 1, rpu_config=rpu_config)
         )
 
         rpu_config.drift_compensation = None
         model_without = AnalogSequential(
-            self.get_layer(4, 2, rpu_config=rpu_config),
-            self.get_layer(2, 1, rpu_config=rpu_config)
+            self.get_layer(4, 2, rpu_config=rpu_config), self.get_layer(2, 1, rpu_config=rpu_config)
         )
 
         model_without.load_state_dict(model.state_dict(), load_rpu_config=False)
@@ -492,12 +464,12 @@ class LinearLayerInferenceTest(ParametrizedTestCase):
 
         model.eval()
         y_before = model(x_b)
-        model.drift_analog_weights(1000.)
+        model.drift_analog_weights(1000.0)
         y_after = model(x_b)
 
         model_without.eval()
         y_without_before = model_without(x_b)
-        model_without.drift_analog_weights(1000.)
+        model_without.drift_analog_weights(1000.0)
         y_without_after = model_without(x_b)
 
         self.assertTensorAlmostEqual(y_before, y_without_before)

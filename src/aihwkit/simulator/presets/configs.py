@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,28 +17,36 @@
 from dataclasses import dataclass, field
 
 from aihwkit.simulator.configs.configs import (
-    SingleRPUConfig, UnitCellRPUConfig, DigitalRankUpdateRPUConfig
+    SingleRPUConfig,
+    UnitCellRPUConfig,
+    DigitalRankUpdateRPUConfig,
 )
 from aihwkit.simulator.configs.devices import PulsedDevice
 from aihwkit.simulator.configs.compounds import (
-    TransferCompound, UnitCell, VectorUnitCell, BufferedTransferCompound,
-    DigitalRankUpdateCell, MixedPrecisionCompound,
+    TransferCompound,
+    UnitCell,
+    VectorUnitCell,
+    BufferedTransferCompound,
+    DigitalRankUpdateCell,
+    MixedPrecisionCompound,
 )
 from aihwkit.simulator.configs.enums import VectorUnitCellUpdatePolicy
-from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters
-)
+from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 from aihwkit.simulator.presets.devices import (
-    CapacitorPresetDevice, EcRamPresetDevice, EcRamMOPresetDevice, IdealizedPresetDevice,
-    ReRamESPresetDevice, ReRamSBPresetDevice, GokmenVlasovPresetDevice,
+    CapacitorPresetDevice,
+    EcRamPresetDevice,
+    EcRamMOPresetDevice,
+    IdealizedPresetDevice,
+    ReRamESPresetDevice,
+    ReRamSBPresetDevice,
+    GokmenVlasovPresetDevice,
 )
 from aihwkit.simulator.presets.compounds import PCMPresetUnitCell
-from aihwkit.simulator.presets.utils import (
-    PresetIOParameters, PresetUpdateParameters
-)
+from aihwkit.simulator.presets.utils import PresetIOParameters, PresetUpdateParameters
 
 
 # Single device configs.
+
 
 @dataclass
 class ReRamESPreset(SingleRPUConfig):
@@ -212,6 +220,7 @@ class PCMPreset(UnitCellRPUConfig):
 
 # 2-device configs.
 
+
 @dataclass
 class ReRamES2Preset(UnitCellRPUConfig):
     """Preset configuration using two ReRam devices per cross-point
@@ -228,10 +237,12 @@ class ReRamES2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -253,10 +264,12 @@ class ReRamSB2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -278,10 +291,12 @@ class Capacitor2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -303,10 +318,12 @@ class EcRam2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -328,10 +345,12 @@ class EcRamMO2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -353,16 +372,19 @@ class Idealized2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
 
 
 # 4-device configs.
+
 
 @dataclass
 class ReRamES4Preset(UnitCellRPUConfig):
@@ -380,11 +402,17 @@ class ReRamES4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice(),
-                           ReRamESPresetDevice(), ReRamESPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                ReRamESPresetDevice(),
+                ReRamESPresetDevice(),
+                ReRamESPresetDevice(),
+                ReRamESPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -406,11 +434,17 @@ class ReRamSB4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice(),
-                           ReRamSBPresetDevice(), ReRamSBPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                ReRamSBPresetDevice(),
+                ReRamSBPresetDevice(),
+                ReRamSBPresetDevice(),
+                ReRamSBPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -432,11 +466,17 @@ class Capacitor4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice(),
-                           CapacitorPresetDevice(), CapacitorPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                CapacitorPresetDevice(),
+                CapacitorPresetDevice(),
+                CapacitorPresetDevice(),
+                CapacitorPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -458,11 +498,17 @@ class EcRam4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice(),
-                           EcRamPresetDevice(), EcRamPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                EcRamPresetDevice(),
+                EcRamPresetDevice(),
+                EcRamPresetDevice(),
+                EcRamPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -484,11 +530,17 @@ class EcRamMO4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice(),
-                           EcRamMOPresetDevice(), EcRamMOPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                EcRamMOPresetDevice(),
+                EcRamMOPresetDevice(),
+                EcRamMOPresetDevice(),
+                EcRamMOPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -510,17 +562,24 @@ class Idealized4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice(),
-                           IdealizedPresetDevice(), IdealizedPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                IdealizedPresetDevice(),
+                IdealizedPresetDevice(),
+                IdealizedPresetDevice(),
+                IdealizedPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
 
 
 # Tiki-taka configs.
+
 
 @dataclass
 class TikiTakaReRamESPreset(UnitCellRPUConfig):
@@ -544,7 +603,8 @@ class TikiTakaReRamESPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -572,7 +632,8 @@ class TikiTakaReRamSBPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -600,7 +661,8 @@ class TikiTakaCapacitorPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -628,7 +690,8 @@ class TikiTakaEcRamPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -656,7 +719,8 @@ class TikiTakaEcRamMOPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -684,10 +748,12 @@ class TikiTakaIdealizedPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
 
 # TTv2 configs.
 
@@ -714,7 +780,8 @@ class TTv2ReRamESPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -742,7 +809,8 @@ class TTv2ReRamSBPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -770,7 +838,8 @@ class TTv2CapacitorPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -798,7 +867,8 @@ class TTv2EcRamPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -826,7 +896,8 @@ class TTv2EcRamMOPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -854,10 +925,12 @@ class TTv2IdealizedPreset(UnitCellRPUConfig):
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
 
 # Mixed precision presets
 
@@ -879,9 +952,8 @@ class MixedPrecisionReRamESPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=ReRamESPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=ReRamESPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -903,9 +975,8 @@ class MixedPrecisionReRamSBPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=ReRamSBPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=ReRamSBPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -927,9 +998,8 @@ class MixedPrecisionCapacitorPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=CapacitorPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=CapacitorPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -951,9 +1021,8 @@ class MixedPrecisionEcRamPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=EcRamPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=EcRamPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -975,9 +1044,8 @@ class MixedPrecisionEcRamMOPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=EcRamMOPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=EcRamMOPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -999,9 +1067,8 @@ class MixedPrecisionIdealizedPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=IdealizedPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=IdealizedPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -1023,9 +1090,8 @@ class MixedPrecisionGokmenVlasovPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=GokmenVlasovPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=GokmenVlasovPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -1047,9 +1113,8 @@ class MixedPrecisionPCMPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=PCMPresetUnitCell(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=PCMPresetUnitCell())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -33,37 +33,39 @@ class ModularRNN(AnalogSequential):
         first_layer_args: RNNCell type, input_size, hidden_size, rpu_config, etc.
         other_layer_args: RNNCell type, hidden_size, hidden_size, rpu_config, etc.
     """
+
     # pylint: disable=abstract-method
 
     # Necessary for iterating through self.layers and dropout support
-    __constants__ = ['layers', 'num_layers']
+    __constants__ = ["layers", "num_layers"]
 
     def __init__(
-            self,
-            num_layers: int,
-            layer: Type,
-            dropout: float,
-            first_layer_args: Any,
-            other_layer_args: Any):
+        self,
+        num_layers: int,
+        layer: Type,
+        dropout: float,
+        first_layer_args: Any,
+        other_layer_args: Any,
+    ):
         super().__init__()
-        self.layers = self.init_stacked_analog_lstm(num_layers, layer, first_layer_args,
-                                                    other_layer_args)
+        self.layers = self.init_stacked_analog_lstm(
+            num_layers, layer, first_layer_args, other_layer_args
+        )
 
         # Introduce a Dropout layer on the outputs of each RNN layer except
         # the last layer.
         self.num_layers = num_layers
         if num_layers == 1 and dropout > 0:
-            warnings.warn('dropout lstm adds dropout layers after all but last '
-                          'recurrent layer, it expects num_layers greater than '
-                          '1, but got num_layers = 1')
+            warnings.warn(
+                "dropout lstm adds dropout layers after all but last "
+                "recurrent layer, it expects num_layers greater than "
+                "1, but got num_layers = 1"
+            )
         self.dropout_layer = Dropout(dropout) if dropout else None
 
     @staticmethod
     def init_stacked_analog_lstm(
-            num_layers: int,
-            layer: Type,
-            first_layer_args: Any,
-            other_layer_args: Any
+        num_layers: int, layer: Type, first_layer_args: Any, other_layer_args: Any
     ) -> ModuleList:
         """Construct a list of LSTMLayers over which to iterate.
 
@@ -77,8 +79,9 @@ class ModularRNN(AnalogSequential):
             torch.nn.ModuleList, which is similar to a regular Python list,
             but where torch.nn.Module methods can be applied
         """
-        layers = [layer(*first_layer_args)] \
-            + [layer(*other_layer_args) for _ in range(num_layers - 1)]
+        layers = [layer(*first_layer_args)] + [
+            layer(*other_layer_args) for _ in range(num_layers - 1)
+        ]
         return ModuleList(layers)
 
     def get_zero_state(self, batch_size: int) -> List[Tensor]:
@@ -93,11 +96,8 @@ class ModularRNN(AnalogSequential):
         return [lay.get_zero_state(batch_size) for lay in self.layers]
 
     def forward(  # pylint: disable=arguments-differ
-            self,
-            input: Tensor,  # pylint: disable=redefined-builtin
-            states: List
+        self, input: Tensor, states: List  # pylint: disable=redefined-builtin
     ) -> Tuple[Tensor, List]:
-
         # List[RNNState]: One state per layer.
         output_states = jit.annotate(List, [])
         output = input
@@ -130,21 +130,22 @@ class AnalogRNN(AnalogSequential):
         bidir: if True, becomes a bidirectional RNN
         dropout: dropout applied to output of all RNN layers except last
     """
+
     # pylint: disable=abstract-method, too-many-arguments
 
     def __init__(
-            self,
-            cell: Type,
-            input_size: int,
-            hidden_size: int,
-            bias: bool = True,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-            xavier: bool = False,
-            num_layers: int = 1,
-            bidir: bool = False,
-            dropout: float = 0.0
-            ):
+        self,
+        cell: Type,
+        input_size: int,
+        hidden_size: int,
+        bias: bool = True,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+        xavier: bool = False,
+        num_layers: int = 1,
+        bidir: bool = False,
+        dropout: float = 0.0,
+    ):
         super().__init__()
 
         if bidir:
@@ -155,19 +156,32 @@ class AnalogRNN(AnalogSequential):
             num_dirs = 1
 
         self.rnn = ModularRNN(
-            num_layers, layer, dropout,
-            first_layer_args=[cell, input_size, hidden_size, bias,
-                              rpu_config, realistic_read_write],
-            other_layer_args=[cell, num_dirs*hidden_size, hidden_size, bias,
-                              rpu_config, realistic_read_write])
+            num_layers,
+            layer,
+            dropout,
+            first_layer_args=[
+                cell,
+                input_size,
+                hidden_size,
+                bias,
+                rpu_config,
+                realistic_read_write,
+            ],
+            other_layer_args=[
+                cell,
+                num_dirs * hidden_size,
+                hidden_size,
+                bias,
+                rpu_config,
+                realistic_read_write,
+            ],
+        )
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.reset_parameters(xavier)
 
     def init_layers(
-            self,
-            weight_init_fn: Callable,
-            bias_init_fn: Optional[Callable] = None
+        self, weight_init_fn: Callable, bias_init_fn: Optional[Callable] = None
     ) -> None:
         """Init the analog layers with custom functions.
 
@@ -181,6 +195,7 @@ class AnalogRNN(AnalogSequential):
             If no bias init function is provided the weight init
             function is taken for the bias as well.
         """
+
         def init_analog_layer(layer: AnalogModuleBase) -> None:
             """Init the weights and bias of an analog linear layer."""
             weight_init_fn(layer.weight.data)
@@ -204,7 +219,7 @@ class AnalogRNN(AnalogSequential):
         if xavier:
             self.init_layers(init.xavier_uniform_, init.zeros_)
         else:
-            stdv = 1. / math.sqrt(self.hidden_size)
+            stdv = 1.0 / math.sqrt(self.hidden_size)
             self.init_layers(lambda x: x.uniform_(-stdv, stdv))
 
     def get_zero_state(self, batch_size: int) -> List[Tensor]:
@@ -220,9 +235,7 @@ class AnalogRNN(AnalogSequential):
         return self.rnn.get_zero_state(batch_size)
 
     def forward(
-            self,
-            input: Tensor,  # pylint: disable=redefined-builtin
-            states: Optional[List] = None
+        self, input: Tensor, states: Optional[List] = None  # pylint: disable=redefined-builtin
     ) -> Tuple[Tensor, List]:
         if states is None:
             # TODO: batch_first.

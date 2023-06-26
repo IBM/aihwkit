@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,6 +23,7 @@ from aihwkit.exceptions import ConfigError
 if version_info[0] >= 3 and version_info[1] > 7:
     # pylint: disable=no-name-in-module
     from typing import get_origin  # type: ignore
+
     HAS_ORIGIN = True
 else:
     HAS_ORIGIN = False
@@ -43,20 +44,20 @@ def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
     """
     result = params.bindings_class()
 
-    field_dict = {field.name: (field, getattr(params, field.name))
-                  for field in fields(params)}
+    field_dict = {field.name: (field, getattr(params, field.name)) for field in fields(params)}
     if check_fields:
-        ignore_fields = getattr(params, 'bindings_ignore', [])
+        ignore_fields = getattr(params, "bindings_ignore", [])
         for key in params.__dict__.keys():
             if key not in field_dict and key not in ignore_fields:
-                raise ConfigError(f"Cannot find '{key}' in params "
-                                  f"'{params.__class__.__name__}'. "
-                                  "Wrong attribute name?")
+                raise ConfigError(
+                    f"Cannot find '{key}' in params "
+                    f"'{params.__class__.__name__}'. "
+                    "Wrong attribute name?"
+                )
 
     for field, (dataclass_field, value) in field_dict.items():
-
         # Convert enums to the bindings enums.
-        if field in ('unit_cell_devices', 'device'):
+        if field in ("unit_cell_devices", "device"):
             # Exclude special fields that are not present in the bindings.
             continue
 
@@ -72,9 +73,11 @@ def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
         else:
             if HAS_ORIGIN:
                 expected_type = get_origin(dataclass_field.type) or dataclass_field.type
-                if ((not isinstance(value, expected_type))
-                    and not (expected_type == float and isinstance(value, int)
-                             and not isinstance(value, bool))):
+                if (not isinstance(value, expected_type)) and not (
+                    expected_type == float
+                    and isinstance(value, int)
+                    and not isinstance(value, bool)
+                ):
                     raise ConfigError(f"Expected type {expected_type} for field {field}")
 
             setattr(result, field, value)
@@ -84,10 +87,17 @@ def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
 
 def tile_parameters_to_bindings(params: Any) -> Any:
     """Convert a tile dataclass parameter into a bindings class."""
-    field_map = {'forward': 'forward_io',
-                 'backward': 'backward_io'}
-    excluded_fields = ('device', 'noise_model', 'drift_compensation',
-                       'clip', 'modifier', 'mapping', 'remap', 'pre_post')
+    field_map = {"forward": "forward_io", "backward": "backward_io"}
+    excluded_fields = (
+        "device",
+        "noise_model",
+        "drift_compensation",
+        "clip",
+        "modifier",
+        "mapping",
+        "remap",
+        "pre_post",
+    )
 
     result = params.bindings_class()
     for field, value in params.__dict__.items():
@@ -113,17 +123,18 @@ def tile_parameters_to_bindings(params: Any) -> Any:
 
 class _PrintableMixin:
     """Helper class for pretty-printing of config dataclasses."""
+
     # pylint: disable=too-few-public-methods
 
     def __str__(self) -> str:
         """Return a pretty-print representation."""
 
         def lines_list_to_str(
-                lines_list: List[str],
-                prefix: str = '',
-                suffix: str = '',
-                indent_: int = 0,
-                force_multiline: bool = False
+            lines_list: List[str],
+            prefix: str = "",
+            suffix: str = "",
+            indent_: int = 0,
+            force_multiline: bool = False,
         ) -> str:
             """Convert a list of lines into a string.
 
@@ -139,17 +150,16 @@ class _PrintableMixin:
                 The lines collapsed into a single string (potentially with line
                 breaks).
             """
-            if force_multiline or len(lines_list) > 3 or any(
-                    '\n' in line for line in lines_list):
+            if force_multiline or len(lines_list) > 3 or any("\n" in line for line in lines_list):
                 # Return a multi-line string.
-                lines_str = indent(',\n'.join(lines_list), ' '*indent_)
-                prefix = '{}\n'.format(prefix) if prefix else prefix
-                suffix = '\n{}'.format(suffix) if suffix else suffix
+                lines_str = indent(",\n".join(lines_list), " " * indent_)
+                prefix = "{}\n".format(prefix) if prefix else prefix
+                suffix = "\n{}".format(suffix) if suffix else suffix
             else:
                 # Return an inline string.
-                lines_str = ', '.join(lines_list)
+                lines_str = ", ".join(lines_list)
 
-            return '{}{}{}'.format(prefix, lines_str, suffix)
+            return "{}{}{}".format(prefix, lines_str, suffix)
 
         def field_to_str(field_value: Any) -> str:
             """Return a string representation of the value of a field.
@@ -168,15 +178,14 @@ class _PrintableMixin:
             if isinstance(field_value, list) and len(value) > 0:
                 # For non-emtpy lists, always use multiline, with one item per line.
                 for item in field_value:
-                    field_lines.append(indent('{}'.format(str(item)), ' '*4))
+                    field_lines.append(indent("{}".format(str(item)), " " * 4))
                 force_multiline = True
             else:
                 field_lines.append(str(field_value))
 
-            prefix = '[' if force_multiline else ''
-            suffix = ']' if force_multiline else ''
-            return lines_list_to_str(
-                field_lines, prefix, suffix, force_multiline=force_multiline)
+            prefix = "[" if force_multiline else ""
+            suffix = "]" if force_multiline else ""
+            return lines_list_to_str(field_lines, prefix, suffix, force_multiline=force_multiline)
 
         def is_skippable(field: Field, value: Any) -> bool:
             """Return whether a field should be skipped."""
@@ -184,7 +193,7 @@ class _PrintableMixin:
                 # Skip fields with the default value.
                 return True
 
-            if 'hide_if' in field.metadata and field.metadata.get('hide_if') == value:
+            if "hide_if" in field.metadata and field.metadata.get("hide_if") == value:
                 return True
 
             return False
@@ -206,10 +215,9 @@ class _PrintableMixin:
             except Exception:  # pylint: disable=broad-except
                 value_str = str(value)
 
-            fields_lines.append('{}={}'.format(field.name, value_str))
+            fields_lines.append("{}={}".format(field.name, value_str))
 
         # Convert the full object to str.
-        output = lines_list_to_str(
-            fields_lines, '{}('.format(self.__class__.__name__), ')', 4)
+        output = lines_list_to_str(fields_lines, "{}(".format(self.__class__.__name__), ")", 4)
 
         return output

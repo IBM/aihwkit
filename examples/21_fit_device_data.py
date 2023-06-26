@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -33,17 +33,14 @@ USE_CUDA = cuda.is_compiled()
 # Declare variables and .csv path
 DEVICE_FIT = True
 if DEVICE_FIT:
-    FILE_NAME = os.path.join(os.path.dirname(__file__), 'csv', 'gong_et_al.csv')
+    FILE_NAME = os.path.join(os.path.dirname(__file__), "csv", "gong_et_al.csv")
 else:
-    FILE_NAME = os.path.join(os.path.dirname(__file__), 'csv', 'selfdefine.csv')
+    FILE_NAME = os.path.join(os.path.dirname(__file__), "csv", "selfdefine.csv")
 
 
-def read_from_file(filename: str,
-                   from_pulse_response: bool = True,
-                   n_segments: int = 10,
-                   skip_rows: int = 0
-                   ) -> Tuple[List[float], List[float], float, float, float,
-                              List[float], List[float]]:
+def read_from_file(
+    filename: str, from_pulse_response: bool = True, n_segments: int = 10, skip_rows: int = 0
+) -> Tuple[List[float], List[float], float, float, float, List[float], List[float]]:
     """Read the update steps from file and convert to the required device input format.
 
     Here the CSV file has two columns, one for the up and the second
@@ -72,15 +69,15 @@ def read_from_file(filename: str,
     up_data = []
     down_data = []
     # Import .csv file to determine up_pulse, down_pulse, and n_points.
-    with open(filename, newline='', encoding='utf-8-sig') as csvfile:
-        fieldnames = ['up_data', 'down_data']
+    with open(filename, newline="", encoding="utf-8-sig") as csvfile:
+        fieldnames = ["up_data", "down_data"]
         reader = csv.DictReader(csvfile, fieldnames=fieldnames)
         for i, row in enumerate(reader):
             if i < skip_rows:
                 continue
 
-            up_data.append(float(row['up_data']))
-            down_data.append(float(row['down_data']))
+            up_data.append(float(row["up_data"]))
+            down_data.append(float(row["down_data"]))
 
     up_data = np.array(up_data)
     down_data = np.array(down_data)
@@ -123,24 +120,36 @@ def read_from_file(filename: str,
     up_down = center_up - center_down
     noise_std = noise_std / dw_min
 
-    return ((up_pulse / center_up).tolist(), (down_pulse / center_down).tolist(),
-            dw_min, up_down, noise_std, up_data, down_data)
+    return (
+        (up_pulse / center_up).tolist(),
+        (down_pulse / center_down).tolist(),
+        dw_min,
+        up_down,
+        noise_std,
+        up_data,
+        down_data,
+    )
 
 
 # define the device response from values in the CSV file
 piecewise_up, piecewise_down, dw_min, up_down, noise_std, up_data, down_data = read_from_file(
-    FILE_NAME, from_pulse_response=DEVICE_FIT)
+    FILE_NAME, from_pulse_response=DEVICE_FIT
+)
 
-my_device = PiecewiseStepDevice(w_min=-1, w_max=1, w_min_dtod=0.0, w_max_dtod=0.0,
-                                dw_min_std=0.0,
-                                dw_min_dtod=0.0,
-                                up_down_dtod=0.0,
-                                dw_min=dw_min,
-                                up_down=up_down,
-                                write_noise_std=noise_std,
-                                piecewise_up=piecewise_up,
-                                piecewise_down=piecewise_down
-                                )
+my_device = PiecewiseStepDevice(
+    w_min=-1,
+    w_max=1,
+    w_min_dtod=0.0,
+    w_max_dtod=0.0,
+    dw_min_std=0.0,
+    dw_min_dtod=0.0,
+    up_down_dtod=0.0,
+    dw_min=dw_min,
+    up_down=up_down,
+    write_noise_std=noise_std,
+    piecewise_up=piecewise_up,
+    piecewise_down=piecewise_down,
+)
 print(my_device)
 
 # plot the pulse response
@@ -148,6 +157,6 @@ plt.ion()
 fig = plot_device_compact(my_device, n_steps=1000, use_cuda=USE_CUDA)
 if DEVICE_FIT:
     axis = fig.get_axes()[0]
-    axis.plot(np.concatenate([up_data, down_data, up_data, down_data]), 'k:', alpha=0.5)
+    axis.plot(np.concatenate([up_data, down_data, up_data, down_data]), "k:", alpha=0.5)
 
 plt.show()

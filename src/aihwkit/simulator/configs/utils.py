@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,9 +21,14 @@ from typing import ClassVar, Type, Union, Any, List, TYPE_CHECKING
 from aihwkit.simulator.configs.helpers import _PrintableMixin
 from aihwkit.simulator.rpu_base import devices, tiles
 from aihwkit.simulator.configs.enums import (
-    BoundManagementType, NoiseManagementType, WeightNoiseType, PulseType,
-    WeightModifierType, WeightClipType, WeightRemapType,
-    AnalogMVType
+    BoundManagementType,
+    NoiseManagementType,
+    WeightNoiseType,
+    PulseType,
+    WeightModifierType,
+    WeightClipType,
+    WeightRemapType,
+    AnalogMVType,
 )
 
 if TYPE_CHECKING:
@@ -430,7 +435,7 @@ class WeightModifierParameter(_PrintableMixin):
 
     coeffs: List[float] = field(
         default_factory=lambda: [0.0105392, 0.0768, -0.046925],
-        metadata={'hide_if': [0.0105392, 0.0768, -0.046925]}
+        metadata={"hide_if": [0.0105392, 0.0768, -0.046925]},
     )
 
     """Coefficients for the ``POLY`` weight modifier type.
@@ -479,6 +484,7 @@ class WeightRemapParameter(_PrintableMixin):
         A remap ``type`` has to be set before any of the parameter
         changes take any effect.
     """
+
     bindings_class: ClassVar[Type] = tiles.WeightRemapParameter
 
     remapped_wmax: float = 1.0
@@ -692,7 +698,7 @@ class MappingParameter(_PrintableMixin):
 
 @dataclass
 class InputRangeParameter(_PrintableMixin):
-    """ Parameter related to input range learning """
+    """Parameter related to input range learning"""
 
     enable: bool = False
     """Whether to enable to learn the input range. Note that if enable is
@@ -769,7 +775,7 @@ class InputRangeParameter(_PrintableMixin):
     """
 
     def supports_manage_output_clipping(self, rpu_config: Any) -> bool:
-        """ Checks whether rpu_config supported ``manage_output_clipping``.
+        """Checks whether rpu_config supported ``manage_output_clipping``.
 
         Args:
             rpu_config: RPUConfig to check
@@ -778,7 +784,7 @@ class InputRangeParameter(_PrintableMixin):
             True if supported otherwise False
         """
 
-        if not hasattr(rpu_config, 'forward') or rpu_config.forward.is_perfect:
+        if not hasattr(rpu_config, "forward") or rpu_config.forward.is_perfect:
             return False
         if not isinstance(rpu_config.forward, IOParameters):
             return False
@@ -793,7 +799,8 @@ class InputRangeParameter(_PrintableMixin):
 class PrePostProcessingParameter(_PrintableMixin):
     """Parameter related to digital input and output processing, such as input clip
     learning.
-     """
+    """
+
     input_range: InputRangeParameter = field(default_factory=InputRangeParameter)
 
 
@@ -804,8 +811,8 @@ class MapableRPU(_PrintableMixin):
     mapping: MappingParameter = field(default_factory=MappingParameter)
     """Parameter related to mapping weights to tiles for supporting modules."""
 
-    def get_linear(self) -> Union[Type['AnalogLinear'], Type['AnalogLinearMapped']]:
-        """Returns a AnalogLinear module as specified """
+    def get_linear(self) -> Union[Type["AnalogLinear"], Type["AnalogLinearMapped"]]:
+        """Returns a AnalogLinear module as specified"""
         # pylint: disable=import-outside-toplevel
         # need to import here to avoid circular imports
         from aihwkit.nn.modules.linear import AnalogLinear

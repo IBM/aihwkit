@@ -1,7 +1,6 @@
-
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -24,10 +23,7 @@ from aihwkit.inference.converter.conductance import SinglePairConductanceConvert
 class BaseNoiseModel:
     """Base class for phenomenological noise models for inference."""
 
-    def __init__(
-            self,
-            g_converter: Optional[BaseConductanceConverter] = None
-    ):
+    def __init__(self, g_converter: Optional[BaseConductanceConverter] = None):
         self.g_converter = g_converter or SinglePairConductanceConverter()
 
     @no_grad()
@@ -53,8 +49,9 @@ class BaseNoiseModel:
             g_prog = self.apply_programming_noise_to_conductance(g_target)
             if t_inference > 0:
                 nu_drift = self.generate_drift_coefficients(g_target)
-                noisy_conductances.append(self.apply_drift_noise_to_conductance(
-                    g_prog, nu_drift, t_inference))
+                noisy_conductances.append(
+                    self.apply_drift_noise_to_conductance(g_prog, nu_drift, t_inference)
+                )
 
         noisy_weights = self.g_converter.convert_back_to_weights(noisy_conductances, params)
 
@@ -80,7 +77,6 @@ class BaseNoiseModel:
         noisy_conductances = []
         nu_drift_list = []
         for g_target in target_conductances:
-
             noisy_conductances.append(self.apply_programming_noise_to_conductance(g_target))
             nu_drift_list.append(self.generate_drift_coefficients(g_target))
         noisy_weights = self.g_converter.convert_back_to_weights(noisy_conductances, params)
@@ -89,10 +85,7 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_drift_noise(
-            self,
-            weights: Tensor,
-            nu_drift_list: List[Tensor],
-            t_inference: float
+        self, weights: Tensor, nu_drift_list: List[Tensor], t_inference: float
     ) -> Tensor:
         """Apply the expected drift noise to weights.
 
@@ -112,7 +105,8 @@ class BaseNoiseModel:
         noisy_conductances = []
         for g_target, nu_drift in zip(target_conductances, nu_drift_list):
             noisy_conductances.append(
-                self.apply_drift_noise_to_conductance(g_target, nu_drift, t_inference))
+                self.apply_drift_noise_to_conductance(g_target, nu_drift, t_inference)
+            )
 
         noisy_weights = self.g_converter.convert_back_to_weights(noisy_conductances, params)
 
@@ -138,10 +132,7 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-            self,
-            g_prog: Tensor,
-            nu_drift: Tensor,
-            t_inference: float
+        self, g_prog: Tensor, nu_drift: Tensor, t_inference: float
     ) -> Tensor:
         r"""Apply the noise and drift up to the assumed inference time point.
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -26,6 +26,7 @@ class AnalogRNNLayer(AnalogSequential):
               AnalogLSTMCellSingleRPU)
         cell_args: arguments to RNNCell (e.g. input_size, hidden_size, rpu_configs)
     """
+
     # pylint: disable=abstract-method
 
     def __init__(self, cell: Type, *cell_args: Any):
@@ -44,8 +45,7 @@ class AnalogRNNLayer(AnalogSequential):
         return self.cell.get_zero_state(batch_size)
 
     def forward(
-            self, input_: Tensor,
-            state: Union[Tuple[Tensor, Tensor], Tensor]
+        self, input_: Tensor, state: Union[Tuple[Tensor, Tensor], Tensor]
     ) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
         # pylint: disable=arguments-differ
         inputs = input_.unbind(0)
@@ -57,19 +57,20 @@ class AnalogRNNLayer(AnalogSequential):
 
 
 class AnalogReverseRNNLayer(AnalogSequential):
-    """ Analog RNN layer for direction.
+    """Analog RNN layer for direction.
 
     Args:
         cell: RNNCell type (AnalogLSTMCell/AnalogGRUCell/AnalogVanillaRNNCell)
         cell_args: arguments to RNNCell (e.g. input_size, hidden_size, rpu_configs)
     """
+
     def __init__(self, cell: Type, *cell_args: Any):
         super().__init__()
         self.cell = cell(*cell_args)
 
     @staticmethod
     def reverse(lst: List[Tensor]) -> List[Tensor]:
-        """ Reverses the list of input tensors. """
+        """Reverses the list of input tensors."""
         return lst[::-1]
 
     def get_zero_state(self, batch_size: int) -> Tensor:
@@ -83,9 +84,9 @@ class AnalogReverseRNNLayer(AnalogSequential):
         """
         return self.cell.get_zero_state(batch_size)
 
-    def forward(self, input_: Tensor,
-                state: Union[Tuple[Tensor, Tensor], Tensor]
-                ) -> Tuple[Tensor, Union[Tuple[Tensor, Tensor], Tensor]]:
+    def forward(
+        self, input_: Tensor, state: Union[Tuple[Tensor, Tensor], Tensor]
+    ) -> Tuple[Tensor, Union[Tuple[Tensor, Tensor], Tensor]]:
         # pylint: disable=arguments-differ
         inputs = self.reverse(input_.unbind(0))
         outputs = jit.annotate(List[Tensor], [])
@@ -96,22 +97,21 @@ class AnalogReverseRNNLayer(AnalogSequential):
 
 
 class AnalogBidirRNNLayer(AnalogSequential):
-    """ Bi-directional analog RNN layer.
+    """Bi-directional analog RNN layer.
 
     Args:
         cell: RNNCell type (AnalogLSTMCell/AnalogGRUCell/AnalogVanillaRNNCell)
         cell_args: arguments to RNNCell (e.g. input_size, hidden_size, rpu_configs)
     """
 
-    __constants__ = ['directions']
+    __constants__ = ["directions"]
 
     def __init__(self, cell: Type, *cell_args: Any):
         super().__init__()
 
-        self.directions = ModuleList([
-            AnalogRNNLayer(cell, *cell_args),
-            AnalogReverseRNNLayer(cell, *cell_args),
-        ])
+        self.directions = ModuleList(
+            [AnalogRNNLayer(cell, *cell_args), AnalogReverseRNNLayer(cell, *cell_args)]
+        )
 
     def get_zero_state(self, batch_size: int) -> Tensor:
         """Returns a zeroed state.
@@ -122,12 +122,14 @@ class AnalogBidirRNNLayer(AnalogSequential):
         Returns:
            Zeroed state tensor
         """
-        return [self.directions[0].get_zero_state(batch_size),
-                self.directions[1].get_zero_state(batch_size)]
+        return [
+            self.directions[0].get_zero_state(batch_size),
+            self.directions[1].get_zero_state(batch_size),
+        ]
 
-    def forward(self, input_: Tensor,
-                states: List[Union[Tuple[Tensor, Tensor], Tensor]]
-                ) -> Tuple[Tensor, List[Union[Tuple[Tensor, Tensor], Tensor]]]:
+    def forward(
+        self, input_: Tensor, states: List[Union[Tuple[Tensor, Tensor], Tensor]]
+    ) -> Tuple[Tensor, List[Union[Tuple[Tensor, Tensor], Tensor]]]:
         # pylint: disable=arguments-differ
         # List[RNNState]: [forward RNNState, backward RNNState]
         outputs = jit.annotate(List[Tensor], [])

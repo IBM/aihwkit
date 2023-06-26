@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -15,27 +15,41 @@ from sys import version_info
 from unittest import SkipTest
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters
-)
+from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
-    FloatingPoint, Ideal, ConstantStep, LinearStep,
-    ExpStep, SoftBounds, SoftBoundsPmax, PowStep, PiecewiseStep, Vector, OneSided,
-    Transfer, MixedPrecision,
-    FloatingPointCuda, IdealCuda, ConstantStepCuda, LinearStepCuda,
-    ExpStepCuda, SoftBoundsCuda, SoftBoundsPmaxCuda, PowStepCuda, PiecewiseStepCuda,
-    VectorCuda, OneSidedCuda, TransferCuda, MixedPrecisionCuda
-
+    FloatingPoint,
+    Ideal,
+    ConstantStep,
+    LinearStep,
+    ExpStep,
+    SoftBounds,
+    SoftBoundsPmax,
+    PowStep,
+    PiecewiseStep,
+    Vector,
+    OneSided,
+    Transfer,
+    MixedPrecision,
+    FloatingPointCuda,
+    IdealCuda,
+    ConstantStepCuda,
+    LinearStepCuda,
+    ExpStepCuda,
+    SoftBoundsCuda,
+    SoftBoundsPmaxCuda,
+    PowStepCuda,
+    PiecewiseStepCuda,
+    VectorCuda,
+    OneSidedCuda,
+    TransferCuda,
+    MixedPrecisionCuda,
 )
 
 
-@parametrize_over_tiles([
-    FloatingPoint,
-    FloatingPointCuda
-])
+@parametrize_over_tiles([FloatingPoint, FloatingPointCuda])
 class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
     """Tests related to resistive processing unit configurations (floating point)."""
 
@@ -62,32 +76,34 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
         self.assertAlmostEqual(parameters.lifetime, 4.56, places=4)
 
 
-@parametrize_over_tiles([
-    Ideal,
-    ConstantStep,
-    LinearStep,
-    ExpStep,
-    SoftBounds,
-    SoftBoundsPmax,
-    PowStep,
-    PiecewiseStep,
-    Vector,
-    OneSided,
-    Transfer,
-    MixedPrecision,
-    IdealCuda,
-    ConstantStepCuda,
-    LinearStepCuda,
-    ExpStepCuda,
-    SoftBoundsCuda,
-    SoftBoundsPmaxCuda,
-    PowStepCuda,
-    PiecewiseStepCuda,
-    VectorCuda,
-    OneSidedCuda,
-    TransferCuda,
-    MixedPrecisionCuda,
-])
+@parametrize_over_tiles(
+    [
+        Ideal,
+        ConstantStep,
+        LinearStep,
+        ExpStep,
+        SoftBounds,
+        SoftBoundsPmax,
+        PowStep,
+        PiecewiseStep,
+        Vector,
+        OneSided,
+        Transfer,
+        MixedPrecision,
+        IdealCuda,
+        ConstantStepCuda,
+        LinearStepCuda,
+        ExpStepCuda,
+        SoftBoundsCuda,
+        SoftBoundsPmaxCuda,
+        PowStepCuda,
+        PiecewiseStepCuda,
+        VectorCuda,
+        OneSidedCuda,
+        TransferCuda,
+        MixedPrecisionCuda,
+    ]
+)
 class RPUConfigurationsTest(ParametrizedTestCase):
     """Tests related to resistive processing unit configurations."""
 
@@ -153,10 +169,8 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         hidden_parameters_2 = tile_2.get_hidden_parameters()
 
         # Compare old and new hidden parameters tensors.
-        for (field, old), (_, new) in zip(hidden_parameters_1.items(),
-                                          hidden_parameters_2.items()):
-
-            if 'weights' in field:
+        for (field, old), (_, new) in zip(hidden_parameters_1.items(), hidden_parameters_2.items()):
+            if "weights" in field:
                 # exclude weights as these are not governed by construction seed
                 continue
             self.assertTrue(old.allclose(new))

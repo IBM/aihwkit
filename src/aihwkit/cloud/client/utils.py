@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,7 +16,7 @@ from os import getenv, path
 from typing import Dict
 from configparser import ConfigParser
 
-DEFAULT_URL = 'https://api-aihw-composer.draco.res.ibm.com'
+DEFAULT_URL = "https://api-aihw-composer.draco.res.ibm.com"
 
 
 class ClientConfiguration:
@@ -51,23 +51,27 @@ class ClientConfiguration:
             configuration file.
         """
         parser = ConfigParser()
-        parser.read(['aihwkit.conf',
-                     path.expanduser('{}/aihwkit/aihwkit.conf'.format(
-                         getenv('XDG_CONFIG_HOME', '~/.config')))])
+        parser.read(
+            [
+                "aihwkit.conf",
+                path.expanduser(
+                    "{}/aihwkit/aihwkit.conf".format(getenv("XDG_CONFIG_HOME", "~/.config"))
+                ),
+            ]
+        )
 
         # Check that the expected section is present.
-        if 'cloud' in parser:
-            return dict(parser['cloud'])
+        if "cloud" in parser:
+            return dict(parser["cloud"])
 
         return {}
 
     @property
     def token(self) -> str:
         """Return the user token."""
-        return getenv('AIHW_API_TOKEN',
-                      self.stored_config.get('api_token', None))
+        return getenv("AIHW_API_TOKEN", self.stored_config.get("api_token", None))
 
     @property
     def url(self) -> str:
         """Return the API URL."""
-        return self.stored_config.get('api_url', DEFAULT_URL)
+        return self.stored_config.get("api_url", DEFAULT_URL)

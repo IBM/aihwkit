@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -34,8 +34,10 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
-    SingleRPUConfig, FloatingPointRPUConfig,
-    ConstantStepDevice, FloatingPointDevice
+    SingleRPUConfig,
+    FloatingPointRPUConfig,
+    ConstantStepDevice,
+    FloatingPointDevice,
 )
 from aihwkit.simulator.rpu_base import cuda
 
@@ -43,13 +45,13 @@ from aihwkit.simulator.rpu_base import cuda
 USE_CUDA = 0
 if cuda.is_compiled():
     USE_CUDA = 1
-DEVICE = torch.device('cuda' if USE_CUDA else 'cpu')
+DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
 
 # Path to store datasets
-PATH_DATASET = os.path.join('data', 'DATASET')
+PATH_DATASET = os.path.join("data", "DATASET")
 
 # Path to store results
-RESULTS = os.path.join(os.getcwd(), 'results', 'LENET5')
+RESULTS = os.path.join(os.getcwd(), "results", "LENET5")
 
 # Training parameters
 SEED = 1
@@ -86,12 +88,18 @@ def create_analog_network():
     """Return a LeNet5 inspired analog model."""
     channel = [16, 32, 512, 128]
     model = AnalogSequential(
-        AnalogConv2d(in_channels=1, out_channels=channel[0], kernel_size=5, stride=1,
-                     rpu_config=RPU_CONFIG),
+        AnalogConv2d(
+            in_channels=1, out_channels=channel[0], kernel_size=5, stride=1, rpu_config=RPU_CONFIG
+        ),
         nn.Tanh(),
         nn.MaxPool2d(kernel_size=2),
-        AnalogConv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=5, stride=1,
-                     rpu_config=RPU_CONFIG),
+        AnalogConv2d(
+            in_channels=channel[0],
+            out_channels=channel[1],
+            kernel_size=5,
+            stride=1,
+            rpu_config=RPU_CONFIG,
+        ),
         nn.Tanh(),
         nn.MaxPool2d(kernel_size=2),
         nn.Tanh(),
@@ -99,7 +107,7 @@ def create_analog_network():
         AnalogLinear(in_features=channel[2], out_features=channel[3], rpu_config=RPU_CONFIG),
         nn.Tanh(),
         AnalogLinear(in_features=channel[3], out_features=N_CLASSES, rpu_config=RPU_CONFIG),
-        nn.LogSoftmax(dim=1)
+        nn.LogSoftmax(dim=1),
     )
 
     return model
@@ -185,8 +193,8 @@ def test_evaluation(validation_data, model, criterion):
         _, predicted = torch.max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
-        accuracy = predicted_ok/total_images*100
-        error = (1-predicted_ok/total_images)*100
+        accuracy = predicted_ok / total_images * 100
+        error = (1 - predicted_ok / total_images) * 100
 
     epoch_loss = total_loss / len(validation_data.dataset)
 
@@ -222,18 +230,19 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
 
         # Validate_step
         with torch.no_grad():
-            model, valid_loss, error, accuracy = test_evaluation(
-                validation_data, model, criterion)
+            model, valid_loss, error, accuracy = test_evaluation(validation_data, model, criterion)
             valid_losses.append(valid_loss)
             test_error.append(error)
 
         if epoch % print_every == (print_every - 1):
-            print(f'{datetime.now().time().replace(microsecond=0)} --- '
-                  f'Epoch: {epoch}\t'
-                  f'Train loss: {train_loss:.4f}\t'
-                  f'Valid loss: {valid_loss:.4f}\t'
-                  f'Test error: {error:.2f}%\t'
-                  f'Accuracy: {accuracy:.2f}%\t')
+            print(
+                f"{datetime.now().time().replace(microsecond=0)} --- "
+                f"Epoch: {epoch}\t"
+                f"Train loss: {train_loss:.4f}\t"
+                f"Valid loss: {valid_loss:.4f}\t"
+                f"Test error: {error:.2f}%\t"
+                f"Accuracy: {accuracy:.2f}%\t"
+            )
 
     # Save results and plot figures
     np.savetxt(os.path.join(RESULTS, "Test_error.csv"), test_error, delimiter=",")
@@ -252,24 +261,24 @@ def plot_results(train_losses, valid_losses, test_error):
         valid_losses (List): validation losses as calculated in the training_loop
         test_error (List): test error as calculated in the training_loop
     """
-    fig = plt.plot(train_losses, 'r-s', valid_losses, 'b-o')
-    plt.title('aihwkit LeNet5')
-    plt.legend(fig[:2], ['Training Losses', 'Validation Losses'])
-    plt.xlabel('Epoch number')
-    plt.ylabel('Loss [A.U.]')
-    plt.grid(which='both', linestyle='--')
-    plt.savefig(os.path.join(RESULTS, 'test_losses.png'))
+    fig = plt.plot(train_losses, "r-s", valid_losses, "b-o")
+    plt.title("aihwkit LeNet5")
+    plt.legend(fig[:2], ["Training Losses", "Validation Losses"])
+    plt.xlabel("Epoch number")
+    plt.ylabel("Loss [A.U.]")
+    plt.grid(which="both", linestyle="--")
+    plt.savefig(os.path.join(RESULTS, "test_losses.png"))
     plt.close()
 
-    fig = plt.plot(test_error, 'r-s')
-    plt.title('aihwkit LeNet5')
-    plt.legend(fig[:1], ['Validation Error'])
-    plt.xlabel('Epoch number')
-    plt.ylabel('Test Error [%]')
-    plt.yscale('log')
+    fig = plt.plot(test_error, "r-s")
+    plt.title("aihwkit LeNet5")
+    plt.legend(fig[:1], ["Validation Error"])
+    plt.xlabel("Epoch number")
+    plt.ylabel("Test Error [%]")
+    plt.yscale("log")
     plt.ylim((5e-1, 1e2))
-    plt.grid(which='both', linestyle='--')
-    plt.savefig(os.path.join(RESULTS, 'test_error.png'))
+    plt.grid(which="both", linestyle="--")
+    plt.savefig(os.path.join(RESULTS, "test_error.png"))
     plt.close()
 
 
@@ -290,20 +299,19 @@ def main():
 
     print(model)
 
-    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
-          f'Started LeNet5 Example')
+    print(f"\n{datetime.now().time().replace(microsecond=0)} --- " f"Started LeNet5 Example")
 
     optimizer = create_sgd_optimizer(model, LEARNING_RATE)
 
     criterion = nn.CrossEntropyLoss()
 
-    model, optimizer, _ = training_loop(model, criterion, optimizer, train_data, validation_data,
-                                        N_EPOCHS)
+    model, optimizer, _ = training_loop(
+        model, criterion, optimizer, train_data, validation_data, N_EPOCHS
+    )
 
-    print(f'{datetime.now().time().replace(microsecond=0)} --- '
-          f'Completed LeNet5 Example')
+    print(f"{datetime.now().time().replace(microsecond=0)} --- " f"Completed LeNet5 Example")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Execute only if run as the entry point into the program
     main()

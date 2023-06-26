@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -15,18 +15,24 @@
 # pylint: disable=too-many-instance-attributes
 
 from dataclasses import dataclass, field
-from aihwkit.simulator.configs.configs import (
-    InferenceRPUConfig
-)
+from aihwkit.simulator.configs.configs import InferenceRPUConfig
 
 from aihwkit.simulator.configs.utils import (
-    IOParameters, WeightClipParameter,  WeightModifierParameter, MappingParameter,
-    BoundManagementType, NoiseManagementType, WeightNoiseType, WeightModifierType,
-    WeightClipType
+    IOParameters,
+    WeightClipParameter,
+    WeightModifierParameter,
+    MappingParameter,
+    BoundManagementType,
+    NoiseManagementType,
+    WeightNoiseType,
+    WeightModifierType,
+    WeightClipType,
 )
 from aihwkit.inference import (
-    BaseDriftCompensation, BaseNoiseModel, GlobalDriftCompensation,
-    PCMLikeNoiseModel
+    BaseDriftCompensation,
+    BaseNoiseModel,
+    GlobalDriftCompensation,
+    PCMLikeNoiseModel,
 )
 
 
@@ -94,8 +100,7 @@ class WebComposerMappingParameter(MappingParameter):
 
 @dataclass
 class WebComposerInferenceRPUConfig(InferenceRPUConfig):
-    """Preset configuration used as default for the Inference Composer
-    """
+    """Preset configuration used as default for the Inference Composer"""
 
     forward: IOParameters = field(default_factory=WebComposerIOParameters)
     """Input-output parameter setting for the forward direction."""
@@ -134,8 +139,7 @@ class OldWebComposerMappingParameter(WebComposerMappingParameter):
 
 @dataclass
 class OldWebComposerInferenceRPUConfig(WebComposerInferenceRPUConfig):
-    """Preset configuration used as default for the Inference Composer
-    """
+    """Preset configuration used as default for the Inference Composer"""
 
     mapping: MappingParameter = field(default_factory=OldWebComposerMappingParameter)
     """Parameter related to mapping weights to tiles for supporting modules."""

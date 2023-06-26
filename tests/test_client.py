@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -31,7 +31,7 @@ class ApiClientTest(AihwkitTestCase):
     def setUp(self) -> None:
         config = ClientConfiguration()
         if not config.token:
-            raise SkipTest('API token not found')
+            raise SkipTest("API token not found")
 
         self.session = ApiSession(config.url, config.token)
         self.api_client = ApiClient(self.session)
@@ -41,15 +41,14 @@ class ApiClientTest(AihwkitTestCase):
         experiments = self.api_client.experiments_list()
 
         self.assertIsInstance(experiments, list)
-        self.assertTrue(all(isinstance(experiment, CloudExperiment)
-                            for experiment in experiments))
+        self.assertTrue(all(isinstance(experiment, CloudExperiment) for experiment in experiments))
 
     def test_experiment_get(self):
         """Test getting an experiment."""
         experiments = self.api_client.experiments_list()
 
         if len(experiments) == 0:
-            raise SkipTest('No experiments found')
+            raise SkipTest("No experiments found")
 
         experiment = experiments[-1]
         fetched_experiment = self.api_client.experiment_get(experiment.id_)
@@ -59,7 +58,7 @@ class ApiClientTest(AihwkitTestCase):
         """Test getting the input of an experiment."""
         experiments = self.api_client.experiments_list()
         if len(experiments) == 0:
-            raise SkipTest('No experiments found')
+            raise SkipTest("No experiments found")
 
         experiment = experiments[-1]
         input_ = self.api_client.input_get(experiment.input_id)
@@ -69,7 +68,7 @@ class ApiClientTest(AihwkitTestCase):
         """Test getting the output of an experiment."""
         experiments = self.api_client.experiments_list()
         if len(experiments) == 0:
-            raise SkipTest('No experiments found')
+            raise SkipTest("No experiments found")
 
         for experiment in experiments:
             job_ = self.api_client.job_get(experiment.job.id_)
@@ -79,19 +78,17 @@ class ApiClientTest(AihwkitTestCase):
                 break
 
 
-@parametrize_over_experiments([
-    FullyConnectedFashionMNIST
-])
+@parametrize_over_experiments([FullyConnectedFashionMNIST])
 class ApiClientCreateTest(AihwkitTestCase):
     """Tests for the AIHW Composer API client involving experiment creation."""
 
     def setUp(self) -> None:
-        if not os.getenv('TEST_CREATE'):
-            raise SkipTest('TEST_CREATE not set')
+        if not os.getenv("TEST_CREATE"):
+            raise SkipTest("TEST_CREATE not set")
 
         config = ClientConfiguration()
         if not config.token:
-            raise SkipTest('API token not found')
+            raise SkipTest("API token not found")
 
         self.session = ApiSession(config.url, config.token)
         self.api_client = ApiClient(self.session)
@@ -100,8 +97,7 @@ class ApiClientCreateTest(AihwkitTestCase):
         """Test creating a new experiment."""
         experiment = self.get_experiment()
         api_experiment = self.api_client.experiment_create(
-            experiment, name='test_create_experiment',
-            device='cpu'
+            experiment, name="test_create_experiment", device="cpu"
         )
         self.assertIsInstance(api_experiment, CloudExperiment)
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -29,9 +29,9 @@ def drift_analog_weights(model: Module, t_inference: float = 0.0) -> None:
     # avoid circular import
     # pylint: disable=import-outside-toplevel
     from aihwkit.nn.modules.base import AnalogModuleBase
+
     if model.training:
-        raise ModuleError('drift_analog_weights can only be applied in '
-                          'evaluation mode')
+        raise ModuleError("drift_analog_weights can only be applied in evaluation mode")
 
     for module in model.modules():
         if not isinstance(module, AnalogModuleBase):
@@ -51,9 +51,9 @@ def program_analog_weights(model: Module) -> None:
     # avoid circular import
     # pylint: disable=import-outside-toplevel
     from aihwkit.nn.modules.base import AnalogModuleBase
+
     if model.training:
-        raise ModuleError('program_analog_weights can only be applied in '
-                          'evaluation mode')
+        raise ModuleError("program_analog_weights can only be applied in evaluation mode")
 
     for module in model.modules():
         if not isinstance(module, AnalogModuleBase):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,22 +41,22 @@ class AnalogOptimizerMixin:
         rm_group_lst = []
         for group in self.param_groups:  # type: ignore[has-type]
             rm_lst = []
-            for param in group['params']:
+            for param in group["params"]:
                 if isinstance(param, AnalogContext):
                     param.analog_tile.set_learning_rate(
-                        self.defaults['lr'])  # type: ignore[attr-defined]
-                    analog_param_groups.append({
-                        'params': [param],
-                    })
+                        self.defaults["lr"]  # type: ignore[attr-defined]
+                    )
+                    analog_param_groups.append({"params": [param]})
                     rm_lst.append(id(param))
 
-            group['params'] = [p for p in group['params'] if id(p) not in rm_lst]
+            group["params"] = [p for p in group["params"] if id(p) not in rm_lst]
 
-            if len(group['params']) == 0:
+            if len(group["params"]) == 0:
                 rm_group_lst.append(id(group))
 
-        self.param_groups = [g for g in self.param_groups  # type: ignore[has-type]
-                             if id(g) not in rm_group_lst]
+        self.param_groups = [
+            g for g in self.param_groups if id(g) not in rm_group_lst  # type: ignore[has-type]
+        ]
 
         # Add analog groups.
         for group in analog_param_groups:
@@ -83,12 +83,11 @@ class AnalogOptimizerMixin:
 
         # Update analog parameters
         for group in self.param_groups:
-            learning_rate = group.get('lr')
+            learning_rate = group.get("lr")
 
             # Use analog_tile object.
-            for param in group['params']:
+            for param in group["params"]:
                 if isinstance(param, AnalogContext):
-
                     # Handle internal analog update.
                     analog_ctx = param
                     analog_tile = analog_ctx.analog_tile
@@ -107,21 +106,24 @@ class AnalogOptimizerMixin:
                         continue
 
                     if analog_ctx.use_indexed:
-                        for x_input, d_input in zip(analog_ctx.analog_input,
-                                                    analog_ctx.analog_grad_output):
+                        for x_input, d_input in zip(
+                            analog_ctx.analog_input, analog_ctx.analog_grad_output
+                        ):
                             analog_tile.update_indexed(x_input, d_input)
                     else:
-                        x_input = cat(analog_ctx.analog_input,
-                                      axis=-1 if analog_tile.in_trans else 0)
-                        d_input = cat(analog_ctx.analog_grad_output,
-                                      axis=-1 if analog_tile.out_trans else 0)
+                        x_input = cat(
+                            analog_ctx.analog_input, axis=-1 if analog_tile.in_trans else 0
+                        )
+                        d_input = cat(
+                            analog_ctx.analog_grad_output, axis=-1 if analog_tile.out_trans else 0
+                        )
                         analog_tile.update(x_input, d_input)
 
                     analog_ctx.reset()
         # Apply post-update step operations (diffuse, decay, etc).
         # (only here because of unknown params order and shared weights)
         for group in self.param_groups:
-            for param in group['params']:
+            for param in group["params"]:
                 if isinstance(param, AnalogContext):
                     param.analog_tile.post_update_step()
         return ret
@@ -136,8 +138,8 @@ class AnalogOptimizerMixin:
             learning_rate: learning rate for the optimizer.
         """
         for param_group in self.param_groups:
-            param_group['lr'] = learning_rate
-            for param in param_group['params']:
+            param_group["lr"] = learning_rate
+            for param in param_group["params"]:
                 if isinstance(param, AnalogContext):
                     # Update learning rate on the tile
                     param.analog_tile.set_learning_rate(learning_rate)
@@ -179,13 +181,8 @@ class AnalogOptimizer(AnalogOptimizerMixin, Optimizer):
     SUBCLASSES = {}  # type: Dict[str, Type]
     """Registry of the created subclasses."""
 
-    def __new__(
-            cls,
-            optimizer_cls: Type,
-            *_: Any,
-            **__: Any
-    ) -> 'AnalogOptimizer':
-        subclass_name = '{}{}'.format(cls.__name__, optimizer_cls.__name__)
+    def __new__(cls, optimizer_cls: Type, *_: Any, **__: Any) -> "AnalogOptimizer":
+        subclass_name = "{}{}".format(cls.__name__, optimizer_cls.__name__)
 
         # Retrieve or create a new subclass, that inherits both from
         # `AnalogOptimizer` and for the specific torch optimizer
@@ -196,10 +193,7 @@ class AnalogOptimizer(AnalogOptimizerMixin, Optimizer):
         return super().__new__(cls.SUBCLASSES[subclass_name])
 
     def __init__(
-            self,
-            optimizer_cls: Type,  # pylint: disable=unused-argument
-            *args: Any,
-            **kwargs: Any
+        self, optimizer_cls: Type, *args: Any, **kwargs: Any  # pylint: disable=unused-argument
     ):
         super().__init__(*args, **kwargs)
 

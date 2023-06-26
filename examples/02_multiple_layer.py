@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -35,7 +35,7 @@ y_b = Tensor([[0.3], [0.6]])
 model = Sequential(
     AnalogLinear(4, 2, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
     AnalogLinear(2, 2, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
-    AnalogLinear(2, 1, rpu_config=SingleRPUConfig(device=ConstantStepDevice()))
+    AnalogLinear(2, 1, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
 )
 
 # Define an analog-aware optimizer, preparing it for using the layers.
@@ -43,7 +43,6 @@ opt = AnalogSGD(model.parameters(), lr=0.5)
 opt.regroup_param_groups(model)
 
 for epoch in range(100):
-
     opt.zero_grad()
 
     # Add the training Tensor to the model (input).
@@ -55,4 +54,4 @@ for epoch in range(100):
 
     opt.step()
 
-    print('Loss error: {:.16f}'.format(loss))
+    print("Loss error: {:.16f}".format(loss))

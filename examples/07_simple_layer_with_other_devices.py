@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,8 +25,10 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
-    UnitCellRPUConfig, ConstantStepDevice,
-    VectorUnitCell, VectorUnitCellUpdatePolicy
+    UnitCellRPUConfig,
+    ConstantStepDevice,
+    VectorUnitCell,
+    VectorUnitCellUpdatePolicy,
 )
 from aihwkit.simulator.rpu_base import cuda
 
@@ -44,7 +46,8 @@ rpu_config.device = VectorUnitCell(
         ConstantStepDevice(w_max=0.3),
         ConstantStepDevice(w_max_dtod=0.4),
         ConstantStepDevice(up_down_dtod=0.1),
-    ])
+    ]
+)
 
 # Only one of the devices should receive a single update.
 # That is selected randomly, the effective weights is the sum of all
@@ -75,4 +78,4 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
-    print('Loss error: {:.16f}'.format(loss))
+    print("Loss error: {:.16f}".format(loss))

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,9 +25,7 @@ from torch.nn.functional import mse_loss
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import (
-    SingleRPUConfig, ConstantStepDevice, PulseType
-)
+from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice, PulseType
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
@@ -42,8 +40,7 @@ rpu_config.update.update_bl_management = True  # will vary up to 10 on demand
 rpu_config.update.d_res_implicit = 0.1  # effective resolution of x bit lines
 rpu_config.update.x_res_implicit = 0.1  # effective resolution of d bit lines
 
-model = AnalogLinear(4, 2, bias=True,
-                     rpu_config=rpu_config)
+model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 print(model.analog_tile.tile)
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
@@ -64,4 +61,4 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
-    print('Loss error: {:.16f}'.format(loss))
+    print("Loss error: {:.16f}".format(loss))

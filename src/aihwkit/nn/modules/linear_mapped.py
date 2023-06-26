@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -59,10 +59,17 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             :class:`aihwkit.simulator.configs.utils.MappingParameter`
             instead to specify weight scaling
     """
+
     # pylint: disable=abstract-method, too-many-locals, too-many-instance-attributes
 
-    __constants__ = ['in_features', 'out_features', 'realistic_read_write',
-                     'digital_bias', 'analog_bias', 'use_bias']
+    __constants__ = [
+        "in_features",
+        "out_features",
+        "realistic_read_write",
+        "digital_bias",
+        "analog_bias",
+        "use_bias",
+    ]
     in_features: int
     out_features: int
     realistic_read_write: bool
@@ -73,15 +80,14 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
     out_sizes: List[int]
 
     def __init__(
-            self,
-            in_features: int,
-            out_features: int,
-            bias: bool = True,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-            weight_scaling_omega: Optional[bool] = None,
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+        weight_scaling_omega: Optional[bool] = None,
     ):
-
         # Call super() after tile creation, including ``reset_parameters``.
         Linear.__init__(self, in_features, out_features, bias=bias)
 
@@ -92,12 +98,7 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         rpu_config = self._set_weight_scaling_omega(rpu_config, weight_scaling_omega)
 
         AnalogModuleBase.__init__(
-            self,
-            in_features,
-            out_features,
-            bias,
-            realistic_read_write,
-            rpu_config.mapping
+            self, in_features, out_features, bias, realistic_read_write, rpu_config.mapping
         )
         if self.analog_bias:
             raise ModuleError("AnalogLinearMapped only supports digital bias.")
@@ -115,10 +116,9 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         for i, in_tile_size in enumerate(self.in_sizes):
             in_tiles = []
             for j, out_tile_size in enumerate(self.out_sizes):
-                tile = rpu_config.tile_class(out_tile_size,
-                                             in_tile_size,
-                                             rpu_config,
-                                             bias=self.analog_bias)
+                tile = rpu_config.tile_class(
+                    out_tile_size, in_tile_size, rpu_config, bias=self.analog_bias
+                )
                 self.register_analog_tile(tile, name=f"{i}_{j}")
                 in_tiles.append(tile)
             self.analog_tile_array.append(in_tiles)
@@ -127,10 +127,10 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         self.set_weights(self.weight, self.bias)
 
         # Unregister weight/bias as a parameter but keep for sync
-        self.unregister_parameter('weight')
+        self.unregister_parameter("weight")
 
     def get_split_sizes(self, size: int, split_max_size: int) -> List[int]:
-        """ Computed the split sizes.
+        """Computed the split sizes.
 
         Args:
             size: number of elements of the layer in one dimension
@@ -147,12 +147,12 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         return [base + (i < extra) for i in range(n_splits)]
 
     def set_weights(
-            self,
-            weight: Tensor,
-            bias: Optional[Tensor] = None,
-            force_exact: bool = False,
-            apply_weight_scaling: bool = True,
-            weight_scaling_omega: Optional[float] = None
+        self,
+        weight: Tensor,
+        bias: Optional[Tensor] = None,
+        force_exact: bool = False,
+        apply_weight_scaling: bool = True,
+        weight_scaling_omega: Optional[float] = None,
     ) -> None:
         """Set the weight (and bias) with given Tensors.
 
@@ -199,9 +199,8 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
                 tile_weight = weight[out_start:out_end, in_start:in_end]
 
                 analog_tile.set_weights(
-                    tile_weight, None,
-                    apply_weight_scaling,
-                    weight_scaling_omega)
+                    tile_weight, None, apply_weight_scaling, weight_scaling_omega
+                )
 
                 if realistic:
                     analog_tile.program_weights()
@@ -215,8 +214,9 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
 
         self._sync_weights_from_tile()
 
-    def get_weights(self, force_exact: bool = False,
-                    apply_weight_scaling: bool = True) -> Tuple[Tensor, Optional[Tensor]]:
+    def get_weights(
+        self, force_exact: bool = False, apply_weight_scaling: bool = True
+    ) -> Tuple[Tensor, Optional[Tensor]]:
         """Get the weight (and bias) tensors.
 
         This uses an realistic read if the property ``realistic_read_write`` of
@@ -280,10 +280,10 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         if self.analog_tile_count() == 1:
             analog_tile = self.analog_tile_array[0][0]
             out = AnalogFunction.apply(
-                analog_tile.get_analog_ctx(), x_input,
-                analog_tile.shared_weights, not self.training)
+                analog_tile.get_analog_ctx(), x_input, analog_tile.shared_weights, not self.training
+            )
 
-            out = analog_tile.apply_out_scaling(out, (-1, ))
+            out = analog_tile.apply_out_scaling(out, (-1,))
 
             if self.digital_bias:
                 return out + self.bias
@@ -298,10 +298,10 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
 
             for analog_tile in in_tiles:
                 output = AnalogFunction.apply(
-                    analog_tile.get_analog_ctx(), x,
-                    analog_tile.shared_weights, not self.training)
+                    analog_tile.get_analog_ctx(), x, analog_tile.shared_weights, not self.training
+                )
 
-                output = analog_tile.apply_out_scaling(output, (-1, ))
+                output = analog_tile.apply_out_scaling(output, (-1,))
                 out_result.append(output)
 
             if idx == 0:
@@ -321,17 +321,17 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
             A string with the extra representation.
         """
         output = AnalogModuleBase.extra_repr(self)
-        output += ', mapping={}'.format((len(self.in_sizes), len(self.out_sizes)))
+        output += ", mapping={}".format((len(self.in_sizes), len(self.out_sizes)))
 
         return output
 
     @classmethod
     def from_digital(
-            cls,
-            module: Linear,
-            rpu_config: Optional[RPUConfigAlias] = None,
-            realistic_read_write: bool = False,
-    ) -> 'AnalogLinearMapped':
+        cls,
+        module: Linear,
+        rpu_config: Optional[RPUConfigAlias] = None,
+        realistic_read_write: bool = False,
+    ) -> "AnalogLinearMapped":
         """Return an AnalogLinearMapped layer from a torch Linear layer.
 
         Args:
@@ -349,12 +349,13 @@ class AnalogLinearMapped(AnalogModuleBase, Linear):
         Returns:
             an AnalogLinearMapped layer based on the digital Linear ``module``.
         """
-        analog_module = cls(module.in_features,
-                            module.out_features,
-                            module.bias is not None,
-                            rpu_config,
-                            realistic_read_write,
-                            )
+        analog_module = cls(
+            module.in_features,
+            module.out_features,
+            module.bias is not None,
+            rpu_config,
+            realistic_read_write,
+        )
 
         analog_module.set_weights(module.weight, module.bias)
         return analog_module

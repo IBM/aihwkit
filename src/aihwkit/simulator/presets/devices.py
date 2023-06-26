@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,7 +16,10 @@
 
 from dataclasses import dataclass
 from aihwkit.simulator.configs.devices import (
-    ConstantStepDevice, ExpStepDevice, LinearStepDevice, SoftBoundsDevice
+    ConstantStepDevice,
+    ExpStepDevice,
+    LinearStepDevice,
+    SoftBoundsDevice,
 )
 
 
@@ -29,6 +32,7 @@ class ReRamESPresetDevice(ExpStepDevice):
 
     .. _`Gong & al., Nat. Commun., 2018`: https://www.nature.com/articles/s41467-018-04485-1
     """
+
     # pylint: disable=invalid-name
 
     dw_min: float = 0.00135
@@ -39,8 +43,8 @@ class ReRamESPresetDevice(ExpStepDevice):
 
     a: float = -0.5
     b: float = -0.5
-    gamma_up: float = 5.
-    gamma_down: float = 5.
+    gamma_up: float = 5.0
+    gamma_down: float = 5.0
     A_up: float = -1.18445
     A_down: float = -0.081404
 
@@ -83,8 +87,8 @@ class ReRamSBPresetDevice(SoftBoundsDevice):
     dw_min_dtod: float = 0.3
     up_down_dtod: float = 0.01  # assumes symmetry point corrected.
 
-    w_max_dtod: float = 0.3/1.25
-    w_min_dtod: float = 0.3/0.75
+    w_max_dtod: float = 0.3 / 1.25
+    w_min_dtod: float = 0.3 / 0.75
 
     # Cycle-to_cycle.
     dw_min_std: float = 3.75
@@ -317,13 +321,14 @@ class PCMPresetDevice(ExpStepDevice):
     .. _`Nandakumar et al., Front. Neurosci. 2020`: \
         https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full
     """
+
     # pylint: disable=invalid-name
 
     dw_min: float = 0.01
     up_down: float = 0.0
 
-    w_max: float = 2.
-    w_min: float = 0.
+    w_max: float = 2.0
+    w_min: float = 0.0
 
     a: float = -1.0  # scales with w_max
     b: float = 0.0

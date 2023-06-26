@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,15 +21,17 @@ from aihwkit.optim.context import AnalogContext
 
 class AnalogFunctionBase(Function):
     """Base function for analog functions."""
+
     # pylint: disable=arguments-differ, protected-access, abstract-method
 
     @staticmethod
     def forward(
-            ctx: Any,
-            analog_ctx: AnalogContext,
-            input_: Tensor,
-            shared_weights: Optional[Tensor] = None,
-            is_test: bool = False) -> Tensor:
+        ctx: Any,
+        analog_ctx: AnalogContext,
+        input_: Tensor,
+        shared_weights: Optional[Tensor] = None,
+        is_test: bool = False,
+    ) -> Tensor:
         """Execute the forward pass in the analog tile.
 
         Note: Indexed versions can used when analog_ctx.use_indexed is
@@ -56,8 +58,7 @@ class AnalogFunctionBase(Function):
 
     @staticmethod
     def backward(
-            ctx: Any,
-            grad_output: Tensor,
+        ctx: Any, grad_output: Tensor
     ) -> Tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor], Optional[Tensor]]:
         """Execute the backward pass in the analog tile."""
         analog_ctx = ctx.analog_ctx
@@ -95,33 +96,35 @@ class AnalogFunctionBase(Function):
 
 class AnalogFunction(AnalogFunctionBase):
     """Function that delegates into a `RPU` unit."""
+
     # pylint: disable=arguments-differ, abstract-method
 
     @staticmethod
     def forward(
-            ctx: Any,
-            analog_ctx: AnalogContext,
-            input_: Tensor,
-            shared_weights: Optional[Tensor] = None,
-            is_test: bool = False) -> Tensor:
+        ctx: Any,
+        analog_ctx: AnalogContext,
+        input_: Tensor,
+        shared_weights: Optional[Tensor] = None,
+        is_test: bool = False,
+    ) -> Tensor:
         """Execute the forward pass in the analog tile."""
         analog_ctx.use_indexed = False
-        return AnalogFunctionBase.forward(
-            ctx, analog_ctx, input_, shared_weights, is_test)
+        return AnalogFunctionBase.forward(ctx, analog_ctx, input_, shared_weights, is_test)
 
 
 class AnalogIndexedFunction(AnalogFunctionBase):
     """Function that delegates into a `RPU` unit to use the indexed forward/backward/update."""
+
     # pylint: disable=arguments-differ, abstract-method
 
     @staticmethod
     def forward(
-            ctx: Any,
-            analog_ctx: AnalogContext,
-            input_: Tensor,
-            shared_weights: Optional[Tensor] = None,
-            is_test: bool = False) -> Tensor:
+        ctx: Any,
+        analog_ctx: AnalogContext,
+        input_: Tensor,
+        shared_weights: Optional[Tensor] = None,
+        is_test: bool = False,
+    ) -> Tensor:
         """Execute the forward pass in the analog tile."""
         analog_ctx.use_indexed = True
-        return AnalogFunctionBase.forward(
-            ctx, analog_ctx, input_, shared_weights, is_test)
+        return AnalogFunctionBase.forward(ctx, analog_ctx, input_, shared_weights, is_test)
