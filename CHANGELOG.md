@@ -14,14 +14,82 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## [Unreleased]
 
+
+
+
+
+
+
+
+
+
+
 ### Added
 
+* New analog in-memory training algorithms: Chopped Tiki-taka II (\#512)
+* New analog in-memory training algorithms: AGAD (\#512)
+* New training presets: `ReRamArrayOMPresetDevice`,
+  `ReRamArrayHfO2PresetDevice`, `ChoppedTTv2*`, `AGAD*` (\#512)
+* New correlation detection example for comparing specialized analog SGD
+  algorithms (\#512)
+* Simplified `build_rpu_config` script for generating `RPUConfigs` for
+  analog in-memory SGD (\#512)
+* `CustomTile` for customization of in-memory training algorithms (\#512)
+* Pulse counters for pulsed analog training (\#512)
+* `TorchInferenceTile` for a fully torch-based analog tile for
+  inference (not using the C++ RPUCuda engine), supporting a subset of MVM nonidealities (\#512)
+* New inference preset `StandardHWATrainingPreset` (\#512)
+* New inference noise model `ReRamWan2022NoiseModel` (\#512)
+* Improved HWA-training for inference featuring input and output range
+  learning and more (\#512)
+* Improved CUDA memory management (using torch cached GPU memory for
+  internal RPUCuda buffer) (\#512)
+* New layer generator: `analog_layers()` loops over layer modules (except
+  container) (\#512)
+* `AnalogWrapper` for wrapping a full torch module (Without using
+  `AnalogSequential`) (\#512)
+* `convert_to_digital` utility (\# 512)
+* `TileModuleArray` for logical weight matrices larger than a single tile. (\#512)
+* Dumping of all C++ fields for accurate analog training saving and
+  training continuation after checkpoint load. (\#512)
+* `apply_write_noise_on_set` for pulsed devices. (\#512)
+* Reset device now also for simple devices. (\#512)
+* `SoftBoundsReference`, `PowStepReference` for explicit reference
+  subtraction of symmetry point in Tiki-taka (\#512)
+* Analog MVM with output-to-output std-deviation variability
+  (`output_noise_std`) (\#512)
+* Plotting utility for weight errors (\#512)
+* `per_batch_sample` weight noise injections for `TorchInferenceRPUConfig` (\#512)
+	
+	
+	
 ### Fixed
 * Fixed compilation error for CUDA 12.1. (\#500)
+* Realistic read weights could have applied the scales wrongly (\#512)
 
+	
 ### Changed
 
+* Major re-organization of `AnalogTiles` for increased modularity
+  (`TileWithPeriphery`, `SimulatorTile`, `SimulatorTileWrapper`). Analog
+ tile modules (possibly array of analog tiles) are now also torch `Module`. (\#512)
+* Change in tile generators: `analog_model.analog_tiles()` now loops over
+  all available tiles (in all modules) (\#512)
+* Import and file position changes. However, user can still import `RPUConfig`
+  related modules from `aihwkit.simulator.config` (\#512)
+* `convert_to_analog` now also considered mapping. Set
+  `mapping.max_out_size = 0` and `mapping.max_out_size = 0` to avoid this. (\#512)
+* Mapped layers now use `TileModuleArray` array by default. (\#512)
+* Checkpoint structure is different than previous
+  versions. `utils.legacy_load` provides a way to load old checkpoints. (\#512)
+
+
+	
 ### Removed
+
+* `realistic_read_write` is removed from some high-level function. Use
+  `program_weights` (after setting the weights) or `read_weights`
+  for realistic reading (using weight estimation technique).  (\#512)
 
 
 ## [0.7.1] - 2023/03/24
