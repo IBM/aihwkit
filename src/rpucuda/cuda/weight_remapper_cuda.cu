@@ -182,11 +182,7 @@ template <typename T> int WeightRemapperCuda<T>::getNBlocks(int nthreads) {
 
 template <typename T>
 void WeightRemapperCuda<T>::apply(
-    T *weights,
-    T current_lr,
-    const WeightRemapParameter &wrmpar,
-    T *scales,
-    T *biases) {
+    T *weights, T current_lr, const WeightRemapParameter &wrmpar, T *scales, T *biases) {
   // does a weight remap to the scales.
 
   int nthreads = context_->getNThreads();
@@ -260,7 +256,6 @@ void WeightRemapperCuda<T>::apply(
     RPU_FATAL("Remapping type not implemented.");
   } // switch
 }
-
 
 template class WeightRemapperCuda<float>;
 #ifdef RPU_USE_DOUBLE

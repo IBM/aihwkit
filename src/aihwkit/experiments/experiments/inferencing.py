@@ -308,9 +308,9 @@ class BasicInferencing(Experiment):
             0, log10(float(inference_time)), n_inference_times - 1
         ).tolist()
         repeat_results = {}
-        accuracy_array = array([], 'float')
-        error_array = array([], 'float')
-        loss_array = array([], 'float')
+        accuracy_array = array([], "float")
+        error_array = array([], "float")
+        loss_array = array([], "float")
 
         for repeat in range(inference_repeats):
             self._call_hook(Signals.INFERENCE_REPEAT_START, repeat)

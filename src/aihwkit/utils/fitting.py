@@ -262,7 +262,7 @@ def model_response(
     analog_tile = AnalogTile(n_traces, n_devices, rpu_config)  # type: ignore
     analog_tile.set_learning_rate(1)
 
-    deviation = array([], 'float')
+    deviation = array([], "float")
     model_responses = []
     for idx, (numpy_pulses, response) in enumerate(zip(pulse_data, response_data)):
         if numpy_pulses.ndim == 1:
