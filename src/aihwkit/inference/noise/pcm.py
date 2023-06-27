@@ -36,23 +36,34 @@ class PCMLikeNoiseModel(BaseNoiseModel):
     Expected weight noise at assumed time of inference with expected
     programming noise at 0.
 
-    The statistical noise model is based on measured PCM devices.
+    The statistical noise model is based on measured PCM devices. See
+    also `Nandakumar et al. ICECS (2019)`_
 
     Args:
-        prog_coeff: programming polynomial coeffs in :math:`\mu S`, c(0) + c(1)*gt + c(2)*gt^2)
-        g_converter: instantiated class of the conductance converter (defaults to single pair)
+        prog_coeff: Programming polynomial coeffs in
+            :math:`\sum_i c_i \left(\frac{g_t}{g_\max}\right)^i`
+        g_converter: instantiated class of the conductance converter
+            (defaults to single pair)
         g_max: In :math:`\mu S`, the maximal conductance, ie the value
             the absolute max of the weights will be mapped to.
-        t_read: parameter of the 1/f fit (in seconds)
-        t_0: parameter of the drift fit (first reading time)
+        t_read: Parameter of the 1/f fit (in seconds).
+        t_0: Parameter of the drift fit (first reading time).
 
             Note:
                 The ``t_inference`` is relative to this time `t0`
                 e.g. t_inference counts from the completion of the programming
                 of a device.
-        prog_noise_scale: scale for the programming noise
-        read_noise_scale: scale for the read and accumulated noise
-        drift_scale: scale for the  drift coefficient
+        prog_noise_scale: Scale for the programming noise.
+        read_noise_scale: Scale for the read and accumulated noise.
+        drift_scale: Scale for the  drift coefficient.
+        prog_coeff_g_max_reference: reference :math:`g_\max` value
+            when fitting the coefficients, since the result of the
+            polynomial fit is given in uS. If
+            ``prog_coeff_g_max_reference`` is not given and
+            `prog_coeffs` are given explicitly, it will be set to
+            ``g_max`` of the conductance converter.
+
+    .. _`Nandakumar et al. ICECS (2019)`: https://ieeexplore.ieee.org/abstract/document/8964852
 
     """
 
@@ -66,16 +77,26 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         prog_noise_scale: float = 1.0,
         read_noise_scale: float = 1.0,
         drift_scale: float = 1.0,
+        prog_coeff_g_max_reference: Optional[float] = None,
     ):
         g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
 
         self.g_max = getattr(self.g_converter, "g_max", g_max)
-
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
 
-        self.prog_coeff = [0.26348, 1.9650, -1.1731] if prog_coeff is None else prog_coeff
+        if prog_coeff_g_max_reference is None:
+            self.prog_coeff_g_max_reference = self.g_max
+
+        if prog_coeff is None:
+            # standard g_max are defined in respect to 25.0 uS. Need to
+            # adjust for that in case g_max is not equal to 25.0 uS
+            self.prog_coeff = [0.26348, 1.9650, -1.1731]
+            self.prog_coeff_g_max_reference = 25.0
+        else:
+            self.prog_coeff = prog_coeff
+
         self.t_0 = t_0
         self.t_read = t_read
         self.prog_noise_scale = prog_noise_scale
@@ -113,6 +134,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             mat *= g_target / self.g_max
             sig_prog += mat * coeff
 
+        sig_prog *= self.g_max / self.prog_coeff_g_max_reference  # type: ignore
         g_prog = g_target + self.prog_noise_scale * sig_prog * randn_like(g_target)
         g_prog.clamp_(min=0.0)  # no negative conductances allowed
 

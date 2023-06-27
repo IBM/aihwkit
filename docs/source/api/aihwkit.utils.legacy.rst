@@ -1,7 +1,7 @@
-aihwkit.nn.functions module
+aihwkit.utils.legacy module
 ===========================
 
-.. automodule:: aihwkit.nn.functions
+.. automodule:: aihwkit.utils.legacy
    :members:
    :undoc-members:
    :show-inheritance:

@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 from typing import ClassVar, List, Type
 from numpy import exp
 
-from aihwkit.simulator.configs.helpers import _PrintableMixin, parameters_to_bindings
-from aihwkit.simulator.configs.utils import DriftParameter, SimpleDriftParameter
+from aihwkit.simulator.parameters.helpers import _PrintableMixin, parameters_to_bindings
+from aihwkit.simulator.parameters.utils import DriftParameter, SimpleDriftParameter
 from aihwkit.simulator.rpu_base import devices
 
 # legacy
@@ -31,6 +31,8 @@ from aihwkit.simulator.configs.compounds import (  # pylint: disable=unused-impo
     TransferCompound,
     BufferedTransferCompound,
     MixedPrecisionCompound,
+    DynamicTransferCompound,
+    ChoppedTransferCompound,
 )
 
 
@@ -131,7 +133,7 @@ class PulsedDevice(_PrintableMixin):
     **Drift**:
 
     Optional power-law drift setting, as described in
-    :class:`~aihwkit.similar.configs.utils.DriftParameter`.
+    :class:`~aihwkit.similar.parameters.utils.DriftParameter`.
 
     Important:
         Similar to reset, drift is *not* applied automatically each
@@ -271,6 +273,14 @@ class PulsedDevice(_PrintableMixin):
     respectively.
     """
 
+    count_pulses: bool = False
+    """Whether to count the positive and negative pulses that were applied.
+
+    Only for GPU devices currently implemented. Some runtime penalty expected.
+
+    Pulses can be obtained by ``analog_tile.tile.get_pulse_counters()``
+    """
+
     def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
         return parameters_to_bindings(self)
@@ -309,6 +319,9 @@ class IdealDevice(_PrintableMixin):
 
     lifetime: float = 0.0
     r"""One over `decay_rate`, ie :math:`1/r_\text{decay}`."""
+
+    reset_std: float = 0.01
+    """Standard deviation around zero mean in case reset is called."""
 
     def as_bindings(self) -> devices.IdealResistiveDeviceParameter:
         """Return a representation of this instance as a simulator bindings object."""
@@ -491,6 +504,14 @@ class LinearStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
     reverse_up: bool = False
     """Whether to increase the step size in up direction with increasing
     weights (default decreases).
@@ -547,6 +568,14 @@ class SoftBoundsDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
     reverse_up: bool = False
@@ -699,6 +728,14 @@ class SoftBoundsReferenceDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
     slope_up_dtod: float = 0.0
     r"""Device-to-device variation on the up-pulse slope.
 
@@ -837,6 +874,14 @@ class ExpStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
 
 @dataclass
 class PowStepDevice(PulsedDevice):
@@ -949,6 +994,14 @@ class PowStepDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
 
@@ -1173,4 +1226,12 @@ class PiecewiseStepDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """

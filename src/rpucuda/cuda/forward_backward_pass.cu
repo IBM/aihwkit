@@ -204,6 +204,10 @@ template <typename T>
 void ForwardBackwardPassIOManagedCuda<T>::populateFrom(const FBParameter<T> &fb_pars_host) {
 
   auto populate = [this](MVParameterCuda<T> &mv_pars, const MVParameter<T> &mv_pars_host) -> void {
+    if (mv_pars_host.out_noise_values.size() > (size_t)0) {
+      mv_pars.out_noise_values = CudaArray<T>(this->context_, mv_pars_host.out_noise_values);
+    }
+
     if (mv_pars_host.v_offset.size() > (size_t)0) {
       mv_pars.v_offset = CudaArray<T>(this->context_, mv_pars_host.v_offset);
     }
@@ -221,6 +225,48 @@ void ForwardBackwardPassIOManagedCuda<T>::populateFrom(const FBParameter<T> &fb_
   };
   populate(fb_pars_.fwd, fb_pars_host.fwd);
   populate(fb_pars_.bwd, fb_pars_host.bwd);
+}
+
+template <typename T>
+void ForwardBackwardPassIOManagedCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+
+  RPU::insert(state, "fwd.v_offset", fb_pars_.fwd.v_offset);
+  RPU::insert(state, "fwd.w_asymmetry", fb_pars_.fwd.w_asymmetry);
+  RPU::insert(state, "fwd.out_nonlinearity", fb_pars_.fwd.out_nonlinearity);
+  RPU::insert(state, "fwd.out_nonlinearity_factor", fb_pars_.fwd.out_nonlinearity_factor);
+  RPU::insert(state, "fwd.out_noise_values", fb_pars_.fwd.out_noise_values);
+
+  RPU::insert(state, "bwd.v_offset", fb_pars_.bwd.v_offset);
+  RPU::insert(state, "bwd.w_asymmetry", fb_pars_.bwd.w_asymmetry);
+  RPU::insert(state, "bwd.out_nonlinearity", fb_pars_.bwd.out_nonlinearity);
+  RPU::insert(state, "bwd.out_nonlinearity_factor", fb_pars_.bwd.out_nonlinearity_factor);
+  RPU::insert(state, "bwd.out_noise_values", fb_pars_.bwd.out_noise_values);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void ForwardBackwardPassIOManagedCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  using V = std::vector<T>;
+  auto state = RPU::selectWithPrefix(extra, prefix);
+  V tmp;
+
+  // forward
+  RPU::load(this->context_, state, "fwd.v_offset", fb_pars_.fwd.v_offset, strict);
+  RPU::load(this->context_, state, "fwd.w_asymmetry", fb_pars_.fwd.w_asymmetry, strict);
+  RPU::load(this->context_, state, "fwd.out_nonlinearity", fb_pars_.fwd.out_nonlinearity, strict);
+  RPU::load(state, "fwd.out_nonlinearity_factor", fb_pars_.fwd.out_nonlinearity_factor, strict);
+  RPU::load(this->context_, state, "fwd.out_noise_values", fb_pars_.fwd.out_noise_values, strict);
+
+  // backward
+  RPU::load(this->context_, state, "bwd.v_offset", fb_pars_.bwd.v_offset, strict);
+  RPU::load(this->context_, state, "bwd.w_asymmetry", fb_pars_.bwd.w_asymmetry, strict);
+  RPU::load(this->context_, state, "bwd.out_nonlinearity", fb_pars_.bwd.out_nonlinearity, strict);
+  RPU::load(state, "bwd.out_nonlinearity_factor", fb_pars_.bwd.out_nonlinearity_factor, strict);
+  RPU::load(this->context_, state, "bwd.out_noise_values", fb_pars_.bwd.out_noise_values, strict);
 }
 
 template <typename T>
@@ -352,6 +398,59 @@ void ForwardBackwardPassIOManagedCuda<T>::applyOutputPCMReadNoise(
   context->template releaseSharedBuffer<T>(RPU_BUFFER_TEMP_1);
 }
 
+/* output dtod noise*/
+template <typename T>
+__global__ void kernelOutputNoiseOtoOBatch(
+    T *output,
+    const int out_size,
+    const bool trans, // true if m_batch first dimensions
+    const int m_batch,
+    const T *out_noise_values,
+    curandState *random_states) {
+  const int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  T stoch_value;
+  curandState local_state;
+  const int total_threads = blockDim.x * gridDim.x;
+  const int total_size = m_batch * out_size;
+  int total_states = MIN(total_size, total_threads);
+  if (tid < total_states) {
+    local_state = random_states[tid];
+  }
+  for (int idx = tid; idx < total_size; idx += total_threads) {
+    T value = output[idx];
+    const int out_idx = trans ? (idx / m_batch) : (idx % out_size);
+    const T noise_std = out_noise_values[out_idx];
+    stoch_value = curand_normal(&local_state);
+    value += stoch_value * noise_std;
+    output[idx] = value;
+  }
+  if (tid < total_states) {
+    random_states[tid] = local_state;
+  }
+}
+
+template <typename T>
+void ForwardBackwardPassIOManagedCuda<T>::applyOutputNoiseOtoO(
+    InputOutputManager<T> &iom,
+    const MVParameterCuda<T> &mv_pars,
+    const bool out_trans,
+    const bool tranposed) {
+
+  auto io = iom.getIO();
+  auto m_batch = iom.getMBatch();
+  auto context = iom.getContext();
+  auto out_size = iom.getOutSize();
+  auto nblocks_om_batch = iom.getOutBlocksBatch(m_batch);
+  auto nthreads = iom.getNThreads();
+
+  // out buffer is out_size_ x m_batch or m_batch x out_size_ (if out_trans)
+  T *out_temp = iom.getOutBuffer();
+
+  kernelOutputNoiseOtoOBatch<<<nblocks_om_batch, nthreads, 0, context->getStream()>>>(
+      out_temp, out_size, out_trans, m_batch, mv_pars.out_noise_values.getDataConst(),
+      context_->getRandomStates(MIN(nblocks_om_batch * nthreads, out_size * m_batch)));
+}
+
 /* output non-linearity*/
 template <typename T>
 __global__ void kernelOutputNonLinearityBatch(
@@ -389,7 +488,6 @@ void ForwardBackwardPassIOManagedCuda<T>::applyOutputNonLinearity(
   auto m_batch = iom.getMBatch();
   auto context = iom.getContext();
   auto out_size = iom.getOutSize();
-  auto nblocks_om = iom.getOutBlocks();
   auto nblocks_om_batch = iom.getOutBlocksBatch(m_batch);
   auto nthreads = iom.getNThreads();
 
@@ -414,7 +512,6 @@ void ForwardBackwardPassIOManagedCuda<T>::applyIrDrop(
   auto context = iom.getContext();
   auto in_size = iom.getInSize();
   auto out_size = iom.getOutSize();
-  auto nblocks_om = iom.getOutBlocks();
   auto nblocks_om_batch = iom.getOutBlocksBatch(m_batch);
   auto nthreads = iom.getNThreads();
 
@@ -520,7 +617,6 @@ void ForwardBackwardPassIOManagedCuda<T>::applyVoltageOffsets(
   auto context = iom.getContext();
   auto in_size = iom.getInSize();
   auto out_size = iom.getOutSize();
-  auto nblocks_om = iom.getOutBlocks();
   auto nblocks_om_batch = iom.getOutBlocksBatch(m_batch);
   auto nthreads = iom.getNThreads();
 

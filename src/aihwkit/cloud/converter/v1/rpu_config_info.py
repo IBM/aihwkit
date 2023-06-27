@@ -24,6 +24,7 @@ from aihwkit.inference.noise.custom import StateIndependentNoiseModel
 from aihwkit.inference.compensation.drift import GlobalDriftCompensation
 from aihwkit.cloud.converter.v1.analog_info import AnalogInfo
 from aihwkit.cloud.converter.v1.noise_model_info import NoiseModelInfo
+from aihwkit.exceptions import ConfigError
 
 RPU_CLASSES = {
     "InferenceRPUConfig": InferenceRPUConfig,
@@ -151,12 +152,14 @@ class RPUconfigInfo:
         rpu_class_name = self._get_common_rpucfg_name(self._layers)
         print(f">>> INFO: rpu_class_name={rpu_class_name}")
         if rpu_class_name is None or len(rpu_class_name) == 0:
-            raise Exception("class name error. see previous messages")
+            raise ConfigError("class name error. see previous messages")
         rpu_config_class = None
         if rpu_class_name in RPU_CLASSES:
             rpu_config_class = RPU_CLASSES[rpu_class_name]
         else:
-            raise Exception(f"rpu class name '{rpu_class_name}' not one of '{RPU_CLASSES.keys()}'")
+            raise ConfigError(
+                f"rpu class name '{rpu_class_name}' not one of '{RPU_CLASSES.keys()}'"
+            )
 
         # Dynamically create the right InferenceRPUConfig class
         rpu_config = rpu_config_class()

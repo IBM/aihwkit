@@ -262,9 +262,14 @@ def model_response(
     analog_tile = AnalogTile(n_traces, n_devices, rpu_config)  # type: ignore
     analog_tile.set_learning_rate(1)
 
-    deviation = array([])
+    deviation = array([], "float")
     model_responses = []
     for idx, (numpy_pulses, response) in enumerate(zip(pulse_data, response_data)):
+        if numpy_pulses.ndim == 1:
+            numpy_pulses = numpy_pulses.reshape(-1, 1)
+        if response.ndim == 1:
+            response = response.reshape(-1, 1)
+
         w_init = response[0, :]
         weights = from_numpy(array(w_init).flatten()[newaxis, :]).to(dtype=float32) * ones(
             (n_traces, n_devices), dtype=float32
@@ -279,7 +284,6 @@ def model_response(
             w_trace.append(analog_tile.tile.get_weights())
 
         stacked_w_trace = stack(w_trace).cpu().numpy()
-
         # compute square error
         num_samples = response.shape[0]
         avg_w_trace = stacked_w_trace.mean(axis=1)[:num_samples, :]

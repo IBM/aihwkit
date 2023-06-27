@@ -30,16 +30,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib import ticker
-from matplotlib.figure import Figure
+from matplotlib.figure import Figure, Axes
 from numpy import ndarray
 from torch import device as torch_device
 from torch import eye, from_numpy, ones, stack
+from torch.autograd import no_grad
 
 from aihwkit.exceptions import ConfigError
+from aihwkit.simulator.parameters.base import RPUConfigBase
 from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 from aihwkit.simulator.configs.devices import PulsedDevice
 from aihwkit.simulator.configs.compounds import UnitCell
-from aihwkit.simulator.configs.utils import (
+from aihwkit.simulator.parameters.utils import (
     BoundManagementType,
     IOParameters,
     NoiseManagementType,
@@ -47,14 +49,17 @@ from aihwkit.simulator.configs.utils import (
     UpdateParameters,
     WeightNoiseType,
 )
-from aihwkit.simulator.tiles import AnalogTile, BaseTile, InferenceTile
+from aihwkit.simulator.presets import PresetIOParameters
+from aihwkit.simulator.tiles import AnalogTile, InferenceTile
+from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
 
 
+@no_grad()
 def compute_pulse_response(
-    analog_tile: BaseTile, direction: ndarray, use_forward: bool = False
+    analog_tile: TileModule, direction: ndarray, use_forward: bool = False
 ) -> ndarray:
     """Compute the pulse response of a given device configuration.
 
@@ -88,7 +93,7 @@ def compute_pulse_response(
 
         if use_forward:
             # Save weights by using the forward pass (to get the short-term read noise).
-            w_trace[i, :, :] = analog_tile.forward(in_eye).detach().cpu().numpy().T
+            w_trace[i, :, :] = analog_tile(in_eye).detach().cpu().numpy().T
         else:
             # Noise free.
             w_trace[i, :, :] = analog_tile.get_weights()[0].detach().cpu().numpy()
@@ -97,7 +102,7 @@ def compute_pulse_response(
 
 
 def plot_pulse_response(
-    analog_tile: BaseTile, direction: ndarray, use_forward: bool = False
+    analog_tile: TileModule, direction: ndarray, use_forward: bool = False
 ) -> ndarray:
     """Plot the pulse response of a direction vector for each weight of
     the analog tile.
@@ -245,7 +250,8 @@ def get_tile_for_plotting(
     n_traces: int,
     use_cuda: bool = False,
     noise_free: bool = False,
-) -> BaseTile:
+    w_init: Optional[float] = None,
+) -> TileModule:
     """Return an analog tile for plotting the response curve.
 
     Args:
@@ -253,6 +259,7 @@ def get_tile_for_plotting(
         n_traces: Number of traces to plot
         use_cuda: Whether to use the CUDA implementation (if available)
         noise_free: Whether to turn-off cycle-to-cycle noises (if possible)
+        w_init: init value if given otherwise  ``w_min`` is taken
 
     Returns:
         Instantiated tile.
@@ -295,11 +302,12 @@ def get_tile_for_plotting(
         if hasattr(config.device, "device"):
             set_noise_free(getattr(config.device, "device"))
 
-    analog_tile = AnalogTile(n_traces, 1, config)  # type: BaseTile
+    analog_tile = AnalogTile(n_traces, 1, config)  # type: TileModule
     analog_tile.set_learning_rate(1)
-    w_min = getattr(config.device.as_bindings(), "w_min", -1.0)
+    if w_init is None:
+        w_init = getattr(config.device.as_bindings(), "w_min", -1.0)
 
-    weights = w_min * ones((n_traces, 1))
+    weights = w_init * ones((n_traces, 1))
     analog_tile.set_weights(weights)
 
     if use_cuda and cuda.is_compiled():
@@ -434,8 +442,12 @@ def plot_device_compact(
     w_noise: float = 0.0,
     n_steps: Optional[int] = None,
     n_traces: int = 3,
+    n_loops: int = 2,
+    w_init: Optional[float] = None,
     use_cuda: bool = False,
-) -> Figure:
+    axes: Optional[Axes] = None,
+    **plot_kwargs: Any,
+) -> Union[Figure, Axes]:
     """Plot a compact step response figure for a given device (preset).
 
     Note:
@@ -449,10 +461,17 @@ def plot_device_compact(
             be tried to be estimated (only for ``PulsedDevice``
             possible otherwise defaults to 1000 if ``n_steps=None``).
         n_traces: Number of traces to plot (for device-to-device variation)
+        n_loops: Number of cycles
+        w_init: init weight values if given, otherwise ``w_min`` is taken
         use_cuda: Whether to use CUDA for the computation
+        axes: axis to plot on. If given the statistics are not
+            computed and only one axes is returned
+        plot_kwargs: additional
+            plotting keywords for the main plot
 
     Returns:
-        the compact step response figure.
+        the compact step response figure or the axes if given as argument.
+
     """
 
     # pylint: disable=too-many-locals,too-many-statements
@@ -463,7 +482,8 @@ def plot_device_compact(
             return SingleRPUConfig(device=device, forward=io_pars)
         return UnitCellRPUConfig(device=device, forward=io_pars)
 
-    figure = plt.figure(figsize=[12, 4])
+    if axes is None:
+        figure = plt.figure(figsize=[12, 4])
 
     # To simulate some weight read noise.
     io_pars = IOParameters(
@@ -483,27 +503,39 @@ def plot_device_compact(
         n_steps = estimate_n_steps(rpu_config)
 
     # Noisy tile response curves.
-    n_loops = 2
     total_iters = n_loops * 2 * n_steps
     direction = np.sign(np.sin(np.pi * (np.arange(total_iters) + 1) / n_steps))
 
-    analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
+    analog_tile = get_tile_for_plotting(
+        rpu_config, n_traces, use_cuda, noise_free=False, w_init=w_init
+    )
     w_trace = compute_pulse_response(analog_tile, direction, use_forward=True).reshape(-1, n_traces)
-    axis = figure.add_subplot(1, 1, 1)
-    axis.plot(w_trace, linewidth=1)
-    axis.set_title(analog_tile.rpu_config.device.__class__.__name__)
-    axis.set_xlabel("Pulse number \\#")
+
+    do_statistics = False
+    if axes is None:
+        axes = figure.add_subplot(1, 1, 1)
+        do_statistics = True
+    if "linewidth" not in plot_kwargs:
+        plot_kwargs["linewidth"] = 1
+    axes.plot(w_trace, **plot_kwargs)
+    axes.set_title(analog_tile.rpu_config.device.__class__.__name__)
+    axes.set_xlabel("Pulse number \\#")
     limit = np.abs(w_trace).max() * 1.2
-    axis.set_ylim(-limit, limit)
-    axis.set_xlim(0, total_iters - 1)
-    axis.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
+    axes.set_ylim(-limit, limit)
+    axes.set_xlim(0, total_iters - 1)
+    axes.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
+
+    if not do_statistics:
+        return axes
 
     # Noise-free tile for statistics.
-    n_loops = 1
-    total_iters = min(max(n_loops * 2 * n_steps, 1000), max(50000, 2 * n_steps))
+    n_loops_noise_free = 1
+    total_iters = min(max(n_loops_noise_free * 2 * n_steps, 1000), max(50000, 2 * n_steps))
     direction = np.sign(np.sin(np.pi * (np.arange(total_iters) + 1) / n_steps))
 
-    analog_tile_noise_free = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=True)
+    analog_tile_noise_free = get_tile_for_plotting(
+        rpu_config, n_traces, use_cuda, noise_free=True, w_init=w_init
+    )
     analog_tile_noise_free.set_hidden_parameters(analog_tile.get_hidden_parameters())
 
     w_trace = compute_pulse_response(analog_tile_noise_free, direction, False)
@@ -520,11 +552,11 @@ def plot_device_compact(
     )
 
     # Plot mean up statistics.
-    pos = axis.get_position().bounds
+    pos = axes.get_position().bounds
     space = 0.1
     gap = 0.01
-    axis.set_position([pos[0] + gap + space, pos[1], pos[2] - 2 * gap - 2 * space, pos[3]])
-    axis.set_yticks([])
+    axes.set_position([pos[0] + gap + space, pos[1], pos[2] - 2 * gap - 2 * space, pos[3]])
+    axes.set_yticks([])
 
     axis_left = figure.add_axes([pos[0], pos[1], space, pos[3]])
     dw_mean_up = dw_mean_up.reshape(-1, n_traces)
@@ -599,9 +631,9 @@ def plot_device_symmetry(
     direction = np.sign(np.cos(np.pi * np.arange(n_pulses)))
     plt.clf()
 
-    analog_tile = get_tile_for_plotting(rpu_config, n_traces, use_cuda, noise_free=False)
-    weights = w_init * ones((n_traces, 1))
-    analog_tile.set_weights(weights)
+    analog_tile = get_tile_for_plotting(
+        rpu_config, n_traces, use_cuda, noise_free=False, w_init=w_init
+    )
 
     plot_pulse_response(analog_tile, direction, use_forward=False)
     plt.ylim([-1, 1])
@@ -675,3 +707,116 @@ def plot_weight_drift(
     plt.gca().set_xscale("log")
     plt.xlabel("Time after programming [sec]")
     plt.ylabel("Weight value [norm. units]")
+
+
+def plot_programming_error(
+    config: Union[PulsedDevice, UnitCell, RPUConfigBase],
+    w_range: Tuple[float, float] = (-1.0, 1.0),
+    w_init: Optional[Union[ndarray]] = None,
+    n_rows: int = 100,
+    realistic_read: bool = False,
+    n_bins: int = 101,
+    use_cuda: bool = False,
+    label: Optional[str] = None,
+    axes: Optional[Axes] = None,
+    t_inference: Optional[int] = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot weight programming error with weight value.
+
+    Programming of weights will be done by calling the
+    ``program_weights`` method and read out can also optionally be
+    done with ``read_weights``. This means that for analog training
+    device configurations, programming will be done using SGD on
+    random vectors and stochastic pulsing or as defined in the
+    ``RPUConfig`` if given explicitely. Read is done perfectly unless
+    ``realistic_read`` is set.
+
+    It plots mean with plus/minus standard error of the mean as
+    confidence interval.
+
+
+    Note:
+
+        If RPUConfig is not directly given, it will use the
+        ``PresetIOParameters`` configuration by default.
+
+    Args:
+        config: ``PulsedDevice``, ``UnitCell`` parameters or directly a ``RPUConfig``
+        w_range: Range of weights.
+        w_init: Weight matrix to program (default n_rows x n_rows uniform in ``w_range``)
+        n_rows: Number of rows (and columns) of the decault weight matrix
+        realistic_read: Whether to use ``read_weights`` estimation instead of a perfect read.
+        n_bins: Number of bins for plotting
+        use_cuda: Whether to use CUDA for the computation
+        label: Plotting curve label
+        axes: Plot axes (default current axis)
+        t_inference: Setting of the inference time (only in case of ``InferenceRPUConfig``)
+        kwargs: Additional arguments for ``program_weights`` call.
+
+    Returns:
+        the axis used for the plot.
+
+    """
+
+    # pylint: disable=too-many-locals,too-many-statements
+    def get_rpu_config(config: Union[PulsedDevice, UnitCell, RPUConfigBase]) -> RPUConfigBase:
+        if isinstance(config, RPUConfigBase):
+            return config
+        if isinstance(config, PulsedDevice):
+            return SingleRPUConfig(device=config, forward=PresetIOParameters())
+        return UnitCellRPUConfig(device=config, forward=PresetIOParameters())
+
+    if axes is None:
+        axes = plt.gca()
+
+    rpu_config = get_rpu_config(config)
+
+    if w_init is None:
+        w_init = np.random.uniform(*w_range, size=(n_rows, n_rows)).astype("float32")
+
+    analog_tile = rpu_config.tile_class(w_init.shape[1], w_init.shape[0], rpu_config, bias=False)
+    if use_cuda:
+        analog_tile.cuda()
+
+    # this is an estimation using the forward pass.
+    if not isinstance(rpu_config, InferenceRPUConfig) or t_inference is None:
+        analog_tile.set_weights(w_init, apply_weight_scaling=False, realistic=False)
+        analog_tile.program_weights(**kwargs)
+        programmed_weights, _ = analog_tile.get_weights(
+            apply_weight_scaling=False, realistic=realistic_read
+        )
+    else:
+        analog_tile.set_weights(w_init, apply_weight_scaling=False, realistic=False)
+        analog_tile.drift_weights(t_inference)
+        programmed_weights, _ = analog_tile.get_weights(
+            apply_weight_scaling=False, realistic=realistic_read
+        )
+
+    x = np.abs(programmed_weights.numpy().flatten() - w_init.flatten())
+    bins = np.linspace(w_range[0], w_range[1], n_bins)
+    indices = np.digitize(w_init.flatten(), bins)
+    num_samples = np.bincount(indices)
+    msk = num_samples != 0.0
+
+    mean_error = np.bincount(indices, weights=x)
+    mean_error[msk] /= num_samples[msk]
+
+    std_error = np.bincount(indices, weights=x**2)
+    std_error[msk] /= num_samples[msk]
+    std_error = np.sqrt(std_error - mean_error**2)
+    std_error[msk] /= np.sqrt(num_samples[msk])
+
+    w_max = (w_range[1] - w_range[0]) / 2
+    scale = 100 / w_max
+    axes.errorbar(
+        bins[:-1] + (bins[1] - bins[0]) / 2,
+        mean_error[1:] * scale,
+        std_error[1:] * scale,
+        label=label,
+    )
+
+    axes.set_xlabel("Weight value")
+    axes.set_ylabel("Programming error [% of gmax]")
+
+    return axes

@@ -464,6 +464,45 @@ template <typename T> void RPUCudaPulsed<T>::setHiddenUpdateIdx(int idx) {
   rpu_device_->setHiddenUpdateIdx(idx);
 };
 
+/*********************************************************************************/
+/* dump / load state */
+
+template <typename T>
+void RPUCudaPulsed<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPUCudaSimple<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  rpu_device_->dumpExtra(state, "rpu_device");
+  rpucuda_device_->dumpExtra(state, "rpucuda_device");
+
+  f_iom_->dumpExtra(state, "f_iom");
+  b_iom_->dumpExtra(state, "b_iom");
+
+  up_pwu_->dumpExtra(state, "up_pwu");
+  fb_pass_->dumpExtra(state, "fb_pass");
+
+  // tmp vectors are ignored
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void RPUCudaPulsed<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+  RPUCudaSimple<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  rpu_device_->loadExtra(state, "rpu_device", strict);
+  rpucuda_device_->loadExtra(state, "rpucuda_device", strict);
+
+  f_iom_->loadExtra(state, "f_iom", strict);
+  b_iom_->loadExtra(state, "b_iom", strict);
+
+  up_pwu_->loadExtra(state, "up_pwu", strict);
+  fb_pass_->loadExtra(state, "fb_pass", strict);
+}
+
+/*********************************************************************************/
 template <typename T> void RPUCudaPulsed<T>::setWeights(const T *host_source) {
 
   CHECK_RPU_DEVICE_INIT;

@@ -120,6 +120,7 @@ public:
   inline std::string getName() const { return this->name; };
   inline bool getOutTrans() const { return this->out_trans; };
   inline int getUseBo64() const { return this->use_bo64; };
+  inline int getnK32() const { return this->nK32; };
   inline int getImplicitPulses() const { return this->implicit_pulses; };
 
   inline void forceBo64Translate() {

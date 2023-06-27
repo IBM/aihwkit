@@ -25,12 +25,14 @@ from typing import Optional, Any, List
 from torch import zeros
 from torch.nn import Module
 
-from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
+from aihwkit.nn.modules.base import AnalogLayerBase
 from aihwkit.nn.modules.conv_mapped import _AnalogConvNdMapped
 from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
 from aihwkit.nn.modules.conv import _AnalogConvNd
 from aihwkit.nn import AnalogLinear
-from aihwkit.simulator.tiles import BaseTile
+from aihwkit.simulator.tiles.module import TileModule
+from aihwkit.simulator.parameters.base import RPUConfigBase
+
 
 COLUMN_DEFINITIONS = ["Layer Information", "Tile Information"]
 
@@ -62,7 +64,7 @@ class TileInfo:
     phy_out_size: Any
     utilization: float
 
-    def __init__(self, tile: BaseTile, is_mapped: bool):
+    def __init__(self, tile: TileModule, is_mapped: bool):
         self.log_in_size = tile.in_size
         self.log_out_size = tile.out_size
         self.phy_in_size = tile.rpu_config.mapping.max_input_size
@@ -104,14 +106,14 @@ class LayerInfo:
     def __init__(
         self,
         module: Module,
-        rpu_config: Optional[RPUConfigAlias] = None,
+        rpu_config: Optional[RPUConfigBase] = None,
         input_size: Any = None,
         output_size: Any = None,
     ):
         self.module = module
         self.name = self.module.__class__.__name__
-        self.isanalog = isinstance(self.module, AnalogModuleBase)
-        self.num_tiles = 0 if not self.isanalog else self.module._analog_tile_counter
+        self.isanalog = isinstance(self.module, AnalogLayerBase)
+        self.num_tiles = 0 if not self.isanalog else len(list(self.module.analog_tiles()))
         self.tiles_info = self.set_tiles_info()
         self.kernel_size = None
         self.reuse_factor = 0
@@ -129,7 +131,7 @@ class LayerInfo:
         tiles_info = []
         is_mapped = isinstance(self.module, AnalogLinearMapped)
         is_mapped = is_mapped or isinstance(self.module, _AnalogConvNdMapped)
-        if isinstance(self.module, AnalogModuleBase):
+        if isinstance(self.module, AnalogLayerBase):
             for tile in self.module.analog_tiles():
                 tiles_info.append(TileInfo(tile, is_mapped))
         return tiles_info
@@ -194,7 +196,7 @@ class AnalogInfo:
     """Class for computing and storing results of the analog summary."""
 
     def __init__(
-        self, model: Module, input_size: Any = None, rpu_config: Optional[RPUConfigAlias] = None
+        self, model: Module, input_size: Any = None, rpu_config: Optional[RPUConfigBase] = None
     ):
         self.model = model
         self.input_size = input_size
@@ -204,11 +206,23 @@ class AnalogInfo:
         self.total_nb_analog = self.calculate_num_analog()
 
     def register_hooks_recursively(self, module: Module, hook: Any) -> None:
-        """Hooks the function into all layers with no children."""
-        if not list(module.children()):
+        """Hooks the function into all layers with no children (or
+        only analog tiles as childrens).
+        """
+
+        if len(list(module.children())) == 0:
             module.register_forward_hook(hook)
+        elif (
+            isinstance(module, AnalogLayerBase)
+            and not module.IS_CONTAINER
+            and len(
+                [ch for ch in module.children() if isinstance(ch, AnalogLayerBase)]  # type: ignore
+            )
+            == 0
+        ):  # type: ignore
+            module.register_forward_hook(hook)  # type: ignore
         else:
-            for _, layer in module.named_children():
+            for layer in module.children():
                 self.register_hooks_recursively(layer, hook)
 
     def create_layer_summary(self) -> List[LayerInfo]:
@@ -216,7 +230,6 @@ class AnalogInfo:
 
         This list contains LayerInfo elements that corresponds to each
         layer of the model.
-
         """
         layer_summary = []
 
@@ -279,7 +292,7 @@ class AnalogInfo:
 
 
 def analog_summary(
-    model: Module, input_size: Optional[Any] = None, rpu_config: Optional[RPUConfigAlias] = None
+    model: Module, input_size: Optional[Any] = None, rpu_config: Optional[RPUConfigBase] = None
 ) -> AnalogInfo:
     """Summarize the given PyTorch model.
 
@@ -304,5 +317,4 @@ def analog_summary(
         AnalogInfo Object.
     """
     results = AnalogInfo(model, input_size, rpu_config)
-    print(results)
     return results

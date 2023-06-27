@@ -28,9 +28,6 @@ template <typename T>
 void WeightRemapper<T>::apply(
     T *weights, T current_lr, const WeightRemapParameter &wrmpar, T *scales, T *biases) {
 
-  UNUSED(biases);
-  UNUSED(current_lr);
-
   switch (wrmpar.type) {
   case WeightRemapType::LayerwiseSymmetric: {
 

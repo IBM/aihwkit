@@ -16,6 +16,7 @@
 #include <memory>
 
 namespace RPU {
+
 /******************************************************************************************/
 /* PulsedRPUDeviceCuda
 
@@ -36,6 +37,8 @@ template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
   dev_diffusion_rate_ = nullptr; // on the fly
   dev_reset_bias_ = nullptr;
   dev_persistent_weights_ = nullptr;
+  dev_neg_pulse_counter_ = nullptr;
+  dev_pos_pulse_counter_ = nullptr;
 
   this->context_->synchronize();
 };
@@ -60,36 +63,43 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other)
     dev_persistent_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
     dev_persistent_weights_->assign(*other.dev_persistent_weights_);
   }
+  if (other.dev_neg_pulse_counter_ != nullptr) {
+    dev_neg_pulse_counter_ = RPU::make_unique<CudaArray<uint64_t>>(this->context_, this->size_);
+    dev_neg_pulse_counter_->assign(*other.dev_neg_pulse_counter_);
+  }
+  if (other.dev_pos_pulse_counter_ != nullptr) {
+    dev_pos_pulse_counter_ = RPU::make_unique<CudaArray<uint64_t>>(this->context_, this->size_);
+    dev_pos_pulse_counter_->assign(*other.dev_pos_pulse_counter_);
+  }
 
   this->context_->synchronize();
 };
 
-// template <typename T>
-// PulsedRPUDeviceCuda<T>& PulsedRPUDeviceCuda<T>::operator=(const PulsedRPUDeviceCuda<T>& other){
-//   PulsedRPUDeviceCuda<T> tmp(other);
-//   swap(*this,tmp);
-//   context_->synchronize(); // need sync because of tmp
-//   return *this;
-// };
+template <typename T>
+PulsedRPUDeviceCuda<T> &PulsedRPUDeviceCuda<T>::operator=(const PulsedRPUDeviceCuda<T> &other) {
+  PulsedRPUDeviceCudaBase<T> tmp(other);
+  swap(*this, tmp);
+  return *this;
+};
 
-// template <typename T>
-// PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(PulsedRPUDeviceCuda<T>&& other) {
-//   *this = std::move(other);
-// };
+template <typename T> PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(PulsedRPUDeviceCuda<T> &&other) {
+  *this = std::move(other);
+};
 
-// template <typename T>
-// PulsedRPUDeviceCuda<T>& PulsedRPUDeviceCuda<T>::operator=(PulsedRPUDeviceCuda<T>&& other){
+template <typename T>
+PulsedRPUDeviceCuda<T> &PulsedRPUDeviceCuda<T>::operator=(PulsedRPUDeviceCuda<T> &&other) {
 
-//   PulsedRPUDeviceCudaBase<T>::operator=(std::move(other));
+  PulsedRPUDeviceCudaBase<T>::operator=(std::move(other));
 
-//   dev_4params_ = std::move(other.dev_4params_);
-//   dev_diffusion_rate_ = std::move(other.dev_diffusion_rate_);
-//   dev_reset_bias_ = std::move(other.dev_reset_bias_);
-//   dev_decay_scale_ = std::move(other.dev_decay_scale_);
-//   dev_persistent_weights_ = std::move(other.dev_persistent_weights_);
-
-//   return *this;
-// };
+  dev_4params_ = std::move(other.dev_4params_);
+  dev_diffusion_rate_ = std::move(other.dev_diffusion_rate_);
+  dev_reset_bias_ = std::move(other.dev_reset_bias_);
+  dev_decay_scale_ = std::move(other.dev_decay_scale_);
+  dev_persistent_weights_ = std::move(other.dev_persistent_weights_);
+  dev_pos_pulse_counter_ = std::move(other.dev_pos_pulse_counter_);
+  dev_neg_pulse_counter_ = std::move(other.dev_neg_pulse_counter_);
+  return *this;
+};
 
 template <typename T>
 void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device_in) {
@@ -181,6 +191,29 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 }
 
 template <typename T>
+void PulsedRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  PulsedRPUDeviceCudaBase<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  RPU::insert(state, "dev_pos_pulse_counter", dev_pos_pulse_counter_);
+  RPU::insert(state, "dev_neg_pulse_counter", dev_neg_pulse_counter_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+};
+
+template <typename T>
+void PulsedRPUDeviceCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  PulsedRPUDeviceCudaBase<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(this->context_, state, "dev_pos_pulse_counter", dev_pos_pulse_counter_, strict);
+  RPU::load(this->context_, state, "dev_neg_pulse_counter", dev_neg_pulse_counter_, strict);
+};
+
+template <typename T>
 void PulsedRPUDeviceCuda<T>::applyWeightUpdate(T *weights, T *dw_and_current_weight_out) {
 
   if (getPar().usesPersistentWeight()) {
@@ -267,19 +300,6 @@ template <typename T> void PulsedRPUDeviceCuda<T>::clipWeights(T *weights, T cli
   applyUpdateWriteNoise(weights);
 }
 
-template <typename T> void PulsedRPUDeviceCuda<T>::initResetRnd() {
-
-  if (this->rnd_context_ == nullptr) {
-    this->initRndContext();
-  }
-  dev_reset_nrnd_ =
-      RPU::make_unique<CudaArray<float>>(&*this->rnd_context_, (this->size_ + 31) / 32 * 32);
-  dev_reset_flag_ =
-      RPU::make_unique<CudaArray<float>>(&*this->rnd_context_, (this->size_ + 31) / 32 * 32);
-  dev_reset_flag_->setConst(0);
-  this->rnd_context_->synchronize();
-}
-
 template <typename T> std::vector<T> PulsedRPUDeviceCuda<T>::getHiddenWeights() const {
   std::vector<T> data;
   if (!getPar().usesPersistentWeight()) {
@@ -294,6 +314,34 @@ template <typename T> std::vector<T> PulsedRPUDeviceCuda<T>::getHiddenWeights() 
     for (int i = 0; i < this->size_; i++) {
       // transpose d_size maj -> x_size maj
       data[offset + i] = w_vec[TRANSPOSE_X2D(i, this->x_size_, this->d_size_)];
+    }
+  }
+  return data;
+}
+
+template <typename T> std::vector<uint64_t> PulsedRPUDeviceCuda<T>::getPulseCounters() const {
+  std::vector<uint64_t> data;
+  if (!dev_neg_pulse_counter_) {
+    return data;
+  }
+  int offset = 0;
+
+  std::vector<uint64_t> counter_vec(this->size_);
+  data.resize(2 * this->size_);
+
+  if (dev_pos_pulse_counter_ != nullptr) {
+    dev_pos_pulse_counter_->copyTo(counter_vec.data());
+    for (int i = 0; i < this->size_; i++) {
+      // transpose d_size maj -> x_size maj
+      data[offset + i] = counter_vec[TRANSPOSE_X2D(i, this->x_size_, this->d_size_)];
+    }
+  }
+  offset = this->size_;
+  if (dev_neg_pulse_counter_ != nullptr) {
+    dev_neg_pulse_counter_->copyTo(counter_vec.data());
+    for (int i = 0; i < this->size_; i++) {
+      // transpose d_size maj -> x_size maj
+      data[offset + i] = counter_vec[TRANSPOSE_X2D(i, this->x_size_, this->d_size_)];
     }
   }
   return data;
@@ -354,18 +402,18 @@ void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
   bool with_nrnd = false;
 
   if (getPar().reset_std > 0) {
-    if (dev_reset_nrnd_ == nullptr) {
-      initResetRnd();
+    if (this->dev_reset_nrnd_ == nullptr) {
+      this->initResetRnd();
     }
     this->rnd_context_->randNormal(
-        dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
+        this->dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
     with_nrnd = true;
   }
   if (reset_prob < 1) {
-    if (dev_reset_flag_ == nullptr) {
-      initResetRnd();
+    if (this->dev_reset_flag_ == nullptr) {
+      this->initResetRnd();
     }
-    this->rnd_context_->randUniform(dev_reset_flag_->getData(), n_cols * this->d_size_);
+    this->rnd_context_->randUniform(this->dev_reset_flag_->getData(), n_cols * this->d_size_);
     with_flag = true;
   }
   if (with_flag || with_nrnd) {
@@ -376,16 +424,17 @@ void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
     // reset whole matrix
     RPU::math::elemresetsat<T>(
         this->context_, w, this->size_, with_bias ? dev_reset_bias_->getDataConst() : nullptr,
-        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
-        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob, dev_4params_->getData());
+        with_nrnd ? this->dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? this->dev_reset_flag_->getDataConst() : nullptr, reset_prob,
+        dev_4params_->getData());
 
   } else if (offset + n <= this->size_) {
     // one pass enough
     RPU::math::elemresetsat<T>(
         this->context_, w + offset, n,
         with_bias ? dev_reset_bias_->getDataConst() + offset : nullptr,
-        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
-        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob,
+        with_nrnd ? this->dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? this->dev_reset_flag_->getDataConst() : nullptr, reset_prob,
         dev_4params_->getData() + 4 * offset);
   } else {
     // two passes
@@ -394,17 +443,33 @@ void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
     RPU::math::elemresetsat<T>(
         this->context_, w + offset, m,
         with_bias ? dev_reset_bias_->getDataConst() + offset : nullptr,
-        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
-        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob,
+        with_nrnd ? this->dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? this->dev_reset_flag_->getDataConst() : nullptr, reset_prob,
         dev_4params_->getData() + 4 * offset);
 
     RPU::math::elemresetsat<T>(
         this->context_, w, n - m, with_bias ? dev_reset_bias_->getDataConst() : nullptr,
-        with_nrnd ? dev_reset_nrnd_->getDataConst() + m : nullptr,
-        with_flag ? dev_reset_flag_->getDataConst() + m : nullptr, reset_prob,
+        with_nrnd ? this->dev_reset_nrnd_->getDataConst() + m : nullptr,
+        with_flag ? this->dev_reset_flag_->getDataConst() + m : nullptr, reset_prob,
         dev_4params_->getData());
   }
   applyUpdateWriteNoise(weights);
+}
+
+template <typename T> uint64_t *PulsedRPUDeviceCuda<T>::getNegPulseCountData() {
+  if (dev_neg_pulse_counter_ == nullptr) {
+    dev_neg_pulse_counter_ = RPU::make_unique<CudaArray<uint64_t>>(this->context_, this->size_);
+    dev_neg_pulse_counter_->setConst(0);
+  }
+  return dev_neg_pulse_counter_->getData();
+}
+
+template <typename T> uint64_t *PulsedRPUDeviceCuda<T>::getPosPulseCountData() {
+  if (dev_pos_pulse_counter_ == nullptr) {
+    dev_pos_pulse_counter_ = RPU::make_unique<CudaArray<uint64_t>>(this->context_, this->size_);
+    dev_pos_pulse_counter_->setConst(0);
+  }
+  return dev_pos_pulse_counter_->getData();
 }
 
 template <typename T>
@@ -421,6 +486,15 @@ void PulsedRPUDeviceCuda<T>::runUpdateKernel(
     uint32_t *x_counts_chunk,
     uint32_t *d_counts_chunk,
     const ChoppedWeightOutput<T> *cwo) {
+
+  if (this->getPar().count_pulses) {
+    PWUKernelParameterPulseCounter<T> pulse_counter(
+        c, this->x_size_, this->d_size_, m_batch, kpars->getnK32(), kpars->getUseBo64(),
+        kpars->getOutTrans(), up, "PulseCounter");
+    pulse_counter.run(
+        c->getStream(), nullptr, m_batch, blm, this, up, nullptr, one_sided, x_counts_chunk,
+        d_counts_chunk);
+  }
 
   kpars->run(
       c->getStream(), dev_weights, m_batch, blm, this, up, dev_states, one_sided, x_counts_chunk,

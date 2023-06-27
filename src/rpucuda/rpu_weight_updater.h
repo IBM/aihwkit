@@ -41,6 +41,9 @@ public:
       const int d_inc,
       const T learning_rate);
 
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix){};
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+
 protected:
   int x_size_ = 0;
   int d_size_ = 0;
@@ -69,6 +72,10 @@ public:
     swap(a.dblm_, b.dblm_);
     swap(a.rng_, b.rng_);
   }
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
+
   bool checkForFPUpdate(AbstractRPUDevice<T> *rpu_device_in);
 
   virtual void updateVectorWithDevice(

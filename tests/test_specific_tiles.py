@@ -65,7 +65,8 @@ class TransferCompoundTest(ParametrizedTestCase):
             weight, bias = model.get_weights()
             model.set_weights(weight * 0.0, bias * 0.0 if bias is not None else None)
 
-            params = model.analog_tile.get_hidden_parameters()
+            analog_tile = next(model.analog_tiles())
+            params = analog_tile.get_hidden_parameters()
             shape = params["hidden_weights_0_0"].shape
 
             # just dummy settings
@@ -75,7 +76,7 @@ class TransferCompoundTest(ParametrizedTestCase):
             params["hidden_weights_0_1"] = c * ones(*shape)  # C
             params["hidden_weights_1_1"] = d * ones(*shape)  # C_ref
 
-            model.analog_tile.set_hidden_parameters(params)
+            analog_tile.set_hidden_parameters(params)
 
             weight, bias = model.get_weights()
 
@@ -93,17 +94,17 @@ class TransferCompoundTest(ParametrizedTestCase):
 
         lifetime = 100.0  # initial setting (needs to be larger 1)
         gamma = 0.1
-        reset_bias = 0.1  # decay shift
+        reset_bias = 0.3  # decay shift
         rpu_config = self.get_transfer_compound(
-            gamma=gamma, lifetime=lifetime, lifetime_dtod=0.0, reset=reset_bias
+            gamma=gamma, lifetime=lifetime, lifetime_dtod=0.0, reset=reset_bias, reset_std=0.0
         )
-
         model = self.get_layer(in_features=2, out_features=1, rpu_config=rpu_config)
 
         weight, bias = model.get_weights()
         model.set_weights(weight * 0.0, bias * 0.0 if bias is not None else None)
 
-        params = model.analog_tile.get_hidden_parameters()
+        analog_tile = next(model.analog_tiles())
+        params = analog_tile.get_hidden_parameters()
         shape = params["hidden_weights_0_0"].shape
 
         # just dummy settings
@@ -114,24 +115,23 @@ class TransferCompoundTest(ParametrizedTestCase):
         params["hidden_weights_1_1"] = d * ones(*shape)  # C_ref
 
         # explicitly set the decay scales (which is 1-1/lifetime)
-        a_dcy, b_dcy, c_dcy, d_dcy = 0.95, 0.78, 0.93, 0.92
+        a_dcy, b_dcy, c_dcy, d_dcy = 0.95, 0.28, 0.33, 0.12
         params["decay_scales_0_0"] = a_dcy * ones(*shape)  # A
         params["decay_scales_1_0"] = b_dcy * ones(*shape)  # A ref
         params["decay_scales_0_1"] = c_dcy * ones(*shape)  # C
         params["decay_scales_1_1"] = d_dcy * ones(*shape)  # C_ref
 
-        model.analog_tile.set_hidden_parameters(params)
-
-        # LR set to zero. Only lifetime will be applied
-        opt = AnalogSGD(model.parameters(), lr=0.0)
-
+        analog_tile.set_hidden_parameters(params)
+        weight, bias = model.get_weights()
         x_b = Tensor([[0.1, 0.2], [0.2, 0.4]])
         y_b = Tensor([[0.3], [0.6]])
 
         if self.use_cuda:
-            model = model.cuda()
             x_b = x_b.cuda()
             y_b = y_b.cuda()
+
+        # LR set to zero. Only lifetime will be applied
+        opt = AnalogSGD(model.parameters(), lr=0.0)
 
         epochs = 2
         for _ in range(epochs):

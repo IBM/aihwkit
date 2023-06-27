@@ -30,6 +30,8 @@ void declare_rpu_devices(py::module &m) {
   using PowStepReferenceParam = RPU::PowStepReferenceRPUDeviceMetaParameter<T>;
   using PiecewiseStepParam = RPU::PiecewiseStepRPUDeviceMetaParameter<T>;
   using BufferedTransferParam = RPU::BufferedTransferRPUDeviceMetaParameter<T>;
+  using ChoppedTransferParam = RPU::ChoppedTransferRPUDeviceMetaParameter<T>;
+  using DynamicTransferParam = RPU::DynamicTransferRPUDeviceMetaParameter<T>;
   using SoftBoundsReferenceParam = RPU::SoftBoundsReferenceRPUDeviceMetaParameter<T>;
 
   /*
@@ -348,6 +350,50 @@ void declare_rpu_devices(py::module &m) {
     }
   };
 
+  class PyChoppedTransferParam : public ChoppedTransferParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, ChoppedTransferParam, getName, );
+    }
+    ChoppedTransferParam *clone() const override {
+      PYBIND11_OVERLOAD(ChoppedTransferParam *, ChoppedTransferParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, ChoppedTransferParam, implements, );
+    }
+    RPU::ChoppedTransferRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::ChoppedTransferRPUDevice<T> *, ChoppedTransferParam, createDevice, x_size, d_size,
+          rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, ChoppedTransferParam, calcWeightGranularity, );
+    }
+  };
+
+  class PyDynamicTransferParam : public DynamicTransferParam {
+  public:
+    std::string getName() const override {
+      PYBIND11_OVERLOAD(std::string, DynamicTransferParam, getName, );
+    }
+    DynamicTransferParam *clone() const override {
+      PYBIND11_OVERLOAD(DynamicTransferParam *, DynamicTransferParam, clone, );
+    }
+    RPU::DeviceUpdateType implements() const override {
+      PYBIND11_OVERLOAD(RPU::DeviceUpdateType, DynamicTransferParam, implements, );
+    }
+    RPU::DynamicTransferRPUDevice<T> *
+    createDevice(int x_size, int d_size, RPU::RealWorldRNG<T> *rng) override {
+      PYBIND11_OVERLOAD(
+          RPU::DynamicTransferRPUDevice<T> *, DynamicTransferParam, createDevice, x_size, d_size,
+          rng);
+    }
+    T calcWeightGranularity() const override {
+      PYBIND11_OVERLOAD(T, DynamicTransferParam, calcWeightGranularity, );
+    }
+  };
+
   class PySoftBoundsReferenceParam : public SoftBoundsReferenceParam {
   public:
     std::string getName() const override {
@@ -438,6 +484,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("noise_management", &RPU::IOMetaParameter<T>::noise_management)
       .def_readwrite("out_bound", &RPU::IOMetaParameter<T>::out_bound)
       .def_readwrite("out_noise", &RPU::IOMetaParameter<T>::out_noise)
+      .def_readwrite("out_noise_std", &RPU::IOMetaParameter<T>::out_noise_std)
       .def_readwrite("out_res", &RPU::IOMetaParameter<T>::out_res)
       .def_readwrite("out_scale", &RPU::IOMetaParameter<T>::out_scale)
       .def_readwrite("out_sto_round", &RPU::IOMetaParameter<T>::out_sto_round)
@@ -482,6 +529,7 @@ void declare_rpu_devices(py::module &m) {
 
   py::class_<SimpleParam, PySimpleParam, AbstractParam>(m, "IdealResistiveDeviceParameter")
       .def(py::init<>())
+      .def_readwrite("reset_std", &SimpleParam::reset_std)
       .def("__str__", [](SimpleParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
@@ -502,14 +550,15 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("lifetime_dtod", &PulsedParam::lifetime_dtod)
       .def_readwrite("perfect_bias", &PulsedParam::perfect_bias)
       .def_readwrite("reset", &PulsedParam::reset)
-      .def_readwrite("reset_dtod", &PulsedParam::reset_dtod)
       .def_readwrite("reset_std", &PulsedParam::reset_std)
+      .def_readwrite("reset_dtod", &PulsedParam::reset_dtod)
       .def_readwrite("up_down", &PulsedParam::up_down)
       .def_readwrite("up_down_dtod", &PulsedParam::up_down_dtod)
       .def_readwrite("w_max", &PulsedParam::w_max)
       .def_readwrite("w_max_dtod", &PulsedParam::w_max_dtod)
       .def_readwrite("w_min", &PulsedParam::w_min)
       .def_readwrite("w_min_dtod", &PulsedParam::w_min_dtod)
+      .def_readwrite("count_pulses", &PulsedParam::count_pulses)
       .def("__str__", [](PulsedParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
@@ -545,6 +594,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("allow_increasing", &LinearStepParam::ls_allow_increasing_slope)
       .def_readwrite("mean_bound_reference", &LinearStepParam::ls_mean_bound_reference)
       .def_readwrite("write_noise_std", &LinearStepParam::write_noise_std)
+      .def_readwrite("apply_write_noise_on_set", &LinearStepParam::apply_write_noise_on_set)
       .def_readwrite("mult_noise", &LinearStepParam::ls_mult_noise)
       .def_readwrite("reverse_up", &LinearStepParam::ls_reverse_up)
       .def_readwrite("reverse_down", &LinearStepParam::ls_reverse_down)
@@ -569,6 +619,7 @@ void declare_rpu_devices(py::module &m) {
       m, "SoftBoundsResistiveDeviceParameter")
       .def_readwrite("mult_noise", &SoftBoundsParam::ls_mult_noise)
       .def_readwrite("write_noise_std", &SoftBoundsParam::write_noise_std)
+      .def_readwrite("apply_write_noise_on_set", &SoftBoundsParam::apply_write_noise_on_set)
       .def_readwrite("reverse_up", &SoftBoundsParam::ls_reverse_up)
       .def_readwrite("reverse_down", &SoftBoundsParam::ls_reverse_down)
       .def_readwrite("reverse_offset", &SoftBoundsParam::ls_reverse_offset)
@@ -598,6 +649,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("a", &ExpStepParam::es_a)
       .def_readwrite("b", &ExpStepParam::es_b)
       .def_readwrite("write_noise_std", &ExpStepParam::write_noise_std)
+      .def_readwrite("apply_write_noise_on_set", &ExpStepParam::apply_write_noise_on_set)
       .def_readwrite("dw_min_std_add", &ExpStepParam::dw_min_std_add)
       .def_readwrite("dw_min_std_slope", &ExpStepParam::dw_min_std_slope)
       .def(
@@ -739,6 +791,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("pow_up_down", &PowStepParam::ps_gamma_up_down)
       .def_readwrite("pow_up_down_dtod", &PowStepParam::ps_gamma_up_down_dtod)
       .def_readwrite("write_noise_std", &PowStepParam::write_noise_std)
+      .def_readwrite("apply_write_noise_on_set", &PowStepParam::apply_write_noise_on_set)
       .def(
           "__str__",
           [](PowStepParam &self) {
@@ -788,6 +841,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("piecewise_up", &PiecewiseStepParam::piecewise_up_vec)
       .def_readwrite("piecewise_down", &PiecewiseStepParam::piecewise_down_vec)
       .def_readwrite("write_noise_std", &PiecewiseStepParam::write_noise_std)
+      .def_readwrite("apply_write_noise_on_set", &PiecewiseStepParam::apply_write_noise_on_set)
       .def(
           "__str__",
           [](PiecewiseStepParam &self) {
@@ -817,6 +871,38 @@ void declare_rpu_devices(py::module &m) {
         return ss.str();
       });
 
+  py::class_<ChoppedTransferParam, PyChoppedTransferParam, BufferedTransferParam>(
+      m, "ChoppedTransferResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("in_chop_prob", &ChoppedTransferParam::in_chop_prob)
+      .def_readwrite("in_chop_random", &ChoppedTransferParam::in_chop_random)
+      .def_readwrite("out_chop_prob", &ChoppedTransferParam::out_chop_prob)
+      .def_readwrite("auto_scale", &ChoppedTransferParam::auto_scale)
+      .def_readwrite("auto_momentum", &ChoppedTransferParam::auto_momentum)
+      .def_readwrite("auto_granularity", &ChoppedTransferParam::auto_granularity)
+      .def_readwrite("buffer_granularity", &ChoppedTransferParam::buffer_granularity)
+      .def_readwrite(
+          "experimental_adjust_auto_scale_with_transfer_every",
+          &ChoppedTransferParam::experimental_adjust_auto_scale_with_transfer_every)
+      .def("__str__", [](ChoppedTransferParam &self) {
+        std::stringstream ss;
+        self.printToStream(ss);
+        return ss.str();
+      });
+
+  py::class_<DynamicTransferParam, PyDynamicTransferParam, ChoppedTransferParam>(
+      m, "DynamicTransferResistiveDeviceParameter")
+      .def(py::init<>())
+      .def_readwrite("scale_thres_with_samples", &DynamicTransferParam::scale_thres_with_samples)
+      .def_readwrite("tail_weightening", &DynamicTransferParam::tail_weightening)
+      .def_readwrite("buffer_cap", &DynamicTransferParam::buffer_cap)
+      .def_readwrite("always_write", &DynamicTransferParam::always_write)
+      .def("__str__", [](DynamicTransferParam &self) {
+        std::stringstream ss;
+        self.printToStream(ss);
+        return ss.str();
+      });
+
   py::class_<SoftBoundsReferenceParam, PySoftBoundsReferenceParam, PulsedParam>(
       m, "SoftBoundsReferenceResistiveDeviceParameter")
       .def(py::init<>())
@@ -826,6 +912,8 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("reference_std", &SoftBoundsReferenceParam::reference_std)
       .def_readwrite("subtract_symmetry_point", &SoftBoundsReferenceParam::subtract_symmetry_point)
       .def_readwrite("write_noise_std", &SoftBoundsReferenceParam::write_noise_std)
+      .def_readwrite(
+          "apply_write_noise_on_set", &SoftBoundsReferenceParam::apply_write_noise_on_set)
       .def_readwrite("mult_noise", &SoftBoundsReferenceParam::mult_noise)
       .def(
           "__str__",

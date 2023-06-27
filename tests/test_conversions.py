@@ -14,16 +14,16 @@
 
 from unittest import SkipTest
 
-from torch import Tensor, manual_seed
-from torch.nn import Sequential, Linear
+from torch import Tensor, manual_seed, randn
+from torch.nn import Sequential, Linear, Conv2d, MaxPool2d, Tanh, LogSoftmax, Flatten, Module
 from torch.nn.functional import mse_loss
 from torch.optim import SGD
 from torchvision.models import resnet18, alexnet
 from parameterized import parameterized_class
 
 from aihwkit.simulator.configs.configs import FloatingPointRPUConfig, InferenceRPUConfig
-from aihwkit.nn import AnalogSequential, AnalogLinear, AnalogConv2d
-from aihwkit.nn.conversion import convert_to_analog
+from aihwkit.nn import AnalogSequential, AnalogLinear, AnalogConv2d, AnalogWrapper
+from aihwkit.nn.conversion import convert_to_analog, convert_to_digital
 
 from .helpers.testcases import ParametrizedTestCase
 
@@ -64,10 +64,117 @@ class ConversionLayerTest(ParametrizedTestCase):
 
         self.train_model_torch(model, loss_func, x_b, y_b)
         digital_loss = loss_func(model(x_b), y_b)
-        analog_model = convert_to_analog(model, FloatingPointRPUConfig())
+        analog_model = convert_to_analog(model, FloatingPointRPUConfig(), ensure_analog_root=False)
         self.assertEqual(analog_model[0].__class__, AnalogLinear)
         self.assertEqual(analog_model.__class__, AnalogSequential)
         self.assertTensorAlmostEqual(loss_func(analog_model(x_b), y_b), digital_loss)
+
+        # convert back to digial
+        new_model = convert_to_digital(analog_model)
+        for new_mod, mod in zip(new_model.modules(), model.modules()):
+            self.assertEqual(new_mod.__class__, mod.__class__)
+            if hasattr(mod, "weight"):
+                self.assertTensorAlmostEqual(new_mod.weight, mod.weight)
+            if hasattr(mod, "bias") and mod.bias is not None:
+                self.assertTensorAlmostEqual(new_mod.bias, mod.bias)
+
+        self.train_model_torch(model, loss_func, x_b, y_b)
+        self.train_model_torch(new_model, loss_func, x_b, y_b)
+        self.assertTensorAlmostEqual(loss_func(new_model(x_b), y_b), loss_func(model(x_b), y_b))
+
+    def test_conversion_lenet(self):
+        """Convert Lenet"""
+
+        manual_seed(4321)
+        model = Sequential(
+            Conv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1),
+            Tanh(),
+            MaxPool2d(kernel_size=2),
+            Conv2d(in_channels=16, out_channels=32, kernel_size=5, stride=1),
+            Tanh(),
+            MaxPool2d(kernel_size=2),
+            Tanh(),
+            Flatten(),
+            Linear(in_features=512, out_features=128),
+            Tanh(),
+            Linear(in_features=128, out_features=10),
+            LogSoftmax(dim=1),
+        )
+        analog_model = convert_to_analog(model, FloatingPointRPUConfig(), ensure_analog_root=False)
+        x_input = randn((10, 1, 28, 28), device="cuda" if self.use_cuda else "cpu")
+
+        if self.use_cuda:
+            analog_model.cuda()
+            model.cuda()
+
+        self.assertEqual(analog_model[0].__class__, AnalogConv2d)
+        self.assertEqual(analog_model.__class__, AnalogSequential)
+        self.assertTensorAlmostEqual(analog_model(x_input), model(x_input))
+
+        # convert back to digial
+        new_model = convert_to_digital(analog_model)
+        for new_mod, mod in zip(new_model.modules(), model.modules()):
+            self.assertEqual(new_mod.__class__, mod.__class__)
+            if hasattr(mod, "weight"):
+                self.assertTensorAlmostEqual(new_mod.weight, mod.weight)
+            if hasattr(mod, "bias") and mod.bias is not None:
+                self.assertTensorAlmostEqual(new_mod.bias, mod.bias)
+
+        self.assertTensorAlmostEqual(new_model(x_input), model(x_input))
+
+    def test_conversion_lenet_module(self) -> None:
+        """Convert Lenet with ensure_analog_root"""
+
+        class LeNet(Module):
+            """Simple module"""
+
+            def __init__(self, my_model: Module):
+                super().__init__()
+                self.model = my_model
+
+            def forward(self, x: Tensor) -> Tensor:
+                """Forward pass"""
+                return self.model(x)
+
+        manual_seed(4321)
+        model = Sequential(
+            Conv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1),
+            Tanh(),
+            MaxPool2d(kernel_size=2),
+            Conv2d(in_channels=16, out_channels=32, kernel_size=5, stride=1),
+            Tanh(),
+            MaxPool2d(kernel_size=2),
+            Tanh(),
+            Flatten(),
+            Linear(in_features=512, out_features=128),
+            Tanh(),
+            Linear(in_features=128, out_features=10),
+            LogSoftmax(dim=1),
+        )
+        lenet = LeNet(model)
+
+        analog_model = convert_to_analog(lenet, FloatingPointRPUConfig(), ensure_analog_root=True)
+        x_input = randn((10, 1, 28, 28), device="cuda" if self.use_cuda else "cpu")
+
+        if self.use_cuda:
+            analog_model.cuda()
+            model.cuda()
+
+        self.assertEqual(analog_model.__class__, AnalogWrapper)
+        self.assertEqual(analog_model.module.model[0].__class__, AnalogConv2d)
+        self.assertEqual(analog_model.module.model.__class__, AnalogSequential)
+        self.assertTensorAlmostEqual(analog_model(x_input), lenet(x_input))
+
+        # convert back to digial
+        new_lenet = convert_to_digital(analog_model)
+        for new_mod, mod in zip(new_lenet.modules(), lenet.modules()):
+            self.assertEqual(new_mod.__class__, mod.__class__)
+            if hasattr(mod, "weight"):
+                self.assertTensorAlmostEqual(new_mod.weight, mod.weight)
+            if hasattr(mod, "bias") and mod.bias is not None:
+                self.assertTensorAlmostEqual(new_mod.bias, mod.bias)
+
+        self.assertTensorAlmostEqual(new_lenet(x_input), lenet(x_input))
 
     def test_conversion_linear_sequential_specific(self):
         """Test converting sequential and linear."""
@@ -83,7 +190,10 @@ class ConversionLayerTest(ParametrizedTestCase):
             model = model.cuda()
 
         analog_model = convert_to_analog(
-            model, FloatingPointRPUConfig(), specific_rpu_config_fun=specfun
+            model,
+            FloatingPointRPUConfig(),
+            specific_rpu_config_fun=specfun,
+            ensure_analog_root=False,
         )
         self.assertEqual(analog_model[0].__class__, AnalogLinear)
         self.assertEqual(
@@ -101,22 +211,39 @@ class ConversionLayerTest(ParametrizedTestCase):
 
     def test_conversion_torchvision_resnet(self):
         """Test converting resnet model from torchvision."""
-        model = resnet18()
         if self.use_cuda:
             raise SkipTest("Skipping for CUDA.")
 
-        analog_model = convert_to_analog(model, FloatingPointRPUConfig())
+        model = resnet18()
+
+        analog_model = convert_to_analog(model, FloatingPointRPUConfig(), ensure_analog_root=False)
         self.assertEqual(analog_model.conv1.__class__, AnalogConv2d)
         self.assertEqual(analog_model.layer1.__class__, AnalogSequential)
         self.assertEqual(analog_model.layer1[0].conv1.__class__, AnalogConv2d)
 
+        new_model = convert_to_digital(analog_model)
+        for new_mod, mod in zip(new_model.modules(), model.modules()):
+            self.assertEqual(new_mod.__class__, mod.__class__)
+            if hasattr(mod, "weight"):
+                self.assertTensorAlmostEqual(new_mod.weight, mod.weight)
+            if hasattr(mod, "bias") and mod.bias is not None:
+                self.assertTensorAlmostEqual(new_mod.bias, mod.bias)
+
     def test_conversion_torchvision_alexnet(self):
         """Test converting resnet model from torchvision"""
-        model = alexnet()
         if self.use_cuda:
             raise SkipTest("Skipping for CUDA.")
 
-        analog_model = convert_to_analog(model, FloatingPointRPUConfig())
+        model = alexnet()
+        analog_model = convert_to_analog(model, FloatingPointRPUConfig(), ensure_analog_root=False)
         self.assertEqual(analog_model.features[0].__class__, AnalogConv2d)
         self.assertEqual(analog_model.classifier[6].__class__, AnalogLinear)
         self.assertEqual(analog_model.features.__class__, AnalogSequential)
+
+        new_model = convert_to_digital(analog_model)
+        for new_mod, mod in zip(new_model.modules(), model.modules()):
+            self.assertEqual(new_mod.__class__, mod.__class__)
+            if hasattr(mod, "weight"):
+                self.assertTensorAlmostEqual(new_mod.weight, mod.weight)
+            if hasattr(mod, "bias") and mod.bias is not None:
+                self.assertTensorAlmostEqual(new_mod.bias, mod.bias)

@@ -11,17 +11,16 @@
 # that they have been altered from the originals.
 
 """Analog layers."""
-from typing import Optional
+from typing import Optional, Type
 
 from torch import Tensor
 from torch.nn import Linear
 
-from aihwkit.nn.functions import AnalogFunction
-from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
-from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.nn.modules.base import AnalogLayerBase
+from aihwkit.simulator.parameters.base import RPUConfigBase
 
 
-class AnalogLinear(AnalogModuleBase, Linear):
+class AnalogLinear(AnalogLayerBase, Linear):
     """Linear layer that uses an analog tile.
 
     Linear layer that uses an analog tile during its forward, backward and
@@ -38,73 +37,68 @@ class AnalogLinear(AnalogModuleBase, Linear):
     Args:
         in_features: input vector size (number of columns).
         out_features: output vector size (number of rows).
-        rpu_config: resistive processing unit configuration.
         bias: whether to use a bias row on the analog tile or not.
-        realistic_read_write: whether to enable realistic read/write
             for setting initial weights and during reading of the weights.
-        weight_scaling_omega: depreciated, use
-            :class:`aihwkit.simulator.configs.utils.MappingParameter`
-            instead to specify weight scaling
+        rpu_config: resistive processing unit configuration.
+        tile_module_class: Class for the tile module (default
+            will be specified from the ``RPUConfig``).
     """
 
     # pylint: disable=abstract-method
-
-    __constants__ = [
-        "in_features",
-        "out_features",
-        "realistic_read_write",
-        "digital_bias",
-        "analog_bias",
-        "use_bias",
-    ]
-    in_features: int
-    out_features: int
-    realistic_read_write: bool
-    digital_bias: bool
-    analog_bias: bool
-    use_bias: bool
 
     def __init__(
         self,
         in_features: int,
         out_features: int,
         bias: bool = True,
-        rpu_config: Optional[RPUConfigAlias] = None,
-        realistic_read_write: bool = False,
-        weight_scaling_omega: Optional[bool] = None,
+        rpu_config: Optional[RPUConfigBase] = None,
+        tile_module_class: Optional[Type] = None,
     ):
-        # Call super() after tile creation, including ``reset_parameters``.
+        # Call super()
         Linear.__init__(self, in_features, out_features, bias=bias)
 
         # Create tile
         if rpu_config is None:
+            # pylint: disable=import-outside-toplevel
+            from aihwkit.simulator.configs.configs import SingleRPUConfig
+
             rpu_config = SingleRPUConfig()
 
-        rpu_config = self._set_weight_scaling_omega(rpu_config, weight_scaling_omega)
+        AnalogLayerBase.__init__(self)
 
-        AnalogModuleBase.__init__(
-            self, in_features, out_features, bias, realistic_read_write, rpu_config.mapping
-        )
-        self.analog_tile = self._setup_tile(rpu_config)
+        if tile_module_class is None:
+            tile_module_class = rpu_config.get_default_tile_module_class(out_features, in_features)
 
-        # Register tile
-        self.register_analog_tile(self.analog_tile)
-
-        # Set weights from the reset_parameters call
-        self.set_weights(self.weight, self.bias)
-
-        # Unregister weight/bias as a parameter but keep it as a
-        # field (needed for syncing still)
+        self.analog_module = tile_module_class(out_features, in_features, rpu_config, bias)
+        # Unregister weight/bias as a parameter.
         self.unregister_parameter("weight")
-        if self.analog_bias:
+        if bias:
             self.unregister_parameter("bias")
+        else:
+            # Seems to be a torch bug.
+            self._parameters.pop("bias", None)
+        self.bias = bias
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        """Reset the parameters (weight and bias)."""
+        if hasattr(self, "analog_module"):
+            bias = self.bias
+            self.weight, self.bias = self.get_weights()  # type: ignore
+            super().reset_parameters()
+            self.set_weights(self.weight, self.bias)  # type: ignore
+            self.weight, self.bias = None, bias
+
+    def forward(self, x_input: Tensor) -> Tensor:
+        """Compute the forward pass."""
+        # pylint: disable=arguments-differ, arguments-renamed
+
+        return self.analog_module(x_input)  # type: ignore
 
     @classmethod
     def from_digital(
-        cls,
-        module: Linear,
-        rpu_config: Optional[RPUConfigAlias] = None,
-        realistic_read_write: bool = False,
+        cls, module: Linear, rpu_config: RPUConfigBase, tile_module_class: Optional[Type] = None
     ) -> "AnalogLinear":
         """Return an AnalogLinear layer from a torch Linear layer.
 
@@ -113,46 +107,43 @@ class AnalogLinear(AnalogModuleBase, Linear):
                 defined in the ``conversion_map``.
             rpu_config: RPU config to apply to all converted tiles.
                 Applied to all converted tiles.
-            realistic_read_write: Whether to use closed-loop programming
-                when setting the weights. Applied to all converted tiles.
-
-                Note:
-                    Make sure that the weight max and min settings of the
-                    device support the desired analog weight range.
+            tile_module_class: Class of the underlying
+                `TileModule`. If not given, will select based on
+                the `MappingParameter` setting either
+                :class:`~aihwkit.simulator.tiles.base.TileModule` or
+                :class:`~aihwkit.simulator.tiles.array.TileModuleArray`
 
         Returns:
             an AnalogLinear layer based on the digital Linear ``module``.
         """
-        analog_module = cls(
+        analog_layer = cls(
             module.in_features,
             module.out_features,
             module.bias is not None,
             rpu_config,
-            realistic_read_write,
+            tile_module_class,
         )
 
-        analog_module.set_weights(module.weight, module.bias)
-        return analog_module
+        analog_layer.set_weights(module.weight, module.bias)
+        return analog_layer
 
-    def reset_parameters(self) -> None:
-        """Reset the parameters (weight and bias)."""
-        super().reset_parameters()
-        if self.analog_tile_count():
-            self.set_weights(self.weight, self.bias)
+    @classmethod
+    def to_digital(cls, module: "AnalogLinear", realistic: bool = False) -> "Linear":
+        """Return an nn.Linear layer from an AnalogLinear layer.
 
-    def forward(self, x_input: Tensor) -> Tensor:
-        """Compute the forward pass."""
-        # pylint: disable=arguments-differ, arguments-renamed
+        Args:
+            module: The analog module to convert.
+            realistic: whehter to estimate the weights with the
+                non-ideal forward pass. If not set, analog weights are
+                (unrealistically) copies exactly
 
-        out = AnalogFunction.apply(
-            self.analog_tile.get_analog_ctx(),
-            x_input,
-            self.analog_tile.shared_weights,
-            not self.training,
-        )
-
-        out = self.analog_tile.apply_out_scaling(out, (-1,))
-
-        if self.digital_bias:
-            return out + self.bias
-        return out
+        Returns:
+            an torch Linear layer with the same dimension and weights
+            as the analog linear layer.
+        """
+        weight, bias = module.get_weights(realistic=realistic)
+        digital_layer = Linear(module.in_features, module.out_features, bias is not None)
+        digital_layer.weight.data = weight.data
+        if bias is not None:
+            digital_layer.bias.data = bias.data
+        return digital_layer

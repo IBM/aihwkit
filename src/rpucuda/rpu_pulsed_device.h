@@ -86,10 +86,15 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   T corrupt_devices_range = std::numeric_limits<T>::max();
 
   T reset = (T)0.0; // mean
-  T reset_std = (T)0.0;
+  // T reset_std = (T)0.0;  from SimpleDevice
   T reset_dtod = (T)0.0;
 
+  bool adjust_bounds_with_up_down = false;
+  T adjust_bounds_with_up_down_dev = (T)0.0;
+
   T write_noise_std = (T)0.0;
+  bool apply_write_noise_on_set = true;
+  bool count_pulses = false; // whether to count the pulses. Some runtime penalty
 
   void printToStream(std::stringstream &ss) const override;
   using SimpleMetaParameter<T>::print;
@@ -110,7 +115,7 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
       RPU_FATAL("Device does not support write noise");
     }
     reset_dtod = MAX(reset_dtod, (T)0.0);
-    reset_std = MAX(reset_std, (T)0.0);
+    this->reset_std = MAX(this->reset_std, (T)0.0);
     reset = MAX(reset, (T)0.0);
   };
 };
@@ -176,11 +181,30 @@ public:
     return learning_rate;
   };
 
-  // called from the weight updater before the call to
-  // initUpdateCycle. Can be used to do some additional computation on
-  // the input
+  /* called from the weight updater before the call to
+     initUpdateCycle. Can be used to do some additional computation on
+     the input */
   virtual void
   initWithUpdateInput(const T *x_input, const int x_inc, const T *d_input, const int d_inc){};
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override {
+    SimpleRPUDevice<T>::dumpExtra(extra, prefix);
+
+    RPU::state_t state;
+    RPU::insert(state, "num_states", num_states_);
+    RPU::insert(state, "weight_granularity", weight_granularity_);
+
+    RPU::insertWithPrefix(extra, state, prefix);
+  };
+
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override {
+    SimpleRPUDevice<T>::loadExtra(extra, prefix, strict);
+
+    auto state = RPU::selectWithPrefix(extra, prefix);
+
+    RPU::load(state, "num_states", num_states_, strict);
+    RPU::load(state, "weight_granularity", weight_granularity_, strict);
+  };
 
 protected:
   inline void setWeightGranularity(T weight_granularity) {
@@ -268,6 +292,9 @@ public:
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
   virtual void resetAtIndices(T **weights, std::vector<int> x_major_indices, RealWorldRNG<T> &rng);
   void copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> *rpu_device) override;
+
+  using PulsedRPUDeviceBase<T>::dumpExtra;
+  using PulsedRPUDeviceBase<T>::loadExtra;
 
 protected:
   void populate(const PulsedRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);

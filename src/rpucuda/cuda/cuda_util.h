@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "cuda_buffer.h"
 #include "utility_functions.h"
 
 #include <iostream>
@@ -184,9 +185,9 @@
   for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i += blockDim.x * gridDim.x)
 
 #define RPU_THREADS_PER_BLOCK 512
-#define RPU_THREADS_PER_BLOCK_UPDATE 512
+#define RPU_THREADS_PER_BLOCK_UPDATE 256
 #define RPU_MAX_RAND_STATE_SIZE 10000
-#define RPU_UPDATE_BLOCKS_PER_SM 1.1
+#define RPU_UPDATE_BLOCKS_PER_SM 8.1
 
 #define RPU_GEN_IITER_TEMPLATES(NUM_T, OUT_T, FUNC, ARGS)                                          \
   template OUT_T FUNC(const NUM_T *ARGS);                                                          \
@@ -251,37 +252,9 @@ private:
 };
 
 template <typename T> class CudaArray;
+
 class CudaContext;
 typedef CudaContext *CudaContextPtr;
-
-template <typename T> class CudaBuffer {
-public:
-  CudaBuffer(){};
-  CudaBuffer(const CudaBuffer<T> &);
-  CudaBuffer &operator=(const CudaBuffer<T> &);
-  CudaBuffer(CudaBuffer<T> &&);
-  CudaBuffer<T> &operator=(CudaBuffer<T> &&);
-  ~CudaBuffer() = default;
-
-  friend void swap(CudaBuffer<T> &a, CudaBuffer<T> &b) noexcept {
-    using std::swap;
-    const std::lock_guard<std::recursive_mutex> locka(a.mutex_);
-    const std::lock_guard<std::recursive_mutex> lockb(b.mutex_);
-    swap(a.buffer_, b.buffer_);
-  }
-
-  T *get(CudaContextPtr context, int size);
-  void release();
-
-  const CudaArray<T> *getCudaArray() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
-    return &*buffer_;
-  };
-
-private:
-  std::unique_ptr<CudaArray<T>> buffer_ = nullptr;
-  std::recursive_mutex mutex_;
-};
 
 class CudaContext : public std::enable_shared_from_this<CudaContext>, public Context {
 
@@ -320,11 +293,12 @@ public:
 
     swap(a.shared_random_states_, b.shared_random_states_);
     swap(a.shared_float_buffer_, b.shared_float_buffer_);
+#ifdef RPU_USE_DOUBLE
     swap(a.shared_double_buffer_, b.shared_double_buffer_);
-
+    swap(a.double_buffer_, b.double_buffer_);
+#endif
     swap(a.random_states_, b.random_states_);
     swap(a.float_buffer_, b.float_buffer_);
-    swap(a.double_buffer_, b.double_buffer_);
   }
 
   void synchronizeDevice() const;
@@ -402,10 +376,11 @@ private:
   std::vector<std::unique_ptr<CudaArray<curandState_t>>> shared_random_states_ = {};
   std::vector<std::unique_ptr<CudaArray<curandState_t>>> random_states_ = {};
   std::vector<std::vector<CudaBuffer<float>>> shared_float_buffer_ = {};
-  std::vector<std::vector<CudaBuffer<double>>> shared_double_buffer_ = {};
   std::vector<std::vector<CudaBuffer<float>>> float_buffer_ = {};
+#ifdef RPU_USE_DOUBLE
+  std::vector<std::vector<CudaBuffer<double>>> shared_double_buffer_ = {};
   std::vector<std::vector<CudaBuffer<double>>> double_buffer_ = {};
-
+#endif
   void init();
 };
 
@@ -448,6 +423,7 @@ public:
 
   void copyTo(T *host_array) const;
   void copyTo(std::vector<T> &host_vector) const;
+  std::vector<T> cpu() const;
 
   void setConst(T set_value);
 
@@ -479,9 +455,9 @@ private:
   CudaContextPtr context_ = nullptr;
 };
 
+/****************************************************/
 void resetCuda(int gpu_id = -1);
 
-// helper for random init
 void curandSetup(CudaArray<curandState_t> &, unsigned long long rseed = 0, bool same_seed = false);
 void curandSetup(
     CudaContextPtr c,
@@ -489,5 +465,9 @@ void curandSetup(
     int n,
     unsigned long long rseed = 0,
     bool same_seed = false);
+
+/* state helper functions*/
+template <typename T>
+void load(CudaContextPtr context, RPU::state_t &state, std::string key, T &value, bool strict);
 
 } // namespace RPU

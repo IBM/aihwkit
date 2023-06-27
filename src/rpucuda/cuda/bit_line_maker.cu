@@ -1253,10 +1253,10 @@ template <typename T>
 BitLineMaker<T>::BitLineMaker(CudaContextPtr c, int x_size, int d_size)
     : context_{c}, x_size_{x_size}, d_size_{d_size}, umh_{nullptr}, buffer_m_batch_{0} {
 
-  max_block_count_ =
-      context_->getSMCount() * (context_->maxThreadsPerSM() / RPU_THREADS_PER_BLOCK_UPDATE);
+  int nthreads_default = MIN(context_->maxThreadsPerBlock(), RPU_THREADS_PER_BLOCK_UPDATE);
+  max_block_count_ = context_->getSMCount() * (context_->maxThreadsPerSM() / nthreads_default);
 
-  nthreads_ = RPU_THREADS_PER_BLOCK_UPDATE;
+  nthreads_ = nthreads_default;
 }
 
 template <typename T>
@@ -2006,6 +2006,15 @@ void BitLineMaker<T>::makeCounts(
     RPU_FATAL("PulseType not supported by BitLineMaker");
   }
 };
+
+template <typename T>
+void BitLineMaker<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  // does not handle the counts.. assumimg that BLM will be called for each sample / batch
+  // does not handle umh
+}
+
+template <typename T>
+void BitLineMaker<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {}
 
 template class BitLineMaker<float>;
 #ifdef RPU_USE_DOUBLE

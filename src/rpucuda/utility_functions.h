@@ -15,6 +15,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string.h>
+#include <unordered_map>
+#include <vector>
 
 #define UNUSED(X) (void)X
 
@@ -91,6 +93,17 @@
 
 namespace RPU {
 
+using state_t = std::unordered_map<std::string, std::vector<double>>;
+
+/* state helper functions */
+template <typename T_VEC>
+void load(RPU::state_t &state, std::string key, T_VEC &value, bool strict);
+template <typename T_VEC> void insert(RPU::state_t &state, std::string key, const T_VEC &value);
+
+void insertWithPrefix(RPU::state_t &extra, const RPU::state_t &state, std::string prefix);
+RPU::state_t selectWithPrefix(const RPU::state_t &extra, std::string prefix);
+
+/* Context class */
 class Context {
 public:
   virtual ~Context() = default;

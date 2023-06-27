@@ -184,7 +184,7 @@ __global__ void kernelModifyWeightsMultNormal(
                      new_weights[i] = w * (1 + stddev * stoch_value););
 }
 
-template <typename T>
+template <typename T, bool preserve_sign>
 __global__ void kernelModifyWeightsProgNoiseN(
     int size_in,
     int d_size,
@@ -206,9 +206,9 @@ __global__ void kernelModifyWeightsProgNoiseN(
       true,
 
       T w = weights[i];
-      T stoch_value = curand_normal(&local_state);
+      T stoch_value = curand_normal(&local_state); T aw = fabs(w) / amax;
 
-      T aw = fabs(w) / amax; T paw = 1; T sig = coeffs[0];
+      T paw = 1; T sig = coeffs[0];
 
       for (int j = 1; j < n_coeffs; j++) {
         paw *= aw;
@@ -216,10 +216,14 @@ __global__ void kernelModifyWeightsProgNoiseN(
       }
 
       sig *= stddev;
-      new_weights[i] = w + amax * sig * stoch_value;);
+      T out_w = w + amax * sig * stoch_value;
+
+      if (preserve_sign) { new_weights[i] = (w < (T)0.0) ? -fabs(out_w) : fabs(out_w); } else {
+        new_weights[i] = out_w;
+      });
 }
 
-template <typename T>
+template <typename T, bool preserve_sign>
 __global__ void kernelModifyWeightsProgNoise(
     int size_in,
     int d_size,
@@ -242,13 +246,19 @@ __global__ void kernelModifyWeightsProgNoise(
   const T p1 = p1_in;
   const T p2 = p2_in;
 
-  RPU_WM_KERNEL_LOOP(true,
+  RPU_WM_KERNEL_LOOP(
+      true,
 
-                     T w = weights[i];
-                     T stoch_value = curand_normal(&local_state);
+      T w = weights[i];
+      T stoch_value = curand_normal(&local_state);
 
-                     T aw = fabs(w) / amax; T sig = (p0 + aw * p1 + aw * aw * p2) * stddev;
-                     new_weights[i] = w + amax * sig * stoch_value;);
+      T aw = fabs(w) / amax;
+
+      T sig = (p0 + aw * p1 + aw * aw * p2) * stddev; T out_w = w + amax * sig * stoch_value;
+
+      if (preserve_sign) { new_weights[i] = (w < (T)0.0) ? -fabs(out_w) : fabs(out_w); } else {
+        new_weights[i] = out_w;
+      });
 }
 
 template <typename T>
@@ -295,6 +305,12 @@ void WeightModifierCuda<T>::apply(
     }
     amaximizer_->compute(weights, 1, false);
     amax = amaximizer_->getMaxValues();
+  }
+
+  if (wmpar.type != WeightModifierType::Copy) {
+    if (wmpar.per_batch_sample) {
+      RPU_FATAL("Per batch sample is not implemented in RPUCuda");
+    }
   }
 
   // note: all methods need to work in
@@ -359,8 +375,7 @@ void WeightModifierCuda<T>::apply(
     if (wmpar.std_dev > 0 && n_coeffs > 0) {
 
       if (n_coeffs <= 3) {
-
-        kernelModifyWeightsProgNoise<T><<<nblocks, nthreads, 0, s>>>(
+        kernelModifyWeightsProgNoise<T, false><<<nblocks, nthreads, 0, s>>>(
             size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev,
             wmpar.coeffs.at(0), (n_coeffs > 1) ? wmpar.coeffs.at(1) : (T)0.0,
             (n_coeffs > 2) ? wmpar.coeffs.at(2) : (T)0.0, wmpar.assumed_wmax, amax,
@@ -378,7 +393,7 @@ void WeightModifierCuda<T>::apply(
           coeffs_ = wmpar.coeffs;
         }
 
-        kernelModifyWeightsProgNoiseN<T><<<nblocks, nthreads, 0, s>>>(
+        kernelModifyWeightsProgNoiseN<T, false><<<nblocks, nthreads, 0, s>>>(
             size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev, n_coeffs,
             dev_coeffs_->getData(), wmpar.assumed_wmax, amax,
             context_->getRandomStates(nblocks * nthreads));
@@ -387,6 +402,42 @@ void WeightModifierCuda<T>::apply(
     }
     break;
   }
+
+  case WeightModifierType::ProgNoise: {
+    int n_coeffs = wmpar.coeffs.size();
+    if (wmpar.std_dev > 0 && n_coeffs > 0) {
+
+      T std = wmpar.std_dev / wmpar.g_max;
+
+      if (n_coeffs <= 3) {
+        kernelModifyWeightsProgNoise<T, true><<<nblocks, nthreads, 0, s>>>(
+            size_, d_size_, wmpar.copy_last_column, new_weights, weights, std, wmpar.coeffs.at(0),
+            (n_coeffs > 1) ? wmpar.coeffs.at(1) : (T)0.0,
+            (n_coeffs > 2) ? wmpar.coeffs.at(2) : (T)0.0, wmpar.assumed_wmax, amax,
+            context_->getRandomStates(nblocks * nthreads));
+
+      } else {
+        // n-poly
+
+        if (wmpar.coeffs.size() != coeffs_.size() || dev_coeffs_ == nullptr) {
+          dev_coeffs_ = RPU::make_unique<CudaArray<T>>(context_, n_coeffs, wmpar.coeffs.data());
+          coeffs_ = wmpar.coeffs;
+          context_->synchronize();
+        } else if (coeffs_ != wmpar.coeffs) {
+          dev_coeffs_->assign(wmpar.coeffs.data());
+          coeffs_ = wmpar.coeffs;
+        }
+
+        kernelModifyWeightsProgNoiseN<T, true><<<nblocks, nthreads, 0, s>>>(
+            size_, d_size_, wmpar.copy_last_column, new_weights, weights, std, n_coeffs,
+            dev_coeffs_->getData(), wmpar.assumed_wmax, amax,
+            context_->getRandomStates(nblocks * nthreads));
+      }
+      done = true;
+    }
+    break;
+  }
+
   case WeightModifierType::DiscretizeAddNormal: {
     if (wmpar.res > 0 || wmpar.std_dev > 0) {
 
@@ -417,6 +468,30 @@ void WeightModifierCuda<T>::apply(
         size_, d_size_, wmpar.copy_last_column, new_weights, new_weights, wmpar.pdrop,
         context_->getRandomStates(nblocks * nthreads));
   }
+}
+
+template <typename T>
+void WeightModifierCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+
+  // don't handle maximizers (no states)
+  RPU::insert(state, "enable_during_test", enable_during_test_);
+  RPU::insert(state, "coeffs", coeffs_);
+  RPU::insert(state, "dev_coeffs", dev_coeffs_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void WeightModifierCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  using V = std::vector<T>;
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "enable_during_test", enable_during_test_, strict);
+  RPU::load(state, "coeffs", coeffs_, strict);
+  RPU::load(this->context_, state, "dev_coeffs", dev_coeffs_, strict);
 }
 
 template class WeightModifierCuda<float>;

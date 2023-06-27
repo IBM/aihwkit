@@ -386,6 +386,8 @@ my_rpu_config.mapping.out_scaling_columnwise = True
 my_rpu_config.mapping.learn_out_scaling = True
 my_rpu_config.mapping.weight_scaling_omega = 1.0
 my_rpu_config.mapping.weight_scaling_columnwise = False
+my_rpu_config.mapping.max_input_size = 512
+my_rpu_config.mapping.max_output_size = 512
 
 my_rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
 my_rpu_config.remap.type = WeightRemapType.CHANNELWISE_SYMMETRIC

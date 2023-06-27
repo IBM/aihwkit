@@ -167,8 +167,8 @@ class PulseType(Enum):
 class WeightModifierType(Enum):
     """Weight modifier type."""
 
-    COPY = "Copy"
-    """Just copy, however, could also drop."""
+    NONE = "None"
+    """No weight modifier. Nothing happens to the weight. """
 
     DISCRETIZE = "Discretize"
     """Quantize the weights."""
@@ -194,6 +194,25 @@ class WeightModifierType(Enum):
     c_N w_{ij}^N/\omega^N)`, where :math:`omega` is either the actual
     max weight (if ``rel_to_actual_wmax`` is set) or the value
     ``assumed_wmax``.
+    """
+
+    PROG_NOISE = "ProgNoise"
+    """Programming noise model added to the weight matrix during
+    training. Same as "POLY", except that weights are ensured to keep
+    the sign with noise mirrored at zero.
+    """
+
+    DROP_CONNECT = "DropConnect"
+    """Drop connect.
+
+    Note that if "pdrop > 0" this is applied. It drop connect can be
+    applied in conjunction to other modifiers as well.
+    """
+
+    COPY = "Copy"
+    """Legacy. No explicit weight modifier, however, pdrop is still observed.
+
+    Use DROP_CONNECT or NONE instead.
     """
 
 

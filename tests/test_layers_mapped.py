@@ -64,8 +64,11 @@ class MappedLayerLinearTest(ParametrizedTestCase):
 
     def get_mapped_model(self, model, rpu_config):
         """Returns the mapped model"""
+        weight, bias = model.weight, model.bias
+        model.weight, model.bias = model.get_weights()
         mapped_model = self.get_mapped_class(model).from_digital(model, rpu_config=rpu_config)
         mapped_model.reset_parameters()  # should set it explicitly below
+        model.weight, model.bias = weight, bias
         return mapped_model
 
     def get_image_size(self, model):
@@ -131,8 +134,6 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         batch_size = 10
 
         rpu_config = self.get_rpu_config()
-        rpu_config.mapping.max_input_size = 10
-        rpu_config.mapping.max_output_size = 6
 
         model = self.get_layer(in_features, out_features, rpu_config=rpu_config)
         weight, bias = model.get_weights()
@@ -141,6 +142,9 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         if self.bias:
             bias = randn(*bias.shape)
         model.set_weights(weight, bias)
+
+        rpu_config.mapping.max_input_size = 10
+        rpu_config.mapping.max_output_size = 6
 
         mapped_model = self.get_mapped_model(model, rpu_config)
         mapped_model.set_weights(weight, bias)
@@ -155,7 +159,7 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         if self.use_cuda:
             out_vectors = out_vectors.cuda()
 
-        # compare predictions for analog linear and analog spit linear layers
+        # compare predictions for analog linear and analog split linear layers
         self.assertTensorAlmostEqual(model(in_vectors), mapped_model(in_vectors), decimal=DECIMAL)
 
         # Define an analog-aware optimizer, preparing it for using the layers.
@@ -176,8 +180,6 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         batch_size = 10
 
         rpu_config = self.get_rpu_config()
-        rpu_config.mapping.max_input_size = 10
-        rpu_config.mapping.max_output_size = 4
 
         model = self.get_layer(in_features, out_features, rpu_config=rpu_config)
         weight, bias = model.get_weights()
@@ -186,6 +188,9 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         if self.bias:
             bias = randn(*bias.shape)
         model.set_weights(weight, bias)
+
+        rpu_config.mapping.max_input_size = 10
+        rpu_config.mapping.max_output_size = 4
 
         mapped_model = self.get_mapped_model(model, rpu_config)
         mapped_model.set_weights(weight, bias)
@@ -214,8 +219,6 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         self.assertTensorAlmostEqual(new_weight, weight, decimal=DECIMAL)
         if self.bias:
             self.assertTensorAlmostEqual(new_bias, bias, decimal=DECIMAL)
-            self.assertTensorAlmostEqual(model.bias, bias, decimal=DECIMAL)
-            self.assertTensorAlmostEqual(mapped_model.bias, bias, decimal=DECIMAL)
 
         for new_tile, tile in zip(
             list(new_model.analog_tiles()), list(mapped_model.analog_tiles())

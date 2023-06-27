@@ -70,9 +70,11 @@ if cuda.is_compiled():
 opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
-print(model.analog_tile.tile)
+print(next(model.analog_tiles()).tile)
 
 for epoch in range(100):
+    # Delete old gradient
+    opt.zero_grad()
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.
@@ -81,6 +83,7 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
+
     print("Loss error: {:.16f}".format(loss))
 
 model.eval()
@@ -97,7 +100,7 @@ for t_inference in [0.0, 1.0, 20.0, 1000.0, 1e5]:
     print(
         "Prediction after drift (t={}, correction={:1.3f}):\t {}".format(
             t_inference,
-            model.analog_tile.alpha.cpu().numpy(),
+            next(model.analog_tiles()).alpha.cpu().numpy(),
             pred_drift.detach().cpu().numpy().flatten(),
         )
     )

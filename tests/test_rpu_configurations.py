@@ -15,7 +15,7 @@ from sys import version_info
 from unittest import SkipTest
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.utils import IOParameters, UpdateParameters
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -71,9 +71,9 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
         tile = self.get_tile(11, 22, rpu_config).tile
 
         # Assert over the parameters in the binding objects.
-        parameters = tile.get_parameters()
-        self.assertAlmostEqual(parameters.diffusion, 1.23, places=4)
-        self.assertAlmostEqual(parameters.lifetime, 4.56, places=4)
+        config = tile.get_meta_parameters()
+        self.assertAlmostEqual(config.diffusion, 1.23, places=4)
+        self.assertAlmostEqual(config.lifetime, 4.56, places=4)
 
 
 @parametrize_over_tiles(
@@ -135,7 +135,7 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         rpu_config.device.lifetime = 4.56
         rpu_config.device.construction_seed = 192
 
-        # TODO: don't assert over tile.get_parameters() as some of them might
+        # TODO: don't assert over tile.get_meta_parameters() as some of them might
         # not be present.
         _ = self.get_tile(11, 22, rpu_config).tile
 
@@ -150,10 +150,10 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         tile = self.get_tile(11, 22, rpu_config).tile
 
         # Assert over the parameters in the binding objects.
-        parameters = tile.get_parameters()
-        self.assertAlmostEqual(parameters.forward_io.inp_noise, 0.321)
-        self.assertAlmostEqual(parameters.backward_io.inp_noise, 0.456)
-        self.assertAlmostEqual(parameters.update.desired_bl, 78)
+        config = tile.get_meta_parameters()
+        self.assertAlmostEqual(config.forward_io.inp_noise, 0.321)
+        self.assertAlmostEqual(config.backward_io.inp_noise, 0.456)
+        self.assertAlmostEqual(config.update.desired_bl, 78)
 
     def test_construction_seed(self):
         """Test the construction seed leads to the same tile values."""

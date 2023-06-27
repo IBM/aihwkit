@@ -37,10 +37,10 @@ job_compile_common: &job_compile_common
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
     - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
+    - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt	
     # Install the package in editable mode.
     - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization, fitting]"
   script:
-    - $PYTHON_EXECUTABLE -m pip install "parameterized==0.7.4"
     - make pytest
 
 build_deploy_common: &build_deploy_common
@@ -69,7 +69,6 @@ jobs:
     stage: Test and lint
     python: "3.10"
     script:
-      - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
       - make pycodestyle
       - make pylint
       - make mypy

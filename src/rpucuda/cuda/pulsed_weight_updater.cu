@@ -42,6 +42,35 @@ PulsedWeightUpdater<T>::PulsedWeightUpdater(CudaContextPtr c, int x_size, int d_
 };
 
 template <typename T>
+void PulsedWeightUpdater<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPU::state_t state;
+  context_->synchronize();
+
+  RPU::insert(state, "is_async_update", is_async_update_);
+  RPU::insert(state, "update_count", update_count_);
+  RPU::insert(state, "verbose", verbose_);
+
+  blm_->dumpExtra(state, "blm");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void PulsedWeightUpdater<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  context_->synchronize();
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "is_async_update", is_async_update_, strict);
+  RPU::load(state, "update_count", update_count_, strict);
+  RPU::load(state, "verbose", verbose_, strict);
+
+  blm_->loadExtra(state, "blm", strict);
+}
+
+template <typename T>
 pwukpvec_t<T> PulsedWeightUpdater<T>::getValidUpdateKernels(
     PulsedRPUDeviceCudaBase<T> *rpucuda_device,
     int m_batch,
@@ -234,7 +263,6 @@ void PulsedWeightUpdater<T>::doFPupdate(
         -lr, d_out, d_trans ? m_batch : d_size_, x_out, x_trans ? m_batch : x_size_, beta,
         dev_weights, d_size_);
   }
-
   context_->template releaseSharedBuffer<T>(RPU_BUFFER_IN);
   context_->template releaseSharedBuffer<T>(RPU_BUFFER_OUT);
 }

@@ -15,33 +15,34 @@
 from typing import Any, Optional, Tuple
 
 from torch import Tensor, empty_like
-from torch.autograd import Function
+from torch.autograd import Function, no_grad
 from aihwkit.optim.context import AnalogContext
 
 
-class AnalogFunctionBase(Function):
-    """Base function for analog functions."""
+class AnalogFunction(Function):
+    """Function for analog functions."""
 
     # pylint: disable=arguments-differ, protected-access, abstract-method
 
     @staticmethod
+    @no_grad()
     def forward(
         ctx: Any,
         analog_ctx: AnalogContext,
+        analog_tile: Any,
         input_: Tensor,
         shared_weights: Optional[Tensor] = None,
         is_test: bool = False,
     ) -> Tensor:
         """Execute the forward pass in the analog tile.
-
         Note: Indexed versions can used when analog_ctx.use_indexed is
         set to True.
         """
         # Store in context for using during `backward()`.
-        analog_tile = analog_ctx.analog_tile
         ctx.analog_ctx = analog_ctx
+        ctx.analog_tile = analog_tile
         ctx.shared_weights = None
-        ctx.save_for_backward(input_)
+        ctx.saved_analog_tensors = [input_]
 
         use_indexed = analog_ctx.use_indexed
         if shared_weights is not None:
@@ -53,17 +54,26 @@ class AnalogFunctionBase(Function):
 
         # Invoke the forward pass in the tile instance.
         if use_indexed:
-            return analog_tile.forward_indexed(input_, is_test, ctx)
-        return analog_tile.forward(input_, is_test, ctx)
+            out = analog_tile.joint_forward_indexed(input_, is_test, ctx)
+        else:
+            out = analog_tile.joint_forward(input_, is_test, ctx)
+
+        ctx.save_for_backward(*ctx.saved_analog_tensors)
+        ctx.saved_analog_tensors = []
+        return out
 
     @staticmethod
+    @no_grad()
     def backward(
         ctx: Any, grad_output: Tensor
-    ) -> Tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor], Optional[Tensor]]:
+    ) -> Tuple[
+        Optional[Tensor], Optional[Tensor], Optional[Tensor], Optional[Tensor], Optional[Tensor]
+    ]:
         """Execute the backward pass in the analog tile."""
         analog_ctx = ctx.analog_ctx
-        analog_tile = analog_ctx.analog_tile
-        input_ = ctx.saved_tensors[0]
+        analog_tile = ctx.analog_tile
+        ctx.saved_analog_tensors = ctx.saved_tensors
+        input_ = ctx.saved_analog_tensors[0]
 
         shared_weights_grad = None
         use_indexed = analog_ctx.use_indexed
@@ -91,40 +101,5 @@ class AnalogFunctionBase(Function):
             analog_ctx.analog_input.append(input_)
             analog_ctx.analog_grad_output.append(grad_output)
 
-        return None, grad_input, shared_weights_grad, None
-
-
-class AnalogFunction(AnalogFunctionBase):
-    """Function that delegates into a `RPU` unit."""
-
-    # pylint: disable=arguments-differ, abstract-method
-
-    @staticmethod
-    def forward(
-        ctx: Any,
-        analog_ctx: AnalogContext,
-        input_: Tensor,
-        shared_weights: Optional[Tensor] = None,
-        is_test: bool = False,
-    ) -> Tensor:
-        """Execute the forward pass in the analog tile."""
-        analog_ctx.use_indexed = False
-        return AnalogFunctionBase.forward(ctx, analog_ctx, input_, shared_weights, is_test)
-
-
-class AnalogIndexedFunction(AnalogFunctionBase):
-    """Function that delegates into a `RPU` unit to use the indexed forward/backward/update."""
-
-    # pylint: disable=arguments-differ, abstract-method
-
-    @staticmethod
-    def forward(
-        ctx: Any,
-        analog_ctx: AnalogContext,
-        input_: Tensor,
-        shared_weights: Optional[Tensor] = None,
-        is_test: bool = False,
-    ) -> Tensor:
-        """Execute the forward pass in the analog tile."""
-        analog_ctx.use_indexed = True
-        return AnalogFunctionBase.forward(ctx, analog_ctx, input_, shared_weights, is_test)
+        ctx.saved_analog_tensors = []
+        return None, None, grad_input, shared_weights_grad, None

@@ -12,6 +12,8 @@
 
 """Tests for layer abstractions."""
 
+from unittest import SkipTest
+
 from torch import randn
 from torch.nn import (
     Conv1d as torch_Conv1d,
@@ -23,7 +25,7 @@ from torch.nn.functional import mse_loss
 
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
+from aihwkit.simulator.parameters.utils import (
     MappingParameter,
     IOParameters,
     WeightModifierParameter,
@@ -36,7 +38,7 @@ from aihwkit.nn.conversion import convert_to_analog
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv1d, Conv1dCuda, Conv2d, Conv2dCuda, Conv3d, Conv3dCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, Inference
+from .helpers.tiles import FloatingPoint, Inference, TorchInference, Custom
 
 
 class ConvolutionLayerTest(ParametrizedTestCase):
@@ -61,7 +63,7 @@ class ConvolutionLayerTest(ParametrizedTestCase):
     def set_weights_from_digital_model(self, analog_model, digital_model):
         """Set the analog model weights based on the digital model."""
         weights, biases = self.get_weights_from_digital_model(analog_model, digital_model)
-        analog_model.set_weights(weights, biases, force_exact=True)
+        analog_model.set_weights(weights, biases)
 
     @staticmethod
     def get_weights_from_digital_model(analog_model, digital_model):
@@ -80,7 +82,7 @@ class ConvolutionLayerTest(ParametrizedTestCase):
     @staticmethod
     def get_weights_from_analog_model(analog_model):
         """Set the analog model weights based on the digital model."""
-        weights, biases = analog_model.get_weights(force_exact=True)
+        weights, biases = analog_model.get_weights()
         return weights, biases
 
     @staticmethod
@@ -277,19 +279,22 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        analog_tile_0 = next(analog_model[0].analog_tiles())
+        analog_tile_1 = next(analog_model[1].analog_tiles())
+
+        initial_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
         self.assertEqual(initial_out_scaling_0.numel(), 1)
         self.assertEqual(initial_out_scaling_1.numel(), 1)
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_0.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_out_scaling_learning_columnwise(self):
@@ -317,17 +322,20 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        analog_tile_0 = next(analog_model[0].analog_tiles())
+        analog_tile_1 = next(analog_model[1].analog_tiles())
+
+        initial_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_0.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_layer_instantiation(self):
@@ -335,10 +343,10 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
         model = self.get_layer(in_channels=2, out_channels=3, kernel_size=4)
 
         # Assert the number of elements of the weights.
-        tile_weights, tile_biases = model.analog_tile.get_weights()
+        tile_weights, tile_biases = model.get_weights()
 
         self.assertEqual(tile_weights.numel(), 2 * 3 * 4)
-        if model.analog_bias:
+        if next(model.analog_tiles()).analog_bias:
             self.assertEqual(tile_biases.numel(), 3)
 
 
@@ -368,7 +376,7 @@ class Convolution1dLayerTestInference(ConvolutionLayerTest):
 
 @parametrize_over_layers(
     layers=[Conv2d, Conv2dCuda],
-    tiles=[FloatingPoint, Inference],
+    tiles=[FloatingPoint, Inference, TorchInference, Custom],
     biases=["analog", "digital", None],
 )
 class Convolution2dLayerTest(ConvolutionLayerTest):
@@ -396,6 +404,9 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
     def test_torch_original_layer_indexed(self):
         """Test a single layer, having the digital layer as reference."""
         # This tests the forward pass
+        if not self.get_rpu_config().tile_class.supports_indexed:
+            raise SkipTest("Indexed not supported")
+
         model = self.get_digital_layer(in_channels=2, out_channels=3, kernel_size=4, padding=2)
         x = randn(3, 2, 4, 4)
 
@@ -511,17 +522,20 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        analog_tile_0 = next(analog_model[0].analog_tiles())
+        analog_tile_1 = next(analog_model[1].analog_tiles())
+
+        initial_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_0.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_out_scaling_learning_columnwise(self):
@@ -549,17 +563,20 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        analog_tile_0 = next(analog_model[0].analog_tiles())
+        analog_tile_1 = next(analog_model[1].analog_tiles())
+
+        initial_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
-        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_0.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_layer_instantiation(self):
@@ -567,14 +584,16 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         model = self.get_layer(in_channels=2, out_channels=3, kernel_size=4)
 
         # Assert the number of elements of the weights.
-        tile_weights, tile_biases = model.analog_tile.get_weights()
+        tile_weights, tile_biases = model.get_weights()
 
         self.assertEqual(tile_weights.numel(), 2 * 3 * 4 * 4)
-        if model.analog_bias:
+        if next(model.analog_tiles()).analog_bias:
             self.assertEqual(tile_biases.numel(), 3)
 
 
-@parametrize_over_layers(layers=[Conv2d, Conv2dCuda], tiles=[Inference], biases=["digital"])
+@parametrize_over_layers(
+    layers=[Conv2d, Conv2dCuda], tiles=[Inference, TorchInference], biases=["digital"]
+)
 class Convolution2dLayerTestInference(ConvolutionLayerTest):
     """Tests for AnalogConv2d layer specific for infernence."""
 
@@ -705,20 +724,23 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        analog_tile_0 = next(analog_model[0].analog_tiles())
+        analog_tile_1 = next(analog_model[1].analog_tiles())
+
+        initial_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
         self.assertEqual(initial_out_scaling_0.numel(), 1)
-        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_0.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
 
         self.assertEqual(initial_out_scaling_1.numel(), 1)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_out_scaling_learning_columnwise(self):
@@ -744,20 +766,23 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
             y_b = y_b.cuda()
             x_b = x_b.cuda()
 
-        initial_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        initial_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        analog_tile_0 = next(analog_model[0].analog_tiles())
+        analog_tile_1 = next(analog_model[1].analog_tiles())
+
+        initial_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        initial_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
         self.train_model(analog_model, loss_func, x_b, y_b)
 
-        learned_out_scaling_0 = analog_model[0].analog_tile.get_learned_out_scales().clone()
-        learned_out_scaling_1 = analog_model[1].analog_tile.get_learned_out_scales().clone()
+        learned_out_scaling_0 = analog_tile_0.get_learned_out_scales().clone()
+        learned_out_scaling_1 = analog_tile_1.get_learned_out_scales().clone()
 
         self.assertGreaterEqual(initial_out_scaling_0.numel(), 1)
-        self.assertIsNotNone(analog_model[0].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_0.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_0, learned_out_scaling_0)
 
         self.assertGreaterEqual(initial_out_scaling_1.numel(), 1)
-        self.assertIsNotNone(analog_model[1].analog_tile.get_learned_out_scales().grad)
+        self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
     def test_layer_instantiation(self):
@@ -765,10 +790,10 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
         model = self.get_layer(in_channels=2, out_channels=3, kernel_size=4)
 
         # Assert the number of elements of the weights.
-        tile_weights, tile_biases = model.analog_tile.get_weights()
+        tile_weights, tile_biases = model.get_weights()
 
         self.assertEqual(tile_weights.numel(), 2 * 3 * 4 * 4 * 4)
-        if model.analog_bias:
+        if next(model.analog_tiles()).analog_bias:
             self.assertEqual(tile_biases.numel(), 3)
 
 

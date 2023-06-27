@@ -184,6 +184,53 @@ template <typename T> void ChoppedWeightOutput<T>::printToStream(std::stringstre
   ss << std::endl;
 };
 
+template <typename T>
+void ChoppedWeightOutput<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+
+  // don't handle maximizers (no states)
+  RPU::insert(state, "current_m_batch", current_m_batch_);
+  RPU::insert(state, "cwo_counter", cwo_counter_);
+  RPU::insert(state, "nwo_counter", nwo_counter_);
+  RPU::insert(state, "flexible_in_size", flexible_in_size_);
+  RPU::insert(state, "swapped_choppers", swapped_choppers_);
+  RPU::insert(state, "dev_switching_probs", dev_switching_probs_);
+  RPU::insert(state, "dev_weight_output_out_chopper", dev_weight_output_out_chopper_);
+  RPU::insert(state, "dev_weight_output_in_chopper", dev_weight_output_in_chopper_);
+  RPU::insert(state, "dev_weight_output_signals", dev_weight_output_signals_);
+  RPU::insert(state, "dev_x_chopper_buffer_1", dev_x_chopper_buffer_1_);
+  RPU::insert(state, "dev_x_chopper_buffer_2", dev_x_chopper_buffer_2_);
+  RPU::insert(state, "dev_d_chopper_buffer_1", dev_d_chopper_buffer_1_);
+  RPU::insert(state, "dev_d_chopper_buffer_2", dev_d_chopper_buffer_2_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void ChoppedWeightOutput<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  using V = std::vector<T>;
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "current_m_batch", current_m_batch_, strict);
+  RPU::load(state, "cwo_counter", cwo_counter_, strict);
+  RPU::load(state, "nwo_counter", nwo_counter_, strict);
+  RPU::load(state, "flexible_in_size", flexible_in_size_, strict);
+  RPU::load(state, "swapped_choppers", swapped_choppers_, strict);
+  RPU::load(this->context_, state, "dev_switching_probs", dev_switching_probs_, strict);
+  RPU::load(
+      this->context_, state, "dev_weight_output_out_chopper", dev_weight_output_out_chopper_,
+      strict);
+  RPU::load(
+      this->context_, state, "dev_weight_output_in_chopper", dev_weight_output_in_chopper_, strict);
+  RPU::load(this->context_, state, "dev_weight_output_signals", dev_weight_output_signals_, strict);
+  RPU::load(this->context_, state, "dev_x_chopper_buffer_1", dev_x_chopper_buffer_1_, strict);
+  RPU::load(this->context_, state, "dev_x_chopper_buffer_2", dev_x_chopper_buffer_2_, strict);
+  RPU::load(this->context_, state, "dev_d_chopper_buffer_1", dev_d_chopper_buffer_1_, strict);
+  RPU::load(this->context_, state, "dev_d_chopper_buffer_2", dev_d_chopper_buffer_2_, strict);
+}
+
 /******************************************************************************************************************/
 
 template <typename T> int ChoppedWeightOutput<T>::getValStart() const {
