@@ -125,6 +125,40 @@ PulsedRPUWeightUpdater<T> &PulsedRPUWeightUpdater<T>::operator=(PulsedRPUWeightU
 }
 
 template <typename T>
+void PulsedRPUWeightUpdater<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPUWeightUpdater<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  if (containers_allocated_) {
+    dblm_->dumpExtra(state, "dblm");
+    sblm_->dumpExtra(state, "sblm");
+  }
+  RPU::insert(state, "containers_allocated", containers_allocated_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void PulsedRPUWeightUpdater<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  RPUWeightUpdater<T>::loadExtra(extra, prefix, strict);
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  bool was_allocated;
+  RPU::load(state, "containers_allocated", was_allocated, strict);
+  if (!containers_allocated_ && was_allocated) {
+    allocateContainers();
+  }
+  if (containers_allocated_) {
+    dblm_->loadExtra(state, "dblm", strict);
+    sblm_->loadExtra(state, "sblm", strict);
+  }
+}
+
+template <typename T>
 void PulsedRPUWeightUpdater<T>::setUpPar(const PulsedUpdateMetaParameter<T> &up) {
   up_ = up;
   // check the parameters

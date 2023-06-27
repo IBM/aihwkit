@@ -28,13 +28,13 @@ def drift_analog_weights(model: Module, t_inference: float = 0.0) -> None:
     """
     # avoid circular import
     # pylint: disable=import-outside-toplevel
-    from aihwkit.nn.modules.base import AnalogModuleBase
+    from aihwkit.nn.modules.base import AnalogLayerBase
 
     if model.training:
-        raise ModuleError("drift_analog_weights can only be applied in evaluation mode")
+        raise ModuleError("drift_analog_weights can only be applied in  evaluation mode")
 
     for module in model.modules():
-        if not isinstance(module, AnalogModuleBase):
+        if not isinstance(module, AnalogLayerBase):
             continue
         module.drift_analog_weights(t_inference)
 
@@ -50,12 +50,12 @@ def program_analog_weights(model: Module) -> None:
     """
     # avoid circular import
     # pylint: disable=import-outside-toplevel
-    from aihwkit.nn.modules.base import AnalogModuleBase
+    from aihwkit.nn.modules.base import AnalogLayerBase
 
     if model.training:
         raise ModuleError("program_analog_weights can only be applied in evaluation mode")
 
     for module in model.modules():
-        if not isinstance(module, AnalogModuleBase):
+        if not isinstance(module, AnalogLayerBase):
             continue
         module.program_analog_weights()

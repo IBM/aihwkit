@@ -145,6 +145,40 @@ void TransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
   fully_hidden_ = par.fullyHidden();
 }
 
+template <typename T>
+void TransferRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  VectorRPUDeviceCuda<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  RPU::insert(state, "current_slice_indices", current_slice_indices_);
+  // RPU::insert(state, "transfer_vecs", transfer_vecs_);
+
+  transfer_fb_pass_->dumpExtra(state, "transfer_fb_pass");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+  transfer_iom_->dumpExtra(state, "transfer_iom");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void TransferRPUDeviceCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  VectorRPUDeviceCuda<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "current_slice_indices", current_slice_indices_, strict);
+  if (state.count("transfer_vecs")) {
+    RPU::load(this->context_, state, "transfer_vecs", transfer_vecs_, strict);
+  }
+  transfer_fb_pass_->loadExtra(state, "transfer_fb_pass", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+  transfer_iom_->loadExtra(state, "transfer_iom", strict);
+}
+
 /*********************************************************************************/
 /* getPulseCountLearningRate */
 /* Here we compute the LR for the A matrix (the SGD update). Because
@@ -491,7 +525,6 @@ void TransferRPUDeviceCuda<T>::decayWeights(T *dev_weights, T alpha, bool bias_n
   if (fully_hidden_) {
     this->dev_weights_ptrs_[this->n_devices_ - 1] = dev_weights;
   }
-
   VectorRPUDeviceCuda<T>::decayWeights(dev_weights, alpha, bias_no_decay);
 }
 

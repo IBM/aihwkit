@@ -42,4 +42,9 @@ if(USE_CUDA)
   include_directories(SYSTEM ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
   add_compile_definitions(RPU_USE_CUDA)
+  add_compile_definitions(__CUDA_NO_HALF_OPERATORS__)
+  add_compile_definitions(__CUDA_NO_HALF_CONVERSIONS__)
+  add_compile_definitions(__CUDA_NO_BFLOAT16_CONVERSIONS__)
+  add_compile_definitions(__CUDA_NO_HALF2_OPERATORS__)
+
 endif()

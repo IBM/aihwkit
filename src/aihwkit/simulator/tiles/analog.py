@@ -12,20 +12,19 @@
 
 """High level analog tiles (analog)."""
 
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, Tuple
 
-from torch import device as torch_device
-from torch.cuda import device as cuda_device
+from torch import Tensor
 
-from aihwkit.exceptions import CudaError
-from aihwkit.simulator.rpu_base import cuda, tiles
-from aihwkit.simulator.tiles.base import BaseTile
+from aihwkit.simulator.tiles.rpucuda import RPUCudaSimulatorTileWrapper
+from aihwkit.simulator.tiles.module import TileModule
+from aihwkit.simulator.tiles.periphery import TileWithPeriphery
+from aihwkit.simulator.tiles.functions import AnalogFunction
+from aihwkit.simulator.parameters.base import RPUConfigGeneric
+from aihwkit.simulator.rpu_base import tiles
 
-if TYPE_CHECKING:
-    from aihwkit.simulator.configs import InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
 
-
-class AnalogTile(BaseTile):
+class AnalogTile(TileModule, TileWithPeriphery, RPUCudaSimulatorTileWrapper):
     r"""Analog tile.
 
     This analog tile implements an abstract analog tile where many
@@ -182,59 +181,19 @@ class AnalogTile(BaseTile):
         self,
         out_size: int,
         in_size: int,
-        rpu_config: Optional[
-            Union["SingleRPUConfig", "UnitCellRPUConfig", "InferenceRPUConfig"]
-        ] = None,
+        rpu_config: RPUConfigGeneric,
         bias: bool = False,
         in_trans: bool = False,
         out_trans: bool = False,
     ):
-        if not rpu_config:
-            # Import `SingleRPUConfig` dynamically to avoid import cycles.
-            # pylint: disable=import-outside-toplevel
-            from aihwkit.simulator.configs import SingleRPUConfig
-
-            rpu_config = SingleRPUConfig()
-
-        super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
-
-    def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "BaseTile":
-        """Return a copy of this tile in CUDA memory.
-
-        Args:
-            device: CUDA device
-
-        Returns:
-            Self with the underlying C++ tile moved to CUDA memory.
-
-        Raises:
-            CudaError: if the library has not been compiled with CUDA.
-        """
-        if not cuda.is_compiled():
-            raise CudaError("aihwkit has not been compiled with CUDA support")
-
-        device = torch_device("cuda", cuda_device(device).idx)
-
-        if self.is_cuda and device != self.device:
-            raise CudaError("Cannot switch CUDA devices of existing Cuda tiles")
-
-        if isinstance(self.tile, tiles.AnalogTile):
-            with cuda_device(device):
-                self.tile = tiles.CudaAnalogTile(self.tile)
-                self.is_cuda = True
-                self.device = device
-                self.analog_ctx.cuda(device)
-                if self.mapping_scales is not None:
-                    self.mapping_scales = self.mapping_scales.cuda(device)
-                if self.out_scaling_alpha is not None:
-                    self.out_scaling_alpha.data = self.out_scaling_alpha.data.cuda(device)
-        return self
+        TileModule.__init__(self)
+        RPUCudaSimulatorTileWrapper.__init__(
+            self, out_size, in_size, rpu_config, bias, in_trans, out_trans
+        )
+        TileWithPeriphery.__init__(self)
 
     def _create_simulator_tile(
-        self,
-        x_size: int,
-        d_size: int,
-        rpu_config: Union["SingleRPUConfig", "UnitCellRPUConfig", "InferenceRPUConfig"],
+        self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
     ) -> tiles.AnalogTile:
         """Create a simulator tile.
 
@@ -246,7 +205,26 @@ class AnalogTile(BaseTile):
         Returns:
             a simulator tile based on the specified configuration.
         """
+
         meta_parameter = rpu_config.as_bindings()
         device_parameter = rpu_config.device.as_bindings()
 
         return meta_parameter.create_array(x_size, d_size, device_parameter)
+
+    def forward(
+        self, x_input: Tensor, tensor_view: Optional[Tuple] = None  # type: ignore
+    ) -> Tensor:
+        """Torch forward function that calls the analog forward"""
+        # pylint: disable=arguments-differ
+
+        out = AnalogFunction.apply(
+            self.get_analog_ctx(), self, x_input, self.shared_weights, not self.training
+        )
+
+        if tensor_view is None:
+            tensor_view = self.get_tensor_view(out.dim())
+        out = self.apply_out_scaling(out, tensor_view)
+
+        if self.digital_bias:
+            return out + self.bias.view(*tensor_view)
+        return out

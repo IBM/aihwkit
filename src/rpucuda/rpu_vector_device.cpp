@@ -326,6 +326,39 @@ void VectorRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
   this->setWeightGranularity(weight_granularity);
 };
 
+template <typename T>
+void VectorRPUDevice<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  PulsedRPUDeviceBase<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+    rpu_device_vec_[k]->dumpExtra(state, std::to_string(k));
+  }
+  RPU::insert(state, "reduce_weightening", reduce_weightening_);
+  RPU::insert(state, "current_device_idx", current_device_idx_);
+  RPU::insert(state, "current_update_idx", current_update_idx_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void VectorRPUDevice<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  PulsedRPUDeviceBase<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+    rpu_device_vec_[k]->loadExtra(state, std::to_string(k), strict);
+  }
+  RPU::load(state, "reduce_weightening", reduce_weightening_, strict);
+  RPU::load(state, "current_device_idx", current_device_idx_, strict);
+  RPU::load(state, "current_update_idx", current_update_idx_, strict);
+}
+
 template <typename T> void VectorRPUDevice<T>::printDP(int x_count, int d_count) const {
 
   int x_count1 = x_count;

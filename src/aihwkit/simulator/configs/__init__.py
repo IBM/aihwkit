@@ -12,25 +12,7 @@
 
 """Configurations for resistive processing units."""
 
-from .configs import (
-    FloatingPointRPUConfig,
-    InferenceRPUConfig,
-    SingleRPUConfig,
-    UnitCellRPUConfig,
-    DigitalRankUpdateRPUConfig,
-)
-from .enums import (
-    BoundManagementType,
-    NoiseManagementType,
-    WeightNoiseType,
-    PulseType,
-    WeightModifierType,
-    WeightClipType,
-    WeightRemapType,
-    VectorUnitCellUpdatePolicy,
-    AnalogMVType,
-)
-from .utils import (
+from aihwkit.simulator.parameters.utils import (
     IOParameters,
     UpdateParameters,
     WeightModifierParameter,
@@ -41,6 +23,17 @@ from .utils import (
     MappingParameter,
     InputRangeParameter,
     PrePostProcessingParameter,
+)
+from aihwkit.simulator.parameters.enums import (
+    BoundManagementType,
+    NoiseManagementType,
+    WeightNoiseType,
+    PulseType,
+    WeightModifierType,
+    WeightClipType,
+    WeightRemapType,
+    VectorUnitCellUpdatePolicy,
+    AnalogMVType,
 )
 from .devices import (
     FloatingPointDevice,
@@ -62,5 +55,17 @@ from .compounds import (
     DifferenceUnitCell,
     TransferCompound,
     BufferedTransferCompound,
+    ChoppedTransferCompound,
+    DynamicTransferCompound,
     MixedPrecisionCompound,
 )
+from .configs import (
+    FloatingPointRPUConfig,
+    InferenceRPUConfig,
+    SingleRPUConfig,
+    UnitCellRPUConfig,
+    DigitalRankUpdateRPUConfig,
+    TorchInferenceRPUConfig,
+)
+
+from .helpers import build_config

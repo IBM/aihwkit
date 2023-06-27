@@ -14,7 +14,8 @@
 
 # pylint: disable=missing-function-docstring,too-few-public-methods
 
-from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile
+from aihwkit.simulator.tiles.module import TileModule
+
 from aihwkit.simulator.configs.devices import (
     IdealDevice,
     ConstantStepDevice,
@@ -35,16 +36,17 @@ from aihwkit.simulator.configs.compounds import (
     ReferenceUnitCell,
     MixedPrecisionCompound,
 )
-from aihwkit.simulator.configs.utils import IOParameters
+from aihwkit.simulator.parameters.utils import IOParameters
 
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
     InferenceRPUConfig,
+    TorchInferenceRPUConfig,
     SingleRPUConfig,
     UnitCellRPUConfig,
     DigitalRankUpdateRPUConfig,
 )
-
+from aihwkit.simulator.tiles.custom import CustomRPUConfig
 from aihwkit.simulator.rpu_base import tiles
 
 
@@ -60,7 +62,7 @@ class FloatingPoint:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return FloatingPointTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class Ideal:
@@ -78,7 +80,25 @@ class Ideal:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
+
+
+class Custom:
+    """CustomTile."""
+
+    simulator_tile_class = CustomRPUConfig.simulator_tile_class
+    first_hidden_field = None
+    use_cuda = False
+
+    def get_rpu_config(self):
+        rpu_config = CustomRPUConfig()
+        rpu_config.forward.is_perfect = True
+        rpu_config.backward.is_perfect = True
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class ConstantStep:
@@ -95,7 +115,7 @@ class ConstantStep:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class IdealizedConstantStep:
@@ -124,7 +144,7 @@ class IdealizedConstantStep:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class LinearStep:
@@ -139,7 +159,7 @@ class LinearStep:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class SoftBounds:
@@ -154,7 +174,7 @@ class SoftBounds:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class SoftBoundsPmax:
@@ -169,7 +189,7 @@ class SoftBoundsPmax:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class SoftBoundsReference:
@@ -184,7 +204,7 @@ class SoftBoundsReference:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class ExpStep:
@@ -199,7 +219,7 @@ class ExpStep:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class PowStep:
@@ -214,7 +234,7 @@ class PowStep:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class PowStepReference(PowStep):
@@ -229,7 +249,7 @@ class PowStepReference(PowStep):
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class PiecewiseStep:
@@ -244,7 +264,7 @@ class PiecewiseStep:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class Vector:
@@ -266,7 +286,7 @@ class Vector:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class Reference:
@@ -288,7 +308,7 @@ class Reference:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class OneSided:
@@ -307,7 +327,7 @@ class OneSided:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class Transfer:
@@ -332,7 +352,7 @@ class Transfer:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class BufferedTransfer:
@@ -357,7 +377,7 @@ class BufferedTransfer:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class MixedPrecision:
@@ -376,7 +396,7 @@ class MixedPrecision:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class Inference:
@@ -393,7 +413,24 @@ class Inference:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return InferenceTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
+
+
+class TorchInference:
+    """Inference torch tile (perfect forward)."""
+
+    simulator_tile_class = TorchInferenceRPUConfig.simulator_tile_class
+    first_hidden_field = None
+    use_cuda = False
+
+    def get_rpu_config(self):
+        rpu_config = TorchInferenceRPUConfig()
+        rpu_config.forward.is_perfect = True
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class InferenceLearnOutScaling:
@@ -412,7 +449,7 @@ class InferenceLearnOutScaling:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return InferenceTile(out_size, in_size, rpu_config, **kwargs)
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
 class FloatingPointCuda:
@@ -427,7 +464,7 @@ class FloatingPointCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return FloatingPointTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class IdealCuda:
@@ -445,7 +482,25 @@ class IdealCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class CustomCuda:
+    """CustomTile."""
+
+    simulator_tile_class = CustomRPUConfig.simulator_tile_class
+    first_hidden_field = None
+    use_cuda = True
+
+    def get_rpu_config(self):
+        rpu_config = CustomRPUConfig()
+        rpu_config.forward.is_perfect = True
+        rpu_config.backward.is_perfect = True
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class ConstantStepCuda:
@@ -460,7 +515,7 @@ class ConstantStepCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class IdealizedConstantStepCuda:
@@ -489,7 +544,7 @@ class IdealizedConstantStepCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class LinearStepCuda:
@@ -504,7 +559,7 @@ class LinearStepCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class SoftBoundsCuda:
@@ -519,7 +574,7 @@ class SoftBoundsCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class SoftBoundsPmaxCuda:
@@ -534,7 +589,7 @@ class SoftBoundsPmaxCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class SoftBoundsReferenceCuda:
@@ -549,7 +604,7 @@ class SoftBoundsReferenceCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class ExpStepCuda:
@@ -564,7 +619,7 @@ class ExpStepCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class PowStepCuda:
@@ -579,7 +634,7 @@ class PowStepCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class PowStepReferenceCuda:
@@ -594,7 +649,7 @@ class PowStepReferenceCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class PiecewiseStepCuda:
@@ -609,7 +664,7 @@ class PiecewiseStepCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class VectorCuda:
@@ -631,7 +686,7 @@ class VectorCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class ReferenceCuda:
@@ -653,7 +708,7 @@ class ReferenceCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class OneSidedCuda:
@@ -672,7 +727,7 @@ class OneSidedCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class TransferCuda:
@@ -697,7 +752,7 @@ class TransferCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class BufferedTransferCuda:
@@ -722,7 +777,7 @@ class BufferedTransferCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class MixedPrecisionCuda:
@@ -741,7 +796,7 @@ class MixedPrecisionCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return AnalogTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
 class InferenceCuda:
@@ -756,4 +811,19 @@ class InferenceCuda:
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()
-        return InferenceTile(out_size, in_size, rpu_config, **kwargs).cuda()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class TorchInferenceCuda:
+    """TorchInference tile."""
+
+    simulator_tile_class = TorchInferenceRPUConfig.simulator_tile_class
+    first_hidden_field = None
+    use_cuda = True
+
+    def get_rpu_config(self):
+        return TorchInferenceRPUConfig()
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()

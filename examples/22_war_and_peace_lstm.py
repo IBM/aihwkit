@@ -146,10 +146,10 @@ class WarAndPeaceDataset(Dataset):
         self.characters = one_hot(self.characters, len(chars)).type(FloatTensor)
 
         # Drop the last characters that won't fit in the multiple of the SEQ_LENGTH
-        floor_seq_length = self.characters.size(0) // self.seq_length * self.seq_length
-        self.characters = self.characters[0:floor_seq_length, :]
-        self.labels = self.labels[0:floor_seq_length]
-
+        self.characters = self.characters[
+            0 : self.characters.size(0) // self.seq_length * self.seq_length, :
+        ]
+        self.labels = self.labels[0 : self.characters.size(0) // self.seq_length * self.seq_length]
         self.characters = self.characters.view(-1, self.seq_length, len(chars))
         self.labels = self.labels.view(-1, self.seq_length)
 
@@ -260,6 +260,8 @@ def create_rpu_config(config="FP"):
         dac_bit = 7
         rpu_config.forward.out_res = 1 / (2**adc_bit - 2)
         rpu_config.forward.inp_res = 1 / (2**dac_bit - 2)
+        rpu_config.forward.out_scale = 2 / 0.6
+        rpu_config.backward = rpu_config.forward
 
     elif config == "RPU_Symmetric":
         rpu_config = SingleRPUConfig(
@@ -271,6 +273,8 @@ def create_rpu_config(config="FP"):
         dac_bit = 7
         rpu_config.forward.out_res = 1 / (2**adc_bit - 2)
         rpu_config.forward.inp_res = 1 / (2**dac_bit - 2)
+        rpu_config.forward.out_scale = 2 / 0.6
+        rpu_config.backward = rpu_config.forward
 
     elif config == "TTv2":
         rpu_config = UnitCellRPUConfig(
@@ -300,6 +304,8 @@ def create_rpu_config(config="FP"):
         dac_bit = 7
         rpu_config.forward.out_res = 1 / (2**adc_bit - 2)
         rpu_config.forward.inp_res = 1 / (2**dac_bit - 2)
+        rpu_config.forward.out_scale = 2 / 0.6
+        rpu_config.backward = rpu_config.forward
 
     else:
         raise ValueError("Selected rpu_config is not available")
@@ -412,17 +418,8 @@ def main():
         p_dropout=P_DROP,
     ).to(DEVICE)
     print(model)
-    print("\nInfo about the instantiated C++ tile:\n")
-    print(model.lstm_1.rnn.layers[0].cell.weight.analog_tile.tile)
     print("\nPretty-print of RPU non-default settings:\n")
     print(rpu_config)
-
-    for name, mod in model.named_children():
-        if name == "lstm_1":
-            for layer in mod.rnn.layers:
-                layer.cell.weight.analog_tile.set_out_scaling_alpha = 2 / 0.6
-        else:
-            mod.analog_tile.set_out_scaling_alpha = 2 / 0.6
 
     epoch_start = 0
     epoch_losses = []
@@ -487,16 +484,14 @@ def main():
             )
         )
 
-        with open((path_file + ".config"), "w", encoding="utf-8") as f:
-            print("==========================", file=f)
-            print("Info about all settings:\n", file=f)
-            print(rpu_config)
-            print("==========================", file=f)
-            print("\nInfo about the instantiated C++ tile:\n", file=f)
-            print(model.lstm_1.rnn.layers[0].cell.weight.analog_tile.tile, file=f)
-
         np.savetxt((path_file + ".csv"), epoch_losses, delimiter=",")
         save(model.state_dict(), (path_file + ".ckpt"))
+
+    with open((path_file + ".config"), "w", encoding="utf-8") as f:
+        print("==========================", file=f)
+        print("Info about all settings:\n", file=f)
+        print(rpu_config, file=f)
+        print("==========================", file=f)
 
 
 if __name__ == "__main__":

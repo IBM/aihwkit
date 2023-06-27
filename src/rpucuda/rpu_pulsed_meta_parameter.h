@@ -72,6 +72,7 @@ template <typename T> struct IOMetaParameter {
   bool inp_sto_round = false;
   T inp_noise = (T)0.0;
   T out_noise = (T)0.06;
+  T out_noise_std = (T)0.0; // systematic variation in percent of out_noise
   T w_noise = (T)0.0;
   T out_bound = (T)12.0;
   T out_res = (T)1.0 / (pow((T)2.0, (T)9.0) - (T)2.0);

@@ -211,7 +211,7 @@ NoiseManager<T>::NoiseManager(CudaContextPtr c, int size)
   maximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, false);
 
   size_t temp_storage_bytes = 0;
-  RPU::cub::DeviceReduce::Reduce(
+  RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
       nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(), size_,
       nsum_op_, (T)0.0, context_->getStream());
 
@@ -243,7 +243,7 @@ template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
     dev_offsets_ = RPU::make_unique<CudaArray<int>>(context_, m_batch + 1, offsets);
 
     size_t temp_storage_bytes = 0;
-    RPU::cub::DeviceSegmentedReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
         nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(),
         m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, 0,
         context_->getStream());
@@ -256,16 +256,55 @@ template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
 }
 
 template <typename T>
+void NoiseManager<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  using V = std::vector<T>;
+  RPU::state_t state;
+  context_->synchronize();
+
+  RPU::insert(state, "ravg_initialized", ravg_initialized_);
+  RPU::insert(state, "const_set_if", const_set_if_);
+
+  RPU::insert(state, "dev_ravg_scale_value", dev_ravg_scale_value_);
+  RPU::insert(state, "dev_scale_values", dev_scale_values_);
+  RPU::insert(state, "dev_nzeros_value", dev_nzeros_value_);
+
+  // amaximizer_->dumpExtra(state, "amaximizer");
+  // maximizer_->dumpExtra(state, "maximizer");
+
+  // will not handle buffers in to store data between applyToInput and applyToOutput
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void NoiseManager<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  context_->synchronize();
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  // amaximizer_->loadExtra(state, "amaximizer", strict);
+  // maximizer_->loadExtra(state, "maximizer", strict);
+
+  RPU::load(state, "ravg_initialized", ravg_initialized_, strict);
+  RPU::load(state, "const_set_if", const_set_if_, strict);
+
+  RPU::load(context_, state, "dev_ravg_scale_value", dev_ravg_scale_value_, strict);
+  RPU::load(context_, state, "dev_scale_values", dev_scale_values_, strict);
+  RPU::load(context_, state, "dev_nzeros_value", dev_nzeros_value_, strict);
+}
+
+template <typename T>
 template <typename InputIteratorT>
 void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool trans) {
   cudaStream_t s = context_->getStream();
 
   if (m_batch == 1) {
     size_t ssz = dev_v_temp_storage_->getSize();
-    RPU::cub::DeviceReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
         (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_psum_values_->getData(), size_,
         psum_op_, (T)0, s);
-    RPU::cub::DeviceReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
         (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_nsum_values_->getData(), size_,
         nsum_op_, (T)0, s);
 
@@ -303,10 +342,10 @@ void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool t
 
       // Fast Segmented reduction
       size_t ssz = dev_m_temp_storage_->getSize();
-      RPU::cub::DeviceSegmentedReduce::Reduce(
+      RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
           (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_psum_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, (T)0.0, s);
-      RPU::cub::DeviceSegmentedReduce::Reduce(
+      RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
           (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_nsum_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, nsum_op_, (T)0.0, s);
     }
@@ -435,7 +474,7 @@ void NoiseManager<T>::compute(
           dev_avgmax_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
 
           size_t temp_storage_bytes = 0;
-          RPU::cub::DeviceReduce::Sum(
+          RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
               nullptr, temp_storage_bytes, amaximizer_->getMaxValues(),
               dev_avgmax_value_->getData(), m_batch, s);
           dev_a_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
@@ -444,7 +483,7 @@ void NoiseManager<T>::compute(
         }
 
         size_t ssz = dev_a_temp_storage_->getSize();
-        RPU::cub::DeviceReduce::Sum(
+        RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
             (void *)dev_a_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
             dev_avgmax_value_->getData(), m_batch, s);
       }
@@ -462,11 +501,11 @@ void NoiseManager<T>::compute(
 
         if (m_batch > 1) {
           NonZeroFunctor<T> nonzero_functor;
-          RPU::cub::TransformInputIterator<T, NonZeroFunctor<T>, T *> nz_input(
+          RPU_CUB_NS_QUALIFIER TransformInputIterator<T, NonZeroFunctor<T>, T *> nz_input(
               amaximizer_->getMaxValues(), nonzero_functor);
           // temp storage already requested above
           size_t ssz = dev_a_temp_storage_->getSize();
-          RPU::cub::DeviceReduce::Sum(
+          RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
               (void *)dev_a_temp_storage_->getData(), ssz, nz_input, dev_nzeros_value_->getData(),
               m_batch, s);
         }
@@ -483,8 +522,6 @@ void NoiseManager<T>::compute(
     return;
   }
   case NoiseManagementType::AbsMaxSingleValue: {
-    // CAUTION: the running average will not be saved for checkpointing... so there might be a
-    // glitch when continueing training from checkpoint...
 
     // this is overall max over m_batch
     if (!is_test) {
@@ -501,7 +538,7 @@ void NoiseManager<T>::compute(
           dev_avgmax_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
 
           size_t temp_storage_bytes = 0;
-          RPU::cub::DeviceReduce::Sum(
+          RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
               nullptr, temp_storage_bytes, amaximizer_->getMaxValues(),
               dev_avgmax_value_->getData(), m_batch, s);
           dev_a_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
@@ -510,7 +547,7 @@ void NoiseManager<T>::compute(
         }
 
         size_t ssz = dev_a_temp_storage_->getSize();
-        RPU::cub::DeviceReduce::Max(
+        RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
             (void *)dev_a_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
             dev_avgmax_value_->getData(), m_batch, s);
       }

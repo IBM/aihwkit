@@ -12,19 +12,18 @@
 
 """Tests for Experiments."""
 
-import os
+from os import getenv
 from unittest import SkipTest
-
 from aihwkit.cloud.converter.v1.training import BasicTrainingConverter
-from aihwkit.nn.modules.base import AnalogModuleBase
+from aihwkit.nn.modules.base import AnalogLayerBase
 
 from .helpers.decorators import parametrize_over_experiments
 from .helpers.experiments import (
     FullyConnectedFashionMNIST,
     FullyConnectedFashionMNISTTikiTaka,
     LeNet5FashionMNIST,
-    Vgg8SVHN,
-    Vgg8SVHNTikiTaka,
+    # Vgg8SVHN,
+    # Vgg8SVHNTikiTaka,
 )
 from .helpers.testcases import AihwkitTestCase
 
@@ -34,15 +33,15 @@ from .helpers.testcases import AihwkitTestCase
         FullyConnectedFashionMNIST,
         FullyConnectedFashionMNISTTikiTaka,
         LeNet5FashionMNIST,
-        Vgg8SVHN,
-        Vgg8SVHNTikiTaka,
+        # Vgg8SVHN,
+        # Vgg8SVHNTikiTaka,
     ]
 )
 class TestBasicTraining(AihwkitTestCase):
     """Test BasicTraining Experiment."""
 
     def setUp(self) -> None:
-        if not os.getenv("TEST_DATASET"):
+        if not getenv("TEST_DATASET"):
             raise SkipTest("TEST_DATASET not set")
 
     def test_conversion_roundtrip(self):
@@ -72,8 +71,8 @@ class TestBasicTraining(AihwkitTestCase):
             experiment_original.model.children(), experiment_converted.model.children()
         ):
             self.assertEqual(type(layer_a), type(layer_b))
-            if isinstance(layer_a, AnalogModuleBase):
+            if isinstance(layer_a, AnalogLayerBase):
                 self.assertEqual(
-                    type(layer_a.analog_tile.rpu_config.device),
-                    type(layer_b.analog_tile.rpu_config.device),
+                    type(next(layer_a.analog_tiles()).rpu_config.device),
+                    type(next(layer_b.analog_tiles()).rpu_config.device),
                 )

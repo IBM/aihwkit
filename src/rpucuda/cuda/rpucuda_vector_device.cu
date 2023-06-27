@@ -180,6 +180,37 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 }
 
 template <typename T>
+void VectorRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  PulsedRPUDeviceCudaBase<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  for (size_t k = 0; k < rpucuda_device_vec_.size(); k++) {
+    rpucuda_device_vec_[k]->dumpExtra(state, std::to_string(k));
+  }
+  RPU::insert(state, "dev_reduce_weightening", dev_reduce_weightening_);
+  RPU::insert(state, "current_device_idx", current_device_idx_);
+  RPU::insert(state, "current_update_idx", current_update_idx_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void VectorRPUDeviceCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  PulsedRPUDeviceCudaBase<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  for (size_t k = 0; k < rpucuda_device_vec_.size(); k++) {
+    rpucuda_device_vec_[k]->loadExtra(state, std::to_string(k), strict);
+  }
+  RPU::load(this->context_, state, "dev_reduce_weightening", dev_reduce_weightening_, strict);
+  RPU::load(state, "current_device_idx", current_device_idx_, strict);
+  RPU::load(state, "current_update_idx", current_update_idx_, strict);
+}
+
+template <typename T>
 void VectorRPUDeviceCuda<T>::reduceToWeights(CudaContextPtr c, T *dev_weights) {
 
   RPU::math::gemv(
@@ -399,6 +430,16 @@ template <typename T> std::vector<T> VectorRPUDeviceCuda<T>::getReduceWeightenin
   vec.resize(n_devices_);
   dev_reduce_weightening_->copyTo(&vec[0]);
   return vec;
+}
+
+template <typename T> std::vector<uint64_t> VectorRPUDeviceCuda<T>::getPulseCounters() const {
+  std::vector<uint64_t> data;
+
+  for (int k = 0; k < n_devices_; k++) {
+    std::vector<uint64_t> tmp_data = rpucuda_device_vec_[k]->getPulseCounters();
+    data.insert(data.end(), tmp_data.begin(), tmp_data.end());
+  }
+  return data;
 }
 
 #undef LOOP_DEVICES_WITH_CONTEXTS_K

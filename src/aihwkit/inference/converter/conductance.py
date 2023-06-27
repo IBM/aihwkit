@@ -46,7 +46,7 @@ class SinglePairConductanceConverter(BaseConductanceConverter):
             raise ValueError("g_max should be a positive value")
         if self.g_min < 0.0:
             raise ValueError("g_min should be a positive value")
-        if self.g_min > self.g_max:
+        if self.g_min >= self.g_max:
             raise ValueError("g_min should be smaller than g_max")
 
     def __str__(self) -> str:

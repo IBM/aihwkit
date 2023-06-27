@@ -14,4 +14,4 @@
 
 # Convenience imports for easier access to the classes.
 
-from aihwkit.optim.analog_optimizer import AnalogOptimizer, AnalogSGD
+from aihwkit.optim.analog_optimizer import AnalogOptimizer, AnalogSGD, AnalogAdam

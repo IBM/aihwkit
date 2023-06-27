@@ -1,3 +1,4 @@
+
 /**
  * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
@@ -36,6 +37,12 @@ template <typename T> void WeightModifier<T>::dropConnections(T *weights, T prob
 template <typename T>
 void WeightModifier<T>::apply(
     T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar) {
+
+  if (wmpar.type != WeightModifierType::Copy) {
+    if (wmpar.per_batch_sample) {
+      RPU_FATAL("Per batch sample is not implemented in RPUCuda");
+    }
+  }
 
   // just copy always if not in-place [also handles WeightModifierType::Copy]
   if (new_weights != weights) {
@@ -99,8 +106,8 @@ void WeightModifier<T>::apply(
     break;
   }
   case WeightModifierType::AddNormal: {
-
     if (wmpar.std_dev > 0) {
+
       const T std = (T)wmpar.std_dev * amax;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
@@ -126,6 +133,31 @@ void WeightModifier<T>::apply(
         }
         sig *= std;
         new_weights[i] += amax * sig * rw_rng_.sampleGauss();
+      }
+    }
+    break;
+  }
+
+  case WeightModifierType::ProgNoise: {
+
+    if (wmpar.std_dev > 0 && wmpar.coeffs.size() > (size_t)0) {
+      const T std = wmpar.std_dev / wmpar.g_max;
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        T aw = fabs(new_weights[i]) / amax;
+        T paw = 1;
+        T sig = wmpar.coeffs.at(0);
+        for (size_t j = 1; j < wmpar.coeffs.size(); j++) {
+          paw *= aw;
+          sig += wmpar.coeffs.at(j) * paw;
+        }
+        sig *= std;
+        T w = new_weights[i];
+        if (w < 0.0f) {
+          new_weights[i] = -fabs(w + amax * sig * rw_rng_.sampleGauss());
+        } else {
+          new_weights[i] = fabs(w + amax * sig * rw_rng_.sampleGauss());
+        }
       }
     }
     break;
@@ -181,6 +213,27 @@ void WeightModifier<T>::apply(
       new_weights[(j + 1) * x_size_ - 1] = saved_bias_[j];
     }
   }
+}
+
+template <typename T>
+void WeightModifier<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPU::state_t state;
+
+  RPU::insert(state, "saved_bias", saved_bias_);
+  RPU::insert(state, "enable_during_test", enable_during_test_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void WeightModifier<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "saved_bias", saved_bias_, strict);
+  RPU::load(state, "enable_during_test", enable_during_test_, strict);
 }
 
 template class WeightModifier<float>;

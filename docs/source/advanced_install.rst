@@ -5,7 +5,7 @@ Install the aihwkit conda package
 ---------------------------------
 
 At this time, the conda package is only available for the Linux environment. You can use the
-following steps as an example for how to install the aihwkit conda package. 
+following steps as an example for how to install the aihwkit conda package.
 
 .. note::
 

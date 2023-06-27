@@ -41,7 +41,7 @@ rpu_config.update.d_res_implicit = 0.1  # effective resolution of x bit lines
 rpu_config.update.x_res_implicit = 0.1  # effective resolution of d bit lines
 
 model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
-print(model.analog_tile.tile)
+print(model)
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
     x = x.cuda()
@@ -53,6 +53,8 @@ opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
 for epoch in range(100):
+    # Delete old gradients
+    opt.zero_grad()
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.

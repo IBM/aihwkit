@@ -16,7 +16,7 @@ from types import new_class
 from typing import Any, Callable, Dict, Optional, Type
 
 from torch import cat
-from torch.optim import Optimizer, SGD
+from torch.optim import Optimizer, SGD, Adam
 from torch.autograd import no_grad
 
 from aihwkit.optim.context import AnalogContext
@@ -96,14 +96,18 @@ class AnalogOptimizerMixin:
                         # In this case a separate weight parameter exists: do nothing.
                         continue
 
-                    # Update learning rate.
-                    if learning_rate is not None:
-                        analog_tile.set_learning_rate(learning_rate)
-
                     # Call `update` in the tile.
                     if not analog_ctx.has_gradient():
                         # Forward never used.
                         continue
+
+                    # Update learning rate.
+                    if learning_rate == 0.0:
+                        analog_ctx.reset()
+                        continue
+
+                    if learning_rate is not None:
+                        analog_tile.set_learning_rate(learning_rate)
 
                     if analog_ctx.use_indexed:
                         for x_input, d_input in zip(
@@ -120,6 +124,7 @@ class AnalogOptimizerMixin:
                         analog_tile.update(x_input, d_input)
 
                     analog_ctx.reset()
+
         # Apply post-update step operations (diffuse, decay, etc).
         # (only here because of unknown params order and shared weights)
         for group in self.param_groups:
@@ -200,3 +205,7 @@ class AnalogOptimizer(AnalogOptimizerMixin, Optimizer):
 
 class AnalogSGD(AnalogOptimizerMixin, SGD):
     """Implements analog-aware stochastic gradient descent."""
+
+
+class AnalogAdam(AnalogOptimizerMixin, Adam):
+    """Implements analog-aware Adam."""

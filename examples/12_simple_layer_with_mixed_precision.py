@@ -47,14 +47,15 @@ rpu_config = DigitalRankUpdateRPUConfig(device=MixedPrecisionCompound(device=Sof
 print("\nPretty-print of non-default settings:\n")
 print(rpu_config)
 
-print("\nInfo about all settings:\n")
-print(repr(rpu_config))
-
 model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
+# print module structure
+print("\nModule structure:\n")
+print(model)
+
 # a more detailed printout of the instantiated
-print("\nInfo about the instantiated C++ tile:\n")
-print(model.analog_tile.tile)
+print("\nC++ RPUCudaTile information:\n")
+print(next(model.analog_tiles()).tile)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
@@ -67,6 +68,8 @@ opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
 for epoch in range(500):
+    # Delete old gradients
+    opt.zero_grad()
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.

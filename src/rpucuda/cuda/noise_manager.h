@@ -61,6 +61,8 @@ public:
 
   float getAverageAbsMax() const;
   void setAverageAbsMax(float value);
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
 private:
   template <typename InputIteratorT>

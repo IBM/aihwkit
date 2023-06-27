@@ -89,7 +89,7 @@ protected:
   // when overriding copy methods below, _Vector_Bias can be used in derived
   T *copyToVectorBiasBuffer(const T *x_input_without_bias, int x_inc) override;
   void copyFromVectorBiasBuffer(T *x_output_without_bias, int x_inc) override;
-  T *getVectorBiasBuffer() const override { return dev_x_vector_bias_->getData(); };
+  T *getVectorBiasBuffer() override { return dev_x_vector_bias_->getData(); };
 
   // new matrix and bias stuff (for Caffe2 interface)
   void copyWeightsFromBuffer() override;
@@ -124,7 +124,7 @@ protected:
       bool d_trans = false) override;
 
   // for tensor interface
-  void getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, int dim3) override;
+  void getTensorBuffer(T **x_tensor_ptr, T **d_tensor_ptr, int m_batch, int dim3) override;
   void
   permute132(T *out_tensor, const T *in_tensor, int dim1, int dim2, int dim3, bool bias2) override;
 
@@ -184,7 +184,6 @@ public:
   void driftWeights(T time_since_last_call) override;
   void diffuseWeights() override;
   void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
-
   void clipWeights(T clip) override;
   void clipWeights(const WeightClipParameter &wclpar) override;
 
@@ -208,6 +207,8 @@ public:
   void finishAllCalculations() override;
 
   ContextPtr getContext() const override { return context_; };
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
   CudaContextPtr context_ = nullptr;

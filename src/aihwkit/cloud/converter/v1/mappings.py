@@ -137,6 +137,13 @@ class Function:
                 new_argument[argument.name] = list(new_argument[argument.name])
             kwargs.update(new_argument)
 
+        # handle the weights_scaling_omega legacy
+        weight_scaling_omega = kwargs.pop("weight_scaling_omega", None)
+        if weight_scaling_omega is not None:
+            if "rpu_config" not in kwargs or not hasattr(kwargs["rpu_config"], "mapping"):
+                raise ConversionError("Expect Mappable RPUConfig")
+            kwargs["rpu_config"].mapping.weights_scaling_omega = weight_scaling_omega
+
         return cls(**kwargs)
 
     def get_field_value_to_proto(self, source: Any, field: str, default: Any = None) -> Any:
@@ -157,10 +164,10 @@ class LayerFunction(Function):
             return getattr(source, "bias", None) is not None
 
         if field == "weight_scaling_omega":
-            return list(source.analog_tiles())[0].rpu_config.mapping.weight_scaling_omega
+            return next(source.analog_tiles()).rpu_config.mapping.weight_scaling_omega
 
         if field == "rpu_config":
-            preset_cls = type(source.analog_tile.rpu_config)
+            preset_cls = type(next(source.analog_tiles()).rpu_config)
             try:
                 return Mappings.presets[preset_cls]
             except KeyError as ex:

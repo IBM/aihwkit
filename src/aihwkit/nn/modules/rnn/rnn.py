@@ -14,13 +14,16 @@
 
 import warnings
 import math
+
 from typing import Any, List, Optional, Tuple, Type, Callable
 from torch import Tensor, jit
 from torch.nn import Dropout, ModuleList, init
+from torch.autograd import no_grad
 
 from aihwkit.nn.modules.container import AnalogSequential
 from aihwkit.nn.modules.rnn.layers import AnalogRNNLayer, AnalogBidirRNNLayer
-from aihwkit.nn.modules.base import AnalogModuleBase, RPUConfigAlias
+from aihwkit.nn.modules.base import AnalogLayerBase
+from aihwkit.simulator.parameters.base import RPUConfigBase
 
 
 class ModularRNN(AnalogSequential):
@@ -122,8 +125,8 @@ class AnalogRNN(AnalogSequential):
         hidden_size: in_features and out_features for W_{hh} matrices
         bias: whether to use a bias row on the analog tile or not
         rpu_config: resistive processing unit configuration.
-        realistic_read_write: whether to enable realistic read/write
-            for setting initial weights and read out of weights
+        tile_module_class: Class for the analog tile module (default
+            will be specified from the ``RPUConfig``).
         xavier: whether standard PyTorch LSTM weight
             initialization (default) or Xavier initialization
         num_layers: number of serially connected RNN layers
@@ -139,8 +142,8 @@ class AnalogRNN(AnalogSequential):
         input_size: int,
         hidden_size: int,
         bias: bool = True,
-        rpu_config: Optional[RPUConfigAlias] = None,
-        realistic_read_write: bool = False,
+        rpu_config: Optional[RPUConfigBase] = None,
+        tile_module_class: Optional[Type] = None,
         xavier: bool = False,
         num_layers: int = 1,
         bidir: bool = False,
@@ -159,27 +162,21 @@ class AnalogRNN(AnalogSequential):
             num_layers,
             layer,
             dropout,
-            first_layer_args=[
-                cell,
-                input_size,
-                hidden_size,
-                bias,
-                rpu_config,
-                realistic_read_write,
-            ],
+            first_layer_args=[cell, input_size, hidden_size, bias, rpu_config, tile_module_class],
             other_layer_args=[
                 cell,
                 num_dirs * hidden_size,
                 hidden_size,
                 bias,
                 rpu_config,
-                realistic_read_write,
+                tile_module_class,
             ],
         )
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.reset_parameters(xavier)
 
+    @no_grad()
     def init_layers(
         self, weight_init_fn: Callable, bias_init_fn: Optional[Callable] = None
     ) -> None:
@@ -196,18 +193,19 @@ class AnalogRNN(AnalogSequential):
             function is taken for the bias as well.
         """
 
-        def init_analog_layer(layer: AnalogModuleBase) -> None:
+        def init_analog_layer(layer: AnalogLayerBase) -> None:
             """Init the weights and bias of an analog linear layer."""
-            weight_init_fn(layer.weight.data)
-            if layer.use_bias:
+            weight, bias = layer.get_weights()
+            weight_init_fn(weight.data)
+            if bias is not None:
                 if bias_init_fn is None:
-                    weight_init_fn(layer.bias.data)
+                    weight_init_fn(bias.data)
                 else:
-                    bias_init_fn(layer.bias.data)
+                    bias_init_fn(bias.data)
 
-            layer.set_weights(layer.weight, layer.bias)
+            layer.set_weights(weight, bias)
 
-        self._apply_to_analog(init_analog_layer)  # pylint: disable=protected-access
+        self.apply_to_analog_tiles(init_analog_layer)
 
     def reset_parameters(self, xavier: bool = False) -> None:
         """Weight and bias initialization.

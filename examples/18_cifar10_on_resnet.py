@@ -53,7 +53,7 @@ WEIGHT_PATH = os.path.join(RESULTS, "example_18_model_weight.pth")
 # Training parameters
 SEED = 1
 N_EPOCHS = 30
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 LEARNING_RATE = 0.1
 N_CLASSES = 10
 

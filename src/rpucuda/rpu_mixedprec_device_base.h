@@ -120,6 +120,10 @@ public:
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
+
   bool usesUpdateParameter() const override { return true; };
   bool onSetWeights(T **weights) override;
 

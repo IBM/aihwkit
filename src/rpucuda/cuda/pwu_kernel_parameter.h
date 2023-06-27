@@ -221,6 +221,18 @@ DEFINE_PWU_KERNEL_BASE(
     this->nstates = this->nthreads * this->nblocks;);
 
 /********************************************************************************
+ * PWUKernelParameterBatchBaseInf // no limit on size
+ *********************************************************************************/
+DEFINE_PWU_KERNEL_BASE(BatchBaseInf,
+                       /*ctor*/
+                       this->nthreads = MIN(RPU_THREADS_PER_BLOCK_UPDATE, this->size);
+                       this->nthreads = (this->nthreads + 31) / 32 * 32;
+                       this->nblocks =
+                           MIN(this->max_block_count,
+                               construction_context->getNBlocks(this->size, this->nthreads));
+                       this->nstates = this->nthreads * this->nblocks;);
+
+/********************************************************************************
  * PWUKernelParameterBatchFunctor
  *********************************************************************************/
 
@@ -446,7 +458,7 @@ DEFINE_PWU_KERNEL_BASE(
     RPU_FATAL("nK32 changed. This is not supported");                                              \
   };                                                                                               \
                                                                                                    \
-  int batch_load_stride = MIN(this->max_batch_load_stride, m_batch);                               \
+  int batch_load_stride = MIN(this->max_batch_load_stride, (m_batch + 1) / 2 * 2);                 \
   int shared_mem = this->shared_mem_per_batch * batch_load_stride;
 
 /********************************************************************************
@@ -553,6 +565,43 @@ DEFINE_PWU_KERNEL_PARAMETER(
              nullptr, dev_states));
       }
     });
+
+/********************************************************************************
+ * PWUKernelCounter
+ *********************************************************************************/
+
+#define RPU_PWU_COUNTER_KERNEL                                                                     \
+  if (this->implicit_pulses) {                                                                     \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        this->shared_mem, kernelPulseCounter,                                                      \
+        (rpucuda_device->getPosPulseCountData(), rpucuda_device->getNegPulseCountData(),           \
+         blm->getXData(), this->x_size, blm->getDData(), this->d_size, 1, m_batch));               \
+  } else if (this->use_bo64) {                                                                     \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,                \
+        this->nthreads, this->shared_mem, kernelPulseCounter,                                      \
+        (rpucuda_device->getPosPulseCountData(), rpucuda_device->getNegPulseCountData(),           \
+         blm->getXCountsBo64Data(), this->x_size, blm->getDCountsBo64Data(), this->d_size,         \
+         this->nK32, blm->getBo64Batch(m_batch),                                                   \
+         blm->getKnData(up.update_bl_management, m_batch)));                                       \
+  } else {                                                                                         \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, uint32_t, this->out_trans, this->out_trans, s, this->nblocks,                \
+        this->nthreads, this->shared_mem, kernelPulseCounter,                                      \
+        (rpucuda_device->getPosPulseCountData(), rpucuda_device->getNegPulseCountData(),           \
+         x_counts_chunk ? x_counts_chunk : blm->getXCountsData(), this->x_size,                    \
+         d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size, this->nK32,        \
+         m_batch));                                                                                \
+  }
+
+template <typename T>
+DEFINE_PWU_KERNEL_PARAMETER(PulseCounter,
+                            BatchBaseInf,
+                            /*run*/
+                            RPU_PWU_COUNTER_KERNEL;);
+
+#undef RPU_PWU_COUNTER_KERNEL
 
 #undef RPU_PWU_START_BATCH_SHARED_KERNEL
 #undef RPU_PWU_START_BATCH_SHARED_INIT

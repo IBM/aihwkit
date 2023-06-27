@@ -15,6 +15,5 @@ Submodules
    aihwkit.simulator.configs.compounds
    aihwkit.simulator.configs.configs
    aihwkit.simulator.configs.devices
-   aihwkit.simulator.configs.enums
    aihwkit.simulator.configs.helpers
    aihwkit.simulator.configs.utils

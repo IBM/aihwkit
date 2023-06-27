@@ -44,8 +44,8 @@ void PulsedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const
     ss << "\t w min:\t\t\t" << w_min << "\t(dtod=" << w_min_dtod << ")" << std::endl;
     ss << "\t w max:\t\t\t" << w_max << "\t(dtod=" << w_max_dtod << ")" << std::endl;
 
-    ss << "\t resets to:\t\t" << reset << "\t(dtod=" << reset_dtod << ", ctoc=" << reset_std << ")"
-       << std::endl;
+    ss << "\t resets to:\t\t" << reset << "\t(dtod=" << reset_dtod << ", ctoc=" << this->reset_std
+       << ")" << std::endl;
 
     if (this->implementsWriteNoise() && write_noise_std > (T)0.0) {
       ss << "\t write noise std:\t" << write_noise_std << std::endl;
@@ -59,6 +59,11 @@ void PulsedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const
     if (corrupt_devices_prob > 0) {
       ss << "\t corrupt_devices_prob:\t" << corrupt_devices_prob << std::endl;
       ss << "\t corrupt_devices_range:\t" << corrupt_devices_range << std::endl;
+    }
+
+    if (adjust_bounds_with_up_down) {
+      ss << "\t adjusted bounds with up/down (dev=" << adjust_bounds_with_up_down_dev << ")"
+         << std::endl;
     }
 
     if (this->drift.nu > 0) {
@@ -547,11 +552,15 @@ template <typename T> bool PulsedRPUDevice<T>::onSetWeights(T **weights) {
   }
 
   if (getPar().usesPersistentWeight()) {
+
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
       w_persistent_[0][i] = w[i];
+      weights[0][i] = w[i];
     }
-    applyUpdateWriteNoise(weights);
+    if (getPar().apply_write_noise_on_set) {
+      applyUpdateWriteNoise(weights);
+    }
     return true; // modified device thus true
   } else {
     return false; // whether device was changed
@@ -634,6 +643,36 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
           w_max_bound_[i][j] = m;
           w_min_bound_[i][j] = m;
         }
+      }
+
+      // adjust with up_down
+      if (par.adjust_bounds_with_up_down) {
+        // if up_down_deviation is close to zero, up_downetric devices will be
+        // close to one sided. If large, up_down all device bounds will be
+        // symmetric around the 0
+
+        if (w_min_bound_[i][j] > w_max_bound_[i][j]) {
+          std::swap(w_min_bound_[i][j], w_max_bound_[i][j]);
+        }
+
+        T up_down_alpha = w_scale_up_[i][j] / (w_scale_up_[i][j] + w_scale_down_[i][j]);
+        T mm = w_max_bound_[i][j] - w_min_bound_[i][j];
+
+        T new_min_bound = (T)0.0;
+        T up_down_deviation = par.adjust_bounds_with_up_down_dev;
+        if (up_down_deviation > 0) {
+          new_min_bound =
+              -((tanh((up_down_alpha - (T)0.5) / up_down_deviation) + (T)1.0) / ((T)2.0)) * mm;
+        } else {
+          if (up_down_alpha < 0.5)
+            new_min_bound = 0;
+          else if (up_down_alpha == 0.5)
+            new_min_bound = -mm / ((T)2.0);
+          else
+            new_min_bound = -mm;
+        }
+        w_min_bound_[i][j] = new_min_bound;
+        w_max_bound_[i][j] = new_min_bound + mm;
       }
 
       // corrupt devices

@@ -71,6 +71,34 @@ void WeightDrifter<T>::populate(const DriftParameter<T> &par, RealWorldRNG<T> *r
 }
 
 template <typename T>
+void WeightDrifter<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPU::state_t state;
+
+  RPU::insert(state, "active", active_);
+  RPU::insert(state, "current_t", current_t_);
+  RPU::insert(state, "previous_weights", previous_weights_);
+  RPU::insert(state, "w0", w0_);
+  RPU::insert(state, "t", t_);
+  RPU::insert(state, "nu", nu_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void WeightDrifter<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "previous_weights", previous_weights_, strict);
+  RPU::load(state, "w0", w0_, strict);
+  RPU::load(state, "t", t_, strict);
+  RPU::load(state, "nu", nu_, strict);
+  RPU::load(state, "current_t", current_t_, strict);
+  RPU::load(state, "active", active_, strict);
+}
+
+template <typename T>
 void WeightDrifter<T>::saturate(T *weights, const T *min_bounds, const T *max_bounds) {
 
   PRAGMA_SIMD
@@ -83,7 +111,6 @@ void WeightDrifter<T>::saturate(T *weights, const T *min_bounds, const T *max_bo
 template <typename T>
 void WeightDrifter<T>::apply(T *weights, T time_since_last_call, RNG<T> &rng) {
 
-  // INIT
   if (previous_weights_.size() != (size_t)size_) {
     initialize(weights);
   }

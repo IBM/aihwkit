@@ -30,12 +30,12 @@ from .helpers.layers import (
     LSTMCombinedWeightCuda,
 )
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, Inference
+from .helpers.tiles import FloatingPoint, Inference, TorchInference, Custom
 
 
 @parametrize_over_layers(
     layers=[LSTM, VanillaRNN, GRU, LSTMCuda, GRUCuda, VanillaRNNCuda],
-    tiles=[FloatingPoint, Inference],
+    tiles=[FloatingPoint, Inference, TorchInference, Custom],
     biases=["analog", "digital", None],
 )
 class RNNLayerTest(ParametrizedTestCase):
@@ -111,8 +111,8 @@ class RNNLayerTest(ParametrizedTestCase):
                 self.assertEqual(layer.cell.weight_ih.in_features, hidden_size)
             self.assertEqual(layer.cell.weight_hh.in_features, hidden_size)
             # Assert over the rpu_config.
-            analog_tile_ih = list(layer.cell.weight_ih.analog_tiles())[0]
-            analog_tile_hh = list(layer.cell.weight_hh.analog_tiles())[0]
+            analog_tile_ih = next(layer.cell.weight_ih.analog_tiles())
+            analog_tile_hh = next(layer.cell.weight_hh.analog_tiles())
             self.assertEqual(analog_tile_ih.rpu_config.__class__, self.get_rpu_config().__class__)
             self.assertEqual(analog_tile_hh.rpu_config.__class__, self.get_rpu_config().__class__)
 
@@ -132,13 +132,13 @@ class RNNLayerTest(ParametrizedTestCase):
                 if isinstance(param, AnalogContext):
                     weight, bias = param.analog_tile.get_weights()
                     splits = name.split(".")
-                    add_on = "_" + splits[-2].split("_")[-1] + "_l" + splits[2]
+                    add_on = "_" + splits[-3].split("_")[-1] + "_l" + splits[2]
                     dic["weight" + add_on] = weight
                     if bias is not None:
                         dic["bias" + add_on] = bias
                 elif analog_if and name.endswith("bias"):  # digital bias
                     splits = name.split(".")
-                    add_on = "_" + splits[-2].split("_")[-1] + "_l" + splits[2]
+                    add_on = "_" + splits[-3].split("_")[-1] + "_l" + splits[2]
                     dic["bias" + add_on] = param
                 else:
                     dic[name] = param
@@ -157,11 +157,7 @@ class RNNLayerTest(ParametrizedTestCase):
         y_out = ones(seq_length, batch_size, 1)
 
         rnn_analog = self.get_layer(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            realistic_read_write=False,
-            dropout=0.0,
+            input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, dropout=0.0
         )
 
         rnn = self.get_native_layer_comparison(
@@ -172,12 +168,7 @@ class RNNLayerTest(ParametrizedTestCase):
             bias=self.bias,
         )
 
-        weights_org = []
-
-        # pylint: disable=protected-access
-        rnn_analog._apply_to_analog(
-            lambda lay: weights_org.append(lay.analog_tile.tile.get_weights())
-        )
+        weights_org = rnn_analog.get_weights()
 
         rnn_pars0 = get_parameters(rnn, False)
         rnn_analog_pars0 = get_parameters(rnn_analog, True)
@@ -195,27 +186,20 @@ class RNNLayerTest(ParametrizedTestCase):
             rnn.cuda()
 
         with no_grad():
-            assert_array_almost_equal(
-                rnn(y_in)[0].detach().clone().cpu(), rnn_analog(y_in)[0].detach().clone().cpu()
-            )
+            self.assertTensorAlmostEqual(rnn(y_in)[0], rnn_analog(y_in)[0])
 
         # First train analog and make sure weights differ.
         pred_analog = self.train_once(rnn_analog, y_in, y_out, True)
 
-        analog_weights = []
-        rnn_analog._apply_to_analog(
-            lambda lay: analog_weights.append(lay.analog_tile.tile.get_weights())
-        )
+        analog_weights = rnn_analog.get_weights()
 
         if test_for_update:
-            for weight, weight_org in zip(analog_weights, weights_org):
-                assert_raises(AssertionError, assert_array_almost_equal, weight, weight_org)
+            for weight, weight_org in zip(analog_weights.values(), weights_org.values()):
+                assert_raises(AssertionError, assert_array_almost_equal, weight[0], weight_org[0])
 
         # Compare with RNN.
         pred = self.train_once(rnn, y_in, y_out, False)
         assert_array_almost_equal(pred, pred_analog)
-
-        rnn_analog._apply_to_analog(lambda lay: lay._sync_weights_from_tile())
 
         rnn_pars = get_parameters(rnn, False)
         rnn_analog_pars = get_parameters(rnn_analog, True)
@@ -242,7 +226,7 @@ class RNNLayerTest(ParametrizedTestCase):
                 if isinstance(param, AnalogContext):
                     weight, bias = param.analog_tile.get_weights()
                     splits = name.split(".")
-                    add_on = "_" + splits[-2].split("_")[-1] + "_l" + splits[2]
+                    add_on = "_" + splits[-3].split("_")[-1] + "_l" + splits[2]
                     if splits[4] == "1":
                         add_on += "_reverse"
 
@@ -251,7 +235,7 @@ class RNNLayerTest(ParametrizedTestCase):
                         dic["bias" + add_on] = bias
                 elif analog_if and name.endswith("bias"):  # digital bias
                     splits = name.split(".")
-                    add_on = "_" + splits[-2].split("_")[-1] + "_l" + splits[2]
+                    add_on = "_" + splits[-3].split("_")[-1] + "_l" + splits[2]
                     if splits[4] == "1":
                         add_on += "_reverse"
                     dic["bias" + add_on] = param
@@ -275,7 +259,6 @@ class RNNLayerTest(ParametrizedTestCase):
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
-            realistic_read_write=False,
             dropout=0.0,
             bidir=True,
         )
@@ -289,12 +272,7 @@ class RNNLayerTest(ParametrizedTestCase):
             bidirectional=True,
         )
 
-        weights_org = []
-
-        # pylint: disable=protected-access
-        rnn_analog._apply_to_analog(
-            lambda lay: weights_org.append(lay.analog_tile.tile.get_weights())
-        )
+        weights_org = rnn_analog.get_weights()
 
         rnn_pars0 = get_parameters(rnn, False)
         rnn_analog_pars0 = get_parameters(rnn_analog, True)
@@ -312,27 +290,20 @@ class RNNLayerTest(ParametrizedTestCase):
             rnn.cuda()
 
         with no_grad():
-            assert_array_almost_equal(
-                rnn(y_in)[0].detach().clone().cpu(), rnn_analog(y_in)[0].detach().clone().cpu()
-            )
+            self.assertTensorAlmostEqual(rnn(y_in)[0], rnn_analog(y_in)[0])
 
         # First train analog and make sure weights differ.
         pred_analog = self.train_once_bidir(rnn_analog, y_in, y_out, True)
 
-        analog_weights = []
-        rnn_analog._apply_to_analog(
-            lambda lay: analog_weights.append(lay.analog_tile.tile.get_weights())
-        )
+        analog_weights = rnn_analog.get_weights()
 
         if test_for_update:
-            for weight, weight_org in zip(analog_weights, weights_org):
-                assert_raises(AssertionError, assert_array_almost_equal, weight, weight_org)
+            for weight, weight_org in zip(analog_weights.values(), weights_org.values()):
+                self.assertNotAlmostEqualTensor(weight[0], weight_org[0])
 
         # Compare with RNN.
         pred = self.train_once_bidir(rnn, y_in, y_out, False)
         assert_array_almost_equal(pred, pred_analog)
-
-        rnn_analog._apply_to_analog(lambda lay: lay._sync_weights_from_tile())
 
         rnn_pars = get_parameters(rnn, False)
         rnn_analog_pars = get_parameters(rnn_analog, True)
@@ -429,11 +400,7 @@ class LSTMCombinedWeightTest(RNNLayerTest):
         y_out = ones(seq_length, batch_size, 1)
 
         rnn_analog = self.get_layer(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            realistic_read_write=False,
-            dropout=0.0,
+            input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, dropout=0.0
         )
 
         rnn = self.get_native_layer_comparison(
@@ -451,9 +418,7 @@ class LSTMCombinedWeightTest(RNNLayerTest):
             par_item.data = rnn_analog_pars0[par_name].detach().clone()
 
         if test_for_update:
-            weights_org = []
-            # pylint: disable=protected-access
-            rnn_analog._apply_to_analog(lambda lay: weights_org.append(lay.get_weights()))
+            weights_org = rnn_analog.get_weights()
 
         if self.use_cuda:
             y_in = y_in.cuda()
@@ -471,11 +436,10 @@ class LSTMCombinedWeightTest(RNNLayerTest):
         pred_analog = self.train_once(rnn_analog, y_in, y_out, True, digital_bias_lr_scale=2.0)
 
         if test_for_update:
-            analog_weights = []
-            # pylint: disable=protected-access
-            rnn_analog._apply_to_analog(lambda lay: analog_weights.append(lay.get_weights()))
-            for weight, weight_org in zip(analog_weights, weights_org):
-                assert_raises(AssertionError, assert_array_almost_equal, weight[0], weight_org[0])
+            analog_weights = rnn_analog.get_weights()
+
+            for weight, weight_org in zip(analog_weights.values(), weights_org.values()):
+                self.assertNotAlmostEqualTensor(weight[0], weight_org[0])
 
         # Compare with RNN.
         pred = self.train_once(rnn, y_in, y_out, False)

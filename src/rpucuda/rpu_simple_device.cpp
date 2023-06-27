@@ -74,6 +74,24 @@ SimpleRPUDevice<T> &SimpleRPUDevice<T>::operator=(SimpleRPUDevice<T> &&other) {
   return *this;
 }
 
+template <typename T>
+void SimpleRPUDevice<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+  if (hasWDrifter()) {
+    wdrifter_->dumpExtra(state, "wdrifter");
+    RPU::insertWithPrefix(extra, state, prefix);
+  }
+}
+
+template <typename T>
+void SimpleRPUDevice<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  if (hasWDrifter()) {
+    auto state = RPU::selectWithPrefix(extra, prefix);
+    wdrifter_->loadExtra(state, "wdrifter", strict);
+  }
+};
+
 /********************************************************************************/
 /* compute functions  */
 
@@ -129,6 +147,29 @@ template <typename T> void SimpleRPUDevice<T>::clipWeights(T **weights, T clip) 
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
       w[i] = MIN(MAX(w[i], -clip), clip);
+    }
+  }
+}
+
+template <typename T>
+void SimpleRPUDevice<T>::resetCols(
+    T **weights, int start_col, int n_col_in, T reset_prob, RealWorldRNG<T> &rng) {
+
+  T *w = weights[0];
+  int n_col = (n_col_in >= 0) ? n_col_in : this->x_size_;
+
+  T reset_std = getPar().reset_std;
+  for (int j = 0; j < this->x_size_; ++j) {
+    if ((start_col + n_col <= this->x_size_ && j >= start_col && j < start_col + n_col) ||
+        (start_col + n_col > this->x_size_ &&
+         ((j >= start_col) || (j < n_col - (this->x_size_ - start_col))))) {
+      PRAGMA_SIMD
+      for (int i = 0; i < this->d_size_; ++i) {
+        if (reset_prob == 1 || rng.sampleUniform() < reset_prob) {
+          int k = i * this->x_size_ + j;
+          w[k] = (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+        }
+      }
     }
   }
 }

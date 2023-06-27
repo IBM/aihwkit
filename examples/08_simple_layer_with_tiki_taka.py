@@ -52,7 +52,7 @@ rpu_config = UnitCellRPUConfig(
 )
 
 # Make more adjustments (can be made here or above).
-rpu_config.forward.inp_res = 1 / 64.0  # 6 bit DAC
+rpu_config.forward.inp_res = 1 / (2**6 - 2)  # 6 bit DAC
 
 # same backward pass settings as forward
 rpu_config.backward = rpu_config.forward
@@ -73,7 +73,7 @@ model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
 # a more detailed printout of the instantiated
 print("\nInfo about the instantiated C++ tile:\n")
-print(model.analog_tile.tile)
+print(next(model.analog_tiles()).tile)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
@@ -86,8 +86,8 @@ opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
 for epoch in range(500):
+    # Delete old gradient
     opt.zero_grad()
-
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.

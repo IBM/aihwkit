@@ -10,214 +10,256 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Utilities for resistive processing units configurations."""
-from sys import version_info
-from dataclasses import Field, fields, is_dataclass
-from enum import Enum
-from textwrap import indent
-from typing import Any, List
+"""Helper for generating presets."""
 
-from aihwkit.simulator.rpu_base import devices, tiles
-from aihwkit.exceptions import ConfigError
+from typing import Union, Type, Callable, Any
+from copy import deepcopy
 
-if version_info[0] >= 3 and version_info[1] > 7:
-    # pylint: disable=no-name-in-module
-    from typing import get_origin  # type: ignore
+from aihwkit.exceptions import ArgumentError
+from aihwkit.simulator.configs.configs import (
+    UnitCellRPUConfig,
+    SingleRPUConfig,
+    DigitalRankUpdateRPUConfig,
+)
+from aihwkit.simulator.configs.devices import PulsedDevice
+from aihwkit.simulator.configs.compounds import (
+    TransferCompound,
+    ChoppedTransferCompound,
+    DynamicTransferCompound,
+    MixedPrecisionCompound,
+    VectorUnitCell,
+)
+from aihwkit.simulator.parameters.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.enums import (
+    VectorUnitCellUpdatePolicy,
+    NoiseManagementType,
+    BoundManagementType,
+)
 
-    HAS_ORIGIN = True
-else:
-    HAS_ORIGIN = False
 
-
-def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
-    """Convert a dataclass parameter into a bindings class.
+def build_config(
+    algorithm: str,
+    device: Union[Type[PulsedDevice], PulsedDevice, Callable],
+    io_parameters: Union[Type[IOParameters], IOParameters, Callable] = IOParameters,
+    up_parameters: Union[Type[UpdateParameters], UpdateParameters, Callable] = UpdateParameters,
+    n_devices: int = 1,
+    construction_seed: int = 0,
+    **kwargs: Any,
+) -> Union[UnitCellRPUConfig, SingleRPUConfig, DigitalRankUpdateRPUConfig]:
+    """Generate a RPU configuration for analog training using a
+    specific device model and a given training algoithm.
 
     Args:
-        params: parameter dataclass
-        check_fields: whether to check for the correct attributes
+        algorithm: The type of the training algorithm. Valid choices are:
+
+            "sgd": Random pulsed (naive) SGD on analog crossbars.  See
+                `Gokmen & Vlasov, Front. Neurosci. 2016`_ for details.
+
+            "mp", "mixed-precision": Mixed-precision analog, where the
+                gradient is computed in digital and only the forward
+                abd backward pass is in analog. Uses
+                :class:`~aihwkit.simulator.configs.compounds.MixedPrecisionCompound`. See
+                also `Nandakumar et al. Front. in Neurosci. (2020)`_
+                for details.
+
+            "tiki-taka", "ttv1", "tt": Tiki-taka I algorithm. Uses
+                :class:`~aihwkit.simulator.configs.compounds.TransferCompound`.
+                See `Gokmen & Haensch, Front. Neurosci. 2020`_ for
+                details.
+
+            "ttv2": second version of the Tiki-taka algorithm
+                (TTv2). Uses
+                :class:`~aihwkit.simulator.configs.compounds.ChoppedTransferCompound`
+                with chopper probabilty set to 0. See `Gokmen,
+                Front. Artif. Intell. 2021`_ for details.
+
+            "chopped-ttv2", "ttv3", "c-ttv2": Chopped version of TTv2
+                algorithm. Uses
+                :class:`~aihwkit.simulator.configs.compounds.ChoppedTransferCompound`.
+                See `Rasch et al., ArXiv 2023`_ for details.
+
+            "agad", "ttv4": Analog gradient accumulation with dynamic
+                reference computation. Uses
+                :class:`~aihwkit.simulator.configs.compounds.StatsticalransferCompound`. See
+                `Rasch et al., ArXiv 2023`_ for details.
+
+        device: Device configuration of the analog devices. Can be the
+            class or the actual device. All available device will have the
+            same configuration.
+
+        io_parameters: IOParameters class (or actual instance) that
+            are used for forward / backward and transfer. Default is
+            :class:`~aihwkit.simulator.parameters.utils.IOParameters`.
+
+        up_parameters: UpdateParameters class (or actual instance) that are used for update and
+            transfer update. Default is
+            :class:`~aihwkit.parameters.utils.UpdateParameters`.
+
+        n_devices: In case of SGD, how many device pairs are used in the unit cell.
+
+            Note:
+                This option is only applied for ``algorithm="sgd"``
+                and ignored for all other algorithm choices.
+
+        construction_seed: Seed of the construction
+
+        kwargs: Other RPUConfig fields to assign explicitely (e.g. ``mapping``).
 
     Returns:
-        the C++ bindings
+        RPU config according to the algorithm and device settings.
 
     Raises:
-        ConfigError: if the field type mismatches (int to float conversion is ignored)
+        ArgumentError: in case algorithm is not known
+
+    .. _`Gokmen & Vlasov, Front. Neurosci. 2016`: \
+    https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
+    .. _`Gokmen & Haensch, Front. Neurosci. 2020`: \
+    https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
+    .. _`Gokmen, Front. Artif. Intell. 2021`: \
+    https://www.frontiersin.org/articles/10.3389/frai.2021.699148/full
+    .. _`Rasch et al., ArXiv 2023`: \
+    https://arxiv.org/abs/2303.04721
+    .. _`Nandakumar et al. Front. in Neurosci. (2020)`: \
+    https://doi.org/10.3389/fnins.2020.00406
+
     """
-    result = params.bindings_class()
+    # pylint: disable=too-many-statements, too-many-return-statements
 
-    field_dict = {field.name: (field, getattr(params, field.name)) for field in fields(params)}
-    if check_fields:
-        ignore_fields = getattr(params, "bindings_ignore", [])
-        for key in params.__dict__.keys():
-            if key not in field_dict and key not in ignore_fields:
-                raise ConfigError(
-                    f"Cannot find '{key}' in params "
-                    f"'{params.__class__.__name__}'. "
-                    "Wrong attribute name?"
-                )
+    if isinstance(device, PulsedDevice):
+        device_to_use = device
 
-    for field, (dataclass_field, value) in field_dict.items():
-        # Convert enums to the bindings enums.
-        if field in ("unit_cell_devices", "device"):
-            # Exclude special fields that are not present in the bindings.
-            continue
+        def device_fun(**kwargs: Any) -> PulsedDevice:
+            dev = deepcopy(device_to_use)
+            dev.__dict__.update(**kwargs)
+            return dev
 
-        if isinstance(value, Enum):
-            if hasattr(tiles, value.__class__.__name__):
-                enum_class = getattr(tiles, value.__class__.__name__)
-            else:
-                enum_class = getattr(devices, value.__class__.__name__)
-            enum_value = getattr(enum_class, value.value)
-            setattr(result, field, enum_value)
-        elif is_dataclass(value):
-            setattr(result, field, parameters_to_bindings(value))
-        else:
-            if HAS_ORIGIN:
-                expected_type = get_origin(dataclass_field.type) or dataclass_field.type
-                if (not isinstance(value, expected_type)) and not (
-                    expected_type == float
-                    and isinstance(value, int)
-                    and not isinstance(value, bool)
-                ):
-                    raise ConfigError(f"Expected type {expected_type} for field {field}")
+        device = device_fun
 
-            setattr(result, field, value)
+    if isinstance(io_parameters, IOParameters):
+        io_pars_to_use = io_parameters
 
-    return result
+        def io_pars_fun(**kwargs: Any) -> IOParameters:
+            io_pars = deepcopy(io_pars_to_use)
+            io_pars.__dict__.update(**kwargs)
+            return io_pars
 
+        io_parameters = io_pars_fun
 
-def tile_parameters_to_bindings(params: Any) -> Any:
-    """Convert a tile dataclass parameter into a bindings class."""
-    field_map = {"forward": "forward_io", "backward": "backward_io"}
-    excluded_fields = (
-        "device",
-        "noise_model",
-        "drift_compensation",
-        "clip",
-        "modifier",
-        "mapping",
-        "remap",
-        "pre_post",
-    )
+    if isinstance(up_parameters, UpdateParameters):
+        up_pars_to_use = up_parameters
 
-    result = params.bindings_class()
-    for field, value in params.__dict__.items():
-        # Get the mapped field name, if needed.
-        field = field_map.get(field, field)
+        def up_pars_fun(**kwargs: Any) -> UpdateParameters:
+            up_pars = deepcopy(up_pars_to_use)
+            up_pars.__dict__.update(**kwargs)
+            return up_pars
 
-        # Convert enums to the bindings enums.
-        if field in excluded_fields:
-            # Exclude special fields that are not present in the bindings.
-            continue
+        up_parameters = up_pars_fun
 
-        if isinstance(value, Enum):
-            enum_class = getattr(devices, value.__class__.__name__)
-            enum_value = getattr(enum_class, value.value)
-            setattr(result, field, enum_value)
-        elif is_dataclass(value):
-            setattr(result, field, parameters_to_bindings(value))
-        else:
-            setattr(result, field, value)
+    if algorithm.lower() in ["sgd"]:
+        if n_devices == 1:
+            return SingleRPUConfig(
+                device=device(construction_seed=construction_seed),
+                forward=io_parameters(),
+                backward=io_parameters(),
+                update=up_parameters(),
+                **kwargs,
+            )
+        return UnitCellRPUConfig(
+            device=VectorUnitCell(
+                unit_cell_devices=[device() for _ in range(n_devices)],
+                update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+                construction_seed=construction_seed,
+            ),
+            forward=io_parameters(),
+            backward=io_parameters(),
+            update=up_parameters(),
+            **kwargs,
+        )
 
-    return result
+    if algorithm.lower() in ["tiki-taka", "tt", "ttv1"]:
+        return UnitCellRPUConfig(
+            device=TransferCompound(
+                unit_cell_devices=[device(), device()],
+                transfer_forward=io_parameters(
+                    noise_management=NoiseManagementType.NONE,
+                    bound_management=BoundManagementType.NONE,
+                ),
+                transfer_update=up_parameters(),
+                units_in_mbatch=True,
+                construction_seed=construction_seed,
+            ),
+            forward=io_parameters(),
+            backward=io_parameters(),
+            update=up_parameters(),
+            **kwargs,
+        )
+    if algorithm.lower() in ["ttv2"]:
+        return UnitCellRPUConfig(
+            device=ChoppedTransferCompound(
+                unit_cell_devices=[device(), device()],
+                transfer_forward=io_parameters(
+                    noise_management=NoiseManagementType.NONE,
+                    bound_management=BoundManagementType.NONE,
+                ),
+                transfer_update=up_parameters(
+                    desired_bl=1, update_bl_management=False, update_management=False
+                ),
+                in_chop_prob=0.0,
+                units_in_mbatch=False,
+                auto_scale=False,
+                construction_seed=construction_seed,
+            ),
+            forward=io_parameters(),
+            backward=io_parameters(),
+            update=up_parameters(desired_bl=5),
+            **kwargs,
+        )
+    if algorithm.lower() in ["chopped-ttv2", "ttv3", "c-ttv2"]:
+        return UnitCellRPUConfig(
+            device=ChoppedTransferCompound(
+                unit_cell_devices=[device(), device()],
+                transfer_forward=io_parameters(
+                    noise_management=NoiseManagementType.NONE,
+                    bound_management=BoundManagementType.NONE,
+                ),
+                transfer_update=up_parameters(
+                    desired_bl=1, update_bl_management=False, update_management=False
+                ),
+                units_in_mbatch=False,
+                fast_lr=0.1,
+                auto_scale=True,
+                construction_seed=construction_seed,
+            ),
+            forward=io_parameters(),
+            backward=io_parameters(),
+            update=up_parameters(desired_bl=5),
+            **kwargs,
+        )
+    if algorithm.lower() in ["agad", "ttv4"]:
+        return UnitCellRPUConfig(
+            device=DynamicTransferCompound(
+                unit_cell_devices=[device(), device()],
+                transfer_forward=io_parameters(),
+                transfer_update=up_parameters(
+                    desired_bl=1, update_bl_management=True, update_management=True
+                ),
+                auto_scale=True,
+                fast_lr=0.1,
+                units_in_mbatch=False,
+                construction_seed=construction_seed,
+            ),
+            forward=io_parameters(),
+            backward=io_parameters(),
+            update=up_parameters(desired_bl=5),
+            **kwargs,
+        )
+    if algorithm.lower() in ["mp", "mixed-precision"]:
+        return DigitalRankUpdateRPUConfig(
+            device=MixedPrecisionCompound(device=device(construction_seed=construction_seed)),
+            forward=io_parameters(),
+            backward=io_parameters(),
+            update=up_parameters(),
+            **kwargs,
+        )
 
-
-class _PrintableMixin:
-    """Helper class for pretty-printing of config dataclasses."""
-
-    # pylint: disable=too-few-public-methods
-
-    def __str__(self) -> str:
-        """Return a pretty-print representation."""
-
-        def lines_list_to_str(
-            lines_list: List[str],
-            prefix: str = "",
-            suffix: str = "",
-            indent_: int = 0,
-            force_multiline: bool = False,
-        ) -> str:
-            """Convert a list of lines into a string.
-
-            Args:
-                lines_list: the list of lines to be converted.
-                prefix: an optional prefix to be appended at the beginning of
-                    the string.
-                suffix: an optional suffix to be appended at the end of the string.
-                indent_: the optional number of spaces to indent the code.
-                force_multiline: force the output to be multiline.
-
-            Returns:
-                The lines collapsed into a single string (potentially with line
-                breaks).
-            """
-            if force_multiline or len(lines_list) > 3 or any("\n" in line for line in lines_list):
-                # Return a multi-line string.
-                lines_str = indent(",\n".join(lines_list), " " * indent_)
-                prefix = "{}\n".format(prefix) if prefix else prefix
-                suffix = "\n{}".format(suffix) if suffix else suffix
-            else:
-                # Return an inline string.
-                lines_str = ", ".join(lines_list)
-
-            return "{}{}{}".format(prefix, lines_str, suffix)
-
-        def field_to_str(field_value: Any) -> str:
-            """Return a string representation of the value of a field.
-
-            Args:
-                field_value: the object that contains a field value.
-
-            Returns:
-                The string representation of the field (potentially with line
-                breaks).
-            """
-            field_lines = []
-            force_multiline = False
-
-            # Handle special cases.
-            if isinstance(field_value, list) and len(value) > 0:
-                # For non-emtpy lists, always use multiline, with one item per line.
-                for item in field_value:
-                    field_lines.append(indent("{}".format(str(item)), " " * 4))
-                force_multiline = True
-            else:
-                field_lines.append(str(field_value))
-
-            prefix = "[" if force_multiline else ""
-            suffix = "]" if force_multiline else ""
-            return lines_list_to_str(field_lines, prefix, suffix, force_multiline=force_multiline)
-
-        def is_skippable(field: Field, value: Any) -> bool:
-            """Return whether a field should be skipped."""
-            if value == field.default:
-                # Skip fields with the default value.
-                return True
-
-            if "hide_if" in field.metadata and field.metadata.get("hide_if") == value:
-                return True
-
-            return False
-
-        # Main loop.
-
-        # Build the list of lines.
-        fields_lines = []
-        for field in fields(self):
-            value = getattr(self, field.name)
-
-            # Exclude fields.
-            if is_skippable(field, value):
-                continue
-
-            # Convert the value into a string, falling back to repr if needed.
-            try:
-                value_str = field_to_str(value)
-            except Exception:  # pylint: disable=broad-except
-                value_str = str(value)
-
-            fields_lines.append("{}={}".format(field.name, value_str))
-
-        # Convert the full object to str.
-        output = lines_list_to_str(fields_lines, "{}(".format(self.__class__.__name__), ")", 4)
-
-        return output
+    raise ArgumentError("Algorithm {} is not known".format(algorithm))

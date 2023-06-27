@@ -12,12 +12,15 @@
 
 #pragma once
 
+#ifndef RPU_CUB_NS_QUALIFIER
 #ifndef CUB_NS_QUALIFIER
 #undef CUB_NS_PREFIX
 #undef CUB_NS_POSTFIX
 #define CUB_NS_PREFIX namespace RPU {
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::RPU::cub
+#define RPU_CUB_NS_QUALIFIER RPU::cub::
+#endif
 #endif
 
 #include <cub/cub.cuh>

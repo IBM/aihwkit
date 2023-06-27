@@ -120,6 +120,55 @@ __global__ void kernelRemapScaleRowwiseRange(
   }
 }
 
+/*Scale row-wise and shift*/
+template <typename T>
+__global__ void kernelRemapScaleAndShiftRowwise(
+    T *weights_out,
+    T *scales_out, // cannot be in-place otherwise some threads might use new scale...!!!
+    T *biases_out,
+    const T *weights_in,
+    const T *scales,     // NOTE: these need to be initialized !!! should be d_size on per output
+    const T *biases,     // NOTE: these need to be initialized !!!
+    const int x_size_in, //
+    const int d_size_in, // major
+    const float *max_values,    // d_size: eg. max per row
+    const float *neg_max_values // d_size: eg. max of - weights
+) {
+  int x_size = x_size_in;
+  int d_size = d_size_in;
+  int size = x_size * d_size;
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, size) {
+    T w = weights_in[idx];
+    int didx = idx % d_size;
+    T max_value = (T)max_values[didx]; // shared mem!?? maybe not worth the effort
+    T min_value = -(T)neg_max_values[didx];
+    T b = biases[didx];
+    T s = scales[didx];
+
+    T half_span = (max_value - min_value) / (T)2.0;
+    half_span = half_span > 0 ? half_span : (T)1.0;
+    T new_scale = s * half_span;
+    T new_b = b - new_scale - s * min_value;
+    // T full_w = w*s + b;
+    // T new_full_w = new_w*new_scale + new_b;
+    /* new_full_w == full_w
+       new_w*new_scale + new_b == w*s + b
+       new_w == (w*s + b - new_b)/new_scale
+       new_w == (w*s + new_scale + s*min_value)/new_scale
+       new_w == w*s/new_scale + 1 + s*min_value/new_scale
+       new_w == w/half_span + 1 + min_value/half_span
+    */
+
+    weights_out[idx] = w / half_span + 1 + min_value / half_span;
+
+    if (idx < d_size) {
+      scales_out[didx] = new_scale;
+      biases_out[didx] = new_b;
+    }
+  }
+}
+
 // ctor
 template <typename T>
 WeightRemapperCuda<T>::WeightRemapperCuda(CudaContextPtr context, int x_size, int d_size)
@@ -200,7 +249,6 @@ void WeightRemapperCuda<T>::apply(
     }
     break;
   }
-
   case WeightRemapType::None: {
     break;
   }

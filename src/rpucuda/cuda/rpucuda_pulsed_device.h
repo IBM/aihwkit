@@ -25,13 +25,12 @@ template <typename T> struct PulsedUpdateMetaParameter;
 /* Base class for all devices that support pulsed update*/
 template <typename T> class PulsedRPUDeviceCudaBase : public SimpleRPUDeviceCuda<T> {
 public:
-  PulsedRPUDeviceCudaBase() = default;
-  ~PulsedRPUDeviceCudaBase() = default;
+  explicit PulsedRPUDeviceCudaBase() = default;
   explicit PulsedRPUDeviceCudaBase(CudaContextPtr c, int x_size, int d_size)
       : SimpleRPUDeviceCuda<T>(c, x_size, d_size){};
 
-  PulsedRPUDeviceCudaBase(const PulsedRPUDeviceCudaBase<T> &other)
-      : SimpleRPUDeviceCuda<T>(other){};
+  ~PulsedRPUDeviceCudaBase() = default;
+  PulsedRPUDeviceCudaBase(const PulsedRPUDeviceCudaBase<T> &other) = default;
   PulsedRPUDeviceCudaBase<T> &operator=(const PulsedRPUDeviceCudaBase<T> &other) = default;
   PulsedRPUDeviceCudaBase(PulsedRPUDeviceCudaBase<T> &&other) = default;
   PulsedRPUDeviceCudaBase<T> &operator=(PulsedRPUDeviceCudaBase<T> &&other) = default;
@@ -42,6 +41,7 @@ public:
     swap(a.weight_granularity_, b.weight_granularity_);
     swap(a.num_states_, b.num_states_);
   }
+
   void populateFrom(const AbstractRPUDevice<T> &rpu_device_in) override {
     SimpleRPUDeviceCuda<T>::populateFrom(rpu_device_in);
 
@@ -51,6 +51,25 @@ public:
     }
     setWeightGranularity(rpu_device.getWeightGranularity());
     setNumStates(rpu_device.getNumStates());
+  };
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override {
+    SimpleRPUDeviceCuda<T>::dumpExtra(extra, prefix);
+
+    RPU::state_t state;
+    RPU::insert(state, "num_states", num_states_);
+    RPU::insert(state, "weight_granularity", weight_granularity_);
+
+    RPU::insertWithPrefix(extra, state, prefix);
+  };
+
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override {
+    SimpleRPUDeviceCuda<T>::loadExtra(extra, prefix, strict);
+
+    auto state = RPU::selectWithPrefix(extra, prefix);
+
+    RPU::load(state, "num_states", num_states_, strict);
+    RPU::load(state, "weight_granularity", weight_granularity_, strict);
   };
 
   bool isPulsedDevice() const override { return true; };
@@ -87,14 +106,14 @@ public:
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
       uint32_t *d_counts_chunk = nullptr,
-      const ChoppedWeightOutput<T> *cwo = nullptr) = 0;
+      const ChoppedWeightOutput<T> *cwo = nullptr) {
+    RPU_FATAL("Needs implementation");
+  };
 
   virtual pwukpvec_t<T> getUpdateKernels(
-      int m_batch,
-      int nK32,
-      int use_bo64,
-      bool out_trans,
-      const PulsedUpdateMetaParameter<T> &up) = 0;
+      int m_batch, int nK32, int use_bo64, bool out_trans, const PulsedUpdateMetaParameter<T> &up) {
+    RPU_FATAL("Needs implementation");
+  };
 
   PulsedRPUDeviceCudaBase<T> *clone() const override { RPU_FATAL("Needs implementation"); };
 
@@ -128,9 +147,9 @@ public:
 
   ~PulsedRPUDeviceCuda(){};
   PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other);
-  PulsedRPUDeviceCuda<T> &operator=(const PulsedRPUDeviceCuda<T> &other) = default;
-  PulsedRPUDeviceCuda(PulsedRPUDeviceCuda<T> &&other) = default;
-  PulsedRPUDeviceCuda<T> &operator=(PulsedRPUDeviceCuda<T> &&other) = default;
+  PulsedRPUDeviceCuda<T> &operator=(const PulsedRPUDeviceCuda<T> &other);
+  PulsedRPUDeviceCuda(PulsedRPUDeviceCuda<T> &&other);
+  PulsedRPUDeviceCuda<T> &operator=(PulsedRPUDeviceCuda<T> &&other);
 
   friend void swap(PulsedRPUDeviceCuda<T> &a, PulsedRPUDeviceCuda<T> &b) noexcept {
     using std::swap;
@@ -140,9 +159,9 @@ public:
     swap(a.dev_reset_bias_, b.dev_reset_bias_);
     swap(a.dev_decay_scale_, b.dev_decay_scale_);
     swap(a.dev_4params_, b.dev_4params_);
-    swap(a.dev_reset_nrnd_, b.dev_reset_nrnd_);
-    swap(a.dev_reset_flag_, b.dev_reset_flag_);
     swap(a.dev_persistent_weights_, b.dev_persistent_weights_);
+    swap(a.dev_neg_pulse_counter_, b.dev_neg_pulse_counter_);
+    swap(a.dev_pos_pulse_counter_, b.dev_pos_pulse_counter_);
   };
 
   // implement abstract functions
@@ -183,14 +202,18 @@ public:
   virtual float *get2ParamsData() { return nullptr; };
   virtual float *get4ParamsData() { return dev_4params_->getData(); }
   virtual T getWeightGranularityNoise() const { return getPar().dw_min_std; };
+  virtual uint64_t *getPosPulseCountData();
+  virtual uint64_t *getNegPulseCountData();
+  std::vector<uint64_t> getPulseCounters() const override;
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
   virtual void applyUpdateWriteNoise(T *dev_weights);
-
-  void initResetRnd();
-  std::unique_ptr<CudaArray<float>> dev_reset_nrnd_ = nullptr;
-  std::unique_ptr<CudaArray<float>> dev_reset_flag_ = nullptr;
   std::unique_ptr<CudaArray<float>> dev_persistent_weights_ = nullptr;
+  std::unique_ptr<CudaArray<uint64_t>> dev_pos_pulse_counter_ = nullptr;
+  std::unique_ptr<CudaArray<uint64_t>> dev_neg_pulse_counter_ = nullptr;
 
 private:
   void initialize();

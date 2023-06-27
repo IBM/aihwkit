@@ -53,6 +53,8 @@ public:
   TransferRPUDeviceCuda<T> *clone() const override { return new TransferRPUDeviceCuda<T>(*this); };
 
   void setHiddenUpdateIdx(int idx) override{};
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   void runUpdateKernel(
       pwukp_t<T> kpars,

@@ -17,7 +17,7 @@
 from dataclasses import dataclass, field
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
 
-from aihwkit.simulator.configs.utils import (
+from aihwkit.simulator.parameters.utils import (
     IOParameters,
     WeightClipParameter,
     WeightModifierParameter,
@@ -135,6 +135,8 @@ class OldWebComposerMappingParameter(WebComposerMappingParameter):
     weight_scaling_columnwise: bool = True
     learn_out_scaling: bool = False
     out_scaling_columnwise: bool = False
+    max_input_size: int = 0
+    max_output_size: int = 0
 
 
 @dataclass

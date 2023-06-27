@@ -30,7 +30,8 @@ from torchvision.datasets import FashionMNIST, SVHN
 from torchvision.transforms import Compose, Normalize, ToTensor
 
 from aihwkit.experiments.experiments.base import Experiment, Signals
-from aihwkit.nn.modules.base import AnalogModuleBase
+from aihwkit.nn.modules.base import AnalogLayerBase
+from aihwkit.utils.legacy import convert_legacy_checkpoint
 
 
 WEIGHT_TEMPLATE_URL = "https://github.com/IBM-AI-Hardware-Center/Composer/raw/main/"
@@ -192,15 +193,14 @@ class BasicInferencing(Experiment):
 
             # print('template_path: ', template_path)
             if path.exists(template_path):
-                model.load_state_dict(
-                    load(template_path, map_location=device), load_rpu_config=False
-                )
+                state_dict = load(template_path, map_location=device)
+                state_dict, _ = convert_legacy_checkpoint(state_dict, model)
+                model.load_state_dict(state_dict, load_rpu_config=False)
             else:
                 print("Checkpoint file: ", template_path, " does not exist.")
 
             if self.remap_weights:
-                for module in model.analog_modules():
-                    module.remap_weights()
+                model.remap_analog_weights()
 
         return model.to(device)
 
@@ -308,9 +308,9 @@ class BasicInferencing(Experiment):
             0, log10(float(inference_time)), n_inference_times - 1
         ).tolist()
         repeat_results = {}
-        accuracy_array = array([])
-        error_array = array([])
-        loss_array = array([])
+        accuracy_array = array([], "float")
+        error_array = array([], "float")
+        loss_array = array([], "float")
 
         for repeat in range(inference_repeats):
             self._call_hook(Signals.INFERENCE_REPEAT_START, repeat)
@@ -343,7 +343,7 @@ class BasicInferencing(Experiment):
         print("\n>>> inferenceworker.py: STARTING _print_rpu_fields() ")
 
         for name, module in model.named_modules():
-            if not isinstance(module, AnalogModuleBase):
+            if not isinstance(module, AnalogLayerBase):
                 continue
 
             print(f"RPUConfig of module {name}:")
@@ -374,7 +374,6 @@ class BasicInferencing(Experiment):
         # Load the weights and biases to the model.
         # Assumption: the model already includes the customer-specified InferenceRPUConfig.
         model = self.get_model(self.weight_template_id, device)
-
         self._print_rpu_fields(model)
 
         # Invoke the inference step

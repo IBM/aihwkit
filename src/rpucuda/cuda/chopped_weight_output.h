@@ -98,6 +98,10 @@ public:
   void printToStream(std::stringstream &ss) const;
   void makeWeightOutputChoppers(const BitLineMaker<T> *blm);
   void releaseBuffers();
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+
   inline void setPar(const ChoppedWeightOutputParameter<T> &par) { par_ = par; };
   inline void setInChopRandom(bool in_chop_random) { par_.in_chop_random = in_chop_random; };
   inline void setInChopProb(T in_chop_prob) { par_.in_chop_prob = in_chop_prob; };
