@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
+* Calibration of input ranges for inference (\#512)
 * New analog in-memory training algorithms: Chopped Tiki-taka II (\#512)
 * New analog in-memory training algorithms: AGAD (\#512)
 * New training presets: `ReRamArrayOMPresetDevice`,
@@ -55,6 +56,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* Cuda supported testing in examples based on AIHWKIT compilation (\#513)
 * Fixed compilation error for CUDA 12.1. (\#500)
 * Realistic read weights could have applied the scales wrongly (\#512)
 

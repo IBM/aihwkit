@@ -554,6 +554,23 @@ The example plots similar figures as discussed in [Rasch MJ, Carta F,
 Fagbohungbe O and Gokmen T (2023) Fast offset-corrected in-memeory
 training. ArXiv preprint].
 
+## Example 27: [`27_input_range_calibration`]
+
+Make sure to first run the simple HW-aware training of LeNet using
+`python examples/25_torch_tile_lenet5_hardware_aware.py`. This saves
+the pretrained model that is used in this example.
+This script calibrates the input ranges of the model post-training
+using three techniques:
+- `CACHE_QUANTILE` simply caches the tile inputs and calculates a
+hard-coded quantile as the input range.
+- `MOVING_QUANTILE` approximates the quantile on-the-fly using
+a moving average. This saves memory since we don't need to cache
+everything.
+- `MOVING_STD` also uses a moving average but uses the X-th
+standard deviaiton as the input range.
+
+For each method, the performance (under quantization) is printed.
+
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
@@ -603,3 +620,4 @@ offset-corrected in-memeory training. ArXiv preprint]: https://arxiv.org/abs/230
 [`24_bert_on_squad.py`]: 24_bert_on_squad.py
 [`25_torch_tile_lenet5_hardware_aware.py`]: 25_torch_tile_lenet5_hardware_aware.py
 [`26_correlation_detection.py`]: 26_correlation_detection.py
+[`27_input_range_calibration`]: 27_input_range_calibration.py
