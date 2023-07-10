@@ -56,6 +56,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 
+* BERT example 24 using `AnalogWrapper` (\#514)
 * Cuda supported testing in examples based on AIHWKIT compilation (\#513)
 * Fixed compilation error for CUDA 12.1. (\#500)
 * Realistic read weights could have applied the scales wrongly (\#512)
