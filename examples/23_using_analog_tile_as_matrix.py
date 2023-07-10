@@ -18,14 +18,14 @@
 # Imports from PyTorch.
 from torch import randn
 from torch import device as torch_device
-from torch import cuda as torch_cuda
 
 # Imports from aihwkit.
 from aihwkit.simulator.tiles import AnalogTile
 from aihwkit.simulator.presets import ReRamSBPreset
+from aihwkit.simulator.rpu_base import cuda
 
 # Check GPU device
-DEVICE = torch_device("cuda" if torch_cuda.is_available() else "cpu")
+DEVICE = torch_device("cuda" if cuda.is_compiled() else "cpu")
 
 # config the hardware properties
 rpu_config = ReRamSBPreset()

@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Imports from PyTorch.
-from torch import nn, manual_seed, no_grad, cuda, save
+from torch import nn, manual_seed, no_grad, save
 from torch import max as torch_max
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -42,9 +42,10 @@ from aihwkit.simulator.configs import (
 )
 from aihwkit.simulator.presets import StandardHWATrainingPreset
 from aihwkit.inference import PCMLikeNoiseModel
+from aihwkit.simulator.rpu_base import cuda
 
 # Check device
-DEVICE = "cuda" if cuda.is_available() else "cpu"
+DEVICE = "cuda" if cuda.is_compiled() else "cpu"
 
 # Path to store datasets
 PATH_DATASET = os.path.join("data", "DATASET")

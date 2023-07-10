@@ -38,9 +38,10 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogLinear, AnalogLinearMapped, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import InferenceRPUConfig
+from aihwkit.simulator.rpu_base import cuda
 
 # Check device
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if cuda.is_compiled() else "cpu")
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join("data", "DATASET")
