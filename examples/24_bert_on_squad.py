@@ -52,8 +52,7 @@ from aihwkit.simulator.configs import (
 
 from aihwkit.simulator.presets import PresetIOParameters
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
-from aihwkit.nn.conversion import convert_to_analog_mapped
-from aihwkit.nn import AnalogSequential
+from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.optim import AnalogSGD
 
 
@@ -177,7 +176,7 @@ def create_model(rpu_config):
     model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
 
     if not ARGS.digital:
-        model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
+        model = convert_to_analog(model, rpu_config)
         model.remap_analog_weights()
 
     print(model)
@@ -476,7 +475,7 @@ def make_trainer(model, optimizer, tokenized_data):
     writer = SummaryWriter(log_dir=log_dir)
 
     trainer = Trainer(
-        model=model if ARGS.digital else model[0],
+        model=model if ARGS.digital else model.module,
         args=training_args,
         data_collator=collator,
         train_dataset=tokenized_data["train"],
