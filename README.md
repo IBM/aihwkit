@@ -60,12 +60,12 @@ Along with the two main components, the toolkit includes other
 functionalities such as:
 
 * A library of device presets that are calibrated to real hardware data and
-  based on models in the literature, along with configuration that specifies a particular device and optimizer choice.
+  based on models in the literature, along with a configuration that specifies a particular device and optimizer choice.
 * A module for executing high-level use cases ("experiments"), such as neural
   network training with minimal code overhead.
 * A utility to automatically convert a downloaded model (e.g., pre-trained) to its equivalent Analog
   model by replacing all linear/conv layers to Analog layers (e.g., for convenient hardware-aware training).
-* Integration with the [AIHW Composer] platform, a no-code web experience, that allows executing
+* Integration with the [AIHW Composer] platform, a no-code web experience that allows executing
   experiments in the cloud.
 
 ## Example
@@ -104,6 +104,7 @@ You can find more examples in the [`examples/`] folder of the project, and
 more information about the library in the [documentation]. Please note that
 the examples have some additional dependencies - you can install them via
 `pip install -r requirements-examples.txt`.
+You can find interactive notebooks and tutorials in the [`notebooks/`] directory. 
 
 
 ## What is Analog AI?
@@ -117,7 +118,7 @@ Analog AI delivers radical performance improvements by combining compute and
 memory in a single device, eliminating the von Neumann bottleneck. By leveraging
 the physical properties of memory devices, computation happens at the same place
 where the data is stored. Such in-memory computing hardware increases the speed
-and energy-efficiency needed for next generation AI workloads.
+and energy efficiency needed for next-generation AI workloads.
 
 ## What is an in-memory computing chip?
 
@@ -152,20 +153,42 @@ your research, please cite the AICAS21 paper that describes the toolkit:
 >
 > https://ieeexplore.ieee.org/abstract/document/9458494
 
+## Awards and Media Mentions 
+We are proud to share the AIHWKIT and the companion cloud composer received the IEEE OPEN SOURCE SCIENCE [award] in 2023. 
+![image](https://github.com/IBM/aihwkit/assets/7916630/1eb2ee6a-31c6-42c1-aa30-da5d396b24d7)
+
 ## Installation
 
 ### Installing from PyPI
 
-The preferred way to install this package is by using the
+The preferred way to install this package is by using the 
 [Python package index]:
 
 ```bash
 $ pip install aihwkit
 ```
+### Conda-based Installation
+We are working on publishing the package in the conda-forge channel. Until then, you need to manually download the package for installation.
 
-> :warning: Note that currently we provide CPU-only pre-built packages for
-> specific combinations of architectures and versions, and in some cases a
-> pre-built package might still not be available.
+Download the aihwkit conda package tar file::
+
+    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-condapkg.tar
+
+Untar the file to a directory such as $HOME/aihwkit-condapkg
+Create a conda environment::
+
+    $ conda create -n aihwkit
+    $ conda activate aihwkit
+
+Install one of the conda packages.  For example:
+
+  - CPU::
+
+    $ conda install python=3.9 aihwkit -c conda-forge -c file:/$HOME/aihwkit-condapkg
+
+  - GPU::
+
+    $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
 
 If you encounter any issues during download or want to compile the package
 for your environment, please refer to the [advanced installation] guide.
@@ -192,6 +215,7 @@ This project is licensed under [Apache License 2.0].
 [`PyTorch`]: https://pytorch.org/
 
 [`examples/`]: examples/
+[`notebooks/`]: notebooks/
 [documentation]: https://aihwkit.readthedocs.io/
 [contributors]: https://github.com/IBM/aihwkit/graphs/contributors
 [advanced installation]: https://aihwkit.readthedocs.io/en/latest/advanced_install.html
@@ -203,3 +227,4 @@ This project is licensed under [Apache License 2.0].
 [Kirchhoff’s circuits laws]: https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws
 [online demo]: https://analog-ai-demo.mybluemix.net/
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
+[award]: https://conferences.computer.org/services/2023/awards/ 
