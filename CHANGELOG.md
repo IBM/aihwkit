@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 
 * Added new tutorial notebooks to cover the concepts of training,
- hardware-aware training, post-training calibration, and extending aihwkit functionality (#518, #523, #526)
+ hardware-aware training, post-training calibration, and extending aihwkit functionality (\#518, \#523, \#526)
 * Calibration of input ranges for inference (\#512)
 * New analog in-memory training algorithms: Chopped Tiki-taka II (\#512)
 * New analog in-memory training algorithms: AGAD (\#512)
