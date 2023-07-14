@@ -100,7 +100,7 @@ jobs:
     before_install:
       - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
-      - python3 -m pip install cibuildwheel==2.13.1
+      - python3 -m pip install cibuildwheel==2.8.1
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse
@@ -124,7 +124,7 @@ jobs:
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
     install:
-      - python3 -m pip install cibuildwheel==2.13.1
+      - python3 -m pip install cibuildwheel==2.8.1
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
@@ -153,7 +153,7 @@ jobs:
       - mkdir C:\\BLAS
       - 7z x openblas.zip -oc:\\BLAS
     install:
-      - python3 -m pip install cibuildwheel==2.13.1
+      - python3 -m pip install cibuildwheel==2.8.1
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse

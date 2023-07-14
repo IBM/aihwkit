@@ -12,11 +12,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [Unreleased]
-
+## [0.8.0] - 2023/07/14
 
 ### Added
 
+* Added new tutorial notebooks to cover the concepts of training,
+ hardware-aware training, post-training calibration, and extending aihwkit functionality (\#518, \#523, \#526)
 * Calibration of input ranges for inference (\#512)
 * New analog in-memory training algorithms: Chopped Tiki-taka II (\#512)
 * New analog in-memory training algorithms: AGAD (\#512)
@@ -533,7 +534,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.7.1...HEAD
+[0.8.0]: https://github.com/IBM/aihwkit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBM/aihwkit/compare/v0.7.0..v0.7.1
 [0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0
 [0.6.0]: https://github.com/IBM/aihwkit/compare/v0.5.1..0.6.0
