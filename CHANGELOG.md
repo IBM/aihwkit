@@ -12,11 +12,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [Unreleased]
+## [0.8.0] - 2023/07/14
 
 
 ### Added
 
+* Added new tutorial notebooks to cover the concepts of training,
+ hardware-aware training, post-training calibration, and extending aihwkit functionality
 * Calibration of input ranges for inference (\#512)
 * New analog in-memory training algorithms: Chopped Tiki-taka II (\#512)
 * New analog in-memory training algorithms: AGAD (\#512)
