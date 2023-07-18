@@ -25,11 +25,11 @@ Install one of the conda packages.  For example:
 
   - CPU::
 
-    $ conda install python=3.9 aihwkit -c conda-forge -c file:/$HOME/aihwkit-condapkg
+    $ conda install python=3.9 aihwkit -c conda-forge -c file://$HOME/aihwkit-condapkg
 
   - GPU::
 
-    $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
+    $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file://$HOME/aihwkit-condapkg
 
 Compilation
 -----------
