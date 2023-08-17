@@ -154,8 +154,9 @@ your research, please cite the AICAS21 paper that describes the toolkit:
 > https://ieeexplore.ieee.org/abstract/document/9458494
 
 ## Awards and Media Mentions 
-We are proud to share the AIHWKIT and the companion cloud composer received the IEEE OPEN SOURCE SCIENCE [award] in 2023. 
-![image](https://github.com/IBM/aihwkit/assets/7916630/1eb2ee6a-31c6-42c1-aa30-da5d396b24d7)
+* IBM Research blog: [Open-sourcing analog AI simulation]: https://research.ibm.com/blog/analog-ai-for-efficient-computing
+* We are proud to share that the AIHWKIT and the companion cloud composer received the IEEE OPEN SOURCE SCIENCE [award] in 2023.
+  <img width="817" alt="IEEE Award" src="https://github.com/IBM/aihwkit/assets/7916630/bd3347fe-49c0-4aa2-ba6e-455b0e2a91ce">
 
 ## Installation
 
@@ -191,17 +192,17 @@ Install one of the conda packages.  For example:
     $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
 
 If you encounter any issues during download or want to compile the package
-for your environment, please refer to the [advanced installation] guide.
+for your environment, please take a look at the [advanced installation] guide.
 That section describes the additional libraries and tools required for
-compiling the sources, using a build system based on `cmake`.
+compiling the sources using a build system based on `cmake`.
 
 ## Authors
 
-IBM Analog Hardware Acceleration Kit has been developed by IBM Research,
+IBM Research has developed IBM Analog Hardware Acceleration Kit,
 with Malte Rasch, Tayfun Gokmen, Diego Moreda, Manuel Le Gallo-Bourdeau, and Kaoutar El Maghraoui
 as the initial core authors, along with many [contributors].
 
-You can contact us by opening a new issue in the repository, or alternatively
+You can contact us by opening a new issue in the repository or alternatively
 at the ``aihwkit@us.ibm.com`` email address.
 
 ## License
