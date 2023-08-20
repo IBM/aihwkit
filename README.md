@@ -144,7 +144,7 @@ learning models at reduced energy consumption.
 ## How to cite?
 
 In case you are using the _IBM Analog Hardware Acceleration Kit_ for
-your research, please cite the AICAS21 paper that describes the toolkit:
+your research, please cite the AICAS21 paper that describes the toolkit and arXiv paper:
 
 > Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
 > Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
@@ -152,6 +152,14 @@ your research, please cite the AICAS21 paper that describes the toolkit:
 > analog crossbar arrays" (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
 >
 > https://ieeexplore.ieee.org/abstract/document/9458494
+
+> Manuel Le Gallo, Corey Lammie, Julian Buechel, Fabio Carta, Omobayode Fagbohungbe,
+> Charles Mackin, Hsinyu Tsai, Vijay Narayanan, Abu Sebastian, Kaoutar El Maghraoui,
+> Malte J. Rasch.
+> "Using the IBM Analog In-Memory Hardware Acceleration Kit for Neural Network Training and Inference"
+> to Appear in APL Machine Learning Journal
+> 
+> https://arxiv.org/abs/2307.09357
 
 ## Awards and Media Mentions 
 * IBM Research blog: [Open-sourcing analog AI simulation]: https://research.ibm.com/blog/analog-ai-for-efficient-computing
