@@ -127,7 +127,7 @@ describes the usage of the toolkit that can be found here:
 > Charles Mackin, Hsinyu Tsai, Vijay Narayanan, Abu Sebastian, Kaoutar El Maghraoui,
 > Malte J. Rasch.
 > "Using the IBM Analog In-Memory Hardware Acceleration Kit for Neural Network Training and Inference"
-> to Appear in APL Machine Learning Journal
+> submitted to APL Machine Learning Journal
 >
 > https://arxiv.org/abs/2307.09357
 
