@@ -121,7 +121,7 @@ You can find interactive notebooks and tutorials in the [`notebooks/`] directory
 ### Further reading
 
 We also recommend to take a look at the tutorial article that
-described the usage of the toolkit that can be found here:
+describes the usage of the toolkit that can be found here:
 
 > Manuel Le Gallo, Corey Lammie, Julian Buechel, Fabio Carta, Omobayode Fagbohungbe,
 > Charles Mackin, Hsinyu Tsai, Vijay Narayanan, Abu Sebastian, Kaoutar El Maghraoui,
