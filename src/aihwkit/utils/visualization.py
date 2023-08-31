@@ -184,8 +184,8 @@ def compute_pulse_statistics(
         w_values = w_trace_s[msk, :, :]
         delta_w_values = delta_w[msk, :, :]
 
-    dw_mean = np.zeros((len(w_nodes), w_trace.shape[1], w_trace.shape[2]))
-    dw_std = np.zeros((len(w_nodes), w_trace.shape[1], w_trace.shape[2]))
+    dw_mean = np.zeros((len(w_nodes), w_trace.shape[1], w_trace.shape[2]))  # type: ignore
+    dw_std = np.zeros((len(w_nodes), w_trace.shape[1], w_trace.shape[2]))  # type: ignore
 
     lam = (w_nodes[1] - w_nodes[0]) / 2 * smoothness
     for i, node in enumerate(w_nodes):
@@ -228,7 +228,7 @@ def plot_pulse_statistics(
         w_nodes, w_trace, direction, up_direction, smoothness
     )
 
-    n_traces = dw_mean.shape[1] * dw_mean.shape[2]
+    n_traces = dw_mean.shape[1] * dw_mean.shape[2]  # type: ignore
 
     for i in range(n_traces):
         errorbar_patch(
