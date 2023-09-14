@@ -14,9 +14,9 @@
 
 """Exporting utilities"""
 
-from typing import Optional, Dict, Tuple, Union
+from typing import Optional, Dict, Tuple, Union, OrderedDict
 from copy import deepcopy
-from collections import OrderedDict
+from collections import OrderedDict as ordered_dict
 from csv import writer, reader
 
 from torch import Tensor
@@ -31,7 +31,6 @@ from aihwkit.inference.converter.fusion import FusionConductanceConverter
 from aihwkit.inference.noise.fusion import FusionImportNoiseModel
 from aihwkit.nn.modules.base import AnalogLayerBase
 from aihwkit.simulator.tiles.base import TileModuleBase, SimulatorTile
-from aihwkit.simulator.configs.configs import InferenceRPUConfig
 
 
 def _fusion_save_csv(file_name: str, conductance_data: OrderedDict, header: str) -> None:
@@ -54,7 +53,7 @@ def _fusion_load_csv(file_name: str, header: str) -> OrderedDict:
         FusionExportError: if the header mismatches
     """
 
-    conductance_data = OrderedDict()
+    conductance_data = ordered_dict()
     header_lines = header.split("\n")[:-1]
 
     with open(file_name, "r", newline="", encoding="utf-8") as file:
@@ -78,14 +77,16 @@ def _fusion_get_csv_header(analog_model: Module) -> str:
         current_header += ",".join([str(info[field]) for info in layer_infos.values()]) + "\n"
         return current_header
 
-    layer_infos = OrderedDict()
+    layer_infos = ordered_dict()  # type: OrderedDict
 
     idx = 0
     for layer_name, module in analog_model.named_modules():
-        if isinstance(module, (TileModuleBase, SimulatorTile, ModuleList)) or (
-            isinstance(module, AnalogLayerBase) and module.IS_CONTAINER
-        ):
+        if isinstance(module, (TileModuleBase, SimulatorTile, ModuleList)):
             continue
+
+        if isinstance(module, AnalogLayerBase) and module.IS_CONTAINER:  # type: ignore
+            continue
+
         idx += 1
         if not isinstance(module, AnalogLayerBase):
             continue
@@ -135,7 +136,7 @@ def fusion_export(
     g_converter = deepcopy(g_converter) or FusionConductanceConverter()
     state_dict = analog_model.state_dict()
 
-    conductance_data = OrderedDict()
+    conductance_data = ordered_dict()
     for layer_name, module in analog_model.named_analog_layers():
         layer_data = []
         for analog_tile in module.analog_tiles():
