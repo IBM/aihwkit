@@ -11,7 +11,7 @@
 # that they have been altered from the originals.
 
 """Base class for adding functionality to analog layers."""
-from typing import Any, List, Optional, Tuple, NamedTuple, Union, Generator, Callable
+from typing import Any, List, Optional, Tuple, NamedTuple, Union, Generator, Callable, TYPE_CHECKING
 from collections import OrderedDict
 
 from torch import Tensor
@@ -22,6 +22,9 @@ from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
 from aihwkit.simulator.tiles.base import AnalogTileStateNames
+
+if TYPE_CHECKING:
+    from aihwkit.inference.noise.base import BaseNoiseModel
 
 
 class AnalogLayerBase:
@@ -304,8 +307,19 @@ class AnalogLayerBase:
             if isinstance(analog_tile, InferenceTileWithPeriphery):
                 analog_tile.drift_weights(t_inference)
 
-    def program_analog_weights(self) -> None:
+    def program_analog_weights(self, noise_model: Optional["BaseNoiseModel"] = None) -> None:
         """Program the analog weights.
+
+        Args:
+            noise_model: Optional defining the noise model to be
+                used. If not given, it will use the noise model
+                defined in the `RPUConfig`.
+
+                Caution:
+
+                    If given a noise model here it will overwrite the
+                    stored `rpu_config.noise_model` definition in the
+                    tiles.
 
         Raises:
             ModuleError: if the layer is not in evaluation mode.
@@ -313,7 +327,7 @@ class AnalogLayerBase:
         if self.training:  # type: ignore
             raise ModuleError("program_analog_weights can only be applied in evaluation mode")
         for analog_tile in self.analog_tiles():
-            analog_tile.program_weights()
+            analog_tile.program_weights(noise_model=noise_model)
 
     def extra_repr(self) -> str:
         """Set the extra representation of the module.

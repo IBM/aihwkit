@@ -31,6 +31,7 @@ from aihwkit.simulator.rpu_base import tiles
 from aihwkit.simulator.parameters.base import RPUConfigGeneric
 from aihwkit.simulator.parameters.helpers import parameters_to_bindings
 from aihwkit.simulator.parameters.enums import WeightModifierType, WeightClipType, WeightRemapType
+from aihwkit.inference.noise.base import BaseNoiseModel
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs import InferenceRPUConfig
@@ -61,7 +62,7 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
         # Helpers.
         self.programmed_weights = None  # type: Optional[Tensor]
-        self.nu_drift_list = None  # type: Optional[List[Tensor]]
+        self.drift_noise_parameters = None  # type: Optional[List[Tensor]]
 
     def _create_simulator_tile(
         self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
@@ -132,34 +133,51 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         )
 
     @no_grad()
-    def program_weights(self, from_reference: bool = True) -> None:
+    def program_weights(
+        self, from_reference: bool = True, noise_model: Optional[BaseNoiseModel] = None
+    ) -> None:
         """Apply weights noise to the current tile weights and saves these for
         repeated drift experiments.
 
         This method also establishes the drift coefficients for each
         conductance slice.
 
-        Will also reset the drift readout tensor and compuate a new
+        Will also reset the drift readout tensor and compute a new
         drift compensation baseline
 
         Args:
             from_reference: Whether to use weights from reference
+            noise_model: Optional defining the noise model to be
+                used. If not given, it will use the noise model
+                defined in the `RPUConfig` of this tile.
+
+                Caution:
+
+                    If given a noise model here it will overwrite the
+                    stored `rpu_config.noise_model` definition.
 
         Raises:
             ConfigError: in case of ``noise_model`` is not defined in
-                the RPUConfig
+                the `RPUConfig` or the given noise model is of the wrong type
+
         """
         # pylint: disable=arguments-differ
 
         if not hasattr(self.rpu_config, "noise_model"):
             raise ConfigError("Seems that RPUConfig is not of type InferenceRPUConfig.")
 
+        if noise_model is not None:
+            if not isinstance(noise_model, BaseNoiseModel):
+                raise ConfigError("Given noise model has to be of type 'BaseNoiseModel'")
+
+            self.rpu_config.noise_model = noise_model
+
         if not from_reference or self.reference_combined_weights is None:
             self.reference_combined_weights = Tensor(self.tile.get_weights())
 
         (
             self.programmed_weights,
-            self.nu_drift_list,
+            self.drift_noise_parameters,
         ) = self.rpu_config.noise_model.apply_programming_noise(self.reference_combined_weights)
 
         self.tile.set_weights(self.programmed_weights)
@@ -199,8 +217,12 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         if self.programmed_weights is None:
             self.program_weights()
 
+        if hasattr(self, "nu_drift_list"):
+            # legacy
+            self.drift_noise_parameters = self.__dict__.pop("nu_drift_list")
+
         drifted_weights = self.rpu_config.noise_model.apply_drift_noise(
-            self.programmed_weights, self.nu_drift_list, t_inference
+            self.programmed_weights, self.drift_noise_parameters, t_inference
         )
         self.tile.set_weights(drifted_weights)
 
@@ -209,9 +231,11 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             and self.rpu_config.drift_compensation is not None
         ):
             forward_output = self._forward_drift_readout_tensor()
-            self.alpha = self.rpu_config.drift_compensation.apply(
-                forward_output, self.drift_baseline
-            ).to(self.device)
+            alpha = self.rpu_config.drift_compensation.apply(forward_output, self.drift_baseline)
+            if isinstance(self, Module):
+                # somehow legacy is incompatible with torch buffers
+                self.__dict__.pop("alpha", None)
+            self.alpha = alpha
 
     def post_forward(
         self, x_output: Tensor, dim: int, is_test: bool = False, ctx: Any = None

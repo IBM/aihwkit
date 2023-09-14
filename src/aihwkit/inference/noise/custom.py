@@ -144,23 +144,6 @@ class StateIndependentNoiseModel(BaseNoiseModel):  # pylint: disable=too-many-in
         self.read_noise_scale = read_noise_scale
         self.t_read = t_read
 
-    def __str__(self) -> str:
-        ret = self.__class__.__name__ + "("
-        for key in [
-            "g_converter",
-            "prog_coeff",
-            "prog_noise_scale",
-            "drift_nu_mean",
-            "drift_nu_std",
-            "drift_scale",
-            "t_0",
-            "read_noise_scale",
-            "t_0",
-        ]:
-            ret += key + "={}, ".format(self.__dict__[key])
-        ret = ret[:-2] + ")"
-        return ret
-
     @no_grad()
     def apply_programming_noise_to_conductance(self, g_target: Tensor) -> Tensor:
         """Apply programming noise to a target conductance Tensor.
@@ -190,7 +173,7 @@ class StateIndependentNoiseModel(BaseNoiseModel):  # pylint: disable=too-many-in
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-        self, g_prog: Tensor, nu_drift: Tensor, t_inference: float
+        self, g_prog: Tensor, drift_noise_param: Tensor, t_inference: float
     ) -> Tensor:
         """Apply the noise and drift up to the assumed inference time
         point."""
@@ -198,7 +181,7 @@ class StateIndependentNoiseModel(BaseNoiseModel):  # pylint: disable=too-many-in
 
         # drift
         if t > self.t_0:
-            g_drift = g_prog * ((t / self.t_0) ** (-nu_drift))
+            g_drift = g_prog * ((t / self.t_0) ** (-drift_noise_param))
         else:
             g_drift = g_prog
 

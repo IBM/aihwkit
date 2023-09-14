@@ -51,3 +51,7 @@ class TorchTileConfigError(ConfigError):
 
 class CloudError(AihwkitException):
     """Exceptions related to the cloud functionality."""
+
+
+class FusionExportError(CloudError):
+    """Exceptions related to the fusion export functionality."""
