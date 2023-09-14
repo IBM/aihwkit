@@ -68,7 +68,19 @@ functionalities such as:
 * Integration with the [AIHW Composer] platform, a no-code web experience that allows executing
   experiments in the cloud.
 
-## Example
+## How to cite?
+
+In case you are using the _IBM Analog Hardware Acceleration Kit_ for
+your research, please cite the AICAS21 paper that describes the toolkit:
+
+> Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
+> Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
+> "A flexible and fast PyTorch toolkit for simulating training and inference on
+> analog crossbar arrays" (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
+>
+> https://ieeexplore.ieee.org/abstract/document/9458494
+
+## Usage
 
 ### Training example
 
@@ -104,7 +116,20 @@ You can find more examples in the [`examples/`] folder of the project, and
 more information about the library in the [documentation]. Please note that
 the examples have some additional dependencies - you can install them via
 `pip install -r requirements-examples.txt`.
-You can find interactive notebooks and tutorials in the [`notebooks/`] directory. 
+You can find interactive notebooks and tutorials in the [`notebooks/`] directory.
+
+### Further reading
+
+We also recommend to take a look at the tutorial article that
+describes the usage of the toolkit that can be found here:
+
+> Manuel Le Gallo, Corey Lammie, Julian Buechel, Fabio Carta, Omobayode Fagbohungbe,
+> Charles Mackin, Hsinyu Tsai, Vijay Narayanan, Abu Sebastian, Kaoutar El Maghraoui,
+> Malte J. Rasch.
+> "Using the IBM Analog In-Memory Hardware Acceleration Kit for Neural Network Training and Inference"
+> submitted to APL Machine Learning Journal
+>
+> https://arxiv.org/abs/2307.09357
 
 
 ## What is Analog AI?
@@ -141,19 +166,7 @@ arrays, creating an artificial neural network where all matrix multiplications
 are performed in-place in an analog manner. This structure allows to run deep
 learning models at reduced energy consumption.
 
-## How to cite?
-
-In case you are using the _IBM Analog Hardware Acceleration Kit_ for
-your research, please cite the AICAS21 paper that describes the toolkit:
-
-> Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
-> Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
-> "A flexible and fast PyTorch toolkit for simulating training and inference on
-> analog crossbar arrays" (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
->
-> https://ieeexplore.ieee.org/abstract/document/9458494
-
-## Awards and Media Mentions 
+## Awards and Media Mentions
 * IBM Research blog: [Open-sourcing analog AI simulation]: https://research.ibm.com/blog/analog-ai-for-efficient-computing
 * We are proud to share that the AIHWKIT and the companion cloud composer received the IEEE OPEN SOURCE SCIENCE [award] in 2023.
   <img width="817" alt="IEEE Award" src="https://github.com/IBM/aihwkit/assets/7916630/bd3347fe-49c0-4aa2-ba6e-455b0e2a91ce">
@@ -162,7 +175,7 @@ your research, please cite the AICAS21 paper that describes the toolkit:
 
 ### Installing from PyPI
 
-The preferred way to install this package is by using the 
+The preferred way to install this package is by using the
 [Python package index]:
 
 ```bash
@@ -228,4 +241,4 @@ This project is licensed under [Apache License 2.0].
 [Kirchhoff’s circuits laws]: https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws
 [online demo]: https://analog-ai-demo.mybluemix.net/
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
-[award]: https://conferences.computer.org/services/2023/awards/ 
+[award]: https://conferences.computer.org/services/2023/awards/
