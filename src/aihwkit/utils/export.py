@@ -20,7 +20,7 @@ from collections import OrderedDict
 from csv import writer, reader
 
 from torch import Tensor
-from torch.nn import Module
+from torch.nn import Module, ModuleList
 
 from numpy import array
 
@@ -82,7 +82,7 @@ def _fusion_get_csv_header(analog_model: Module) -> str:
 
     idx = 0
     for layer_name, module in analog_model.named_modules():
-        if isinstance(module, (TileModuleBase, SimulatorTile)) or (
+        if isinstance(module, (TileModuleBase, SimulatorTile, ModuleList)) or (
             isinstance(module, AnalogLayerBase) and module.IS_CONTAINER
         ):
             continue
