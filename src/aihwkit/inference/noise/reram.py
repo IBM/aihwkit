@@ -98,11 +98,6 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
         self.coeff_dic = coeff_dic
         self.noise_scale = noise_scale
 
-    def __str__(self) -> str:
-        return ("{}(g_converter={}, g_max={:1.2f}, noise_scale={})").format(  # type: ignore
-            self.__class__.__name__, self.g_converter, self.g_max, self.noise_scale
-        )
-
     def _apply_poly(self, g_target: Tensor, coeff: List, scale: float = 1.0) -> Tensor:
         """Applied polynomial noise"""
 

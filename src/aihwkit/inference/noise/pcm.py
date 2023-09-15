@@ -103,23 +103,6 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         self.read_noise_scale = read_noise_scale
         self.drift_scale = drift_scale
 
-    def __str__(self) -> str:
-        return (
-            "{}(prog_coeff={}, g_converter={}, g_max={:1.2f}, t_read={}, "
-            "t_0={:1.2f}, prog_noise_scale={}, "
-            "read_noise_scale={}, drift_scale={})"
-        ).format(  # type: ignore
-            self.__class__.__name__,
-            self.prog_coeff,
-            self.g_converter,
-            self.g_max,
-            self.t_read,
-            self.t_0,
-            self.prog_noise_scale,
-            self.read_noise_scale,
-            self.drift_scale,
-        )
-
     @no_grad()
     def apply_programming_noise_to_conductance(self, g_target: Tensor) -> Tensor:
         """Apply programming noise to a target conductance Tensor.
@@ -154,7 +137,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-        self, g_prog: Tensor, nu_drift: Tensor, t_inference: float
+        self, g_prog: Tensor, drift_noise_param: Tensor, t_inference: float
     ) -> Tensor:
         """Apply the noise and drift up to the assumed inference time
         point based on PCM measurements."""
@@ -162,7 +145,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
 
         # drift
         if t > self.t_0:
-            g_drift = g_prog * ((t / self.t_0) ** (-nu_drift))
+            g_drift = g_prog * ((t / self.t_0) ** (-drift_noise_param))
         else:
             g_drift = g_prog
 

@@ -26,6 +26,26 @@ class BaseNoiseModel:
     def __init__(self, g_converter: Optional[BaseConductanceConverter] = None):
         self.g_converter = g_converter or SinglePairConductanceConverter()
 
+    def __eq__(self, other: object) -> bool:
+        return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
+
+    def __str__(
+        self, exclude_keys: Optional[List[str]] = None, keys: Optional[List[str]] = None
+    ) -> str:
+        """Print instance."""
+        ret = self.__class__.__name__ + "("
+        if keys is None:
+            keys = list(self.__dict__.keys())
+
+        if exclude_keys is not None:
+            for key in exclude_keys:
+                keys.remove(key)
+
+        for key in keys:
+            ret += key + "={}, ".format(self.__dict__[key])
+        ret = ret[:-2] + ")"
+        return ret
+
     @no_grad()
     def apply_noise(self, weights: Tensor, t_inference: float) -> Tensor:
         """Apply the expected noise.
@@ -85,7 +105,7 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_drift_noise(
-        self, weights: Tensor, nu_drift_list: List[Tensor], t_inference: float
+        self, weights: Tensor, drift_noise_parameters: List[Optional[Tensor]], t_inference: float
     ) -> Tensor:
         """Apply the expected drift noise to weights.
 
@@ -94,7 +114,7 @@ class BaseNoiseModel:
 
         Args:
             weights: weights tensor (usually with programming noise already applied)
-            nu_drift_list: list of drift nu for each conductance slice
+            drift_noise_parameters: list of drift nu for each conductance slice
             t_inference: assumed time of inference (in sec)
 
         Returns:
@@ -103,9 +123,9 @@ class BaseNoiseModel:
         target_conductances, params = self.g_converter.convert_to_conductances(weights)
 
         noisy_conductances = []
-        for g_target, nu_drift in zip(target_conductances, nu_drift_list):
+        for g_target, drift_noise_param in zip(target_conductances, drift_noise_parameters):
             noisy_conductances.append(
-                self.apply_drift_noise_to_conductance(g_target, nu_drift, t_inference)
+                self.apply_drift_noise_to_conductance(g_target, drift_noise_param, t_inference)
             )
 
         noisy_weights = self.g_converter.convert_back_to_weights(noisy_conductances, params)
@@ -142,19 +162,16 @@ class BaseNoiseModel:
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-        self, g_prog: Tensor, nu_drift: Optional[Tensor], t_inference: float
+        self, g_prog: Tensor, drift_noise_param: Optional[Tensor], t_inference: float
     ) -> Tensor:
         r"""Apply the noise and drift up to the assumed inference time point.
 
         Args:
             g_prog: Tensor of conductance values after programming (in :math:`\muS`)
-            nu_drift: drift nu
+            drift_noise_param: typically drift nu
             t_inference: assumed time of inference (in sec)
 
         Returns:
             conductance Tensor with applied noise and drift
         """
         raise NotImplementedError
-
-    def __eq__(self, other: object) -> bool:
-        return self.__class__ == other.__class__ and self.__dict__ == other.__dict__

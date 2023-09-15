@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## Unreleased
+
+### Added
+* Fusion chip CSV file model weights exporter functionality (#\538) 
+
+
 ## [0.8.0] - 2023/07/14
 
 ### Added
