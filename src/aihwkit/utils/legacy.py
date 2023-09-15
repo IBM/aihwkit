@@ -103,6 +103,18 @@ def convert_legacy_checkpoint(
                 continue
             if not hasattr(rpu_config, "mapping"):
                 rpu_config.mapping = OldWebComposerMappingParameter()
+            if "weight_scaling_omega_columnwise" in rpu_config.mapping.__dict__:
+                rpu_config.mapping.weight_scaling_columnwise = rpu_config.mapping.__dict__.pop(
+                    "weight_scaling_omega_columnwise"
+                )
+            if "learn_out_scaling_alpha" in rpu_config.mapping.__dict__:
+                rpu_config.mapping.learn_out_scaling = rpu_config.mapping.__dict__.pop(
+                    "learn_out_scaling_alpha"
+                )
+                rpu_config.mapping.out_scaling_columnwise = (
+                    rpu_config.mapping.weight_scaling_columnwise
+                )
+
             if not has_mapped:
                 # need to set tile sizes to full since otherwise
                 # mapping would now still occur

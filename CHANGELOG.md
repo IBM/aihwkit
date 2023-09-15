@@ -15,8 +15,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
-* Fusion chip CSV file model weights exporter functionality (#\538) 
-
+* On-the-fly change of some `RPUConfig` fields (\# 539)
+* Fusion chip CSV file model weights exporter functionality (\#538) 
 
 ## [0.8.0] - 2023/07/14
 
