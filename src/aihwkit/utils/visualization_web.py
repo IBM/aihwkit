@@ -13,14 +13,14 @@
 """Visualization utilities (web)."""
 
 import argparse
-from typing import Optional
+from typing import Optional, Union
 from pathlib import Path
 
 from cycler import cycler
 import matplotlib.pyplot as plt
 
-from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 
 from aihwkit.simulator.presets.devices import (
     ReRamSBPresetDevice,
@@ -71,7 +71,7 @@ def set_dark_style(axes: Axes) -> None:
 
 def plot_device_compact_web(
     device: PulsedDevice, w_noise: float = 0.0, n_steps: Optional[int] = None, n_traces: int = 3
-) -> Figure:
+) -> Union[Figure, Axes]:
     """Plots a compact step response figure for a given device (preset).
 
     Note:
@@ -92,9 +92,12 @@ def plot_device_compact_web(
 
     figure = plot_device_compact(device, w_noise, n_steps, n_traces)
 
+    if isinstance(figure, Axes):
+        return figure
+
     # Tune for web.
-    for axes in figure.axes:
-        for i, line in enumerate(axes.lines):
+    for axes in figure.get_axes():
+        for i, line in enumerate(axes.get_lines()):
             line.set_color(WEB_COLORS[i])
         # set_dark_style(axes)
 
@@ -120,15 +123,16 @@ def save_plots_for_web(path: Path = Path("/tmp"), file_format: str = "svg") -> N
         file_name = "{}.{}".format(camel_to_snake(device.__name__), file_format)
         file_path = path.absolute() / file_name
 
-        figure = plot_device_compact_web(device(), n_steps=n_steps)
-        figure.savefig(file_path, format=file_format, transparent=True, bbox_inches="tight")
+        figure = plot_device_compact_web(device(), n_steps=n_steps)  # type: ignore
+
+        figure.savefig(file_path, format=file_format, transparent=True, bbox_inches="tight")  # type: ignore
 
         # Images for the mini leftbar.
         file_name = "{}-mini.{}".format(camel_to_snake(device.__name__), file_format)
         file_path = path.absolute() / file_name
 
         figure = plot_device_compact_web(device(), n_traces=1, n_steps=n_steps)
-        for axes in figure.axes:
+        for axes in figure.get_axes():  # type: ignore
             # Disable texts.
             axes.set_title("")
             axes.set_xlabel("")
@@ -142,9 +146,9 @@ def save_plots_for_web(path: Path = Path("/tmp"), file_format: str = "svg") -> N
             # Increase axis width.
             for axis in ["top", "bottom", "left", "right"]:
                 axes.spines[axis].set_linewidth(3)
-            for line in axes.lines:
+            for line in axes.get_lines():
                 line.set_linewidth(4)
-        figure.savefig(file_path, format=file_format, transparent=True, bbox_inches="tight")
+        figure.savefig(file_path, format=file_format, transparent=True, bbox_inches="tight")  # type: ignore
 
 
 if __name__ == "__main__":
