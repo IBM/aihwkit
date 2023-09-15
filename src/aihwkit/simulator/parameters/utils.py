@@ -15,7 +15,7 @@
 
 """Utility parameters for resistive processing units."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import ClassVar, Type, Any, List, Optional
 
 from aihwkit.simulator.parameters.helpers import _PrintableMixin
@@ -725,6 +725,26 @@ class MappingParameter(_PrintableMixin):
         Only relevant for ``Mapped`` modules such as
         :class:`aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`.
     """
+
+    def compatible_with(self, mapping: "MappingParameter") -> bool:
+        """Checks compatiblity
+
+        Args:
+            mapping: param to check
+
+        Returns:
+            success:  if compatible
+        """
+        if mapping == self:
+            return True
+
+        for key in fields(mapping):
+            if key.name in ["weight_scaling_omega", "weight_scaling_columnwise"]:
+                continue
+
+            if mapping.__dict__[key.name] != self.__dict__[key.name]:
+                return False
+        return True
 
 
 @dataclass

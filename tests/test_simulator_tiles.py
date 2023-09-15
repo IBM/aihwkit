@@ -18,7 +18,7 @@ from unittest import SkipTest
 
 from torch import Tensor, zeros, ones, manual_seed
 
-from aihwkit.exceptions import ArgumentError
+from aihwkit.exceptions import ArgumentError, TileModuleError
 from aihwkit.simulator.configs.configs import UnitCellRPUConfig
 from aihwkit.simulator.configs.compounds import VectorUnitCell, ReferenceUnitCell
 from aihwkit.simulator.parameters.enums import (
@@ -26,7 +26,7 @@ from aihwkit.simulator.parameters.enums import (
     NoiseManagementType,
     BoundManagementType,
 )
-from aihwkit.simulator.configs.configs import PrePostProcessingRPU
+from aihwkit.simulator.configs.configs import PrePostProcessingRPU, FloatingPointRPUConfig
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -559,6 +559,62 @@ class TileTest(ParametrizedTestCase):
         del state[non_empty_keys[-1]]
         with self.assertRaises(RuntimeError):
             analog_tile.tile.load_extra(state, True)
+
+    def test_replace_rpu_config(self) -> None:
+        """Tests whether it is possible to replace the RPUConfig"""
+        rpu_config = self.get_rpu_config()
+        if not hasattr(rpu_config, "forward"):
+            raise SkipTest("No forward")
+
+        rpu_config.forward.out_noise = 0.123
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        # check C++ tile
+        meta_pars = analog_tile.tile.get_meta_parameters()
+        self.assertAlmostEqual(meta_pars.forward_io.out_noise, 0.123)
+        with self.assertRaises(TileModuleError):
+            analog_tile.replace_with(FloatingPointRPUConfig)
+
+        # dummy check
+        rpu_config.forward.out_noise = 0.234
+        self.assertNotAlmostEqual(analog_tile.rpu_config.forward.out_noise, 0.234)
+
+        # replace
+        analog_tile.replace_with(rpu_config)
+        meta_pars = analog_tile.tile.get_meta_parameters()
+        self.assertAlmostEqual(meta_pars.forward_io.out_noise, 0.234)
+        self.assertAlmostEqual(analog_tile.rpu_config.forward.out_noise, 0.234)
+
+    def test_replace_rpu_config_to(self) -> None:
+        """Tests whether it is possible to replace the RPUConfig with to"""
+        rpu_config = self.get_rpu_config()
+        if not hasattr(rpu_config, "forward"):
+            raise SkipTest("No forward")
+
+        rpu_config.forward.out_noise = 0.123
+        analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
+
+        # check C++ tile
+        meta_pars = analog_tile.tile.get_meta_parameters()
+        self.assertAlmostEqual(meta_pars.forward_io.out_noise, 0.123)
+        with self.assertRaises(TileModuleError):
+            analog_tile.replace_with(FloatingPointRPUConfig)
+
+        # dummy check
+        rpu_config.forward.out_noise = 0.234
+        self.assertNotAlmostEqual(analog_tile.rpu_config.forward.out_noise, 0.234)
+
+        # replace
+        analog_tile.to(rpu_config)
+        meta_pars = analog_tile.tile.get_meta_parameters()
+        self.assertAlmostEqual(meta_pars.forward_io.out_noise, 0.234)
+        self.assertAlmostEqual(analog_tile.rpu_config.forward.out_noise, 0.234)
+
+        rpu_config.forward.out_noise = 0.54
+        analog_tile.to(rpu_config=rpu_config)
+        meta_pars = analog_tile.tile.get_meta_parameters()
+        self.assertAlmostEqual(meta_pars.forward_io.out_noise, 0.54)
+        self.assertAlmostEqual(analog_tile.rpu_config.forward.out_noise, 0.54)
 
 
 @parametrize_over_tiles(
