@@ -141,11 +141,14 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
                 self.analog_ctx.data = self.analog_ctx.data.cuda(device)
                 self.analog_ctx.reset(self)  # type: ignore
 
-        if self.shared_weights is not None:
-            self.shared_weights.data = zeros(
-                self.tile.get_x_size(), self.tile.get_d_size(), dtype=float32, requires_grad=True
-            ).cuda(device)
-            # ensure shared weights will be called later (needs copying still)
+            if self.shared_weights is not None:
+                self.shared_weights.data = zeros(
+                    self.tile.get_x_size(),
+                    self.tile.get_d_size(),
+                    dtype=float32,
+                    requires_grad=True,
+                ).cuda(device)
+                # ensure shared weights will be called later (needs copying still)
         return self
 
     @no_grad()
