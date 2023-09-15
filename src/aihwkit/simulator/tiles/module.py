@@ -14,8 +14,9 @@
 
 # pylint: disable=too-few-public-methods, abstract-method, bad-super-call
 
-from typing import Dict, List, Optional, Union, Any, Callable, NamedTuple
+from typing import Dict, List, Optional, Union, Any, Callable, Tuple, NamedTuple
 from collections import OrderedDict
+from copy import deepcopy
 
 from torch import Tensor, dtype
 from torch.nn import Module
@@ -24,6 +25,7 @@ from torch import device as torch_device
 from aihwkit.exceptions import TileModuleError
 from aihwkit.simulator.tiles.base import AnalogTileStateNames, BaseTile, TileModuleBase
 from aihwkit.optim.context import AnalogContext
+from aihwkit.simulator.parameters.base import RPUConfigBase, MappableRPU
 
 
 class TileModule(Module, TileModuleBase):
@@ -198,6 +200,8 @@ class TileModule(Module, TileModuleBase):
     def to(self, *args: Any, **kwargs: Any) -> "TileModule":
         """Move analog tile module to a device.
 
+        RPUConfig conversions can be done as well.
+
         Note:
             Please be aware that moving analog tiles from GPU to CPU is
             currently not supported.
@@ -211,10 +215,20 @@ class TileModule(Module, TileModuleBase):
             This module in the specified device.
         """
 
+        rpu_config = kwargs.pop("rpu_config", None)
+        new_args = list(args)
+        if len(new_args) > 0 and isinstance(new_args[0], RPUConfigBase):
+            rpu_config = args[0]
+            del new_args[0]
+        if rpu_config is not None:
+            self.replace_with(rpu_config)
+
         device = None
         if "device" in kwargs:
             device = kwargs["device"]
-        elif len(args) > 0 and not isinstance(args[0], (Tensor, dtype)):
+        elif len(new_args) > 0 and not isinstance(new_args[0], (Tensor, dtype)):
+            if new_args[0] is None:
+                return self
             device = torch_device(args[0])
 
         if device is not None:
@@ -224,7 +238,8 @@ class TileModule(Module, TileModuleBase):
             else:
                 self.cpu()
 
-        self._apply_without_context(lambda t: t.to(*args, **kwargs))
+        if len(new_args) > 0 or len(kwargs) > 0:
+            self._apply_without_context(lambda t: t.to(*new_args, **kwargs))
         return self
 
     @staticmethod
@@ -318,6 +333,58 @@ class TileModule(Module, TileModuleBase):
                 # this needs to be handled in the analog_module level
                 unexpected_keys.remove(key)
 
+    def compatible_with(self, rpu_config: RPUConfigBase) -> Tuple[bool, Optional[str]]:
+        """Checks whether current `RPUConfig` is compatible with given
+        one.
+
+        Args:
+            rpu_config: New `RPUConfig` to check against
+
+        Returns:
+            success: Whether the given `RPUConfig` is compatible
+            msg: Error message if not
+        """
+        if self.strict_rpu_config_check:
+            if not isinstance(self.rpu_config, type(rpu_config)) and not isinstance(
+                rpu_config, type(self.rpu_config)
+            ):
+                return False, (
+                    "RPU config mismatch: "
+                    "Cannot replace "
+                    f"{rpu_config.__class__.__name__} "
+                    f"with {self.rpu_config.__class__.__name__}"
+                )
+
+        if (
+            isinstance(rpu_config, MappableRPU)
+            and isinstance(self.rpu_config, MappableRPU)
+            and rpu_config.mapping != self.rpu_config.mapping
+        ):
+            if not self.rpu_config.mapping.compatible_with(rpu_config.mapping):
+                return False, (
+                    "MappingParameter mismatch. Cannot in-place change mapping parameters"
+                    "as it might change the model structure."
+                )
+
+        return True, None
+
+    def replace_with(self, rpu_config: RPUConfigBase) -> None:
+        """Replaces the current `RPUConfig` with the given one.
+
+        Args:
+            rpu_config: New `RPUConfig` to check against
+
+        Raises:
+            TileModuleError: if given `RPUConfig` is not compatible.
+        """
+        success, msg = self.compatible_with(rpu_config)
+        if not success:
+            raise TileModuleError(msg)
+
+        analog_state = self.__getstate__()
+        analog_state[AnalogTileStateNames.RPU_CONFIG] = deepcopy(rpu_config)
+        self.__setstate__(analog_state)
+
     @staticmethod
     def _load_state_dict_pre_hook(
         analog_tile: "TileModule",
@@ -344,31 +411,9 @@ class TileModule(Module, TileModuleBase):
 
         analog_state = state_dict.pop(analog_state_name).copy()
         if not analog_tile.load_rpu_config:
-            if analog_tile.strict_rpu_config_check:
-                if not isinstance(
-                    analog_tile.rpu_config, type(analog_state["rpu_config"])
-                ) and not isinstance(analog_state["rpu_config"], type(analog_tile.rpu_config)):
-                    raise TileModuleError(
-                        "RPU config mismatch during loading: "
-                        "Tried to replace "
-                        f"{analog_state['rpu_config'].__class__.__name__} "
-                        f"with {analog_tile.rpu_config.__class__.__name__}"
-                    )
+            success, msg = analog_tile.compatible_with(analog_state["rpu_config"])
+            if not success:
+                raise TileModuleError(msg)
 
-            if hasattr(analog_state["rpu_config"], "mapping"):
-                old_mapping = analog_state["rpu_config"].mapping
-                new_mapping = analog_tile.rpu_config.mapping
-                if (
-                    old_mapping.max_input_size != new_mapping.max_input_size
-                    or old_mapping.max_output_size != new_mapping.max_output_size
-                    or old_mapping.digital_bias != new_mapping.digital_bias
-                    or (old_mapping.out_scaling_columnwise != new_mapping.out_scaling_columnwise)
-                ):
-                    raise TileModuleError(
-                        "MappingParameter mismatch during loading: "
-                        "Tried to replace "
-                        f"{old_mapping} "
-                        f"with {new_mapping}"
-                    )
             analog_state["rpu_config"] = analog_tile.rpu_config
         analog_tile.__setstate__(analog_state)

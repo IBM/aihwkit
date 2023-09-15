@@ -22,6 +22,7 @@ from aihwkit.exceptions import ModuleError
 from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
 from aihwkit.simulator.tiles.base import AnalogTileStateNames
+from aihwkit.simulator.parameters.base import RPUConfigBase
 
 if TYPE_CHECKING:
     from aihwkit.inference.noise.base import BaseNoiseModel
@@ -375,3 +376,24 @@ class AnalogLayerBase:
         """
         for analog_tile in self.analog_tiles():
             analog_tile.remap_weights(weight_scaling_omega=weight_scaling_omega)
+
+    def replace_rpu_config(self, rpu_config: RPUConfigBase) -> None:
+        """Modifies the RPUConfig for all underlying analog tiles.
+
+        Each tile will be recreated, to apply the RPUConfig changes.
+
+        Note:
+
+            Typically, the RPUConfig class needs to be the same
+            otherwise an error will be raised.
+
+        Caution:
+            If analog tiles have different RPUConfigs, these
+            differences will be overwritten
+
+        Args:
+            rpu_config: New RPUConfig to apply
+        """
+
+        for analog_tile in self.analog_tiles():
+            analog_tile.to(rpu_config)
