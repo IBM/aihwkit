@@ -25,6 +25,7 @@ from aihwkit.simulator.configs.configs import InferenceRPUConfig
 from aihwkit.simulator.parameters.base import RPUConfigBase
 from aihwkit.simulator.parameters.utils import PrePostProcessingParameter, WeightRemapParameter
 from aihwkit.simulator.presets.web import OldWebComposerMappingParameter
+from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
 
 
 def convert_legacy_checkpoint(
@@ -107,6 +108,11 @@ def convert_legacy_checkpoint(
                 # mapping would now still occur
                 rpu_config.mapping.max_input_size = 0
                 rpu_config.mapping.max_output_size = 0
+
+            if isinstance(rpu_config.noise_model, PCMLikeNoiseModel) and not hasattr(
+                rpu_config.noise_model, "prog_coeff_g_max_reference"
+            ):
+                rpu_config.noise_model.prog_coeff_g_max_reference = rpu_config.noise_model.g_max
 
             if not hasattr(rpu_config, "pre_post"):
                 rpu_config.pre_post = PrePostProcessingParameter()
