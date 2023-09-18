@@ -18,6 +18,13 @@ The format is based on [Keep a Changelog], and this project adheres to
 * On-the-fly change of some `RPUConfig` fields (\# 539)
 * Fusion chip CSV file model weights exporter functionality (\#538) 
 
+### Fixed
+* Repeated call of `cuda()` reset the weights for `InferenceTile` (\#540)
+
+### Changed
+
+### Removed
+
 ## [0.8.0] - 2023/07/14
 
 ### Added

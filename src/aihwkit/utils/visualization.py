@@ -30,7 +30,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from matplotlib import ticker
-from matplotlib.figure import Figure, Axes
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 from numpy import ndarray
 from torch import device as torch_device
 from torch import eye, from_numpy, ones, stack
@@ -418,7 +419,7 @@ def plot_device(device: Union[PulsedDevice, UnitCell], w_noise: float = 0.0, **k
         w_noise: Weight noise standard deviation during read
         kwargs: for other parameters, see :func:`plot_response_overview`
     """
-    plt.figure(figsize=[7, 7])
+    plt.figure(figsize=(7, 7))
     # To simulate some weight read noise.
     io_pars = IOParameters(
         out_noise=0.0,  # no out noise
@@ -483,7 +484,7 @@ def plot_device_compact(
         return UnitCellRPUConfig(device=device, forward=io_pars)
 
     if axes is None:
-        figure = plt.figure(figsize=[12, 4])
+        figure = plt.figure(figsize=(12, 4))
 
     # To simulate some weight read noise.
     io_pars = IOParameters(
@@ -555,21 +556,21 @@ def plot_device_compact(
     pos = axes.get_position().bounds
     space = 0.1
     gap = 0.01
-    axes.set_position([pos[0] + gap + space, pos[1], pos[2] - 2 * gap - 2 * space, pos[3]])
+    axes.set_position((pos[0] + gap + space, pos[1], pos[2] - 2 * gap - 2 * space, pos[3]))
     axes.set_yticks([])
 
-    axis_left = figure.add_axes([pos[0], pos[1], space, pos[3]])
+    axis_left = figure.add_axes((pos[0], pos[1], space, pos[3]))
     dw_mean_up = dw_mean_up.reshape(-1, n_traces)
     for i in range(n_traces):
         axis_left.plot(dw_mean_up[:, i], w_nodes)
 
-    axis_left.set_position([pos[0], pos[1], space, pos[3]])
+    axis_left.set_position((pos[0], pos[1], space, pos[3]))
     axis_left.set_xlabel("Up pulse size")
     axis_left.set_ylabel("Weight \n [conductance]")
     axis_left.set_ylim(-limit, limit)
 
     # Plot mean down statistics.
-    axis_right = figure.add_axes([pos[0] + pos[2] - space, pos[1], space, pos[3]])
+    axis_right = figure.add_axes((pos[0] + pos[2] - space, pos[1], space, pos[3]))
     dw_mean_down = dw_mean_down.reshape(-1, n_traces)
     for i in range(n_traces):
         axis_right.plot(np.abs(dw_mean_down[:, i]), w_nodes)
@@ -613,7 +614,7 @@ def plot_device_symmetry(
         use_cuda: Whether to use CUDA,
         w_init: Initial value of the weights
     """
-    plt.figure(figsize=[10, 5])
+    plt.figure(figsize=(10, 5))
 
     io_pars = IOParameters(
         out_noise=0.0,  # no out noise
@@ -658,7 +659,7 @@ def plot_weight_drift(
     """
     # pylint: disable=too-many-locals
 
-    plt.figure(figsize=[10, 5])
+    plt.figure(figsize=(10, 5))
     if noise_model is None:
         noise_model = PCMLikeNoiseModel()
     if t_inference_list is None:
