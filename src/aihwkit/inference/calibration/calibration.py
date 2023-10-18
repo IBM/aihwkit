@@ -119,9 +119,12 @@ def calibrate_input_ranges(
 
     Only tiles that support and have enabled input range learning will
     be calibrated. If noise management is turned on an error is
-    raised.  Note: this implementation transiently registers a new `forward_pre_hook`
-    on the analog tile level. It assumes that the user has not defined
-    any other forward pre hooks.
+    raised.
+
+    Note:
+        This implementation transiently registers a new `forward_pre_hook`
+        on the analog tile level. It assumes that the user has not defined
+        any other forward prehooks.
 
     Args:
         model: The analog model for
