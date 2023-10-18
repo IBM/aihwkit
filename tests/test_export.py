@@ -130,7 +130,7 @@ class FusionExactTest(AihwkitTestCase):
     def test_fusion_load_csv(self) -> None:
         """Test export and loading via dict."""
         weights = [Tensor([[1.0, 0.2], [0.3, -0.4]]), Tensor([[-0.5, 0.6], [0.7, -1.0]])]
-        conductances = [[45.0, 9.0, 13.5, 18.0], [22.5, 27.0, 31.5, 45.0]]
+        conductances = [[40.0, 8.0, 12., 16.0], [20., 24., 28., 40.]]
 
         rpu_config = InferenceRPUConfig()
         rpu_config.mapping.weight_scaling_columnwise = 0.0

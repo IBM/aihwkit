@@ -138,6 +138,7 @@ class TileModule(Module, TileModuleBase):
         self._parameters = _parameters
 
     def _apply(self, fn: Callable) -> None:
+        # pylint: disable=arguments-differ
         """Delegates to the module level.
 
         This avoids looping through parameters which would cause
