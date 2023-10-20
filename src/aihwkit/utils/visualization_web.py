@@ -126,10 +126,7 @@ def save_plots_for_web(path: Path = Path("/tmp"), file_format: str = "svg") -> N
         figure = plot_device_compact_web(device(), n_steps=n_steps)  # type: ignore
 
         figure.savefig(  # type: ignore
-            file_path,
-            format=file_format,
-            transparent=True,
-            bbox_inches="tight"
+            file_path, format=file_format, transparent=True, bbox_inches="tight"
         )
 
         # Images for the mini leftbar.
@@ -154,10 +151,7 @@ def save_plots_for_web(path: Path = Path("/tmp"), file_format: str = "svg") -> N
             for line in axes.get_lines():
                 line.set_linewidth(4)
         figure.savefig(  # type: ignore
-            file_path,
-            format=file_format,
-            transparent=True,
-            bbox_inches="tight"
+            file_path, format=file_format, transparent=True, bbox_inches="tight"
         )
 
 

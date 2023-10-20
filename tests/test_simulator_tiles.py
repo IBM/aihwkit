@@ -660,8 +660,9 @@ class TileForwardBackwardTest(ParametrizedTestCase):
         inputs = Tensor([[-0.1, 0.4], [-0.5, 0.1]])
         if analog_tile.is_cuda:
             inputs = inputs.cuda()
-        y_1 = analog_tile(inputs)
-        y_2 = analog_tile(inputs)
+        for _ in range(10):
+            y_1 = analog_tile(inputs)
+            y_2 = analog_tile(inputs)
         self.assertTensorAlmostEqual(y_1[:, 1], y_2[:, 1])
         self.assertNotAlmostEqualTensor(y_1[:, 0], y_2[:, 0])
 

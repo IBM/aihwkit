@@ -26,7 +26,7 @@ set(RPU_CUDA_ARCHITECTURES "60;70;75;80" CACHE STRING "Target CUDA architectures
 set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
                            CUDA_RESOLVE_DEVICE_SYMBOLS ON
                            CUDA_SEPARABLE_COMPILATION ON
-                           CXX_STANDARD 14)
+                           CXX_STANDARD 17)
 
 # Append the virtualenv library path to cmake.
 if(DEFINED ENV{VIRTUAL_ENV})
@@ -43,7 +43,7 @@ include(cmake/dependencies_test.cmake)
 # Set compilation flags.
 if(WIN32)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2")
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-narrowing -Wno-strict-overflow")
@@ -65,7 +65,7 @@ if(WIN32)
   target_link_libraries(RPU_CPU c10.lib torch_cpu.lib)
 endif()
 
-set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 14
+set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 17
   POSITION_INDEPENDENT_CODE ON)
 
 if(USE_CUDA)

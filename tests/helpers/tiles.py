@@ -14,8 +14,6 @@
 
 # pylint: disable=missing-function-docstring,too-few-public-methods
 
-from aihwkit.simulator.tiles.module import TileModule
-
 from aihwkit.simulator.configs.devices import (
     IdealDevice,
     ConstantStepDevice,
