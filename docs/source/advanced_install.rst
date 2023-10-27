@@ -259,8 +259,8 @@ The image can be built via::
     --build-arg CUDA_ARCH=${CUDA_ARCH} \
     --file CUDA.Dockerfile .
 
-If building your image against a different CUDA or PyTorch version, please
-ensure setting the build arguments accordingly.
+If building your image against a different CUDA version, please make sure to
+update the ``CUDA_ARCH`` build argument accordingly.
 
 .. note::
 
