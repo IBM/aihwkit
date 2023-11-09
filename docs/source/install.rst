@@ -53,7 +53,7 @@ If you encounter any issues during the installation or executing the snippet,
 please refer to the :doc:`advanced_install` section for more details and don't
 hesitate on using the `issue tracker`_ for additional support.
 
-Next steps
+Next Steps
 ----------
 
 You can read more about the PyTorch layers in the :doc:`using_pytorch`
