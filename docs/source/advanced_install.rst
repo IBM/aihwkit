@@ -25,8 +25,11 @@ Install the aihwkit using pip
 AIHWKIT can also be installed using pip commands as shown below.
 
  - CPU::
+
     $ !pip install aihwkit
+
  - GPU::
+    
     $ !get https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
 
    then,
