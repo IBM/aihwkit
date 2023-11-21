@@ -115,7 +115,7 @@ for epoch in range(10):
 You can find more examples in the [`examples/`] folder of the project, and
 more information about the library in the [documentation]. Please note that
 the examples have some additional dependencies - you can install them via
-`pip install -r requirements-examples.txt`.
+`pip install -r requirements-ex`amples.txt`.
 You can find interactive notebooks and tutorials in the [`notebooks/`] directory.
 
 ### Further reading
@@ -182,32 +182,24 @@ The preferred way to install this package is by using the
 $ pip install aihwkit
 ```
 ### Conda-based Installation
-We are working on publishing the package in the conda-forge channel. Until then, you need to manually download the package for installation.
+There is a conda package for aihwkit available in conda-forge.   It can be  installed in a conda environment running on a Linux or WSL in a Windows system.  
+- CPU::
+  $ conda install -c conda-forge aihwkit
+- GPU::
+  $ conda install -c conda-forge aihwkit-gpu
 
-Download the aihwkit conda package tar file::
+###  Pip-based Installation
+AIHWKIT can also be installed using pip commands as shown below.
 
-    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-condapkg.tar
+ - CPU::
+    $ !pip install aihwkit
+ - GPU::
+    $ !get https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
 
-Untar the file to a directory such as $HOME/aihwkit-condapkg
-Create a conda environment::
+  then,
 
-    $ conda create -n aihwkit
-    $ conda activate aihwkit
+    $ !pip install aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 
-Install one of the conda packages.  For example:
-
-  - CPU::
-
-    $ conda install python=3.9 aihwkit -c conda-forge -c file:/$HOME/aihwkit-condapkg
-
-  - GPU::
-
-    $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
-
-If you encounter any issues during download or want to compile the package
-for your environment, please take a look at the [advanced installation] guide.
-That section describes the additional libraries and tools required for
-compiling the sources using a build system based on `cmake`.
 
 ## Authors
 
