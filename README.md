@@ -185,28 +185,34 @@ $ pip install aihwkit
 There is a conda package for aihwkit available in conda-forge.   It can be  installed in a conda environment running on a Linux or WSL in a Windows system.  
 - CPU::
 
-  $ conda install -c conda-forge aihwkit
+  ```bash
+  $ !conda install -c conda-forge aihwkit
+  ```
 
 - GPU::
 
-  $ conda install -c conda-forge aihwkit-gpu
-  
+  ```bash
+  $ !conda install -c conda-forge aihwkit-gpu
+  ```
 
 ###  Pip-based Installation
 AIHWKIT can also be installed using pip commands as shown below.
 
  - CPU::
-
+   
+   ```bash
     $ !pip install aihwkit
+  ```
 
  - GPU::
-
-    $ !get https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
+   ```bash
+    $ !wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
+   ```
 
   then,
-
+   ```bash
     $ !pip install aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-
+   ```
 
 ## Authors
 
