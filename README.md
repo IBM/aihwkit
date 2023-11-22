@@ -209,6 +209,8 @@ for your environment, please take a look at the [advanced installation] guide.
 That section describes the additional libraries and tools required for
 compiling the sources using a build system based on `cmake`.
 
+For GPU support, you can also build and use a docker container following the [CUDA Dockerfile instructions].
+
 ## Authors
 
 IBM Research has developed IBM Analog Hardware Acceleration Kit,
@@ -242,3 +244,4 @@ This project is licensed under [Apache License 2.0].
 [online demo]: https://analog-ai-demo.mybluemix.net/
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
 [award]: https://conferences.computer.org/services/2023/awards/
+[CUDA Dockerfile instructions]: https://github.com/IBM/aihwkit/blob/master/docs/source/advanced_install.rst#cuda-enabled-docker-image
