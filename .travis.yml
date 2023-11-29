@@ -25,7 +25,7 @@ stages:
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
   os: linux
-  dist: bionic
+  dist: focal
   language: python
   before_install:
     - sudo apt-get -qq install -y ca-certificates
@@ -85,7 +85,7 @@ jobs:
     
   - name: "Build wheel for Python 3.8, 3.9, 3.10 on Linux x86_64"
     os: linux
-    dist: bionic
+    dist: focal
     language: python
     services: docker
     stage: Build wheels
