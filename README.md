@@ -75,10 +75,10 @@ your research, please cite the AICAS21 paper that describes the toolkit:
 
 > Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
 > Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
-> "A flexible and fast PyTorch toolkit for simulating training and inference on
-> analog crossbar arrays" (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
+> ["A flexible and fast PyTorch toolkit for simulating training and inference on
+> analog crossbar arrays"](https://ieeexplore.ieee.org/abstract/document/9458494) (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
 >
-> https://ieeexplore.ieee.org/abstract/document/9458494
+> 
 
 ## Usage
 
@@ -126,10 +126,10 @@ describes the usage of the toolkit that can be found here:
 > Manuel Le Gallo, Corey Lammie, Julian Buechel, Fabio Carta, Omobayode Fagbohungbe,
 > Charles Mackin, Hsinyu Tsai, Vijay Narayanan, Abu Sebastian, Kaoutar El Maghraoui,
 > Malte J. Rasch.
-> "Using the IBM Analog In-Memory Hardware Acceleration Kit for Neural Network Training and Inference"
-> submitted to APL Machine Learning Journal
+> ["Using the IBM Analog In-Memory Hardware Acceleration Kit for Neural Network Training and Inference"](https://doi.org/10.1063/5.0168089)
+> (APL Machine Learning Journal:1(4) 2023)
 >
-> https://arxiv.org/abs/2307.09357
+> 
 
 
 ## What is Analog AI?
@@ -212,7 +212,7 @@ compiling the sources using a build system based on `cmake`.
 ## Authors
 
 IBM Research has developed IBM Analog Hardware Acceleration Kit,
-with Malte Rasch, Tayfun Gokmen, Diego Moreda, Manuel Le Gallo-Bourdeau, and Kaoutar El Maghraoui
+with Malte Rasch, Diego Moreda, Fabio Carta, Julian Büchel, Corey Lammie, Charles Mackin, Tayfun Gokmen, Manuel Le Gallo-Bourdeau, and Kaoutar El Maghraoui
 as the initial core authors, along with many [contributors].
 
 You can contact us by opening a new issue in the repository or alternatively
