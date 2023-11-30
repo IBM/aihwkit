@@ -182,41 +182,26 @@ pip install aihwkit
 ```
 
 ### Conda-based Installation
-
-We are working on publishing the package in the conda-forge channel. Until then, you need to manually download the package for installation.
-
-Download the aihwkit conda package tar file::
-
-```shell
-wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-condapkg.tar
-```
-
-Untar the file to a directory such as $HOME/aihwkit-condapkg
-Create a conda environment::
-
-```shell
-conda create -n aihwkit
-conda activate aihwkit
-```
-
-Install one of the conda packages.  For example:
+There is a conda package for aihwkit available in conda-forge.   It can be  installed in a conda environment running on a Linux or WSL in a Windows system.  
 
 * CPU
 
   ```shell
-  conda install python=3.9 aihwkit -c conda-forge -c file:/$HOME/aihwkit-condapkg
+  conda install -c conda-forge aihwkit
   ```
 
-* GPU
+* GPU 
 
   ```shell
-  conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
+  conda install -c conda-forge aihwkit-gpu
   ```
 
 If you encounter any issues during download or want to compile the package
 for your environment, please take a look at the [advanced installation] guide.
 That section describes the additional libraries and tools required for
 compiling the sources using a build system based on `cmake`.
+
+### Docker Installation 
 
 For GPU support, you can also build a docker container following the [CUDA Dockerfile instructions].
 You can then run a GPU enabled docker container using the follwing command from your peoject dircetory
