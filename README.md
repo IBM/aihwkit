@@ -78,7 +78,7 @@ your research, please cite the AICAS21 paper that describes the toolkit:
 > "A flexible and fast PyTorch toolkit for simulating training and inference on
 > analog crossbar arrays" (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
 >
-> https://ieeexplore.ieee.org/abstract/document/9458494
+> <https://ieeexplore.ieee.org/abstract/document/9458494>
 
 ## Usage
 
@@ -129,8 +129,7 @@ describes the usage of the toolkit that can be found here:
 > "Using the IBM Analog In-Memory Hardware Acceleration Kit for Neural Network Training and Inference"
 > submitted to APL Machine Learning Journal
 >
-> https://arxiv.org/abs/2307.09357
-
+> <https://arxiv.org/abs/2307.09357>
 
 ## What is Analog AI?
 
@@ -167,7 +166,8 @@ are performed in-place in an analog manner. This structure allows to run deep
 learning models at reduced energy consumption.
 
 ## Awards and Media Mentions
-* IBM Research blog: [Open-sourcing analog AI simulation]: https://research.ibm.com/blog/analog-ai-for-efficient-computing
+
+* IBM Research blog: [Open-sourcing analog AI simulation]: <https://research.ibm.com/blog/analog-ai-for-efficient-computing>
 * We are proud to share that the AIHWKIT and the companion cloud composer received the IEEE OPEN SOURCE SCIENCE [award] in 2023.
   <img width="817" alt="IEEE Award" src="https://github.com/IBM/aihwkit/assets/7916630/bd3347fe-49c0-4aa2-ba6e-455b0e2a91ce">
 
@@ -178,36 +178,53 @@ learning models at reduced energy consumption.
 The preferred way to install this package is by using the
 [Python package index]:
 
-```bash
-$ pip install aihwkit
+```shell
+pip install aihwkit
 ```
+
 ### Conda-based Installation
+
 We are working on publishing the package in the conda-forge channel. Until then, you need to manually download the package for installation.
 
 Download the aihwkit conda package tar file::
 
-    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-condapkg.tar
+```shell
+wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-condapkg.tar
+```
 
 Untar the file to a directory such as $HOME/aihwkit-condapkg
 Create a conda environment::
 
-    $ conda create -n aihwkit
-    $ conda activate aihwkit
+```shell
+conda create -n aihwkit
+conda activate aihwkit
+```
 
 Install one of the conda packages.  For example:
 
-  - CPU::
+* CPU
 
-    $ conda install python=3.9 aihwkit -c conda-forge -c file:/$HOME/aihwkit-condapkg
+  ```shell
+  conda install python=3.9 aihwkit -c conda-forge -c file:/$HOME/aihwkit-condapkg
+  ```
 
-  - GPU::
+* GPU
 
-    $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
+  ```shell
+  conda install python=3.9 aihwkit-gpu -c conda-forge -c file:/$HOME/aihwkit-condapkg
+  ```
 
 If you encounter any issues during download or want to compile the package
 for your environment, please take a look at the [advanced installation] guide.
 That section describes the additional libraries and tools required for
 compiling the sources using a build system based on `cmake`.
+
+For GPU support, you can also build a docker container following the [CUDA Dockerfile instructions].
+You can then run a GPU enabled docker container using the follwing command from your peoject dircetory
+
+```shell
+docker run --rm -it --gpus all -v $(pwd):$HOME --name aihwkit aihwkit:cuda bash
+```
 
 ## Authors
 
@@ -223,8 +240,6 @@ at the ``aihwkit@us.ibm.com`` email address.
 This project is licensed under [Apache License 2.0].
 
 [Apache License 2.0]: LICENSE.txt
-[`CUDA Toolkit`]: https://developer.nvidia.com/accelerated-computing-toolkit
-[`OpenBLAS`]: https://www.openblas.net/
 [Python package index]: https://pypi.org/project/aihwkit
 [`PyTorch`]: https://pytorch.org/
 
@@ -242,3 +257,4 @@ This project is licensed under [Apache License 2.0].
 [online demo]: https://analog-ai-demo.mybluemix.net/
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
 [award]: https://conferences.computer.org/services/2023/awards/
+[CUDA Dockerfile instructions]: https://github.com/IBM/aihwkit/blob/master/docs/source/advanced_install.rst#cuda-enabled-docker-image
