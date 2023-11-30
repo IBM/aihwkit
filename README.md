@@ -115,7 +115,7 @@ for epoch in range(10):
 You can find more examples in the [`examples/`] folder of the project, and
 more information about the library in the [documentation]. Please note that
 the examples have some additional dependencies - you can install them via
-`pip install -r requirements-ex`amples.txt`.
+`pip install -r requirements-examples.txt`.
 You can find interactive notebooks and tutorials in the [`notebooks/`] directory.
 
 ### Further reading
