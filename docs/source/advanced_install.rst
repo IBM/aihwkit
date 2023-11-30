@@ -10,7 +10,7 @@ following steps as an example for how to install the aihwkit conda package.
 There is a conda package for aihwkit available in conda-forge. 
 It can be  installed in a conda environment running on a Linux or WSL in a Windows system.  
 
-Install any one one of the conda packages as shown below.
+Install any one of the conda packages as shown below.
 
   - CPU::
 
