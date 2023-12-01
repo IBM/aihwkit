@@ -121,6 +121,11 @@ def calibrate_input_ranges(
     be calibrated. If noise management is turned on an error is
     raised.
 
+    Note:
+        This implementation transiently registers a new `forward_pre_hook`
+        on the analog tile level. It assumes that the user has not defined
+        any other forward prehooks.
+
     Args:
         model: The analog model for
             which to calibrate the input ranges.
@@ -209,7 +214,7 @@ def calibrate_input_ranges(
             global_cache=cache,
             max_samples=max_samples,
         )
-        handles.append(tile.register_forward_pre_hook(hook, prepend=True))
+        handles.append(tile.register_forward_pre_hook(hook))
 
     # Pass through the samples
     for input_ in dataloader:

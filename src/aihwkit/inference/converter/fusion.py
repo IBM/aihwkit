@@ -18,6 +18,7 @@ from torch import abs as torch_abs
 from torch import Tensor, sign
 from torch.autograd import no_grad
 
+from aihwkit.exceptions import ArgumentError
 from aihwkit.inference.converter.base import BaseConductanceConverter
 
 _ZERO_CLIP = 1e-7
@@ -30,12 +31,26 @@ class FusionConductanceConverter(BaseConductanceConverter):
     positive and negative weights, respectively, where one device is
     always at 0. However, the zero device will not be explicitly
     programmed, as the reset conductance value is assumed to be
-    neglegible.
+    negligible.
+
+    Args:
+        g_max: In :math:`\mu S`, the maximal conductance, ie the value
+            the absolute max of the weights will be mapped to.
+            The valid g_max value fusion chip is between 10 and 40.
+            If no value is specified, the default value 40 is used.
+
+    Returns:
+        None
+
+    Raises:
+        ArgumentError: in case g_max is not in the range of 10 to 40.
 
     """
 
-    def __init__(self) -> None:
-        self.g_max = 45.0  # fixed for fusion
+    def __init__(self, g_max: int = 40) -> None:
+        if g_max < 10 or g_max > 40:
+            raise ArgumentError("Specified fusion g_max value must be between 10 and 40.")
+        self.g_max = g_max
         self.scale_ratio = None
 
     def __str__(self) -> str:

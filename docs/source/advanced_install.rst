@@ -7,29 +7,34 @@ Install the aihwkit conda package
 At this time, the conda package is only available for the Linux environment. You can use the
 following steps as an example for how to install the aihwkit conda package.
 
-.. note::
+There is a conda package for aihwkit available in conda-forge. 
+It can be  installed in a conda environment running on a Linux or WSL in a Windows system.  
 
-    We are working on publishing the package in conda-forge channel.  Until then, you need to download the package for installation.
-
-Download the aihwkit conda package tar file::
-
-    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-condapkg.tar
-
-Untar the file to a directory such as $HOME/aihwkit-condapkg
-Create a conda environment::
-
-    $ conda create -n aihwkit
-    $ conda activate aihwkit
-
-Install one of the conda packages.  For example:
+Install any one of the conda packages as shown below.
 
   - CPU::
 
-    $ conda install python=3.9 aihwkit -c conda-forge -c file://$HOME/aihwkit-condapkg
+    $ conda install -c conda-forge aihwkit
 
   - GPU::
 
-    $ conda install python=3.9 aihwkit-gpu -c conda-forge -c file://$HOME/aihwkit-condapkg
+    $ conda install -c conda-forge aihwkit-gpu
+
+Install the aihwkit using pip
+---------------------------------
+AIHWKIT can also be installed using pip commands as shown below.
+
+ - CPU::
+
+    $ !pip install aihwkit
+
+ - GPU::
+
+    $ !wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
+
+   then,
+    
+    $ !pip install aihwkit-0.8.0+cuda117-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 
 Compilation
 -----------
@@ -257,13 +262,10 @@ The image can be built via::
     --build-arg USERID=(id -u $USER) \
     --build-arg GROUPID=(id -g $USER) \
     --build-arg CUDA_ARCH=${CUDA_ARCH} \
-    --build-arg CUDA_VER=11.8.0 \
-    --build-arg UBUNTU_VER=22.04 \
-    --build-arg PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu117 \
     --file CUDA.Dockerfile .
 
-If building your image against a different CUDA or PyTorch version, please
-ensure setting the build arguments accordingly.
+If building your image against a different CUDA version, please make sure to
+update the ``CUDA_ARCH`` build argument accordingly.
 
 .. note::
 
