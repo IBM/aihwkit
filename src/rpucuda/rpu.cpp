@@ -1341,7 +1341,7 @@ void RPUSimple<T>::setWeightsAndBias(
 template <typename T> void RPUSimple<T>::setSharedWeights(T *weightsptr) {
   if (!shared_weights_if_) {
     this->getWeights(weightsptr); // copy existing weights to given workspace.
-    delete[] * weights_;          // delete allocated memory array but not the pointer
+    delete[] *weights_;           // delete allocated memory array but not the pointer
   }
   *weights_ = weightsptr;
   shared_weights_if_ = true;
