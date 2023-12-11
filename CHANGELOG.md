@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 * On-the-fly change of some `RPUConfig` fields (\# 539)
-* Fusion chip CSV file model weights exporter functionality (\#538) 
+* Fusion chip CSV file model weights exporter functionality (\#538)
 
 ### Fixed
 * Repeated call of `cuda()` reset the weights for `InferenceTile` (\#540)
@@ -547,6 +547,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.8.0...HEAD
 [0.8.0]: https://github.com/IBM/aihwkit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBM/aihwkit/compare/v0.7.0..v0.7.1
 [0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0

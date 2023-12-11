@@ -12,7 +12,7 @@
 
 """Calibration for inference."""
 
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, TYPE_CHECKING
 from collections.abc import Iterator
 from functools import partial
 from enum import Enum
@@ -22,10 +22,12 @@ from torch.nn import Module
 
 from aihwkit.exceptions import ConfigError, ArgumentError
 from aihwkit.simulator.parameters.enums import NoiseManagementType
-from aihwkit.simulator.parameters.utils import IOParameters
 from aihwkit.simulator.parameters.base import PrePostProcessingRPU
 from aihwkit.simulator.tiles.base import AnalogTileStateNames
 from aihwkit.nn.modules.base import AnalogLayerBase
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.parameters.utils import IOParameters
 
 
 class InputRangeCalibrationType(Enum):
