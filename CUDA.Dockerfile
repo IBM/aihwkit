@@ -1,5 +1,5 @@
 # Stage 0: Intel MKL
-ARG CUDA_VERSION=11.8.0
+ARG CUDA_VERSION=12.2.2
 FROM intel/oneapi-basekit AS mkl-env
 
 # Stage 1: Build dependencies
@@ -45,8 +45,7 @@ RUN chown -R ${USERNAME}:${USERNAME} /aihwkit
 USER ${USERNAME}
 
 # Install PyTorch
-ARG PYTORCH_PIP_URL=https://download.pytorch.org/whl/cu118
-RUN pip install --no-cache-dir --no-warn-script-location torch torchvision --extra-index-url ${PYTORCH_PIP_URL}
+RUN pip install --no-cache-dir --no-warn-script-location torch torchvision
 
 # Build aihwkit
 WORKDIR /aihwkit
