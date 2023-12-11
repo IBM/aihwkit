@@ -19,7 +19,6 @@
 
 from datetime import datetime
 from argparse import ArgumentParser
-from os import environ
 from collections import OrderedDict, defaultdict
 from numpy import log10, logspace, argsort
 from transformers.integrations import TensorBoardCallback
@@ -108,8 +107,6 @@ if ARGS.wandb:
     }
 
     SWEEP_ID = wandb.sweep(sweep=SWEEP_CONFIG, project="bert-weight-noise-experiment")
-else:
-    environ["WANDB_DISABLED"] = "true"
 
 # max length and stride specific to pretrained model
 MAX_LENGTH = 320
@@ -475,7 +472,7 @@ def make_trainer(model, optimizer, tokenized_data):
     writer = SummaryWriter(log_dir=log_dir)
 
     trainer = Trainer(
-        model=model if ARGS.digital else model.module,
+        model=model,
         args=training_args,
         data_collator=collator,
         train_dataset=tokenized_data["train"],

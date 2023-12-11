@@ -31,7 +31,7 @@ from aihwkit.nn import AnalogConv2d, AnalogConv2dMapped, AnalogSequential, Analo
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, InferenceRPUConfig, FloatingPointRPUConfig
 from aihwkit.simulator.configs.devices import ConstantStepDevice, LinearStepDevice
-from aihwkit.simulator.parameters.utils import IOParameters, UpdateParameters, MappingParameter
+from aihwkit.simulator.parameters import IOParameters, UpdateParameters, MappingParameter
 from aihwkit.simulator.tiles.base import AnalogTileStateNames
 from aihwkit.exceptions import TileError, TileModuleError
 from aihwkit.nn.conversion import convert_to_analog

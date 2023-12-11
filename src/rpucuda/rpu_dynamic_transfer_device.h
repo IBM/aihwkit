@@ -24,13 +24,21 @@ template <typename T> class DynamicTransferRPUDevice;
 
  */
 
+#define FEEDBACK_ESTIMATE 0
+#define FEEDBACK_TARGET 1
+#define FEEDBACK_MOD 2
+#define FEEDBACK_N 3
+
 template <typename T>
 struct DynamicTransferRPUDeviceMetaParameter : ChoppedTransferRPUDeviceMetaParameter<T> {
 
-  bool scale_thres_with_samples = true;
   T tail_weightening = 1.0;
   T buffer_cap = 10.0; // times the max_steps (in case of forget_buffer = false)
-  bool always_write = false;
+
+  bool experimental_correct_accumulation = false; // for CPU only correct if chopping NOT random !
+  bool experimental_fast_lr_feedback = false;
+  T experimental_feedback_target = 0.1;
+  int experimental_feedback_mod = 1; // times read-out period of past_momentum
 
   DynamicTransferRPUDeviceMetaParameter() : ChoppedTransferRPUDeviceMetaParameter<T>() {
     initDefaults();
@@ -47,7 +55,14 @@ struct DynamicTransferRPUDeviceMetaParameter : ChoppedTransferRPUDeviceMetaParam
       : ChoppedTransferRPUDeviceMetaParameter<T>(dp_fast, dp_rest, n_total_devices) {
     initDefaults();
   };
-  unsigned int getNumInChopSamples(T current_in_chop_prob) const;
+  inline unsigned int getNumInChopSamples() const;
+
+  void computeCountLRFeedback(
+      T &count_lr_scale,
+      std::vector<T> &pm_vec,
+      uint64_t &previous_update_idx,
+      uint64_t current_update_idx,
+      int current_m_batch) const;
 
   void initDefaults() { this->in_chop_random = false; };
   void checkSupported() const;
@@ -97,10 +112,12 @@ public:
         static_cast<ChoppedTransferRPUDevice<T> &>(a),
         static_cast<ChoppedTransferRPUDevice<T> &>(b));
     swap(a.running_mean_, b.running_mean_);
-    swap(a.running_var_, b.running_var_);
     swap(a.past_mean_, b.past_mean_);
     swap(a.in_chopper_switched_, b.in_chopper_switched_);
-    swap(a.current_in_chop_prob_, b.current_in_chop_prob_);
+    swap(a.count_lr_scale_, b.count_lr_scale_);
+
+    swap(a.feedback_data_, b.feedback_data_);
+    swap(a.feedback_data_idx_, b.feedback_data_idx_);
   }
 
   DynamicTransferRPUDeviceMetaParameter<T> &getPar() const override {
@@ -118,31 +135,39 @@ public:
       const T *vec,
       const int n_vec,
       const T reset_prob,
-      const int i_col) override;
+      const int i_col,
+      const int m_batch_info) override;
 
   void getDPNames(std::vector<std::string> &names) const override;
   void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
+  T getPulseCountLearningRate(
+      T lr, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) override;
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   const T *getPastMean() const { return past_mean_.data(); };
-  const T getCurrentInChopProb() const { return current_in_chop_prob_; };
   const T *getRunningMean() const { return running_mean_.data(); };
-  const T *getRunningVar() const { return running_var_.data(); };
+
+  void setCountLRScale(T count_lr_scale) { count_lr_scale_ = count_lr_scale; };
+  const T getCountLRScale() const { return count_lr_scale_; };
+  inline const std::vector<T> getFeedbackData() const { return feedback_data_; };
+  inline uint64_t getFeedbackIdx() const { return feedback_data_idx_; };
 
 protected:
   void populate(const DynamicTransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
-  T current_in_chop_prob_ = (T)0.0;
 
 private:
   std::vector<T> running_mean_;
-  std::vector<T> running_var_;
   std::vector<T> past_mean_;
   std::vector<bool> in_chopper_switched_;
+  T count_lr_scale_ = 1.0;
+
+  std::vector<T> feedback_data_;
+  uint64_t feedback_data_idx_ = 0;
 };
 
 } // namespace RPU

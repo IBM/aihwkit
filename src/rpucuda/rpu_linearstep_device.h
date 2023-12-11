@@ -88,8 +88,8 @@ struct SoftBoundsRPUDeviceMetaParameter : LinearStepRPUDeviceMetaParameter<T> {
     this->ls_mean_bound_reference = false; // need reference to actual bounds for soft bounds
   }
   void checkSoftBounds() const {
-    if (!(this->ls_decrease_up == 1 && this->ls_decrease_down == 1.0 &&
-          this->ls_decrease_up_dtod == 0.0 && this->ls_decrease_down_dtod == 0.0 &&
+    if (!(this->ls_decrease_up == (T)1.0 && this->ls_decrease_down == (T)1.0 &&
+          this->ls_decrease_up_dtod == (T)0.0 && this->ls_decrease_down_dtod == (T)0.0 &&
           this->ls_allow_increasing_slope == false && this->ls_mean_bound_reference == false)) {
       RPU_FATAL("SoftBounds set to wrong values!");
     }

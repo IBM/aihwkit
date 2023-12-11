@@ -12,7 +12,7 @@
 
 """Configurations for resistive processing units."""
 
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     IOParameters,
     UpdateParameters,
     WeightModifierParameter,
@@ -25,6 +25,7 @@ from aihwkit.simulator.parameters.utils import (
     PrePostProcessingParameter,
 )
 from aihwkit.simulator.parameters.enums import (
+    RPUDataType,
     BoundManagementType,
     NoiseManagementType,
     WeightNoiseType,
@@ -34,6 +35,7 @@ from aihwkit.simulator.parameters.enums import (
     WeightRemapType,
     VectorUnitCellUpdatePolicy,
     AnalogMVType,
+    CountLRFeedbackPolicy,
 )
 from .devices import (
     FloatingPointDevice,

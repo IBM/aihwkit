@@ -12,20 +12,24 @@
 
 """Calibration for inference."""
 
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, TYPE_CHECKING
 from collections.abc import Iterator
 from functools import partial
 from enum import Enum
 
-from torch import tensor, Tensor, cat, randperm
+from tqdm import tqdm
+
+from torch import tensor, Tensor, cat, randperm, no_grad
 from torch.nn import Module
 
 from aihwkit.exceptions import ConfigError, ArgumentError
 from aihwkit.simulator.parameters.enums import NoiseManagementType
-from aihwkit.simulator.parameters.utils import IOParameters
-from aihwkit.simulator.parameters.base import PrePostProcessingRPU
+from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
 from aihwkit.simulator.tiles.base import AnalogTileStateNames
 from aihwkit.nn.modules.base import AnalogLayerBase
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.parameters.utils import IOParameters
 
 
 class InputRangeCalibrationType(Enum):
@@ -46,6 +50,9 @@ class InputRangeCalibrationType(Enum):
     CACHE_QUANTILE = "CacheQuantile"
     """Caches inputs that are then used to compute the Xth quantile for the input range."""
 
+    MAX = "Max"
+    """Takes the abs().max() over the inputs."""
+
 
 def _calibration_pre_forward(
     mod: Module,
@@ -64,19 +71,30 @@ def _calibration_pre_forward(
         cache_key: key of global cache
         max_samples: Maximal number of cache samples
     """
+
+    # get rid of entries that are all-zeros
     x_input = input_args[0]
+    x_input = x_input.reshape(-1, x_input.size(-1))
+    x_input = x_input[~(x_input == 0.0).all(-1)]
+
     ir_params = mod.rpu_config.pre_post.input_range  # type: ignore
     cache = global_cache[cache_key]
-    if calibration_type in [InputRangeCalibrationType.CACHE_QUANTILE]:
+    if calibration_type in [
+        InputRangeCalibrationType.CACHE_QUANTILE,
+        InputRangeCalibrationType.MAX,
+    ]:
         # We need to cache the inputs
         # Add new samples to the cache
-        if calibration_type == InputRangeCalibrationType.CACHE_QUANTILE:
-            cache = cat([cache, x_input.reshape(x_input.size(0), -1).clone().detach().cpu()])
+        if calibration_type in [InputRangeCalibrationType.CACHE_QUANTILE]:
+            cache = cat([cache, x_input.reshape(-1, x_input.size(-1)).clone().detach().cpu()])
+            # Shuffle and limit the number
+            cache = cache[randperm(cache.size(0))[:max_samples]]
         else:
-            # Don't reshape since we need to perform MVMs during PTQ
-            cache = cat([cache, x_input.clone().detach().cpu()])
-        # Shuffle and limit the number
-        cache = cache[randperm(cache.size(0))[:max_samples]]
+            # Compute the max
+            if cache.numel() == 0:
+                cache = x_input.abs().max().detach()
+            else:
+                cache = max(cache, x_input.abs().max().detach())
     elif calibration_type in [
         InputRangeCalibrationType.MOVING_QUANTILE,
         InputRangeCalibrationType.MOVING_STD,
@@ -105,6 +123,7 @@ def _calibration_pre_forward(
     global_cache[cache_key] = cache
 
 
+@no_grad()
 def calibrate_input_ranges(
     model: Module,
     calibration_type: InputRangeCalibrationType,
@@ -179,6 +198,7 @@ def calibrate_input_ranges(
             tile.init_input_processing()
 
         rpu_config.pre_post.input_range.init_from_data = 0  # turn off on-the-fly mechanism
+
         if std_alpha is not None:
             rpu_config.pre_post.input_range.init_std_alpha = std_alpha
 
@@ -194,7 +214,9 @@ def calibrate_input_ranges(
             needs_set_state = True
 
         is_perfect_dic[tile_name] = io_pars.is_perfect
-        if "Cache" in calibration_type.value and not is_perfect_dic[tile_name]:
+        if (
+            "Max" in calibration_type.value or "Cache" in calibration_type.value
+        ) and not is_perfect_dic[tile_name]:
             rpu_config.forward.is_perfect = True
             needs_set_state = True
 
@@ -217,12 +239,21 @@ def calibrate_input_ranges(
         handles.append(tile.register_forward_pre_hook(hook))
 
     # Pass through the samples
-    for input_ in dataloader:
-        model(input_)
+    progress_bar = tqdm if verbose else lambda x: x
+    for args, kwargs in progress_bar(dataloader):
+        model(*args, **kwargs)
 
     # Remove hooks
     for handle in handles:
         handle.remove()
+
+    # now create the input range fields
+    for tile_name, tile in model.named_analog_tiles():
+        rpu_config = tile.rpu_config
+        if not rpu_config.pre_post.input_range.enable:
+            rpu_config.pre_post.input_range.enable = True
+            rpu_config.pre_post.input_range.learn_input_range = False
+            tile.init_input_processing()
 
     for tile_name, tile in model.named_analog_tiles():
         rpu_config = tile.rpu_config
@@ -234,6 +265,18 @@ def calibrate_input_ranges(
             continue
 
         inputs = cache[tile_name]
+        if inputs.numel() == 0:
+            if verbose:
+                print(f"Warning: Tile {tile_name} cached inputs is empty")
+            continue
+
+        input_range = tile.input_range.item()
+        # Compute on the cache
+
+        if calibration_type == InputRangeCalibrationType.CACHE_QUANTILE:
+            input_range = inputs.flatten().quantile(quantile).item()
+        elif calibration_type == InputRangeCalibrationType.MAX:
+            input_range = inputs.item()
 
         # Restore the tile if necessary
         if rpu_config.forward.is_perfect != is_perfect_dic[tile_name]:
@@ -242,12 +285,6 @@ def calibrate_input_ranges(
                 tile_name
             ]
             tile.__setstate__(tile_state)
-
-        input_range = tile.input_range.item()
-        # Compute on the cache
-
-        if calibration_type == InputRangeCalibrationType.CACHE_QUANTILE:
-            input_range = inputs.flatten().quantile(quantile).item()
 
         # set the input range
         tile.set_input_range(input_range)

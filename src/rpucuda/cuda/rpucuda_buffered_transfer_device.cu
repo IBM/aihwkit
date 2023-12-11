@@ -10,6 +10,7 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_fp16_util.h"
 #include "forward_backward_pass.h"
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_buffered_transfer_device.h"
@@ -141,11 +142,11 @@ __global__ void kernelBufferedTransfer(
 
     transfer_in[idx] = (T)0.0; // reset to zero for next round
 
-    T n_steps = truncf(omega / buffer_granularity);
+    T n_steps = trunc(omega / buffer_granularity);
     n_steps = MIN(MAX(n_steps, -desired_BL), desired_BL);
 
     if (forget_buffer) {
-      W_buffer[idx] = (n_steps != 0) ? omega * momentum : omega;
+      W_buffer[idx] = (n_steps != (T)0.0) ? omega * momentum : omega;
     } else {
       W_buffer[idx] = omega - sub_momentum * n_steps * buffer_granularity;
     }
@@ -198,11 +199,11 @@ void BufferedTransferRPUDeviceCuda<T>::readAndUpdate(
   T sub_momentum = (T)1.0 - MAX(MIN(par.momentum, (T)1.0), (T)0.0);
 
   kernelBufferedTransfer<T><<<nblocks, nthreads, 0, this->context_->getStream()>>>(
-      transfer_out, B, transfer_tmp, t_size, fabs(lr), thres, step, sub_momentum, up.desired_BL,
+      transfer_out, B, transfer_tmp, t_size, fabsf(lr), thres, step, sub_momentum, up.desired_BL,
       par.forget_buffer);
 
   // update according to device
-  this->writeMatrix(to_device_idx, vec, transfer_out, n_vec, fabs(step * weight_granularity), up);
+  this->writeMatrix(to_device_idx, vec, transfer_out, n_vec, fabsf(step * weight_granularity), up);
 
   this->context_->template releaseSharedBuffer<T>(RPU_BUFFER_DEVICE_0);
   this->context_->template releaseSharedBuffer<T>(RPU_BUFFER_DEVICE_1);
@@ -247,4 +248,8 @@ template class BufferedTransferRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class BufferedTransferRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class BufferedTransferRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

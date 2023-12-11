@@ -207,7 +207,7 @@ class AnalogTile(TileModule, TileWithPeriphery, RPUCudaSimulatorTileWrapper):
         """
 
         meta_parameter = rpu_config.as_bindings()
-        device_parameter = rpu_config.device.as_bindings()
+        device_parameter = rpu_config.device.as_bindings(self.get_data_type())
 
         return meta_parameter.create_array(x_size, d_size, device_parameter)
 

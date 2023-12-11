@@ -104,7 +104,7 @@ template <typename T> struct SimpleRPUDeviceMetaParameter : AbstractRPUDeviceMet
   using SimpleMetaParameter<T>::print;
   void printToStream(std::stringstream &ss) const override {
     SimpleMetaParameter<T>::printToStream(ss);
-    if (reset_std > 0.0) {
+    if (reset_std > (T)0.0) {
       ss << "\t reset_std: " << reset_std << std::endl;
     }
   }

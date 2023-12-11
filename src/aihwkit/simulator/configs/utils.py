@@ -14,7 +14,7 @@
 
 # pylint: disable=unused-import
 
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     IOParameters,
     UpdateParameters,
     WeightModifierParameter,

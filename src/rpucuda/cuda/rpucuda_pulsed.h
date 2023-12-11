@@ -157,6 +157,13 @@ public:
   void clipWeights(const WeightClipParameter &wclpar) override;
 
   void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
+  bool swaWeights(
+      const WeightRemapParameter &wrmpar,
+      T *swa_weights,
+      uint64_t iter,
+      T *scales = nullptr,
+      T *biases = nullptr) override;
+
   void resetCols(int start_col, int n_cols, T reset_prob) override;
 
   void setLearningRate(T rate) override;

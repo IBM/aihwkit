@@ -328,7 +328,7 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
   if (par.singleDeviceUpdate()) {
     // random states and context are shared, since only one is updated at a time.
     if (par.update_policy == VectorDeviceUpdatePolicy::SingleRandom) {
-      current_device_idx_ = floor(rw_rng_.sampleUniform() * m);
+      current_device_idx_ = floorf((float)rw_rng_.sampleUniform() * m);
     } else if (par.update_policy == VectorDeviceUpdatePolicy::SingleSequential) {
       current_device_idx_ = ++current_device_idx_ % m;
     }
@@ -448,4 +448,8 @@ template class VectorRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class VectorRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class VectorRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

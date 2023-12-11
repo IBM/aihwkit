@@ -18,7 +18,7 @@ https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
 Uses learning rates of η = 0.01, 0.005, and 0.0025
 for epochs 0–10, 11–20, and 21–30, respectively.
 """
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, redefined-outer-name
 
 import os
 from time import time
@@ -34,6 +34,7 @@ from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda
+
 
 # Check device
 USE_CUDA = 0
@@ -193,8 +194,7 @@ def test_evaluation(model, val_set):
     print("Model Accuracy = {}".format(predicted_ok / total_images))
 
 
-def main():
-    """Train a PyTorch analog model with the MNIST dataset."""
+if __name__ == "__main__":
     # Load datasets.
     train_dataset, validation_dataset = load_images()
 
@@ -206,8 +206,3 @@ def main():
 
     # Evaluate the trained model.
     test_evaluation(model, validation_dataset)
-
-
-if __name__ == "__main__":
-    # Execute only if run as the entry point into the program.
-    main()

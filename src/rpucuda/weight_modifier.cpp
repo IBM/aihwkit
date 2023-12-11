@@ -65,10 +65,10 @@ void WeightModifier<T>::apply(
       if (wmpar.copy_last_column && (i % x_size_) == x_size_ - 1) {
         continue;
       }
-      T a = fabs(new_weights[i]);
+      T a = (T)fabsf(new_weights[i]);
       amax = a > amax ? a : amax;
     }
-    amax = amax > 0.0 ? amax : (T)1.0;
+    amax = amax > (T)0.0 ? amax : (T)1.0;
   }
 
   switch (wmpar.type) {
@@ -83,7 +83,7 @@ void WeightModifier<T>::apply(
   case WeightModifierType::Discretize: {
 
     const T res = (T)wmpar.res;
-    if (res > 0) {
+    if (res > (T)0.0) {
       const bool sto_round = wmpar.sto_round;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
@@ -95,7 +95,7 @@ void WeightModifier<T>::apply(
   }
   case WeightModifierType::MultNormal: {
 
-    if (wmpar.std_dev > 0) {
+    if (wmpar.std_dev > (T)0.0) {
       const T std = (T)wmpar.std_dev * amax;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
@@ -106,7 +106,7 @@ void WeightModifier<T>::apply(
     break;
   }
   case WeightModifierType::AddNormal: {
-    if (wmpar.std_dev > 0) {
+    if (wmpar.std_dev > (T)0.0) {
 
       const T std = (T)wmpar.std_dev * amax;
       PRAGMA_SIMD
@@ -120,11 +120,11 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::Poly: {
 
-    if (wmpar.std_dev > 0 && wmpar.coeffs.size() > (size_t)0) {
+    if (wmpar.std_dev > (T)0.0 && wmpar.coeffs.size() > (size_t)0) {
       const T std = wmpar.std_dev;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
-        T aw = fabs(new_weights[i]) / amax;
+        T aw = (T)fabsf(new_weights[i]) / amax;
         T paw = 1;
         T sig = wmpar.coeffs.at(0);
         for (size_t j = 1; j < wmpar.coeffs.size(); j++) {
@@ -140,11 +140,11 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::ProgNoise: {
 
-    if (wmpar.std_dev > 0 && wmpar.coeffs.size() > (size_t)0) {
+    if (wmpar.std_dev > (T)0.0 && wmpar.coeffs.size() > (size_t)0) {
       const T std = wmpar.std_dev / wmpar.g_max;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
-        T aw = fabs(new_weights[i]) / amax;
+        T aw = (T)fabsf(new_weights[i]) / amax;
         T paw = 1;
         T sig = wmpar.coeffs.at(0);
         for (size_t j = 1; j < wmpar.coeffs.size(); j++) {
@@ -153,10 +153,10 @@ void WeightModifier<T>::apply(
         }
         sig *= std;
         T w = new_weights[i];
-        if (w < 0.0f) {
-          new_weights[i] = -fabs(w + amax * sig * rw_rng_.sampleGauss());
+        if (w < (T)0.0) {
+          new_weights[i] = -(T)fabsf(w + amax * sig * rw_rng_.sampleGauss());
         } else {
-          new_weights[i] = fabs(w + amax * sig * rw_rng_.sampleGauss());
+          new_weights[i] = (T)fabsf(w + amax * sig * rw_rng_.sampleGauss());
         }
       }
     }
@@ -167,13 +167,13 @@ void WeightModifier<T>::apply(
 
     const T res = (T)wmpar.res;
 
-    if (res > 0) {
+    if (res > (T)0.0) {
       const bool sto_round = wmpar.sto_round;
-      const T scale = (T)fabs(wmpar.dorefa_clip / tanh(amax));
+      const T scale = (T)(T)fabsf(wmpar.dorefa_clip / (T)tanh((float)amax));
 
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
-        T w = tanh(new_weights[i]) * scale;
+        T w = (T)tanh((float)new_weights[i]) * scale;
         new_weights[i] = getDiscretizedValueRound(w, res, sto_round, rw_rng_);
       }
     }
@@ -186,7 +186,7 @@ void WeightModifier<T>::apply(
     const T res = (T)wmpar.res;
     const T std = (T)wmpar.std_dev * amax;
 
-    if (res > 0 || std > 0) {
+    if (res > (T)0.0 || std > (T)0.0) {
       const bool sto_round = wmpar.sto_round;
 
       PRAGMA_SIMD
@@ -204,7 +204,7 @@ void WeightModifier<T>::apply(
     RPU_FATAL("Requested WeightModifierType not implemented in CPU version.");
   }
 
-  if (wmpar.pdrop > 0.0) {
+  if (wmpar.pdrop > (T)0.0) {
     dropConnections(new_weights, (T)wmpar.pdrop);
   }
 
@@ -239,6 +239,9 @@ void WeightModifier<T>::loadExtra(
 template class WeightModifier<float>;
 #ifdef RPU_USE_DOUBLE
 template class WeightModifier<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class WeightModifier<half_t>;
 #endif
 
 } // namespace RPU

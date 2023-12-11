@@ -125,7 +125,7 @@ class AnalogLinear(AnalogLayerBase, Linear):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)
 
     @classmethod
     def to_digital(cls, module: "AnalogLinear", realistic: bool = False) -> "Linear":
@@ -146,4 +146,5 @@ class AnalogLinear(AnalogLayerBase, Linear):
         digital_layer.weight.data = weight.data
         if bias is not None:
             digital_layer.bias.data = bias.data
-        return digital_layer
+        analog_tile = next(module.analog_tiles())
+        return digital_layer.to(device=analog_tile.device, dtype=analog_tile.get_dtype())

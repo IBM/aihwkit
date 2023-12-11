@@ -71,6 +71,9 @@ public:
     swap(a.sblm_, b.sblm_);
     swap(a.dblm_, b.dblm_);
     swap(a.rng_, b.rng_);
+
+    swap(a.x_noz_, b.x_noz_);
+    swap(a.d_noz_, b.d_noz_);
   }
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
@@ -102,6 +105,8 @@ public:
 
   void setUpPar(const PulsedUpdateMetaParameter<T> &up);
   inline const PulsedUpdateMetaParameter<T> &getUpPar() const { return up_; };
+  inline const T getCurrentDSparsity() { return (T)d_noz_ / (T)this->d_size_; };
+  inline const T getCurrentXSparsity() { return (T)x_noz_ / (T)this->x_size_; };
 
 private:
   void freeContainers();
@@ -112,6 +117,9 @@ private:
   std::unique_ptr<DenseBitLineMaker<T>> dblm_ = nullptr;
 
   PulsedUpdateMetaParameter<T> up_;
+
+  int d_noz_ = 0;
+  int x_noz_ = 0;
 };
 
 } // namespace RPU

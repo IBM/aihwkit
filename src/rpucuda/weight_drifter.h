@@ -85,12 +85,12 @@ template <typename T> struct DriftParameter {
       ss << "\t nu_k / log G0:\t" << nu_k << " / " << logG0 << std::endl;
     }
 
-    if (fabs(reset_tol) > (T)1e-6) {
+    if (fabsf(reset_tol) > (float)1e-6) {
       ss << "\t reset_tol:\t\t" << reset_tol << std::endl;
     }
   }
 
-  inline bool usesRandom() { return (w_read_std > 0 || nu_std > 0); };
+  inline bool usesRandom() { return (w_read_std > (T)0.0 || nu_std > (T)0.0); };
 };
 
 /***********************************************************************************/

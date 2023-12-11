@@ -22,12 +22,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -75,8 +69,8 @@ public:
 
     dp = new OneSidedRPUDeviceMetaParameter<num_t>(dp_cs);
     // note: meta parameters for g+ and g- need to be the same (to support inversion)
-    reference_update = dw_min * n_pos - dw_min * n_neg;
-    reference_update_inv = -dw_min * n_neg + dw_min * n_pos;
+    reference_update = dw_min * (num_t)n_pos - dw_min * (num_t)n_neg;
+    reference_update_inv = -dw_min * (num_t)n_neg + dw_min * (num_t)n_pos;
 
     rng = new RNG<num_t>(0);
   };
@@ -129,7 +123,7 @@ TEST_P(RPUDeviceTestFixture, onSetWeights) {
   for (int i = 0; i < this->x_size * this->d_size; i++) {
     num_t w = this->weights[0][i];
     ASSERT_FLOAT_EQ(w, w_ref[0][i]);
-    if (w >= 0) {
+    if (w >= (num_t)0.0) {
       ASSERT_FLOAT_EQ(w_vec[1][0][i], w_ref[0][i]);
       ASSERT_FLOAT_EQ(w_vec[0][0][i], 0);
     } else {
@@ -209,8 +203,8 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdate) {
   }
 
   num_t ***w_vec = rpu_device->getWeightVec();
-  ASSERT_FLOAT_EQ(w_vec[0][0][0], (*this->dp)[0]->dw_min * n_neg);
-  ASSERT_FLOAT_EQ(w_vec[1][0][0], (*this->dp)[1]->dw_min * n_pos);
+  ASSERT_FLOAT_EQ(w_vec[0][0][0], (*this->dp)[0]->dw_min * (num_t)n_neg);
+  ASSERT_FLOAT_EQ(w_vec[1][0][0], (*this->dp)[1]->dw_min * (num_t)n_pos);
 
   delete rpu_device;
 }
@@ -231,8 +225,8 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateInvert) {
   }
 
   num_t ***w_vec = rpu_device->getWeightVec();
-  ASSERT_FLOAT_EQ(w_vec[0][0][0], (*this->dp)[0]->dw_min * n_pos);
-  ASSERT_FLOAT_EQ(w_vec[1][0][0], (*this->dp)[1]->dw_min * n_neg);
+  ASSERT_FLOAT_EQ(w_vec[0][0][0], (*this->dp)[0]->dw_min * (num_t)n_pos);
+  ASSERT_FLOAT_EQ(w_vec[1][0][0], (*this->dp)[1]->dw_min * (num_t)n_neg);
 
   delete rpu_device;
 }

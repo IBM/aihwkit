@@ -36,7 +36,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
        << std::endl;
     ,
     /* calc weight granularity body */
-    return this->dw_min * pow((T)0.5, ps_gamma);
+    return this->dw_min * (T)powf((T)0.5, ps_gamma);
     ,
     /*Add*/
     bool implementsWriteNoise() const override { return true; };);

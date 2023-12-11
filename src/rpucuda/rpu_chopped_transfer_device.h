@@ -32,10 +32,12 @@ struct ChoppedTransferRPUDeviceMetaParameter : BufferedTransferRPUDeviceMetaPara
   T out_chop_prob = (T)0.0; // out chopper is applied to output of the A reads
 
   bool auto_scale = false; // scales according the recent past gradient size
-  bool experimental_adjust_auto_scale_with_transfer_every = false; // normalized for tile size
+
+  bool correct_gradient_magnitudes = false; // scale transfer_lr with fast_lr
 
   T auto_momentum = (T)0.99;   // momentum for auto_scale (in batch?)
   T auto_granularity = (T)0.0; // scales by the number of mat-vecs to reach thres
+
   T buffer_granularity =
       (T)1.0; // does REPLACE the thres_scale (and is NOT scaled with weight_granularity)
   bool no_buffer = false; // turn off buffer (TTv1)
@@ -60,17 +62,19 @@ struct ChoppedTransferRPUDeviceMetaParameter : BufferedTransferRPUDeviceMetaPara
 
   void checkSupported() const;
 
-  T getTransferLRScale(T weight_granularity, T lr) const;
+  T getTransferLRScale(
+      T from_weight_granularity, T to_weight_granularity, T lr, T count_lr, int m_batch) const;
   T getWriteLR(T weight_granularity) const;
   virtual T getPulseCountAutoLR(
       T m_x,
       T m_d,
+      T d_sparsity,
       T weight_granularity,
       T transfer_every,
       const PulsedUpdateMetaParameter<T> &up) const;
-  inline bool usesAutoTransferEvery() const { return this->transfer_every < 0; }
+  inline bool usesAutoTransferEvery() const { return this->transfer_every < (T)0.0; }
   T getAutoTransferEvery(T n_states, const PulsedUpdateMetaParameter<T> &up) const;
-  T getBufferGranularity(T weight_granularity) const;
+  T getBufferGranularity(T weight_granularity, int m_batch) const;
   void updateAutoScale(T &m, T new_val, int m_batch) const;
 
   std::string getName() const override {
@@ -121,6 +125,7 @@ public:
     swap(a.out_chopper_, b.out_chopper_);
     swap(a.m_x_, b.m_x_);
     swap(a.m_d_, b.m_d_);
+    swap(a.d_sparsity_, b.d_sparsity_);
     swap(a.x_signed_indices_tmp_, b.x_signed_indices_tmp_);
     swap(a.transfer_counter_, b.transfer_counter_);
   }
@@ -142,7 +147,8 @@ public:
       const T *vec,
       const int n_vec,
       const T reset_prob,
-      const int i_col) override;
+      const int i_col,
+      const int m_batch_info) override;
 
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
@@ -174,7 +180,10 @@ protected:
   std::vector<bool> out_chopper_;
   T m_x_ = 0.0;
   T m_d_ = 0.0;
-  virtual T getCurrentCountLR() const { return tmp_count_lr_; };
+  T d_sparsity_ = 0.0;
+
+  inline T getCurrentCountLR() const { return tmp_count_lr_; };
+  inline void setCurrentCountLR(T count_lr) { tmp_count_lr_ = count_lr; };
   inline T getCurrentGradStrength() const { return m_x_ * m_d_; };
 
   uint64_t transfer_counter_ = 0;

@@ -75,6 +75,14 @@ public:
   void copyXCountsBo64ToHost(uint64_t *dest) const;
   void copyDCountsBo64ToHost(uint64_t *dest) const;
 
+  void copyDNumberOfZerosToHost(uint32_t &noz) const {
+    if (dev_d_noz_ != nullptr) {
+      dev_d_noz_->copyTo(&noz);
+    } else {
+      noz = (uint32_t)0;
+    };
+  };
+
   inline bool checkBuffer(int m_batch, int BL) const {
     return (BL == buffer_BL_) && (m_batch <= buffer_m_batch_);
   }
@@ -83,6 +91,8 @@ public:
   inline int getCurrentMBatch() const { return current_m_batch_; };
   inline int getCurrentUBLM() const { return current_ublm_; };
   inline int getCurrentUM() const { return current_um_; };
+  inline int getCurrentDNOZ() const { return current_d_sparsity_; };
+
   void getFPCounts(T *x_counts, T *d_counts);
   inline T getCurrentLR() const { return current_lr_; };
   void initializeBLBuffers(int m_batch, int BL, int use_bo64, bool implicit_pulses);
@@ -105,6 +115,7 @@ public:
   void getAbsMax(T &m_x, T &m_d) const;
   void dumpExtra(RPU::state_t &extra, const std::string prefix);
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+  T getAverageDSparsity() const;
 
 private:
   CudaContextPtr context_ = nullptr;
@@ -120,6 +131,8 @@ private:
   bool current_out_trans_ = false;
   bool current_ublm_ = false;
   bool current_um_ = false;
+  bool current_d_sparsity_ = false;
+
   BLMOutputFormat format_ = BLMOutputFormat::NotSet;
 
   // TODO: use shared buffers for some of these? However, need to be
@@ -127,6 +140,8 @@ private:
   // devices
   std::unique_ptr<CudaArray<T>> dev_x_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_d_ = nullptr;
+
+  std::unique_ptr<CudaArray<uint32_t>> dev_d_noz_ = nullptr;
 
   std::unique_ptr<CudaArray<uint32_t>> dev_x_counts_ = nullptr;
   std::unique_ptr<CudaArray<uint32_t>> dev_d_counts_ = nullptr;
@@ -139,19 +154,51 @@ private:
 namespace test_helper {
 template <typename T>
 int debugKernelUpdateGetCounts_Loop2(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed);
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed);
 
 template <typename T>
 int debugKernelUpdateGetCountsBatch_Loop2(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed);
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed);
 
 template <typename T>
 int debugKernelUpdateGetCountsBatch_SimpleLoop2(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed);
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed);
 
 template <typename T, int ITEMS_PER_THREAD>
 int debugKernelUpdateGetCounts_Linear(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed);
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed);
 int getCounts(uint32_t *counts, int i, int K, int size, bool negtest);
 
 template <typename T>

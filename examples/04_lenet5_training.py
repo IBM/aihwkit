@@ -17,7 +17,7 @@ https://www.frontiersin.org/articles/10.3389/fnins.2017.00538/full
 
 Learning rates of η = 0.01 for all the epochs with minibatch 8.
 """
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, redefined-outer-name
 
 import os
 from datetime import datetime
@@ -30,6 +30,7 @@ import torch
 from torch import nn
 from torchvision import datasets, transforms
 
+
 # Imports from aihwkit.
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
@@ -40,6 +41,7 @@ from aihwkit.simulator.configs import (
     FloatingPointDevice,
 )
 from aihwkit.simulator.rpu_base import cuda
+
 
 # Check device
 USE_CUDA = 0
@@ -65,7 +67,7 @@ N_CLASSES = 10
 #   constant step devices will be used,
 # * If `FloatingPointRPUConfig(device=FloatingPointDevice())` then standard
 #   floating point devices will be used
-USE_ANALOG_TRAINING = True
+USE_ANALOG_TRAINING = False
 if USE_ANALOG_TRAINING:
     RPU_CONFIG = SingleRPUConfig(device=ConstantStepDevice())
 else:
@@ -282,8 +284,7 @@ def plot_results(train_losses, valid_losses, test_error):
     plt.close()
 
 
-def main():
-    """Train a PyTorch CNN analog model with the MNIST dataset."""
+if __name__ == "__main__":
     # Make sure the directory where to save the results exist.
     # Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
     os.makedirs(RESULTS, exist_ok=True)
@@ -310,8 +311,3 @@ def main():
     )
 
     print(f"{datetime.now().time().replace(microsecond=0)} --- " f"Completed LeNet5 Example")
-
-
-if __name__ == "__main__":
-    # Execute only if run as the entry point into the program
-    main()

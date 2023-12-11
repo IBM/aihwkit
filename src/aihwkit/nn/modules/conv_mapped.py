@@ -25,7 +25,8 @@ from torch.nn import ModuleList
 from aihwkit.nn.modules.base import AnalogLayerBase
 from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.exceptions import AnalogBiasConfigError, ModuleError, ConfigError
-from aihwkit.simulator.parameters.base import MappableRPU, RPUConfigBase
+from aihwkit.simulator.parameters.base import RPUConfigBase
+from aihwkit.simulator.parameters.mapping import MappableRPU
 
 
 class _AnalogConvNdMapped(AnalogLayerBase, _ConvNd):
@@ -350,7 +351,7 @@ class AnalogConv1dMapped(_AnalogConvNdMapped):
 
     The module will split the weight matrix onto multiple tiles if
     necessary. Physical max tile sizes are specified with
-    :class:`~aihwkit.simulator.parameters.utils.MappingParameter` in the
+    :class:`~aihwkit.simulator.parameters.mapping.MappingParameter` in the
     RPU configuration, see
     :class:`~aihwkit.simulator.configs.configs.RPUConfigBase`.
 
@@ -461,7 +462,7 @@ class AnalogConv1dMapped(_AnalogConvNdMapped):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)
 
     @classmethod
     def to_digital(cls, module: "AnalogConv1dMapped", realistic: bool = False) -> Conv1d:
@@ -552,7 +553,7 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
 
     The module will split the weight matrix onto multiple tiles if
     necessary. Physical max tile sizes are specified with
-    :class:`~aihwkit.simulator.parameters.utils.MappingParameter` in the
+    :class:`~aihwkit.simulator.parameters.mapping.MappingParameter` in the
     RPU configuration, see
     :class:`~aihwkit.simulator.configs.configs.RPUConfigBase`.
 
@@ -664,7 +665,7 @@ class AnalogConv2dMapped(_AnalogConvNdMapped):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)
 
     @classmethod
     def to_digital(cls, module: "AnalogConv2dMapped", realistic: bool = False) -> Conv2d:
@@ -753,7 +754,7 @@ class AnalogConv3dMapped(_AnalogConvNdMapped):
 
     The module will split the weight matrix onto multiple tiles if
     necessary. Physical max tile sizes are specified with
-    :class:`~aihwkit.simulator.parameters.utils.MappingParameter` in the
+    :class:`~aihwkit.simulator.parameters.mapping.MappingParameter` in the
     RPU configuration, see
     :class:`~aihwkit.simulator.configs.configs.RPUConfigBase`.
 
@@ -871,7 +872,7 @@ class AnalogConv3dMapped(_AnalogConvNdMapped):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)
 
     @classmethod
     def to_digital(cls, module: "AnalogConv3dMapped", realistic: bool = False) -> Conv3d:

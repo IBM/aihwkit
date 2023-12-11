@@ -37,7 +37,7 @@ void MixedPrecIntRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss)
   ss << n_d_bins << std::endl;
   if (stoc_round_x || stoc_round_d) {
     ss << "\t stoc_round (x / d): \t";
-    ss << stoc_round_x << " / " << stoc_round_d << std::endl;
+    ss << std::boolalpha << stoc_round_x << " / " << stoc_round_d << std::endl;
   }
   MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(ss);
 }
@@ -50,7 +50,8 @@ template <typename T> void MixedPrecIntRPUDeviceMetaParameter<T>::initialize() {
       RPU_FATAL("Expect n_bins to be at least 3.");
     }
 
-    if (momentum_chi > 1 || momentum_nm > 1 || momentum_nm < 0 || momentum_chi < 0) {
+    if (momentum_chi > (T)1.0 || momentum_nm > (T)1.0 || momentum_nm < (T)0.0 ||
+        momentum_chi < (T)0.0) {
       RPU_FATAL("momentum should be in 0..1");
     }
   }
@@ -59,6 +60,9 @@ template <typename T> void MixedPrecIntRPUDeviceMetaParameter<T>::initialize() {
 template struct MixedPrecIntRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct MixedPrecIntRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct MixedPrecIntRPUDeviceMetaParameter<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -206,10 +210,10 @@ void MixedPrecIntRPUDevice<T>::forwardUpdate(
   if (this->transfer_tmp_.size() < (size_t)this->x_size_) {
     this->transfer_tmp_.resize(this->x_size_);
   }
-  T d_width = md_ / (par.n_d_bins / 2);
-  T x_width = mx_ / (par.n_x_bins / 2); // needs to be integer div
+  T d_width = md_ / (T)(par.n_d_bins / 2);
+  T x_width = mx_ / (T)(par.n_x_bins / 2); // needs to be integer div
   T momentum = par.momentum_chi;
-  T thres = MAX(round(this->granularity_ / fabs(lr) / d_width / x_width), 1);
+  T thres = MAX((T)roundf(this->granularity_ / (T)fabsf(lr) / d_width / x_width), (T)1.0);
 
   // forward / update
   for (size_t j = 0; j < (size_t)n_vec; j++) {
@@ -218,9 +222,9 @@ void MixedPrecIntRPUDevice<T>::forwardUpdate(
     PRAGMA_SIMD
     for (size_t i = 0; i < (size_t)this->x_size_; i++) {
       T value = (T)chi_row[i];
-      T dw = (T)trunc(value / thres);
+      T dw = (T)truncf(value / thres);
       this->transfer_tmp_[i] = dw;
-      chi_row[i] = (int32_t)value - (int32_t)round((1.0f - momentum) * thres * dw);
+      chi_row[i] = (int32_t)value - (int32_t)roundf(((T)1.0 - momentum) * thres * dw);
     }
 
     this->transfer_pwu_->updateVectorWithDevice(
@@ -247,10 +251,10 @@ void MixedPrecIntRPUDevice<T>::doDirectVectorUpdate(
   const auto &par = getPar();
 
   int max_index = RPU::math::iamax<T>(this->x_size_, x_input, x_inc);
-  T x_amax = fabs(x_input[max_index * x_inc]);
+  T x_amax = (T)fabsf(x_input[max_index * x_inc]);
 
   max_index = RPU::math::iamax<T>(this->d_size_, d_input, d_inc);
-  T d_amax = fabs(d_input[max_index * d_inc]);
+  T d_amax = (T)fabsf(d_input[max_index * d_inc]);
 
   T momentum = md_ < (T)0.0 ? (T)0.0 : par.momentum_nm;
   if (d_amax > (T)0.0) {
@@ -285,7 +289,7 @@ void MixedPrecIntRPUDevice<T>::doDirectVectorUpdate(
     }
 
     // quantize
-    int16_t qx = (int16_t)round(x / x_width + stoch_value);
+    int16_t qx = (int16_t)roundf(x / x_width + stoch_value);
 
     if (qx == (int16_t)0) {
       continue;
@@ -308,7 +312,7 @@ void MixedPrecIntRPUDevice<T>::doDirectVectorUpdate(
     }
 
     // quantize
-    int16_t qd = (int16_t)round(d / d_width + stoch_value);
+    int16_t qd = (int16_t)roundf(d / d_width + stoch_value);
     if (qd == (int16_t)0) {
       continue;
     }
@@ -345,13 +349,16 @@ template <typename T> void MixedPrecIntRPUDevice<T>::getChi(T *data) const {
 
 template <typename T> void MixedPrecIntRPUDevice<T>::setChi(const T *data) {
   for (int i = 0; i < this->size_; ++i) {
-    chi_[0][i] = (int16_t)round(data[i]);
+    chi_[0][i] = (int16_t)roundf(data[i]);
   }
 }
 
 template class MixedPrecIntRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecIntRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class MixedPrecIntRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

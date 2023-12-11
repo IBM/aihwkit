@@ -63,7 +63,7 @@ class AnalogOptimizerMixin:
             self.add_param_group(group)  # type: ignore[attr-defined]
 
     @no_grad()
-    def step(self, closure: Optional[Callable] = None) -> Optional[float]:
+    def step(self, closure: Optional[Callable] = None, **kwargs: Any) -> Optional[float]:
         """Perform an analog-aware single optimization step.
 
         If a group containing analog parameters is detected, the optimization
@@ -73,13 +73,14 @@ class AnalogOptimizerMixin:
         Args:
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss.
+            kwargs: additional arguments if any
 
         Returns:
             The loss, if ``closure`` has been passed as a parameter.
         """
         # pylint: disable=too-many-branches
         # Update non-analog parameters using the given optimizer
-        ret = super().step(closure)  # type: ignore[misc]
+        ret = super().step(closure, **kwargs)  # type: ignore[misc]
 
         # Update analog parameters
         for group in self.param_groups:
@@ -109,11 +110,19 @@ class AnalogOptimizerMixin:
                     if learning_rate is not None:
                         analog_tile.set_learning_rate(learning_rate)
 
+                    runtime = analog_tile.get_runtime()
                     if analog_ctx.use_indexed:
                         for x_input, d_input in zip(
                             analog_ctx.analog_input, analog_ctx.analog_grad_output
                         ):
-                            analog_tile.update_indexed(x_input, d_input)
+                            analog_tile.update_indexed(
+                                x_input.to(analog_tile.device)
+                                if runtime.offload_input
+                                else x_input,
+                                d_input.to(analog_tile.device)
+                                if runtime.offload_gradient
+                                else d_input,
+                            )
                     else:
                         x_input = cat(
                             analog_ctx.analog_input, axis=-1 if analog_tile.in_trans else 0
@@ -121,7 +130,10 @@ class AnalogOptimizerMixin:
                         d_input = cat(
                             analog_ctx.analog_grad_output, axis=-1 if analog_tile.out_trans else 0
                         )
-                        analog_tile.update(x_input, d_input)
+                        analog_tile.update(
+                            x_input.to(analog_tile.device) if runtime.offload_input else x_input,
+                            d_input.to(analog_tile.device) if runtime.offload_gradient else d_input,
+                        )
 
                     analog_ctx.reset()
 
