@@ -1,12 +1,16 @@
 ``aihwkit`` design
 ==================
+Since the aihwkit is based on the PyTorch ML framework, users can rely on the
+vast library of digital Floating Point (FP) layers and functions for defining common DNNs. Only some layers
+of the DNN that are supposed to run on Analog Accelerators or AIMC will use the simulation AIMC capabilities
+of the aihwkit
 
 ``aihwkit`` architecture
 ------------------------
 
 The library is comprised by several layers:
 
-.. image:: ../img/architecture.png
+.. image:: ../img/aihwkit-design.png
    :scale: 50%
    :alt: aihwkit architecture
    :align: center

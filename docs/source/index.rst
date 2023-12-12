@@ -56,7 +56,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
    developer_install
    development_conventions
    roadmap
-   changelog.md
+   changelog
 
 .. toctree::
    :maxdepth: 3
