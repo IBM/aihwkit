@@ -332,7 +332,7 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
 
   int max_weight_outputs = par_.every > 0 ? (current_m_batch_ + par_.every - 1) / par_.every : 0;
   int sw_size = (x_size_ + d_size_) * max_weight_outputs;
-  if (max_weight_outputs > 0 && (par_.in_chop_random || par_.out_chop_prob > 0)) {
+  if (max_weight_outputs > 0 && (par_.in_chop_random || par_.out_chop_prob > (T)0.0)) {
     RPU_GET_CUDA_BUFFER(context_, float, dev_switching_probs_, sw_size);
   }
 
@@ -347,19 +347,18 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
           context_, chop_t, dev_weight_output_out_chopper_, n_weight_outputs * getOutSize());
       RPU_GET_CUDA_BUFFER(context_, chop_t, dev_weight_output_in_chopper_, n_weight_outputs);
 
-      if (par_.in_chop_random || par_.out_chop_prob > 0) {
+      if (par_.in_chop_random || par_.out_chop_prob > (T)0.0) {
         context_->randUniform(dev_switching_probs_->getData(), sw_size);
 
         x_switching_probs_ = dev_switching_probs_->getData();
         d_switching_probs_ = dev_switching_probs_->getData() + x_size_ * max_weight_outputs;
       }
+      // out put is done in the correct row/col of a weight matrix
+      // (where the non-output rows/cols are random). In case that n_wo
+      // is larger than in_size then a second weight matrix is populated
+      // and so on
+      weight_outputs_ = context_->template getSharedBuffer<T>(RPU_BUFFER_CWO, getWODataSize());
     }
-
-    // out put is done in the correct row/col of a weight matrix
-    // (where the non-output rows/cols are random). In case that n_wo
-    // is larger than in_size then a second weight matrix is populated
-    // and so on
-    weight_outputs_ = context_->template getSharedBuffer<T>(RPU_BUFFER_CWO, getWODataSize());
   }
 
   if (blm->usesBo64() && blm->getCurrentUBLM()) {
@@ -382,6 +381,9 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
 template class ChoppedWeightOutput<float>;
 #ifdef RPU_USE_DOUBLE
 template class ChoppedWeightOutput<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ChoppedWeightOutput<half_t>;
 #endif
 
 } // namespace RPU

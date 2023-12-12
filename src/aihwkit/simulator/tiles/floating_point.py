@@ -131,8 +131,7 @@ class FloatingPointTile(TileModule, TileWithPeriphery, RPUCudaSimulatorTileWrapp
         Returns:
             a simulator tile based on the specified configuration.
         """
-        meta_parameter = rpu_config.device.as_bindings()
-
+        meta_parameter = rpu_config.device.as_bindings(self.get_data_type())
         return meta_parameter.create_array(x_size, d_size)
 
     def forward(

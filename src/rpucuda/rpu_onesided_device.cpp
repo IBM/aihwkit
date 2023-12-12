@@ -77,6 +77,9 @@ template struct OneSidedRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct OneSidedRPUDeviceMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct OneSidedRPUDeviceMetaParameter<half_t>;
+#endif
 
 /************************************************************************************/
 /* OneSidedRPUDevice*/
@@ -315,12 +318,12 @@ template <typename T> int OneSidedRPUDevice<T>::refreshWeights() {
     refresh_m_vec_.resize(this->d_size_);
   }
 
-  T w_max =
-      fabs(static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_plus_]->getPar())
-               .w_max);
-  T w_min =
-      fabs(static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_minus_]->getPar())
-               .w_max); // also max because of the one-sided-ness
+  T w_max = (T)fabsf(
+      static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_plus_]->getPar())
+          .w_max);
+  T w_min = (T)fabsf(
+      static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_minus_]->getPar())
+          .w_max); // also max because of the one-sided-ness
   T upper_thres = par.refresh_upper_thres;
   T lower_thres = par.refresh_lower_thres;
   T **weights_p = this->weights_vec_[g_plus_];
@@ -407,8 +410,8 @@ template <typename T> bool OneSidedRPUDevice<T>::onSetWeights(T **weights) {
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->weights_vec_[g_plus_][0][i] = w[i] > 0 ? w[i] : (T)0.0;
-    this->weights_vec_[g_minus_][0][i] = w[i] < 0 ? -w[i] : (T)0.0;
+    this->weights_vec_[g_plus_][0][i] = w[i] > (T)0.0 ? w[i] : (T)0.0;
+    this->weights_vec_[g_minus_][0][i] = w[i] < (T)0.0 ? -w[i] : (T)0.0;
   }
 
   this->rpu_device_vec_[g_plus_]->onSetWeights(this->weights_vec_[g_plus_]);
@@ -422,6 +425,9 @@ template <typename T> bool OneSidedRPUDevice<T>::onSetWeights(T **weights) {
 template class OneSidedRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class OneSidedRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class OneSidedRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

@@ -23,7 +23,7 @@ from torch.nn import Module
 
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
 from aihwkit.simulator.parameters.base import RPUConfigBase
-from aihwkit.simulator.parameters.utils import PrePostProcessingParameter, WeightRemapParameter
+from aihwkit.simulator.parameters import PrePostProcessingParameter, WeightRemapParameter
 from aihwkit.simulator.presets.web import OldWebComposerMappingParameter
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
 

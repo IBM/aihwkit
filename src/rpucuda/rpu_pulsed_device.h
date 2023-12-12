@@ -106,7 +106,7 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   DeviceUpdateType implements() const override { return DeviceUpdateType::Undefined; };
 
   virtual bool implementsWriteNoise() const { return false; }; // needs to be activated in derived
-  virtual bool usesPersistentWeight() const { return write_noise_std > 0; };
+  virtual bool usesPersistentWeight() const { return write_noise_std > (T)0.0; };
   inline T getScaledWriteNoise() const { return write_noise_std * this->dw_min; };
 
   void initialize() override {

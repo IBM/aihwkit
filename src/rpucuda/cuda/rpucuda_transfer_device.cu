@@ -191,7 +191,7 @@ T TransferRPUDeviceCuda<T>::getPulseCountLearningRate(
 
   const auto &par = getPar();
 
-  if (par.fast_lr > 0) {
+  if (par.fast_lr > (T)0.0) {
     return par.fast_lr;
   } else {
     return PulsedRPUDeviceCudaBase<T>::getPulseCountLearningRate(
@@ -232,11 +232,11 @@ void TransferRPUDeviceCuda<T>::writeMatrix(
 
   if (par.transfer_columns) {
     transfer_pwu_->update(
-        in_vec, out_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
+        in_vec, out_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabsf(lr), m_batch, false,
         false);
   } else {
     transfer_pwu_->update(
-        out_vec, in_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
+        out_vec, in_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabsf(lr), m_batch, false,
         false);
   }
 }
@@ -270,7 +270,7 @@ void TransferRPUDeviceCuda<T>::readAndUpdate(
   // accordingly
   readMatrix(from_device_idx, vec, out_vec, n_vec, -1.0);
   // update according to device
-  writeMatrix(to_device_idx, vec, out_vec, n_vec, fabs(lr), up);
+  writeMatrix(to_device_idx, vec, out_vec, n_vec, fabsf(lr), up);
 
   this->context_->template releaseSharedBuffer<T>(RPU_BUFFER_DEVICE_0);
 }
@@ -291,7 +291,7 @@ void TransferRPUDeviceCuda<T>::transfer(
   int out_size = par.getOutSize();
 
   if (par.random_selection) {
-    i_slice = MAX(MIN(floor(this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
+    i_slice = MAX(MIN(floorf((float)this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0.0f);
   }
 
   // transfer_vecs_ is always in_size-major (that is trans==false)
@@ -333,9 +333,9 @@ int TransferRPUDeviceCuda<T>::getTransferEvery(
     int didx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const {
   UNUSED(up);
   if (getPar().units_in_mbatch) {
-    return MAX(ceil(getPar().transfer_every_vec[didx] * m_batch), 0);
+    return MAX((int)ceilf((float)getPar().transfer_every_vec[didx] * m_batch), 0);
   } else {
-    return MAX(round(getPar().transfer_every_vec[didx]), 0);
+    return MAX((int)roundf(getPar().transfer_every_vec[didx]), 0);
   }
 }
 
@@ -344,7 +344,7 @@ template <typename T> inline int getNChunks(int m_batch, T every) {
   if (every <= 0) {
     return 1;
   } else {
-    return MAX((int)(round((T)m_batch / every)), 1); // take next integer for period
+    return MAX((int)(round((float)m_batch / every)), 1); // take next integer for period
   }
 }
 
@@ -579,4 +579,8 @@ template class TransferRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class TransferRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class TransferRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

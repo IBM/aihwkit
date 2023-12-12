@@ -33,13 +33,14 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 # Define a single-layer network, using a constant step device type.
 rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+
 model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
     x = x.cuda()
     y = y.cuda()
-    model.cuda()
+    model = model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
 opt = AnalogSGD(model.parameters(), lr=0.1)

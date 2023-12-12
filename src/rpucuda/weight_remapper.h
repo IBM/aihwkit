@@ -21,6 +21,10 @@ enum class WeightRemapType {
   None,
   LayerwiseSymmetric,
   ChannelwiseSymmetric,
+  ChannelwiseNorm,
+  ChannelwiseExceeded,
+  LayerwiseAsymmetric,
+  ChannelwiseAsymmetric
 };
 
 // no template. Just double
@@ -29,7 +33,13 @@ struct WeightRemapParameter {
   WeightRemapType type = WeightRemapType::None;
   double max_scale_range = 0.0; // for Symmetric: whether to bound the diversity of scales
   double max_scale_ref = 0.0;   // reference is minimum scale if larger than this
+  double row_norm = 1.0;        // max norm of row for ChannelwiseNorm
   double remapped_wmax = 1.0;   // For Channelwise/LayerwiseSymmetric: where the max is mapped to
+  bool clip_if = true;          // only for norm
+  int swa_every = 0;            // stochastic weight averaging
+  int swa_transfer_every =
+      0; // stochastic weight averaging -> copy to weight [counting in the number of swa applied]
+  uint64_t swa_start = 0; // start iter to do SWA
   void print() const {
     std::stringstream ss;
     printToStream(ss);
@@ -38,9 +48,23 @@ struct WeightRemapParameter {
 
   void printToStream(std::stringstream &ss) const {
 
+    if (swa_every > 0) {
+      ss << "\t swa_every:\t\t" << swa_every << std::endl;
+      ss << "\t swa_start:\t\t" << swa_start << std::endl;
+    }
+    if (swa_transfer_every > 0) {
+      ss << "\t swa_transfer_every:\t" << swa_transfer_every << std::endl;
+    }
+
     ss << "\t weight remapping type:\t" << getTypeName() << std::endl;
     if (type == WeightRemapType::None) {
       return;
+    }
+    if (type == WeightRemapType::ChannelwiseNorm) {
+      ss << "\t row norm:\t\t" << row_norm << std::endl;
+    }
+    if (type == WeightRemapType::ChannelwiseNorm || type == WeightRemapType::ChannelwiseExceeded) {
+      ss << "\t clip if:\t\t" << clip_if << std::endl;
     }
     if (max_scale_range > 0 && type == WeightRemapType::ChannelwiseSymmetric) {
       ss << "\t max scale range:\t" << max_scale_range << std::endl;
@@ -58,8 +82,16 @@ struct WeightRemapParameter {
       return "None";
     case WeightRemapType::LayerwiseSymmetric:
       return "LayerwiseSymmetric";
+    case WeightRemapType::ChannelwiseNorm:
+      return "ChannelwiseNorm";
     case WeightRemapType::ChannelwiseSymmetric:
       return "ChannelwiseSymmetric";
+    case WeightRemapType::ChannelwiseExceeded:
+      return "ChannelwiseExceeded";
+    case WeightRemapType::LayerwiseAsymmetric:
+      return "LayerwiseAsymmetric";
+    case WeightRemapType::ChannelwiseAsymmetric:
+      return "ChannelwiseAsymmetric";
     default:
       return "Unknown";
     }
@@ -76,6 +108,16 @@ public:
   void apply(
       T *weights, T current_lr, const WeightRemapParameter &wmpar, T *scales, T *biases = nullptr);
 
+  /* intermittantly saving of the running average weight. Returns true if weight was modified */
+  bool applySWA(
+      T *swa_weights,
+      T *weights,
+      uint64_t iter,
+      const WeightRemapParameter &wmpar,
+      T current_lr,
+      T *scales = nullptr,
+      T *biases = nullptr);
+
   void dumpExtra(RPU::state_t &extra, const std::string prefix){};
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
 
@@ -83,6 +125,7 @@ private:
   std::vector<T> max_values_;
   std::vector<T> min_values_;
   std::vector<T> old_scales_;
+  std::vector<T> norm_values_;
 
   int x_size_ = 0;
   int d_size_ = 0;

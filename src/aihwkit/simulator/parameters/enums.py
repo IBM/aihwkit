@@ -15,6 +15,32 @@
 """Utility enumerators for resistive processing units."""
 
 from enum import Enum
+from torch import dtype, float32, float64, half
+
+_TORCH_DATA_TYPE_MAP = {"float": float32, "double": float64, "half": half}
+
+
+class RPUDataType(Enum):
+    """Data type for the C++ simulation of the analog tiles.
+
+    Note:
+
+        `FLOAT` is the default. Other data types need special
+        compilation options to be enabled.
+    """
+
+    FLOAT = "float"
+    """Float32 (single) precision format."""
+
+    DOUBLE = "double"
+    """Float64 (double) precision format."""
+
+    HALF = "half"
+    """Float16 (half) precision format."""
+
+    def as_torch(self) -> dtype:
+        """Returns corresponding torch dtype."""
+        return _TORCH_DATA_TYPE_MAP[self.value]
 
 
 class BoundManagementType(Enum):
@@ -196,6 +222,11 @@ class WeightModifierType(Enum):
     ``assumed_wmax``.
     """
 
+    PCM_NOISE = "PCMNoise"
+    """PCM programming / drift noise model added to the weight matrix
+    during training.
+    """
+
     PROG_NOISE = "ProgNoise"
     """Programming noise model added to the weight matrix during
     training. Same as "POLY", except that weights are ensured to keep
@@ -287,3 +318,12 @@ class AnalogMVType(Enum):
     separately and the results are summed in full precision (i.e. in
     digital).
     """
+
+
+# legacy
+class CountLRFeedbackPolicy(Enum):
+    """Depreciated. Legacy."""
+
+    NONE = "None"
+    PAST_MOMENTUM = "PastMomentum"
+    EXTERN = "Extern"

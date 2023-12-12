@@ -18,13 +18,13 @@ namespace RPU {
 namespace {
 #define UPDATE_ONCE                                                                                \
   {                                                                                                \
-    T z = 2.0 * w / b_diff * a + b;                                                                \
-    T y = 1.0 - A * __expf(gamma * z);                                                             \
-    if (y > 0) {                                                                                   \
-      if (noise_std_dw > 0) {                                                                      \
+    T z = (T)2.0 * w / b_diff * a + b;                                                             \
+    T y = (T)1.0 - A * (T)__expf(gamma * z);                                                       \
+    if (y > (T)0.0) {                                                                              \
+      if (noise_std_dw > (T)0.0) {                                                                 \
         T stoch_value = curand_normal(&local_state);                                               \
         stoch_value *= noise_std_dw;                                                               \
-        w += y * (stoch_value + 1.0) * dw;                                                         \
+        w += y * (stoch_value + (T)1.0) * dw;                                                      \
       } else {                                                                                     \
         w += y * dw;                                                                               \
       }                                                                                            \
@@ -39,8 +39,8 @@ template <typename T> struct UpdateFunctorExpStep {
       T &apparent_weight,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 par_2,
+      const param4_t par_4,
+      const param2_t par_2,
       T &persistent_weight,
       const T *global_pars,
       const int global_params_count,
@@ -58,15 +58,15 @@ template <typename T> struct UpdateFunctorExpStep {
     T wmin = par_4.x; //[0];
     T b_diff = (wmax - wmin);
 
-    T &w = uw_std > 0.0f ? persistent_weight : apparent_weight;
+    T &w = uw_std > (T)0.0 ? persistent_weight : apparent_weight;
 
-    if (b_diff > 0.0f) { // only do something when bounds make sense
+    if (b_diff > (T)0.0) { // only do something when bounds make sense
 
       T A = negative ? global_pars[1] : global_pars[0];        // 1: up, 0: down
       T gamma = negative ? global_pars[3] : (-global_pars[2]); // 3: up, 2 down
       T a = global_pars[4];
       T b = global_pars[5];
-      T dw = (negative > 0) ? (par_4.w) : (-par_4.y); // [3], [1]
+      T dw = (negative > 0) ? ((T)par_4.w) : (-(T)par_4.y); // [3], [1]
 
       // n is larger 0 in any case
       if (n == 1) {
@@ -77,7 +77,7 @@ template <typename T> struct UpdateFunctorExpStep {
         }
       }
       // add update write noise onto apparent weight
-      if (uw_std > 0) {
+      if (uw_std > (T)0.0) {
         T stoch_value = curand_normal(&local_state);
         apparent_weight = persistent_weight + uw_std * stoch_value;
       }
@@ -88,9 +88,9 @@ template <typename T> struct UpdateFunctorExpStep {
 
 #define UPDATE_ONCE_COMPLEX_NOISE                                                                  \
   {                                                                                                \
-    T z = 2.0 * w / b_diff * a + b;                                                                \
-    T y = 1.0 - A * __expf(gamma * z);                                                             \
-    if (y > 0.0f) {                                                                                \
+    T z = (T)2.0 * w / b_diff * a + b;                                                             \
+    T y = (T)1.0 - A * (T)__expf(gamma * z);                                                       \
+    if (y > (T)0.0) {                                                                              \
       T dw_act = y * dw;                                                                           \
       T stoch_value = curand_normal(&local_state);                                                 \
       stoch_value *= noise_std_dw * (fabs(dw_act) + dw_std_add + dw_std_slope * fabs(w));          \
@@ -106,8 +106,8 @@ template <typename T> struct UpdateFunctorExpStepComplexNoise {
       T &apparent_weight,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 par_2,
+      const param4_t par_4,
+      const param2_t par_2,
       T &persistent_weight,
       const T *global_pars,
       const int global_params_count,
@@ -123,19 +123,19 @@ template <typename T> struct UpdateFunctorExpStepComplexNoise {
     T uw_std = global_pars[6];
     T dw_std_add = global_pars[7];
     T dw_std_slope = global_pars[8];
-    T wmax = par_4.z; //[2];
-    T wmin = par_4.x; //[0];
+    T wmax = (T)par_4.z; //[2];
+    T wmin = (T)par_4.x; //[0];
     T b_diff = (wmax - wmin);
 
-    T &w = uw_std > 0.0f ? persistent_weight : apparent_weight;
+    T &w = uw_std > (T)0.0 ? persistent_weight : apparent_weight;
 
-    if (b_diff > 0.0f) { // only do something when bounds make sense
+    if (b_diff > (T)0.0) { // only do something when bounds make sense
 
       T A = negative ? global_pars[1] : global_pars[0];        // 1: up, 0: down
       T gamma = negative ? global_pars[3] : (-global_pars[2]); // 3: up, 2 down
       T a = global_pars[4];
       T b = global_pars[5];
-      T dw = (negative > 0) ? (par_4.w) : (-par_4.y); // [3], [1]
+      T dw = (negative > 0) ? ((T)par_4.w) : (-(T)par_4.y); // [3], [1]
 
       // n is larger 0 in any case
       if (n == 1) {
@@ -146,7 +146,7 @@ template <typename T> struct UpdateFunctorExpStepComplexNoise {
         }
       }
       // add update write noise onto apparent weight
-      if (uw_std > 0) {
+      if (uw_std > (T)0.0) {
         T stoch_value = curand_normal(&local_state);
         apparent_weight = persistent_weight + uw_std * stoch_value;
       }
@@ -211,4 +211,8 @@ template class ExpStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class ExpStepRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class ExpStepRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

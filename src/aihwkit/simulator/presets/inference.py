@@ -17,7 +17,7 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     MappingParameter,
     IOParameters,
     PrePostProcessingParameter,

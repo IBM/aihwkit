@@ -62,6 +62,8 @@ WEIGHT_SCALING_OMEGA = 0.6  # Should not be larger than max weight.
 # but it can be changed to a number of preset to explore possible different analog devices
 mapping = MappingParameter(weight_scaling_omega=WEIGHT_SCALING_OMEGA)
 RPU_CONFIG = GokmenVlasovPreset(mapping=mapping)
+RPU_CONFIG.runtime.offload_gradient = True
+RPU_CONFIG.runtime.offload_input = True
 
 
 def load_images():

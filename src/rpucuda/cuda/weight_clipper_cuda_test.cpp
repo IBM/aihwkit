@@ -22,12 +22,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -47,7 +41,7 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::normal_distribution<num_t> ndist{0.0, 1.0};
+    std::normal_distribution<float> ndist{0.0, 1.0};
     auto nrnd = std::bind(ndist, generator);
 
     wclipper = RPU::make_unique<WeightClipper<num_t>>(x_size, d_size);

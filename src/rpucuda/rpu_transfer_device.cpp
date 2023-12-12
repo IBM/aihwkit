@@ -54,7 +54,7 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
   ss << "\t transfer_every [init]:\t";
   if (this->_par_initialized)
     for (size_t k = 0; k < transfer_every_vec.size() - 1; k++) {
-      if (transfer_every_vec[k] < 0) {
+      if (transfer_every_vec[k] < (T)0.0) {
         ss << "auto  ";
       } else {
         ss << transfer_every_vec[k] << "  ";
@@ -69,7 +69,7 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
   ss << std::endl;
 
   // lr
-  if (fast_lr > 0) {
+  if (fast_lr > (T)0.0) {
     ss << "\t fast_lr:\t\t";
     ss << fast_lr;
     ss << std::endl;
@@ -95,7 +95,7 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
     ss << "\t [reading rows]";
   }
 
-  if (with_reset_prob) {
+  if (with_reset_prob > (T)0.0) {
     ss << "\t [with reset p=" << with_reset_prob << "]";
   }
   if (random_selection) {
@@ -158,7 +158,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     for (size_t i = 0; i < n_devices - 1; i++) {
       g += this->gamma_vec[i];
     }
-    if (this->gamma_vec[n_devices - 1] == 0) {
+    if (this->gamma_vec[n_devices - 1] == (T)0.0) {
       RPU_FATAL("Expect that last device has some constribution to the network weights. [otherwise "
                 "why transfer?]");
     }
@@ -167,7 +167,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
   if (this->gamma_vec.size() == 0) {
     this->gamma_vec.resize(n_devices);
     for (size_t i = 0; i < n_devices; i++) {
-      this->gamma_vec[n_devices - i - 1] = pow(gamma, (T)i);
+      this->gamma_vec[n_devices - i - 1] = (T)powf(gamma, (T)i);
     }
   }
 
@@ -189,7 +189,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     T n = transfer_every;
     for (size_t i = 0; i < n_devices; i++) {
       transfer_every_vec.push_back(n);
-      n *= (T)_out_size / n_reads_per_transfer;
+      n *= (T)_out_size / (T)n_reads_per_transfer;
     }
     if (no_self_transfer) {
       transfer_every_vec[n_devices - 1] = 0;
@@ -200,7 +200,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     RPU_FATAL("Expect transfer_every_vec to be of length n_devices");
   }
 
-  if (with_reset_prob > 0 && !transfer_columns) {
+  if (with_reset_prob > (T)0.0 && !transfer_columns) {
     RPU_FATAL("Reset prob is only implemented for column-transfer so far.");
   }
 
@@ -241,6 +241,9 @@ T TransferRPUDeviceMetaParameter<T>::getTransferLR(
 template struct TransferRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct TransferRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct TransferRPUDeviceMetaParameter<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -373,7 +376,7 @@ T TransferRPUDevice<T>::getPulseCountLearningRate(
 
   const auto &par = getPar();
 
-  if (par.fast_lr > 0) {
+  if (par.fast_lr > (T)0.0) {
     return par.fast_lr;
   } else {
     return learning_rate;
@@ -396,9 +399,9 @@ int TransferRPUDevice<T>::getTransferEvery(
     int from_device_idx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const {
   UNUSED(up);
   if (getPar().units_in_mbatch) {
-    return MAX((int)ceil(transfer_every_[from_device_idx] * m_batch), 0);
+    return MAX((int)ceilf((float)transfer_every_[from_device_idx] * (float)m_batch), 0);
   } else {
-    return MAX((int)round(transfer_every_[from_device_idx]), 0);
+    return MAX((int)roundf(transfer_every_[from_device_idx]), 0);
   }
 }
 
@@ -436,9 +439,10 @@ void TransferRPUDevice<T>::readAndUpdate(
     const T *vec, // these are the selected transfer vecs
     const int n_vec,
     const T reset_prob,
-    const int i_slice) {
+    const int i_slice,
+    const int m_batch_info) {
 
-  if (lr == 0.0) {
+  if (lr == (T)0.0) {
     return;
   }
 
@@ -472,7 +476,8 @@ void TransferRPUDevice<T>::readAndUpdate(
 }
 
 template <typename T>
-void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T current_lr) {
+void TransferRPUDevice<T>::transfer(
+    int to_device_idx, int from_device_idx, T current_lr, int m_batch_info) {
 
   int i_slice = current_slice_indices_[from_device_idx];
   const auto &par = getPar();
@@ -480,7 +485,7 @@ void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T cu
   int in_size = par.getInSize();
 
   if (par.random_selection) {
-    i_slice = MAX(MIN((int)floor(this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
+    i_slice = MAX(MIN((int)floorf((float)this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
   }
 
   // transfer_vecs_ is always in_size-major (that is trans==false)
@@ -494,15 +499,18 @@ void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T cu
   if (n_rest < n_transfer) {
     // rest
 
-    readAndUpdate(to_device_idx, from_device_idx, lr, tvec, n_rest, par.with_reset_prob, i_slice);
+    readAndUpdate(
+        to_device_idx, from_device_idx, lr, tvec, n_rest, par.with_reset_prob, i_slice,
+        m_batch_info);
     // from beginning
     readAndUpdate(
         to_device_idx, from_device_idx, lr, &transfer_vecs_[0], n_transfer - n_rest,
-        par.with_reset_prob, 0);
+        par.with_reset_prob, 0, m_batch_info);
 
   } else {
     readAndUpdate(
-        to_device_idx, from_device_idx, lr, tvec, n_transfer, par.with_reset_prob, i_slice);
+        to_device_idx, from_device_idx, lr, tvec, n_transfer, par.with_reset_prob, i_slice,
+        m_batch_info);
   }
 
   current_slice_indices_[from_device_idx] = (i_slice + n_transfer) % in_size;
@@ -543,7 +551,7 @@ void TransferRPUDevice<T>::finishUpdateCycle(
     int every = getTransferEvery(j, m_batch_info, up);
     if (every > 0 && this->current_update_idx_ % every == 0) {
       // last is self-update (does nothing per default, but could implement refresh in child)
-      transfer(MIN(j + 1, this->n_devices_ - 1), j, current_lr);
+      transfer(MIN(j + 1, this->n_devices_ - 1), j, current_lr, m_batch_info);
     }
   }
   this->reduceToWeights(weights);
@@ -705,6 +713,9 @@ void TransferRPUDevice<T>::loadExtra(
 template class TransferRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class TransferRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class TransferRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

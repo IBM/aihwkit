@@ -26,9 +26,10 @@ from aihwkit.simulator.tiles.torch_tile import AnalogMVM
 from aihwkit.simulator.tiles.periphery import TileWithPeriphery
 from aihwkit.simulator.tiles.functions import AnalogFunction
 from aihwkit.simulator.tiles.array import TileModuleArray
-from aihwkit.simulator.parameters.base import PrePostProcessingRPU, MappableRPU
+from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
+from aihwkit.simulator.parameters.mapping import MappableRPU
 from aihwkit.simulator.parameters.helpers import _PrintableMixin
-from aihwkit.simulator.parameters.utils import IOParameters
+from aihwkit.simulator.parameters.training import IOParameters
 
 
 class CustomSimulatorTile(SimulatorTile, Module):
@@ -280,24 +281,6 @@ class CustomTile(TileModule, TileWithPeriphery, SimulatorTileWrapper):
         if self.digital_bias:
             return out + self.bias.view(*tensor_view)
         return out
-
-    def get_learning_rate(self) -> Optional[float]:
-        """Get the learning rate of the tile.
-
-        Returns:
-           learning rate if exists.
-        """
-        return self.tile.get_learning_rate()
-
-    def set_learning_rate(self, learning_rate: Optional[float]) -> None:
-        """Set the learning rate of the tile.
-
-        No-op for tiles that do not need a learning rate.
-
-        Args:
-           learning rate: learning rate to set
-        """
-        self.tile.set_learning_rate(learning_rate)
 
     def post_update_step(self) -> None:
         """Operators that need to be called once per mini-batch.

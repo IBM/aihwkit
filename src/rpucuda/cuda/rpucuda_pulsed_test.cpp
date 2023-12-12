@@ -128,22 +128,22 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (T)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (T)urnd();
     }
 
-    std::uniform_real_distribution<T> udist2(-0.2, 0.2);
+    std::uniform_real_distribution<float> udist2(-0.2, 0.2);
     auto urnd2 = std::bind(udist2, generator);
 
     for (int j = 0; j < d_size * x_size; j++) {
-      w_other[j] = urnd2();
+      w_other[j] = (T)urnd2();
     }
     transpose(w_other_trans, w_other, x_size, d_size);
 
@@ -288,15 +288,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weight matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (T)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (T)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<T>>(context, x_size);
@@ -362,11 +362,7 @@ public:
 };
 
 // types
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> Tios;
-#else
-typedef ::testing::Types<float> Tios;
-#endif
+typedef ::testing::Types<num_t> Tios;
 
 TYPED_TEST_CASE(RPUCudaPulsedTestFixtureNoNoise, Tios);
 TYPED_TEST_CASE(RPUCudaPulsedTestFixture, Tios);
@@ -420,8 +416,8 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardVector) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->d_size; i++) {
-      cuavg[i] += this->d1[i] / nloop;
-      avg[i] += this->d2[i] / nloop;
+      cuavg[i] += this->d1[i] / (num_t)nloop;
+      avg[i] += this->d2[i] / (num_t)nloop;
 
       if (!this->noise_value) {
         EXPECT_FLOAT_EQ(this->d1[i], this->d2[i]);
@@ -429,14 +425,14 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardVector) {
     }
   }
 
-  std::cout << BOLD_ON << "\tCUDA Forward done in: " << cudur / (nloop - 1) << " msec" << BOLD_OFF
-            << std::endl;
-  std::cout << BOLD_ON << "\tCPU Forward done in: " << (T)dur / (nloop - 1) / 1000. << " msec"
+  std::cout << BOLD_ON << "\tCUDA Forward done in: " << (float)cudur / (nloop - 1) << " msec"
+            << BOLD_OFF << std::endl;
+  std::cout << BOLD_ON << "\tCPU Forward done in: " << (float)dur / (nloop - 1) / 1000. << " msec"
             << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->d_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -477,15 +473,15 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, ForwardMatrixBiasNoNoise) {
 
   for (int i = 0; i < this->d_size * this->m_batch; i++) {
     // std::cout << i << ": d1 " << this->d1[i] << " vs d2 " << this->d2[i] << std::endl;
-    ASSERT_NEAR(this->d1[i], this->d2[i], TOLERANCE);
+    ASSERT_NEAR((float)this->d1[i], (float)this->d2[i], TOLERANCE);
 
     if (!this->non_linearities) {
-      ASSERT_NEAR(this->d2[i], this->d3[i], TOLERANCE);
-      ASSERT_NEAR(this->d1[i], this->d3[i], TOLERANCE);
+      ASSERT_NEAR((float)this->d2[i], (float)this->d3[i], TOLERANCE);
+      ASSERT_NEAR((float)this->d1[i], (float)this->d3[i], TOLERANCE);
 
     } else {
-      ASSERT_NE(this->d2[i], this->d3[i]);
-      ASSERT_NE(this->d1[i], this->d3[i]);
+      ASSERT_NE((float)this->d2[i], (float)this->d3[i]);
+      ASSERT_NE((float)this->d1[i], (float)this->d3[i]);
     }
   }
 }
@@ -629,7 +625,7 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardIndexedNoNoise) {
 
     // std::cout << "\nCPU Indexed (" << trans << "):";
     for (int i = 0; i < output_size * this->dim3; i++) {
-      ASSERT_NEAR(this->x1[i], indexed_output[i], 1e-6);
+      ASSERT_NEAR((float)this->x1[i], (float)indexed_output[i], 1e-6);
     }
     // std::cout << "  success!\n";
 
@@ -665,7 +661,7 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardIndexedNoNoise) {
     }
 
     for (int i = 0; i < output_size * this->dim3; i++) {
-      ASSERT_FLOAT_EQ(this->x1[i], indexed_output[i]);
+      ASSERT_FLOAT_EQ((float)this->x1[i], (float)indexed_output[i]);
     }
 
     delete[] indexed_output;
@@ -705,16 +701,16 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardMatrixBiasNoNoise) {
   this->x3 = this->x_vec_batch;
 
   for (int i = 0; i < (this->x_size - 1) * this->m_batch; i++) {
-    ASSERT_NEAR(this->x1[i], this->x2[i], TOLERANCE);
+    ASSERT_NEAR((float)this->x1[i], (float)this->x2[i], TOLERANCE);
 
     if (!this->non_linearities) {
-      ASSERT_NEAR(this->x1[i], this->x3[i], TOLERANCE);
+      ASSERT_NEAR((float)this->x1[i], (float)this->x3[i], TOLERANCE);
 
-      ASSERT_NEAR(this->x2[i], this->x3[i], TOLERANCE);
+      ASSERT_NEAR((float)this->x2[i], (float)this->x3[i], TOLERANCE);
 
     } else {
-      ASSERT_NE(this->x2[i], this->x3[i]);
-      ASSERT_NE(this->x1[i], this->x3[i]);
+      ASSERT_NE((float)this->x2[i], (float)this->x3[i]);
+      ASSERT_NE((float)this->x1[i], (float)this->x3[i]);
     }
   }
 }
@@ -754,8 +750,8 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, GetWeightsReal) {
 
   for (int i = 0; i < this->d_size * this->x_size; i++) {
 
-    avg_dev1 += fabs(w1[i] - w1_ref[i]);
-    avg_dev2 += fabs(w2[i] - w2_ref[i]);
+    avg_dev1 += fabsf(w1[i] - w1_ref[i]);
+    avg_dev2 += fabsf(w2[i] - w2_ref[i]);
   }
   avg_dev1 /= this->d_size * this->x_size;
   avg_dev2 /= this->d_size * this->x_size;
@@ -800,16 +796,16 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, SetWeightsReal) {
   // int max_dev2_i = 0;
 
   for (int i = 0; i < this->d_size * this->x_size; i++) {
-    avg_dev1 += fabs(w1[i] - w1_ref[i]);
-    avg_dev2 += fabs(w2[i] - w2_ref[i]);
+    avg_dev1 += fabsf(w1[i] - w1_ref[i]);
+    avg_dev2 += fabsf(w2[i] - w2_ref[i]);
 
-    // if (max_dev1 < fabs(w1[i] - w1_ref[i])) {
-    //   max_dev1 = fabs(w1[i] - w1_ref[i]);
+    // if (max_dev1 < fabsf(w1[i] - w1_ref[i])) {
+    //   max_dev1 = fabsf(w1[i] - w1_ref[i]);
     //   max_dev1_i = i;
     // }
 
-    // if (max_dev2 < fabs(w2[i] - w2_ref[i])) {
-    //   max_dev2 = fabs(w2[i] - w2_ref[i]);
+    // if (max_dev2 < fabsf(w2[i] - w2_ref[i])) {
+    //   max_dev2 = fabsf(w2[i] - w2_ref[i]);
     //   max_dev2_i = i;
     // }
 
@@ -881,8 +877,8 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardMatrix) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->d_size * this->m_batch; i++) {
-      cuavg[i % this->m_batch] += this->d1[i] / nloop / this->m_batch;
-      avg[i % this->m_batch] += this->d2[i] / nloop / this->m_batch;
+      cuavg[i % this->m_batch] += this->d1[i] / (num_t)nloop / (num_t)this->m_batch;
+      avg[i % this->m_batch] += this->d2[i] / (num_t)nloop / (num_t)this->m_batch;
 
       if (!this->noise_value) {
         EXPECT_FLOAT_EQ(this->d1[i], this->d2[i]);
@@ -890,14 +886,14 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardMatrix) {
     }
   }
 
-  std::cout << BOLD_ON << "\tCUDA Forward Matrix done in: " << cudur / (nloop - 1) << " msec"
+  std::cout << BOLD_ON << "\tCUDA Forward Matrix done in: " << (float)cudur / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
-  std::cout << BOLD_ON << "\tCPU Forward Matrix done in: " << (T)dur / 1000. / (nloop - 1)
+  std::cout << BOLD_ON << "\tCPU Forward Matrix done in: " << (float)dur / 1000. / (nloop - 1)
             << " msec" << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->d_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -956,22 +952,22 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardVector) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->x_size; i++) {
-      cuavg[i] += this->x1[i] / nloop;
-      avg[i] += this->x2[i] / nloop;
+      cuavg[i] += this->x1[i] / (num_t)nloop;
+      avg[i] += this->x2[i] / (num_t)nloop;
 
       if (!this->noise_value) {
         EXPECT_FLOAT_EQ(this->x1[i], this->x2[i]);
       }
     }
   }
-  std::cout << BOLD_ON << "\tCUDA Backwards done in: " << cudur / (nloop - 1) << " msec" << BOLD_OFF
-            << std::endl;
-  std::cout << BOLD_ON << "\tCPU Backwards done in: " << (T)dur / 1000. / (nloop - 1) << " msec"
+  std::cout << BOLD_ON << "\tCUDA Backwards done in: " << (float)cudur / (nloop - 1) << " msec"
+            << BOLD_OFF << std::endl;
+  std::cout << BOLD_ON << "\tCPU Backwards done in: " << (float)dur / 1000. / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->x_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -1028,11 +1024,11 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->x_size * this->m_batch; i++) {
-      cuavg[i % this->m_batch] += this->x1[i] / nloop / this->m_batch;
-      avg[i % this->m_batch] += this->x2[i] / nloop / this->m_batch;
+      cuavg[i % this->m_batch] += this->x1[i] / (num_t)nloop / (num_t)this->m_batch;
+      avg[i % this->m_batch] += this->x2[i] / (num_t)nloop / (num_t)this->m_batch;
 
       if (!this->noise_value) {
-        // if ((fabs(this->x2[i] - this->x1[i])) > 1e-6)
+        // if ((fabsf(this->x2[i] - this->x1[i])) > 1e-6)
         // std::cout << "i " << i << " x_size " << this->x_size << " batch: " << this->m_batch
         //          << std::endl;
         EXPECT_FLOAT_EQ(this->x1[i], this->x2[i]);
@@ -1040,14 +1036,14 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
       }
     }
   }
-  std::cout << BOLD_ON << "\tCUDA Backward Mat done in: " << cudur / (nloop - 1) << " msec"
+  std::cout << BOLD_ON << "\tCUDA Backward Mat done in: " << (float)cudur / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
-  std::cout << BOLD_ON << "\tCPU Backward Mat done in: " << (T)dur / 1000. / (nloop - 1) << " msec"
-            << BOLD_OFF << std::endl;
+  std::cout << BOLD_ON << "\tCPU Backward Mat done in: " << (float)dur / 1000. / (nloop - 1)
+            << " msec" << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->x_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -1104,13 +1100,13 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
     for (int i = 0; i < this->d_size; i++) {                                                       \
       for (int j = 0; j < this->x_size; j++) {                                                     \
         int k = j + i * this->x_size;                                                              \
-        cuavg[k] += cuweights[i][j] / nloop;                                                       \
-        avg[k] += weights[i][j] / nloop;                                                           \
+        cuavg[k] += cuweights[i][j] / (num_t)nloop;                                                \
+        avg[k] += weights[i][j] / (num_t)nloop;                                                    \
         if (no_noise) {                                                                            \
-          ASSERT_NEAR(cuweights[i][j], weights[i][j], TOLERANCE);                                  \
+          ASSERT_NEAR((float)cuweights[i][j], (float)weights[i][j], TOLERANCE);                    \
         }                                                                                          \
-        cusig[k] += cuweights[i][j] * cuweights[i][j] / nloop;                                     \
-        sig[k] += weights[i][j] * weights[i][j] / nloop;                                           \
+        cusig[k] += cuweights[i][j] * cuweights[i][j] / (num_t)nloop;                              \
+        sig[k] += weights[i][j] * weights[i][j] / (num_t)nloop;                                    \
                                                                                                    \
         /*weights[i][j] = refweights[i][j];*/                                                      \
       }                                                                                            \
@@ -1121,16 +1117,16 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
       this->layer_pulsed->setWeights(refweights[0]);                                               \
     }                                                                                              \
   }                                                                                                \
-  std::cout << BOLD_ON << "\tCUDA done in: " << cudur / (nloop - 1) << " msec " << BOLD_OFF        \
+  std::cout << BOLD_ON << "\tCUDA done in: " << (float)cudur / (nloop - 1) << " msec " << BOLD_OFF \
             << std::endl;                                                                          \
-  std::cout << BOLD_ON << "\tCPU done in: " << (T)dur / 1000. / (nloop - 1) << " msec" << BOLD_OFF \
-            << std::endl;                                                                          \
+  std::cout << BOLD_ON << "\tCPU done in: " << (float)dur / 1000. / (nloop - 1) << " msec"         \
+            << BOLD_OFF << std::endl;                                                              \
   for (int k = 0; k < n; k++) {                                                                    \
-    T sigi = sqrt(fabs(sig[k] - avg[k] * avg[k]));                                                 \
-    T cusigi = sqrt(fabs(cusig[k] - cuavg[k] * cuavg[k]));                                         \
+    T sigi = sqrt(fabsf(sig[k] - avg[k] * avg[k]));                                                \
+    T cusigi = sqrt(fabsf(cusig[k] - cuavg[k] * cuavg[k]));                                        \
                                                                                                    \
-    ASSERT_NEAR(avg[k], cuavg[k], 2. / sqrtf(nloop));                                              \
-    ASSERT_NEAR(sigi, cusigi, 2. / sqrtf(nloop));                                                  \
+    ASSERT_NEAR((float)avg[k], (float)cuavg[k], 2. / sqrtf(nloop));                                \
+    ASSERT_NEAR((float)sigi, (float)cusigi, 2. / sqrtf(nloop));                                    \
   }                                                                                                \
   delete[] cuavg;                                                                                  \
   delete[] avg;                                                                                    \

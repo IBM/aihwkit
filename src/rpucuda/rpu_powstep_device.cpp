@@ -35,8 +35,8 @@ void PowStepRPUDevice<T>::populate(
   T up_down_std = par.ps_gamma_up_down_dtod;
   T up_down = par.ps_gamma_up_down;
 
-  T up_bias = up_down > 0 ? (T)0.0 : up_down;
-  T down_bias = up_down > 0 ? -up_down : (T)0.0;
+  T up_bias = up_down > (T)0.0 ? (T)0.0 : up_down;
+  T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
 
   for (int i = 0; i < this->d_size_; ++i) {
     for (int j = 0; j < this->x_size_; ++j) {
@@ -48,8 +48,8 @@ void PowStepRPUDevice<T>::populate(
       w_gamma_down_[i][j] = (down_bias + gain - r) * gamma;
 
       if (par.enforce_consistency) {
-        w_gamma_up_[i][j] = fabs(w_gamma_up_[i][j]);
-        w_gamma_down_[i][j] = fabs(w_gamma_down_[i][j]);
+        w_gamma_up_[i][j] = (T)fabsf(w_gamma_up_[i][j]);
+        w_gamma_down_[i][j] = (T)fabsf(w_gamma_down_[i][j]);
       }
     }
   }
@@ -106,14 +106,14 @@ inline void update_once(
     const T &write_noise_std,
     RNG<T> *rng) {
   T range = max_bound - min_bound;
-  if (range == 0.0) {
+  if (range == (T)0.0) {
     return;
   }
   if (sign > 0) {
-    w -= scale_down * pow((w - min_bound) / range, gamma_down) *
+    w -= scale_down * (T)powf((w - min_bound) / range, gamma_down) *
          ((T)1.0 + dw_min_std * rng->sampleGauss());
   } else {
-    w += scale_up * pow((max_bound - w) / range, gamma_up) *
+    w += scale_up * (T)powf(((max_bound - w) / range), gamma_up) *
          ((T)1.0 + dw_min_std * rng->sampleGauss());
   }
   w = MAX(w, min_bound);
@@ -172,6 +172,9 @@ void PowStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *
 template class PowStepRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class PowStepRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class PowStepRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

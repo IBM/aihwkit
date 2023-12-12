@@ -44,7 +44,9 @@ template <typename T> struct ChoppedWeightOutputParameter {
     ss << "\t in_chop_random:\t" << std::boolalpha << in_chop_random << std::endl;
   };
 
-  inline bool isEnabled() const { return in_chop_prob > 0 || out_chop_prob > 0 || every > 0; };
+  inline bool isEnabled() const {
+    return in_chop_prob > (T)0.0 || out_chop_prob > (T)0.0 || every > 0;
+  };
 };
 
 template <typename T> class ChoppedWeightOutput {

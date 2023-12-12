@@ -51,14 +51,14 @@ void HiddenStepRPUDevice<T>::populate(
   auto &par = getPar();
 
   T up_down = par.hs_up_down;
-  T up_bias = up_down > 0 ? (T)0 : up_down;
-  T down_bias = up_down > 0 ? -up_down : (T)0.0;
+  T up_bias = up_down > (T)0.0 ? (T)0 : up_down;
+  T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
   T up_down_std = par.hs_up_down_dtod;
 
   for (int j = 0; j < this->x_size_; ++j) {
     for (int i = 0; i < this->d_size_; ++i) {
 
-      T gain = ((T)1 + par.hs_dw_min_dtod * rng->sampleGauss());
+      T gain = ((T)1.0 + par.hs_dw_min_dtod * rng->sampleGauss());
       T r = up_down_std * rng->sampleGauss();
       hs_scale_up_[i][j] = (up_bias + gain + r) * par.hs_dw_min;
       hs_scale_down_[i][j] = (down_bias + gain - r) * par.hs_dw_min;
@@ -87,14 +87,15 @@ inline void update_once(
 
   T hs_dw = sign > 0 ? -hs_scale_down : hs_scale_up;
   hw += hs_dw_min_std ? ((T)1.0 + hs_dw_min_std * rng->sampleGauss()) * hs_dw : hs_dw;
-  if (hw < -1.0) {
+  if (hw < (T)-1.0) {
     hw = (T)0.0;
-    T dw = dw_min_std > 0 ? ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_down : scale_down;
+    T dw =
+        dw_min_std > (T)0.0 ? ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_down : scale_down;
     w -= dw;
     w = MAX(w, min_bound);
-  } else if (hw > 1.0) {
+  } else if (hw > (T)1.0) {
     hw = (T)0.0;
-    T dw = dw_min_std > 0 ? ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_up : scale_up;
+    T dw = dw_min_std > (T)0.0 ? ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_up : scale_up;
     w += dw;
     w = MIN(w, max_bound);
   }
@@ -143,6 +144,9 @@ void HiddenStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T
 template class HiddenStepRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class HiddenStepRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class HiddenStepRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

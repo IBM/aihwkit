@@ -49,8 +49,10 @@ public:
   virtual int makeCounts(
       const T *x_in,
       const int x_inc,
+      int &x_noz,
       const T *d_in,
       const int d_inc,
+      int &d_noz,
       RNG<T> *rng,
       const T lr,
       const T dw_min,

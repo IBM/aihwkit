@@ -29,7 +29,7 @@ from aihwkit.simulator.configs.compounds import (
     MixedPrecisionCompound,
     VectorUnitCell,
 )
-from aihwkit.simulator.parameters.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
 from aihwkit.simulator.parameters.enums import (
     VectorUnitCellUpdatePolicy,
     NoiseManagementType,
@@ -89,11 +89,11 @@ def build_config(
 
         io_parameters: IOParameters class (or actual instance) that
             are used for forward / backward and transfer. Default is
-            :class:`~aihwkit.simulator.parameters.utils.IOParameters`.
+            :class:`~aihwkit.simulator.config.IOParameters`.
 
         up_parameters: UpdateParameters class (or actual instance) that are used for update and
             transfer update. Default is
-            :class:`~aihwkit.parameters.utils.UpdateParameters`.
+            :class:`~aihwkit.simulator.config.UpdateParameters`.
 
         n_devices: In case of SGD, how many device pairs are used in the unit cell.
 

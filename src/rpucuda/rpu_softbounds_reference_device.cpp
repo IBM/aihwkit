@@ -39,15 +39,15 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
       T w_max = this->w_max_bound_[i][j];
       T scale_up = this->w_scale_up_[i][j];
 
-      if (w_max > 0 && w_min < 0) {
+      if (w_max > (T)0.0 && w_min < (T)0.0) {
         // only apply an additional variation if consistent
         // no real need to compute the full slope here, but for clarity
 
         T current_slope_down = -scale_down / w_min;
-        current_slope_down *= fabs((T)1.0 + par.slope_down_dtod * rng->sampleGauss());
+        current_slope_down *= (T)fabsf((T)1.0 + par.slope_down_dtod * rng->sampleGauss());
 
         T current_slope_up = scale_up / w_max;
-        current_slope_up *= fabs((T)1.0 + par.slope_up_dtod * rng->sampleGauss());
+        current_slope_up *= (T)fabsf((T)1.0 + par.slope_up_dtod * rng->sampleGauss());
 
         w_max = scale_up / current_slope_up;
         w_min = -scale_down / current_slope_down;
@@ -58,7 +58,7 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
       // reference
       w_reference_[i][j] = par.reference_mean + par.reference_std * rng->sampleGauss();
 
-      if (par.subtract_symmetry_point && (w_max > 0 && w_min < 0)) {
+      if (par.subtract_symmetry_point && (w_max > (T)0.0 && w_min < (T)0.0)) {
         // scale_down (1 - w / w_min) == scale_up * (1 - w / w_max)
         // scale_down -  scale_down * w / w_min == scale_up  -scale_up *  w / w_max
         // scale_up *  w / w_max -  scale_down * w / w_min == scale_up - scale_down
@@ -235,6 +235,9 @@ void SoftBoundsReferenceRPUDevice<T>::doDenseUpdate(T **weights, int *coincidenc
 template class SoftBoundsReferenceRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class SoftBoundsReferenceRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class SoftBoundsReferenceRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

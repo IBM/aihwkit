@@ -35,7 +35,7 @@ template <typename T> T checkRes(T res) {
 }
 
 template <typename T> void checkAndSetRes(T &res, T &res_in, T range) {
-  if (res_in != 0) {
+  if (res_in != (T)0.0) {
     RPU_FATAL("Cannot re-set resolutions after parameters were intialized!");
   }
   res_in = checkRes(res);
@@ -63,17 +63,17 @@ template <typename T> void IOMetaParameter<T>::initializeForForward(int x_size, 
     detail::checkAndSetRes(this->inp_res, this->_inp_res, (T)2.0 * this->inp_bound);
 
     if (this->noise_management != NoiseManagementType::None) {
-      if (this->inp_bound != 1.0) {
+      if (this->inp_bound != (T)1.0) {
         RPU_FATAL("Forward noise managment expects bound==1");
       }
     } else {
       this->nm_thres = (T)0.0;
     }
-    if (this->out_bound <= 0.0) {
+    if (this->out_bound <= (T)0.0) {
       this->out_bound = std::numeric_limits<T>::infinity();
     }
 
-    if (this->inp_bound <= 0.0) {
+    if (this->inp_bound <= (T)0.0) {
       this->inp_bound = std::numeric_limits<T>::infinity();
     }
     if (v_offset_vec.size() > 0 && v_offset_vec.size() != (size_t)d_size) {
@@ -106,18 +106,18 @@ template <typename T> void IOMetaParameter<T>::initializeForBackward(int x_size,
     detail::checkAndSetRes(this->inp_res, this->_inp_res, (T)2.0 * this->inp_bound);
 
     if (this->noise_management != NoiseManagementType::None) {
-      if (this->inp_bound != 1) {
+      if (this->inp_bound != (T)1.0) {
         RPU_FATAL("Backward noise managment expects input bound==1");
       }
     } else {
       this->nm_thres = (T)0.0;
     }
 
-    if (this->out_bound <= 0.0) {
+    if (this->out_bound <= (T)0.0) {
       this->out_bound = std::numeric_limits<T>::infinity();
     }
 
-    if (this->inp_bound <= 0.0) {
+    if (this->inp_bound <= (T)0.0) {
       this->inp_bound = std::numeric_limits<T>::infinity();
     }
 
@@ -158,9 +158,9 @@ template <typename T> void PulsedUpdateMetaParameter<T>::initialize() {
 template <typename T>
 void PulsedUpdateMetaParameter<T>::calculateBlAB(
     int &BL, T &A, T &B, T lr, T weight_granularity) const {
-  if (lr < 0.0) {
+  if (lr < (T)0.0) {
     RPU_FATAL("lr should be positive !");
-  } else if (lr == 0.0) {
+  } else if (lr == (T)0.0) {
     A = (T)0.0;
     B = (T)0.0;
     BL = 0;
@@ -169,16 +169,16 @@ void PulsedUpdateMetaParameter<T>::calculateBlAB(
 
   if (fixed_BL || update_bl_management) {
     BL = desired_BL; // actually max for UBLM
-    A = sqrt(lr / (weight_granularity * BL));
+    A = (T)sqrtf(lr / (weight_granularity * (T)BL));
     B = A;
   } else {
-    if ((weight_granularity * desired_BL) < lr) {
+    if ((weight_granularity * (T)desired_BL) < lr) {
       A = (T)1.0;
       B = (T)1.0;
-      BL = MAX((int)ceil(lr / weight_granularity), 1);
+      BL = MAX((int)ceilf(lr / weight_granularity), 1);
     } else {
       BL = desired_BL;
-      A = sqrt(lr / (weight_granularity * BL));
+      A = (T)sqrtf(lr / (weight_granularity * (T)BL));
       B = A;
     }
   }
@@ -196,7 +196,7 @@ void PulsedUpdateMetaParameter<T>::performUpdateManagement(
     const T weight_granularity) const {
 
   this->calculateBlAB(BL, A, B, lr, weight_granularity);
-  if (lr > 0.0) {
+  if (lr > (T)0.0) {
 
     if (d_abs_max == (T)0 || x_abs_max == (T)0) {
       A = 1;
@@ -212,23 +212,23 @@ void PulsedUpdateMetaParameter<T>::performUpdateManagement(
       T k_val = lr * x_val * d_val / weight_granularity;
 
       if (this->update_bl_management) {
-        BL = (int)ceil(k_val);
+        BL = (int)ceilf(k_val);
         if (BL > max_BL) {
           BL = max_BL; // the set BL is the *max BL* in case of update_bl_management  !
         }
-        A = sqrt(lr / (weight_granularity * BL));
+        A = (T)sqrtf(lr / (weight_granularity * (T)BL));
         B = A;
       }
 
       if (this->update_management) {
 
-        if (k_val > max_BL) {
+        if (k_val > (T)max_BL) {
           // avoid clipping of x
           d_val *= (T)max_BL / k_val;
         }
 
-        A *= sqrt(x_val / d_val);
-        B *= sqrt(d_val / x_val);
+        A *= (T)sqrtf(x_val / d_val);
+        B *= (T)sqrtf(d_val / x_val);
 
         // that is:
         //     prob(x) = B * x = x * sqrt(d_amax / x_amax) * sqrt(lr / dw_min / BL)
@@ -247,6 +247,10 @@ template struct IOMetaParameter<float>;
 template struct IOMetaParameter<double>;
 template struct PulsedUpdateMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct IOMetaParameter<half_t>;
+template struct PulsedUpdateMetaParameter<half_t>;
+#endif
 
 /********************************************************************************
  * DebugPulsedUpdateMetaParameter<T>
@@ -260,9 +264,11 @@ void DebugPulsedUpdateMetaParameter<T>::calculateBlAB(
 }
 
 template struct DebugPulsedUpdateMetaParameter<float>;
-
 #ifdef RPU_USE_DOUBLE
 template struct DebugPulsedUpdateMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct DebugPulsedUpdateMetaParameter<half_t>;
 #endif
 
 } // namespace RPU

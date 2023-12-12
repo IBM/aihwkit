@@ -14,11 +14,10 @@
 
 from typing import Any, List, Tuple, Type, Union
 from torch import Tensor, stack, jit, cat
-from torch.nn import ModuleList
-from aihwkit.nn.modules.container import AnalogSequential
+from torch.nn import ModuleList, Module
 
 
-class AnalogRNNLayer(AnalogSequential):
+class AnalogRNNLayer(Module):
     """Analog RNN Layer.
 
     Args:
@@ -47,6 +46,15 @@ class AnalogRNNLayer(AnalogSequential):
     def forward(
         self, input_: Tensor, state: Union[Tuple[Tensor, Tensor], Tensor]
     ) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
+        """Forward pass.
+
+        Args:
+            input_: input tensor
+            state: LSTM state tensor
+
+        Returns:
+            stacked outputs and state
+        """
         # pylint: disable=arguments-differ
         inputs = input_.unbind(0)
         outputs = jit.annotate(List[Tensor], [])
@@ -56,7 +64,7 @@ class AnalogRNNLayer(AnalogSequential):
         return stack(outputs), state
 
 
-class AnalogReverseRNNLayer(AnalogSequential):
+class AnalogReverseRNNLayer(Module):
     """Analog RNN layer for direction.
 
     Args:
@@ -87,6 +95,15 @@ class AnalogReverseRNNLayer(AnalogSequential):
     def forward(
         self, input_: Tensor, state: Union[Tuple[Tensor, Tensor], Tensor]
     ) -> Tuple[Tensor, Union[Tuple[Tensor, Tensor], Tensor]]:
+        """Forward pass.
+
+        Args:
+            input_: input tensor
+            state: LSTM state tensor
+
+        Returns:
+            stacked reverse outputs and state
+        """
         # pylint: disable=arguments-differ
         inputs = self.reverse(input_.unbind(0))
         outputs = jit.annotate(List[Tensor], [])
@@ -96,7 +113,7 @@ class AnalogReverseRNNLayer(AnalogSequential):
         return stack(self.reverse(outputs)), state
 
 
-class AnalogBidirRNNLayer(AnalogSequential):
+class AnalogBidirRNNLayer(Module):
     """Bi-directional analog RNN layer.
 
     Args:
@@ -130,6 +147,15 @@ class AnalogBidirRNNLayer(AnalogSequential):
     def forward(
         self, input_: Tensor, states: List[Union[Tuple[Tensor, Tensor], Tensor]]
     ) -> Tuple[Tensor, List[Union[Tuple[Tensor, Tensor], Tensor]]]:
+        """Forward pass.
+
+        Args:
+            input_: input tensor
+            states: LSTM state tensor
+
+        Returns:
+            cat outputs and states
+        """
         # pylint: disable=arguments-differ
         # List[RNNState]: [forward RNNState, backward RNNState]
         outputs = jit.annotate(List[Tensor], [])
