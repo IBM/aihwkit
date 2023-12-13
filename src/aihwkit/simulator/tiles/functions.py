@@ -43,6 +43,7 @@ class AnalogFunction(Function):
         ctx.analog_tile = analog_tile
         ctx.shared_weights = None
         ctx.saved_analog_tensors = [input_]
+        runtime = analog_tile.get_runtime()
 
         use_indexed = analog_ctx.use_indexed
         if shared_weights is not None:
@@ -57,6 +58,9 @@ class AnalogFunction(Function):
             out = analog_tile.joint_forward_indexed(input_, is_test, ctx)
         else:
             out = analog_tile.joint_forward(input_, is_test, ctx)
+
+        if runtime.offload_input:
+            ctx.saved_analog_tensors[0] = ctx.saved_analog_tensors[0].cpu()
 
         ctx.save_for_backward(*ctx.saved_analog_tensors)
         ctx.saved_analog_tensors = []
@@ -74,6 +78,7 @@ class AnalogFunction(Function):
         analog_tile = ctx.analog_tile
         ctx.saved_analog_tensors = ctx.saved_tensors
         input_ = ctx.saved_analog_tensors[0]
+        runtime = analog_tile.get_runtime()
 
         shared_weights_grad = None
         use_indexed = analog_ctx.use_indexed
@@ -88,6 +93,9 @@ class AnalogFunction(Function):
             grad_input = analog_tile.backward(grad_output, ctx)
 
         if analog_ctx.use_torch_update:
+            if runtime.offload_input:
+                input_ = input_.to(analog_tile.device)
+
             # Grad computed directly (for inference training)
             shared_weights_grad = empty_like(ctx.shared_weights)
             analog_tile.set_delta_weights(shared_weights_grad)
@@ -99,7 +107,12 @@ class AnalogFunction(Function):
         else:
             # Store activation and errors for optimizer (for analog training)
             analog_ctx.analog_input.append(input_)
-            analog_ctx.analog_grad_output.append(grad_output)
+
+            if runtime.offload_gradient:
+                store_gradients = grad_output.cpu()
+            else:
+                store_gradients = grad_output
+            analog_ctx.analog_grad_output.append(store_gradients)
 
         ctx.saved_analog_tensors = []
         return None, None, grad_input, shared_weights_grad, None

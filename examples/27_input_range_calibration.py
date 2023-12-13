@@ -151,7 +151,7 @@ class Sampler:
         self.idx += 1
         if self.idx > 10:
             raise StopIteration
-        return x.to(DEVICE)
+        return (x.to(DEVICE), {})  # args and kwargs
 
 
 # Training parameters

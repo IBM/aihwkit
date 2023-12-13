@@ -20,6 +20,8 @@
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::RPU::cub
 #define RPU_CUB_NS_QUALIFIER RPU::cub::
+#else
+#define RPU_CUB_NS_QUALIFIER CUB_NS_QUALIFIER::
 #endif
 #endif
 

@@ -17,6 +17,7 @@
 #include <iostream>
 #include <memory>
 
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 #include "cuda_util.h"
 #include "io_iterator.h"
@@ -410,14 +411,20 @@ debugKernelTranslateTransFormatToBatchOrder64Format<double, true>(double *, int,
 template int
 debugKernelTranslateTransFormatToBatchOrder64Format<double, false>(double *, int, int, double, int);
 #endif
+#ifdef RPU_USE_FP16
+template int
+debugKernelTranslateTransFormatToBatchOrder64Format<half_t, true>(half_t *, int, int, half_t, int);
+template int
+debugKernelTranslateTransFormatToBatchOrder64Format<half_t, false>(half_t *, int, int, half_t, int);
+#endif
 } // namespace test_helper
 
 template <typename T>
 __global__ void kernelUMGetScaleAndKValues(
     T *scale_values,
     int *K_values,
-    float *x_amax_values,
-    float *d_amax_values,
+    T *x_amax_values,
+    T *d_amax_values,
     const int m_batch,
     const bool ublm_in,
     const T weight_granularity_in,
@@ -437,7 +444,7 @@ __global__ void kernelUMGetScaleAndKValues(
     T k_val = lr * x_val * d_val / weight_granularity;
 
     if (k_val > (T)0.0) {
-      if (k_val > Kmax) {
+      if (k_val > (T)Kmax) {
         d_val *= (T)Kmax / k_val;
       }
       scale_values[tid] = sqrt(x_val / d_val);
@@ -587,8 +594,8 @@ void UpdateManagementHelper<T>::getAverageAbsMax(T &m_x, T &m_d, int m_batch) co
       dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
   dev_sumabsmax_value_->copyTo(result);
-  m_x = result[0] / m_batch;
-  m_d = result[1] / m_batch;
+  m_x = result[0] / (T)m_batch;
+  m_d = result[1] / (T)m_batch;
 }
 
 template <typename T>
@@ -614,8 +621,8 @@ void UpdateManagementHelper<T>::getAverageLogAbsMax(T &m_x, T &m_d, int m_batch)
       dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
   dev_sumabsmax_value_->copyTo(result);
-  m_x = expf(result[0] / m_batch);
-  m_d = expf(result[1] / m_batch);
+  m_x = expf(result[0] / (T)m_batch);
+  m_d = expf(result[1] / (T)m_batch);
 }
 
 template <typename T> void UpdateManagementHelper<T>::getAbsMax(T &m_x, T &m_d, int m_batch) const {
@@ -778,6 +785,33 @@ RPU_UMH_ITER_TEMPLATE(double, EyeInputIterator<double>, const double *);
 RPU_UMH_ITER_TEMPLATE(double, const double *, EyeInputIterator<double>);
 
 #undef TRANSDOUBLE
+#endif
+
+#ifdef RPU_USE_FP16
+#define TRANSHALF(TRANS) TRANS, half_t
+
+template class UpdateManagementHelper<half_t>;
+
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, half_t *, half_t *);
+RPU_UMH_ITER_TEMPLATE(
+    half_t, IndexReaderTransInputIterator<half_t>, PermuterTransInputIterator<half_t>);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderInputIterator<half_t>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderTransInputIterator<half_t>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, SliceInputIterator<TRANSHALF(true)>);
+RPU_UMH_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, SliceInputIterator<TRANSHALF(false)>);
+
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, PermuterTransInputIterator<half_t>);
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(true)>);
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(false)>);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, EyeInputIterator<half_t>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, EyeInputIterator<half_t>);
+
+#undef TRANSHALF
 #endif
 
 #undef RPU_UMH_ITER_TEMPLATE

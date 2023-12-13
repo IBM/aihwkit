@@ -14,7 +14,7 @@
 
 from typing import Optional, Union, Dict, Tuple, Any
 
-from torch import Tensor, zeros, float32, tensor
+from torch import Tensor, zeros, tensor
 from torch import device as torch_device
 from torch.nn import Parameter
 from torch.cuda import device as cuda_device
@@ -33,6 +33,28 @@ if cuda.is_compiled():
         tiles.AnalogTile: tiles.CudaAnalogTile,
         tiles.FloatingPointTile: tiles.CudaFloatingPointTile,
     }
+    if hasattr(tiles, "half"):
+        MAP_TILE_CLASS_TO_CUDA.update(
+            {
+                tiles.half.AnalogTile: tiles.half.CudaAnalogTile,
+                tiles.half.FloatingPointTile: tiles.half.CudaFloatingPointTile,
+            }
+        )
+    if hasattr(tiles, "double"):
+        MAP_TILE_CLASS_TO_CUDA.update(
+            {
+                tiles.double.AnalogTile: tiles.double.CudaAnalogTile,
+                tiles.double.FloatingPointTile: tiles.double.CudaFloatingPointTile,
+            }
+        )
+    if hasattr(tiles, "bfloat16"):
+        MAP_TILE_CLASS_TO_CUDA.update(
+            {
+                tiles.bfloat16.AnalogTile: tiles.bfloat16.CudaAnalogTile,
+                tiles.bfloat16.FloatingPointTile: tiles.bfloat16.CudaFloatingPointTile,
+            }
+        )
+
 else:
     MAP_TILE_CLASS_TO_CUDA = {}
 
@@ -81,7 +103,9 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
 
         self.shared_weights = None  # type: Parameter
         if shared_weights:
-            self.shared_weights = Parameter(zeros(out_size, in_size + int(self.analog_bias)))
+            self.shared_weights = Parameter(
+                zeros(out_size, in_size + int(self.analog_bias), dtype=self.get_dtype())
+            )
             self.ensure_shared_weights()
 
     def get_forward_out_bound(self) -> Optional[float]:
@@ -132,7 +156,6 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
 
         if self.is_cuda and device != self.device:
             raise CudaError("Cannot switch CUDA devices of existing Cuda tiles")
-
         if self.tile.__class__ in MAP_TILE_CLASS_TO_CUDA:
             with cuda_device(device):
                 self.tile = MAP_TILE_CLASS_TO_CUDA[self.tile.__class__](self.tile)
@@ -145,10 +168,11 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
                 self.shared_weights.data = zeros(
                     self.tile.get_x_size(),
                     self.tile.get_d_size(),
-                    dtype=float32,
+                    dtype=self.get_dtype(),
                     requires_grad=True,
                 ).cuda(device)
                 # ensure shared weights will be called later (needs copying still)
+
         return self
 
     @no_grad()
@@ -184,27 +208,6 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
         """
         if self.shared_weights is not None:
             self.tile.reset_delta_weights()
-
-    def set_learning_rate(self, learning_rate: Optional[float]) -> None:
-        """Set the tile learning rate.
-
-        Set the tile learning rate to ``-learning_rate``. Note that the
-        learning rate is always taken to be negative (because of the meaning in
-        gradient descent) and positive learning rates are not supported.
-
-        Args:
-            learning_rate: the desired learning rate.
-        """
-        if learning_rate is not None:
-            self.tile.set_learning_rate(learning_rate)
-
-    def get_learning_rate(self) -> float:
-        """Return the tile learning rate.
-
-        Returns:
-            float: the tile learning rate.
-        """
-        return self.tile.get_learning_rate()
 
     def get_hidden_update_index(self) -> int:
         """Get the current updated device index of the hidden devices.
@@ -345,7 +348,7 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
         """Drifts the weights once according to the drift parameters of the
         tile.
 
-        See also :class:`~aihwkit.simulator.parameters.utils.DriftParameter`.
+        See also :class:`~aihwkit.simulator.configs.DriftParameter`.
 
         Args:
             delta_t: Time since last drift call.

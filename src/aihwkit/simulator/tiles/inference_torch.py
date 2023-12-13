@@ -131,7 +131,8 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
             return grad
 
         # - Register the hook
-        self._input_range_hook = self.input_range.register_hook(grad_input_range)
+        if self.input_range.requires_grad:
+            self._input_range_hook = self.input_range.register_hook(grad_input_range)
 
         return True
 
@@ -153,7 +154,8 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
         def hook(grad: Tensor) -> Tensor:
             return grad / scales.to(grad.device).view(-1, 1) ** 2
 
-        self._backward_hook_handle = self.tile.register_weight_hook(hook)
+        if self.tile.weight.requires_grad:
+            self._backward_hook_handle = self.tile.register_weight_hook(hook)
 
     def pre_forward(
         self, x_input: Tensor, dim: int, is_test: bool = False, ctx: Any = None

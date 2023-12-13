@@ -21,13 +21,12 @@
 #include <queue>
 #include <string.h>
 
+#include "cublas_v2.h"
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <curand.h>
 #include <curand_kernel.h>
-
-#include "cublas_v2.h"
 
 #define RPU_BUFFER_IN 0
 #define RPU_BUFFER_OUT 1
@@ -35,14 +34,15 @@
 #define RPU_BUFFER_WEIGHT 3
 #define RPU_BUFFER_POS_NEG_IN 4
 #define RPU_BUFFER_POS_NEG_OUT 5
-#define RPU_BUFFER_TEMP_0 6
-#define RPU_BUFFER_TEMP_1 7
-#define RPU_BUFFER_TEMP_2 8
-#define RPU_BUFFER_TEMP_3 9
-#define RPU_BUFFER_TEMP_4 10
-#define RPU_BUFFER_DEVICE_0 11
-#define RPU_BUFFER_DEVICE_1 12
-#define RPU_BUFFER_CWO 13
+#define RPU_BUFFER_TEMP_BLAS 6
+#define RPU_BUFFER_TEMP_0 7
+#define RPU_BUFFER_TEMP_1 8
+#define RPU_BUFFER_TEMP_2 9
+#define RPU_BUFFER_TEMP_3 10
+#define RPU_BUFFER_TEMP_4 11
+#define RPU_BUFFER_DEVICE_0 12
+#define RPU_BUFFER_DEVICE_1 13
+#define RPU_BUFFER_CWO 14
 
 #define RPU_MAX_BUFFER 15
 
@@ -184,10 +184,20 @@
 #define RPU_CUDA_1D_KERNEL_LOOP(i, n)                                                              \
   for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i += blockDim.x * gridDim.x)
 
+#define RPU_CUDA_1D_KERNEL_LOOP_HALF(i, n)                                                         \
+  int size2 =                                                                                      \
+      ((n) + 1) / 2; /* CudaArray makes sure that last idx is dummy allocated for odd sizes*/      \
+  RPU_CUDA_1D_KERNEL_LOOP(i, size2)
+
+#define HALF2PTR(PTR) reinterpret_cast<half2_t *>(PTR)
+#define HALF2PTRCONST(PTR) reinterpret_cast<const half2_t *>(PTR)
+
 #define RPU_THREADS_PER_BLOCK 512
 #define RPU_THREADS_PER_BLOCK_UPDATE 256
 #define RPU_MAX_RAND_STATE_SIZE 10000
 #define RPU_UPDATE_BLOCKS_PER_SM 8.1
+
+#define RPU_GET_BLOCKS(SIZE) (SIZE + RPU_THREADS_PER_BLOCK - 1) / RPU_THREADS_PER_BLOCK
 
 #define RPU_GEN_IITER_TEMPLATES(NUM_T, OUT_T, FUNC, ARGS)                                          \
   template OUT_T FUNC(const NUM_T *ARGS);                                                          \
@@ -222,6 +232,17 @@ namespace RPU {
 
 typedef uint32_t kagg_t; // K aggregate type
 typedef int8_t chop_t;   // chopper type
+
+#ifdef RPU_PARAM_FP16
+typedef half_t param_t;
+typedef half2_t param2_t;
+typedef struct __align__(8) { half_t x, y, z, w; }
+param4_t;
+#else
+typedef float param_t;
+typedef float2 param2_t;
+typedef float4 param4_t;
+#endif
 
 class CublasEnvironment {
 
@@ -297,6 +318,11 @@ public:
     swap(a.shared_double_buffer_, b.shared_double_buffer_);
     swap(a.double_buffer_, b.double_buffer_);
 #endif
+#ifdef RPU_USE_FP16
+    swap(a.shared_half_t_buffer_, b.shared_half_t_buffer_);
+    swap(a.half_t_buffer_, b.half_t_buffer_);
+#endif
+
     swap(a.random_states_, b.random_states_);
     swap(a.float_buffer_, b.float_buffer_);
   }
@@ -310,7 +336,20 @@ public:
   void synchronizeWith(CudaContextPtr ca, CudaContextPtr cb) const;
   void synchronize() const override { this->synchronizeStream(); }; // default current stream only
 
-  int getNBlocks(int size, int nthreads = RPU_THREADS_PER_BLOCK) const;
+  template <typename T = float>
+  int getNBlocks(
+      int size, int nthreads = RPU_THREADS_PER_BLOCK, bool half_for_half_t = false) const {
+#ifdef RPU_USE_FP16
+    if (std::is_same<T, half_t>::value && half_for_half_t) {
+      int size2 = (size + 1) / 2; // ceil
+      nthreads = MIN(maxThreadsPerBlock(), nthreads);
+      return (size2 + nthreads - 1) / nthreads;
+    }
+#endif
+    nthreads = MIN(maxThreadsPerBlock(), nthreads);
+    return (size + nthreads - 1) / nthreads;
+  }
+
   int getNStrideBlocks(int size, int nthreads = RPU_THREADS_PER_BLOCK) const;
   inline int getNThreads() const { return MIN(RPU_THREADS_PER_BLOCK, maxThreadsPerBlock()); };
   inline int getNThreads(int n) const { return MIN((n + 31) / 32 * 32, getNThreads()); };
@@ -380,6 +419,10 @@ private:
 #ifdef RPU_USE_DOUBLE
   std::vector<std::vector<CudaBuffer<double>>> shared_double_buffer_ = {};
   std::vector<std::vector<CudaBuffer<double>>> double_buffer_ = {};
+#endif
+#ifdef RPU_USE_FP16
+  std::vector<std::vector<CudaBuffer<half_t>>> shared_half_t_buffer_ = {};
+  std::vector<std::vector<CudaBuffer<half_t>>> half_t_buffer_ = {};
 #endif
   void init();
 };

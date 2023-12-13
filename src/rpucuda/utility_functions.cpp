@@ -11,6 +11,7 @@
  */
 
 #include "utility_functions.h"
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -19,6 +20,13 @@
 #include <vector>
 
 namespace RPU {
+
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+std::ostream &operator<<(std::ostream &out, const half_t &value) {
+  out << (float)value;
+  return out;
+};
+#endif
 
 template <typename T_VEC>
 void load(RPU::state_t &state, std::string key, T_VEC &value, bool strict) {
@@ -43,6 +51,9 @@ RPU_LOAD_VECTOR(int);
 RPU_LOAD_VECTOR(uint64_t);
 RPU_LOAD_VECTOR(int64_t);
 RPU_LOAD_VECTOR(bool);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_LOAD_VECTOR(half_t);
+#endif
 #undef RPU_LOAD_VECTOR
 
 #define RPU_LOAD_SINGLE(T)                                                                         \
@@ -65,6 +76,9 @@ RPU_LOAD_SINGLE(int);
 RPU_LOAD_SINGLE(uint64_t);
 RPU_LOAD_SINGLE(int64_t);
 RPU_LOAD_SINGLE(bool);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_LOAD_SINGLE(half_t);
+#endif
 #undef RPU_LOAD_SINGLE
 
 template <typename T_VEC> void insert(RPU::state_t &state, std::string key, const T_VEC &value) {
@@ -81,6 +95,9 @@ RPU_INSERT_VECTOR(int);
 RPU_INSERT_VECTOR(uint64_t);
 RPU_INSERT_VECTOR(int64_t);
 RPU_INSERT_VECTOR(bool);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_INSERT_VECTOR(half_t);
+#endif
 #undef RPU_INSERT_VECTOR
 
 #define RPU_INSERT_SINGLE(T)                                                                       \
@@ -95,6 +112,9 @@ RPU_INSERT_SINGLE(int);
 RPU_INSERT_SINGLE(uint64_t);
 RPU_INSERT_SINGLE(int64_t);
 RPU_INSERT_SINGLE(bool);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_INSERT_SINGLE(half_t);
+#endif
 #undef RPU_INSERT_SINGLE
 
 /* inserts the state into the extra and adding the prefix to the keys*/

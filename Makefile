@@ -33,16 +33,14 @@ build_inplace_cuda:
 clean:
 	python setup.py clean
 	rm -rf _skbuild
-	rm -f src/aihwkit/simulator/rpu_base.*.so
+	rm -f src/aihwkit/simulator/rpu_base*.so
+	rm -f src/aihwkit/extension/*.so
 
 clean-doc:
 	cd docs && make clean
 
 clang-format:
-	clang-format -i src/aihwkit/simulator/rpu_base_src/*.cpp  \
-	src/aihwkit/simulator/rpu_base_src/*.h \
-	src/rpucuda/*.cpp src/rpucuda/*.h \
-	src/rpucuda/cuda/*.cpp src/rpucuda/cuda/*.h src/rpucuda/cuda/*.cu
+	git ls-files | grep -E ".*\.(cu|h|cpp)$$" | xargs clang-format -i
 
 doc:
 	cd docs && make html

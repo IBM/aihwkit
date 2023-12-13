@@ -46,11 +46,11 @@ public:
 
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(0, orig_matrix_size + 2);
+    std::uniform_real_distribution<float> udist(0, orig_matrix_size + 2);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < orig_matrix_size * N; i++) {
-      orig_vector[i] = urnd(); // some random numnbers
+      orig_vector[i] = (num_t)urnd(); // some random numnbers
       orig_vector2[i] = orig_vector[i];
     }
     for (int i = 0; i < unfolded_matrix_size; i++) {
@@ -60,7 +60,8 @@ public:
     for (int i = 0; i < unfolded_matrix_size * N; i++) {
       int idx = index[i % unfolded_matrix_size];
       unfolded_vector[i] =
-          idx <= 1 ? idx : (orig_vector[idx - 2 + i / unfolded_matrix_size * orig_matrix_size]);
+          idx <= 1 ? (num_t)idx
+                   : (orig_vector[idx - 2 + i / unfolded_matrix_size * orig_matrix_size]);
       unfolded_vector2[i] = unfolded_vector[i];
     }
     context = &context_container;
@@ -114,11 +115,7 @@ public:
   int unfolded_matrix_size, N, orig_matrix_size, size, m, m_slice;
 };
 
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> num_types;
-#else
-typedef ::testing::Types<float> num_types;
-#endif
+typedef ::testing::Types<num_t> num_types;
 
 TYPED_TEST_CASE(IteratorTestFixture, num_types);
 

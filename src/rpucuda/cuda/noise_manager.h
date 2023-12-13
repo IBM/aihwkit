@@ -50,17 +50,17 @@ public:
       bool is_test = false);
 
   // debugging functions
-  inline void copyScaleValuesToHost(float *dest) const { dev_scale_values_->copyTo(dest); };
+  inline void copyScaleValuesToHost(T *dest) const { dev_scale_values_->copyTo(dest); };
   void printScaleValues() const { dev_scale_values_->printValues(); };
   void printAvgAbsMax() const { dev_ravg_scale_value_->printValues(); };
   void printAbsMaxValues() const { amaximizer_->printMaxValues(); };
 
   /* sets the computed max values to zero below thres. Caution: This
      is in-place. does not check whether compute was called. */
-  float *getScaleValues() const;
+  T *getScaleValues() const;
 
-  float getAverageAbsMax() const;
-  void setAverageAbsMax(float value);
+  T getAverageAbsMax() const;
+  void setAverageAbsMax(T value);
   void dumpExtra(RPU::state_t &extra, const std::string prefix);
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
@@ -70,10 +70,10 @@ private:
 
   void initializeBatchBuffer(int m_batch);
 
-  std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr;     // need float here
-  std::unique_ptr<CudaArray<float>> dev_ravg_scale_value_ = nullptr; // need float here
-  std::unique_ptr<CudaArray<float>> dev_avgmax_value_ = nullptr;     // need float here
-  std::unique_ptr<CudaArray<float>> dev_nzeros_value_ = nullptr;     // need float here
+  std::unique_ptr<CudaArray<T>> dev_scale_values_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_ravg_scale_value_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_avgmax_value_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_nzeros_value_ = nullptr;
   std::unique_ptr<Maximizer<T>> amaximizer_ = nullptr;
   std::unique_ptr<Maximizer<T>> maximizer_ = nullptr;
 

@@ -26,7 +26,8 @@ import time
 
 from typing import Tuple
 from torch import tensor, device, FloatTensor, Tensor, transpose, save, load
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, Linear
+from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 from torch.nn.functional import one_hot
@@ -36,11 +37,10 @@ import numpy as np
 from aihwkit.nn import AnalogSequential, AnalogRNN, AnalogLinear, AnalogLSTMCellCombinedWeight
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
-    InferenceRPUConfig,
-    UnitCellRPUConfig,
+    build_config,
     SingleRPUConfig,
-    BufferedTransferCompound,
     SoftBoundsDevice,
+    SoftBoundsReferenceDevice,
     ConstantStepDevice,
     MappingParameter,
     IOParameters,
@@ -55,42 +55,36 @@ if cuda.is_compiled():
 DEVICE = device("cuda" if USE_CUDA else "cpu")
 
 HIDDEN_DIM = 64
-P_DROP = 0.0
+P_DROP = 0.2
 TEST_FREQ = 1
 
 # needs to be downloaded, e.g. from Gutenberg
-WP_TRAIN_FNAME = "wp_train.txt"
-WP_TEST_FNAME = "wp_test.txt"
-DATASET_PATH = os.path.join(os.getcwd(), "data", "DATASET", "war_and_peace")
+WP_TRAIN_FNAME = "wp.train.txt"
+WP_TEST_FNAME = "wp.test.txt"
+WP_VALID_FNAME = "wp.valid.txt"
+DATASET_PATH = os.path.join(os.getenv("RPUSIM"), "data", "lstm")
 
 
 def parse_args():
     """Parse arguments for the experiment."""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--bs", type=int, default=128, help="Batch size")
+    parser.add_argument("--bs", type=int, default=32, help="Batch size")
     parser.add_argument("--sl", type=int, default=100, help="Sequence length")
-    parser.add_argument("--lr", type=float, default=0.005, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=50, help="Training epochs")
     parser.add_argument(
         "--rpu_conf",
         type=str,
-        default="FP",
-        help="Configuration for the rpu_config. FP is floating point tile with"
-        "is_perfect=True. TTV2 is the unit cell tile for tiki-takaV2 "
-        "training",
+        default="agad",
+        help="""Configuration for the rpu_config. FP is native torch
+        using the custom LSTM module of the AIHWKIT. TTV2 is the unit
+        cell tile for tiki-takaV2 training""",
     )
     parser.add_argument("--file_name", type=str, default=None, help="Training epochs")
     parser.add_argument(
         "--results_path", type=str, default=None, help="Path where the results will be saved"
     )
-    parser.add_argument(
-        "--use_analog",
-        action="store_true",
-        default=True,
-        help="Run the training on AnalogLSTMLayer",
-    )
-
     return parser.parse_args()
 
 
@@ -197,7 +191,7 @@ class AnalogLSTMLayer(AnalogSequential):
         self.hidden_dim = hidden_dim
         self.batch_size = batch_size
 
-        self.lstm_1 = AnalogRNN(
+        self.lstm = AnalogRNN(
             AnalogLSTMCellCombinedWeight,
             self.vocab_size,
             self.hidden_dim,
@@ -205,30 +199,25 @@ class AnalogLSTMLayer(AnalogSequential):
             rpu_config=rpu_config,
             dropout=p_dropout,
         )
-        self.linear = AnalogLinear(self.hidden_dim, self.vocab_size, rpu_config=rpu_config)
+        if rpu_config is not None:
+            self.linear = AnalogLinear(self.hidden_dim, self.vocab_size, rpu_config=rpu_config)
+        else:
+            self.linear = Linear(self.hidden_dim, self.vocab_size)
 
     def forward(self, x_in, in_states):
         # pylint: disable=arguments-differ
 
         x_in = transpose(x_in, 0, 1).contiguous()
-
-        out, _ = self.lstm_1(x_in, in_states)
+        out, _ = self.lstm(x_in, in_states)
         out = transpose(out, 0, 1).contiguous()
         out = out.reshape(self.seq_length * self.batch_size, -1)
         out = self.linear(out)
 
         return out
 
-    def init_hidden(self) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    def init_hidden(self, batch_size: int) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """Initialize the hidden states."""
-
-        weight = next(self.parameters()).data
-        hidden = (
-            weight.new(2, self.batch_size, self.hidden_dim).zero_().to(DEVICE),
-            weight.new(2, self.batch_size, self.hidden_dim).zero_().to(DEVICE),
-        )
-
-        return hidden
+        return self.lstm.get_zero_state(batch_size)
 
 
 def create_rpu_config(config="FP"):
@@ -247,10 +236,10 @@ def create_rpu_config(config="FP"):
         ValueError: In case config is not found
     """
 
-    mapping = MappingParameter(digital_bias=False, max_input_size=0, max_output_size=0)
+    mapping = MappingParameter(digital_bias=True, max_input_size=0, max_output_size=0)
 
     if config == "FP":
-        rpu_config = InferenceRPUConfig(forward=IOParameters(is_perfect=True), mapping=mapping)
+        rpu_config = None  # native
 
     elif config == "RPU_Baseline":
         rpu_config = SingleRPUConfig(
@@ -276,39 +265,17 @@ def create_rpu_config(config="FP"):
         rpu_config.forward.out_scale = 2 / 0.6
         rpu_config.backward = rpu_config.forward
 
-    elif config == "TTv2":
-        rpu_config = UnitCellRPUConfig(
-            device=BufferedTransferCompound(
-                # Devices that compose the Tiki-taka compound.
-                unit_cell_devices=[
-                    SoftBoundsDevice(dw_min=0.001, up_down_dtod=0),
-                    SoftBoundsDevice(dw_min=0.001, up_down_dtod=0),
-                ],
-                transfer_update=UpdateParameters(
-                    desired_bl=1, update_bl_management=False, update_management=False
-                ),
-                # Make some adjustments of the way Tiki-Taka is performed.
-                units_in_mbatch=False,  # batch_size=1 anyway
-                transfer_every=2,
-                n_reads_per_transfer=1,  # one forward read for each transfer
-                gamma=0.0,
-                scale_transfer_lr=True,  # in relative terms to SGD LR
-                transfer_lr=1.0,  # same transfer LR as for SGD
-                fast_lr=5.0,
-            ),
-            update=UpdateParameters(desired_bl=10),
-            mapping=mapping,
+    else:
+        rpu_config = build_config(
+            config, device=SoftBoundsReferenceDevice(dw_min=0.1, subtract_symmetry_point=True)
         )
-
         adc_bit = 9
         dac_bit = 7
+        rpu_config.mapping = mapping
         rpu_config.forward.out_res = 1 / (2**adc_bit - 2)
         rpu_config.forward.inp_res = 1 / (2**dac_bit - 2)
         rpu_config.forward.out_scale = 2 / 0.6
         rpu_config.backward = rpu_config.forward
-
-    else:
-        raise ValueError("Selected rpu_config is not available")
 
     return rpu_config
 
@@ -350,23 +317,6 @@ def load_dataset(path, seq_length=1, batch_size=1):
     return train_data, test_data
 
 
-def create_sgd_optimizer(model, learning_rate, momentum):
-    """Create the analog-aware optimizer.
-
-    Args:
-        model (nn.Module): model to be trained
-        learning_rate (float): global parameter to define learning rate
-        momentum (float): momentum
-
-    Returns:
-        nn.Module: Analog optimizer
-    """
-    optimizer = AnalogSGD(model.parameters(), lr=learning_rate, momentum=momentum)
-    optimizer.regroup_param_groups(model)
-
-    return optimizer
-
-
 def main():
     """Train an AnalogLSTM model with the War and Peace dataset."""
 
@@ -374,7 +324,7 @@ def main():
     print("Setting Arguments.. : ", args)
 
     batch_size = args.bs
-    seq_lenght = args.sl
+    seq_length = args.sl
     learning_rate = args.lr
     epochs = args.epochs
     momentum = 0
@@ -403,14 +353,14 @@ def main():
     print("Saving data to: ", path_file)
 
     # Load datasets.
-    train_data, test_data = load_dataset(path_dataset, seq_lenght, batch_size)
+    train_data, test_data = load_dataset(path_dataset, seq_length, batch_size)
 
     # Create rpu_config.
     rpu_config = create_rpu_config(config=rpu_conf)
 
     # Create model.
     model = AnalogLSTMLayer(
-        seq_length=seq_lenght,
+        seq_length=seq_length,
         vocab_size=87,
         hidden_dim=HIDDEN_DIM,
         batch_size=batch_size,
@@ -434,36 +384,35 @@ def main():
         epoch_losses = epoch_losses.tolist()
 
     # Create optimizer and define loss function
-    optimizer = create_sgd_optimizer(model, learning_rate, momentum)
+    optimizer = AnalogSGD(model.parameters(), lr=learning_rate, momentum=momentum)
     criterion = CrossEntropyLoss()
 
     for epoch_number in range(epoch_start + 1, epochs):
-        in_states = model.init_hidden()
+        in_states = model.init_hidden(batch_size)
         model.train()
         train_total_loss = 0
 
         for characters, labels in train_data:
             characters = characters.to(DEVICE)
-            labels = labels.to(DEVICE)
-            labels = labels.view(seq_lenght * batch_size)
+            labels = labels.view(-1).to(DEVICE)
             optimizer.zero_grad()
             prediction = model(characters, in_states)
-            loss = criterion(prediction, labels)
+            loss = criterion(prediction, labels.view(-1))
 
             loss.backward()
+            clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
             train_total_loss += loss.item() * characters.size(0)
 
         test_total_loss = 0
         if epoch_number % TEST_FREQ == 0:
-            in_states = model.init_hidden()
+            in_states = model.init_hidden(batch_size)
             model.eval()
 
             for characters, labels in test_data:
                 characters = characters.to(DEVICE)
-                labels = labels.to(DEVICE)
-                labels = labels.view(seq_lenght * batch_size)
+                labels = labels.view(-1).to(DEVICE)
                 prediction = model(characters, in_states)
                 loss = criterion(prediction, labels)
                 test_total_loss += loss.item() * characters.size(0)

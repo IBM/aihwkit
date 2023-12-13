@@ -16,6 +16,7 @@
 # the simulator shared library is linked against.
 
 from .enums import (
+    RPUDataType,
     BoundManagementType,
     NoiseManagementType,
     WeightNoiseType,
@@ -26,15 +27,17 @@ from .enums import (
     VectorUnitCellUpdatePolicy,
     AnalogMVType,
 )
-from .utils import (
-    IOParameters,
-    UpdateParameters,
+
+from .training import IOParameters, UpdateParameters
+
+from .mapping import MappingParameter
+
+from .pre_post import InputRangeParameter, PrePostProcessingParameter
+
+from .inference import (
     WeightModifierParameter,
     WeightClipParameter,
     WeightRemapParameter,
     SimpleDriftParameter,
     DriftParameter,
-    MappingParameter,
-    InputRangeParameter,
-    PrePostProcessingParameter,
 )

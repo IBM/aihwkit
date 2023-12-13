@@ -67,7 +67,7 @@ public:
   T getWeightGranularityNoise() const override {
     // need to make sure that random states are enabled
     return getPar().usesPersistentWeight()
-               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + 1e-6
+               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + (T)1e-6
                : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
 

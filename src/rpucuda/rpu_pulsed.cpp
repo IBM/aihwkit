@@ -83,6 +83,9 @@ template struct PulsedMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct PulsedMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct PulsedMetaParameter<half_t>;
+#endif
 
 /********************************************************************************
  * RPUPulsed<T>
@@ -166,13 +169,8 @@ template <typename T> void RPUPulsed<T>::printToStream(std::stringstream &ss) co
 
   std::string name;
   name = rpu_device_->getPar().getName();
-
-  std::string num = "float";
-  if (sizeof(T) == 8) {
-    num = "double";
-  }
-  ss << "RPUPulsed<" << num << ">[" << name << "](" << this->d_size_ << "," << this->x_size_
-     << ")\n";
+  ss << "RPUPulsed<" << this->getDataTypeName() << ">[" << name << "](" << this->d_size_ << ","
+     << this->x_size_ << ")" << std::endl;
 };
 
 template <typename T> void RPUPulsed<T>::setLearningRate(T lr) {
@@ -209,6 +207,21 @@ template <typename T> void RPUPulsed<T>::diffuseWeights() {
   rpu_device_->diffuseWeights(this->getWeightsPtr(), *this->rng_);
 }
 
+template <typename T> void RPUPulsed<T>::diffuseWeightsPink() {
+  CHECK_RPU_DEVICE_INIT;
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  RPUSimple<T>::diffuseWeightsPink();
+
+  if (rpu_device_->implements() == DeviceUpdateType::FloatingPoint) {
+    return;
+  } else if (rpu_device_->implements() == DeviceUpdateType::ConstantStep) {
+    rpu_device_->onSetWeights(this->getWeightsPtr());
+  } else {
+    RPU_FATAL("Pink noise NOT implemented for most devices");
+  }
+}
+
 template <typename T> void RPUPulsed<T>::resetCols(int start_col, int n_cols, T reset_prob) {
   if (reset_prob) {
     CHECK_RPU_DEVICE_INIT;
@@ -232,6 +245,25 @@ void RPUPulsed<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scales, T
   ENFORCE_NO_DELAYED_UPDATE;
 
   RPUSimple<T>::remapWeights(wrmpar, scales, biases);
+}
+
+template <typename T>
+bool RPUPulsed<T>::swaWeights(
+    const WeightRemapParameter &wrmpar, T *swa_weights, uint64_t iter, T *scales, T *biases) {
+
+  CHECK_RPU_DEVICE_INIT;
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  if (wrmpar.type != WeightRemapType::None && !pwu_->checkForFPUpdate(&*rpu_device_)) {
+    RPU_FATAL("SWA is NOT implemented for most devices");
+  }
+
+  bool modfied = RPUSimple<T>::swaWeights(wrmpar, swa_weights, iter, scales, biases);
+
+  if (modfied) {
+    rpu_device_->onSetWeights(this->getWeightsPtr());
+  }
+  return modfied;
 }
 
 template <typename T> void RPUPulsed<T>::clipWeights(T clip) {
@@ -320,9 +352,9 @@ template <typename T> void RPUPulsed<T>::setWeightsReal(const T *weightsptr, int
   T B = (T)0.0;
   getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), weight_granularity);
 
-  T mx_change = BL * weight_granularity;
+  T mx_change = (T)BL * weight_granularity;
   T range = w_max - w_min;
-  int iter = (int)round(n_loops * range / mx_change);
+  int iter = (int)roundf((T)n_loops * range / mx_change);
 
   /*====*/
 
@@ -352,7 +384,7 @@ template <typename T> void RPUPulsed<T>::setWeightsReal(const T *weightsptr, int
 
   T avg_dev = 0.0;
   for (int i = 0; i < x_sz * d_sz; ++i) {
-    avg_dev += fabs(weightsptr[i] - w_current[i]);
+    avg_dev += (T)fabsf(weightsptr[i] - w_current[i]);
   }
   avg_dev /= x_sz * d_sz;
   DEBUG_OUT("Finished setting weights real [avg deviation=" << avg_dev << "]");
@@ -561,6 +593,9 @@ void RPUPulsed<T>::updateMatrix(
 template class RPUPulsed<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUPulsed<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class RPUPulsed<half_t>;
 #endif
 
 #undef CHECK_RPU_DEVICE_INIT

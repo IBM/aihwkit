@@ -17,7 +17,8 @@ from typing import Optional, Type
 from torch.nn import Linear
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.parameters.base import MappableRPU, RPUConfigBase
+from aihwkit.simulator.parameters.base import RPUConfigBase
+from aihwkit.simulator.parameters.mapping import MappableRPU
 from aihwkit.simulator.tiles.array import TileModuleArray
 from aihwkit.nn.modules.linear import AnalogLinear
 
@@ -42,7 +43,7 @@ class AnalogLinearMapped(AnalogLinear):
 
     Note:
         Mapping is controlled by the
-        :class:`~aihwkit.simulator.parameters.utils.MappingParameter`.
+        :class:`~aihwkit.simulator.parameters.mapping.MappingParameter`.
 
     Note:
         The tensor parameters of this layer (``.weight`` and ``.bias``) are not
@@ -106,4 +107,4 @@ class AnalogLinearMapped(AnalogLinear):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)

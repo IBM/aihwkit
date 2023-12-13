@@ -566,6 +566,7 @@ class TileTest(ParametrizedTestCase):
         if not hasattr(rpu_config, "forward"):
             raise SkipTest("No forward")
 
+        rpu_config.forward.is_perfect = False
         rpu_config.forward.out_noise = 0.123
         analog_tile = self.get_tile(2, 3, rpu_config=rpu_config, bias=True)
 

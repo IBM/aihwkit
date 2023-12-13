@@ -42,14 +42,13 @@ from aihwkit.simulator.parameters.base import RPUConfigBase
 from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 from aihwkit.simulator.configs.devices import PulsedDevice
 from aihwkit.simulator.configs.compounds import UnitCell
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters.enums import (
     BoundManagementType,
-    IOParameters,
     NoiseManagementType,
     PulseType,
-    UpdateParameters,
     WeightNoiseType,
 )
+from aihwkit.simulator.parameters.training import UpdateParameters, IOParameters
 from aihwkit.simulator.presets import PresetIOParameters
 from aihwkit.simulator.tiles import AnalogTile, InferenceTile
 from aihwkit.simulator.tiles.module import TileModule
@@ -306,7 +305,7 @@ def get_tile_for_plotting(
     analog_tile = AnalogTile(n_traces, 1, config)  # type: TileModule
     analog_tile.set_learning_rate(1)
     if w_init is None:
-        w_init = getattr(config.device.as_bindings(), "w_min", -1.0)
+        w_init = getattr(config.device.as_bindings(analog_tile.get_data_type()), "w_min", -1.0)
 
     weights = w_init * ones((n_traces, 1))
     analog_tile.set_weights(weights)
@@ -339,7 +338,7 @@ def estimate_n_steps(rpu_config: Union[SingleRPUConfig, UnitCellRPUConfig]) -> i
     if not isinstance(rpu_config, SingleRPUConfig):
         return 1000
 
-    device_binding = rpu_config.device.as_bindings()
+    device_binding = rpu_config.device.as_bindings(rpu_config.runtime.data_type)
 
     if not hasattr(device_binding, "w_min"):
         raise ConfigError(

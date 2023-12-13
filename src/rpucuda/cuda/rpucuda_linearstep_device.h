@@ -26,7 +26,7 @@ public:
       LinearStepRPUDeviceCuda,
       LinearStepRPUDevice,
       /*ctor body*/
-      dev_slope_ = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
+      dev_slope_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 2 * this->size_);
       dev_write_noise_std_ = RPU::make_unique<CudaArray<T>>(this->context_, 1);
       ,
       /*dtor body*/
@@ -48,7 +48,7 @@ public:
       int x_size = this->x_size_;
       T **w_slope_up = rpu_device.getSlopeUp();
       T **w_slope_down = rpu_device.getSlopeDown();
-      float *tmp_slope = new float[2 * this->size_];
+      param_t *tmp_slope = new param_t[2 * this->size_];
 
       for (int i = 0; i < d_size; ++i) {
         for (int j = 0; j < x_size; ++j) {
@@ -69,19 +69,19 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
   T *getGlobalParamsData() override { return dev_write_noise_std_->getData(); };
-  float *get2ParamsData() override { return dev_slope_->getData(); };
+  param_t *get2ParamsData() override { return dev_slope_->getData(); };
   T *get1ParamsData() override {
     return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
   };
   T getWeightGranularityNoise() const override {
     // need to make sure that random states are enabled
     return getPar().usesPersistentWeight()
-               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + 1e-6
+               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + (T)1e-6
                : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
 
 private:
-  std::unique_ptr<CudaArray<float>> dev_slope_ = nullptr;
+  std::unique_ptr<CudaArray<param_t>> dev_slope_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_write_noise_std_ = nullptr;
 };
 

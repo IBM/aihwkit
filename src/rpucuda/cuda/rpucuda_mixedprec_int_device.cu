@@ -10,6 +10,7 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_fp16_util.h"
 #include "rpucuda_mixedprec_int_device.h"
 #include <memory>
 
@@ -87,7 +88,7 @@ void MixedPrecIntRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_
 
   const auto &par = this->getPar();
 
-  this->io_.nm_decay = 1.0f - par.momentum_nm;
+  this->io_.nm_decay = (T)1.0 - par.momentum_nm;
   this->io_.noise_management = NoiseManagementType::AverageAbsMaxSingleValue;
 
   // chi technically is integer.  bin half needs to be floored
@@ -140,8 +141,8 @@ __global__ void kernelQuantizeIntStocRound(
     int max =
         n_bins / 2; // integer div to make sure that rounding errors do not occur at saturation
     T width = nm / half_bins;
-    T xq = RPU_ROUNDFUN(x / width + stoch_value - 0.5);
-    quantized_values[idx] = MAX(MIN(xq, (T)max), (T)-max);
+    T xq = RPU_ROUNDFUN(x / width + stoch_value - (T)0.5);
+    quantized_values[idx] = MAX(MIN(xq, (T)max), -(T)max);
   }
   random_states[tid] = local_state;
 }
@@ -188,7 +189,7 @@ void MixedPrecIntRPUDeviceCuda<T>::doDirectUpdate(
     T *x_buffer,
     T *d_buffer) {
 
-  if (beta != 1.0f) {
+  if (beta != (T)1.0) {
     RPU_FATAL("beta not equal 1 is not supported.")
   }
   this->setUpPar(up);
@@ -236,8 +237,8 @@ __global__ void kernelMixedPrecIntTransfer(
     T d_width = *d_nm; //  already divided by d_bins/2 below
     T x_width = *x_nm; //  already divided by x_bins/2 below
     T value = round(chi[tid]);
-    T thres = MAX(round(w_width_div_lr_chi_scale / (d_width * x_width)), 1);
-    T dw = truncf(value / thres); // multiplies of thres OK
+    T thres = MAX(round(w_width_div_lr_chi_scale / (d_width * x_width)), (T)1.0);
+    T dw = trunc(value / thres); // multiplies of thres OK
 
     transfer_out[tid] = dw;
 
@@ -257,7 +258,7 @@ void MixedPrecIntRPUDeviceCuda<T>::forwardUpdate(
   if (!lr) {
     return;
   }
-  T t_size = n_vec * this->x_size_;
+  int t_size = n_vec * this->x_size_;
   if ((this->dev_transfer_tmp_ == nullptr) || this->dev_transfer_tmp_->getSize() < t_size) {
     this->dev_transfer_tmp_ = RPU::make_unique<CudaArray<T>>(this->context_, t_size);
   }
@@ -270,7 +271,7 @@ void MixedPrecIntRPUDeviceCuda<T>::forwardUpdate(
   kernelMixedPrecIntTransfer<T><<<nblocks, nthreads, 0, this->context_->getStream()>>>(
       this->dev_transfer_tmp_->getData(), dev_chi_->getData() + i_row_start * this->x_size_, t_size,
       this->noise_manager_x_->getScaleValues(), this->noise_manager_d_->getScaleValues(),
-      this->granularity_ / fabs(lr) * chi_scale, par.momentum_chi);
+      this->granularity_ / (T)(fabsf(lr) * chi_scale), par.momentum_chi);
 
   // requires to turn on update_managment / bl managment as well
   this->transfer_pwu_->update(
@@ -294,4 +295,8 @@ template class MixedPrecIntRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecIntRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class MixedPrecIntRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

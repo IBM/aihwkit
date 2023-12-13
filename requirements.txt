@@ -9,3 +9,4 @@ scipy
 requests>=2.25,<3
 numpy>=1.22
 protobuf>=4.21.6
+tqdm

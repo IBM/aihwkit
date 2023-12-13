@@ -10,6 +10,7 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_math_util.h"
 #include "cuda_util.h"
 #include "weight_drifter.h"
 #include "weight_drifter_cuda.h"
@@ -19,12 +20,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -58,8 +53,11 @@ public:
 
     context->setRandomSeed(0);
     dev_w = RPU::make_unique<CudaArray<num_t>>(context, size);
+    auto dev_w_float = RPU::make_unique<CudaArray<float>>(context, size);
     dev_w2 = RPU::make_unique<CudaArray<num_t>>(context, size);
-    context->randNormal(dev_w->getData(), dev_w->getSize());
+
+    context->randNormal(dev_w_float->getData(), size);
+    RPU::math::elemcopy(context, dev_w->getData(), size, dev_w_float->getDataConst());
 
     dev_nu = RPU::make_unique<CudaArray<num_t>>(context, size);
 
@@ -157,7 +155,8 @@ TEST_F(WeightDrifterTestFixture, ApplySimple) {
   }
 
   for (int i = 0; i < size; i++) {
-    num_t w_ref = w_orig[i] * (pow((ntimes)*time_since_last_call / par.t0, -par.nu));
+    num_t w_ref =
+        w_orig[i] * (num_t)(powf(((num_t)ntimes) * time_since_last_call / par.t0, -par.nu));
     ASSERT_NEAR(w_ref, w2[i], TOLERANCE);
     ASSERT_NEAR(w[i], w2[i], TOLERANCE);
   }
@@ -183,7 +182,7 @@ TEST_F(WeightDrifterTestFixture, ApplyChange) {
   for (int i = 0; i < size; i++) {
     ASSERT_FLOAT_EQ(w[i], w2[i]);
   }
-  // num_t w_ref = 0.5 * (pow(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
+  // num_t w_ref = 0.5 * (powf(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
   // std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << w_ref <<
   // std::endl;
 
@@ -218,7 +217,7 @@ TEST_F(WeightDrifterTestFixture, ApplyChange) {
 
   wdrifter->apply(w2, time_since_last_call, rng);
 
-  // w_ref = c * (pow(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
+  // w_ref = c * (powf(time_since_last_call / par.t0, -wdrifter->getNu()[0]));
   // std::cout << "w cpu :  " << w2[0] << ",  w gpu : " << w[0] << ", w ref : " << w_ref <<
   // std::endl;
 

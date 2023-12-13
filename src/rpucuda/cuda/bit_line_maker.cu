@@ -20,6 +20,7 @@
 #include <random>
 
 #include "chopped_weight_output.h"
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 #include "cuda_util.h"
 #include "io_iterator.h"
@@ -74,8 +75,7 @@ namespace RPU {
 
 #define RPU_BLM_DEBUG_DEFINE_K_NO_STOROUND                                                         \
   int Kplus1 = K + 1;                                                                              \
-  int nK32 = (Kplus1 + 31) / 32;                                                                   \
-  T resolution = 0.01;
+  int nK32 = (Kplus1 + 31) / 32;
 
 #define RPU_BLM_DEBUG_DEFINE_K                                                                     \
   RPU_BLM_DEBUG_DEFINE_K_NO_STOROUND;                                                              \
@@ -90,8 +90,9 @@ namespace RPU {
   auto c_container = CudaContext(-1, false);                                                       \
   CudaContextPtr c = &c_container;                                                                 \
   CudaArray<uint32_t> dev_counts(c, size *nK32);                                                   \
+  CudaArray<uint32_t> dev_d_noz(c, 1);                                                             \
   CudaArray<T> dev_indata(c, size, indata);                                                        \
-                                                                                                   \
+  dev_d_noz.setConst(0);                                                                           \
   CudaArray<curandState> dev_states(c, NSTATES);                                                   \
   curandSetup(dev_states, size, fake_seed);                                                        \
   CUDA_CALL(cudaDeviceSynchronize());                                                              \
@@ -112,11 +113,14 @@ namespace RPU {
                                                                                                    \
   *timing = milliseconds;                                                                          \
   dev_counts.copyTo(counts);                                                                       \
+  dev_d_noz.copyTo(&d_noz);                                                                        \
   CUDA_CALL(cudaDeviceSynchronize());
 
 #define RPU_BLM_DEBUG_BATCH_INIT(NSTATES, COUNTSTYPE)                                              \
   auto c_container = CudaContext(-1, false);                                                       \
   CudaContextPtr c = &c_container;                                                                 \
+  CudaArray<uint32_t> dev_d_noz(c, 1);                                                             \
+  dev_d_noz.setConst(0);                                                                           \
   CudaArray<COUNTSTYPE> dev_counts(c, size *m_batch *nK32);                                        \
   CudaArray<COUNTSTYPE> dev_counts2(c, size *m_batch *nK32);                                       \
   dev_counts.setConst(0);                                                                          \
@@ -153,6 +157,7 @@ namespace RPU {
                                                                                                    \
   COUNTT *tmp32 = new COUNTT[size * m_batch * nK32];                                               \
   dev_counts.copyTo(tmp32);                                                                        \
+  dev_d_noz.copyTo(&d_noz);                                                                        \
   CUDA_CALL(cudaDeviceSynchronize());                                                              \
                                                                                                    \
   int batch_idx = m_batch - 1;                                                                     \
@@ -201,11 +206,11 @@ __device__ __forceinline__ void getCountsSimpleLoop(
 
 #define DISCRETIZE_VALUE_STOCH_DEFINITIONS                                                         \
   T res = resolution;                                                                              \
-  bool sr = sto_round & (res > 0);                                                                 \
+  bool sr = sto_round & (res > (T)0.0);                                                            \
   T stoch_value;
 
 #define DISCRETIZE_VALUE(RES)                                                                      \
-  if (RES > 0) {                                                                                   \
+  if (RES > (T)0.0) {                                                                              \
     value /= RES;                                                                                  \
     value = RES * RPU_ROUNDFUN(value);                                                             \
   }
@@ -214,11 +219,38 @@ __device__ __forceinline__ void getCountsSimpleLoop(
   if (sr)                                                                                          \
     stoch_value = curand_uniform(&STATEVAR);                                                       \
                                                                                                    \
-  if (res > 0) {                                                                                   \
+  if (res > (T)0.0) {                                                                              \
     value /= res;                                                                                  \
     if (sr)                                                                                        \
-      value += stoch_value - 0.5;                                                                  \
+      value += stoch_value - (T)0.5;                                                               \
     value = res * RPU_ROUNDFUN(value);                                                             \
+  }
+
+#define NUMBER_OF_ZEROS_INIT(NOZ_PTR)                                                              \
+  __shared__ uint32_t shared_noz[1];                                                               \
+  const bool noz_if = NOZ_PTR != nullptr;                                                          \
+  bool compute_noz_if = noz_if;                                                                    \
+  if (noz_if) {                                                                                    \
+    shared_noz[0] = 0;                                                                             \
+    __syncthreads();                                                                               \
+  }
+
+#define NUMBER_OF_ZEROS_FINALIZE(NOZ_PTR, TID_COND)                                                \
+  if (noz_if) {                                                                                    \
+    __syncthreads();                                                                               \
+    if (TID_COND) {                                                                                \
+      atomicAdd(NOZ_PTR, shared_noz[0]);                                                           \
+    }                                                                                              \
+  }
+
+#define NUMBER_OF_ZEROS_COMPUTE                                                                    \
+  if (compute_noz_if && (value == (T)0.0)) {                                                       \
+    atomicAdd(&shared_noz[0], (uint32_t)1);                                                        \
+  }
+
+#define NUMBER_OF_ZEROS_COMPUTE_GLOBAL(PTR)                                                        \
+  if (compute_noz_if && (value == (T)0.0)) {                                                       \
+    atomicAdd(&PTR[0], (uint32_t)1);                                                               \
   }
 
 namespace test_helper {
@@ -274,14 +306,14 @@ void checkCounts(
     if (i < 100)
       std::cout << "D[" << i << "]: " << d << " (" << (T)d / BL << ")"
                 << " in: " << host_d_input[i] * A << std::endl;
-    if (fabs(d) == 0)
+    if (abs(d) == 0)
       dzero++;
   }
 
   for (int i = 0; i < x_size; i++) {
     int x = getCounts(x_counts, i, BL, x_size, true);
 
-    if (fabs(x) == 0)
+    if (abs(x) == 0)
       xzero++;
 
     if (i < 100)
@@ -308,6 +340,7 @@ __global__ void kernelUpdateGetCounts_Linear(
     int size_in,
     T scaleprob,
     uint32_t *counts,
+    uint32_t *noz,
     int Kplus1,
     curandState *random_states,
     T resolution,
@@ -323,28 +356,26 @@ __global__ void kernelUpdateGetCounts_Linear(
   const int Kp1 = Kplus1;
   const int size = size_in;
   const int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  const int nKthreads = (Kp1 / ITEMS_PER_THREAD);
+  const int nKthreads = Kp1 / ITEMS_PER_THREAD;
   const int sourceId = tid / nKthreads;
   const int kidsub = (tid * ITEMS_PER_THREAD) % Kp1;
   const int kidthread = tid % nKthreads;
   const uint32_t one = 1;
-
-  if (tid >= (size * nKthreads))
-    return;
-
-  DISCRETIZE_VALUE_STOCH_DEFINITIONS;
-
-  curandState local_state;
   T value;
   bool negative;
+  const bool compute_noz_if = noz != nullptr;
 
   if (sourceId < size) {
+
+    DISCRETIZE_VALUE_STOCH_DEFINITIONS;
+
+    curandState local_state;
 
     value = source_value[sourceId]; // not memory optimized but good  for K=32 (broadcasted)
     local_state = random_states[tid];
 
     // input management
-    negative = value < 0;
+    negative = value < (T)0.0;
     value = (negative) ? -value : value;
 
     value *= scaleprob;
@@ -353,7 +384,11 @@ __global__ void kernelUpdateGetCounts_Linear(
       counts[sourceId] = 0; // need to set zero (all Kthreads need to be inside a warp!)
 
       DISCRETIZE_VALUE_STOCH(local_state);
+
+      NUMBER_OF_ZEROS_COMPUTE_GLOBAL(
+          noz); // shared and syncthreads hangs for some (unknown) reason.
     }
+
     // need to broadcast value to within K threads
     value = __shfl_up_sync(0xFFFFFFFF, value, kidthread);
 
@@ -379,7 +414,15 @@ namespace test_helper {
 
 template <typename T, int ITEMS_PER_THREAD>
 int debugKernelUpdateGetCounts_Linear(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed) {
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed) {
   // counts should be: size*nk32;
   RPU_BLM_DEBUG_DEFINE_K;
 
@@ -396,40 +439,56 @@ int debugKernelUpdateGetCounts_Linear(
 
   kernelUpdateGetCounts_Linear<T, ITEMS_PER_THREAD, const T *>
       <<<nblocks, nthreads, 0, c->getStream()>>>(
-          dev_indata.getData(), size, scaleprob, dev_counts.getData(), Kplus1, dev_states.getData(),
-          resolution, sto_round);
+          dev_indata.getData(), size, scaleprob, dev_counts.getData(), dev_d_noz.getData(), Kplus1,
+          dev_states.getData(), resolution, sto_round);
 
   RPU_BLM_DEBUG_FINISH;
   return 0;
 }
 
-template int
-debugKernelUpdateGetCounts_Linear<float, 1>(float *, int, float, uint32_t *, int, float *, bool);
-template int
-debugKernelUpdateGetCounts_Linear<float, 2>(float *, int, float, uint32_t *, int, float *, bool);
-template int
-debugKernelUpdateGetCounts_Linear<float, 4>(float *, int, float, uint32_t *, int, float *, bool);
-template int
-debugKernelUpdateGetCounts_Linear<float, 8>(float *, int, float, uint32_t *, int, float *, bool);
-template int
-debugKernelUpdateGetCounts_Linear<float, 16>(float *, int, float, uint32_t *, int, float *, bool);
-template int
-debugKernelUpdateGetCounts_Linear<float, 32>(float *, int, float, uint32_t *, int, float *, bool);
+template int debugKernelUpdateGetCounts_Linear<float, 1>(
+    float *, int, float, uint32_t *, uint32_t &, int, float, float *, bool);
+template int debugKernelUpdateGetCounts_Linear<float, 2>(
+    float *, int, float, uint32_t *, uint32_t &, int, float, float *, bool);
+template int debugKernelUpdateGetCounts_Linear<float, 4>(
+    float *, int, float, uint32_t *, uint32_t &, int, float, float *, bool);
+template int debugKernelUpdateGetCounts_Linear<float, 8>(
+    float *, int, float, uint32_t *, uint32_t &, int, float, float *, bool);
+template int debugKernelUpdateGetCounts_Linear<float, 16>(
+    float *, int, float, uint32_t *, uint32_t &, int, float, float *, bool);
+template int debugKernelUpdateGetCounts_Linear<float, 32>(
+    float *, int, float, uint32_t *, uint32_t &, int, float, float *, bool);
 
 #ifdef RPU_USE_DOUBLE
 template int debugKernelUpdateGetCounts_Linear<double, 1>(
-    double *, int, double, uint32_t *, int, double *, bool);
+    double *, int, double, uint32_t *, uint32_t &, int, double, double *, bool);
 template int debugKernelUpdateGetCounts_Linear<double, 2>(
-    double *, int, double, uint32_t *, int, double *, bool);
+    double *, int, double, uint32_t *, uint32_t &, int, double, double *, bool);
 template int debugKernelUpdateGetCounts_Linear<double, 4>(
-    double *, int, double, uint32_t *, int, double *, bool);
+    double *, int, double, uint32_t *, uint32_t &, int, double, double *, bool);
 template int debugKernelUpdateGetCounts_Linear<double, 8>(
-    double *, int, double, uint32_t *, int, double *, bool);
+    double *, int, double, uint32_t *, uint32_t &, int, double, double *, bool);
 template int debugKernelUpdateGetCounts_Linear<double, 16>(
-    double *, int, double, uint32_t *, int, double *, bool);
+    double *, int, double, uint32_t *, uint32_t &, int, double, double *, bool);
 template int debugKernelUpdateGetCounts_Linear<double, 32>(
-    double *, int, double, uint32_t *, int, double *, bool);
+    double *, int, double, uint32_t *, uint32_t &, int, double, double *, bool);
 #endif
+
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateGetCounts_Linear<half_t, 1>(
+    half_t *, int, half_t, uint32_t *, uint32_t &, int, half_t, half_t *, bool);
+template int debugKernelUpdateGetCounts_Linear<half_t, 2>(
+    half_t *, int, half_t, uint32_t *, uint32_t &, int, half_t, half_t *, bool);
+template int debugKernelUpdateGetCounts_Linear<half_t, 4>(
+    half_t *, int, half_t, uint32_t *, uint32_t &, int, half_t, half_t *, bool);
+template int debugKernelUpdateGetCounts_Linear<half_t, 8>(
+    half_t *, int, half_t, uint32_t *, uint32_t &, int, half_t, half_t *, bool);
+template int debugKernelUpdateGetCounts_Linear<half_t, 16>(
+    half_t *, int, half_t, uint32_t *, uint32_t &, int, half_t, half_t *, bool);
+template int debugKernelUpdateGetCounts_Linear<half_t, 32>(
+    half_t *, int, half_t, uint32_t *, uint32_t &, int, half_t, half_t *, bool);
+#endif
+
 } // namespace test_helper
 
 // *********************************************************************************
@@ -437,13 +496,14 @@ template int debugKernelUpdateGetCounts_Linear<double, 32>(
 
 #define GET_COUNTS_INNER_LOOP(SCALEPROB)                                                           \
                                                                                                    \
-  negative = value < 0;                                                                            \
+  negative = value < (T)0.0;                                                                       \
   value = (negative) ? -value : value;                                                             \
                                                                                                    \
   value *= SCALEPROB;                                                                              \
                                                                                                    \
   if (laneId == 0) {                                                                               \
     DISCRETIZE_VALUE_STOCH(local_state);                                                           \
+    NUMBER_OF_ZEROS_COMPUTE;                                                                       \
   }                                                                                                \
   value = __shfl_sync(0xFFFFFFFF, value, 0);                                                       \
                                                                                                    \
@@ -474,7 +534,6 @@ template int debugKernelUpdateGetCounts_Linear<double, 32>(
   sz = SIZE;                                                                                       \
   if (sourceId < sz) {                                                                             \
     value = PROB[sourceId];                                                                        \
-                                                                                                   \
     c = &COUNTS[sourceId];                                                                         \
                                                                                                    \
     GET_COUNTS_INNER_LOOP(SCALEPROB);                                                              \
@@ -513,6 +572,7 @@ __global__ void kernelUpdateGetCountsBatch_Loop2(
     int d_size_in,
     T d_scaleprob,
     uint32_t *d_counts,
+    uint32_t *d_noz,
     int Kplus1,
     int m_batch_in,
     curandState *random_states,
@@ -531,43 +591,55 @@ __global__ void kernelUpdateGetCountsBatch_Loop2(
 
   const int max_size = (((d_size > x_size) ? d_size : x_size) * m_batch) << 5;
 
-  if (tid >= max_size)
-    return;
+  NUMBER_OF_ZEROS_INIT(d_noz);
 
-  curandState local_state;
-  local_state = random_states[tid];
+  if (tid < max_size) {
+    curandState local_state;
+    local_state = random_states[tid];
 
-  RPU_BLM_DEFINE_NK32;
-  const uint32_t lastK32mask = LASTK32MASK;
-  const uint32_t one = 1;
+    RPU_BLM_DEFINE_NK32;
+    const uint32_t lastK32mask = LASTK32MASK;
+    const uint32_t one = 1;
 
-  const int laneId = threadIdx.x & 0x1f;
+    const int laneId = threadIdx.x & 0x1f;
 
-  DISCRETIZE_VALUE_STOCH_DEFINITIONS;
+    DISCRETIZE_VALUE_STOCH_DEFINITIONS;
 
-  uint32_t ballot = 0;
+    uint32_t ballot = 0;
 
-  T value;
-  uint32_t *c;
-  bool negative;
-  int sz;
+    T value;
+    uint32_t *c;
+    bool negative;
+    int sz;
 
-  // NOTE: need to re-order in update from SIZE*nK32 format, when it is trans!
+    // NOTE: need to re-order in update from SIZE*nK32 format, when it is trans!
 
-  // x input
-  GET_COUNTS_LOOP_BATCH(x_prob, x_size, x_counts, x_scaleprob, x_trans, out_trans);
+    // d input
+    GET_COUNTS_LOOP_BATCH(d_prob, d_size, d_counts, d_scaleprob, d_trans, out_trans);
 
-  // d input
-  GET_COUNTS_LOOP_BATCH(d_prob, d_size, d_counts, d_scaleprob, d_trans, out_trans);
+    // x input
+    compute_noz_if = false;
+    GET_COUNTS_LOOP_BATCH(x_prob, x_size, x_counts, x_scaleprob, x_trans, out_trans);
 
-  // save new random states
-  random_states[tid] = local_state;
+    // save new random states
+    random_states[tid] = local_state;
+  }
+
+  NUMBER_OF_ZEROS_FINALIZE(d_noz, threadIdx.x == 0);
 }
 
 namespace test_helper {
 template <typename T>
 int debugKernelUpdateGetCountsBatch_Loop2(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed) {
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed) {
   // counts should be: size*nk32 allocated !
   RPU_BLM_DEBUG_DEFINE_K_BATCH;
 
@@ -584,17 +656,21 @@ int debugKernelUpdateGetCountsBatch_Loop2(
   kernelUpdateGetCountsBatch_Loop2<T, false, false, false>
       <<<nblocks, nthreads, 0, c->getStream()>>>(
           dev_indata.getData(), size, scaleprob, dev_counts.getData(), dev_indata2.getData(), size,
-          scaleprob, dev_counts2.getData(), Kplus1, m_batch, dev_states.getData(), resolution,
-          sto_round);
+          scaleprob, dev_counts2.getData(), dev_d_noz.getData(), Kplus1, m_batch,
+          dev_states.getData(), resolution, sto_round);
 
   RPU_BLM_DEBUG_BATCH_FINISH(uint32_t);
   return 0;
 }
 template int debugKernelUpdateGetCountsBatch_Loop2<float>(
-    float *, int, float, unsigned int *, int, float *, bool);
+    float *, int, float, unsigned int *, uint32_t &, int, float, float *, bool);
 #ifdef RPU_USE_DOUBLE
 template int debugKernelUpdateGetCountsBatch_Loop2<double>(
-    double *, int, double, unsigned int *, int, double *, bool);
+    double *, int, double, unsigned int *, uint32_t &, int, double, double *, bool);
+#endif
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateGetCountsBatch_Loop2<half_t>(
+    half_t *, int, half_t, unsigned int *, uint32_t &, int, half_t, half_t *, bool);
 #endif
 
 } // namespace test_helper
@@ -702,6 +778,21 @@ getScale<double, false>(const double *scale_values, int batch_idx) {
 }
 #endif
 
+#ifdef RPU_USE_FP16
+template <>
+__device__ __forceinline__ half_t
+getScale<half_t, true>(const half_t *scale_values, int batch_idx) {
+  // UM + inverse (for B (that is x))
+  return scale_values[batch_idx];
+}
+
+template <>
+__device__ __forceinline__ half_t
+getScale<half_t, false>(const half_t *scale_values, int batch_idx) {
+  return 1.0;
+}
+#endif
+
 template <> // UBLM
 __device__ __forceinline__ int getK<true>(const int *K_values, int batch_idx, int Kplus1) {
   return K_values[batch_idx];
@@ -778,6 +869,21 @@ getScaleProb<double, true>(const double scaleprob, const int K, const double lr_
 template <>
 __device__ __forceinline__ double
 getScaleProb<double, false>(const double scaleprob, const int K, const double lr_div_dwmin) {
+  return scaleprob;
+};
+
+#endif
+
+#ifdef RPU_USE_FP16
+template <>
+__device__ __forceinline__ half_t
+getScaleProb<half_t, true>(const half_t scaleprob, const int K, const half_t lr_div_dwmin) {
+  return sqrt(lr_div_dwmin / (half_t)K);
+};
+
+template <>
+__device__ __forceinline__ half_t
+getScaleProb<half_t, false>(const half_t scaleprob, const int K, const half_t lr_div_dwmin) {
   return scaleprob;
 };
 
@@ -880,20 +986,24 @@ __device__ __forceinline__ void getCountsSimpleLoop<uint64_t>(
           T value = PROB[idx];                                                                     \
           int batch_idx = getBatchIdx<TRANS>(idx, sz, m_batch);                                    \
           int K = getK<update_bl_management>(K_values, batch_idx, Kplus1);                         \
-          if ((K == 0) || (value == 0)) {                                                          \
+          if ((K == 0) || (value == (T)0.0)) {                                                     \
+            NUMBER_OF_ZEROS_COMPUTE;                                                               \
             continue;                                                                              \
           }                                                                                        \
-          kagg_t Kc = getKc<update_bl_management, count_t>(Kc_values, batch_idx, Kplus1);          \
           T scaleprob = getScaleProb<T, update_bl_management>(SCALEPROB, K, lr_div_dwmin);         \
           T scale = getScale<T, update_management>(scale_values, batch_idx);                       \
-          count_t *c = &COUNTS[getCountsIdx<TRANS, OUTTRANS, count_t>(                             \
-              idx, sz, m_batch, counts_offset, K, Kc, nB)];                                        \
           T sprob = scaleprob SPROPOP scale;                                                       \
-          bool negative = value < 0;                                                               \
+          bool negative = value < (T)0.0;                                                          \
           value = (negative) ? -value : value;                                                     \
           value *= sprob;                                                                          \
           DISCRETIZE_VALUE_STOCH(local_state);                                                     \
-                                                                                                   \
+          NUMBER_OF_ZEROS_COMPUTE;                                                                 \
+          if (value == (T)0.0) {                                                                   \
+            continue;                                                                              \
+          }                                                                                        \
+          kagg_t Kc = getKc<update_bl_management, count_t>(Kc_values, batch_idx, Kplus1);          \
+          count_t *c = &COUNTS[getCountsIdx<TRANS, OUTTRANS, count_t>(                             \
+              idx, sz, m_batch, counts_offset, K, Kc, nB)];                                        \
           getCountsSimpleLoop<count_t>(value, negative, c, nK32m1, K, local_state, nK32, sz, Kc);  \
         }                                                                                          \
       }                                                                                            \
@@ -919,6 +1029,7 @@ __global__ void kernelUpdateGetCountsBatch_SimpleLoop2(
     int d_size_in,
     T d_scaleprob_in,
     count_t *d_counts,
+    uint32_t *d_noz,
     int Kplus1_in,
     int m_batch_in,
     curandState *random_states,
@@ -958,7 +1069,7 @@ __global__ void kernelUpdateGetCountsBatch_SimpleLoop2(
   const T x_scaleprob = x_scaleprob_in;
   const T d_scaleprob = d_scaleprob_in;
 
-  int nx_blocks = ceil(gridDim.x * ((T)x_size / (T)(x_size + d_size)));
+  int nx_blocks = (int)ceilf(gridDim.x * ((float)x_size / (float)(x_size + d_size)));
   int nd_blocks = gridDim.x - nx_blocks;
   if ((nd_blocks <= 0) && (d_size > 0)) {
     nx_blocks = gridDim.x - 1; // ASSUMES gridDim.x>1 !~
@@ -967,35 +1078,47 @@ __global__ void kernelUpdateGetCountsBatch_SimpleLoop2(
   const int tid_nx = nx_blocks * blockDim.x;
   const int tid_nd = nd_blocks * blockDim.x;
 
-  if ((tid < tid_nx) && (tid > x_size * m_batch))
-    return;
-  if ((tid >= tid_nx) && (tid - tid_nx > d_size * m_batch))
-    return;
+  NUMBER_OF_ZEROS_INIT(d_noz);
 
-  const T lr_div_dwmin = lr_div_dwmin_in;
+  if (((tid < tid_nx) && (tid < x_size * m_batch)) ||
+      ((tid >= tid_nx) && (tid - tid_nx < d_size * m_batch))) {
 
-  curandState local_state = random_states[tid];
-  RPU_BLM_DEFINE_NK32;
+    const T lr_div_dwmin = lr_div_dwmin_in;
 
-  DISCRETIZE_VALUE_STOCH_DEFINITIONS;
+    curandState local_state = random_states[tid];
+    RPU_BLM_DEFINE_NK32;
 
-  // x input
-  GET_COUNTS_SIMPLE_LOOP_BATCH(
-      x_prob, x_size, x_counts, x_scaleprob, x_trans, out_trans, /, 0, tid_nx, tid_nx);
+    DISCRETIZE_VALUE_STOCH_DEFINITIONS;
 
-  // d input
-  GET_COUNTS_SIMPLE_LOOP_BATCH(
-      d_prob, d_size, d_counts, d_scaleprob, d_trans, out_trans, *, tid_nx, tid_nx + tid_nd,
-      tid_nd);
+    // d input
+    GET_COUNTS_SIMPLE_LOOP_BATCH(
+        d_prob, d_size, d_counts, d_scaleprob, d_trans, out_trans, *, tid_nx, tid_nx + tid_nd,
+        tid_nd);
 
-  // save new random states
-  random_states[tid] = local_state;
+    // x input
+    compute_noz_if = false;
+    GET_COUNTS_SIMPLE_LOOP_BATCH(
+        x_prob, x_size, x_counts, x_scaleprob, x_trans, out_trans, /, 0, tid_nx, tid_nx);
+
+    // save new random states
+    random_states[tid] = local_state;
+  }
+
+  NUMBER_OF_ZEROS_FINALIZE(d_noz, threadIdx.x == 0 && tid >= tid_nx);
 }
 
 namespace test_helper {
 template <typename T>
 int debugKernelUpdateGetCountsBatch_SimpleLoop2(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed) {
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed) {
   // counts should be: size*nk32 allocated !
   RPU_BLM_DEBUG_DEFINE_K_BATCH;
 
@@ -1010,18 +1133,23 @@ int debugKernelUpdateGetCountsBatch_SimpleLoop2(
   kernelUpdateGetCountsBatch_SimpleLoop2<T, false, false, false, false, false>
       <<<nblocks, nthreads, 0, c->getStream()>>>(
           dev_indata.getData(), size, scaleprob, dev_counts.getData(), dev_indata2.getData(), size,
-          scaleprob, dev_counts2.getData(), Kplus1, m_batch, dev_states.getData(), resolution,
-          sto_round);
+          scaleprob, dev_counts2.getData(), dev_d_noz.getData(), Kplus1, m_batch,
+          dev_states.getData(), resolution, sto_round);
 
   RPU_BLM_DEBUG_BATCH_FINISH(uint32_t);
   return 0;
 }
 template int debugKernelUpdateGetCountsBatch_SimpleLoop2<float>(
-    float *, int, float, unsigned int *, int, float *, bool);
+    float *, int, float, unsigned int *, uint32_t &, int, float, float *, bool);
 #ifdef RPU_USE_DOUBLE
 template int debugKernelUpdateGetCountsBatch_SimpleLoop2<double>(
-    double *, int, double, unsigned int *, int, double *, bool);
+    double *, int, double, unsigned int *, uint32_t &, int, double, double *, bool);
 #endif
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateGetCountsBatch_SimpleLoop2<half_t>(
+    half_t *, int, half_t, unsigned int *, uint32_t &, int, half_t, half_t *, bool);
+#endif
+
 } // namespace test_helper
 
 // *********************************************************************************
@@ -1036,6 +1164,7 @@ __global__ void kernelUpdateGetCounts_Loop2(
     int d_size_in,
     T d_scaleprob,
     uint32_t *d_counts,
+    uint32_t *d_noz,
     int Kplus1,
     curandState *random_states,
     T resolution,
@@ -1051,42 +1180,54 @@ __global__ void kernelUpdateGetCounts_Loop2(
 
   const int max_size = ((x_size > d_size) ? x_size : d_size) << 5;
 
-  if (tid >= max_size)
-    return;
+  NUMBER_OF_ZEROS_INIT(d_noz);
 
-  curandState local_state = random_states[tid];
+  if (tid < max_size) {
+    curandState local_state = random_states[tid];
 
-  RPU_BLM_DEFINE_NK32;
-  const uint32_t one = 1;
-  const uint32_t lastK32mask = LASTK32MASK;
+    RPU_BLM_DEFINE_NK32;
+    const uint32_t one = 1;
+    const uint32_t lastK32mask = LASTK32MASK;
 
-  const int laneId = threadIdx.x & 0x1f;
-  // const uint32_t sourceId =  blockIdx.x*warps_per_block + warpId;
-  const int sourceId = blockIdx.x * (blockDim.x >> 5) + (threadIdx.x >> 5);
+    const int laneId = threadIdx.x & 0x1f;
+    // const uint32_t sourceId =  blockIdx.x*warps_per_block + warpId;
+    const int sourceId = blockIdx.x * (blockDim.x >> 5) + (threadIdx.x >> 5);
 
-  DISCRETIZE_VALUE_STOCH_DEFINITIONS;
+    DISCRETIZE_VALUE_STOCH_DEFINITIONS;
 
-  uint32_t ballot = 0;
+    uint32_t ballot = 0;
 
-  T value;
-  uint32_t *c;
-  bool negative;
-  int sz;
+    T value;
+    uint32_t *c;
+    bool negative;
+    int sz;
 
-  // x input
-  GET_COUNTS_LOOP(x_prob, x_size, x_counts, x_scaleprob);
+    // d input
+    GET_COUNTS_LOOP(d_prob, d_size, d_counts, d_scaleprob);
 
-  // d input
-  GET_COUNTS_LOOP(d_prob, d_size, d_counts, d_scaleprob);
+    // x input
+    compute_noz_if = false;
+    GET_COUNTS_LOOP(x_prob, x_size, x_counts, x_scaleprob);
 
-  // save new random states
-  random_states[tid] = local_state;
+    // save new random states
+    random_states[tid] = local_state;
+  }
+
+  NUMBER_OF_ZEROS_FINALIZE(d_noz, threadIdx.x == 0);
 }
 
 namespace test_helper {
 template <typename T>
 int debugKernelUpdateGetCounts_Loop2(
-    T *indata, int size, T scaleprob, uint32_t *counts, int K, T *timing, bool fake_seed) {
+    T *indata,
+    int size,
+    T scaleprob,
+    uint32_t *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed) {
   // counts should be: size*nk32 allocated !
   RPU_BLM_DEBUG_DEFINE_K;
 
@@ -1099,17 +1240,22 @@ int debugKernelUpdateGetCounts_Loop2(
   RPU_BLM_DEBUG_INIT(n);
 
   kernelUpdateGetCounts_Loop2<<<nblocks, nthreads, 0, c->getStream()>>>(
-      dev_indata.getData(), size, scaleprob, dev_counts.getData(), dev_indata.getData(), 0,
-      scaleprob, dev_counts.getData(), Kplus1, dev_states.getData(), resolution, sto_round);
+      dev_indata.getData(), 0, scaleprob, dev_counts.getData(), dev_indata.getData(), size,
+      scaleprob, dev_counts.getData(), dev_d_noz.getData(), Kplus1, dev_states.getData(),
+      resolution, sto_round);
 
   RPU_BLM_DEBUG_FINISH;
   return 0;
 }
-template int
-debugKernelUpdateGetCounts_Loop2<float>(float *, int, float, unsigned int *, int, float *, bool);
+template int debugKernelUpdateGetCounts_Loop2<float>(
+    float *, int, float, unsigned int *, uint32_t &, int, float, float *, bool);
 #ifdef RPU_USE_DOUBLE
 template int debugKernelUpdateGetCounts_Loop2<double>(
-    double *, int, double, unsigned int *, int, double *, bool);
+    double *, int, double, unsigned int *, uint32_t &, int, double, double *, bool);
+#endif
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateGetCounts_Loop2<half_t>(
+    half_t *, int, half_t, unsigned int *, uint32_t &, int, half_t, half_t *, bool);
 #endif
 
 } // namespace test_helper
@@ -1135,8 +1281,9 @@ template int debugKernelUpdateGetCounts_Loop2<double>(
           T *c = &COUNTS[getCountsIdx<TRANS, OUTTRANS, uint32_t>(idx, sz, m_batch, sz, K, 0, 1)];  \
           T sprob = scaleprob SPROPOP scale;                                                       \
           value *= sprob;                                                                          \
-          value = MIN(MAX(value, -1.0), 1.0);                                                      \
+          value = MIN(MAX(value, -(T)1.0), (T)1.0);                                                \
           DISCRETIZE_VALUE(RES);                                                                   \
+          NUMBER_OF_ZEROS_COMPUTE;                                                                 \
           *c = value TIMESK;                                                                       \
         }                                                                                          \
       }                                                                                            \
@@ -1163,6 +1310,7 @@ __global__ void kernelUpdateGetCountsBatchImplicit(
     T d_scaleprob_in,
     T d_res_in,
     T *d_counts,
+    uint32_t *d_noz,
     int Kplus1_in,
     int m_batch_in,
     const T *scale_values = nullptr,
@@ -1182,7 +1330,7 @@ __global__ void kernelUpdateGetCountsBatchImplicit(
   const T x_scaleprob = x_scaleprob_in;
   const T d_scaleprob = d_scaleprob_in;
 
-  int nx_blocks = ceil(gridDim.x * ((T)x_size / (T)(x_size + d_size)));
+  int nx_blocks = ceilf(gridDim.x * ((float)x_size / (float)(x_size + d_size)));
   int nd_blocks = gridDim.x - nx_blocks;
   if ((nd_blocks <= 0) && (d_size > 0)) {
     nx_blocks = gridDim.x - 1; // ASSUMES gridDim.x>1 !~
@@ -1191,27 +1339,40 @@ __global__ void kernelUpdateGetCountsBatchImplicit(
   const int tid_nx = nx_blocks * blockDim.x;
   const int tid_nd = nd_blocks * blockDim.x;
 
-  if ((tid < tid_nx) && (tid > x_size * m_batch))
-    return;
-  if ((tid >= tid_nx) && (tid - tid_nx > d_size * m_batch))
-    return;
+  NUMBER_OF_ZEROS_INIT(d_noz);
 
-  const T lr_div_dwmin = lr_div_dwmin_in;
+  if (((tid < tid_nx) && (tid < x_size * m_batch)) ||
+      ((tid >= tid_nx) && (tid - tid_nx < d_size * m_batch))) {
 
-  // x input // gets the K mult
-  GET_COUNTS_SIMPLE_LOOP_BATCH_IMPLICIT(
-      x_prob, x_size, x_counts, x_scaleprob, x_res, x_trans, out_trans, /, *K, 0, tid_nx, tid_nx);
+    const T lr_div_dwmin = lr_div_dwmin_in;
 
-  // d input
-  GET_COUNTS_SIMPLE_LOOP_BATCH_IMPLICIT(
-      d_prob, d_size, d_counts, d_scaleprob, d_res, d_trans, out_trans, *, , tid_nx,
-      tid_nx + tid_nd, tid_nd);
+    // d input
+    GET_COUNTS_SIMPLE_LOOP_BATCH_IMPLICIT(
+        d_prob, d_size, d_counts, d_scaleprob, d_res, d_trans, out_trans, *, , tid_nx,
+        tid_nx + tid_nd, tid_nd);
+
+    // x input // gets the K mult
+    compute_noz_if = false;
+    GET_COUNTS_SIMPLE_LOOP_BATCH_IMPLICIT(
+        x_prob, x_size, x_counts, x_scaleprob, x_res, x_trans, out_trans, /, *(T)K, 0, tid_nx,
+        tid_nx);
+  }
+
+  NUMBER_OF_ZEROS_FINALIZE(d_noz, tid >= tid_nx && threadIdx.x == 0);
 }
 
 namespace test_helper {
 template <typename T>
 int debugKernelUpdateGetCountsBatchImplicit(
-    T *indata, int size, T scaleprob, T *counts, int K, T *timing, bool fake_seed) {
+    T *indata,
+    int size,
+    T scaleprob,
+    T *counts,
+    uint32_t &d_noz,
+    int K,
+    T resolution,
+    T *timing,
+    bool fake_seed) {
   // counts should be: size allocated !
   RPU_BLM_DEBUG_DEFINE_K_NO_STOROUND;
   int m_batch = 1;
@@ -1227,17 +1388,21 @@ int debugKernelUpdateGetCountsBatchImplicit(
   kernelUpdateGetCountsBatchImplicit<T, false, false, false, false, false>
       <<<nblocks, nthreads, 0, c->getStream()>>>(
           dev_indata.getData(), size, scaleprob, resolution, dev_counts.getData(),
-          dev_indata2.getData(), size, scaleprob, resolution, dev_counts2.getData(), Kplus1,
-          m_batch);
+          dev_indata2.getData(), size, scaleprob, resolution, dev_counts2.getData(),
+          dev_d_noz.getData(), Kplus1, m_batch);
 
   RPU_BLM_DEBUG_BATCH_FINISH(T);
   return 0;
 }
-template int
-debugKernelUpdateGetCountsBatchImplicit<float>(float *, int, float, float *, int, float *, bool);
+template int debugKernelUpdateGetCountsBatchImplicit<float>(
+    float *, int, float, float *, uint32_t &, int, float, float *, bool);
 #ifdef RPU_USE_DOUBLE
 template int debugKernelUpdateGetCountsBatchImplicit<double>(
-    double *, int, double, double *, int, double *, bool);
+    double *, int, double, double *, uint32_t &, int, double, double *, bool);
+#endif
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateGetCountsBatchImplicit<half_t>(
+    half_t *, int, half_t, half_t *, uint32_t &, int, half_t, half_t *, bool);
 #endif
 
 } // namespace test_helper
@@ -1392,10 +1557,10 @@ void BitLineMaker<T>::initializeBLBuffers(int m_batch, int BL, int use_bo64, boo
           wo_idx = i_d + d_size_ * (val_wo + i_wo / x_size_ * x_size_);                            \
         }                                                                                          \
         weights_output[wo_idx] = weights[i_d + d_size_ * i_x];                                     \
-        x_chop = x_probs[i_x + i_wo * x_size_] < cwo_par.in_chop_prob ? -x_chop : x_chop;          \
+        x_chop = (T)x_probs[i_x + i_wo * x_size_] < cwo_par.in_chop_prob ? -x_chop : x_chop;       \
       }                                                                                            \
       if (wo_val == x_size_ - 1) {                                                                 \
-        d_chop = d_probs[i_d + i_wo * d_size_] < cwo_par.out_chop_prob ? -d_chop : d_chop;         \
+        d_chop = (T)d_probs[i_d + i_wo * d_size_] < cwo_par.out_chop_prob ? -d_chop : d_chop;      \
       }                                                                                            \
     } else {                                                                                       \
       int wo_val = (val_start + i_wo) % d_size_;                                                   \
@@ -1410,10 +1575,10 @@ void BitLineMaker<T>::initializeBLBuffers(int m_batch, int BL, int use_bo64, boo
           wo_idx = val_wo + d_size_ * i_x + i_wo / d_size_ * d_size_ * x_size_;                    \
         }                                                                                          \
         weights_output[wo_idx] = weights[i_d + d_size_ * i_x];                                     \
-        d_chop = d_probs[i_d + i_wo * d_size_] < cwo_par.in_chop_prob ? -d_chop : d_chop;          \
+        d_chop = (T)d_probs[i_d + i_wo * d_size_] < cwo_par.in_chop_prob ? -d_chop : d_chop;       \
       }                                                                                            \
       if (wo_val == d_size_ - 1) {                                                                 \
-        x_chop = x_probs[i_x + i_wo * x_size_] < cwo_par.out_chop_prob ? -x_chop : x_chop;         \
+        x_chop = (T)x_probs[i_x + i_wo * x_size_] < cwo_par.out_chop_prob ? -x_chop : x_chop;      \
       }                                                                                            \
     }                                                                                              \
     i_wo++;                                                                                        \
@@ -1457,12 +1622,12 @@ void BitLineMaker<T>::getAccCountsDebug(
     cwo_par = cwo->getPar();
     cwo->setFlexibleInSize(flexible_in_size);
 
-    CudaArray<T> tmp_x(context_, x_size_ * n_wo);
+    CudaArray<float> tmp_x(context_, x_size_ * n_wo);
     tmp_x.assignFromDevice(cwo->getXSwitchingProbData());
     tmp_x.synchronize();
     tmp_x.copyTo(x_probs);
 
-    CudaArray<T> tmp_d(context_, d_size_ * n_wo);
+    CudaArray<float> tmp_d(context_, d_size_ * n_wo);
     tmp_d.assignFromDevice(cwo->getDSwitchingProbData());
     tmp_d.synchronize();
     tmp_d.copyTo(d_probs);
@@ -1549,7 +1714,7 @@ void BitLineMaker<T>::getAccCountsDebug(
             }
           }
           n = x_chop != d_chop ? -n : n;
-          T dw = -dw_min * n;
+          T dw = -dw_min * (T)n;
           weights_batch[out_idx] = dw;
           weights[i_d + d_size_ * i_x] += dw;
           if (verbose) {
@@ -1675,7 +1840,7 @@ void BitLineMaker<T>::getAccCountsDebug(
           int n = b.count();
           n = (sign_x != sign_d) ? -n : n;
           n = (x_chop != d_chop) ? -n : n;
-          T dw = -dw_min * n;
+          T dw = -dw_min * (T)n;
           weights_batch[out_idx] = dw;
           weights[i_d + d_size_ * i_x] += dw;
 
@@ -1755,6 +1920,15 @@ template <typename T> void BitLineMaker<T>::getAverageAbsMax(T &m_x, T &m_d) con
   umh_->getAverageAbsMax(m_x, m_d, current_m_batch_);
 }
 
+template <typename T> T BitLineMaker<T>::getAverageDSparsity() const {
+  if (!current_d_sparsity_) {
+    RPU_FATAL("Average D sparsity needs 'd_sparsity' to be turned on.");
+  }
+  uint32_t d_noz;
+  dev_d_noz_->copyTo(&d_noz);
+  return (T)d_noz / (T)(current_m_batch_ * d_size_);
+}
+
 template <typename T> void BitLineMaker<T>::getAverageLogAbsMax(T &m_x, T &m_d) const {
   if (!current_um_ || !umh_) {
     RPU_FATAL("AverageLogAbsMax needs update management to be turned on.");
@@ -1764,15 +1938,14 @@ template <typename T> void BitLineMaker<T>::getAverageLogAbsMax(T &m_x, T &m_d) 
 
 #define RPU_BLM_START_KERNEL_LINEAR(ITEM_PER_THREAD)                                               \
   int n = (Kplus1 / ITEM_PER_THREAD);                                                              \
-                                                                                                   \
   int nblocks = context_->getNBlocks(x_size_ * n, nthreads_);                                      \
   kernelUpdateGetCounts_Linear<T, ITEM_PER_THREAD><<<nblocks, nthreads_, 0, s>>>(                  \
-      x_in, x_size_, B, dev_x_counts_->getData(), Kplus1,                                          \
+      x_in, x_size_, B, dev_x_counts_->getData(), nullptr, Kplus1,                                 \
       context_->getRandomStates(nthreads_ * nblocks), res, sr);                                    \
                                                                                                    \
   nblocks = context_->getNBlocks(d_size_ * n, nthreads_);                                          \
   kernelUpdateGetCounts_Linear<T, ITEM_PER_THREAD><<<nblocks, nthreads_, 0, s>>>(                  \
-      d_in, d_size_, A, dev_d_counts_->getData(), Kplus1,                                          \
+      d_in, d_size_, A, dev_d_counts_->getData(), dev_d_noz, Kplus1,                               \
       context_->getRandomStates(nthreads_ * nblocks), res, sr);
 
 template <typename T>
@@ -1804,6 +1977,7 @@ void BitLineMaker<T>::makeCounts(
   current_ublm_ = up.update_bl_management;
   current_um_ = up.update_management;
   current_lr_ = lr; // save for rpu device if needed
+  current_d_sparsity_ = up.d_sparsity;
 
   // Note: this is called even in case of LR=0 otherwise some memory
   // values will not get allocated correctly. Could mamke better
@@ -1812,6 +1986,16 @@ void BitLineMaker<T>::makeCounts(
 
   bool um_if = current_um_ || current_ublm_;
   bool use_umh = um_if || use_bo64 > 0;
+
+  uint32_t *dev_d_noz = nullptr;
+  if (current_d_sparsity_) {
+    if (dev_d_noz_ == nullptr) {
+      dev_d_noz_ = RPU::make_unique<CudaArray<uint32_t>>(context_, 1);
+      context_->synchronize();
+    }
+    dev_d_noz_->setConst(0); // needs to be initialized to zero..
+    dev_d_noz = dev_d_noz_->getData();
+  }
 
   T A = 0;
   T B = 0;
@@ -1883,8 +2067,8 @@ void BitLineMaker<T>::makeCounts(
     RPU_BLM_SWITCH_TRANS_TEMPLATE_UM(
         x_trans, d_trans, out_trans, current_um_, current_ublm_, kernelUpdateGetCountsBatchImplicit,
         (x_in, x_size_, B, up.x_res_implicit, dev_x_->getData(), d_in, d_size_, A,
-         up.d_res_implicit, dev_d_->getData(), current_BL_ + 1, m_batch, scale_values, K_values,
-         lr / weight_granularity));
+         up.d_res_implicit, dev_d_->getData(), dev_d_noz, current_BL_ + 1, m_batch, scale_values,
+         K_values, lr / weight_granularity));
 
   } break;
 
@@ -1915,17 +2099,15 @@ void BitLineMaker<T>::makeCounts(
 
         kernelUpdateGetCounts_Loop2<<<nblocks, nthreads_, 0, s>>>(
             x_in, x_size_, B, dev_x_counts_->getData(), d_in, d_size_, A, dev_d_counts_->getData(),
-            Kplus1, context_->getRandomStates(nthreads_ * nblocks), res, sr);
+            dev_d_noz, Kplus1, context_->getRandomStates(nthreads_ * nblocks), res, sr);
 
-      } else { // fast path for smaller K values (needs to be K<=32!)
+      } else {
+        // fast path for smaller K values (needs to be K<=32! and (K + 1) % 2 == 0)
 
         if ((Kplus1 % RPU_BLM_ITEMS_PER_THREAD) != 0) {
           // just set to 2 (smallest possible)
-
           RPU_BLM_START_KERNEL_LINEAR(2);
-
         } else {
-
           RPU_BLM_START_KERNEL_LINEAR(RPU_BLM_ITEMS_PER_THREAD);
         }
       }
@@ -1956,7 +2138,7 @@ void BitLineMaker<T>::makeCounts(
               x_trans, d_trans, out_trans, current_um_, current_ublm_,
               kernelUpdateGetCountsBatch_SimpleLoop2,
               (x_in, x_size_, B, dev_x_counts_bo64_->getData(), d_in, d_size_, A,
-               dev_d_counts_bo64_->getData(), current_BL_ + 1, m_batch,
+               dev_d_counts_bo64_->getData(), dev_d_noz, current_BL_ + 1, m_batch,
                context_->getRandomStates(nthreads_ * nblocks), res, sr, scale_values, K_values,
                lr / weight_granularity, Kc_values, Kn));
 
@@ -1970,7 +2152,7 @@ void BitLineMaker<T>::makeCounts(
               x_trans, d_trans, out_trans, current_um_, current_ublm_,
               kernelUpdateGetCountsBatch_SimpleLoop2,
               (x_in, x_size_, B, dev_x_counts_->getData(), d_in, d_size_, A,
-               dev_d_counts_->getData(), current_BL_ + 1, m_batch,
+               dev_d_counts_->getData(), dev_d_noz, current_BL_ + 1, m_batch,
                context_->getRandomStates(nthreads_ * nblocks), res, sr, scale_values, K_values,
                lr / weight_granularity));
         }
@@ -1982,7 +2164,8 @@ void BitLineMaker<T>::makeCounts(
         RPU_BLM_SWITCH_TRANS_TEMPLATE(
             x_trans, d_trans, out_trans, kernelUpdateGetCountsBatch_Loop2,
             (x_in, x_size_, B, dev_x_counts_->getData(), d_in, d_size_, A, dev_d_counts_->getData(),
-             current_BL_ + 1, m_batch, context_->getRandomStates(nthreads_ * nblocks), res, sr), );
+             dev_d_noz, current_BL_ + 1, m_batch, context_->getRandomStates(nthreads_ * nblocks),
+             res, sr), );
       }
     }
     // translate to BO64 if necessary
@@ -2019,6 +2202,9 @@ void BitLineMaker<T>::loadExtra(const RPU::state_t &extra, const std::string pre
 template class BitLineMaker<float>;
 #ifdef RPU_USE_DOUBLE
 template class BitLineMaker<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class BitLineMaker<half_t>;
 #endif
 
 #define RPU_BLM_ITER_TEMPLATE(NUM_T, XITERT, DITERT)                                               \
@@ -2077,6 +2263,31 @@ RPU_BLM_ITER_TEMPLATE(double, EyeInputIterator<double>, const double *);
 RPU_BLM_ITER_TEMPLATE(double, const double *, EyeInputIterator<double>);
 
 #undef TRANSDOUBLE
+#endif
+
+#ifdef RPU_USE_FP16
+#define TRANSHALF(TRANS) TRANS, half_t
+
+RPU_BLM_ITER_TEMPLATE(half_t, const half_t *, const half_t *);
+RPU_BLM_ITER_TEMPLATE(half_t, half_t *, half_t *);
+RPU_BLM_ITER_TEMPLATE(half_t, IndexReaderInputIterator<half_t>, const half_t *);
+RPU_BLM_ITER_TEMPLATE(half_t, IndexReaderTransInputIterator<half_t>, const half_t *);
+RPU_BLM_ITER_TEMPLATE(
+    half_t, IndexReaderTransInputIterator<half_t>, PermuterTransInputIterator<half_t>);
+RPU_BLM_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, SliceInputIterator<TRANSHALF(true)>);
+RPU_BLM_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, SliceInputIterator<TRANSHALF(false)>);
+
+RPU_BLM_ITER_TEMPLATE(half_t, const half_t *, PermuterTransInputIterator<half_t>);
+RPU_BLM_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(true)>);
+RPU_BLM_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(false)>);
+RPU_BLM_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, const half_t *);
+RPU_BLM_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, const half_t *);
+RPU_BLM_ITER_TEMPLATE(half_t, EyeInputIterator<half_t>, const half_t *);
+RPU_BLM_ITER_TEMPLATE(half_t, const half_t *, EyeInputIterator<half_t>);
+
+#undef TRANSHALF
 #endif
 
 #undef RPU_BLM_ITER_TEMPLATE

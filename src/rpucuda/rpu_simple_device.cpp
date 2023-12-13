@@ -102,10 +102,10 @@ template <typename T> void SimpleRPUDevice<T>::decayWeights(T **weights, bool bi
 template <typename T>
 void SimpleRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
   T lifetime = getPar().lifetime;
-  T decay_rate = (lifetime > 1) ? ((T)1.0 / lifetime) : (T)0.0;
+  T decay_rate = (lifetime > (T)1.0) ? ((T)1.0 / lifetime) : (T)0.0;
   T decay_scale = (T)1.0 - alpha * decay_rate;
 
-  if (decay_scale > 0 && decay_scale < 1.0) {
+  if (decay_scale > (T)0.0 && decay_scale < (T)1.0) {
     if (!bias_no_decay) {
       RPU::math::scal<T>(this->size_, decay_scale, weights[0], 1);
     } else {
@@ -130,7 +130,7 @@ void SimpleRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T
 template <typename T> void SimpleRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
 
   T diffusion = getPar().diffusion;
-  if (diffusion > 0.0) {
+  if (diffusion > (T)0.0) {
     T *w = weights[0];
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
@@ -142,7 +142,7 @@ template <typename T> void SimpleRPUDevice<T>::diffuseWeights(T **weights, RNG<T
 template <typename T> void SimpleRPUDevice<T>::clipWeights(T **weights, T clip) {
   // apply hard bounds
 
-  if (clip >= 0) {
+  if (clip >= (T)0.0) {
     T *w = weights[0];
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
@@ -165,9 +165,9 @@ void SimpleRPUDevice<T>::resetCols(
          ((j >= start_col) || (j < n_col - (this->x_size_ - start_col))))) {
       PRAGMA_SIMD
       for (int i = 0; i < this->d_size_; ++i) {
-        if (reset_prob == 1 || rng.sampleUniform() < reset_prob) {
+        if (reset_prob == (T)1.0 || rng.sampleUniform() < reset_prob) {
           int k = i * this->x_size_ + j;
-          w[k] = (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+          w[k] = (reset_std > (T)0.0 ? reset_std * rng.sampleGauss() : (T)0.0);
         }
       }
     }
@@ -180,7 +180,7 @@ void SimpleRPUDevice<T>::populate(const SimpleRPUDeviceMetaParameter<T> &p, Real
   par_storage_ = p.cloneUnique();
   par_storage_->initialize();
 
-  if (p.drift.nu > 0) {
+  if (p.drift.nu > (T)0.0) {
     wdrifter_ = RPU::make_unique<WeightDrifter<T>>(this->size_, p.drift, rng);
   } else {
     wdrifter_ = nullptr;
@@ -194,6 +194,11 @@ template class SimpleRPUDevice<float>;
 template class AbstractRPUDevice<double>;
 template class SimpleRPUDevice<double>;
 template struct SimpleRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class AbstractRPUDevice<half_t>;
+template class SimpleRPUDevice<half_t>;
+template struct SimpleRPUDeviceMetaParameter<half_t>;
 #endif
 
 } // namespace RPU

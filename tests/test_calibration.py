@@ -84,7 +84,7 @@ class Sampler:
         self.idx += 1
         if self.idx > 10:
             raise StopIteration
-        return x
+        return (x,), {}
 
 
 def fix_random(seed):

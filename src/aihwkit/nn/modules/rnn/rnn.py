@@ -17,16 +17,16 @@ import math
 
 from typing import Any, List, Optional, Tuple, Type, Callable
 from torch import Tensor, jit
-from torch.nn import Dropout, ModuleList, init
+from torch.nn import Dropout, ModuleList, init, Module, Linear
 from torch.autograd import no_grad
 
-from aihwkit.nn.modules.container import AnalogSequential
-from aihwkit.nn.modules.rnn.layers import AnalogRNNLayer, AnalogBidirRNNLayer
-from aihwkit.nn.modules.base import AnalogLayerBase
+from aihwkit.nn.modules.container import AnalogContainerBase
+from aihwkit.nn.modules.linear import AnalogLinear
 from aihwkit.simulator.parameters.base import RPUConfigBase
+from .layers import AnalogRNNLayer, AnalogBidirRNNLayer
 
 
-class ModularRNN(AnalogSequential):
+class ModularRNN(Module):
     """Helper class to create a Modular RNN
 
     Args:
@@ -64,7 +64,7 @@ class ModularRNN(AnalogSequential):
                 "recurrent layer, it expects num_layers greater than "
                 "1, but got num_layers = 1"
             )
-        self.dropout_layer = Dropout(dropout) if dropout else None
+        self.dropout_layer = Dropout(dropout) if dropout > 0.0 else None
 
     @staticmethod
     def init_stacked_analog_lstm(
@@ -101,6 +101,15 @@ class ModularRNN(AnalogSequential):
     def forward(  # pylint: disable=arguments-differ
         self, input: Tensor, states: List  # pylint: disable=redefined-builtin
     ) -> Tuple[Tensor, List]:
+        """Forward pass.
+
+        Args:
+            input: input tensor
+            states: list of LSTM state tensors
+
+        Returns:
+            outputs and states
+        """
         # List[RNNState]: One state per layer.
         output_states = jit.annotate(List, [])
         output = input
@@ -116,7 +125,7 @@ class ModularRNN(AnalogSequential):
         return output, output_states
 
 
-class AnalogRNN(AnalogSequential):
+class AnalogRNN(AnalogContainerBase, Module):
     """Modular RNN that uses analog tiles.
 
     Args:
@@ -124,7 +133,9 @@ class AnalogRNN(AnalogSequential):
         input_size: in_features to W_{ih} matrix of first layer
         hidden_size: in_features and out_features for W_{hh} matrices
         bias: whether to use a bias row on the analog tile or not
-        rpu_config: resistive processing unit configuration.
+        rpu_config: configuration for an analog resistive processing
+            unit. If not given a native torch model will be
+            constructed instead.
         tile_module_class: Class for the analog tile module (default
             will be specified from the ``RPUConfig``).
         xavier: whether standard PyTorch LSTM weight
@@ -193,9 +204,8 @@ class AnalogRNN(AnalogSequential):
             function is taken for the bias as well.
         """
 
-        def init_analog_layer(layer: AnalogLayerBase) -> None:
-            """Init the weights and bias of an analog linear layer."""
-            weight, bias = layer.get_weights()
+        def init_weight_and_bias(weight: Tensor, bias: Optional[Tensor]) -> None:
+            """Init the weight and bias"""
             weight_init_fn(weight.data)
             if bias is not None:
                 if bias_init_fn is None:
@@ -203,9 +213,14 @@ class AnalogRNN(AnalogSequential):
                 else:
                     bias_init_fn(bias.data)
 
-            layer.set_weights(weight, bias)
-
-        self.apply_to_analog_tiles(init_analog_layer)
+        for module in self.modules():
+            if isinstance(module, AnalogLinear):
+                weight, bias = module.get_weights()
+                init_weight_and_bias(weight, bias)
+                module.set_weights(weight, bias)
+            elif isinstance(module, Linear):
+                # init torch layers if any
+                init_weight_and_bias(module.weight, module.bias)
 
     def reset_parameters(self, xavier: bool = False) -> None:
         """Weight and bias initialization.
@@ -235,6 +250,16 @@ class AnalogRNN(AnalogSequential):
     def forward(
         self, input: Tensor, states: Optional[List] = None  # pylint: disable=redefined-builtin
     ) -> Tuple[Tensor, List]:
+        """Forward pass.
+
+        Args:
+            input: input tensor
+            states: list of LSTM state tensors
+
+        Returns:
+            outputs and states
+        """
+
         if states is None:
             # TODO: batch_first.
             states = self.get_zero_state(input.shape[1])

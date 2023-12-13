@@ -67,7 +67,7 @@ template <typename T> struct IOMetaParameter {
                                     // observed for AnalogMVType::PosNegSeparate
 
   T inp_bound = (T)1.0;
-  T inp_res = (T)1.0 / (pow((T)2.0, (T)7.0) - (T)2.0);
+  T inp_res = (T)1.0 / ((T)powf((T)2.0, (T)7.0) - (T)2.0);
   T _inp_res = (T)0.0; // this is the unscaled version saved for output..
   bool inp_sto_round = false;
   T inp_noise = (T)0.0;
@@ -75,7 +75,7 @@ template <typename T> struct IOMetaParameter {
   T out_noise_std = (T)0.0; // systematic variation in percent of out_noise
   T w_noise = (T)0.0;
   T out_bound = (T)12.0;
-  T out_res = (T)1.0 / (pow((T)2.0, (T)9.0) - (T)2.0);
+  T out_res = (T)1.0 / ((T)powf((T)2.0, (T)9.0) - (T)2.0);
   T _out_res = (T)0;
   bool out_sto_round = false;
   T out_scale = (T)1.0;
@@ -115,7 +115,7 @@ template <typename T> struct IOMetaParameter {
   inline bool hasOutNonlinearity() const {
     return (out_nonlinearity > (T)0 || out_nonlinearity_vec.size() > (size_t)0) && (!isPerfect());
   };
-  inline bool hasNLCalibration() const { return hasOutNonlinearity() || r_series > 0; }
+  inline bool hasNLCalibration() const { return hasOutNonlinearity() || r_series > (T)0.0; }
   void printToStream(std::stringstream &ss) const {
 
     if (!isPerfect()) {
@@ -139,21 +139,21 @@ template <typename T> struct IOMetaParameter {
 
       ss << "\t inp/out_bound:\t\t" << inp_bound << " / " << out_bound << std::endl;
       if (_par_initialized) {
-        ss << "\t DAC/ADC:\t\t" << 1.0 / MAX(_inp_res, 0) << " / " << 1.0 / MAX(_out_res, 0)
-           << std::endl;
+        ss << "\t DAC/ADC:\t\t" << 1.0f / MAX((float)_inp_res, 0.0f) << " / "
+           << 1.0f / MAX((float)_out_res, 0.0f) << std::endl;
       } else {
-        ss << "\t DAC/ADC:\t\t" << 1.0 / MAX(inp_res, 0) << " / " << 1.0 / MAX(out_res, 0)
-           << std::endl;
+        ss << "\t DAC/ADC:\t\t" << 1.0f / MAX((float)inp_res, 0.0f) << " / "
+           << 1.0f / MAX((float)out_res, 0.0f) << std::endl;
       }
       if (inp_sto_round || out_sto_round) {
         ss << "\t sto_round:\t\t" << std::boolalpha << inp_sto_round;
         ss << " / " << std::boolalpha << out_sto_round << std::endl;
       }
       ss << "\t out_noise:\t\t" << out_noise << std::endl;
-      if (inp_noise > 0.0) {
+      if (inp_noise > (T)0.0) {
         ss << "\t inp_noise:\t\t" << inp_noise << std::endl;
       }
-      if (w_noise > 0.0 && w_noise_type != OutputWeightNoiseType::None) {
+      if (w_noise > (T)0.0 && w_noise_type != OutputWeightNoiseType::None) {
         ss << "\t w_noise:\t\t" << w_noise << std::endl;
         if (w_noise_type == OutputWeightNoiseType::AdditiveConstant) {
           ss << "\t w_noise_type:\t\t" << (int)OutputWeightNoiseType::AdditiveConstant
@@ -164,7 +164,7 @@ template <typename T> struct IOMetaParameter {
              << std::endl;
         }
       }
-      if (ir_drop > 0.0) {
+      if (ir_drop > (T)0.0) {
         ss << "\t ir_drop [scale]:\t" << ir_drop << "  (ir_drop_Gw_div_gmax is "
            << ir_drop_Gw_div_gmax << ")" << std::endl;
       }
@@ -192,26 +192,26 @@ template <typename T> struct IOMetaParameter {
         ss << "\t slope_calibration:\t" << slope_calibration << std::endl;
       }
 
-      if (inp_asymmetry != (T)0) {
+      if (inp_asymmetry != (T)0.0) {
         ss << "\t inp_asymmetry:\t\t" << inp_asymmetry << std::endl;
       }
-      if (out_asymmetry != (T)0) {
+      if (out_asymmetry != (T)0.0) {
         ss << "\t out_asymmetry:\t\t" << out_asymmetry << std::endl;
       }
 
-      if (w_read_asymmetry_dtod > 0 && mv_type == AnalogMVType::PosNegSeparate) {
+      if (w_read_asymmetry_dtod > (T)0.0 && mv_type == AnalogMVType::PosNegSeparate) {
         ss << "\t w_read_asymmetry_dtod:\t" << w_read_asymmetry_dtod << std::endl;
       }
     }
-    if (out_scale != 1.0) {
+    if (out_scale != (T)1.0) {
       ss << "\t out_scale:\t\t" << out_scale << std::endl;
     }
     if (!isPerfect()) {
-      if (noise_management == NoiseManagementType::AbsMax && nm_thres > 0) {
+      if (noise_management == NoiseManagementType::AbsMax && nm_thres > (T)0.0) {
         ss << "\t noise_management [nm_thres]:\t" << nm_thres << std::endl;
       } else if (noise_management == NoiseManagementType::AbsMaxNPSum) {
         ss << "\t noise_management [NPSum;wmax]:\t" << nm_assumed_wmax << std::endl;
-      } else if (noise_management == NoiseManagementType::Constant && nm_thres > 0) {
+      } else if (noise_management == NoiseManagementType::Constant && nm_thres > (T)0.0) {
         ss << "\t noise_management: \t" << nm_thres << " (Constant scale)" << std::endl;
       } else {
         ss << "\t noise_management:\t" << (int)noise_management << std::endl;
@@ -254,6 +254,8 @@ template <typename T> struct PulsedUpdateMetaParameter {
   T um_grad_scale = 1.0; // bias gradient for UM (ie 0.5 means more clipping of gradient)
   T um_reg_scale = 1.0;  // scale for regularizer of UM / UBLM (scale=1 means reg = dw_min**2)
   bool sto_round = false;
+  bool d_sparsity = false; // whether compute d sparsity
+  T _d_sparsity = 0.0;     // hidden container
 
   T res = (T)0; // this is taken to be in the range 0..1 as positive and negative phases are done
                 // separately
@@ -297,11 +299,11 @@ template <typename T> struct PulsedUpdateMetaParameter {
     } else {
       if (needsImplicitPulses()) {
         ss << "\t using implicit pulsing scheme." << std::endl;
-        if (x_res_implicit > 0) {
-          ss << "\t nx (x_res):\t\t" << 1. / x_res_implicit << std::endl;
+        if (x_res_implicit > (T)0.0) {
+          ss << "\t nx (x_res):\t\t" << 1.f / (float)x_res_implicit << std::endl;
         }
-        if (d_res_implicit > 0) {
-          ss << "\t nd (d_res):\t\t" << 1. / d_res_implicit << std::endl;
+        if (d_res_implicit > (T)0.0) {
+          ss << "\t nd (d_res):\t\t" << 1.f / (float)d_res_implicit << std::endl;
         }
       }
       ss << "\t desired_BL:\t\t" << desired_BL << std::endl;
@@ -313,7 +315,7 @@ template <typename T> struct PulsedUpdateMetaParameter {
       ss << "\t update_management:\t" << std::boolalpha << update_management << std::endl;
       ss << "\t update_bl_management:\t" << std::boolalpha << update_bl_management << std::endl;
       ss << "\t up_DAC_stoc_round:\t" << sto_round << std::endl;
-      ss << "\t up_DAC:\t\t" << 1 / MAX(res, 0) << std::endl;
+      ss << "\t up_DAC:\t\t" << 1.0f / MAX((float)res, 0.0f) << std::endl;
       ss << "\t pulse_type:\t\t" << (int)pulse_type << std::endl;
     }
   }
