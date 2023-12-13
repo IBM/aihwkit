@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 
 #include <algorithm>
@@ -141,15 +142,15 @@ DEFINE_GETNFROMCOUNT32(
                                                                                                    \
     /* never mixed pos/neg within one read in this format*/                                        \
     mixed = false;                                                                                 \
-    negative = ((x < 0) != (d < 0)) ? 1 : 0;                                                       \
-    if ((x == 0) || (d == 0)) {                                                                    \
+    negative = ((x < (FPTYPE)0.0) != (d < (FPTYPE)0.0)) ? 1 : 0;                                   \
+    if ((x == (FPTYPE)0.0) || (d == (FPTYPE)0.0)) {                                                \
       n = 0;                                                                                       \
       return;                                                                                      \
     };                                                                                             \
                                                                                                    \
     OS_ADD                                                                                         \
                                                                                                    \
-    n = abs(RPU_ROUNDFUN(d * x));                                                                  \
+    n = (uint32_t)fabs(RPU_ROUNDFUN(d * x));                                                       \
   }
 
 DEFINE_GETNFROMCOUNTFP(float, 0, );
@@ -181,6 +182,22 @@ DEFINE_GETNFROMCOUNTFP(
       return;
     });
 #endif
+#ifdef RPU_USE_FP16
+DEFINE_GETNFROMCOUNTFP(half_t, 0, );
+DEFINE_GETNFROMCOUNTFP(
+    half_t,
+    -1,
+    if (negative) {
+      n = 0;
+      return;
+    } else { negative = 1; });
+DEFINE_GETNFROMCOUNTFP(
+    half_t, 1, if (!negative) {
+      n = 0;
+      return;
+    });
+#endif
+
 #undef DEFINE_GETNFROMCOUNTFP
 
 #define DEFINE_GETNFROMCOUNT64(ONE_SIDED, OS_ADD)                                                  \
@@ -228,8 +245,8 @@ DEFINE_GETNFROMCOUNT64(1, data &= neg; neg = ~0;);
 
 #define RPU_FUNCTOR_INIT_VARS                                                                      \
   T w = 0;                                                                                         \
-  float4 par_4;                                                                                    \
-  float2 par_2;                                                                                    \
+  param4_t par_4;                                                                                  \
+  param2_t par_2;                                                                                  \
   T par_1 = 0;                                                                                     \
   bool use_par_1 = params_1 != nullptr;                                                            \
   UpdateFunctor up_fun;                                                                            \
@@ -245,10 +262,10 @@ DEFINE_GETNFROMCOUNT64(1, data &= neg; neg = ~0;);
   {                                                                                                \
     w = weights[idx];                                                                              \
     if (params != nullptr) {                                                                       \
-      par_4 = reinterpret_cast<float4 *>(params)[idx];                                             \
+      par_4 = reinterpret_cast<param4_t *>(params)[idx];                                           \
     }                                                                                              \
     if (params_2 != nullptr) {                                                                     \
-      par_2 = reinterpret_cast<float2 *>(params_2)[idx];                                           \
+      par_2 = reinterpret_cast<param2_t *>(params_2)[idx];                                         \
     }                                                                                              \
     if (use_par_1) {                                                                               \
       par_1 = params_1[idx];                                                                       \
@@ -264,8 +281,8 @@ template <typename T> struct UpdateFunctorConstantStep {
       T &w,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 par_2,
+      const param4_t par_4,
+      const param2_t par_2,
       T &par_1,
       const T *global_par,
       const int global_params_count,
@@ -280,27 +297,26 @@ template <typename T> struct UpdateFunctorConstantStep {
     UNUSED(par_1);
     UNUSED(par_2);
 
-    float dw = (negative > 0) ? (par_4.w) : (-par_4.y);
-    T wmax = par_4.z;
-    T wmin = par_4.x;
-    float sigma = noise_std_dw;
+    T dw = (negative > 0) ? ((T)par_4.w) : (-(T)par_4.y);
+    T wmax = (T)par_4.z;
+    T wmin = (T)par_4.x;
+    T sigma = noise_std_dw;
     // n is larger 0 in any case
     if (n == 1) {
-      if (sigma > 0) {
-        float stoch_value = curand_normal(&local_state);
+      if (sigma > (T)0.0) {
+        T stoch_value = (T)curand_normal(&local_state);
         stoch_value *= sigma;
-        w += dw * ((float)1.0 + stoch_value);
+        w += dw * ((T)1.0 + stoch_value);
       } else {
         w += dw;
       }
     } else {
-      if (sigma > 0) {
-        float stoch_value = curand_normal(&local_state);
+      if (sigma > (T)0.0) {
+        T stoch_value = (T)curand_normal(&local_state);
         stoch_value *= sigma;
-        w += dw * n *
-             ((float)1.0 + rsqrtf((float)n) * stoch_value); // rsqrt(x) = 1/sqrt(x) is faster
+        w += dw * (T)n * ((T)1.0 + rsqrt((T)n) * stoch_value); // rsqrt(x) = 1/sqrt(x) is faster
       } else {
-        w += dw * n;
+        w += dw * (T)n;
       }
     }
 
@@ -327,12 +343,12 @@ __global__ void kernelUpdateWFunctor(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
-    float *params_2,
+    param_t *params,
+    param_t *params_2,
     T *params_1,
     T *global_params,
     int nK32in,
-    const T dw_min_std,
+    T dw_min_std,
     curandState *random_states) {
   // call with <<< d_size*x_size/NUM_THREADS_PER_BLOCK,NUM_THREADS_PER_BLOCK>>>
 
@@ -355,7 +371,7 @@ __global__ void kernelUpdateWFunctor(
   uint32_t n;
   bool mixed = false;
 
-  if (dw_min_std > 0 && tid < sz) {
+  if (dw_min_std > (T)0.0 && tid < sz) {
     local_state = random_states[tid];
   }
 
@@ -384,7 +400,7 @@ __global__ void kernelUpdateWFunctor(
       }
     }
   }
-  if (dw_min_std > 0 && tid < sz) {
+  if (dw_min_std > (T)0.0 && tid < sz) {
     random_states[tid] = local_state;
   }
 }
@@ -435,22 +451,24 @@ __global__ void kernelUpdateWFunctor(
       } sum_n = 0;                                                                                 \
       last_negative = 0;                                                                           \
                                                                                                    \
-      int pos_n = __popc((~negative) & n); int neg_n = __popc((negative)&n);                       \
-      float dw_pos = (float)pos_n; float dw_neg = (float)neg_n;                                    \
+      int pos_n = __popc((~negative) & n); int neg_n = __popc((negative)&n); T dw_pos = (T)pos_n;  \
+      T dw_neg = (T)neg_n;                                                                         \
                                                                                                    \
-      if (noise_std_dw > 0) {                                                                      \
+      if (noise_std_dw > (T)0.0) {                                                                 \
         if (pos_n > 0) {                                                                           \
-          float stoch_value = curand_normal(&local_state);                                         \
-          dw_pos += sqrtf(dw_pos) * noise_std_dw;                                                  \
+          T stoch_value = (T)curand_normal(&local_state);                                          \
+          dw_pos += sqrt(dw_pos) * noise_std_dw;                                                   \
         }                                                                                          \
         if (neg_n > 0) {                                                                           \
-          float stoch_value = curand_normal(&local_state);                                         \
-          dw_neg += sqrtf(dw_neg) * noise_std_dw;                                                  \
+          T stoch_value = (T)curand_normal(&local_state);                                          \
+          dw_neg += sqrt(dw_neg) * noise_std_dw;                                                   \
         }                                                                                          \
-      } dw_pos *= par_4.y;                                                                         \
-      dw_neg *= par_4.w;                                                                           \
+      } dw_pos *= (T)par_4.y;                                                                      \
+      dw_neg *= (T)par_4.w;                                                                        \
                                                                                                    \
-      if ((w - dw_pos >= par_4.x) && (w + dw_neg <= par_4.z)) { w -= dw_pos - dw_neg; } else)
+      if ((w - dw_pos >= (T)par_4.x) && (w + dw_neg <= (T)par_4.z)) {                              \
+        w -= dw_pos - dw_neg;                                                                      \
+      } else)
 
 template <typename T, int one_sided, typename count_t, bool x_trans, bool d_trans>
 __global__ void kernelUpdateWBatchSum(
@@ -459,7 +477,7 @@ __global__ void kernelUpdateWBatchSum(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
+    param_t *params,
     int nK32_in,
     int m_batch_in,
     const T dw_min_std,
@@ -474,7 +492,7 @@ __global__ void kernelUpdateWBatchSum(
   const int total_threads = blockDim.x * gridDim.x;
   curandState local_state;
   const T noise_std_dw = dw_min_std;
-  if (noise_std_dw > 0)
+  if (noise_std_dw > (T)0.0)
     local_state = random_states[tid];
 
   const int xsz = x_size;
@@ -484,8 +502,8 @@ __global__ void kernelUpdateWBatchSum(
   count_t *xptr, *dptr;
 
   T w;
-  float4 par_4;
-  float2 par_2;
+  param4_t par_4;
+  param2_t par_2;
   T par_1; // dummy
   UpdateFunctorConstantStep<T> up_fun;
 
@@ -501,7 +519,7 @@ __global__ void kernelUpdateWBatchSum(
       int dIdx = idx % dsz; // first d
       int xIdx = idx / dsz;
 
-      par_4 = reinterpret_cast<float4 *>(params)[idx];
+      par_4 = reinterpret_cast<param4_t *>(params)[idx];
       w = weights[idx];
 
       uint32_t sum_n = 0;
@@ -529,7 +547,7 @@ __global__ void kernelUpdateWBatchSum(
       weights[idx] = w;
     }
   }
-  if (noise_std_dw > 0)
+  if (noise_std_dw > (T)0.0)
     random_states[tid] = local_state;
 }
 
@@ -540,7 +558,7 @@ __global__ void kernelUpdateWBatchSumBoundCheck(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
+    param_t *params,
     int nK32_in,
     int m_batch_in,
     const T dw_min_std,
@@ -555,7 +573,7 @@ __global__ void kernelUpdateWBatchSumBoundCheck(
   const int total_threads = blockDim.x * gridDim.x;
   curandState local_state;
   const T noise_std_dw = dw_min_std;
-  if (noise_std_dw > 0)
+  if (noise_std_dw > (T)0.0)
     local_state = random_states[tid];
 
   const int xsz = x_size;
@@ -565,9 +583,9 @@ __global__ void kernelUpdateWBatchSumBoundCheck(
   count_t *xptr, *dptr;
 
   T w;
-  float4 par_4;
-  float2 par_2; // dummy
-  T par_1;      // dummy
+  param4_t par_4;
+  param2_t par_2; // dummy
+  T par_1;        // dummy
   UpdateFunctorConstantStep<T> up_fun;
 
   const int x_count_offset = xsz * nK32;
@@ -582,7 +600,7 @@ __global__ void kernelUpdateWBatchSumBoundCheck(
       int dIdx = idx % dsz; // first d
       int xIdx = idx / dsz;
 
-      par_4 = reinterpret_cast<float4 *>(params)[idx];
+      par_4 = reinterpret_cast<param4_t *>(params)[idx];
       w = weights[idx];
 
       uint32_t sum_n = 0;
@@ -610,7 +628,7 @@ __global__ void kernelUpdateWBatchSumBoundCheck(
       weights[idx] = w;
     }
   }
-  if (noise_std_dw > 0)
+  if (noise_std_dw > (T)0.0)
     random_states[tid] = local_state;
 }
 
@@ -629,8 +647,8 @@ __global__ void kernelUpdateWBatchFunctor(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
-    float *params_2,
+    param_t *params,
+    param_t *params_2,
     T *params_1,
     T *global_params,
     int nK32_in,
@@ -648,7 +666,7 @@ __global__ void kernelUpdateWBatchFunctor(
   const int total_threads = blockDim.x * gridDim.x;
   curandState local_state;
   const T noise_std_dw = dw_min_std;
-  if (noise_std_dw > 0)
+  if (noise_std_dw > (T)0.0)
     local_state = random_states[tid];
 
   const int xsz = x_size;
@@ -705,7 +723,7 @@ __global__ void kernelUpdateWBatchFunctor(
       params_1[idx] = par_1;
     }
   }
-  if (noise_std_dw > 0)
+  if (noise_std_dw > (T)0.0)
     random_states[tid] = local_state;
 }
 
@@ -856,7 +874,7 @@ __global__ void kernelUpdateWBatchSharedSum(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
+    param_t *params,
     int nK32_in,
     int m_batch_in,
     int batch_stride_in,
@@ -879,15 +897,15 @@ __global__ void kernelUpdateWBatchSharedSum(
   }
 
   T w = 0;
-  float4 par_4;
-  float2 par_2; // dummy
-  T par_1;      // dummy
+  param4_t par_4;
+  param2_t par_2; // dummy
+  T par_1;        // dummy
   UpdateFunctorConstantStep<T> up_fun;
 
-  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > 0);
+  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > (T)0.0);
 
   if (within_range) {
-    par_4 = reinterpret_cast<float4 *>(params)[idx];
+    par_4 = reinterpret_cast<param4_t *>(params)[idx];
     w = weights[idx];
   }
 
@@ -934,7 +952,7 @@ __global__ void kernelUpdateWBatchSharedSumBoundCheck(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
+    param_t *params,
     int nK32_in,
     int m_batch_in,
     int batch_stride_in,
@@ -952,15 +970,15 @@ __global__ void kernelUpdateWBatchSharedSumBoundCheck(
   }
 
   T w = 0;
-  float4 par_4;
-  float2 par_2;
+  param4_t par_4;
+  param2_t par_2;
   T par_1; // dummy
   UpdateFunctorConstantStep<T> up_fun;
 
-  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > 0);
+  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > (T)0.0);
 
   if (within_range) {
-    par_4 = reinterpret_cast<float4 *>(params)[idx];
+    par_4 = reinterpret_cast<param4_t *>(params)[idx];
     w = weights[idx];
   }
 
@@ -1019,8 +1037,8 @@ __global__ void kernelUpdateWBatchSharedFunctor(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
-    float *params_2,
+    param_t *params,
+    param_t *params_2,
     T *params_1,
     T *global_params,
     int nK32_in,
@@ -1047,7 +1065,7 @@ __global__ void kernelUpdateWBatchSharedFunctor(
 
   RPU_FUNCTOR_INIT_VARS;
 
-  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > 0);
+  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > (T)0.0);
 
   if (within_range) {
     RPU_FUNCTOR_LOAD_PARAMS;
@@ -1240,39 +1258,39 @@ __device__ __forceinline__ void updateChopper(
     // in is x, out is d
     // in chopper:
     int val_weight_output = (i_weight_output + val_start) % x_size;
-    if (x_index == val_weight_output && in_chop_prob > 0) {
+    if (x_index == val_weight_output && in_chop_prob > (T)0.0) {
       if (x_switching_probs == nullptr) {
         int i_every = (int)ceilf((T)1.0 / in_chop_prob);
         x_chop =
             (((nwo_counter_start + i_weight_output) / x_size) % i_every == 0) ? -x_chop : x_chop;
       } else {
-        x_chop =
-            x_switching_probs[i_weight_output * x_size + x_index] < in_chop_prob ? -x_chop : x_chop;
+        x_chop = (T)x_switching_probs[i_weight_output * x_size + x_index] < in_chop_prob ? -x_chop
+                                                                                         : x_chop;
       }
     }
     // out chopper
-    if (val_weight_output == x_size - 1 && out_chop_prob > 0) {
-      d_chop =
-          d_switching_probs[i_weight_output * d_size + d_index] < out_chop_prob ? -d_chop : d_chop;
+    if (val_weight_output == x_size - 1 && out_chop_prob > (T)0.0) {
+      d_chop = (T)d_switching_probs[i_weight_output * d_size + d_index] < out_chop_prob ? -d_chop
+                                                                                        : d_chop;
     }
   } else {
     // in is d, out is x
     // in chopper:
     int val_weight_output = (i_weight_output + val_start) % d_size;
-    if (d_index == val_weight_output && in_chop_prob > 0) {
+    if (d_index == val_weight_output && in_chop_prob > (T)0.0) {
       if (d_switching_probs == nullptr) {
-        int i_every = (int)ceilf((T)1.0 / in_chop_prob);
+        int i_every = (int)ceil((T)1.0 / in_chop_prob);
         d_chop =
             (((nwo_counter_start + i_weight_output) / d_size) % i_every == 0) ? -d_chop : d_chop;
       } else {
-        d_chop =
-            d_switching_probs[i_weight_output * d_size + d_index] < in_chop_prob ? -d_chop : d_chop;
+        d_chop = (T)d_switching_probs[i_weight_output * d_size + d_index] < in_chop_prob ? -d_chop
+                                                                                         : d_chop;
       }
     }
     // out chopper
-    if (val_weight_output == d_size - 1 && out_chop_prob > 0) {
-      x_chop =
-          x_switching_probs[i_weight_output * x_size + x_index] < out_chop_prob ? -x_chop : x_chop;
+    if (val_weight_output == d_size - 1 && out_chop_prob > (T)0.0) {
+      x_chop = (T)x_switching_probs[i_weight_output * x_size + x_index] < out_chop_prob ? -x_chop
+                                                                                        : x_chop;
     }
   }
   current_chop_neg = x_chop != d_chop;
@@ -1310,8 +1328,8 @@ __global__ void kernelUpdateWBatchSharedWeightOutputFunctor(
     int x_size,
     count_t *d_counts,
     int d_size,
-    float *params,
-    float *params_2,
+    param_t *params,
+    param_t *params_2,
     T *params_1,
     T *global_params,
     int BL_in,
@@ -1375,7 +1393,7 @@ __global__ void kernelUpdateWBatchSharedWeightOutputFunctor(
 
   RPU_FUNCTOR_INIT_VARS;
 
-  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > 0);
+  RPU_UWBS_DEF_AND_STRIDE_LOOP(noise_std_dw > (T)0.0);
 
   // in this loop the x_index / d_index change
 

@@ -10,6 +10,7 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_fp16_util.h"
 #include "forward_backward_pass.h"
 #include "io_iterator.h"
 #include "rpu_pulsed_meta_parameter.h"
@@ -128,6 +129,7 @@ void ChoppedTransferRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::
   RPU::state_t state;
   RPU::insert(state, "m_x", m_x_);
   RPU::insert(state, "m_d", m_d_);
+  RPU::insert(state, "d_sparsity", d_sparsity_);
 
   cwo_->dumpExtra(state, "cwo");
 
@@ -143,6 +145,7 @@ void ChoppedTransferRPUDeviceCuda<T>::loadExtra(
 
   RPU::load(state, "m_x", m_x_, strict);
   RPU::load(state, "m_d", m_d_, strict);
+  RPU::load(state, "d_sparsity", d_sparsity_, strict);
 
   cwo_->loadExtra(state, "cwo", strict);
 }
@@ -154,7 +157,7 @@ int ChoppedTransferRPUDeviceCuda<T>::getTransferEvery(
   const auto &par = getPar();
   if (par.usesAutoTransferEvery()) {
     T t = par.getAutoTransferEvery(this->rpucuda_device_vec_[didx]->getNumStates(), up);
-    return MAX(1, (int)floor(t));
+    return MAX(1, (int)floorf(t));
   }
   return BufferedTransferRPUDeviceCuda<T>::getTransferEvery(didx, m_batch, up);
 }
@@ -273,12 +276,12 @@ void ChoppedTransferRPUDeviceCuda<T>::writeMatrix(
 
   if (par.transfer_columns) {
     this->transfer_pwu_->update(
-        eye_iter, out_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
-        false);
+        eye_iter, out_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabsf(lr), m_batch,
+        false, false);
   } else {
     this->transfer_pwu_->update(
-        out_vec, eye_iter, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
-        false);
+        out_vec, eye_iter, W, &*this->rpucuda_device_vec_[device_idx], up, fabsf(lr), m_batch,
+        false, false);
   }
 }
 
@@ -338,7 +341,7 @@ __global__ void kernelChoppedTransfer(
       // writing
       T n_steps = 0;
       if (fabs(omega) >= (T)1.0) {
-        n_steps = MIN(MAX(truncf(omega), -max_steps), max_steps);
+        n_steps = MIN(MAX(trunc(omega), -max_steps), max_steps);
 
         if (!no_buffer) {
           if (forget_buffer) {
@@ -378,12 +381,13 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
   int in_size = par.getInSize();
   int out_size = par.getOutSize();
   int t_size = n_vec * out_size; // transfer size
-  T weight_granularity = this->rpucuda_device_vec_[to_device_idx]->getWeightGranularity();
+  T to_weight_granularity = this->rpucuda_device_vec_[to_device_idx]->getWeightGranularity();
   T from_weight_granularity = this->rpucuda_device_vec_[from_device_idx]->getWeightGranularity();
 
   T *transfer_tmp = this->context_->template getSharedBuffer<T>(RPU_BUFFER_DEVICE_0, t_size);
   T *transfer_out = this->context_->template getSharedBuffer<T>(RPU_BUFFER_DEVICE_1, t_size);
-  T lr_scale = par.getTransferLRScale(from_weight_granularity, lr);
+  T lr_scale = par.getTransferLRScale(
+      from_weight_granularity, to_weight_granularity, lr, count_lr, cwo_->getCurrentMBatch());
 
   // forward/backward with transfer vectors into tmp
   this->readMatrix(from_device_idx, nullptr, transfer_tmp, n_vec, (T)1.0);
@@ -402,7 +406,7 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
       sub_momentum, up.desired_BL, par.forget_buffer, par.no_buffer);
 
   // update according to device
-  T write_lr = par.getWriteLR(weight_granularity);
+  T write_lr = par.getWriteLR(to_weight_granularity);
   this->writeMatrix(to_device_idx, nullptr, transfer_out, n_vec, write_lr, up);
 
   this->context_->template releaseSharedBuffer<T>(RPU_BUFFER_DEVICE_0);
@@ -416,11 +420,12 @@ T ChoppedTransferRPUDeviceCuda<T>::getPulseCountLearningRate(
   const auto &par = getPar();
   T out_count_lr;
 
-  if (par.auto_scale && par.fast_lr > 0) {
+  if (par.auto_scale && par.fast_lr > (T)0.0) {
 
     T transfer_every = (T)this->getTransferEvery(0, current_m_batch, up);
     out_count_lr = par.getPulseCountAutoLR(
-        m_x_, m_d_, this->rpucuda_device_vec_[0]->getWeightGranularity(), transfer_every, up);
+        m_x_, m_d_, d_sparsity_, this->rpucuda_device_vec_[0]->getWeightGranularity(),
+        transfer_every, up);
   } else {
     out_count_lr =
         BufferedTransferRPUDeviceCuda<T>::getPulseCountLearningRate(lr, current_m_batch, up);
@@ -518,15 +523,6 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
   //       same (up) context.
   CudaContextPtr c = up_context;
 
-  const auto &par = getPar();
-  if (par.auto_scale && !up._currently_tuning) {
-    T abs_m_x;
-    T abs_m_d;
-    blm->getAverageAbsMax(abs_m_x, abs_m_d); // this will sync...
-    par.updateAutoScale(m_x_, abs_m_x, 1);
-    par.updateAutoScale(m_d_, abs_m_d, 1);
-  }
-
   // generate the choppers, advance counter, etc
   cwo_->makeWeightOutputChoppers(blm);
 
@@ -536,6 +532,19 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
 
   if (up._currently_tuning) {
     return;
+  }
+
+  const auto &par = getPar();
+  if (par.auto_scale) {
+    T abs_m_x;
+    T abs_m_d;
+    blm->getAverageAbsMax(abs_m_x, abs_m_d); // this will sync...
+    par.updateAutoScale(m_x_, abs_m_x, 1);
+    par.updateAutoScale(m_d_, abs_m_d, 1);
+  }
+  if (up.d_sparsity) {
+    T d_sparsity = blm->getAverageDSparsity(); // this will sync
+    par.updateAutoScale(d_sparsity_, d_sparsity, 1);
   }
 
   // let CWO do the counting
@@ -558,4 +567,8 @@ template class ChoppedTransferRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class ChoppedTransferRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class ChoppedTransferRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

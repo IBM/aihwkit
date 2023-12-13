@@ -10,6 +10,7 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 #include "weight_modifier_cuda.h"
 
@@ -51,12 +52,12 @@ __global__ void kernelModifyWeightsDiscretize(
     const T *weights,
     const T res_in, // need to larger than zero!!
     const bool sto_round,
-    const float assumed_wmax,
-    const float *wmax,
+    const T assumed_wmax,
+    const T *wmax,
     curandState_t *random_states) {
   const T res = res_in;
   T amax = (wmax) ? (*wmax) : assumed_wmax;
-  amax = amax > 0.0 ? amax : (T)1.0;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
 
   RPU_WM_KERNEL_LOOP(
       sto_round,
@@ -66,7 +67,7 @@ __global__ void kernelModifyWeightsDiscretize(
 
       if (stoch_if) {
         T stoch_value = curand_uniform(&local_state);
-        value += stoch_value - 0.5;
+        value += stoch_value - (T)0.5;
       }
 
       new_weights[i] = amax * res * round(value););
@@ -82,26 +83,26 @@ __global__ void kernelModifyWeightsDoReFa(
     const T res_in, // need to larger than zero!!
     const bool sto_round,
     const T dorefa_clip,
-    float assumed_wmax,
-    float *wmax,
+    T assumed_wmax,
+    T *wmax,
     curandState_t *random_states) {
   T amax = (wmax) ? (*wmax) : assumed_wmax;
-  amax = amax > 0.0 ? amax : (T)1.0;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
 
   const T res = res_in;
-  const T scale = fabs(dorefa_clip / tanhf(amax));
+  const T scale = fabs(dorefa_clip / (T)tanhf(amax));
 
   RPU_WM_KERNEL_LOOP(
       sto_round,
 
       T value = weights[i];
-      value = tanhf(value) * scale;
+      value = (T)tanhf(value) * scale;
 
       value /= res;
 
       if (stoch_if) {
         T stoch_value = curand_uniform(&local_state);
-        value += stoch_value - 0.5;
+        value += stoch_value - (T)0.5;
       }
 
       new_weights[i] = res * round(value););
@@ -117,14 +118,14 @@ __global__ void kernelModifyWeightsDiscretizeAddNormal(
     const T res_in, // need to larger than zero!!
     const bool sto_round_in,
     const T stddev_in,
-    const float assumed_wmax,
-    const float *wmax,
+    const T assumed_wmax,
+    const T *wmax,
     curandState_t *random_states) {
   const T res = res_in;
   const T stddev = stddev_in;
   const bool sto_round = sto_round_in;
   T amax = (wmax) ? (*wmax) : assumed_wmax;
-  amax = amax > 0.0 ? amax : (T)1.0;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
 
   RPU_WM_KERNEL_LOOP(
       true,
@@ -133,7 +134,7 @@ __global__ void kernelModifyWeightsDiscretizeAddNormal(
 
       value /= res;
 
-      if (sto_round) { value += curand_uniform(&local_state) - 0.5; }
+      if (sto_round) { value += (T)curand_uniform(&local_state) - (T)0.5; }
 
       value = res * round(value);
       T stoch_value = curand_normal(&local_state);
@@ -148,11 +149,11 @@ __global__ void kernelModifyWeightsAddNormal(
     T *new_weights,
     const T *weights,
     const T stddev_in,
-    const float assumed_wmax,
-    const float *wmax,
+    const T assumed_wmax,
+    const T *wmax,
     curandState_t *random_states) {
   T amax = (wmax) ? (*wmax) : assumed_wmax;
-  amax = amax > 0.0 ? amax : (T)1.0;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
 
   const T stddev = amax * stddev_in;
 
@@ -170,11 +171,11 @@ __global__ void kernelModifyWeightsMultNormal(
     T *new_weights,
     const T *weights,
     const T stddev_in,
-    const float assumed_wmax,
-    const float *wmax,
+    const T assumed_wmax,
+    const T *wmax,
     curandState_t *random_states) {
   T amax = (wmax) ? (*wmax) : assumed_wmax;
-  amax = amax > 0.0 ? amax : (T)1.0;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
 
   const T stddev = stddev_in * amax;
 
@@ -183,7 +184,7 @@ __global__ void kernelModifyWeightsMultNormal(
                      T w = weights[i];
                      T stoch_value = curand_normal(&local_state);
 
-                     new_weights[i] = w * (1 + stddev * stoch_value););
+                     new_weights[i] = w * ((T)1.0 + stddev * stoch_value););
 }
 
 template <typename T, bool preserve_sign>
@@ -196,11 +197,11 @@ __global__ void kernelModifyWeightsProgNoiseN(
     const T stddev_in, // additional scale:
     int n_coeffs,
     T *coeffs,
-    const float assumed_wmax,
-    const float *wmax,
+    const T assumed_wmax,
+    const T *wmax,
     curandState_t *random_states) {
   T amax = (wmax) ? (*wmax) : assumed_wmax;
-  amax = amax > 0.0 ? amax : (T)1.0;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
 
   const T stddev = stddev_in;
 
@@ -236,12 +237,12 @@ __global__ void kernelModifyWeightsProgNoise(
     const T p0_in,
     const T p1_in,
     const T p2_in,
-    const float assumed_wmax,
-    const float *wmax,
+    const T assumed_wmax,
+    const T *wmax,
     curandState_t *random_states) {
 
   T amax = (wmax) ? (*wmax) : assumed_wmax;
-  amax = amax > 0.0 ? amax : (T)1.0;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
 
   const T stddev = stddev_in;
   const T p0 = p0_in;
@@ -261,6 +262,129 @@ __global__ void kernelModifyWeightsProgNoise(
       if (preserve_sign) { new_weights[i] = (w < (T)0.0) ? -fabs(out_w) : fabs(out_w); } else {
         new_weights[i] = out_w;
       });
+}
+
+#define PCM_T_READ (double)250.0e-9
+#define PCM_P0 0.26348f
+#define PCM_P1 1.9650f
+#define PCM_P2 -1.1731f
+
+/*This is the new ZEUS baseline definition of PCM noise. NOTE: this
+  does ONLY include the drift variation NOT the mean drift */
+template <typename T>
+__global__ void kernelModifyWeightsPCMNoise(
+    int size_in,
+    int d_size,
+    const bool copy_last_column, // in case of bias
+    T *new_weights,
+    const T *weights,
+    const T t_minus_t0_in,  // relative to t0, only for drift variation, not mean
+    const T noise_scale_in, // additional scale, scaling both prog noise and 1/f (read) noise
+    const T gmax_in,
+    const T t0_in,
+    const T zero_thres_in, // in % of P0!!
+    const T prob_at_reset_in,
+    const T prob_at_gmax_in,
+    const T prob_at_random_in,
+    const T log_sqrt_factor_in, // should be sqrt(log((((double) t)+t_read) / (2.0*t_read)))
+    const T assumed_wmax,
+    const T *wmax,
+    curandState_t *random_states) {
+  T amax = (wmax) ? (*wmax) : assumed_wmax;
+  amax = amax > (T)0.0 ? amax : (T)1.0;
+  const T t0 = t0_in;
+  const T t = t_minus_t0_in + t0;
+
+  const T noise_scale = noise_scale_in;
+
+  const T gmax = gmax_in;
+  const T log_sqrt_factor = log_sqrt_factor_in;
+  const T prob_at_gmax = prob_at_gmax_in;
+  const T prob_at_reset = prob_at_reset_in;
+  const T prob_at_random = prob_at_random_in;
+  const T zero_thres = zero_thres_in * noise_scale * (T)PCM_P0;
+
+  RPU_WM_KERNEL_LOOP(
+      true, T w = weights[i]; T g = MAX(MIN(w, amax), -amax) * gmax / amax;
+
+      g = fabs(g) > zero_thres ? g : (T)0.0; // to avoid programming small numbers
+
+      bool w_negative = g < (T)0.0;
+
+      if (prob_at_reset > (T)0.0) {
+        T stoch_value = curand_uniform(&local_state);
+        g = (stoch_value < prob_at_reset) ? (T)0.0 : g;
+      }
+
+      if (prob_at_gmax > (T)0.0) {
+        T stoch_value1 = curand_uniform(&local_state);
+        T stoch_value2 = curand_uniform(&local_state);
+
+        if (stoch_value1 < prob_at_gmax) {
+          g = (stoch_value2 > (T)0.5) ? (g - gmax) : (g + gmax);
+        }
+      }
+
+      if (prob_at_random > (T)0.0) {
+        T stoch_value1 = curand_uniform(&local_state);
+        T stoch_value2 = curand_uniform(&local_state);
+
+        if (stoch_value1 < prob_at_random) {
+          stoch_value2 *= gmax;
+          g = (g > (T)0.0) ? stoch_value2 : -stoch_value2;
+        }
+      }
+
+      g = MIN(MAX(g, -gmax), gmax); // clip the target weights to gmax
+
+      T w_final = (T)0.0;
+      // exactly zero if close to zero anyway (in this case one will
+      // not programm it and leave it at RESET)
+      if (fabs(g) > (T)0.0) {
+        T stoch_value = curand_normal(&local_state);
+        T ag_rel = fabs(g / gmax);
+        T sig_prog = (T)PCM_P0 + ag_rel * (T)PCM_P1 + ag_rel * ag_rel * (T)PCM_P2;
+
+        T g_prog = g + noise_scale * sig_prog * stoch_value;
+        T ag_prog_rel = fabs(g_prog / gmax);
+
+        // drift
+        T g_drift = g_prog;
+        if (t > t0) {
+          T ag_rel_for_drift = MAX(ag_prog_rel, (T)1e-6);
+          stoch_value = curand_normal(&local_state);
+
+          // we do not consider the mean drift here [assuming it can
+          // be corrected], only the variation mu_drift =
+          // np.minimum(np.maximum(-0.0155*np.log(Grel) + 0.0244,
+          // 0.049), 0.1)
+
+          T sig_drift =
+              MIN(MAX((T)-0.0125 * (T)logf(ag_rel_for_drift) - (T)0.0059, (T)0.008), (T)0.045);
+          T nu_drift = fabs(stoch_value * sig_drift);
+
+          g_drift = g_prog * (T)powf(t / t0, -nu_drift);
+        }
+
+        // 1/f noise
+        T g_final = g_drift;
+
+        if (t > (T)0.0) {
+          stoch_value = curand_normal(&local_state);
+
+          T Qs = MIN((T)0.0088 / MAX((T)powf(ag_prog_rel, (T)0.65), (T)1e-3), (T)0.2);
+          T sig_noise = Qs * log_sqrt_factor;
+
+          g_final = g_drift + noise_scale * fabs(g_drift) * sig_noise * stoch_value;
+        }
+
+        w_final = g_final / gmax * amax;
+
+        // clip. cannot change signs. Note that boundary noise will be reflected
+        w_final = w_negative ? -fabs(w_final) : fabs(w_final);
+      } new_weights[i] = w_final;
+
+  );
 }
 
 template <typename T>
@@ -299,7 +423,7 @@ void WeightModifierCuda<T>::apply(
   bool done = false;
   enable_during_test_ = wmpar.enable_during_test;
 
-  float *amax = nullptr;
+  T *amax = nullptr;
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
     if (!amaximizer_) {
       amaximizer_ = RPU::make_unique<Maximizer<T>>(
@@ -328,7 +452,7 @@ void WeightModifierCuda<T>::apply(
 
   case WeightModifierType::Discretize: {
 
-    if (wmpar.res > 0) {
+    if (wmpar.res > (T)0.0) {
 
       kernelModifyWeightsDiscretize<T><<<nblocks, nthreads, 0, s>>>(
           size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
@@ -339,7 +463,7 @@ void WeightModifierCuda<T>::apply(
     break;
   }
   case WeightModifierType::DoReFa: {
-    if (wmpar.res > 0) {
+    if (wmpar.res > (T)0.0) {
 
       kernelModifyWeightsDoReFa<T><<<nblocks, nthreads, 0, s>>>(
           size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
@@ -351,7 +475,7 @@ void WeightModifierCuda<T>::apply(
   }
 
   case WeightModifierType::MultNormal: {
-    if (wmpar.std_dev > 0) {
+    if (wmpar.std_dev > (T)0.0) {
 
       kernelModifyWeightsMultNormal<T><<<nblocks, nthreads, 0, s>>>(
           size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev,
@@ -362,7 +486,7 @@ void WeightModifierCuda<T>::apply(
   }
 
   case WeightModifierType::AddNormal: {
-    if (wmpar.std_dev > 0) {
+    if (wmpar.std_dev > (T)0.0) {
 
       kernelModifyWeightsAddNormal<T><<<nblocks, nthreads, 0, s>>>(
           size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.std_dev,
@@ -374,7 +498,7 @@ void WeightModifierCuda<T>::apply(
 
   case WeightModifierType::Poly: {
     int n_coeffs = wmpar.coeffs.size();
-    if (wmpar.std_dev > 0 && n_coeffs > 0) {
+    if (wmpar.std_dev > (T)0.0 && n_coeffs > 0) {
 
       if (n_coeffs <= 3) {
         kernelModifyWeightsProgNoise<T, false><<<nblocks, nthreads, 0, s>>>(
@@ -407,7 +531,7 @@ void WeightModifierCuda<T>::apply(
 
   case WeightModifierType::ProgNoise: {
     int n_coeffs = wmpar.coeffs.size();
-    if (wmpar.std_dev > 0 && n_coeffs > 0) {
+    if (wmpar.std_dev > (T)0.0 && n_coeffs > 0) {
 
       T std = wmpar.std_dev / wmpar.g_max;
 
@@ -440,8 +564,22 @@ void WeightModifierCuda<T>::apply(
     break;
   }
 
+  case WeightModifierType::PCMNoise: {
+
+    T t = wmpar.pcm_t_inference + wmpar.pcm_t0;
+    T log_sqrt_factor = sqrt(log((((double)t) + PCM_T_READ) / (2.0 * PCM_T_READ)));
+
+    kernelModifyWeightsPCMNoise<T><<<nblocks, nthreads, 0, s>>>(
+        size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.pcm_t_inference,
+        wmpar.std_dev, wmpar.g_max, wmpar.pcm_t0, wmpar.pcm_zero_thres, wmpar.pcm_prob_at_reset,
+        wmpar.pcm_prob_at_gmax, wmpar.pcm_prob_at_random, log_sqrt_factor, wmpar.assumed_wmax, amax,
+        context_->getRandomStates(nblocks * nthreads));
+    done = true;
+
+    break;
+  }
   case WeightModifierType::DiscretizeAddNormal: {
-    if (wmpar.res > 0 || wmpar.std_dev > 0) {
+    if (wmpar.res > (T)0.0 || wmpar.std_dev > (T)0.0) {
 
       kernelModifyWeightsDiscretizeAddNormal<T><<<nblocks, nthreads, 0, s>>>(
           size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
@@ -460,7 +598,7 @@ void WeightModifierCuda<T>::apply(
     RPU::math::copy<T>(context_, size_, weights, 1, new_weights, 1);
   }
 
-  if (wmpar.pdrop > 0.0) {
+  if (wmpar.pdrop > (T)0.0) {
 
     if (new_weights == weights) {
       RPU_FATAL("cannot use pdrop>0 with in-place weights.");
@@ -499,6 +637,9 @@ void WeightModifierCuda<T>::loadExtra(
 template class WeightModifierCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class WeightModifierCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class WeightModifierCuda<half_t>;
 #endif
 
 #undef RPU_WM_KERNEL_LOOP

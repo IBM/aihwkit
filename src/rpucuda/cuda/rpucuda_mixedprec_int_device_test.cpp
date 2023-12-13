@@ -21,12 +21,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -332,7 +326,7 @@ TEST_P(MixedPrecIntRPUDeviceCudaTestFixture, UpdateAndTransfer) {
   dp.momentum_chi = 0.4;
   num_t lr = 0.05;
   dp.compute_sparsity = false;
-  dp.transfer_every = round(dw_min / lr);
+  dp.transfer_every = roundf(dw_min / lr);
 
   // just newly create from paramerers
   rpu_device = dp.createDeviceUnique(this->x_size, this->d_size, &this->rw_rng);

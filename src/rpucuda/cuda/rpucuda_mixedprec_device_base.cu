@@ -208,8 +208,8 @@ __global__ void kernelAddSparsity(
   volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tid == 0) {
-    sparsity[0] = (sparsity[0] * current_update_index + x_sparsity[0] * d_sparsity[0]) /
-                  (current_update_index + m_batch);
+    sparsity[0] = (sparsity[0] * (T)current_update_index + x_sparsity[0] * d_sparsity[0]) /
+                  (T)(current_update_index + m_batch);
   }
 }
 
@@ -276,7 +276,7 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::transfer(T *dev_weight
   // updating the matrix with rows of using one-hot transfer vectors
 
   const auto &par = getPar();
-  if (par.n_rows_per_transfer == 0 || fabs(lr) == (T)0) {
+  if (par.n_rows_per_transfer == 0 || fabsf(lr) == 0.0f) {
     return;
   }
   int n_transfers = par.n_rows_per_transfer;
@@ -288,7 +288,8 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::transfer(T *dev_weight
   //  << std::endl;
   int i_row = current_row_index_;
   if (par.random_row) {
-    i_row = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
+    i_row = MAX(
+        MIN(floorf((float)this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
   }
 
   int d2_size = this->d_size_ * this->d_size_;
@@ -371,4 +372,8 @@ template class MixedPrecRPUDeviceBaseCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecRPUDeviceBaseCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class MixedPrecRPUDeviceBaseCuda<half_t>;
+#endif
+
 } // namespace RPU

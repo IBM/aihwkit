@@ -23,7 +23,6 @@ from torch import (
     cat,
     ones,
     where,
-    float32,
     from_numpy,
     full,
     clamp,
@@ -43,8 +42,8 @@ from torch.linalg import lstsq
 from aihwkit.exceptions import TileError, ConfigError
 from aihwkit.simulator.tiles.base import BaseTile, SimulatorTileWrapper, SimulatorTile
 
-from aihwkit.simulator.parameters.utils import MappingParameter, InputRangeParameter
-from aihwkit.simulator.parameters.base import PrePostProcessingRPU
+from aihwkit.simulator.parameters.mapping import MappingParameter
+from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU, InputRangeParameter
 
 
 class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
@@ -70,7 +69,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
     """
 
     # pylint: disable=no-member, too-many-public-methods, abstract-method
-
+    # pylint: disable=too-many-instance-attributes
     supports_indexed = True
 
     def __init__(self) -> None:
@@ -80,13 +79,14 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
         self.out_scaling_alpha = None  # type: Parameter
         self.mapping_scales = None  # type: Tensor
+        self.mapping_lr_scale = 1.0
         self.input_range = None  # type: Parameter
 
         self.image_sizes = []  # type: List[int]
 
         if self.digital_bias:
             # Note that the bias needs to be handled on the module level
-            self.bias = Parameter(zeros(self.out_size), requires_grad=True)
+            self.bias = Parameter(zeros(self.out_size, dtype=self.get_dtype()), requires_grad=True)
         else:
             self.bias = None
 
@@ -137,7 +137,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             apply_weight_scaling: Whether to rescale the given weight matrix
                 and populate the digital output scaling factors as
                 specified in the configuration
-                :class:`~aihwkit.simulator.parameters.utils.MappingParameter`. A
+                :class:`~aihwkit.simulator.configs.MappingParameter`. A
                 new ``weight_scaling_omega`` can be given. Note that
                 this will overwrite the existing digital out scaling
                 factors.
@@ -145,7 +145,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
                 getting the weights. Internally calls
                 `program_weights`.
             weight_scaling_omega: The weight scaling omega factor (see
-                :class:`~aihwkit.simulator.parameters.utils.MappingParameter`). If
+                :class:`~aihwkit.simulator.configs.MappingParameter`). If
                 given explicitly here, it will overwrite the value in
                 the mapping field.
 
@@ -155,7 +155,8 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         if bias is not None and self.digital_bias:
             if not isinstance(bias, Tensor):
                 bias = from_numpy(array(bias))
-            self.bias.data[:] = bias[:].clone().detach().to(float32).to(self.bias.device)
+
+            self.bias.data[:] = bias[:].clone().detach().to(self.get_dtype()).to(self.bias.device)
             bias = None
 
         combined_weights = self._combine_weights(weight, bias)
@@ -260,12 +261,12 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
         if not from_reference or self.reference_combined_weights is None:
             self.reference_combined_weights = self.tile.get_weights()
-        target_weights = self.reference_combined_weights
+            target_weights = self.reference_combined_weights
 
         if x_values is None:
             x_values = eye(self.tile.get_x_size())
-        x_values = x_values.to(self.device)
-        target_values = x_values @ target_weights.to(self.device).T
+            x_values = x_values.to(self.device)
+            target_values = x_values @ target_weights.to(self.device).T
 
         target_max = target_values.abs().max().item()
         if isinstance(w_init, Tensor):
@@ -296,7 +297,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         weight mapping scales so that the absolute max analog weights
         are set to 1 (as specified in the ``weight_scaling``
         configuration of
-        :class:`~aihwkit.parameters.utils.MappingParameter`).
+        :class:`~aihwkit.simulator.configs.MappingParameter`).
 
         Note:
             By default the weight scaling omega factor is set to 1
@@ -310,7 +311,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
         Args:
             weight_scaling_omega: The weight scaling omega factor (see
-                :class:`~aihwkit.parameters.utils.MappingParameter`). If
+                :class:`~aihwkit.simulator.configs.MappingParameter`). If
                 set to None here, it will take the value in the
                 mapping parameters. Default is however 1.0.
         """
@@ -349,7 +350,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             apply_weight_scaling: Whether to rescale the given weight matrix
                 and populate the digital output scaling factors as
                 specified in the configuration
-                :class:`~aihwkit.parameters.utils.MappingParameter`. A
+                :class:`~aihwkit.simulator.configs.MappingParameter`. A
                 new ``weight_scaling_omega`` can be given. Note that
                 this will overwrite the existing digital out scaling
                 factors.
@@ -369,10 +370,10 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         Raises:
             TileError: in case wrong code usage of TileWithPeriphery
         """
-
+        dtype = self.get_dtype()
         if x_values is None:
             x_values = randn(
-                self.in_size * over_sampling, self.in_size, device=self.device, dtype=float32
+                self.in_size * over_sampling, self.in_size, device=self.device, dtype=dtype
             )
         else:
             x_values = x_values.to(self.device)
@@ -393,7 +394,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
         # calculate pseudo inverse (with bias, if necessary)
         if self.analog_bias:
-            ones_column = ones(self.in_size * over_sampling, 1, device=self.device, dtype=float32)
+            ones_column = ones(self.in_size * over_sampling, 1, device=self.device, dtype=dtype)
             x_values = cat([x_values, ones_column], axis=1)
 
         est_weight = lstsq(x_values, y_values).solution.T.cpu()
@@ -436,7 +437,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
                 clipped for most devices. If this parameter is not
                 given, it will default to the ``weight_scaling_omega``
                 value set in the
-                :class:`~aihwkit.parameters.utils.MappingParameter` of the
+                :class:`~aihwkit.simulator.configs.MappingParameter` of the
                 ``rpu_config``
 
         Returns:
@@ -494,22 +495,21 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
            the SGD graph but might get initialized when
            ``weight_scaling_omega`` is used or remapping is enforced.
         """
-
-        if mapping_scales is None:
+        if mapping_scales is None or not hasattr(self.rpu_config, "mapping"):
             self.mapping_scales = None
             return
 
         if isinstance(mapping_scales, float):
             if self.mapping_scales is None:
-                self.mapping_scales = ones((1,), dtype=float32, device=self.device)
-            self.mapping_scales[:] = mapping_scales
-            return
-
-        if isinstance(self.mapping_scales, Tensor) and len(mapping_scales) == 1:
+                self.mapping_scales = ones((1,), dtype=self.get_dtype(), device=self.device)
+                self.mapping_scales[:] = mapping_scales
+        elif isinstance(self.mapping_scales, Tensor) and len(mapping_scales) == 1:
             self.mapping_scales[:] = mapping_scales.to(self.device)
-            return
+        else:
+            self.mapping_scales = mapping_scales.flatten().to(self.device)
 
-        self.mapping_scales = mapping_scales.flatten().to(self.device)
+        if getattr(self.rpu_config.mapping, "weight_scaling_lr_compensation", False):
+            self.mapping_lr_scale = 1.0 / self.mapping_scales.mean().item()
 
     @no_grad()
     def init_mapping_scales(self) -> None:
@@ -528,11 +528,16 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         if mapping.weight_scaling_omega:
             if mapping.weight_scaling_columnwise:
                 mapping_scales = ones(
-                    (self.out_size,), dtype=float32, device=self.device, requires_grad=False
+                    (self.out_size,),
+                    dtype=self.get_dtype(),
+                    device=self.device,
+                    requires_grad=False,
                 )
             else:
-                mapping_scales = ones((1,), dtype=float32, device=self.device, requires_grad=False)
-        self.set_mapping_scales(mapping_scales)
+                mapping_scales = ones(
+                    (1,), dtype=self.get_dtype(), device=self.device, requires_grad=False
+                )
+                self.set_mapping_scales(mapping_scales)
 
     @no_grad()
     def init_input_processing(self) -> bool:
@@ -561,7 +566,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
                     full(
                         (1,),
                         ir_params.init_value,
-                        dtype=float32,
+                        dtype=self.get_dtype(),
                         device=self.device,
                         requires_grad=True,
                     )
@@ -570,10 +575,12 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
                 input_range = full(
                     (1,),
                     ir_params.init_value,
-                    dtype=float32,
+                    dtype=self.get_dtype(),
                     device=self.device,
                     requires_grad=False,
                 )
+                if hasattr(self, "input_range") and self.input_range is None:
+                    delattr(self, "input_range")
                 self.register_buffer("input_range", input_range)  # type: ignore
 
             if ir_params.manage_output_clipping and not ir_params.supports_manage_output_clipping(
@@ -661,11 +668,16 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         if mapping.learn_out_scaling:
             if mapping.out_scaling_columnwise:
                 self.out_scaling_alpha = Parameter(
-                    ones((self.out_size,), dtype=float32, device=self.device, requires_grad=True)
+                    ones(
+                        (self.out_size,),
+                        dtype=self.get_dtype(),
+                        device=self.device,
+                        requires_grad=True,
+                    )
                 )
             else:
                 self.out_scaling_alpha = Parameter(
-                    ones((1,), dtype=float32, device=self.device, requires_grad=True)
+                    ones((1,), dtype=self.get_dtype(), device=self.device, requires_grad=True)
                 )
 
     @no_grad()
@@ -902,7 +914,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
             if ir_params.gradient_relative:
                 grad *= self.input_range
-            grad *= ir_params.gradient_scale
+                grad *= ir_params.gradient_scale
 
             zero_grad_msk = (
                 None if len(ctx.saved_analog_tensors) < 2 else ctx.saved_analog_tensors[1]
@@ -978,8 +990,9 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
         if self.mapping_scales is not None:
             tensor_view = self.get_tensor_view(d_input.dim(), d_dim)
-            return x_input, d_input / self.get_mapping_scales().view(tensor_view)
-
+            return x_input, d_input / (
+                self.get_mapping_scales().view(tensor_view) * self.mapping_lr_scale
+            )
         return x_input, d_input
 
     def update(self, x_input: Tensor, d_input: Tensor) -> None:
@@ -1168,3 +1181,24 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         """
         x_input, d_input = self.pre_update(x_input, 1, d_input, 1)
         return self.tile.update_indexed(x_input, d_input, self.non_blocking)  # type: ignore
+
+    def set_learning_rate(self, learning_rate: Optional[float]) -> None:
+        """Set the tile learning rate.
+
+        Set the tile learning rate to ``-learning_rate``. Note that the
+        learning rate is always taken to be negative (because of the meaning in
+        gradient descent) and positive learning rates are not supported.
+
+        Args:
+            learning_rate: the desired learning rate.
+        """
+        if learning_rate is not None:
+            self.tile.set_learning_rate(learning_rate * self.mapping_lr_scale)
+
+    def get_learning_rate(self) -> float:
+        """Return the tile learning rate.
+
+        Returns:
+            float: the tile learning rate.
+        """
+        return self.tile.get_learning_rate() / self.mapping_lr_scale

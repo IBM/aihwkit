@@ -93,14 +93,14 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   T calcWeightGranularity() const override {
     T weight_granularity = 0.0;
     for (size_t k = 0; k < vec_par.size(); k++) {
-      weight_granularity += vec_par[k]->calcWeightGranularity() / vec_par.size();
+      weight_granularity += vec_par[k]->calcWeightGranularity() / (T)vec_par.size();
     }
     return weight_granularity;
   }
   T calcNumStates() const override {
     T num_states = 0.0;
     for (size_t k = 0; k < vec_par.size(); k++) {
-      num_states += vec_par[k]->calcNumStates() / vec_par.size();
+      num_states += vec_par[k]->calcNumStates() / (T)vec_par.size();
     }
     return num_states;
   }

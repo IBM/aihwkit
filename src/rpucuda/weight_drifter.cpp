@@ -122,7 +122,7 @@ void WeightDrifter<T>::apply(T *weights, T time_since_last_call, RNG<T> &rng) {
   T reset_tol = par_.reset_tol;
   bool simple = par_.isSimpleDrift();
   T a = par_.g_offset * par_.wg_ratio + par_.w_offset;
-  if (fabs(a) < reset_tol) {
+  if ((T)fabsf(a) < reset_tol) {
     a = (T)0.0;
   }
   T w_noise_std = par_.w_read_std;
@@ -132,7 +132,7 @@ void WeightDrifter<T>::apply(T *weights, T time_since_last_call, RNG<T> &rng) {
   PRAGMA_SIMD
   for (int i = 0; i < size_; i++) {
     T w = weights[i];
-    if (fabs(previous_weights_[i] - w) > reset_tol) {
+    if ((T)fabsf(previous_weights_[i] - w) > reset_tol) {
       // weight has changed and thus need a drift reset
       t_[i] = current_t_;
       w0_[i] = w;
@@ -142,17 +142,17 @@ void WeightDrifter<T>::apply(T *weights, T time_since_last_call, RNG<T> &rng) {
 
       T w0 = w0_[i];
       T nu = simple ? nu0 : nu_[i];
-      nu = (nu_std <= 0) ? nu : nu + nu_std * nu * rng.sampleGauss();
+      nu = (nu_std <= (T)0.0) ? nu : nu + nu_std * nu * rng.sampleGauss();
       nu = (!par_.nu_k)
                ? nu
-               : nu - par_.nu_k * log((w - par_.w_offset) / par_.wg_ratio + par_.g_offset) +
+               : nu - par_.nu_k * (T)logf((w - par_.w_offset) / par_.wg_ratio + par_.g_offset) +
                      par_.nu_k * par_.logG0;
       T delta_t = MAX(current_t_ - t_[i], (T)1.0); // at least t0
-      T nu_scale = pow(delta_t, -nu);
+      T nu_scale = (T)powf(delta_t, -nu);
       w = w0 * nu_scale; // overwrites w
       w = (!a) ? w : w + a * (nu_scale - (T)1.0);
     }
-    w += w_noise_std > 0 ? w_noise_std * rng.sampleGauss() : (T)0.0;
+    w += w_noise_std > (T)0.0 ? w_noise_std * rng.sampleGauss() : (T)0.0;
     previous_weights_[i] = w;
     weights[i] = w;
   }
@@ -161,6 +161,9 @@ void WeightDrifter<T>::apply(T *weights, T time_since_last_call, RNG<T> &rng) {
 template class WeightDrifter<float>;
 #ifdef RPU_USE_DOUBLE
 template class WeightDrifter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class WeightDrifter<half_t>;
 #endif
 
 } // namespace RPU

@@ -44,8 +44,8 @@ void LinearStepRPUDevice<T>::populate(
 
       if (!par.ls_allow_increasing_slope) {
         /* we force the number to be positive when requested [RRAM]*/
-        diff_slope_at_bound_up = fabs(diff_slope_at_bound_up);
-        diff_slope_at_bound_down = fabs(diff_slope_at_bound_down);
+        diff_slope_at_bound_up = (T)fabsf(diff_slope_at_bound_up);
+        diff_slope_at_bound_down = (T)fabsf(diff_slope_at_bound_down);
       }
       T w_ref_up, w_ref_down;
 
@@ -65,15 +65,15 @@ void LinearStepRPUDevice<T>::populate(
       }
 
       // slope should be correct because of sign of reference
-      if (w_ref_up != 0.0) {
+      if (w_ref_up != (T)0.0) {
         w_slope_up_[i][j] = -diff_slope_at_bound_up * this->w_scale_up_[i][j] / w_ref_up;
       } else {
-        w_slope_up_[i][j] = 0.0;
+        w_slope_up_[i][j] = (T)0.0;
       }
-      if (w_ref_down != 0.0) {
+      if (w_ref_down != (T)0.0) {
         w_slope_down_[i][j] = -diff_slope_at_bound_down * this->w_scale_down_[i][j] / w_ref_down;
       } else {
-        w_slope_down_[i][j] = 0.0;
+        w_slope_down_[i][j] = (T)0.0;
       }
     }
   }
@@ -230,6 +230,9 @@ void LinearStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T
 template class LinearStepRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class LinearStepRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class LinearStepRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

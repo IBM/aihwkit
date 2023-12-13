@@ -36,14 +36,27 @@ template <typename T> T *CudaBuffer<T>::get(CudaContextPtr c, int size) {
   if (buffer_.numel() < size || c->getGPUId() != buffer_.device().index()) {
     // Build the buffers.
     std::vector<int64_t> dims{size};
+    auto options = at::TensorOptions().device(at::kCUDA, c->getGPUId()).requires_grad(false);
 
-    auto options =
-        at::TensorOptions().device(at::kCUDA, c->getGPUId()).dtype(at::kFloat).requires_grad(false);
-
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+    if (std::is_same<T, half_t>::value) {
+      options = options.dtype(at::kHalf);
+    }
+#endif
+    if (std::is_same<T, double>::value) {
+      options = options.dtype(at::kDouble);
+    } else {
+      options = options.dtype(at::kFloat);
+    }
     c->synchronize();
     buffer_ = at::empty(dims, options);
   }
   tmp_context_ = c;
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+  if (std::is_same<T, half_t>::value) {
+    return reinterpret_cast<T *>(buffer_.template data_ptr<at::Half>());
+  }
+#endif
   return buffer_.template data_ptr<T>();
 }
 
@@ -133,6 +146,9 @@ template <typename T> CudaBuffer<T> &CudaBuffer<T>::operator=(CudaBuffer<T> &&ot
 template class CudaBuffer<float>;
 #ifdef RPU_USE_DOUBLE
 template class CudaBuffer<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class CudaBuffer<half_t>;
 #endif
 
 } // namespace RPU

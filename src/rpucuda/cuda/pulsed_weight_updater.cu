@@ -233,6 +233,15 @@ PulsedWeightUpdater<double>::copyIterator2Buffer(const double *vec, double *buff
 }
 #endif
 
+#ifdef RPU_USE_FP16
+template <>
+template <>
+const half_t *
+PulsedWeightUpdater<half_t>::copyIterator2Buffer(const half_t *vec, half_t *buffer, int size) {
+  return vec;
+}
+#endif
+
 template <typename T>
 template <typename XInputIteratorT, typename DInputIteratorT>
 void PulsedWeightUpdater<T>::doFPupdate(
@@ -251,7 +260,7 @@ void PulsedWeightUpdater<T>::doFPupdate(
   const T *x_out = copyIterator2Buffer(x_in, fpx_buffer, x_size_ * m_batch);
   const T *d_out = copyIterator2Buffer(d_in, fpd_buffer, d_size_ * m_batch);
 
-  if (m_batch == 1 && beta == 1.0) {
+  if (m_batch == 1 && beta == (T)1.0) {
     RPU::math::ger<T>(context_, d_size_, x_size_, -lr, d_out, 1, x_out, 1, dev_weights, d_size_);
   } else {
 
@@ -486,6 +495,33 @@ RPU_PWU_ITER_TEMPLATE(double, EyeInputIterator<double>, const double *);
 RPU_PWU_ITER_TEMPLATE(double, const double *, EyeInputIterator<double>);
 
 #undef TRANSDOUBLE
+#endif
+
+#ifdef RPU_USE_FP16
+#define TRANSHALF(TRANS) TRANS, half_t
+
+template class PulsedWeightUpdater<half_t>;
+
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderTransInputIterator<half_t>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderInputIterator<half_t>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, const half_t *);
+RPU_PWU_ITER_TEMPLATE(
+    half_t, IndexReaderTransInputIterator<half_t>, PermuterTransInputIterator<half_t>);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, PermuterTransInputIterator<half_t>);
+
+RPU_PWU_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, SliceInputIterator<TRANSHALF(true)>);
+RPU_PWU_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, SliceInputIterator<TRANSHALF(false)>);
+
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(true)>);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(false)>);
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, EyeInputIterator<half_t>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, EyeInputIterator<half_t>);
+
+#undef TRANSHALF
 #endif
 
 #undef RPU_PWU_ITER_TEMPLATE

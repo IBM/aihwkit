@@ -31,7 +31,7 @@ namespace test_helper {
 
 #define DEBUG_KERNEL_UPDATE_BATCH_INIT(CONTEXT, STATE_SIZE, M_BATCH)                               \
   int size = x_size * d_size;                                                                      \
-  float *tmp = new float[size * 4];                                                                \
+  param_t *tmp = new param_t[size * 4];                                                            \
   for (int i = 0; i < size; i++) {                                                                 \
     int k = i * 4;                                                                                 \
     tmp[k] = -bound;                                                                               \
@@ -39,7 +39,7 @@ namespace test_helper {
     tmp[k + 2] = bound;                                                                            \
     tmp[k + 3] = dw_min;                                                                           \
   }                                                                                                \
-  CudaArray<float> dev_4params(CONTEXT, size * 4, tmp);                                            \
+  CudaArray<param_t> dev_4params(CONTEXT, size * 4, tmp);                                          \
   delete[] tmp;                                                                                    \
   CudaArray<T> dev_weights(CONTEXT, size, weights);                                                \
   CudaArray<uint32_t> dev_x_counts(CONTEXT, x_size *nK32 *M_BATCH, x_counts);                      \
@@ -92,7 +92,7 @@ int debugKernelUpdateW(
   kernelUpdateWFunctor<T, 0, uint32_t, UpdateFunctorConstantStep<T>>
       <<<nblocks, nthreads, 0, c->getStream()>>>(
           dev_weights.getData(), dev_x_counts.getData(), x_size, dev_d_counts.getData(), d_size,
-          dev_4params.getData(), (float *)nullptr, (T *)nullptr, (T *)nullptr, nK32, dw_min_std,
+          dev_4params.getData(), (param_t *)nullptr, (T *)nullptr, (T *)nullptr, nK32, dw_min_std,
           dev_states.getData());
 
   DEBUG_KERNEL_UPDATE_CLEANUP(c);
@@ -100,6 +100,10 @@ int debugKernelUpdateW(
 #ifdef RPU_USE_DOUBLE
 template int debugKernelUpdateW<double>(
     double *, unsigned int *, int, unsigned int *, int, int, double, double, double, double *);
+#endif
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateW<half_t>(
+    half_t *, unsigned int *, int, unsigned int *, int, int, half_t, half_t, half_t, half_t *);
 #endif
 template int debugKernelUpdateW<float>(
     float *, unsigned int *, int, unsigned int *, int, int, float, float, float, float *);
@@ -175,7 +179,7 @@ int debugKernelUpdateWBatch(
       kernelUpdateWBatchFunctor<T, 0, uint32_t, true, true, UpdateFunctorConstantStep<T>>
           <<<nblocks, nthreads, 0, c->getStream()>>>(
               dev_weights.getData(), dev_x_counts.getData(), x_size, dev_d_counts.getData(), d_size,
-              dev_4params.getData(), (float *)nullptr, (T *)nullptr, (T *)nullptr, nK32, m_batch,
+              dev_4params.getData(), (param_t *)nullptr, (T *)nullptr, (T *)nullptr, nK32, m_batch,
               dw_min_std, dev_states.getData());
     } else {
       std::cout << "kernelUpdateWBatchFunctor<uint32_t,false,false,UpdateFunctorConstantStep>"
@@ -183,7 +187,7 @@ int debugKernelUpdateWBatch(
       kernelUpdateWBatchFunctor<T, 0, uint32_t, false, false, UpdateFunctorConstantStep<T>>
           <<<nblocks, nthreads, 0, c->getStream()>>>(
               dev_weights.getData(), dev_x_counts.getData(), x_size, dev_d_counts.getData(), d_size,
-              dev_4params.getData(), (float *)nullptr, (T *)nullptr, (T *)nullptr, nK32, m_batch,
+              dev_4params.getData(), (param_t *)nullptr, (T *)nullptr, (T *)nullptr, nK32, m_batch,
               dw_min_std, dev_states.getData());
     }
     break;
@@ -210,6 +214,22 @@ template int debugKernelUpdateWBatch<double>(
     double,
     int,
     double *);
+#endif
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateWBatch<half_t>(
+    half_t *,
+    unsigned int *,
+    int,
+    unsigned int *,
+    int,
+    int,
+    int,
+    bool,
+    half_t,
+    half_t,
+    half_t,
+    int,
+    half_t *);
 #endif
 template int debugKernelUpdateWBatch<float>(
     float *,
@@ -395,6 +415,22 @@ template int debugKernelUpdateWBatchShared<double>(
     double,
     int,
     double *);
+#endif
+#ifdef RPU_USE_FP16
+template int debugKernelUpdateWBatchShared<half_t>(
+    half_t *,
+    unsigned int *,
+    int,
+    unsigned int *,
+    int,
+    int,
+    int,
+    bool,
+    half_t,
+    half_t,
+    half_t,
+    int,
+    half_t *);
 #endif
 template int debugKernelUpdateWBatchShared<float>(
     float *,

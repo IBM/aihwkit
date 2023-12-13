@@ -16,14 +16,13 @@
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import ClassVar, List, Type, Union, TYPE_CHECKING
+from typing import ClassVar, List, Union, Any, TYPE_CHECKING
 from warnings import warn
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.parameters.helpers import _PrintableMixin, parameters_to_bindings
-from aihwkit.simulator.parameters.utils import IOParameters, UpdateParameters
-from aihwkit.simulator.parameters.enums import VectorUnitCellUpdatePolicy
-from aihwkit.simulator.rpu_base import devices
+from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.enums import VectorUnitCellUpdatePolicy, RPUDataType
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs.devices import PulsedDevice
@@ -33,8 +32,9 @@ if TYPE_CHECKING:
 class UnitCell(_PrintableMixin):
     """Parameters that modify the behaviour of a unit cell."""
 
-    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
-
+    bindings_class: ClassVar[str] = "VectorResistiveDeviceParameter"
+    bindings_module: ClassVar[str] = "devices"
+    bindings_typed: ClassVar[bool] = True
     bindings_ignore: ClassVar[List] = ["diffusion", "lifetime"]
 
     unit_cell_devices: List = field(default_factory=list)
@@ -47,8 +47,10 @@ class UnitCell(_PrintableMixin):
     Applies to all ``unit_cell_devices``.
     """
 
-    def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
+    def as_bindings(self, data_type: RPUDataType) -> Any:
+        """Return a representation of this instance as a simulator
+        bindings object of a given data type.
+        """
         raise NotImplementedError
 
     def requires_diffusion(self) -> bool:
@@ -75,7 +77,7 @@ class VectorUnitCell(UnitCell):
     weight of a cross point.
     """
 
-    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "VectorResistiveDeviceParameter"
 
     update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.ALL
     """The update policy of which if the devices will be receiving the update
@@ -95,15 +97,15 @@ class VectorUnitCell(UnitCell):
     amounts (:math:`1/n`).
     """
 
-    def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        vector_parameters = parameters_to_bindings(self)
+        vector_parameters = parameters_to_bindings(self, data_type)
 
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
 
         for param in self.unit_cell_devices:
-            device_parameters = param.as_bindings()
+            device_parameters = param.as_bindings(data_type)
             if not vector_parameters.append_parameter(device_parameters):
                 raise ConfigError("Could not add unit cell device parameter")
 
@@ -133,7 +135,7 @@ class ReferenceUnitCell(UnitCell):
             analog_tile.set_hidden_update_index(0) # set back to 0 for the following updates
     """
 
-    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "VectorResistiveDeviceParameter"
 
     update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.SINGLE_FIXED
     """The update policy of which if the devices will be receiving the
@@ -156,9 +158,9 @@ class ReferenceUnitCell(UnitCell):
         the default ``[1, -1]`` to implement the reference device subtraction.
     """
 
-    def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        vector_parameters = parameters_to_bindings(self)
+        vector_parameters = parameters_to_bindings(self, data_type)
 
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
@@ -174,7 +176,7 @@ class ReferenceUnitCell(UnitCell):
             raise ConfigError("ReferenceUnitCell expects two unit_cell_devices")
 
         for param in self.unit_cell_devices:
-            device_parameters = param.as_bindings()
+            device_parameters = param.as_bindings(data_type)
             if not vector_parameters.append_parameter(device_parameters):
                 raise ConfigError("Could not add unit cell device parameter")
 
@@ -219,7 +221,7 @@ class OneSidedUnitCell(UnitCell):
         ``w_min``, will become the w_max of the negative device.
     """
 
-    bindings_class: ClassVar[Type] = devices.OneSidedResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "OneSidedResistiveDeviceParameter"
 
     refresh_every: int = 0
     """How often a refresh is performed (in units of the number of vector
@@ -252,7 +254,7 @@ class OneSidedUnitCell(UnitCell):
     refresh_forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameters that define the read during a refresh event.
 
-    :class:`~aihwkit.simulator.parameters.utils.IOParameters`
+    :class:`~aihwkit.simulator.configs.IOParameters`
     that define the read (forward) of an refresh event. For instance
     the amount of noise or whether refresh is done using a ADC/DAC
     etc.
@@ -263,7 +265,7 @@ class OneSidedUnitCell(UnitCell):
     event.
 
     Update parameters
-    :class:`~aihwkit.simulator.parameters.utils.UpdateParameters`
+    :class:`~aihwkit.simulator.configs.UpdateParameters`
     that define the type of update used for each refresh event.
     """
 
@@ -272,14 +274,14 @@ class OneSidedUnitCell(UnitCell):
     the negative updates instead of the positive half of the second
     device."""
 
-    def as_bindings(self) -> devices.OneSidedResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator
         bindings object."""
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
 
-        onesided_parameters = parameters_to_bindings(self)
-        device_parameter0 = self.unit_cell_devices[0].as_bindings()
+        onesided_parameters = parameters_to_bindings(self, data_type)
+        device_parameter0 = self.unit_cell_devices[0].as_bindings(data_type)
 
         if len(self.unit_cell_devices) == 0 or len(self.unit_cell_devices) > 2:
             raise ConfigError("Need 1 or 2 unit_cell_devices")
@@ -287,7 +289,7 @@ class OneSidedUnitCell(UnitCell):
         if len(self.unit_cell_devices) == 1:
             device_parameter1 = device_parameter0
         else:
-            device_parameter1 = self.unit_cell_devices[1].as_bindings()
+            device_parameter1 = self.unit_cell_devices[1].as_bindings(data_type)
 
         # need to be exactly 2 and same parameters
         if not onesided_parameters.append_parameter(device_parameter0):
@@ -365,7 +367,7 @@ class TransferCompound(UnitCell):
     .. _Gokmen & Haensch (2020): https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
     """
 
-    bindings_class: ClassVar[Type] = devices.TransferResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "TransferResistiveDeviceParameter"
 
     gamma: float = 0.0
     r"""Weighting factor to compute the effective SGD weight from the hidden
@@ -489,7 +491,7 @@ class TransferCompound(UnitCell):
     transfer_forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameters that define the read of a transfer event.
 
-    :class:`~aihwkit.simulator.parameters.utils.IOParameters` that define the read
+    :class:`~aihwkit.simulator.configs.IOParameters` that define the read
     (forward or backward) of an transfer event. For instance the amount of noise
     or whether transfer is done using a ADC/DAC etc.
     """
@@ -498,21 +500,21 @@ class TransferCompound(UnitCell):
     """Update parameters that define the type of update used for each transfer
     event.
 
-    Update parameters :class:`~aihwkit.simulator.parameters.utils.UpdateParameters` that
+    Update parameters :class:`~aihwkit.simulator.configs.UpdateParameters` that
     define the type of update used for each transfer event.
     """
 
-    def as_bindings(self) -> devices.TransferResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
 
         n_devices = len(self.unit_cell_devices)
 
-        transfer_parameters = parameters_to_bindings(self)
+        transfer_parameters = parameters_to_bindings(self, data_type)
 
-        param_fast = self.unit_cell_devices[0].as_bindings()
-        param_slow = self.unit_cell_devices[1].as_bindings()
+        param_fast = self.unit_cell_devices[0].as_bindings(data_type)
+        param_slow = self.unit_cell_devices[1].as_bindings(data_type)
 
         if not transfer_parameters.append_parameter(param_fast):
             raise ConfigError("Could not add unit cell device parameter")
@@ -547,7 +549,7 @@ class BufferedTransferCompound(TransferCompound):
     .. _Gokmen (2021): https://www.frontiersin.org/articles/10.3389/frai.2021.699148/full
     """
 
-    bindings_class: ClassVar[Type] = devices.BufferedTransferResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "BufferedTransferResistiveDeviceParameter"
 
     thres_scale: float = 1.0
     """Threshold scale for buffer to determine whether to transfer to next
@@ -586,7 +588,7 @@ class BufferedTransferCompound(TransferCompound):
     """Update parameters that define the type of update used for each transfer
     event.
 
-    Update parameters :class:`~aihwkit.simulator.parameters.utils.UpdateParameters` that
+    Update parameters :class:`~aihwkit.simulator.configs.UpdateParameters` that
     define the type of update used for each transfer event.
     """
 
@@ -619,7 +621,7 @@ class ChoppedTransferCompound(TransferCompound):
         fused CUDA kernel design.
     """
 
-    bindings_class: ClassVar[Type] = devices.ChoppedTransferResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "ChoppedTransferResistiveDeviceParameter"
 
     in_chop_prob: float = 0.1
     """Switching probability of the input choppers. The chopper will be
@@ -652,7 +654,9 @@ class ChoppedTransferCompound(TransferCompound):
          buffer_granularity *= auto_granularity / (in_size * transfer_every) *
                                weight_granularity
 
-    Typical value would be e.g. 20000.
+    Typical value would be e.g. 1000. But see
+    ``auto_granularity_scaled_with_weight_granularity`` switch.
+
     """
 
     step: float = 1.0
@@ -678,7 +682,15 @@ class ChoppedTransferCompound(TransferCompound):
     subtracted by the amount transferred (times one minus momentum).
     """
 
+    no_buffer: bool = False
+    """Turn off the usage of the digital buffer.
+
+    This is identical to the Tiki-taka (version 1) algorithm with
+    `gamma=0`
+    """
+
     units_in_mbatch: bool = False
+
     """Units for ``transfer_every``.
 
     If set, then the cycle length units of ``transfer_every`` are in
@@ -697,6 +709,14 @@ class ChoppedTransferCompound(TransferCompound):
 
     auto_momentum: float = 0.99
     """Momentum of the gradient when using auto scale """
+
+    correct_gradient_magnitudes: bool = False
+    """Scale the transfer LR with the fast LR to yield the
+    correct gradient magnitudes.
+
+    Note:
+        ``auto_granularity`` has no effect in this case
+    """
 
     transfer_columns: bool = True
     """Whether to read and transfer columns or rows.
@@ -734,13 +754,11 @@ class ChoppedTransferCompound(TransferCompound):
 
     ie. whether to scale the transfer LR with the current LR of the SGD.
     """
-    experimental_adjust_auto_scale_with_transfer_every: bool = False
-    """ (EXPERIMENTAL). Adjusts the auto scale with transfer every ratio """
 
     transfer_forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameters that define the read of a transfer event.
 
-    :class:`~aihwkit.simulator.parameters.utils.IOParameters` that define the read
+    :class:`~aihwkit.simulator.configs.IOParameters` that define the read
     (forward or backward) of an transfer event. For instance the amount of noise
     or whether transfer is done using a ADC/DAC etc.
     """
@@ -753,11 +771,11 @@ class ChoppedTransferCompound(TransferCompound):
     """Update parameters that define the type of update used for each transfer
     event.
 
-    Update parameters :class:`~aihwkit.simulator.parameters.utils.UpdateParameters` that
+    Update parameters :class:`~aihwkit.simulator.configs.UpdateParameters` that
     define the type of update used for each transfer event.
     """
 
-    def as_bindings(self) -> devices.ChoppedTransferResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
@@ -766,10 +784,10 @@ class ChoppedTransferCompound(TransferCompound):
         if n_devices != 2:
             raise ConfigError("Only 2 devices supported for ChoppedTransferCompound")
 
-        transfer_parameters = parameters_to_bindings(self)
+        transfer_parameters = parameters_to_bindings(self, data_type)
 
-        param_fast = self.unit_cell_devices[0].as_bindings()
-        param_slow = self.unit_cell_devices[1].as_bindings()
+        param_fast = self.unit_cell_devices[0].as_bindings(data_type)
+        param_slow = self.unit_cell_devices[1].as_bindings(data_type)
 
         if not transfer_parameters.append_parameter(param_fast):
             raise ConfigError("Could not add unit cell device parameter")
@@ -806,7 +824,7 @@ class DynamicTransferCompound(ChoppedTransferCompound):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.DynamicTransferResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "DynamicTransferResistiveDeviceParameter"
 
     in_chop_prob: float = 0.1
     """Switching probability of the input choppers. The chopper will be
@@ -828,23 +846,13 @@ class DynamicTransferCompound(ChoppedTransferCompound):
     col. All rows/cols will switch at the same matrix update cycle.
     """
 
-    out_chop_prob: float = 0.0
-    """Switching probability of the output choppers. The chopper will be
-    switched with the given probability once after a full matrix
-    update has been accomplished.
-    """
+    experimental_correct_accumulation: bool = False
+    """Correct the gradient accumulation for the multiple reads.
 
-    always_write: bool = True
-    """Whether to always write (to the weight matrix), or only write after
-    each chopper period."""
+    Caution:
+        This feature is only approximately computed in the CPU version
+        if ``in_chop_random`` is set.
 
-    thres_scale: float = 0.0
-    """Threshold scale for buffer to determine whether to transfer to next
-    device. This is multiplied with the running standard deviation.
-
-    Setting the this to 0.0 mean that the standard deviation
-    estimation and threshold computation is omitted and the difference
-    is updated onto the buffer directly without scaling.
     """
 
     step: float = 1.0
@@ -918,10 +926,6 @@ class DynamicTransferCompound(ChoppedTransferCompound):
     ie. whether to scale the transfer LR with the current LR of the SGD.
     """
 
-    scale_thres_with_samples: bool = True
-    """Whether to divide the threshold with the square of the number of
-    samples in the current chopper period."""
-
     tail_weightening: float = 5.0
     """Weight the tail of the chopper period more (if larger than 1). This
     helps to reduce the impact of the transient period"""
@@ -930,7 +934,7 @@ class DynamicTransferCompound(ChoppedTransferCompound):
 
     """Input-output parameters that define the read of a transfer event.
 
-    :class:`~aihwkit.simulator.parameters.utils.IOParameters`
+    :class:`~aihwkit.simulator.configs.IOParameters`
     that define the read (forward or backward) of an transfer
     event. For instance the amount of noise or whether transfer is
     done using a ADC/DAC etc.
@@ -944,11 +948,11 @@ class DynamicTransferCompound(ChoppedTransferCompound):
     """Update parameters that define the type of update used for each transfer
     event.
 
-    Update parameters :class:`~aihwkit.simulator.parameters.utils.UpdateParameters` that
+    Update parameters :class:`~aihwkit.simulator.configs.UpdateParameters` that
     define the type of update used for each transfer event.
     """
 
-    def as_bindings(self) -> devices.ChoppedTransferResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
@@ -957,10 +961,10 @@ class DynamicTransferCompound(ChoppedTransferCompound):
         if n_devices != 2:
             raise ConfigError("Only 2 devices supported for ChoppedTransferCompound")
 
-        transfer_parameters = parameters_to_bindings(self)
+        transfer_parameters = parameters_to_bindings(self, data_type)
 
-        param_fast = self.unit_cell_devices[0].as_bindings()
-        param_slow = self.unit_cell_devices[1].as_bindings()
+        param_fast = self.unit_cell_devices[0].as_bindings(data_type)
+        param_slow = self.unit_cell_devices[1].as_bindings(data_type)
 
         if not transfer_parameters.append_parameter(param_fast):
             raise ConfigError("Could not add unit cell device parameter")
@@ -986,8 +990,7 @@ class DigitalRankUpdateCell(_PrintableMixin):
     (analog) crossbar array that is used during forward and backward.
     """
 
-    bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
-
+    bindings_class: ClassVar[str] = "AbstractResistiveDeviceParameter"
     bindings_ignore: ClassVar[List] = ["diffusion", "lifetime"]
 
     device: Union["PulsedDevice", OneSidedUnitCell, VectorUnitCell, ReferenceUnitCell] = field(
@@ -1002,7 +1005,7 @@ class DigitalRankUpdateCell(_PrintableMixin):
     Applies to ``device``.
     """
 
-    def as_bindings(self) -> devices.AbstractResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         raise NotImplementedError
 
@@ -1043,7 +1046,7 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
     .. _`Nandakumar et al. Front. in Neurosci. (2020)`: https://doi.org/10.3389/fnins.2020.00406
     """
 
-    bindings_class: ClassVar[Type] = devices.MixedPrecResistiveDeviceParameter
+    bindings_class: ClassVar[str] = "MixedPrecResistiveDeviceParameter"
 
     transfer_every: int = 1
     """Transfers every :math:`n` mat-vec operations.
@@ -1112,10 +1115,10 @@ class MixedPrecisionCompound(DigitalRankUpdateCell):
     """Whether to use stochastic rounding in case of quantization of the error d.
     """
 
-    def as_bindings(self) -> devices.MixedPrecResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        mixed_prec_parameter = parameters_to_bindings(self)
-        param_device = self.device.as_bindings()
+        mixed_prec_parameter = parameters_to_bindings(self, data_type)
+        param_device = self.device.as_bindings(data_type)
 
         if not mixed_prec_parameter.set_device_parameter(param_device):
             raise ConfigError("Could not add device parameter")

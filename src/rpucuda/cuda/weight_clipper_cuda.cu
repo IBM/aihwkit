@@ -10,6 +10,7 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 #include "io_iterator.h"
 #include "rpu_cub.h"
@@ -31,7 +32,7 @@ template <typename T> struct StdFunctor {
 template <typename T> __global__ void kernelAClipC(T *values, int size, T *a, T c, T max_clip) {
 
   T abs_a = fabs(*a / c);
-  if (max_clip > 0) {
+  if (max_clip > (T)0.0) {
     abs_a = MIN(abs_a, max_clip);
   }
 
@@ -41,8 +42,8 @@ template <typename T> __global__ void kernelAClipC(T *values, int size, T *a, T 
 template <typename T>
 __global__ void kernelAClipSqrt(T *values, int size, T *a, T sigma, T max_clip) {
 
-  T abs_a = sqrtf(fabs(*a) / (size - 1)) * sigma;
-  if (max_clip > 0) {
+  T abs_a = sqrt(fabs(*a) / (T)(size - 1)) * sigma;
+  if (max_clip > (T)0.0) {
     abs_a = MIN(abs_a, max_clip);
   }
 
@@ -136,6 +137,9 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
 template class WeightClipperCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class WeightClipperCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class WeightClipperCuda<half_t>;
 #endif
 
 #undef RPU_WM_KERNEL_LOOP

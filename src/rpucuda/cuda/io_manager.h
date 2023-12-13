@@ -138,7 +138,7 @@ private:
   T *temp_input_applied_ = nullptr;
   T *temp_output_applied_ = nullptr;
 
-  std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_scale_values_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_bound_exceeded_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_any_exceeded_ = nullptr;
 };

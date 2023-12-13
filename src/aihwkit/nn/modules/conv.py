@@ -297,7 +297,7 @@ class AnalogConv1d(_AnalogConvNd):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)
 
     @classmethod
     def to_digital(cls, module: "AnalogConv1d", realistic: bool = False) -> Conv1d:
@@ -328,7 +328,8 @@ class AnalogConv1d(_AnalogConvNd):
         digital_layer.weight.data = weight.data.view(-1, module.in_channels, *module.kernel_size)
         if bias is not None:
             digital_layer.bias.data = bias.data
-        return digital_layer
+        analog_tile = next(module.analog_tiles())
+        return digital_layer.to(device=analog_tile.device, dtype=analog_tile.get_dtype())
 
     def get_tile_size(self, in_channels: int, groups: int, kernel_size: Tuple[int, ...]) -> int:
         """Calculate the tile size."""
@@ -493,7 +494,7 @@ class AnalogConv2d(_AnalogConvNd):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)
 
     @classmethod
     def to_digital(cls, module: "AnalogConv2d", realistic: bool = False) -> Conv2d:
@@ -524,7 +525,8 @@ class AnalogConv2d(_AnalogConvNd):
         digital_layer.weight.data = weight.data.view(-1, module.in_channels, *module.kernel_size)
         if bias is not None:
             digital_layer.bias.data = bias.data
-        return digital_layer
+        analog_tile = next(module.analog_tiles())
+        return digital_layer.to(device=analog_tile.device, dtype=analog_tile.get_dtype())
 
     def get_tile_size(self, in_channels: int, groups: int, kernel_size: Tuple[int, ...]) -> int:
         """Calculate the tile size."""
@@ -687,7 +689,7 @@ class AnalogConv3d(_AnalogConvNd):
         )
 
         analog_layer.set_weights(module.weight, module.bias)
-        return analog_layer
+        return analog_layer.to(module.weight.device)
 
     @classmethod
     def to_digital(cls, module: "AnalogConv3d", realistic: bool = False) -> Conv3d:
@@ -718,7 +720,8 @@ class AnalogConv3d(_AnalogConvNd):
         digital_layer.weight.data = weight.data.view(-1, module.in_channels, *module.kernel_size)
         if bias is not None:
             digital_layer.bias.data = bias.data
-        return digital_layer
+        analog_tile = next(module.analog_tiles())
+        return digital_layer.to(device=analog_tile.device, dtype=analog_tile.get_dtype())
 
     def get_tile_size(self, in_channels: int, groups: int, kernel_size: Tuple[int, ...]) -> int:
         """Calculate the tile size."""

@@ -18,6 +18,7 @@
 #include <memory>
 #include <random>
 
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 #include "cuda_util.h"
 #include "forward_backward_pass.h"
@@ -46,7 +47,7 @@ __global__ void kernelOutputWeightNoise(
   }
   for (int idx = tid; idx < size; idx += total_threads) {
     T value = input[idx];
-    value += noise_std * curand_normal(&local_state);
+    value += noise_std * (T)curand_normal(&local_state);
 
     output[idx] = value;
   }
@@ -274,7 +275,7 @@ void ForwardBackwardPassIOManagedCuda<T>::applyOutputWeightNoise(
     InputOutputManager<T> &iom, const bool out_trans, const bool tranposed) {
 
   auto io = iom.getIO();
-  if (io.w_noise <= 0) {
+  if (io.w_noise <= (T)0.0) {
     return;
   }
 
@@ -299,7 +300,7 @@ void ForwardBackwardPassIOManagedCuda<T>::applyOutputWeightNoise(
   // out buffer is out_size_ x m_batch or m_batch x out_size_ (if out_trans)
   T *out_temp = iom.getOutBuffer();
 
-  if (m_batch == 1) {
+  if (m_batch == 1 && sizeof(T) >= 4) {
 
     // directly calculate vector norm, (over-)use same buffer
     RPU::math::nrm2(context, in_size, in_temp, 1, wnoise_buffer);
@@ -344,7 +345,7 @@ void ForwardBackwardPassIOManagedCuda<T>::applyOutputPCMReadNoise(
     const T *dev_weights, InputOutputManager<T> &iom, const bool out_trans, const bool transposed) {
 
   auto io = iom.getIO();
-  if (io.w_noise <= 0) {
+  if (io.w_noise <= (T)0.0) {
     return;
   }
 
@@ -468,7 +469,7 @@ __global__ void kernelOutputNonLinearityBatch(
   for (int idx = tid; idx < total_size; idx += total_threads) {
     T value = output[idx];
     int out_idx = trans ? (idx / m_batch) : (idx % size);
-    value = nlf * value / (1 + fabs(nonlinearity[out_idx] * value));
+    value = nlf * value / ((T)1.0 + fabs(nonlinearity[out_idx] * value));
     output[idx] = value;
   }
 }
@@ -503,7 +504,7 @@ template <typename T>
 void ForwardBackwardPassIOManagedCuda<T>::applyIrDrop(
     const T *dev_weights, InputOutputManager<T> &iom, const bool out_trans, const bool transposed) {
   auto io = iom.getIO();
-  if (io.ir_drop <= 0.0) {
+  if (io.ir_drop <= (T)0.0) {
     return;
   }
 
@@ -542,7 +543,7 @@ void ForwardBackwardPassIOManagedCuda<T>::applyIrDrop(
   // compute the a_i
   this->gemm(
       context, weight_buffer, batch_buffer, in_size, in_trans, a_buffer, out_size, out_trans,
-      m_batch, in_size / io.ir_drop_Gw_div_gmax, (T)0.0, transposed);
+      m_batch, (T)in_size / io.ir_drop_Gw_div_gmax, (T)0.0, transposed);
 
   // compute x_j*(1-(1-j/n)^2)
   kernelInputPositionCoding<<<nblocks_om_batch, nthreads, 0, context_->getStream()>>>(
@@ -591,11 +592,11 @@ __global__ void kernelOutputVoffsetBatch(
     T v_offs = v_offset[out_idx];
     T y_ref = (y_ref_values == nullptr) ? (T)0.0 : y_ref_values[b_idx];
     T y_pos = y + y_ref;
-    if (rs > 0) {
-      y_pos /= (1 + MIN(rs * fabs(y_pos), rs_max_total));
-      y_ref /= (1 + MIN(rs * fabs(y_ref), rs_max_total));
+    if (rs > (T)0.0) {
+      y_pos /= ((T)1.0 + MIN(rs * fabs(y_pos), rs_max_total));
+      y_ref /= ((T)1.0 + MIN(rs * fabs(y_ref), rs_max_total));
     }
-    output[idx] = (1 - v_offs) * y_pos - (1 + v_offs) * y_ref;
+    output[idx] = ((T)1.0 - v_offs) * y_pos - ((T)1.0 + v_offs) * y_ref;
   }
 }
 
@@ -625,7 +626,7 @@ void ForwardBackwardPassIOManagedCuda<T>::applyVoltageOffsets(
   T *out_temp = iom.getOutBuffer();
 
   T *y_ref = nullptr;
-  if (io.v_offset_w_min != 0.0) {
+  if (io.v_offset_w_min != (T)0.0) {
     y_ref = context->template getSharedBuffer<T>(RPU_BUFFER_TEMP_2, m_batch);
 
     // reduce x
@@ -748,7 +749,7 @@ bool ForwardBackwardPassIOManagedCuda<T>::computeAnalogMV(
     RPU::math::elemmin(this->context_, pos_neg_buffer_in, total_in_size, (T)0.0, in_temp);
 
     int w_size = this->d_size_ * this->x_size_;
-    if (io.w_read_asymmetry_dtod > 0 && (in_size * out_size == w_size)) {
+    if (io.w_read_asymmetry_dtod > (T)0.0 && (in_size * out_size == w_size)) {
       neg_weights = context_->template getSharedBuffer<T>(RPU_BUFFER_WEIGHT, w_size);
       RPU::math::elemmul(
           context_, neg_weights, w_size, dev_weights, mv_pars.w_asymmetry.getDataConst());
@@ -773,7 +774,7 @@ bool ForwardBackwardPassIOManagedCuda<T>::computeAnalogMV(
     context_->template releaseSharedBuffer<T>(RPU_BUFFER_POS_NEG_IN);
     context_->template releaseSharedBuffer<T>(RPU_BUFFER_POS_NEG_OUT);
 
-    if (io.w_read_asymmetry_dtod > 0) {
+    if (io.w_read_asymmetry_dtod > (T)0.0) {
       context_->template releaseSharedBuffer<T>(RPU_BUFFER_WEIGHT);
     }
 
@@ -801,7 +802,7 @@ bool ForwardBackwardPassIOManagedCuda<T>::computeAnalogMV(
     RPU::math::elemmin(this->context_, pos_neg_buffer_in, total_in_size, (T)0.0, in_temp);
 
     int w_size = this->d_size_ * this->x_size_;
-    if (io.w_read_asymmetry_dtod > 0 && (in_size * out_size == w_size)) {
+    if (io.w_read_asymmetry_dtod > (T)0.0 && (in_size * out_size == w_size)) {
       neg_weights = context_->template getSharedBuffer<T>(RPU_BUFFER_WEIGHT, w_size);
       RPU::math::elemmul(
           context_, neg_weights, w_size, dev_weights, mv_pars.w_asymmetry.getDataConst());
@@ -827,7 +828,7 @@ bool ForwardBackwardPassIOManagedCuda<T>::computeAnalogMV(
     context_->template releaseSharedBuffer<T>(RPU_BUFFER_POS_NEG_IN);
     context_->template releaseSharedBuffer<T>(RPU_BUFFER_POS_NEG_OUT);
 
-    if (io.w_read_asymmetry_dtod > 0) {
+    if (io.w_read_asymmetry_dtod > (T)0.0) {
       context_->template releaseSharedBuffer<T>(RPU_BUFFER_WEIGHT);
     }
 
@@ -846,9 +847,16 @@ RPU_GEN_OITER_TEMPLATES(
     float, bool, ForwardBackwardPassIOManagedCuda<float>::computeAnalogMV, OARG(float));
 
 #ifdef RPU_USE_DOUBLE
-template class InputOutputManager<double>;
-RPU_GEN_OITER_TEMPLATES(double, bool, InputOutputManager<double>::computeAnalogMV, OARG(double));
+template class ForwardBackwardPassIOManagedCuda<double>;
+RPU_GEN_OITER_TEMPLATES(
+    double, bool, ForwardBackwardPassIOManagedCuda<double>::computeAnalogMV, OARG(double));
 #endif
+#ifdef RPU_USE_FP16
+template class ForwardBackwardPassIOManagedCuda<half_t>;
+RPU_GEN_OITER_TEMPLATES(
+    half_t, bool, ForwardBackwardPassIOManagedCuda<half_t>::computeAnalogMV, OARG(half_t));
+#endif
+
 #undef OARG
 
 } // namespace RPU

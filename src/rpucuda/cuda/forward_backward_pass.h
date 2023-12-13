@@ -33,7 +33,6 @@ void forwardMatrix(
     const T alpha,
     const T beta = 0.0) {
   if (m_batch == 1) {
-
     RPU::math::gemv<T>(
         context, false, d_size, x_size, alpha, dev_weights, d_size, X_input,
         1, // x_inc
@@ -155,7 +154,7 @@ public:
   void populateFrom(const FBParameter<T> &fb_pars_host);
   bool checkFlexibleInSize(const IOMetaParameter<T> &io) {
     // TODO: need to check whether that is all correct...
-    if (io.w_noise > 0 || io.ir_drop > 0 || io.w_read_asymmetry_dtod > 0) {
+    if (io.w_noise > (T)0.0 || io.ir_drop > (T)0.0 || io.w_read_asymmetry_dtod > (T)0.0) {
       return false;
     } else {
       return true;

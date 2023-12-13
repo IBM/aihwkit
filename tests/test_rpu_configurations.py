@@ -15,7 +15,7 @@ from sys import version_info
 from unittest import SkipTest
 
 from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.parameters.utils import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters import IOParameters, UpdateParameters
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -57,7 +57,7 @@ class RPUConfigurationsFloatingPointTest(ParametrizedTestCase):
         """Test creating an array using the mappings to bindings."""
         rpu_config = self.get_rpu_config()
 
-        tile_params = rpu_config.device.as_bindings()
+        tile_params = rpu_config.device.as_bindings(rpu_config.runtime.data_type)
 
         _ = tile_params.create_array(10, 20)
 
@@ -112,7 +112,7 @@ class RPUConfigurationsTest(ParametrizedTestCase):
         rpu_config = self.get_rpu_config()
 
         tile_params = rpu_config.as_bindings()
-        device_params = rpu_config.device.as_bindings()
+        device_params = rpu_config.device.as_bindings(rpu_config.runtime.data_type)
 
         _ = tile_params.create_array(10, 20, device_params)
 

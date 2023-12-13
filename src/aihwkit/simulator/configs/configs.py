@@ -15,9 +15,11 @@
 # pylint: disable=too-few-public-methods
 
 from dataclasses import dataclass, field
-from typing import ClassVar, Type, Optional, Union
+from typing import ClassVar, Type, Optional, Union, Any
 
-from aihwkit.simulator.parameters.base import PrePostProcessingRPU, MappableRPU
+from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
+from aihwkit.simulator.parameters.mapping import MappableRPU
+from aihwkit.simulator.parameters.helpers import tile_parameters_to_bindings
 
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
@@ -26,7 +28,7 @@ from aihwkit.simulator.configs.devices import (
     PulsedDevice,
 )
 from aihwkit.simulator.configs.compounds import DigitalRankUpdateCell, UnitCell, TransferCompound
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     IOParameters,
     PulseType,
     UpdateParameters,
@@ -40,7 +42,7 @@ from aihwkit.inference import (
     GlobalDriftCompensation,
     PCMLikeNoiseModel,
 )
-from aihwkit.simulator.rpu_base import devices
+
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile, TorchInferenceTile
 from aihwkit.simulator.tiles.torch_tile import TorchSimulatorTile
 from aihwkit.simulator.tiles.array import TileModuleArray
@@ -61,7 +63,34 @@ class FloatingPointRPUConfig(MappableRPU, PrePostProcessingRPU):
 
 
 @dataclass
-class SingleRPUConfig(MappableRPU, PrePostProcessingRPU):
+class IOManagedRPUConfig(MappableRPU, PrePostProcessingRPU):
+    """Configuration for an analog (pulsed device) resistive processing unit."""
+
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "AnalogTileParameter"
+    bindings_module: ClassVar[Optional[str]] = "devices"
+
+    forward: IOParameters = field(
+        default_factory=IOParameters, metadata=dict(bindings_include=True)
+    )
+    """Input-output parameter setting for the forward direction."""
+
+    backward: IOParameters = field(
+        default_factory=IOParameters, metadata=dict(bindings_include=True)
+    )
+    """Input-output parameter setting for the backward direction."""
+
+    update: UpdateParameters = field(
+        default_factory=UpdateParameters, metadata=dict(bindings_include=True)
+    )
+    """Parameter for the update behavior."""
+
+    def as_bindings(self) -> Any:
+        """Return a representation of this instance as a simulator bindings object."""
+        return tile_parameters_to_bindings(self, self.runtime.data_type)
+
+
+@dataclass
+class SingleRPUConfig(IOManagedRPUConfig):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -70,23 +99,12 @@ class SingleRPUConfig(MappableRPU, PrePostProcessingRPU):
     tile_array_class: ClassVar[Type] = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
-    bindings_class: ClassVar[Type] = devices.AnalogTileParameter
-
     device: PulsedDevice = field(default_factory=ConstantStepDevice)
     """Parameter that modify the behavior of the pulsed device."""
 
-    forward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the forward direction."""
-
-    backward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the backward direction."""
-
-    update: UpdateParameters = field(default_factory=UpdateParameters)
-    """Parameter for the update behavior."""
-
 
 @dataclass
-class UnitCellRPUConfig(MappableRPU, PrePostProcessingRPU):
+class UnitCellRPUConfig(IOManagedRPUConfig):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
     tile_class: ClassVar[Type] = AnalogTile
@@ -95,23 +113,12 @@ class UnitCellRPUConfig(MappableRPU, PrePostProcessingRPU):
     tile_array_class: ClassVar[Type] = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
-    bindings_class: ClassVar[Type] = devices.AnalogTileParameter
-
     device: Union[UnitCell, TransferCompound] = field(default_factory=UnitCell)
     """Parameter that modify the behavior of the pulsed device."""
 
-    forward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the forward direction."""
-
-    backward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the backward direction."""
-
-    update: UpdateParameters = field(default_factory=UpdateParameters)
-    """Parameter for the parallel analog update behavior."""
-
 
 @dataclass
-class DigitalRankUpdateRPUConfig(MappableRPU, PrePostProcessingRPU):
+class DigitalRankUpdateRPUConfig(IOManagedRPUConfig):
     """Configuration for an analog (unit cell) resistive processing unit
     where the rank update is done in digital.
 
@@ -126,24 +133,12 @@ class DigitalRankUpdateRPUConfig(MappableRPU, PrePostProcessingRPU):
     tile_array_class: ClassVar[Type] = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
-    bindings_class: ClassVar[Type] = devices.AnalogTileParameter
-
     device: DigitalRankUpdateCell = field(default_factory=DigitalRankUpdateCell)
     """Parameter that modify the behavior of the pulsed device."""
 
-    forward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the forward direction."""
-
-    backward: IOParameters = field(default_factory=IOParameters)
-    """Input-output parameter setting for the backward direction."""
-
-    update: UpdateParameters = field(default_factory=UpdateParameters)
-    """Parameter for the analog part of the update, that is the transfer
-    from the digital buffer to the devices."""
-
 
 @dataclass
-class InferenceRPUConfig(MappableRPU, PrePostProcessingRPU):
+class InferenceRPUConfig(IOManagedRPUConfig):
     """Configuration for an analog tile that is used only for inference.
 
     Training is done in *hardware-aware* manner, thus using only the
@@ -162,9 +157,9 @@ class InferenceRPUConfig(MappableRPU, PrePostProcessingRPU):
     tile_array_class: ClassVar[Type] = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
-    bindings_class: ClassVar[Type] = devices.AnalogTileParameter
-
-    forward: IOParameters = field(default_factory=IOParameters)
+    forward: IOParameters = field(
+        default_factory=IOParameters, metadata=dict(bindings_include=True)
+    )
     """Input-output parameter setting for the forward direction.
 
     This parameters govern the hardware definitions specifying analog
@@ -234,12 +229,16 @@ class InferenceRPUConfig(MappableRPU, PrePostProcessingRPU):
     """Parameter that modify the behavior of the pulsed device: ideal device."""
 
     backward: IOParameters = field(
-        default_factory=lambda: IOParameters(is_perfect=True), init=False
+        default_factory=lambda: IOParameters(is_perfect=True),
+        init=False,
+        metadata=dict(bindings_include=True),
     )
     """Input-output parameter setting for the backward direction: perfect."""
 
     update: UpdateParameters = field(
-        default_factory=lambda: UpdateParameters(pulse_type=PulseType.NONE), init=False
+        default_factory=lambda: UpdateParameters(pulse_type=PulseType.NONE),
+        init=False,
+        metadata=dict(bindings_include=True),
     )
     """Parameter for the update behavior: ``NONE`` pulse type."""
 

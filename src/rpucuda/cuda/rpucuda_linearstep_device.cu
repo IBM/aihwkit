@@ -23,8 +23,8 @@ template <typename T> struct UpdateFunctorLinearStepMult {
       T &apparent_weight,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 lin_slope,
+      const param4_t par_4,
+      const param2_t lin_slope,
       T &persistent_weight,
       const T *write_noise_std,
       const int global_params_count,
@@ -34,30 +34,30 @@ template <typename T> struct UpdateFunctorLinearStepMult {
     UNUSED(global_params_count); // fixed
     // negative > 0 means going up here ...
     T uw_std = *write_noise_std;
-    T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        //[3], [1]
-    T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); // [1],[0]
-    T wmax = par_4.z;                                          // [2]
-    T wmin = par_4.x;                                          // [0]
+    T lin_dw = (negative > 0) ? ((T)par_4.w) : (-(T)par_4.y);        //[3], [1]
+    T lin_a = (negative > 0) ? ((T)lin_slope.y) : (-(T)lin_slope.x); // [1],[0]
+    T wmax = par_4.z;                                                // [2]
+    T wmin = par_4.x;                                                // [0]
 
-    T &w = uw_std > 0 ? persistent_weight : apparent_weight;
+    T &w = uw_std > (T)0.0 ? persistent_weight : apparent_weight;
 
     // n is larger 0 in any case
     if (n == 1) {
-      if (noise_std_dw > 0) {
+      if (noise_std_dw > (T)0.0) {
         T stoch_value = curand_normal(&local_state);
         stoch_value *= noise_std_dw;
-        w += (lin_a * w + lin_dw) * (1.0 + stoch_value);
+        w += (lin_a * w + lin_dw) * ((T)1.0 + stoch_value);
       } else {
         w += lin_a * w + lin_dw;
       }
       w = (w > wmax) ? wmax : w;
       w = (w < wmin) ? wmin : w;
     } else {
-      if (noise_std_dw > 0) {
+      if (noise_std_dw > (T)0.0) {
         for (int i_updates = 0; i_updates < n; i_updates++) {
-          T stoch_value = curand_normal(&local_state);
+          T stoch_value = (T)curand_normal(&local_state);
           stoch_value *= noise_std_dw;
-          w += (lin_a * w + lin_dw) * (1.0 + stoch_value);
+          w += (lin_a * w + lin_dw) * ((T)1.0 + stoch_value);
           // better always check both bounds
           w = (w > wmax) ? wmax : w;
           w = (w < wmin) ? wmin : w;
@@ -73,8 +73,8 @@ template <typename T> struct UpdateFunctorLinearStepMult {
     }
 
     // add update write noise onto apparent weight
-    if (uw_std > 0) {
-      T stoch_value = curand_normal(&local_state);
+    if (uw_std > (T)0.0) {
+      T stoch_value = (T)curand_normal(&local_state);
       apparent_weight = w + uw_std * stoch_value;
     }
   }
@@ -86,8 +86,8 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
       T &apparent_weight,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 lin_slope,
+      const param4_t par_4,
+      const param2_t lin_slope,
       T &persistent_weight,
       const T *write_noise_std,
       const int global_params_count,
@@ -97,29 +97,29 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
     UNUSED(global_params_count); // fixed
 
     T uw_std = *write_noise_std;
-    T lin_dw = (negative > 0) ? (par_4.w) : (-par_4.y);        // [3] [1]
-    T lin_a = (negative > 0) ? (lin_slope.y) : (-lin_slope.x); //[1],[0]
-    T &w = uw_std > 0 ? persistent_weight : apparent_weight;
-    T wmax = par_4.z; // [2]
-    T wmin = par_4.x; // [0]
+    T lin_dw = (negative > 0) ? ((T)par_4.w) : (-(T)par_4.y);        // [3] [1]
+    T lin_a = (negative > 0) ? ((T)lin_slope.y) : (-(T)lin_slope.x); //[1],[0]
+    T &w = uw_std > (T)0.0 ? persistent_weight : apparent_weight;
+    T wmax = (T)par_4.z; // [2]
+    T wmin = (T)par_4.x; // [0]
 
     // n is larger 0 in any case
     if (n == 1) {
-      if (noise_std_dw > 0) {
+      if (noise_std_dw > (T)0) {
         T stoch_value = curand_normal(&local_state);
         stoch_value *= noise_std_dw;
-        w += lin_a * w + lin_dw * (1.0 + stoch_value);
+        w += lin_a * w + lin_dw * ((T)1.0 + stoch_value);
       } else {
         w += lin_a * w + lin_dw;
       }
       w = (w > wmax) ? wmax : w;
       w = (w < wmin) ? wmin : w;
     } else {
-      if (noise_std_dw > 0) {
+      if (noise_std_dw > (T)0.0) {
         for (int i_updates = 0; i_updates < n; i_updates++) {
           T stoch_value = curand_normal(&local_state);
           stoch_value *= noise_std_dw;
-          w += lin_a * w + lin_dw * (1.0 + stoch_value);
+          w += lin_a * w + lin_dw * ((T)1.0 + stoch_value);
           w = (w > wmax) ? wmax : w;
           w = (w < wmin) ? wmin : w;
         }
@@ -132,7 +132,7 @@ template <typename T> struct UpdateFunctorLinearStepAdd {
       }
     }
     // add update write noise onto apparent weight
-    if (uw_std > 0) {
+    if (uw_std > (T)0.0) {
       T stoch_value = curand_normal(&local_state);
       apparent_weight = w + uw_std * stoch_value;
     }
@@ -183,6 +183,9 @@ pwukpvec_t<T> LinearStepRPUDeviceCuda<T>::getUpdateKernels(
 template class LinearStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class LinearStepRPUDeviceCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class LinearStepRPUDeviceCuda<half_t>;
 #endif
 
 } // namespace RPU

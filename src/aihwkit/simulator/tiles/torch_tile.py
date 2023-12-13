@@ -13,8 +13,9 @@
 """Low level implementation of torch-based tile."""
 
 from typing import Union, Callable, Any, Optional, TYPE_CHECKING
+from numbers import Number
 
-from torch import Tensor, zeros, randn_like, clamp, bmm, randn, float32
+from torch import Tensor, zeros, randn_like, clamp, bmm, randn
 from torch.nn import Parameter, Module
 from torch.autograd import no_grad
 
@@ -30,8 +31,8 @@ from aihwkit.simulator.parameters.enums import (
     WeightClipType,
     WeightRemapType,
 )
-from aihwkit.simulator.parameters.utils import (
-    IOParameters,
+from aihwkit.simulator.parameters.training import IOParameters
+from aihwkit.simulator.parameters.inference import (
     WeightModifierParameter,
     WeightClipParameter,
     WeightRemapParameter,
@@ -65,17 +66,16 @@ class TorchSimulatorTile(SimulatorTile, Module):
 
         self._f_io = rpu_config.forward
         self._modifier = rpu_config.modifier
+        dtype = rpu_config.runtime.data_type.as_torch()
         if self._f_io.out_noise_std > 0:
-            out_noise_values = (
-                self._f_io.out_noise * (1.0 + randn((d_size,), dtype=float32))
-            ).abs()
+            out_noise_values = (self._f_io.out_noise * (1.0 + randn((d_size,), dtype=dtype))).abs()
             self.register_buffer("out_noise_values", out_noise_values)
         else:
             self.out_noise_values = None
 
         # Don't use randn here to avoid changing the seed in
         # comparison to RPUCuda tiles
-        self.weight = Parameter(zeros(self.d_size, self.x_size, dtype=float32))
+        self.weight = Parameter(zeros(self.d_size, self.x_size, dtype=dtype))
 
     def set_weights(self, weight: Tensor) -> None:
         """Set the tile weights.
@@ -282,6 +282,7 @@ class TorchSimulatorTile(SimulatorTile, Module):
             WeightModifierType.DOREFA,
             WeightModifierType.POLY,
             WeightModifierType.PROG_NOISE,
+            WeightModifierType.PCM_NOISE,
             WeightModifierType.DISCRETIZE_ADD_NORMAL,
         ]:
             raise TorchTileConfigError(
@@ -363,7 +364,7 @@ class AnalogMVM:
             and (nm_scale_values == 0.0).all()
         ):
             # - Shortcut, output would be all zeros
-            return zeros(size=out_size, device=input_.device, dtype=float32)
+            return zeros(size=out_size, device=input_.device, dtype=input_.dtype())
 
         if isinstance(nm_scale_values, Tensor):
             # set zeros to 1 to avoid divide-by-zero errors
@@ -376,7 +377,7 @@ class AnalogMVM:
             # Fast path without bound management
             if n_management:
                 scale = scale / nm_scale_values
-                scaling = not (isinstance(scale, float) and scale == 1.0)
+                scaling = not (isinstance(scale, Number) and scale == 1.0)
 
             _, output = AnalogMVM._compute_analog_mv(
                 weight=weight,
@@ -413,11 +414,11 @@ class AnalogMVM:
 
             if n_management:
                 scale /= nm_scale_values
-                scaling = not (isinstance(scale, float) and scale == 1.0)
+                scaling = not (isinstance(scale, Number) and scale == 1.0)
 
             if b_management:
                 scale /= reduction_due_to_bound_management
-                scaling = not (isinstance(scale, float) and scale == 1.0)
+                scaling = not (isinstance(scale, Number) and scale == 1.0)
 
             bound_test_passed, output = AnalogMVM._compute_analog_mv(
                 weight=weight,
@@ -432,7 +433,7 @@ class AnalogMVM:
             bound_test_passed = bound_test_passed or (
                 (reduction_due_to_bound_management > io_pars.max_bm_factor)
                 or (
-                    (inp_res > 0)
+                    (inp_res > 0.0)
                     and (reduction_due_to_bound_management > io_pars.max_bm_res / inp_res)
                 )
             )

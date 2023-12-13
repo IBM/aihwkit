@@ -189,10 +189,10 @@ DEFINE_PWU_KERNEL_PARAMETER(
     /*run*/
     if (this->implicit_pulses) {
       START_SINGLE_FUNCTOR(
-          float, (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
-                  rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
-                  rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1,
-                  rpucuda_device->getWeightGranularityNoise(), dev_states));
+          T, (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
+              rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
+              rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1,
+              rpucuda_device->getWeightGranularityNoise(), dev_states));
     } else {
       START_SINGLE_FUNCTOR(
           uint32_t,
@@ -243,7 +243,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
     /*run*/
     if (this->implicit_pulses) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
-          T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
+          T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
           this->shared_mem, kernelUpdateWBatchFunctor, FunctorT, gp_count,
           (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
@@ -276,7 +276,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
 #define RPU_PWU_START_BATCH_KERNEL(KNAME)                                                          \
   if (this->implicit_pulses) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
-        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,       \
         this->shared_mem, KNAME,                                                                   \
         (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,                \
          rpucuda_device->get4ParamsData(), 1, m_batch,                                             \
@@ -359,7 +359,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
     RPU_PWU_START_BATCH_SHARED_INIT;
     if (this->implicit_pulses) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
-          T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
+          T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
           shared_mem, kernelUpdateWBatchSharedFunctor, FunctorT, gp_count,
           (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
@@ -393,7 +393,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
   RPU_PWU_START_BATCH_SHARED_INIT;                                                                 \
   if (this->implicit_pulses) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
-        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,       \
         shared_mem, KNAME,                                                                         \
         (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,                \
          rpucuda_device->get4ParamsData(), 1, m_batch, batch_load_stride,                          \
@@ -487,8 +487,8 @@ DEFINE_PWU_KERNEL_PARAMETER(
 
       if (this->implicit_pulses) {
         RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR_OS(
-            T, 0, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
-            shared_mem, kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
+            T, 0, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads, shared_mem,
+            kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
             (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
              rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
              rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
@@ -535,8 +535,8 @@ DEFINE_PWU_KERNEL_PARAMETER(
     } else {
       if (this->implicit_pulses) {
         RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR_OS(
-            T, 0, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
-            shared_mem, kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
+            T, 0, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads, shared_mem,
+            kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
             (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
              rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
              rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
@@ -573,7 +573,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
 #define RPU_PWU_COUNTER_KERNEL                                                                     \
   if (this->implicit_pulses) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
-        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,       \
         this->shared_mem, kernelPulseCounter,                                                      \
         (rpucuda_device->getPosPulseCountData(), rpucuda_device->getNegPulseCountData(),           \
          blm->getXData(), this->x_size, blm->getDData(), this->d_size, 1, m_batch));               \

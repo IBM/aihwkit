@@ -32,7 +32,7 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(CudaContextPtr c, int x_size, int d_
 
 template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
 
-  dev_4params_ = RPU::make_unique<CudaArray<float>>(this->context_, 4 * this->size_);
+  dev_4params_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 4 * this->size_);
   dev_decay_scale_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
   dev_diffusion_rate_ = nullptr; // on the fly
   dev_reset_bias_ = nullptr;
@@ -123,7 +123,7 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
   T *sd = rpu_device.getScaleDown()[0];
 
   // copy RPU to device variables
-  float *tmp = new float[4 * size];
+  param_t *tmp = new param_t[4 * size];
   T *tmp_ds = new T[size];
   T *tmp_df = new T[size];
   T *tmp_rb = new T[size];
@@ -153,10 +153,10 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
       tmp_rb[l_t] = rb[l];
       tmp_pw[l_t] = pw[l];
 
-      if (df[l] != 0.0) {
+      if (df[l] != (T)0.0) {
         with_diffusion = true;
       }
-      if (rb[l] != 0.0) {
+      if (rb[l] != (T)0.0) {
         with_reset_bias = true;
       }
     }
@@ -294,7 +294,7 @@ template <typename T> void PulsedRPUDeviceCuda<T>::clipWeights(T *weights, T cli
   T *w = getPar().usesPersistentWeight() ? dev_persistent_weights_->getData() : weights;
 
   RPU::math::elemsat<T>(this->context_, w, this->size_, dev_4params_->getData());
-  if (clip >= 0) {
+  if (clip >= (T)0.0) {
     RPU::math::aclip<T>(this->context_, w, this->size_, clip);
   }
   applyUpdateWriteNoise(weights);
@@ -363,7 +363,7 @@ template <typename T> void PulsedRPUDeviceCuda<T>::applyUpdateWriteNoise(T *dev_
   }
   this->rnd_context_->synchronize();
 
-  RPU::math::elemweightedsum<T>(
+  RPU::math::elemweightedsum<T, float>(
       this->context_, dev_weights, this->size_, dev_persistent_weights_->getData(), (T)1.0,
       this->dev_diffusion_nrnd_->getData(), par.write_noise_std);
 
@@ -401,7 +401,7 @@ void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
   bool with_flag = false;
   bool with_nrnd = false;
 
-  if (getPar().reset_std > 0) {
+  if (getPar().reset_std > (T)0.0) {
     if (this->dev_reset_nrnd_ == nullptr) {
       this->initResetRnd();
     }
@@ -409,7 +409,7 @@ void PulsedRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
         this->dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
     with_nrnd = true;
   }
-  if (reset_prob < 1) {
+  if (reset_prob < (T)1.0) {
     if (this->dev_reset_flag_ == nullptr) {
       this->initResetRnd();
     }
@@ -505,4 +505,8 @@ template class PulsedRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class PulsedRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class PulsedRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

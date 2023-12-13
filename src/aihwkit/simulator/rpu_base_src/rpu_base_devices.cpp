@@ -10,9 +10,29 @@
  * that they have been altered from the originals.
  */
 
+#include "rpu.h"
 #include "rpu_base.h"
+#include "rpu_buffered_transfer_device.h"
+#include "rpu_chopped_transfer_device.h"
+#include "rpu_constantstep_device.h"
+#include "rpu_dynamic_transfer_device.h"
+#include "rpu_expstep_device.h"
+#include "rpu_linearstep_device.h"
+#include "rpu_mixedprec_device.h"
+#include "rpu_mixedprec_device_base.h"
+#include "rpu_onesided_device.h"
+#include "rpu_piecewisestep_device.h"
+#include "rpu_powstep_device.h"
+#include "rpu_powstep_reference_device.h"
+#include "rpu_pulsed.h"
+#include "rpu_simple_device.h"
+#include "rpu_softbounds_reference_device.h"
+#include "rpu_transfer_device.h"
+#include "rpu_vector_device.h"
 
-void declare_rpu_devices(py::module &m) {
+#define NAME(S) (S + type_name_add).c_str()
+
+template <typename T> void declare_rpu_devices(py::module &m, std::string type_name_add) {
 
   using AbstractParam = RPU::AbstractRPUDeviceMetaParameter<T>;
   using SimpleParam = RPU::SimpleRPUDeviceMetaParameter<T>;
@@ -419,7 +439,7 @@ void declare_rpu_devices(py::module &m) {
   /*
    * Python class definitions.
    */
-  py::class_<RPU::SimpleMetaParameter<T>>(m, "FloatingPointTileParameter")
+  py::class_<RPU::SimpleMetaParameter<T>>(m, NAME("FloatingPointTileParameter"))
       .def(py::init<>())
       .def(
           "create_array", &RPU::SimpleMetaParameter<T>::createRPUArray, py::arg("x_size"),
@@ -436,7 +456,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("lifetime", &RPU::SimpleMetaParameter<T>::lifetime)
       .def_readwrite("drift", &RPU::SimpleMetaParameter<T>::drift);
 
-  py::class_<RPU::PulsedMetaParameter<T>>(m, "AnalogTileParameter")
+  py::class_<RPU::PulsedMetaParameter<T>>(m, NAME("AnalogTileParameter"))
       .def(py::init<>())
       .def(
           "create_array", [](RPU::PulsedMetaParameter<T> &self, int n_cols, int n_rows,
@@ -452,7 +472,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("backward_io", &RPU::PulsedMetaParameter<T>::b_io)
       .def_readwrite("update", &RPU::PulsedMetaParameter<T>::up);
 
-  py::class_<RPU::PulsedUpdateMetaParameter<T>>(m, "AnalogTileUpdateParameter")
+  py::class_<RPU::PulsedUpdateMetaParameter<T>>(m, NAME("AnalogTileUpdateParameter"))
       .def(py::init<>())
       .def_readwrite("fixed_bl", &RPU::PulsedUpdateMetaParameter<T>::fixed_BL)
       .def_readwrite("desired_bl", &RPU::PulsedUpdateMetaParameter<T>::desired_BL)
@@ -462,12 +482,13 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("sto_round", &RPU::PulsedUpdateMetaParameter<T>::sto_round)
       .def_readwrite("um_reg_scale", &RPU::PulsedUpdateMetaParameter<T>::um_reg_scale)
       .def_readwrite("um_grad_scale", &RPU::PulsedUpdateMetaParameter<T>::um_grad_scale)
+      .def_readwrite("d_sparsity", &RPU::PulsedUpdateMetaParameter<T>::d_sparsity)
       .def_readwrite("update_management", &RPU::PulsedUpdateMetaParameter<T>::update_management)
       .def_readwrite(
           "update_bl_management", &RPU::PulsedUpdateMetaParameter<T>::update_bl_management)
       .def_readwrite("x_res_implicit", &RPU::PulsedUpdateMetaParameter<T>::x_res_implicit);
 
-  py::class_<RPU::IOMetaParameter<T>>(m, "AnalogTileInputOutputParameter")
+  py::class_<RPU::IOMetaParameter<T>>(m, NAME("AnalogTileInputOutputParameter"))
       .def(py::init<>())
       .def_readwrite("bm_test_negative_bound", &RPU::IOMetaParameter<T>::bm_test_negative_bound)
       .def_readwrite("bound_management", &RPU::IOMetaParameter<T>::bound_management)
@@ -503,7 +524,7 @@ void declare_rpu_devices(py::module &m) {
       .def_readwrite("v_offset_w_min", &RPU::IOMetaParameter<T>::v_offset_w_min)
       .def_readwrite("w_read_asymmetry_dtod", &RPU::IOMetaParameter<T>::w_read_asymmetry_dtod);
 
-  py::class_<RPU::DriftParameter<T>>(m, "DriftParameter")
+  py::class_<RPU::DriftParameter<T>>(m, NAME("DriftParameter"))
       .def(py::init<>())
       .def_readwrite("nu", &RPU::DriftParameter<T>::nu)
       .def_readwrite("nu_dtod", &RPU::DriftParameter<T>::nu_dtod)
@@ -519,15 +540,15 @@ void declare_rpu_devices(py::module &m) {
 
   // device params
   py::class_<AbstractParam, PyAbstractParam, RPU::SimpleMetaParameter<T>>(
-      m, "AbstractResistiveDeviceParameter")
+      m, NAME("AbstractResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("construction_seed", &AbstractParam::construction_seed);
 
   py::class_<PulsedBaseParam, PyPulsedBaseParam, AbstractParam>(
-      m, "PulsedBaseResistiveDeviceParameter")
+      m, NAME("PulsedBaseResistiveDeviceParameter"))
       .def(py::init<>());
 
-  py::class_<SimpleParam, PySimpleParam, AbstractParam>(m, "IdealResistiveDeviceParameter")
+  py::class_<SimpleParam, PySimpleParam, AbstractParam>(m, NAME("IdealResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("reset_std", &SimpleParam::reset_std)
       .def("__str__", [](SimpleParam &self) {
@@ -536,7 +557,7 @@ void declare_rpu_devices(py::module &m) {
         return ss.str();
       });
 
-  py::class_<PulsedParam, PyPulsedParam, AbstractParam>(m, "PulsedResistiveDeviceParameter")
+  py::class_<PulsedParam, PyPulsedParam, AbstractParam>(m, NAME("PulsedResistiveDeviceParameter"))
       .def(py::init<>())
       // Properties from this class.
       .def_readwrite("corrupt_devices_prob", &PulsedParam::corrupt_devices_prob)
@@ -566,7 +587,7 @@ void declare_rpu_devices(py::module &m) {
       });
 
   py::class_<ConstantStepParam, PyConstantStepParam, PulsedParam>(
-      m, "ConstantStepResistiveDeviceParameter")
+      m, NAME("ConstantStepResistiveDeviceParameter"))
       .def(py::init<>())
       .def(
           "__str__",
@@ -585,7 +606,7 @@ void declare_rpu_devices(py::module &m) {
         )pbdoc");
 
   py::class_<LinearStepParam, PyLinearStepParam, PulsedParam>(
-      m, "LinearStepResistiveDeviceParameter")
+      m, NAME("LinearStepResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("gamma_up", &LinearStepParam::ls_decrease_up)
       .def_readwrite("gamma_down", &LinearStepParam::ls_decrease_down)
@@ -616,7 +637,7 @@ void declare_rpu_devices(py::module &m) {
         )pbdoc");
 
   py::class_<SoftBoundsParam, PySoftBoundsParam, LinearStepParam>(
-      m, "SoftBoundsResistiveDeviceParameter")
+      m, NAME("SoftBoundsResistiveDeviceParameter"))
       .def_readwrite("mult_noise", &SoftBoundsParam::ls_mult_noise)
       .def_readwrite("write_noise_std", &SoftBoundsParam::write_noise_std)
       .def_readwrite("apply_write_noise_on_set", &SoftBoundsParam::apply_write_noise_on_set)
@@ -640,7 +661,7 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<ExpStepParam, PyExpStepParam, PulsedParam>(m, "ExpStepResistiveDeviceParameter")
+  py::class_<ExpStepParam, PyExpStepParam, PulsedParam>(m, NAME("ExpStepResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("A_up", &ExpStepParam::es_A_up)
       .def_readwrite("A_down", &ExpStepParam::es_A_down)
@@ -668,7 +689,7 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<VectorParam, PyVectorParam, PulsedBaseParam>(m, "VectorResistiveDeviceParameter")
+  py::class_<VectorParam, PyVectorParam, PulsedBaseParam>(m, NAME("VectorResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("gamma_vec", &VectorParam::gamma_vec)
       .def_readwrite("update_policy", &VectorParam::update_policy)
@@ -698,7 +719,8 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<OneSidedParam, PyOneSidedParam, VectorParam>(m, "OneSidedResistiveDeviceParameter")
+  py::class_<OneSidedParam, PyOneSidedParam, VectorParam>(
+      m, NAME("OneSidedResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("refresh_every", &OneSidedParam::refresh_every)
       .def_readwrite("refresh_forward", &OneSidedParam::refresh_io)
@@ -723,7 +745,8 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<TransferParam, PyTransferParam, VectorParam>(m, "TransferResistiveDeviceParameter")
+  py::class_<TransferParam, PyTransferParam, VectorParam>(
+      m, NAME("TransferResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("gamma", &TransferParam::gamma)
       .def_readwrite("transfer_every", &TransferParam::transfer_every)
@@ -757,7 +780,8 @@ void declare_rpu_devices(py::module &m) {
            float: weight granularity
         )pbdoc");
 
-  py::class_<MixedPrecParam, PyMixedPrecParam, SimpleParam>(m, "MixedPrecResistiveDeviceParameter")
+  py::class_<MixedPrecParam, PyMixedPrecParam, SimpleParam>(
+      m, NAME("MixedPrecResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("transfer_every", &MixedPrecParam::transfer_every)
       .def_readwrite("n_rows_per_transfer", &MixedPrecParam::n_rows_per_transfer)
@@ -784,7 +808,7 @@ void declare_rpu_devices(py::module &m) {
         return ss.str();
       });
 
-  py::class_<PowStepParam, PyPowStepParam, PulsedParam>(m, "PowStepResistiveDeviceParameter")
+  py::class_<PowStepParam, PyPowStepParam, PulsedParam>(m, NAME("PowStepResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("pow_gamma", &PowStepParam::ps_gamma)
       .def_readwrite("pow_gamma_dtod", &PowStepParam::ps_gamma_dtod)
@@ -809,7 +833,7 @@ void declare_rpu_devices(py::module &m) {
         )pbdoc");
 
   py::class_<PowStepReferenceParam, PyPowStepReferenceParam, PulsedParam>(
-      m, "PowStepReferenceResistiveDeviceParameter")
+      m, NAME("PowStepReferenceResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("pow_gamma", &PowStepReferenceParam::ps_gamma)
       .def_readwrite("pow_gamma_dtod", &PowStepReferenceParam::ps_gamma_dtod)
@@ -836,7 +860,7 @@ void declare_rpu_devices(py::module &m) {
         )pbdoc");
 
   py::class_<PiecewiseStepParam, PyPiecewiseStepParam, PulsedParam>(
-      m, "PiecewiseStepResistiveDeviceParameter")
+      m, NAME("PiecewiseStepResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("piecewise_up", &PiecewiseStepParam::piecewise_up_vec)
       .def_readwrite("piecewise_down", &PiecewiseStepParam::piecewise_down_vec)
@@ -859,7 +883,7 @@ void declare_rpu_devices(py::module &m) {
         )pbdoc");
 
   py::class_<BufferedTransferParam, PyBufferedTransferParam, TransferParam>(
-      m, "BufferedTransferResistiveDeviceParameter")
+      m, NAME("BufferedTransferResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("thres_scale", &BufferedTransferParam::thres_scale)
       .def_readwrite("momentum", &BufferedTransferParam::momentum)
@@ -872,18 +896,18 @@ void declare_rpu_devices(py::module &m) {
       });
 
   py::class_<ChoppedTransferParam, PyChoppedTransferParam, BufferedTransferParam>(
-      m, "ChoppedTransferResistiveDeviceParameter")
+      m, NAME("ChoppedTransferResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("in_chop_prob", &ChoppedTransferParam::in_chop_prob)
       .def_readwrite("in_chop_random", &ChoppedTransferParam::in_chop_random)
       .def_readwrite("out_chop_prob", &ChoppedTransferParam::out_chop_prob)
       .def_readwrite("auto_scale", &ChoppedTransferParam::auto_scale)
+      .def_readwrite(
+          "correct_gradient_magnitudes", &ChoppedTransferParam::correct_gradient_magnitudes)
       .def_readwrite("auto_momentum", &ChoppedTransferParam::auto_momentum)
       .def_readwrite("auto_granularity", &ChoppedTransferParam::auto_granularity)
+      .def_readwrite("no_buffer", &ChoppedTransferParam::no_buffer)
       .def_readwrite("buffer_granularity", &ChoppedTransferParam::buffer_granularity)
-      .def_readwrite(
-          "experimental_adjust_auto_scale_with_transfer_every",
-          &ChoppedTransferParam::experimental_adjust_auto_scale_with_transfer_every)
       .def("__str__", [](ChoppedTransferParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
@@ -891,12 +915,13 @@ void declare_rpu_devices(py::module &m) {
       });
 
   py::class_<DynamicTransferParam, PyDynamicTransferParam, ChoppedTransferParam>(
-      m, "DynamicTransferResistiveDeviceParameter")
+      m, NAME("DynamicTransferResistiveDeviceParameter"))
       .def(py::init<>())
-      .def_readwrite("scale_thres_with_samples", &DynamicTransferParam::scale_thres_with_samples)
       .def_readwrite("tail_weightening", &DynamicTransferParam::tail_weightening)
       .def_readwrite("buffer_cap", &DynamicTransferParam::buffer_cap)
-      .def_readwrite("always_write", &DynamicTransferParam::always_write)
+      .def_readwrite(
+          "experimental_correct_accumulation",
+          &DynamicTransferParam::experimental_correct_accumulation)
       .def("__str__", [](DynamicTransferParam &self) {
         std::stringstream ss;
         self.printToStream(ss);
@@ -904,7 +929,7 @@ void declare_rpu_devices(py::module &m) {
       });
 
   py::class_<SoftBoundsReferenceParam, PySoftBoundsReferenceParam, PulsedParam>(
-      m, "SoftBoundsReferenceResistiveDeviceParameter")
+      m, NAME("SoftBoundsReferenceResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("slope_up_dtod", &SoftBoundsReferenceParam::slope_up_dtod)
       .def_readwrite("slope_down_dtod", &SoftBoundsReferenceParam::slope_down_dtod)
@@ -930,45 +955,14 @@ void declare_rpu_devices(py::module &m) {
         Returns:
            float: weight granularity
         )pbdoc");
+};
 
-  /**
-   * Helper enums.
-   **/
-  py::enum_<RPU::BoundManagementType>(m, "BoundManagementType")
-      .value("None", RPU::BoundManagementType::None)
-      .value("Iterative", RPU::BoundManagementType::Iterative)
-      .value("IterativeWorstCase", RPU::BoundManagementType::IterativeWorstCase);
+#undef NAME
 
-  py::enum_<RPU::VectorDeviceUpdatePolicy>(m, "VectorUnitCellUpdatePolicy")
-      .value("All", RPU::VectorDeviceUpdatePolicy::All)
-      .value("SingleFixed", RPU::VectorDeviceUpdatePolicy::SingleFixed)
-      .value("SingleSequential", RPU::VectorDeviceUpdatePolicy::SingleSequential)
-      .value("SingleRandom", RPU::VectorDeviceUpdatePolicy::SingleRandom);
-
-  py::enum_<RPU::NoiseManagementType>(m, "NoiseManagementType")
-      .value("None", RPU::NoiseManagementType::None)
-      .value("AbsMax", RPU::NoiseManagementType::AbsMax)
-      .value("AbsMaxNPSum", RPU::NoiseManagementType::AbsMaxNPSum)
-      .value("Max", RPU::NoiseManagementType::Max)
-      .value("Constant", RPU::NoiseManagementType::Constant)
-      .value("AverageAbsMax", RPU::NoiseManagementType::AverageAbsMax);
-
-  py::enum_<RPU::OutputWeightNoiseType>(m, "WeightNoiseType")
-      .value("None", RPU::OutputWeightNoiseType::None)
-      .value("AdditiveConstant", RPU::OutputWeightNoiseType::AdditiveConstant)
-      .value("PCMRead", RPU::OutputWeightNoiseType::PCMRead);
-
-  py::enum_<RPU::PulseType>(m, "PulseType")
-      .value("None", RPU::PulseType::None)
-      .value("StochasticCompressed", RPU::PulseType::StochasticCompressed)
-      .value("Stochastic", RPU::PulseType::Stochastic)
-      .value("NoneWithDevice", RPU::PulseType::NoneWithDevice)
-      .value("MeanCount", RPU::PulseType::MeanCount)
-      .value("DeterministicImplicit", RPU::PulseType::DeterministicImplicit);
-
-  py::enum_<RPU::AnalogMVType>(m, "AnalogMVType")
-      .value("Ideal", RPU::AnalogMVType::Ideal)
-      .value("OnePass", RPU::AnalogMVType::OnePass)
-      .value("PosNegSeparate", RPU::AnalogMVType::PosNegSeparate)
-      .value("PosNegSeparateDigitalSum", RPU::AnalogMVType::PosNegSeparateDigitalSum);
-}
+template void declare_rpu_devices<float>(py::module &, std::string);
+#ifdef RPU_USE_DOUBLE
+template void declare_rpu_devices<double>(py::module &, std::string);
+#endif
+#ifdef RPU_USE_FP16
+template void declare_rpu_devices<half_t>(py::module &, std::string);
+#endif

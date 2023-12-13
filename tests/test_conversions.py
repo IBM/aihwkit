@@ -160,15 +160,15 @@ class ConversionLayerTest(ParametrizedTestCase):
             analog_model.cuda()
             model.cuda()
 
-        self.assertEqual(analog_model.__class__, AnalogWrapper)
-        self.assertEqual(analog_model.module.model[0].__class__, AnalogConv2d)
-        self.assertEqual(analog_model.module.model.__class__, AnalogSequential)
+        self.assertTrue(isinstance(analog_model, AnalogWrapper))
+        self.assertEqual(analog_model.model[0].__class__, AnalogConv2d)
+        self.assertEqual(analog_model.model.__class__, AnalogSequential)
         self.assertTensorAlmostEqual(analog_model(x_input), lenet(x_input))
 
         # convert back to digial
         new_lenet = convert_to_digital(analog_model)
         for new_mod, mod in zip(new_lenet.modules(), lenet.modules()):
-            self.assertEqual(new_mod.__class__, mod.__class__)
+            self.assertEqual(new_mod.__class__.__name__, mod.__class__.__name__)
             if hasattr(mod, "weight"):
                 self.assertTensorAlmostEqual(new_mod.weight, mod.weight)
             if hasattr(mod, "bias") and mod.bias is not None:

@@ -148,7 +148,8 @@ public:
       const T *vec,
       const int n_vec,
       const T reset_prob,
-      const int i_col) override;
+      const int i_col,
+      const int m_batch_info) override;
 
   std::vector<std::vector<T>> getTransferBuffers() const { return transfer_buffer_vec_; };
 

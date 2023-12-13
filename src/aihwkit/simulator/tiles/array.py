@@ -18,6 +18,7 @@ from torch.nn import ModuleList, Parameter, Module
 from torch.autograd import no_grad
 
 from aihwkit.simulator.tiles.base import TileModuleBase
+from aihwkit.exceptions import TileModuleError
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs.configs import MappableRPU
@@ -176,3 +177,19 @@ class TileModuleArray(Module, TileModuleBase):
                 tensor_view = analog_tile.get_tensor_view(result.dim())
             return result + self.bias.view(*tensor_view)
         return result
+
+    def _apply_to_tiles(self, method_name: str, *args: Any, **kwargs: Any) -> List[List[Any]]:
+        """Applies function to each tile in the array.
+
+        Raises:
+            TileModuleError: if method does not exist
+        """
+        out_values = []
+        for in_tiles in self.array:
+            out_values_row = []
+            for analog_tile in in_tiles:
+                if not hasattr(analog_tile, method_name):
+                    raise TileModuleError(f"Tile does not have method '{method_name}'")
+                out_values_row.append(getattr(analog_tile, method_name)(*args, **kwargs))
+            out_values.append(out_values_row)
+        return out_values

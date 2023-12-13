@@ -87,6 +87,7 @@ public:
     printToStream(ss);
     std::cout << ss.str();
   };
+  std::string getDataTypeName() const;
   virtual void printToStream(std::stringstream &ss) const;
   virtual void setLearningRate(T lrate) { learning_rate_ = lrate; };
 
@@ -147,6 +148,24 @@ protected:
   T learning_rate_ = (T)0.0;
 };
 
+template <typename T> struct FlickerParameter {
+
+  int n = 64;                      // pink diffusion
+  T r = (T)sqrt(sqrt((float)2.0)); // frequency ratio
+  T q = (T)0.5;                    // flip prob
+  T h = (T)0.0; // reset time constant: if set to flicker_r^k, reset will mostly effect the first k
+                // traps
+  bool wreset = false;
+  T wreset_tol = (T)1e-5;
+
+  void printToStream(std::stringstream &ss) const;
+  void print() const {
+    std::stringstream ss;
+    printToStream(ss);
+    std::cout << ss.str();
+  };
+};
+
 template <typename T> struct SimpleMetaParameter {
 
   SimpleMetaParameter() { drift.setSimpleDrift(); }
@@ -156,6 +175,7 @@ template <typename T> struct SimpleMetaParameter {
   T alpha_std = (T)0.0; // one-time relative error when setting alpha scale
   bool use_delayed_update = false;
 
+  FlickerParameter<T> flicker;
   DriftParameter<T> drift;
 
   virtual void printToStream(std::stringstream &ss) const;
@@ -207,6 +227,9 @@ public:
     swap(a.temp_x_vector_bias_, b.temp_x_vector_bias_);
     swap(a.temp_x_matrix_bias_, b.temp_x_matrix_bias_);
     swap(a.temp_tensor_, b.temp_tensor_);
+
+    swap(a.flicker_states_, b.flicker_states_);
+    swap(a.flicker_probs_, b.flicker_probs_);
 
     swap(a.matrix_indices_, b.matrix_indices_);
     swap(a.matrix_indices_set_, b.matrix_indices_set_);
@@ -333,9 +356,21 @@ public:
   /* conductance drift */
   virtual void driftWeights(T time_since_last_call);
 
+  /* 1/f pink noise process (flicker noise) */
+  virtual void diffuseWeightsPink();
+  uint64_t *initFlickerStates();
+
   /* Remapping the weights. Scales and Biases need to be handled
      from outside for now*/
   virtual void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr);
+
+  /* Using stochastic weight averaging, together with remapping [thus the scales/biases]*/
+  virtual bool swaWeights(
+      const WeightRemapParameter &wrmpar,
+      T *swa_weights,
+      uint64_t iter,
+      T *scales = nullptr,
+      T *biases = nullptr);
 
   /* Modify forward/backward weights (while keeping the update
      weights to a reference). This essentially copies the weight
@@ -659,6 +694,8 @@ private:
   std::vector<T> temp_x_vector_bias_;
   std::vector<T> temp_x_matrix_bias_;
   std::vector<T> temp_tensor_;
+  std::vector<uint64_t> flicker_states_;
+  std::vector<T> flicker_probs_;
 
   std::unique_ptr<WeightDrifter<T>> wdrifter_ = nullptr;
   std::unique_ptr<WeightRemapper<T>> wremapper_ = nullptr;
