@@ -34,7 +34,7 @@ public:
 
   inline bool isActive() { return active_; };
 
-  void saturate(T *weights, float *dev_4params);
+  void saturate(T *weights, param_t *dev_4params);
   const T *getNu() const { return dev_nu_ == nullptr ? nullptr : dev_nu_->getDataConst(); };
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix);

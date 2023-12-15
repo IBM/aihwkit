@@ -34,7 +34,7 @@ from aihwkit.simulator.configs.compounds import (
     ReferenceUnitCell,
     MixedPrecisionCompound,
 )
-from aihwkit.simulator.parameters.utils import IOParameters
+from aihwkit.simulator.parameters import IOParameters
 
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,

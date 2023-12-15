@@ -27,7 +27,7 @@ from torch.nn import Linear
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import FloatingPointRPUConfig
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     WeightClipType,
     WeightModifierType,
     WeightModifierParameter,
@@ -233,7 +233,6 @@ class InferenceTileTest(ParametrizedTestCase):
 
         analog_tile.set_learning_rate(0.123)
         analog_tile.set_weights(weights, biases, apply_weight_scaling=False)
-
         analog_tile.post_update_step()
 
         tile_weights, tile_biases = analog_tile.get_weights(apply_weight_scaling=False)

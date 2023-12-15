@@ -23,12 +23,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -65,9 +59,9 @@ int discretize(
     x = (x > bound_upper) ? bound_upper : x;
     x = (x < bound_lower) ? bound_lower : x;
 
-    if (resolution > 0) {
+    if (resolution > (num_t)0.0) {
       x /= resolution;
-      x = RPU_ROUNDFUN(x);
+      x = (num_t)RPU_ROUNDFUNF(x);
       x *= resolution;
     }
     vq[i] = x * post_scale;
@@ -126,21 +120,21 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
-    std::uniform_real_distribution<num_t> udist2(-0.2, 1.2);
+    std::uniform_real_distribution<float> udist2(-0.2, 1.2);
     auto urnd2 = std::bind(udist2, generator);
     for (int j = 0; j < d_size * x_size; j++) {
-      W[j] = urnd2();
+      W[j] = (num_t)urnd2();
     }
 
     transpose(rd_trans, rd, d_size, m_batch);
@@ -361,7 +355,7 @@ TEST_P(IOManagerTestFixture, InputBoundManagementBatch) {
   CUDA_TIMING_INIT;
 
   CudaArray<num_t> cubu(context, d_size * m_batch);
-  cubu.setConst(2.0 * io.out_bound);
+  cubu.setConst((num_t)2.0 * io.out_bound);
   context->synchronize();
 
   // make reference
@@ -394,7 +388,7 @@ TEST_P(IOManagerTestFixture, InputBoundManagementBatch) {
   }
 
   // trans
-  cubu.setConst(2.0 * io.out_bound);
+  cubu.setConst((num_t)2.0 * io.out_bound);
   context->synchronize();
 
   transpose(rxq_trans, rxq, x_size, m_batch);

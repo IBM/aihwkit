@@ -36,14 +36,18 @@ public:
         static_cast<ChoppedTransferRPUDeviceCuda<T> &>(a),
         static_cast<ChoppedTransferRPUDeviceCuda<T> &>(b));
 
-    swap(a.dev_running_var_, b.dev_running_var_);
     swap(a.dev_running_mean_, b.dev_running_mean_);
     swap(a.dev_past_mean_, b.dev_past_mean_);
+    swap(a.dev_feedback_, b.dev_feedback_);
+
+    swap(a.feedback_data_, b.feedback_data_);
+    swap(a.feedback_data_idx_, b.feedback_data_idx_);
+    swap(a.count_lr_scale_, b.count_lr_scale_);
+
     swap(a.dev_transfers_since_in_chop_, b.dev_transfers_since_in_chop_);
     swap(a.dev_transfers_since_in_chop_tmp_, b.dev_transfers_since_in_chop_tmp_);
     swap(a.dev_previous_in_chopper_, b.dev_previous_in_chopper_);
     swap(a.dev_previous_in_chopper_tmp_, b.dev_previous_in_chopper_tmp_);
-    swap(a.current_in_chop_prob_, b.current_in_chop_prob_);
   };
 
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
@@ -70,11 +74,18 @@ public:
 
   std::vector<T> getHiddenWeights() const override;
 
+protected:
+  T getPulseCountLearningRate(
+      T lr, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) override;
+
 private:
-  T current_in_chop_prob_ = 0.0;
+  std::vector<T> feedback_data_;
+  T count_lr_scale_ = 1.0;
+  uint64_t feedback_data_idx_ = 0;
+
   std::unique_ptr<CudaArray<T>> dev_past_mean_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_running_mean_ = nullptr;
-  std::unique_ptr<CudaArray<T>> dev_running_var_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_feedback_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_transfers_since_in_chop_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_transfers_since_in_chop_tmp_ = nullptr;
   std::unique_ptr<CudaArray<chop_t>> dev_previous_in_chopper_ = nullptr;

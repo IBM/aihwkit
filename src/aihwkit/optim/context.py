@@ -35,7 +35,9 @@ class AnalogContext(Parameter):
         # pylint: disable=signature-differs
         if parameter is None:
             return Parameter.__new__(
-                cls, data=ones((), device=analog_tile.device), requires_grad=True
+                cls,
+                data=ones((), device=analog_tile.device, dtype=analog_tile.get_dtype()),
+                requires_grad=True,
             )
         parameter.__class__ = cls
         return parameter

@@ -41,12 +41,12 @@ public:
 
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < size * m_batch; i++) {
-      x1[i] = urnd();
-      d1[i] = 5 * urnd();
+      x1[i] = (num_t)urnd();
+      d1[i] = (num_t)(5 * urnd());
     }
   };
 
@@ -60,11 +60,7 @@ public:
   T *x1, *d1;
 };
 
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> num_types;
-#else
-typedef ::testing::Types<float> num_types;
-#endif
+typedef ::testing::Types<num_t> num_types;
 
 TYPED_TEST_CASE(UMHTestFixture, num_types);
 
@@ -119,14 +115,14 @@ TYPED_TEST(UMHTestFixture, computeScaleAndK) {
     TypeParam d_abs_max_value =
         Find_Absolute_Max<TypeParam>(this->d1 + this->size * i_batch, this->size);
 
-    int bl = ceil(lr * x_abs_max_value * d_abs_max_value / dw_min);
+    int bl = ceilf(lr * x_abs_max_value * d_abs_max_value / dw_min);
     if (bl > BL) {
       bl = BL;
     }
 
     TypeParam reg = dw_min;
 
-    TypeParam scale = sqrt(MAX(x_abs_max_value, reg) / MAX(d_abs_max_value, reg));
+    TypeParam scale = sqrtf((float)MAX(x_abs_max_value, reg) / (float)MAX(d_abs_max_value, reg));
 
     EXPECT_FLOAT_EQ(scale, scale_val[i_batch]); // large error ?
     ASSERT_EQ(bl, K_val[i_batch]);

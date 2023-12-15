@@ -20,15 +20,17 @@ from copy import deepcopy
 from numpy import array
 from numpy.typing import ArrayLike
 
-from torch import Tensor, from_numpy, float32, unsqueeze, cat, empty, stack
+from torch import Tensor, from_numpy, float32, unsqueeze, cat, empty, stack, dtype
 from torch import device as torch_device
 from torch.cuda import device as cuda_device
 from torch.autograd import no_grad
 
 from aihwkit import __version__
 from aihwkit.exceptions import TileError
-from aihwkit.simulator.parameters.utils import MappingParameter
+from aihwkit.simulator.parameters.mapping import MappingParameter
 from aihwkit.simulator.parameters.base import RPUConfigGeneric
+from aihwkit.simulator.parameters.runtime import RuntimeParameter
+from aihwkit.simulator.parameters.enums import RPUDataType
 from aihwkit.optim.context import AnalogContext
 
 
@@ -38,7 +40,7 @@ class TileModuleBase:
     """
 
 
-class AnalogTileStateNames:  # pylint: disable=too-few-public-methods
+class AnalogTileStateNames:
     """Class defining analog tile state name constants.
 
     Caution:
@@ -59,6 +61,15 @@ class AnalogTileStateNames:  # pylint: disable=too-few-public-methods
     ANALOG_STATE_PREFIX = "analog_tile_state_"
     ANALOG_STATE_NAME = "analog_tile_state"
     EXTRA = "state_extra"
+
+    @staticmethod
+    def get_field_names() -> List[str]:
+        """Returns expected field names."""
+        return [
+            getattr(AnalogTileStateNames, key)
+            for key in AnalogTileStateNames.__dict__
+            if not key.startswith("_")
+        ]
 
 
 class BaseTile:
@@ -301,6 +312,20 @@ class SimulatorTileWrapper:
         self.analog_ctx = AnalogContext(self)
         self.analog_ctx.use_torch_update = torch_update
 
+    def get_runtime(self) -> RuntimeParameter:
+        """Returns the runtime parameter."""
+        if hasattr(self.rpu_config, "runtime"):
+            return self.rpu_config.runtime
+        return RuntimeParameter()
+
+    def get_data_type(self) -> RPUDataType:
+        """Return data_type setting of the RPUConfig"""
+        return self.get_runtime().data_type
+
+    def get_dtype(self) -> dtype:
+        """Return dtype setting of the RPUConfig"""
+        return self.get_runtime().data_type.as_torch()
+
     def _create_simulator_tile(
         self, x_size: int, d_size: int, rpu_config: "RPUConfigGeneric"
     ) -> Any:  # just use Any instead of Union["SimulatorTile", tiles.AnalogTile, ..]
@@ -364,6 +389,23 @@ class SimulatorTileWrapper:
         """Implements indexed interface to the tile update
         (e.g. using pulse trains)."""
         raise NotImplementedError
+
+    def get_analog_state(self) -> Dict:
+        """Get the analog state for the state_dict.
+
+        Excludes the non-analog state names that might be added for
+        pickling. Only fields defined in ``AnalogTileStateNames`` are
+        returned.
+        """
+        state = self.__getstate__()
+        fields = AnalogTileStateNames.get_field_names()
+        rm_fields = []
+        for key in state:
+            if key not in fields:
+                rm_fields.append(key)
+        for key in rm_fields:
+            state.pop(key)
+        return state
 
     def __getstate__(self) -> Dict:
         """Get the state for pickling.
@@ -528,9 +570,10 @@ class SimulatorTileWrapper:
             ValueError: if the tile has bias but ``bias`` has not been
                 specified.
         """
+        d_type = self.get_dtype()
         if not isinstance(weight, Tensor):
             weight = from_numpy(array(weight))
-        weight = weight.clone().detach().cpu().to(float32)
+        weight = weight.clone().detach().cpu().to(d_type)
 
         shape = [self.out_size, self.in_size]
         weight = weight.reshape(shape)
@@ -543,7 +586,7 @@ class SimulatorTileWrapper:
             if not isinstance(bias, Tensor):
                 bias = from_numpy(array(bias))
 
-            bias = unsqueeze(bias.clone().detach().cpu().to(float32), 1)
+            bias = unsqueeze(bias.clone().detach().cpu().to(d_type), 1)
             return cat((weight, bias), dim=1)
         # Use only the ``[out_size, in_size]`` matrix.
         return weight

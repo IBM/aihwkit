@@ -25,7 +25,8 @@ from torch import device as torch_device
 from aihwkit.exceptions import TileModuleError
 from aihwkit.simulator.tiles.base import AnalogTileStateNames, BaseTile, TileModuleBase
 from aihwkit.optim.context import AnalogContext
-from aihwkit.simulator.parameters.base import RPUConfigBase, MappableRPU
+from aihwkit.simulator.parameters.base import RPUConfigBase
+from aihwkit.simulator.parameters.mapping import MappableRPU
 
 
 class TileModule(Module, TileModuleBase):
@@ -255,13 +256,7 @@ class TileModule(Module, TileModuleBase):
         # pylint: disable=unused-argument
 
         analog_state_name = TileModule.get_analog_state_name(prefix)
-        analog_state = analog_tile.__getstate__()
-
-        # don't return those hidden Module attributes:
-        for key in list(analog_state.keys()).copy():
-            if key.startswith("_"):
-                analog_state.pop(key, None)
-
+        analog_state = analog_tile.get_analog_state()
         state_dict[analog_state_name] = analog_state
 
     def state_dict(  # pylint: disable=arguments-differ

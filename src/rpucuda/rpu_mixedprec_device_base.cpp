@@ -25,7 +25,7 @@ namespace RPU {
 template <typename T>
 void MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(std::stringstream &ss) const {
 
-  if (granularity > 0) {
+  if (granularity > (T)0.0) {
     ss << "\t granularity: \t\t";
     ss << granularity << std::endl;
   }
@@ -139,6 +139,9 @@ template struct MixedPrecRPUDeviceBaseMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct MixedPrecRPUDeviceBaseMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct MixedPrecRPUDeviceBaseMetaParameter<half_t>;
+#endif
 
 /******************************************************************************************/
 
@@ -232,11 +235,11 @@ void MixedPrecRPUDeviceBase<T>::populate(
   if (dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_) != nullptr) {
     granularity_ = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)->getWeightGranularity();
   }
-  if (par.granularity > 0) {
+  if (par.granularity > (T)0.0) {
     // overwrites
     granularity_ = par.granularity;
   }
-  if (granularity_ <= 0) {
+  if (granularity_ <= (T)0.0) {
     RPU_FATAL("Cannot establish granularity from device. Need explicit setting >=0.");
   }
 }
@@ -306,7 +309,7 @@ void MixedPrecRPUDeviceBase<T>::setUpPar(const PulsedUpdateMetaParameter<T> &up)
 template <typename T> void MixedPrecRPUDeviceBase<T>::computeSparsity(const int kx, const int kd) {
   const auto &par = getPar();
   if (par.compute_sparsity) {
-    avg_sparsity_ = (current_update_index_ * avg_sparsity_ +
+    avg_sparsity_ = ((T)current_update_index_ * avg_sparsity_ +
                      (T)((this->d_size_ - kd) * (this->x_size_ - kx)) / (T)this->size_) /
                     (T)(current_update_index_ + 1);
   }
@@ -316,7 +319,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
   // updating the matrix with rows of using one-hot transfer vectors
 
   const auto &par = getPar();
-  if (par.n_rows_per_transfer == 0 || fabs(lr) == (T)0) {
+  if (par.n_rows_per_transfer == 0 || (T)fabsf(lr) == (T)0) {
     return;
   }
   int n_transfers = par.n_rows_per_transfer;
@@ -326,8 +329,8 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
   n_transfers = MIN(n_transfers, this->d_size_);
   int i_row = current_row_index_;
   if (par.random_row && (n_transfers < this->d_size_)) {
-    i_row =
-        MAX(MIN((int)floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
+    i_row = MAX(
+        MIN((int)floorf(this->rw_rng_.sampleUniform() * (T)this->d_size_), this->d_size_ - 1), 0);
   }
 
   int d2_size = this->d_size_ * this->d_size_;
@@ -494,6 +497,9 @@ void MixedPrecRPUDeviceBase<T>::resetCols(
 template class MixedPrecRPUDeviceBase<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecRPUDeviceBase<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class MixedPrecRPUDeviceBase<half_t>;
 #endif
 
 } // namespace RPU

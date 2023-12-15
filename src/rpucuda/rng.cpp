@@ -109,10 +109,10 @@ template <typename T> void RNG<T>::generateNewList(int list_size) {
     seed = (unsigned long long)std::chrono::high_resolution_clock::now().time_since_epoch().count();
   }
   std::default_random_engine generator{(unsigned int)seed};
-  std::normal_distribution<T> random_dist{};
+  std::normal_distribution<float> random_dist{};
   auto nrnd = std::bind(random_dist, generator);
 
-  T *numbers = new T[list_size];
+  float *numbers = new float[list_size];
 
   for (int i = 0; i < list_size; ++i) {
     numbers[i] = nrnd();
@@ -126,10 +126,15 @@ template <typename T> void RNG<T>::generateNewList(int list_size) {
   gauss_numbers_list_ = numbers;
 }
 
+template class RNG<float>;
+template class RealWorldRNG<float>;
 #ifdef RPU_USE_DOUBLE
 template class RNG<double>;
 template class RealWorldRNG<double>;
 #endif
-template class RNG<float>;
-template class RealWorldRNG<float>;
+#ifdef RPU_USE_FP16
+template class RNG<half_t>;
+template class RealWorldRNG<half_t>;
+#endif
+
 } // namespace RPU

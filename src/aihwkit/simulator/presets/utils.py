@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass
 
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     BoundManagementType,
     IOParameters,
     NoiseManagementType,

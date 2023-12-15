@@ -14,10 +14,10 @@
 
 # pylint: disable=too-many-ancestors
 
-from typing import Optional, Union, Any, Tuple, List, TYPE_CHECKING
+from typing import Optional, Union, Any, Tuple, List, Dict, TYPE_CHECKING
 
 from torch import device as torch_device
-from torch import ones, Tensor, float32
+from torch import ones, Tensor
 from torch.nn import Module
 from torch.autograd import no_grad
 
@@ -28,7 +28,6 @@ from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.simulator.tiles.rpucuda import RPUCudaSimulatorTileWrapper
 from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.rpu_base import tiles
-from aihwkit.simulator.parameters.base import RPUConfigGeneric
 from aihwkit.simulator.parameters.helpers import parameters_to_bindings
 from aihwkit.simulator.parameters.enums import WeightModifierType, WeightClipType, WeightRemapType
 from aihwkit.inference.noise.base import BaseNoiseModel
@@ -56,16 +55,16 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         self.drift_baseline = None
         self.drift_readout_tensor = None  # type: Optional[Tensor]
         if isinstance(self, Module):
-            self.register_buffer("alpha", ones((1,), dtype=float32))
+            self.register_buffer("alpha", ones((1,), dtype=self.get_dtype()))
         else:
-            self.alpha = ones((1,), dtype=float32)
+            self.alpha = ones((1,), dtype=self.get_dtype())
 
         # Helpers.
         self.programmed_weights = None  # type: Optional[Tensor]
         self.drift_noise_parameters = None  # type: Optional[List[Tensor]]
 
-    def _create_simulator_tile(
-        self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
+    def _create_simulator_tile(  # type: ignore
+        self, x_size: int, d_size: int, rpu_config: "InferenceRPUConfig"
     ) -> tiles.AnalogTile:
         """Create a simulator tile.
 
@@ -77,9 +76,8 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         Returns:
             a simulator tile based on the specified configuration.
         """
-
         meta_parameter = rpu_config.as_bindings()
-        device_parameter = rpu_config.device.as_bindings()
+        device_parameter = rpu_config.device.as_bindings(self.get_data_type())
 
         return meta_parameter.create_array(x_size, d_size, device_parameter)
 
@@ -95,7 +93,7 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         if hasattr(self.rpu_config, "remap") and self.rpu_config.remap.type != WeightRemapType.NONE:
             # needs to be always out_size
             mapping_scales = ones(
-                (self.out_size,), dtype=float32, device=self.device, requires_grad=False
+                (self.out_size,), dtype=self.get_dtype(), device=self.device, requires_grad=False
             )
             self.set_mapping_scales(mapping_scales)
 
@@ -271,15 +269,25 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         # TODO: make this a little nicer. Now each time bindings are
         # generated, which however has the advantage that parameters
         # could be changed-on-the-fly
-
+        data_type = self.get_data_type()
+        on_the_fly_bindings = self.get_runtime().on_the_fly_bindings
+        if not hasattr(self, "_tmp"):
+            # pylint: disable=attribute-defined-outside-init
+            self._tmp = {}  # type: Dict[str, Any]
         if hasattr(self.rpu_config, "clip") and self.rpu_config.clip.type != WeightClipType.NONE:
-            weight_clip_params = parameters_to_bindings(self.rpu_config.clip)
-            self.tile.clip_weights(weight_clip_params)
+            if on_the_fly_bindings or "weight_clip_params" not in self._tmp:
+                self._tmp["weight_clip_params"] = parameters_to_bindings(
+                    self.rpu_config.clip, data_type
+                )
+            self.tile.clip_weights(self._tmp["weight_clip_params"])
 
         if hasattr(self.rpu_config, "remap") and self.rpu_config.remap.type != WeightRemapType.NONE:
-            weight_remap_params = parameters_to_bindings(self.rpu_config.remap)
+            if on_the_fly_bindings or "weight_remap_params" not in self._tmp:
+                self._tmp["weight_remap_params"] = parameters_to_bindings(
+                    self.rpu_config.remap, data_type
+                )
             scales = self.get_scales()
-            scales = self.tile.remap_weights(weight_remap_params, scales)
+            scales = self.tile.remap_weights(self._tmp["weight_remap_params"], scales)
             self.set_scales(scales)
 
         # update the forward / backward modified weights here
@@ -292,8 +300,11 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             and self.rpu_config.modifier.pdrop <= 0.0
         ):
             return
-        weight_modify_params = parameters_to_bindings(self.rpu_config.modifier)
-        self.tile.modify_weights(weight_modify_params)  # type: ignore
+        if on_the_fly_bindings or "weight_modify_params" not in self._tmp:
+            self._tmp["weight_modify_params"] = parameters_to_bindings(
+                self.rpu_config.modifier, data_type
+            )
+        self.tile.modify_weights(self._tmp["weight_modify_params"])  # type: ignore
 
     def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "BaseTile":
         self.alpha = self.alpha.cuda(device)
@@ -354,24 +365,6 @@ class InferenceTile(TileModule, InferenceTileWithPeriphery, RPUCudaSimulatorTile
             shared_weights=shared_weights,
         )
         InferenceTileWithPeriphery.__init__(self)
-
-    def _create_simulator_tile(  # type: ignore
-        self, x_size: int, d_size: int, rpu_config: "InferenceRPUConfig"
-    ) -> tiles.AnalogTile:
-        """Create a simulator tile.
-
-        Args:
-            x_size: input size
-            d_size: output size
-            rpu_config: resistive processing unit configuration
-
-        Returns:
-            a simulator tile based on the specified configuration.
-        """
-        meta_parameter = rpu_config.as_bindings()
-        device_parameter = rpu_config.device.as_bindings()
-
-        return meta_parameter.create_array(x_size, d_size, device_parameter)
 
     def forward(
         self, x_input: Tensor, tensor_view: Optional[Tuple] = None  # type: ignore

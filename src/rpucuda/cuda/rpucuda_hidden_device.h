@@ -26,7 +26,7 @@ public:
       HiddenStepRPUDeviceCuda,
       HiddenStepRPUDevice,
       /*ctor body*/
-      dev_hs_scale_ = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
+      dev_hs_scale_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 2 * this->size_);
       dev_hidden_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
       dev_hs_dw_min_std_ = RPU::make_unique<CudaArray<T>>(this->context_, 1);
       ,
@@ -54,7 +54,7 @@ public:
       T **hs_scale_up = rpu_device.getHsScaleUp();
       T **hs_scale_down = rpu_device.getHsScaleDown();
       T **hidden_weights = rpu_device.getHiddenWeights();
-      float *tmp_scale = new float[2 * this->size_];
+      param_t *tmp_scale = new param_t[2 * this->size_];
       T *tmp_hw = new T[this->size_];
 
       for (int i = 0; i < this->d_size_; ++i) {
@@ -77,7 +77,7 @@ public:
 
   T *getGlobalParamsData() override { return dev_hs_dw_min_std_->getData(); };
   T *get1ParamsData() override { return dev_hidden_weights_->getData(); };
-  float *get2ParamsData() override { return dev_hs_scale_->getData(); };
+  param_t *get2ParamsData() override { return dev_hs_scale_->getData(); };
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override {
     // would need to sync hidden weights separately. too costly anyway
     RPU_FATAL("Not supported for hidden step devices.");
@@ -88,7 +88,7 @@ public:
 
 private:
   std::unique_ptr<CudaArray<T>> dev_hidden_weights_ = nullptr;
-  std::unique_ptr<CudaArray<float>> dev_hs_scale_ = nullptr;
+  std::unique_ptr<CudaArray<param_t>> dev_hs_scale_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_hs_dw_min_std_ = nullptr;
 };
 

@@ -199,8 +199,8 @@ public:
   // for interfacing with pwu_kernel
   virtual T *getGlobalParamsData() { return nullptr; };
   virtual T *get1ParamsData() { return nullptr; };
-  virtual float *get2ParamsData() { return nullptr; };
-  virtual float *get4ParamsData() { return dev_4params_->getData(); }
+  virtual param_t *get2ParamsData() { return nullptr; };
+  virtual param_t *get4ParamsData() { return dev_4params_->getData(); }
   virtual T getWeightGranularityNoise() const { return getPar().dw_min_std; };
   virtual uint64_t *getPosPulseCountData();
   virtual uint64_t *getNegPulseCountData();
@@ -211,14 +211,14 @@ public:
 
 protected:
   virtual void applyUpdateWriteNoise(T *dev_weights);
-  std::unique_ptr<CudaArray<float>> dev_persistent_weights_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_persistent_weights_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_pos_pulse_counter_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_neg_pulse_counter_ = nullptr;
 
 private:
   void initialize();
 
-  std::unique_ptr<CudaArray<float>> dev_4params_ = nullptr;
+  std::unique_ptr<CudaArray<param_t>> dev_4params_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_diffusion_rate_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_decay_scale_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_reset_bias_ = nullptr;

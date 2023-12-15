@@ -25,7 +25,7 @@ from torch.nn.functional import mse_loss
 
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     MappingParameter,
     IOParameters,
     WeightModifierParameter,

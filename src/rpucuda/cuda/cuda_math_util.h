@@ -15,10 +15,12 @@
 #include "cuda_util.h"
 #include <iterator>
 
+static_assert(sizeof(unsigned long long int) == sizeof(uint64_t), "64 bit mismatch ");
+
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600
 
 #else
-static __inline__ __device__ double atomicAdd(double *address, double val) {
+static __forceinline__ __device__ double atomicAdd(double *address, double val) {
   unsigned long long int *address_as_ull = (unsigned long long int *)address;
   unsigned long long int old = *address_as_ull, assumed;
   if (val == 0.0)
@@ -31,8 +33,6 @@ static __inline__ __device__ double atomicAdd(double *address, double val) {
   return __longlong_as_double(old);
 }
 #endif
-
-static_assert(sizeof(unsigned long long int) == sizeof(uint64_t), "64 bit mismatch ");
 
 namespace RPU {
 namespace math {
@@ -54,11 +54,7 @@ void gemm(
     T *C,
     const int ldc);
 
-template <typename T>
-int iamax(const CudaContextPtr context, const int N, const T *X, const int incX);
-
-template <typename T>
-void scal(const CudaContextPtr context, const int N, const T alpha, T *X, const int incX);
+template <typename T> void scal(const CudaContextPtr context, const int N, const T alpha, T *X);
 
 template <typename T>
 void nrm2(const CudaContextPtr context, const int N, const T *X, const int incX, T *res);
@@ -95,6 +91,24 @@ void ger(
     T *A,
     const int lda);
 
+// W = A
+template <typename T, typename T_A>
+void elemcopy(
+    const CudaContextPtr context,
+    T *W,
+    const int size,
+    const int incW,
+    const T_A *A,
+    const int incA);
+template <typename T, typename T_A>
+void elemcopy(const CudaContextPtr context, T *W, const int size, const T_A *A) {
+  elemcopy<T, T_A>(context, W, size, 1, A, 1);
+};
+
+// W *= alpha
+template <typename T>
+void elemscale(const CudaContextPtr context, T *W, const int size, const T alpha);
+
 // W += beta * A
 template <typename T, typename T_A>
 void elemaddscale(const CudaContextPtr context, T *W, const int size, const T_A *A, const T beta);
@@ -120,7 +134,7 @@ void elemasb02(
     const int size,
     const T_A *A,
     const T *B,
-    float *dev_4params); // bounds in [0,2] // 4params and 2params always float !
+    param_t *dev_4params); // bounds in [0,2] // 4params and 2params always param_t !
 
 // sat(W *= A) (optionally with shift)
 template <typename T>
@@ -129,7 +143,7 @@ void elemscale(
     T *W,
     const int size,
     const T *A,
-    float *dev_4params = nullptr,
+    param_t *dev_4params = nullptr,
     const T *dev_shift = nullptr);
 
 // C = A.*B
@@ -138,7 +152,7 @@ void elemmul(const CudaContextPtr context, T *C, const int size, const T *A, con
 
 // sat(W)
 template <typename T>
-void elemsat(const CudaContextPtr context, T *W, const int size, float *dev_4params);
+void elemsat(const CudaContextPtr context, T *W, const int size, param_t *dev_4params);
 
 // sat(W *= 1+alpha*(A-1))
 template <typename T>
@@ -147,7 +161,7 @@ void elemscalealpha(
     T *W,
     const int size,
     const T *A,
-    float *dev_4params,
+    param_t *dev_4params,
     const T alpha,
     const T *dev_shift = nullptr);
 
@@ -157,7 +171,7 @@ template <typename T> void elemaddcopy(const CudaContextPtr context, T *W, T *A,
 // W = sat(W+A), A = W
 template <typename T>
 void elemaddcopysat(
-    const CudaContextPtr context, T *W, T *A, const int size, const float *dev_4params);
+    const CudaContextPtr context, T *W, T *A, const int size, const param_t *dev_4params);
 
 // A = scale*(W - A_in), W = A_in
 template <typename T>
@@ -174,7 +188,7 @@ void elemresetsat(
     const float *B, // float for random
     const float *P, // float for random
     T thres,
-    const float *dev_4params);
+    const param_t *dev_4params);
 
 // MSK = P<thres
 // W(MSK) = A(MSK) + B(MSK)
@@ -198,7 +212,7 @@ void elemresetsatmsk(
     const char *msk,
     const T *reset_bias, // can be nullptr
     const T reset_std,
-    const float *dev_4params);
+    const param_t *dev_4params);
 
 // set all elements to a
 template <typename T>
@@ -239,14 +253,14 @@ template <typename T>
 void elemaverage(const CudaContextPtr context, T *W, const int size, T **Ms, const int m);
 
 // W[j] = a*A[j] + b*B[j]
-template <typename T>
+template <typename T, typename T_B = T>
 void elemweightedsum(
     const CudaContextPtr context,
     T *W,
     const int size,
     const T *A,
     const T a,
-    const T *B,
+    const T_B *B,
     const T b);
 
 template <typename T>
@@ -283,6 +297,22 @@ void addWithIterator(
     const T *in_tensor_A,
     const T *in_tensor_B,
     const int total_input_size);
+
+// incY += 1/f noise [with given pars]
+template <typename T>
+void elemaddpinknoise(
+    const CudaContextPtr,
+    T *W,
+    T *Wb,
+    const int size,
+    const T rate,
+    const int n_flicker,
+    const T flicker_r,
+    const T flicker_q,
+    const T flicker_h,
+    const T flicker_wreset_tol,
+    uint64_t *flicker_states,
+    curandState *rnd_states);
 
 // to overcome compiling issues. ONLY forks for IteratorT=T * of const T * respectively. Else it
 // will cause a compilation error. To be guarded with std::is_same<>

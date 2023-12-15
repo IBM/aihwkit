@@ -63,6 +63,8 @@ public:
 
     swap(a.dev_temp_tensor_, b.dev_temp_tensor_);
 
+    swap(a.dev_flicker_states_, b.dev_flicker_states_);
+
     swap(a.rnd_diffusion_context_, b.rnd_diffusion_context_);
     swap(a.dev_diffusion_nrnd_, b.dev_diffusion_nrnd_);
 
@@ -183,7 +185,15 @@ public:
 
   void driftWeights(T time_since_last_call) override;
   void diffuseWeights() override;
+  void diffuseWeightsPink() override;
   void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
+  bool swaWeights(
+      const WeightRemapParameter &wrmpar,
+      T *swa_weights,
+      uint64_t iter,
+      T *scales,
+      T *biases = nullptr) override;
+
   void clipWeights(T clip) override;
   void clipWeights(const WeightClipParameter &wclpar) override;
 
@@ -215,6 +225,7 @@ protected:
   std::unique_ptr<CudaContext> internal_context_ = nullptr;
   std::unique_ptr<CudaContext> rnd_diffusion_context_ = nullptr;
   std::unique_ptr<CudaArray<float>> dev_diffusion_nrnd_ = nullptr;
+  std::unique_ptr<CudaArray<uint64_t>> dev_flicker_states_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_weights_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_weights_buffer_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_fb_weights_ = nullptr;

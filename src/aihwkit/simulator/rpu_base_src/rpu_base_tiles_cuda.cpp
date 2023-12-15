@@ -11,33 +11,45 @@
  */
 
 #ifdef RPU_USE_CUDA
+#define __RPU_CUDA_HALF_DEFINED
 #include "cuda.h"
+#include "cuda_util.h"
 #include "rpu_base.h"
+
+#include "rpucuda.h"
+#include "rpucuda_pulsed.h"
+#include <ATen/cuda/CUDAContext.h>
 
 #define CHECK_CUDA(x)                                                                              \
   TORCH_CHECK(                                                                                     \
       x.device().type() == torch::kCUDA, #x " must be a CUDA tensor. got ", x.device().type(),     \
       " versus ", torch::kCUDA)
 #define CHECK_CUDA_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+#define CHECK_CUDA_DTYPE(x)                                                                        \
+  TORCH_CHECK(x.dtype() == DEFAULT_DTYPE, #x " must be of the right data type.")
 #define CHECK_TORCH_CUDA_INPUT(x)                                                                  \
   CHECK_CUDA(x);                                                                                   \
-  CHECK_CUDA_CONTIGUOUS(x)
+  CHECK_CUDA_CONTIGUOUS(x);                                                                        \
+  CHECK_CUDA_DTYPE(x)
 
-void declare_rpu_tiles_cuda(py::module &m) {
-  using Class = RPU::RPUCudaSimple<T>;
-  using ClassPulsed = RPU::RPUCudaPulsed<T>;
+#define NAME(S) (S + type_name_add).c_str()
 
-  /*
-   * Helper bindings.
-   */
-  py::class_<cudaStream_t>(m, "cudaStream_t");
+template <typename T, typename T_RPU>
+void declare_rpu_tiles_cuda(py::module &m, std::string type_name_add, bool add_utilities) {
+  using Class = RPU::RPUCudaSimple<T_RPU>;
+  using ClassPulsed = RPU::RPUCudaPulsed<T_RPU>;
 
   /*
    * RPU definitions.
    */
 
-  py::class_<Class, RPU::RPUSimple<T>>(
-      m, "CudaFloatingPointTile",
+  if (add_utilities) {
+    // Helper bindings.
+    py::class_<cudaStream_t>(m, "cudaStream_t");
+  }
+
+  py::class_<Class, RPU::RPUSimple<T_RPU>>(
+      m, NAME("CudaFloatingPointTile"),
       R"pbdoc(
     Floating point tile (CUDA).
 
@@ -45,7 +57,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
         tile: existing ``FloatingPointTile`` that will be copied.
     )pbdoc")
       .def(
-          py::init([](RPU::RPUSimple<T> &rpu) {
+          py::init([](RPU::RPUSimple<T_RPU> &rpu) {
             auto ret = std::unique_ptr<Class>(new Class(at::cuda::getCurrentCUDAStream(), rpu));
             return ret;
           }),
@@ -97,7 +109,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
             }
 
             std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.setSharedWeights(weights.data_ptr<T>());
+            return self.setSharedWeights(reinterpret_cast<T_RPU *>(weights.data_ptr<T>()));
           },
           py::arg("weights"))
       .def(
@@ -119,7 +131,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
             }
 
             std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.setDeltaWeights(delta_weights.data_ptr<T>());
+            return self.setDeltaWeights(reinterpret_cast<T_RPU *>(delta_weights.data_ptr<T>()));
           },
           py::arg("delta_weights"))
       .def(
@@ -132,7 +144,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
                   "] tensor");
             }
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.remapWeights(wrmpar, scales.data_ptr<T>());
+            self.remapWeights(wrmpar, reinterpret_cast<T_RPU *>(scales.data_ptr<T>()));
             return scales;
           },
           py::arg("weight_remap_params"), py::arg("scales"),
@@ -188,8 +200,9 @@ void declare_rpu_tiles_cuda(py::module &m) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.forward(
-                x_input.template data_ptr<T>(), d_output.template data_ptr<T>(), bias, m_batch,
-                x_trans, d_trans, is_test);
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_output.template data_ptr<T>()), bias, m_batch, x_trans,
+                d_trans, is_test);
 
             if (!non_blocking) {
               self.finishAllCalculations();
@@ -265,8 +278,9 @@ void declare_rpu_tiles_cuda(py::module &m) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.backward(
-                d_input.template data_ptr<T>(), x_output.template data_ptr<T>(), bias, m_batch,
-                d_trans, x_trans);
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(x_output.template data_ptr<T>()), bias, m_batch, d_trans,
+                x_trans);
 
             if (!non_blocking) {
               self.finishAllCalculations();
@@ -305,8 +319,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
           [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_,
              bool bias = false, bool x_trans = false, bool d_trans = false,
              bool non_blocking = false) {
-            T lr = self.getLearningRate();
-            if (lr == (T)0.0) {
+            T_RPU lr = self.getLearningRate();
+            if (lr == (T_RPU)0.0) {
               return;
             }
 
@@ -354,8 +368,9 @@ void declare_rpu_tiles_cuda(py::module &m) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.update(
-                x_input.template data_ptr<T>(), d_input.template data_ptr<T>(), bias, m_batch,
-                x_trans, d_trans);
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()), bias, m_batch, x_trans,
+                d_trans);
 
             if (!non_blocking) {
               self.finishAllCalculations();
@@ -404,7 +419,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.forwardIndexed(
-                x_input.template data_ptr<T>(), d_tensor.template data_ptr<T>(), x_input.numel(),
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_tensor.template data_ptr<T>()), x_input.numel(),
                 d_image_size, N, true, is_test);
 
             if (!non_blocking) {
@@ -447,7 +463,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.backwardIndexed(
-                d_input.template data_ptr<T>(), x_tensor.template data_ptr<T>(), x_tensor.numel(),
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(x_tensor.template data_ptr<T>()), x_tensor.numel(),
                 d_image_size, N, true);
 
             if (!non_blocking) {
@@ -488,7 +505,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setExternalStream(at::cuda::getCurrentCUDAStream());
             self.updateIndexed(
-                x_input.template data_ptr<T>(), d_input.template data_ptr<T>(), x_input.numel(),
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()), x_input.numel(),
                 d_image_size, N, true);
 
             if (!non_blocking) {
@@ -510,8 +528,8 @@ void declare_rpu_tiles_cuda(py::module &m) {
 
            )pbdoc");
 
-  py::class_<ClassPulsed, RPU::RPUCudaSimple<T>>(
-      m, "CudaAnalogTile",
+  py::class_<ClassPulsed, RPU::RPUCudaSimple<T_RPU>>(
+      m, NAME("CudaAnalogTile"),
       R"pbdoc(
     Analog tile (CUDA).
 
@@ -519,7 +537,7 @@ void declare_rpu_tiles_cuda(py::module &m) {
         tile: existing ``AnalogTile`` that will be copied.
     )pbdoc")
       .def(
-          py::init([](RPU::RPUPulsed<T> &rpu) {
+          py::init([](RPU::RPUPulsed<T_RPU> &rpu) {
             // TODO: why does directly passing a stream is a problem?
             return std::unique_ptr<ClassPulsed>(
                 new ClassPulsed(at::cuda::getCurrentCUDAStream(), rpu));
@@ -530,6 +548,15 @@ void declare_rpu_tiles_cuda(py::module &m) {
           "__deepcopy__", [](const ClassPulsed &self, py::dict) { return ClassPulsed(self); },
           py::arg("memo"))
       .def("get_meta_parameters", &ClassPulsed::getMetaPar);
-}
+};
+#undef NAME
+
+template void declare_rpu_tiles_cuda<float, float>(py::module &, std::string, bool);
+#ifdef RPU_USE_DOUBLE
+template void declare_rpu_tiles_cuda<double, double>(py::module &, std::string, bool);
+#endif
+#ifdef RPU_USE_FP16
+template void declare_rpu_tiles_cuda<at::Half, half_t>(py::module &, std::string, bool);
+#endif
 
 #endif

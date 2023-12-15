@@ -15,13 +15,31 @@ The format is based on [Keep a Changelog], and this project adheres to
 ## Unreleased
 
 ### Added
+
 * On-the-fly change of some `RPUConfig` fields (\# 539)
-* Fusion chip CSV file model weights exporter functionality (\#538) 
+* Fusion chip CSV file model weights exporter functionality (\#538)
+* Experimental support for RPU data types (\#563)
+* Optional AIHWKIT C++ extension module (\#563)
+* Variable mantissa / exponent tensor conversion operator (\#563)
+* To digital feature for analog layers (\#563)
+* new `PCM_NOISE` type for hardware-aware training for inference (\#563)
 
 ### Fixed
+
 * Repeated call of `cuda()` reset the weights for `InferenceTile` (\#540)
+* Custom tile bugfixes (\#563)
+* bug-fixes for specialized learning algorithms (\#563)
 
 ### Changed
+
+* Parameter structure changed into separate files to reduce file sizes (\#563)
+* `RPUConfig` has a new `runtime` field and inherits from additional base
+  classes (\#563)
+* `AnalogWrapper` now directly adds module classes to subclasses (\#563)
+* RNN linear layers more custonable (\#563)
+* Parameters for specialized learning algorithms changed somwhat (\#563)
+* RNN modules inherit from `Module` or `AnalogContainerBase` instead of `AnalogSequential` (\#563)
+* Adjustment of parameter to bindings for various number formats (\#563)
 
 ### Removed
 
@@ -547,6 +565,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.8.0...HEAD
 [0.8.0]: https://github.com/IBM/aihwkit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBM/aihwkit/compare/v0.7.0..v0.7.1
 [0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0

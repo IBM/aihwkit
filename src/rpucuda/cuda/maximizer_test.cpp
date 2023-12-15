@@ -23,12 +23,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -53,17 +47,17 @@ public:
     x1 = new num_t[x_size * m_batch];
     rx = new num_t[x_size * m_batch];
 
-    max_values = new float[this->m_batch];
-    max_values2 = new float[this->m_batch];
+    max_values = new num_t[this->m_batch];
+    max_values2 = new num_t[this->m_batch];
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++) {
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
     }
     rx[0] = -2.6;
   }
@@ -79,7 +73,7 @@ public:
   int m_batch;
   CudaContext context_container{-1, false};
   CudaContextPtr c;
-  float *max_values, *max_values2;
+  num_t *max_values, *max_values2;
   num_t *x1, *rx;
 };
 
@@ -204,7 +198,6 @@ TEST_P(MaximizerTestFixture, MaximizerAbsBatch) {
   c->synchronize();
 
   for (int i = 0; i < this->m_batch; i++) {
-    // std::cout << max_values[i] << " vs " << max_values2[i] << std::endl;
     EXPECT_FLOAT_EQ(this->max_values[i], this->max_values2[i]);
   }
 
@@ -245,7 +238,6 @@ TEST_P(MaximizerTestFixture, MaximizerBatch) {
   c->synchronize();
 
   for (int i = 0; i < this->m_batch; i++) {
-    // std::cout << max_values[i] << " vs " << max_values2[i] << std::endl;
     EXPECT_FLOAT_EQ(this->max_values[i], this->max_values2[i]);
   }
 

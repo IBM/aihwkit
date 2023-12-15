@@ -110,10 +110,12 @@ protected:
       T lr, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) override;
   std::unique_ptr<ChoppedWeightOutput<T>> cwo_ = nullptr;
   inline T getCurrentGradStrength() const { return m_x_ * m_d_; };
+  inline T getCurrentDSparsity() const { return d_sparsity_; };
 
 private:
   T m_x_ = (T)0.0;
   T m_d_ = (T)0.0;
+  T d_sparsity_ = (T)0.0;
 };
 
 } // namespace RPU

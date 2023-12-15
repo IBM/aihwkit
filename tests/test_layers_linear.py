@@ -22,7 +22,7 @@ from torch.optim import SGD
 
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs.configs import InferenceRPUConfig, FloatingPointRPUConfig
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     MappingParameter,
     WeightModifierType,
     WeightModifierParameter,

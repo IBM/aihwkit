@@ -356,7 +356,7 @@ class AnalogLayerBase:
         weight mapping scales so that the absolute max analog weights
         are set to 1 (as specified in the ``weight_scaling``
         configuration of
-        :class:`~aihwkit.parameters.utils.MappingParameter`).
+        :class:`~aihwkit.parameters.mapping.MappingParameter`).
 
         Note:
             By default the weight scaling omega factor is set to 1
@@ -370,7 +370,7 @@ class AnalogLayerBase:
 
         Args:
             weight_scaling_omega: The weight scaling omega factor (see
-                :class:`~aihwkit.parameters.utils.MappingParameter`). If
+                :class:`~aihwkit.parameters.mapping.MappingParameter`). If
                 set to None here, it will take the value in the
                 mapping parameters. Default is however 1.0.
         """

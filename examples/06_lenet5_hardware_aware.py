@@ -32,6 +32,7 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
+    RPUDataType,
     InferenceRPUConfig,
     WeightRemapType,
     WeightModifierType,
@@ -47,6 +48,7 @@ USE_CUDA = 0
 if cuda.is_compiled():
     USE_CUDA = 1
 DEVICE = device("cuda" if USE_CUDA else "cpu")
+DATA_TYPE = RPUDataType.FLOAT
 
 # Path to store datasets
 PATH_DATASET = os.path.join("data", "DATASET")
@@ -144,7 +146,7 @@ def train_step(data, model, criterion, optimizer):
     model.train()
 
     for images, labels in data:
-        images = images.to(DEVICE)
+        images = images.to(device=DEVICE, dtype=DATA_TYPE.as_torch())
         labels = labels.to(DEVICE)
         optimizer.zero_grad()
 
@@ -183,7 +185,7 @@ def test_evaluation(data, model, criterion):
     model.eval()
 
     for images, labels in data:
-        images = images.to(DEVICE)
+        images = images.to(device=DEVICE, dtype=DATA_TYPE.as_torch())
         labels = labels.to(DEVICE)
 
         pred = model(images)
@@ -365,62 +367,65 @@ def inference_phase(t_inference_times, model, criterion, validation_data):
     return error_lst, accuracy_lst
 
 
-# Make sure the directory where to save the results exist.
-# Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
-os.makedirs(RESULTS, exist_ok=True)
-manual_seed(1)
+if __name__ == "__main__":
+    # Make sure the directory where to save the results exist.
+    # Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
 
-# Training parameters
-N_EPOCHS = 30
-BATCH_SIZE = 50
-LEARNING_RATE = 0.1
+    os.makedirs(RESULTS, exist_ok=True)
+    manual_seed(1)
 
-# Load datasets.
-training_data, valid_data = load_images(BATCH_SIZE)
+    # Training parameters
+    N_EPOCHS = 30
+    BATCH_SIZE = 50
+    LEARNING_RATE = 0.1
 
-# Define the properties of the neural network in terms of noise simulated during
-# the inference/training pass
-my_rpu_config = InferenceRPUConfig()
-my_rpu_config.mapping.digital_bias = True
-my_rpu_config.mapping.out_scaling_columnwise = True
-my_rpu_config.mapping.learn_out_scaling = True
-my_rpu_config.mapping.weight_scaling_omega = 1.0
-my_rpu_config.mapping.weight_scaling_columnwise = False
-my_rpu_config.mapping.max_input_size = 512
-my_rpu_config.mapping.max_output_size = 512
+    # Load datasets.
+    training_data, valid_data = load_images(BATCH_SIZE)
 
-my_rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
-my_rpu_config.remap.type = WeightRemapType.CHANNELWISE_SYMMETRIC
-my_rpu_config.clip.type = WeightClipType.LAYER_GAUSSIAN
-my_rpu_config.clip.sigma = 2.5
+    # Define the properties of the neural network in terms of noise simulated during
+    # the inference/training pass
+    my_rpu_config = InferenceRPUConfig()
+    my_rpu_config.mapping.digital_bias = True
+    my_rpu_config.mapping.out_scaling_columnwise = True
+    my_rpu_config.mapping.learn_out_scaling = True
+    my_rpu_config.mapping.weight_scaling_omega = 1.0
+    my_rpu_config.mapping.weight_scaling_columnwise = False
+    my_rpu_config.mapping.max_input_size = 512
+    my_rpu_config.mapping.max_output_size = 512
 
-# train input clipping
-my_rpu_config.forward.noise_management = NoiseManagementType.NONE
-my_rpu_config.forward.bound_management = BoundManagementType.NONE
-my_rpu_config.forward.out_bound = 10.0  # quite restrictive
-my_rpu_config.pre_post.input_range.enable = True
-my_rpu_config.pre_post.input_range.manage_output_clipping = True
-my_rpu_config.pre_post.input_range.decay = 0.001
-my_rpu_config.pre_post.input_range.input_min_percentage = 0.95
-my_rpu_config.pre_post.input_range.output_min_percentage = 0.95
+    my_rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
+    my_rpu_config.remap.type = WeightRemapType.CHANNELWISE_SYMMETRIC
+    my_rpu_config.clip.type = WeightClipType.LAYER_GAUSSIAN
+    my_rpu_config.clip.sigma = 2.5
 
-my_rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
-my_rpu_config.modifier.std_dev = 0.1
+    # train input clipping
+    my_rpu_config.forward.noise_management = NoiseManagementType.NONE
+    my_rpu_config.forward.bound_management = BoundManagementType.NONE
+    my_rpu_config.forward.out_bound = 10.0  # quite restrictive
+    my_rpu_config.pre_post.input_range.enable = True
+    my_rpu_config.pre_post.input_range.manage_output_clipping = True
+    my_rpu_config.pre_post.input_range.decay = 0.001
+    my_rpu_config.pre_post.input_range.input_min_percentage = 0.95
+    my_rpu_config.pre_post.input_range.output_min_percentage = 0.95
 
-# Prepare the model.
-analog_model = create_analog_network(my_rpu_config)
-if USE_CUDA:
-    analog_model = analog_model.cuda()
-print(analog_model)
+    my_rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
+    my_rpu_config.modifier.std_dev = 0.1
 
-opt = create_sgd_optimizer(analog_model, LEARNING_RATE)
-crit = nn.CrossEntropyLoss()
+    my_rpu_config.runtime.data_type = DATA_TYPE
 
-# Train the model
-results = training_phase(analog_model, crit, opt, training_data, valid_data)
+    # Prepare the model.
+    analog_model = create_analog_network(my_rpu_config)
+    if USE_CUDA:
+        analog_model = analog_model.cuda()
+    print(analog_model)
 
+    opt = create_sgd_optimizer(analog_model, LEARNING_RATE)
+    crit = nn.CrossEntropyLoss()
 
-# Test model inference over time
-t_inference_lst = [0.0, 1.0, 20.0, 1000.0, 1e5, 1e7]
-inference_error, _ = inference_phase(t_inference_lst, analog_model, crit, valid_data)
-plot_results(*results, t_inference_lst, inference_error)
+    # Train the model
+    results = training_phase(analog_model, crit, opt, training_data, valid_data)
+
+    # Test model inference over time
+    t_inference_lst = [0.0, 1.0, 20.0, 1000.0, 1e5, 1e7]
+    inference_error, _ = inference_phase(t_inference_lst, analog_model, crit, valid_data)
+    plot_results(*results, t_inference_lst, inference_error)

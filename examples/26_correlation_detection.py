@@ -30,19 +30,22 @@ from aihwkit.simulator.presets import StandardIOParameters
 from aihwkit.simulator.tiles import AnalogTile
 from aihwkit.simulator.configs import (
     build_config,
+    RPUDataType,
     UnitCellRPUConfig,
     SingleRPUConfig,
     SoftBoundsReferenceDevice,
     MixedPrecisionCompound,
     ChoppedTransferCompound,
+    DynamicTransferCompound,
 )
 
 # Check device
 DEVICE = torch_device("cuda" if cuda.is_compiled() else "cpu")
+DATA_TYPE = RPUDataType.FLOAT
 
 
 def get_rpu_config(
-    algorithm: str = "ttv2", construction_seed: int = 0
+    algorithm: str = "ttv2", construction_seed: int = 123
 ) -> Union[UnitCellRPUConfig, SingleRPUConfig]:
     """Returns a rpu_config of a given type.
 
@@ -58,7 +61,7 @@ def get_rpu_config(
     """
 
     sb_device = SoftBoundsReferenceDevice(
-        dw_min=0.01,
+        dw_min=0.1,
         w_max_dtod=0.3,
         w_min_dtod=0.3,
         w_min=-1.0,
@@ -92,6 +95,10 @@ def get_rpu_config(
         # Common parameters in ttv2 ttv3 ttv4.
         rpu_config.device.transfer_every = 1
         rpu_config.device.auto_granularity = 200
+
+    if isinstance(rpu_config.device, DynamicTransferCompound):
+        # Common parameters in ttv4.
+        rpu_config.device.tail_weightening = np.inf
 
     return rpu_config
 
@@ -204,8 +211,8 @@ if __name__ == "__main__":
     t = 5000
     alpha = 0.4  # correlation factor
 
-    x_values = randn(t, n)
-    d_values = randn(t, n)
+    x_values = randn(t, n, dtype=DATA_TYPE.as_torch())
+    d_values = randn(t, n, dtype=DATA_TYPE.as_torch())
     d_values = alpha * x_values + (1 - alpha) * d_values
 
     # Algorithm can be one of: 'tiki-taka', 'ttv2', 'c-ttv2', 'agad', 'sgd', 'mp'
@@ -214,12 +221,13 @@ if __name__ == "__main__":
     # correlated traces from the blue uncorrelated (which should stay
     # around zero).
 
-    # training_algorithm = "mp"
+    training_algorithm = "mp"
     # training_algorithm = "ttv2"
     # training_algorithm = "c-ttv2"
-    training_algorithm = "agad"
+    # training_algorithm = "agad"
 
     my_rpu_config = get_rpu_config(training_algorithm)
+    my_rpu_config.runtime.data_type = DATA_TYPE
     tile = create_analog_tile(weight_matrix, my_rpu_config)
 
     w_traces, h_traces = run_updates(tile, x_values, d_values)

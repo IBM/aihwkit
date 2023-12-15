@@ -15,12 +15,12 @@
 # pylint: disable=too-many-instance-attributes, too-many-lines
 
 from dataclasses import dataclass, field
-from typing import ClassVar, List, Type
+from typing import ClassVar, List, Type, Optional, Union, Any
 from numpy import exp
 
+from aihwkit.simulator.parameters.enums import RPUDataType
 from aihwkit.simulator.parameters.helpers import _PrintableMixin, parameters_to_bindings
-from aihwkit.simulator.parameters.utils import DriftParameter, SimpleDriftParameter
-from aihwkit.simulator.rpu_base import devices
+from aihwkit.simulator.parameters.inference import DriftParameter, SimpleDriftParameter
 
 # legacy
 from aihwkit.simulator.configs.compounds import (  # pylint: disable=unused-import
@@ -43,7 +43,8 @@ class FloatingPointDevice(_PrintableMixin):
     Implements ideal devices forward/backward/update behavior.
     """
 
-    bindings_class: ClassVar[Type] = devices.FloatingPointTileParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "FloatingPointTileParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     diffusion: float = 0.0
     """Standard deviation of diffusion process."""
@@ -54,9 +55,9 @@ class FloatingPointDevice(_PrintableMixin):
     drift: SimpleDriftParameter = field(default_factory=SimpleDriftParameter)
     """Parameter governing a power-law drift."""
 
-    def as_bindings(self) -> devices.FloatingPointTileParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -133,7 +134,7 @@ class PulsedDevice(_PrintableMixin):
     **Drift**:
 
     Optional power-law drift setting, as described in
-    :class:`~aihwkit.similar.parameters.utils.DriftParameter`.
+    :class:`~aihwkit.similar.parameters.inference.DriftParameter`.
 
     Important:
         Similar to reset, drift is *not* applied automatically each
@@ -143,7 +144,8 @@ class PulsedDevice(_PrintableMixin):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PulsedResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PulsedResistiveDeviceParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     construction_seed: int = 0
     """If not equal 0, will set a unique seed for hidden parameters during
@@ -281,9 +283,9 @@ class PulsedDevice(_PrintableMixin):
     Pulses can be obtained by ``analog_tile.tile.get_pulse_counters()``
     """
 
-    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -308,7 +310,8 @@ class IdealDevice(_PrintableMixin):
     forward/backward might still have a non-ideal ADC or noise added.
     """
 
-    bindings_class: ClassVar[Type] = devices.IdealResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "IdealResistiveDeviceParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     construction_seed: int = 0
     """If not ``0``, set a unique seed for hidden parameters during
@@ -323,9 +326,9 @@ class IdealDevice(_PrintableMixin):
     reset_std: float = 0.01
     """Standard deviation around zero mean in case reset is called."""
 
-    def as_bindings(self) -> devices.IdealResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -369,7 +372,7 @@ class ConstantStepDevice(PulsedDevice):
     :class:`~PulsedDevice`.
     """
 
-    bindings_class: ClassVar[Type] = devices.ConstantStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "ConstantStepResistiveDeviceParameter"
 
 
 @dataclass
@@ -434,7 +437,7 @@ class LinearStepDevice(PulsedDevice):
         :class:`~PulsedDevice`.
     """
 
-    bindings_class: ClassVar[Type] = devices.LinearStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "LinearStepResistiveDeviceParameter"
 
     gamma_up: float = 0.0
     r"""The value of :math:`\gamma^+`.
@@ -547,7 +550,7 @@ class SoftBoundsDevice(PulsedDevice):
     parameters set to model soft bounds.
     """
 
-    bindings_class: ClassVar[Type] = devices.SoftBoundsResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "SoftBoundsResistiveDeviceParameter"
 
     mult_noise: bool = True
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
@@ -666,7 +669,7 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     dw_min: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
     up_down: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
 
-    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         params = SoftBoundsDevice()
         for key, value in self.__dict__.items():
@@ -679,7 +682,7 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
         params.dw_min = b_factor * self.alpha
         params.up_down = 1 + 2 * self.range_min / b_factor
 
-        return parameters_to_bindings(params)
+        return parameters_to_bindings(params, data_type)
 
 
 @dataclass
@@ -705,7 +708,9 @@ class SoftBoundsReferenceDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.SoftBoundsReferenceResistiveDeviceParameter
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "SoftBoundsReferenceResistiveDeviceParameter"
 
     mult_noise: bool = False
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
@@ -830,7 +835,7 @@ class ExpStepDevice(PulsedDevice):
     """
     # pylint: disable=invalid-name
 
-    bindings_class: ClassVar[Type] = devices.ExpStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "ExpStepResistiveDeviceParameter"
 
     A_up: float = 0.00081
     """Factor ``A`` for the up direction."""
@@ -945,7 +950,7 @@ class PowStepDevice(PulsedDevice):
     ..  _Frascaroli et al. (2108): https://www.nature.com/articles/s41598-018-25376-x
     """
 
-    bindings_class: ClassVar[Type] = devices.PowStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PowStepResistiveDeviceParameter"
 
     pow_gamma: float = 1.0
     r"""The value of :math:`\gamma` as explained above.
@@ -1082,7 +1087,9 @@ class PowStepReferenceDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PowStepReferenceResistiveDeviceParameter
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "PowStepReferenceResistiveDeviceParameter"
 
     pow_gamma: float = 1.0
     r"""The value of :math:`\gamma` as explained above.
@@ -1183,7 +1190,7 @@ class PiecewiseStepDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PiecewiseStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PiecewiseStepResistiveDeviceParameter"
 
     piecewise_up: List[float] = field(default_factory=lambda: [1])
     r"""Array of values that characterize the update steps in upwards direction.

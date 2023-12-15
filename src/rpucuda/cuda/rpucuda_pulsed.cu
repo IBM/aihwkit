@@ -244,12 +244,8 @@ template <typename T> void RPUCudaPulsed<T>::printToStream(std::stringstream &ss
   std::string name;
   name = rpucuda_device_->getPar().getName();
 
-  std::string num = "float";
-  if (sizeof(T) == 8) {
-    num = "double";
-  }
-  ss << "RPUCudaPulsed<" << num << ">[" << name << "](" << this->d_size_ << "," << this->x_size_
-     << ")" << std::endl;
+  ss << "RPUCudaPulsed<" << this->getDataTypeName() << ">[" << name << "](" << this->d_size_ << ","
+     << this->x_size_ << ")" << std::endl;
 };
 
 /*********************************************************************************/
@@ -311,6 +307,28 @@ void RPUCudaPulsed<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scale
   // remap weights
   this->wremapper_cuda_->apply(
       this->dev_weights_->getData(), this->getAlphaLearningRate(), wrmpar, scales, biases);
+}
+
+template <typename T>
+bool RPUCudaPulsed<T>::swaWeights(
+    const WeightRemapParameter &wrmpar, T *swa_weights, uint64_t iter, T *scales, T *biases) {
+
+  CHECK_RPU_DEVICE_INIT;
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  if (wrmpar.type != WeightRemapType::None &&
+      !up_pwu_->checkForFPUpdate(&*rpucuda_device_, getMetaPar().up)) {
+    getMetaPar().print();
+    RPU_FATAL("SWA is NOT implemented for most devices");
+  }
+
+  bool modfied = RPUCudaSimple<T>::swaWeights(wrmpar, swa_weights, iter, scales, biases);
+
+  if (modfied) {
+    this->copyWeightsToHost();
+    this->setWeights(this->getWeightsPtr()[0]);
+  }
+  return modfied;
 }
 
 template <typename T> void RPUCudaPulsed<T>::resetCols(int start_col, int n_cols, T reset_prob) {
@@ -378,9 +396,9 @@ template <typename T> void RPUCudaPulsed<T>::setWeightsReal(const T *weightsptr,
   T B = 0;
   int BL = 0;
   getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), weight_granularity);
-  T mx_change = BL * weight_granularity;
-  T range = fabs(w_max - w_min);
-  int iter = n_loops * range / mx_change;
+  T mx_change = (T)BL * weight_granularity;
+  T range = fabsf(w_max - w_min);
+  int iter = ceilf((T)n_loops * range / mx_change);
 
   /*==== */
 
@@ -414,7 +432,7 @@ template <typename T> void RPUCudaPulsed<T>::setWeightsReal(const T *weightsptr,
   T avg_dev = 0.0;
   T *w_current = this->copyWeightsToHost()[0];
   for (int i = 0; i < x_sz * d_sz; ++i) {
-    avg_dev += fabs(weightsptr[i] - w_current[i]);
+    avg_dev += fabsf(weightsptr[i] - w_current[i]);
   }
   avg_dev /= x_sz * d_sz;
   DEBUG_OUT("Finished setting weights real [avg deviation=" << avg_dev << "]");
@@ -898,6 +916,9 @@ void RPUCudaPulsed<T>::updateMatrixIterator(
 template class RPUCudaPulsed<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUCudaPulsed<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class RPUCudaPulsed<half_t>;
 #endif
 
 #undef CHECK_RPU_DEVICE_INIT

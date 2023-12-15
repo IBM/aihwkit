@@ -104,6 +104,9 @@ template class AbstractRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class AbstractRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class AbstractRPUDeviceCuda<half_t>;
+#endif
 
 /******************************************************************************************/
 /* SimpleRPUDeviceCuda*/
@@ -226,7 +229,7 @@ void SimpleRPUDeviceCuda<T>::doDirectUpdate(
     const RPU::PulsedUpdateMetaParameter<T> &up,
     T *x_buffer,
     T *d_buffer) {
-  if (m_batch == 1 && beta == 1.0) {
+  if (m_batch == 1 && beta == (T)1.0) {
     RPU::math::ger<T>(
         context_, d_size_, x_size_, -lr, d_input, 1, x_input, 1, dev_weights, d_size_);
   } else {
@@ -247,12 +250,12 @@ template <typename T>
 void SimpleRPUDeviceCuda<T>::decayWeights(T *weights, T alpha, bool bias_no_decay) {
 
   T lifetime = this->getPar().lifetime;
-  T decay_rate = (lifetime > 1) ? (1.0 / lifetime) : 0.0;
-  T decay_scale = 1.0 - alpha * decay_rate;
+  T decay_rate = (lifetime > (T)1) ? ((T)1.0 / lifetime) : (T)0.0;
+  T decay_scale = (T)1.0 - alpha * decay_rate;
 
-  if (decay_scale > 0.0 && decay_scale < 1.0) {
+  if (decay_scale > (T)0.0 && decay_scale < (T)1.0) {
     RPU::math::scal<T>(
-        context_, bias_no_decay ? MAX(size_ - d_size_, 0) : size_, decay_scale, weights, 1);
+        context_, bias_no_decay ? MAX(size_ - d_size_, 0) : size_, decay_scale, weights);
   }
 }
 
@@ -285,7 +288,7 @@ template <typename T> void SimpleRPUDeviceCuda<T>::initDiffusionRnd() {
 template <typename T> void SimpleRPUDeviceCuda<T>::diffuseWeights(T *weights) {
 
   T diffusion = this->getPar().diffusion;
-  if (diffusion <= 0) {
+  if (diffusion <= (T)0.0) {
     return;
   }
 
@@ -304,7 +307,7 @@ template <typename T> void SimpleRPUDeviceCuda<T>::diffuseWeights(T *weights) {
 
 template <typename T> void SimpleRPUDeviceCuda<T>::clipWeights(T *weights, T clip) {
 
-  if (clip >= 0) {
+  if (clip >= (T)0.0) {
     RPU::math::aclip<T>(context_, weights, size_, clip);
   }
 }
@@ -334,7 +337,7 @@ void SimpleRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
   bool with_flag = false;
   bool with_nrnd = false;
 
-  if (getPar().reset_std > 0) {
+  if (getPar().reset_std > (T)0.0) {
     if (dev_reset_nrnd_ == nullptr) {
       initResetRnd();
     }
@@ -342,7 +345,7 @@ void SimpleRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
         dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
     with_nrnd = true;
   }
-  if (reset_prob < 1) {
+  if (reset_prob < (T)1.0) {
     if (dev_reset_flag_ == nullptr) {
       initResetRnd();
     }
@@ -385,6 +388,9 @@ void SimpleRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in,
 template class SimpleRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class SimpleRPUDeviceCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class SimpleRPUDeviceCuda<half_t>;
 #endif
 
 } // namespace RPU

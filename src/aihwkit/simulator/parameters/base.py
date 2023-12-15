@@ -15,9 +15,7 @@
 from typing import ClassVar, Type, Union, Any, TYPE_CHECKING
 from dataclasses import dataclass, field
 
-from aihwkit.simulator.parameters.utils import MappingParameter, PrePostProcessingParameter
-from aihwkit.simulator.parameters.helpers import _PrintableMixin, tile_parameters_to_bindings
-from aihwkit.simulator.rpu_base import devices
+from .runtime import RuntimeParameter
 
 
 if TYPE_CHECKING:
@@ -48,9 +46,14 @@ class RPUConfigBase:
     """Tile class that correspond to the RPUConfig. Needs to be
     defined in the derived class."""
 
-    def as_bindings(self) -> devices.AnalogTileParameter:
+    runtime: RuntimeParameter = field(default_factory=RuntimeParameter, compare=False)
+    """Parameters setting simulation runtime options, such as
+    gradient memory management.
+    """
+
+    def as_bindings(self) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return tile_parameters_to_bindings(self)
+        return self
 
     def compatible_with(self, tile_class_name: str) -> bool:
         """Tests whether the RPUConfig is compatile with a given ``TileModule`` class.
@@ -60,7 +63,7 @@ class RPUConfigBase:
 
         Returns:
 
-            Whehter the class is compatible. By default only the
+            Whether the class is compatible. By default only the
             class that is defined in the ``tile_class`` property of
             the RPUConfig
         """
@@ -77,34 +80,3 @@ class RPUConfigBase:
         Short-cut for instantiating ``self.tile_class`` with given parameters.
         """
         return self.tile_class(*args, rpu_config=self, **kwargs)
-
-
-@dataclass
-class MappableRPU(RPUConfigBase, _PrintableMixin):
-    """Defines the mapping parameters and utility factories"""
-
-    tile_array_class: ClassVar[Type]
-    """Tile array class that correspond to the RPUConfig.
-
-    This is used to build logical arrays of tiles. Needs to be defined
-    in the derived class.
-    """
-
-    mapping: MappingParameter = field(default_factory=MappingParameter)
-    """Parameter related to mapping weights to tiles for supporting modules."""
-
-    def get_default_tile_module_class(self, out_size: int = 0, in_size: int = 0) -> Type:
-        """Returns the default TileModule class."""
-        if self.mapping.max_input_size == 0 and self.mapping.max_output_size == 0:
-            return self.tile_class
-        if self.mapping.max_input_size < in_size or self.mapping.max_output_size < out_size:
-            return self.tile_array_class
-        return self.tile_class
-
-
-@dataclass
-class PrePostProcessingRPU(RPUConfigBase, _PrintableMixin):
-    """Defines the pre-post parameters and utility factories"""
-
-    pre_post: PrePostProcessingParameter = field(default_factory=PrePostProcessingParameter)
-    """Parameter related digital pre and post processing."""

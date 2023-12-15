@@ -17,7 +17,7 @@
 from dataclasses import dataclass, field
 from aihwkit.simulator.configs.configs import InferenceRPUConfig
 
-from aihwkit.simulator.parameters.utils import (
+from aihwkit.simulator.parameters import (
     IOParameters,
     WeightClipParameter,
     WeightModifierParameter,
@@ -102,7 +102,9 @@ class WebComposerMappingParameter(MappingParameter):
 class WebComposerInferenceRPUConfig(InferenceRPUConfig):
     """Preset configuration used as default for the Inference Composer"""
 
-    forward: IOParameters = field(default_factory=WebComposerIOParameters)
+    forward: IOParameters = field(
+        default_factory=WebComposerIOParameters, metadata=dict(bindings_include=True)
+    )
     """Input-output parameter setting for the forward direction."""
 
     noise_model: BaseNoiseModel = field(default_factory=PCMLikeNoiseModel)

@@ -22,8 +22,8 @@ template <typename T> struct UpdateFunctorConstantStepLargeNoise {
       T &w,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 par_2,
+      const param4_t par_4,
+      const param2_t par_2,
       T &par_1,
       const T *global_par,
       const int global_params_count,
@@ -74,7 +74,7 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
 
   pwukpvec_t<T> v;
 
-  if (getPar().dw_min_std > 0.33) { // 3 sigma
+  if (getPar().dw_min_std > (T)0.33) { // 3 sigma
     v.push_back(RPU::make_unique<PWUKernelParameterSingleFunctor<
                     T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
     v.push_back(RPU::make_unique<PWUKernelParameterBatchFunctor<
@@ -114,6 +114,9 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
 template class ConstantStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class ConstantStepRPUDeviceCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ConstantStepRPUDeviceCuda<half_t>;
 #endif
 
 } // namespace RPU

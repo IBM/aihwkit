@@ -12,16 +12,17 @@
 
 """Utilities for resistive processing units configurations."""
 from sys import version_info
+from typing import Any, List, Optional, Type
 from dataclasses import Field, fields, is_dataclass
 from enum import Enum
 from textwrap import indent
-from typing import Any, List
 
-from aihwkit.simulator.rpu_base import devices, tiles
+from aihwkit.simulator import rpu_base
 from aihwkit.exceptions import ConfigError
+from .enums import RPUDataType
 
 if version_info[0] >= 3 and version_info[1] > 7:
-    # pylint: disable=no-name-in-module
+    # pylint: disable=no-name-in-module, ungrouped-imports
     from typing import get_origin  # type: ignore
 
     HAS_ORIGIN = True
@@ -29,13 +30,48 @@ else:
     HAS_ORIGIN = False
 
 ALL_SKIP_FIELD = "is_perfect"
+FIELD_MAP = {"forward": "forward_io", "backward": "backward_io"}
+ALWAYS_INCLUDE = ["forward", "backward", "update"]
 
 
-def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
+def get_bindings_class(params: Any, data_type: RPUDataType) -> Optional[Type]:
+    """Return the data class from the param binding fields.
+
+    Args:
+        params: parameter dataclass
+        data_type: RPUDataType to use
+
+    Returns:
+        the C++ binding class
+
+    Raises:
+        ConfigError: if the class is not found
+    """
+    if getattr(params, "bindings_class", None) is None:
+        return None
+    if not isinstance(params.bindings_class, str):
+        return params.bindings_class
+    # string / typed
+    class_name = params.bindings_class
+    module = getattr(rpu_base, getattr(params, "bindings_module", "devices"))
+    if data_type != RPUDataType.FLOAT:
+        if not hasattr(module, data_type.value):
+            raise ConfigError(
+                f"Cannot find requested data_type '{data_type.value}' in rpu_base module. "
+            )
+        module = getattr(module, data_type.value)
+    param_class = getattr(module, class_name, None)
+    if param_class is None:
+        ConfigError(f"Cannot find requested class '{class_name}' in rpu_base module. ")
+    return param_class
+
+
+def parameters_to_bindings(params: Any, data_type: RPUDataType, check_fields: bool = True) -> Any:
     """Convert a dataclass parameter into a bindings class.
 
     Args:
         params: parameter dataclass
+        data_type: RPUDataType to use
         check_fields: whether to check for the correct attributes
 
     Returns:
@@ -45,7 +81,10 @@ def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
         ConfigError: if the field type mismatches (int to float conversion is ignored)
     """
     # pylint: disable=no-name-in-module, too-many-branches
-    result = params.bindings_class()
+    result = get_bindings_class(params, data_type)
+    if result is None:
+        return params
+    result = result()
 
     field_dict = {field.name: (field, getattr(params, field.name)) for field in fields(params)}
     if check_fields:
@@ -65,15 +104,15 @@ def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
             continue
 
         if isinstance(value, Enum):
-            if hasattr(tiles, value.__class__.__name__):
-                enum_class = getattr(tiles, value.__class__.__name__)
+            if hasattr(rpu_base.tiles, value.__class__.__name__):
+                enum_class = getattr(rpu_base.tiles, value.__class__.__name__)
             else:
-                enum_class = getattr(devices, value.__class__.__name__)
+                enum_class = getattr(rpu_base.devices, value.__class__.__name__)
             enum_value = getattr(enum_class, value.value)
             setattr(result, field, enum_value)
         elif is_dataclass(value):
             if hasattr(value, "bindings_class"):
-                setattr(result, field, parameters_to_bindings(value))
+                setattr(result, field, parameters_to_bindings(value, data_type=data_type))
         else:
             if HAS_ORIGIN:
                 expected_type = get_origin(dataclass_field.type) or dataclass_field.type
@@ -89,41 +128,48 @@ def parameters_to_bindings(params: Any, check_fields: bool = True) -> Any:
     return result
 
 
-def tile_parameters_to_bindings(params: Any) -> Any:
-    """Convert a tile dataclass parameter into a bindings class."""
-    field_map = {"forward": "forward_io", "backward": "backward_io"}
-    excluded_fields = (
-        "device",
-        "noise_model",
-        "drift_compensation",
-        "clip",
-        "modifier",
-        "mapping",
-        "remap",
-        "pre_post",
-        "tile_class",
-        "tile_array_class",
-    )
+def tile_parameters_to_bindings(params: Any, data_type: RPUDataType) -> Any:
+    """Convert a tile dataclass parameter into a bindings class.
 
-    result = params.bindings_class()
-    for field, value in params.__dict__.items():
+    Ignores fields that do not have metadata with ``bindings_include`` key.
+
+    Args:
+        params: parameter dataclass
+        data_type: RPUDataType to use
+
+    Returns:
+        the C++ bindings
+
+    """
+
+    result = get_bindings_class(params, data_type)
+    if result is None:
+        return params
+
+    result = result()  # instantiate results class
+
+    for field in fields(params):
         # Get the mapped field name, if needed.
-        field = field_map.get(field, field)
 
-        # Convert enums to the bindings enums.
-        if field in excluded_fields:
-            # Exclude special fields that are not present in the bindings.
+        if field.name not in ALWAYS_INCLUDE and not field.metadata.get("bindings_include", False):
             continue
 
+        value = params.__dict__[field.name]
+        field_name = FIELD_MAP.get(field.name, field.name)
+
         if isinstance(value, Enum):
-            enum_class = getattr(devices, value.__class__.__name__)
+            if hasattr(rpu_base.tiles, value.__class__.__name__):
+                enum_class = getattr(rpu_base.tiles, value.__class__.__name__)
+            else:
+                enum_class = getattr(rpu_base.devices, value.__class__.__name__)
             enum_value = getattr(enum_class, value.value)
-            setattr(result, field, enum_value)
+            setattr(result, field_name, enum_value)
+
         elif is_dataclass(value):
-            if hasattr(value, "bindings_class"):
-                setattr(result, field, parameters_to_bindings(value))
+            if getattr(value, "bindings_class", None) is not None:
+                setattr(result, field_name, parameters_to_bindings(value, data_type=data_type))
         else:
-            setattr(result, field, value)
+            setattr(result, field_name, value)
 
     return result
 
@@ -196,6 +242,9 @@ class _PrintableMixin:
 
         def is_skippable(field: Field, value: Any) -> bool:
             """Return whether a field should be skipped."""
+            if field.metadata.get("always_show", False):
+                return False
+
             if value == field.default:
                 # Skip fields with the default value.
                 return True
