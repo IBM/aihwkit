@@ -52,10 +52,10 @@ from aihwkit.simulator.tiles.array import TileModuleArray
 class FloatingPointRPUConfig(MappableRPU, PrePostProcessingRPU):
     """Configuration for a floating point resistive processing unit."""
 
-    tile_class: ClassVar[Type] = FloatingPointTile
-    """Tile class that correspond to this RPUConfig."""
+    tile_class: Type = FloatingPointTile
+    """Tile class that corresponds to this RPUConfig."""
 
-    tile_array_class: ClassVar[Type] = TileModuleArray
+    tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
     device: FloatingPointDevice = field(default_factory=FloatingPointDevice)
@@ -93,10 +93,10 @@ class IOManagedRPUConfig(MappableRPU, PrePostProcessingRPU):
 class SingleRPUConfig(IOManagedRPUConfig):
     """Configuration for an analog (pulsed device) resistive processing unit."""
 
-    tile_class: ClassVar[Type] = AnalogTile
-    """Tile class that correspond to this RPUConfig."""
+    tile_class: Type = AnalogTile
+    """Tile class that corresponds to this RPUConfig."""
 
-    tile_array_class: ClassVar[Type] = TileModuleArray
+    tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
     device: PulsedDevice = field(default_factory=ConstantStepDevice)
@@ -107,10 +107,10 @@ class SingleRPUConfig(IOManagedRPUConfig):
 class UnitCellRPUConfig(IOManagedRPUConfig):
     """Configuration for an analog (unit cell) resistive processing unit."""
 
-    tile_class: ClassVar[Type] = AnalogTile
-    """Tile class that correspond to this RPUConfig."""
+    tile_class: Type = AnalogTile
+    """Tile class that corresponds to this RPUConfig."""
 
-    tile_array_class: ClassVar[Type] = TileModuleArray
+    tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
     device: Union[UnitCell, TransferCompound] = field(default_factory=UnitCell)
@@ -127,10 +127,10 @@ class DigitalRankUpdateRPUConfig(IOManagedRPUConfig):
     transferred to the analog crossbar using pulses.
     """
 
-    tile_class: ClassVar[Type] = AnalogTile
-    """Tile class that correspond to this RPUConfig."""
+    tile_class: Type = AnalogTile
+    """Tile class that corresponds to this RPUConfig."""
 
-    tile_array_class: ClassVar[Type] = TileModuleArray
+    tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
     device: DigitalRankUpdateCell = field(default_factory=DigitalRankUpdateCell)
@@ -151,10 +151,10 @@ class InferenceRPUConfig(IOManagedRPUConfig):
 
     # pylint: disable=too-many-instance-attributes
 
-    tile_class: ClassVar[Type] = InferenceTile
-    """Tile class that correspond to this RPUConfig."""
+    tile_class: Type = InferenceTile
+    """Tile class that corresponds to this RPUConfig."""
 
-    tile_array_class: ClassVar[Type] = TileModuleArray
+    tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
     forward: IOParameters = field(
@@ -267,10 +267,10 @@ class TorchInferenceRPUConfig(InferenceRPUConfig):
         ``TorchTileConfigError`` is raised.
     """
 
-    simulator_tile_class: ClassVar[Type] = TorchSimulatorTile
+    simulator_tile_class: Type = TorchSimulatorTile
 
-    tile_class: ClassVar[Type] = TorchInferenceTile
-    """Tile class that correspond to this RPUConfig."""
+    tile_class: Type = TorchInferenceTile
+    """Tile class that corresponds to this RPUConfig."""
 
-    tile_array_class: ClassVar[Type] = TileModuleArray
+    tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""

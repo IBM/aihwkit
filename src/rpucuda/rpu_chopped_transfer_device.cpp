@@ -48,6 +48,8 @@ void ChoppedTransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &
 
   ss << "\t auto_momentum:\t\t" << auto_momentum << std::endl;
 
+  ss << "\t auto_momentum:\t\t" << auto_momentum << std::endl;
+
   if (no_buffer) {
     ss << "\t buffer not used.";
     ss << std::endl;
@@ -248,7 +250,7 @@ void ChoppedTransferRPUDevice<T>::populate(
   BufferedTransferRPUDevice<T>::populate(p, rng);
 
   const auto &par = getPar();
-  in_chopper_.resize(par.getInSize(), true);
+  in_chopper_.resize(par.getInSize(), false);
   out_chopper_.resize(par.getOutSize(), false);
   m_x_ = (T)0.0;
   m_d_ = (T)0.0;
