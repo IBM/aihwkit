@@ -31,6 +31,7 @@ from aihwkit.simulator.configs.compounds import (
     VectorUnitCell,
     TransferCompound,
     BufferedTransferCompound,
+    ChoppedTransferCompound,
     ReferenceUnitCell,
     MixedPrecisionCompound,
 )
@@ -44,7 +45,9 @@ from aihwkit.simulator.configs import (
     UnitCellRPUConfig,
     DigitalRankUpdateRPUConfig,
 )
-from aihwkit.simulator.tiles.custom import CustomRPUConfig
+from aihwkit.simulator.tiles.custom import CustomRPUConfig, CustomSimulatorTile
+from aihwkit.simulator.tiles.transfer import TorchTransferTile, TransferSimulatorTile
+from aihwkit.simulator.tiles.torch_tile import TorchSimulatorTile
 from aihwkit.simulator.rpu_base import tiles
 
 
@@ -84,7 +87,7 @@ class Ideal:
 class Custom:
     """CustomTile."""
 
-    simulator_tile_class = CustomRPUConfig.simulator_tile_class
+    simulator_tile_class = CustomSimulatorTile
     first_hidden_field = None
     use_cuda = False
 
@@ -378,6 +381,35 @@ class BufferedTransfer:
         return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
 
 
+class TorchTransfer:
+    """AnalogTile with ChopppedTransferCompound."""
+
+    simulator_tile_class = TransferSimulatorTile
+    first_hidden_field = "max_bound_0"
+    use_cuda = False
+
+    def get_rpu_config(self):
+        rpu_config = UnitCellRPUConfig(
+            device=ChoppedTransferCompound(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ],
+                in_chop_prob=0.0,
+                transfer_forward=IOParameters(is_perfect=True),
+                transfer_every=1,
+                units_in_mbatch=True,
+            )
+        )
+        rpu_config.tile_class = TorchTransferTile
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        rpu_config.tile_class = TorchTransferTile
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
+
+
 class MixedPrecision:
     """AnalogTile with MixedPrecisionCompound."""
 
@@ -417,7 +449,7 @@ class Inference:
 class TorchInference:
     """Inference torch tile (perfect forward)."""
 
-    simulator_tile_class = TorchInferenceRPUConfig.simulator_tile_class
+    simulator_tile_class = TorchSimulatorTile
     first_hidden_field = None
     use_cuda = False
 
@@ -486,7 +518,7 @@ class IdealCuda:
 class CustomCuda:
     """CustomTile."""
 
-    simulator_tile_class = CustomRPUConfig.simulator_tile_class
+    simulator_tile_class = CustomSimulatorTile
     first_hidden_field = None
     use_cuda = True
 
@@ -778,6 +810,35 @@ class BufferedTransferCuda:
         return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
 
 
+class TorchTransferCuda:
+    """AnalogTile with ChopppedTransferCompound."""
+
+    simulator_tile_class = TransferSimulatorTile
+    first_hidden_field = "max_bound_0"
+    use_cuda = True
+
+    def get_rpu_config(self):
+        rpu_config = UnitCellRPUConfig(
+            device=ChoppedTransferCompound(
+                unit_cell_devices=[
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                    SoftBoundsDevice(w_max_dtod=0, w_min_dtod=0),
+                ],
+                in_chop_prob=0.0,
+                transfer_forward=IOParameters(is_perfect=True),
+                transfer_every=1,
+                units_in_mbatch=True,
+            )
+        )
+        rpu_config.tile_class = TorchTransferTile
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        rpu_config.tile_class = TorchTransferTile
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
 class MixedPrecisionCuda:
     """AnalogTile with MixedPrecisionCompound."""
 
@@ -815,7 +876,7 @@ class InferenceCuda:
 class TorchInferenceCuda:
     """TorchInference tile."""
 
-    simulator_tile_class = TorchInferenceRPUConfig.simulator_tile_class
+    simulator_tile_class = TorchSimulatorTile
     first_hidden_field = None
     use_cuda = True
 

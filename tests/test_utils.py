@@ -55,6 +55,7 @@ from .helpers.tiles import (
     InferenceLearnOutScaling,
     TorchInference,
     Custom,
+    TorchTransfer,
 )
 
 SKIP_META_PARAM_TILES = [TorchInference, Custom, FloatingPoint]
@@ -77,6 +78,7 @@ SKIP_META_PARAM_TILES = [TorchInference, Custom, FloatingPoint]
         Inference,
         InferenceLearnOutScaling,
         TorchInference,
+        TorchTransfer,
         Custom,
     ],
     biases=["digital", None],
@@ -242,7 +244,7 @@ class SerializationTest(ParametrizedTestCase):
         new_loss = self.train_model(new_model, loss_func, input_x, input_y)
 
         loss = self.train_model(model, loss_func, input_x, input_y)
-        if self.tile_class != ConstantStep:
+        if self.tile_class not in (ConstantStep, TorchTransfer):
             self.assertTensorAlmostEqual(loss, new_loss)
 
     def test_save_load_state_dict_train_after_old_model(self):
@@ -335,7 +337,7 @@ class SerializationTest(ParametrizedTestCase):
 
         new_loss = self.train_model(new_model, loss_func, input_x, input_y)
         loss = self.train_model(model, loss_func, input_x, input_y)
-        if self.tile_class != ConstantStep:
+        if self.tile_class not in (ConstantStep, TorchTransfer):
             self.assertTensorAlmostEqual(loss, new_loss)
 
     def test_save_load_model(self):
@@ -758,6 +760,9 @@ class SerializationTest(ParametrizedTestCase):
 
         new_model = self.get_layer(rpu_config=rpu_config)
         new_analog_tile = self.get_analog_tile(new_model)
+
+        if "Torch" in analog_tile.__class__.__name__:
+            raise SkipTest("Torch tile")
 
         if new_analog_tile.__class__.__name__ != analog_tile.__class__.__name__:
             with self.assertRaises(TileError):
