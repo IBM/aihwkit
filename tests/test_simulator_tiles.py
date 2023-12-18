@@ -27,6 +27,9 @@ from aihwkit.simulator.parameters.enums import (
     BoundManagementType,
 )
 from aihwkit.simulator.configs.configs import PrePostProcessingRPU, FloatingPointRPUConfig
+from aihwkit.simulator.rpu_base import tiles
+from aihwkit.simulator.tiles.analog import AnalogTile
+from aihwkit.simulator.tiles.transfer import TransferSimulatorTile
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -41,6 +44,7 @@ from .helpers.tiles import (
     OneSided,
     Transfer,
     BufferedTransfer,
+    TorchTransfer,
     MixedPrecision,
     PiecewiseStep,
     PiecewiseStepCuda,
@@ -56,6 +60,7 @@ from .helpers.tiles import (
     OneSidedCuda,
     TransferCuda,
     BufferedTransferCuda,
+    TorchTransferCuda,
     InferenceCuda,
     ReferenceCuda,
     MixedPrecisionCuda,
@@ -86,6 +91,7 @@ TOL = 1e-6
         OneSided,
         Transfer,
         BufferedTransfer,
+        TorchTransfer,
         MixedPrecision,
         Inference,
         Reference,
@@ -107,6 +113,7 @@ TOL = 1e-6
         OneSidedCuda,
         TransferCuda,
         BufferedTransferCuda,
+        TorchTransferCuda,
         MixedPrecisionCuda,
         InferenceCuda,
         ReferenceCuda,
@@ -287,6 +294,9 @@ class TileTest(ParametrizedTestCase):
         """Tests hidden update index"""
         rpu_config = self.get_rpu_config()
 
+        if rpu_config.tile_class != AnalogTile:
+            raise SkipTest("Not an AnalogTile")
+
         if not isinstance(rpu_config, UnitCellRPUConfig) or not isinstance(
             rpu_config.device, (VectorUnitCell, ReferenceUnitCell)
         ):
@@ -411,7 +421,8 @@ class TileTest(ParametrizedTestCase):
 
         analog_tile = cuda_analog_tile.cpu()
         self.assertEqual(analog_tile.is_cuda, False)
-        self.assertNotEqual(analog_tile.tile.__class__, self.simulator_tile_class)
+        if analog_tile.tile.__class__ in tiles.__dict__.values():
+            self.assertNotEqual(analog_tile.tile.__class__, self.simulator_tile_class)
         # Assert over learning rate.
         self.assertAlmostEqual(analog_tile.get_learning_rate(), learning_rate)
         self.assertAlmostEqual(
@@ -468,7 +479,8 @@ class TileTest(ParametrizedTestCase):
         self.assertEqual(cpu_analog_tile.tile.__class__, self.simulator_tile_class)
         analog_tile = cpu_analog_tile.cuda()
         self.assertEqual(analog_tile.is_cuda, True)
-        self.assertNotEqual(analog_tile.tile.__class__, self.simulator_tile_class)
+        if analog_tile.tile.__class__ in tiles.__dict__.values():
+            self.assertNotEqual(analog_tile.tile.__class__, self.simulator_tile_class)
 
         # Assert over learning rate.
         self.assertAlmostEqual(analog_tile.get_learning_rate(), learning_rate)
@@ -563,7 +575,7 @@ class TileTest(ParametrizedTestCase):
     def test_replace_rpu_config(self) -> None:
         """Tests whether it is possible to replace the RPUConfig"""
         rpu_config = self.get_rpu_config()
-        if not hasattr(rpu_config, "forward"):
+        if not hasattr(rpu_config, "forward") or self.simulator_tile_class == TransferSimulatorTile:
             raise SkipTest("No forward")
 
         rpu_config.forward.is_perfect = False
@@ -589,7 +601,7 @@ class TileTest(ParametrizedTestCase):
     def test_replace_rpu_config_to(self) -> None:
         """Tests whether it is possible to replace the RPUConfig with to"""
         rpu_config = self.get_rpu_config()
-        if not hasattr(rpu_config, "forward"):
+        if not hasattr(rpu_config, "forward") or self.simulator_tile_class == TransferSimulatorTile:
             raise SkipTest("No forward")
 
         rpu_config.forward.out_noise = 0.123

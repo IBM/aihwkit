@@ -12,7 +12,7 @@
 
 """Base classes for the RPUConfig."""
 
-from typing import ClassVar, Type, Union, Any, TYPE_CHECKING
+from typing import Type, Union, Any, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 from .runtime import RuntimeParameter
@@ -42,7 +42,7 @@ RPUConfigGeneric = Union[
 class RPUConfigBase:
     """Base class of all RPUConfigs."""
 
-    tile_class: ClassVar[Type]
+    tile_class: Type
     """Tile class that correspond to the RPUConfig. Needs to be
     defined in the derived class."""
 
