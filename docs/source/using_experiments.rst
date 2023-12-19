@@ -21,7 +21,7 @@ Tile class                                                             Descripti
 Creating an Experiment
 ^^^^^^^^^^^^^^^^^^^^^^
 
-An Experiment can be created just by creating an instance of its class::
+A :class:`~aihwkit.experiments.experiments.training.BasicTraining`  Experiment can be created just by creating an instance of its class::
 
     from torchvision.datasets import FashionMNIST
 
@@ -42,12 +42,43 @@ An Experiment can be created just by creating an instance of its class::
             AnalogLinear(128, 10, bias=True),
             LogSoftmax(dim=1)
         )
+    
+Similarly a :class:`~aihwkit.experiments.experiments.training.BasicInferencing`  Experiment can also be created by creating an instance of the class ::
+
+    from torch.nn import (
+    Flatten, LogSoftmax, MaxPool2d, Module, Tanh
     )
+    from torchvision.datasets import FashionMNIST
+
+    from aihwkit.nn import AnalogConv2dMapped, AnalogLinearMapped, AnalogSequential
+
+    from aihwkit.experiments.experiments.inferencing import BasicInferencing
+
+    DATASET = FashionMNIST
+    MODEL = create_analog_lenet5_network()
+    BATCH_SIZE = 8
+    REPEATS = 2
+    I_TIMES = 86400
+    TEMPLATE_ID = 'hwa-trained-lenet5-mapped'
+
+    my_experiment = BasicInferencing(
+      dataset=DATASET,
+      model = MODEL,
+      batch_size = BATCH_SIZE,
+      weight_template_id = TEMPLATE_ID,
+      inference_repeats = REPEATS,
+      inference_time = I_TIMES
+    )
+
 
 Each Experiment has its own attributes, providing sensible defaults as needed.
 For example, the ``BasicTraining`` Experiment allows setting attributes that
 define the characteristics of the training (``dataset``, ``model``,
 ``batch_size``, ``loss_function``, ``epochs``, ``learning_rate``).
+
+Similarly the ``BasicInferencing`` Experiment allow setting attributes 
+that define the characteristics of the Inferencing experiment (``dataset``,
+``model``, ``batch_size`` , ``inference_repeats`` , ``inference_time``)
 
 The created Experiment contains the definition of the operation to be performed,
 but is not executed automatically.  That is the role of the ``Runners``.
@@ -74,11 +105,17 @@ Running an Experiment Locally
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In order to run an Experiment, the first step is creating the appropriate
-runner::
+runner, for executing a ``training exepriment`` locally we create :class:`~aihwkit.experiments.runners.local.LocalRunner`  ::
 
     from aihwkit.experiments.runners import LocalRunner
 
     my_runner = LocalRunner()
+
+Similarly for executing a ``Inferencing Experimnet`` locally  we create :class:`~aihwkit.experiments.runners.i_local.InferenceLocalRunner` ::
+
+    from aihwkit.experiments.runners import InferenceLocalRunner
+
+    my_runner = InferenceLocalRunner()
 
 .. note::
 
@@ -90,7 +127,14 @@ runner::
 
         my_runner = LocalRunner(device=torch_device('cuda'))
 
-Once the runner is created, the Experiment can be executed via::
+    Similarly , the ``InferenceLocalRunner`` has also an option for setting the device
+    when the model would be used for inferencing , for using the available GPU ::
+
+        from torch import device as torch_device
+
+        my_runner - InferenceLocalRunner(device=torch_device('cuda'))
+
+Once the runner is created for either ``Training`` or ``Inferencing`` experiment , the Experiment can be executed via::
 
     result = my_runner.run(my_experiment)
 
@@ -121,16 +165,17 @@ epoch::
      ...
     ]
 
-The local runner will also print information by default while the experiment
-is being executed (for example, if running the experiment in an interactive
-session, as a way of tracking progress). This can be turned off by the
+The ``LocalRunner`` for ``Training`` experimnet and ``InferenceLocalRunner`` for ``Inferencing`` experiment
+will also print information by default while the experiment is being executed (for example, if running 
+the experiment in an interactive session, as a way of tracking progress). This can be turned off by the
 ``stdout`` argument to the ``run()`` function::
 
     result = my_runner.run(my_experiment, stdout=False)
 
 .. note::
 
-    The local runner will automatically attempt to download the dataset if it
+    The local runner for both ``Training`` and ``Inferencing`` type of experiments
+    will automatically attempt to download the dataset if it
     is ``FashionMNIST`` or ``SVHN`` into a temporary folder. For other datasets,
     please ensure that the dataset is downloaded previously, using the
     ``dataset_root`` argument to indicate the location of the data files::
@@ -177,7 +222,7 @@ run experiments in the cloud:
 Running an Experiment in the cloud
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Once your credentials are configured, running experiments in the cloud can
+Once your credentials are configured, running ``training`` experiments in the cloud can
 be performed by using the ``CloudRunner``, in an analogous way as running
 experiments locally::
 
@@ -186,6 +231,15 @@ experiments locally::
     my_cloud_runner = CloudRunner()
     cloud_experiment = my_cloud_runner.run(my_experiment)
 
+Similarly ``Inferencing`` experiment can also be performed in the cloud by using 
+the ``InferenceCloudRunner`` , in an analogoud way as running experiments locally ::
+
+    from aihwkit.experiments.runners import InferenceCloudRunner
+
+    cloud_runner = InferenceCloudRunner()
+    cloud_experiment = cloud_runner.run(my_experiment, analog_info,
+                                    noise_model_info, name=NAME, device='gpu')
+
 Instead of waiting for the experiment to be completed, the ``run()`` method
 returns an object that represents a job in the cloud. As such, it has several
 convenience methods:
@@ -193,7 +247,7 @@ convenience methods:
 Checking the status of a cloud experiment
 """""""""""""""""""""""""""""""""""""""""
 
-The status of a cloud experiment can be retrieved via::
+The status of a cloud experiment for both ``Training`` and ``Inferencing`` experiments can be retrieved via::
 
     cloud_experiment.status()
 
@@ -213,7 +267,7 @@ The response will provide information about the cloud experiment:
 Retrieving the results of a cloud experiment
 """"""""""""""""""""""""""""""""""""""""""""
 
-Once the cloud experiment completes its execution, its results can be retrieved
+Once the cloud experiment (``Training`` or ``Inferencing``) completes its execution, its results can be retrieved
 using::
 
     result = cloud_experiment.get_result()
@@ -228,7 +282,7 @@ The Experiment can be retrieved using::
 
     experiment = cloud_experiment.get_experiment()
 
-This will return a local Experiment (for example, a ``BasicTraining``) that
+This will return a local Experiment (for example, a ``BasicTraining`` or ``BasicInferencing``) that
 can be used locally and their properties inspected. In particular, the weights
 of the model will reflect the results of the experiment.
 
