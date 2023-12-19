@@ -554,6 +554,7 @@ class TorchTransferTile(TileModule, TileWithPeriphery, SimulatorTileWrapper):
     """
 
     supports_indexed: bool = False
+    supports_ddp: bool = False
 
     def __init__(
         self,
