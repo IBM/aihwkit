@@ -28,6 +28,7 @@ from torch import device as torch_device
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.simulator.presets import StandardIOParameters
 from aihwkit.simulator.tiles import AnalogTile
+from aihwkit.simulator.tiles.transfer import TorchTransferTile
 from aihwkit.simulator.configs import (
     build_config,
     RPUDataType,
@@ -42,6 +43,7 @@ from aihwkit.simulator.configs import (
 # Check device
 DEVICE = torch_device("cuda" if cuda.is_compiled() else "cpu")
 DATA_TYPE = RPUDataType.FLOAT
+USE_TORCH_TRANSFER = False  # whether to use torch transfer implementation
 
 
 def get_rpu_config(
@@ -66,10 +68,10 @@ def get_rpu_config(
         w_min_dtod=0.3,
         w_min=-1.0,
         w_max=1.0,
-        up_down_dtod=0.2,
+        up_down_dtod=0.0,
         up_down=0.0,
-        dw_min_dtod=0.3,
-        dw_min_std=0.3,
+        dw_min_dtod=0.0,
+        dw_min_std=0.0,
         slope_down_dtod=0.0,
         slope_up_dtod=0.0,
         enforce_consistency=True,
@@ -95,6 +97,12 @@ def get_rpu_config(
         # Common parameters in ttv2 ttv3 ttv4.
         rpu_config.device.transfer_every = 1
         rpu_config.device.auto_granularity = 200
+        rpu_config.device.auto_scale = True
+        rpu_config.device.in_chop_random = False
+
+    if isinstance(rpu_config.device, DynamicTransferCompound):
+        # Common parameters in ttv4.
+        rpu_config.device.tail_weightening = 5
 
     if isinstance(rpu_config.device, DynamicTransferCompound):
         # Common parameters in ttv4.
@@ -146,7 +154,7 @@ def run_updates(analog_tile: AnalogTile, x_data: Tensor, d_data: Tensor) -> Tupl
     w_trace = []
     h_trace = []
     for i in range(n_iter):
-        analog_tile.update(x_data[i], d_data[i])
+        analog_tile.update(x_data[i][None, :], d_data[i][None, :])
         w_trace.append(analog_tile.tile.get_weights())
         h_trace.append(analog_tile.get_hidden_parameters())
 
@@ -155,6 +163,7 @@ def run_updates(analog_tile: AnalogTile, x_data: Tensor, d_data: Tensor) -> Tupl
     h_dic = {}
     for key in names:
         h_dic[key] = np.stack([h[key].cpu().numpy() for h in h_trace], axis=2)
+
     return w_trace, h_dic
 
 
@@ -227,8 +236,16 @@ if __name__ == "__main__":
     # training_algorithm = "agad"
 
     my_rpu_config = get_rpu_config(training_algorithm)
+
+    if USE_TORCH_TRANSFER:
+        my_rpu_config.tile_class = TorchTransferTile
+
     my_rpu_config.runtime.data_type = DATA_TYPE
     tile = create_analog_tile(weight_matrix, my_rpu_config)
+
+    dest = {}
+    tile.state_dict(dest)
+    tile.load_state_dict(dest)
 
     w_traces, h_traces = run_updates(tile, x_values, d_values)
 

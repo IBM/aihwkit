@@ -22,7 +22,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Optional AIHWKIT C++ extension module (\#563)
 * Variable mantissa / exponent tensor conversion operator (\#563)
 * To digital feature for analog layers (\#563)
-* new `PCM_NOISE` type for hardware-aware training for inference (\#563)
+* New `PCM_NOISE` type for hardware-aware training for inference (\#563)
+* Transfer compounds using torch implementation (`TorchTransferTile`) (\#567)
 
 ### Fixed
 
