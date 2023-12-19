@@ -76,7 +76,7 @@ For example, the ``BasicTraining`` Experiment allows setting attributes that
 define the characteristics of the training (``dataset``, ``model``,
 ``batch_size``, ``loss_function``, ``epochs``, ``learning_rate``).
 
-Similarly the ``BasicInferencing`` Experiment allow setting attributes 
+Similarly the ``BasicInferencing`` Experiment allows setting attributes 
 that define the characteristics of the Inferencing experiment (``dataset``,
 ``model``, ``batch_size`` , ``inference_repeats`` , ``inference_time``)
 
@@ -142,7 +142,7 @@ This will start the desired experiment, and return the results of the
 experiment - in the training case, a dictionary containing the metrics for each
 epoch::
 
-    > print(result)
+     print(result)
 
     [{
       'epoch': 0,
@@ -165,7 +165,7 @@ epoch::
      ...
     ]
 
-The ``LocalRunner`` for ``Training`` experimnet and ``InferenceLocalRunner`` for ``Inferencing`` experiment
+The ``LocalRunner`` for ``Training`` experiment and ``InferenceLocalRunner`` for ``Inferencing`` experiment
 will also print information by default while the experiment is being executed (for example, if running 
 the experiment in an interactive session, as a way of tracking progress). This can be turned off by the
 ``stdout`` argument to the ``run()`` function::
@@ -232,7 +232,7 @@ experiments locally::
     cloud_experiment = my_cloud_runner.run(my_experiment)
 
 Similarly ``Inferencing`` experiment can also be performed in the cloud by using 
-the ``InferenceCloudRunner`` , in an analogoud way as running experiments locally ::
+the ``InferenceCloudRunner`` , in an analogous way as running experiments locally ::
 
     from aihwkit.experiments.runners import InferenceCloudRunner
 

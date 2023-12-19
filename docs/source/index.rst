@@ -23,11 +23,18 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
 
 .. toctree::
     :maxdepth: 3
+    :caption: Cloud/Composer
+    :hidden:
+     
+    using_experiments
+
+.. toctree::
+    :maxdepth: 3
     :caption: Using the Simulator
     :hidden:
 
     using_simulator
-    using_experiments
+    
 
      
 .. toctree::
