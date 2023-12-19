@@ -142,7 +142,7 @@ This will start the desired experiment, and return the results of the
 experiment - in the training case, a dictionary containing the metrics for each
 epoch::
 
-    > print(result)
+     print(result)
 
     [{
       'epoch': 0,
