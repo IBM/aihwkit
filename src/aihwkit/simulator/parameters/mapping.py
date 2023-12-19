@@ -14,8 +14,11 @@
 
 """Mapping parameters for resistive processing units."""
 
-from typing import ClassVar, Type
+from typing import Type, Optional
 from dataclasses import dataclass, fields, field
+
+from aihwkit.exceptions import ConfigError
+
 from .base import RPUConfigBase
 from .helpers import _PrintableMixin
 
@@ -132,7 +135,7 @@ class MappingParameter(_PrintableMixin):
 class MappableRPU(RPUConfigBase, _PrintableMixin):
     """Defines the mapping parameters and utility factories"""
 
-    tile_array_class: ClassVar[Type]
+    tile_array_class: Optional[Type] = None
     """Tile array class that correspond to the RPUConfig.
 
     This is used to build logical arrays of tiles. Needs to be defined
@@ -143,8 +146,22 @@ class MappableRPU(RPUConfigBase, _PrintableMixin):
     """Parameter related to mapping weights to tiles for supporting modules."""
 
     def get_default_tile_module_class(self, out_size: int = 0, in_size: int = 0) -> Type:
-        """Returns the default TileModule class."""
-        if self.mapping.max_input_size == 0 and self.mapping.max_output_size == 0:
+        """Returns the default TileModule class.
+
+        Args:
+            out_size: overall output size
+            in_size: overall output size
+
+        Raises:
+            ConfigError: in case tile array is not defined.
+        """
+
+        if self.tile_array_class is None:
+            ConfigError("RPUConfig does not support any tile array class")
+
+        if self.tile_array_class is None or (
+            self.mapping.max_input_size == 0 and self.mapping.max_output_size == 0
+        ):
             return self.tile_class
         if self.mapping.max_input_size < in_size or self.mapping.max_output_size < out_size:
             return self.tile_array_class

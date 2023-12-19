@@ -12,10 +12,10 @@
 
 """High level analog tiles (floating point)."""
 
-from typing import Optional, Tuple, ClassVar, Type
+from typing import Optional, Tuple, Type, Any
 from dataclasses import dataclass, field
 
-from torch import Tensor, zeros, float32, randn_like
+from torch import Tensor, zeros, float32, randn_like, rand_like
 from torch.autograd import no_grad
 from torch.nn import Module
 
@@ -201,6 +201,24 @@ class CustomSimulatorTile(SimulatorTile, Module):
         if learning_rate is not None:
             self.learning_rate = learning_rate
 
+    def set_weights_uniform_random(self, bmin: float, bmax: float) -> None:
+        """Sets the weights to uniform random numbers.
+
+        Args:
+           bmin: min value
+           bmax: max value
+
+        Raises:
+            TileError: in case bmin >= bmax
+        """
+        if bmin >= bmax:
+            raise TileError("Bmin should be smaller than bmax")
+        self.set_weights(rand_like(self.get_weights()) / (bmax - bmin) - bmin)
+
+    def get_meta_parameters(self) -> Any:
+        """Returns meta parameters."""
+        raise NotImplementedError
+
 
 class CustomTile(TileModule, TileWithPeriphery, SimulatorTileWrapper):
     r"""Custom tile based on :class:`TileWithPeriphery`.
@@ -306,13 +324,13 @@ class CustomUpdateParameters(_PrintableMixin):
 class CustomRPUConfig(MappableRPU, PrePostProcessingRPU):
     """Configuration for resistive processing unit using the CustomTile."""
 
-    tile_class: ClassVar[Type] = CustomTile
-    """Tile class that correspond to this RPUConfig."""
+    tile_class: Type = CustomTile
+    """Tile class that corresponds to this RPUConfig."""
 
-    simulator_tile_class: ClassVar[Type] = CustomSimulatorTile
+    simulator_tile_class: Type = CustomSimulatorTile
     """Simulator tile class implementing the analog forward / backward / update."""
 
-    tile_array_class: ClassVar[Type] = TileModuleArray
+    tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
 
     forward: IOParameters = field(default_factory=IOParameters)

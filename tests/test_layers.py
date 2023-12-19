@@ -20,9 +20,7 @@ from torch import Tensor, device, load, save, zeros
 from torch.cuda import current_device, device_count
 
 from aihwkit.nn import AnalogSequential
-from aihwkit.simulator.configs import SingleRPUConfig
 from aihwkit.simulator.rpu_base import tiles
-from aihwkit.simulator.tiles import AnalogTile
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import (
@@ -36,7 +34,7 @@ from .helpers.layers import (
     Conv3dCuda,
 )
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import ConstantStep, Inference
+from .helpers.tiles import ConstantStep, Inference, Custom, TorchTransfer, TorchInference
 from .helpers.testcases import SKIP_CUDA_TESTS
 
 
@@ -347,37 +345,20 @@ class CpuAnalogLayerTest(ParametrizedTestCase):
         self.assertIsInstance(analog_tile.tile, tiles.AnalogTile)
 
 
-class CustomAnalogTile(AnalogTile):
-    """Helper tile for ``CustomTileTest``."""
-
-
-class CustomRPUConfig(SingleRPUConfig):
-    """Helper rpu config for ``CustomTileTest``."""
-
-    tile_class = CustomAnalogTile
-
-
-class CustomTileTestHelper:
-    """Helper tile for parametrizing during ``CustomTileTest``."""
-
-    def get_rpu_config(self):
-        """Return a RPU Config."""
-        return CustomRPUConfig()
-
-
 @parametrize_over_layers(
-    layers=[Linear, Conv1d, Conv2d, Conv3d],
-    tiles=[CustomTileTestHelper],
-    biases=["analog", "digital", None],
+    layers=[Linear, Conv2d, LinearCuda, Conv2dCuda],
+    tiles=[Custom, TorchTransfer, TorchInference],
+    biases=["digital", None],
 )
 class CustomTileTest(ParametrizedTestCase):
     """Test for analog layers using custom tiles."""
 
     def test_custom_tile(self):
         """Test using a custom tile with analog layers."""
-        # Create the layer, which uses `CustomRPUConfig`.
-        layer = self.get_layer()
+        # Create the layer, which uses the custom RPUConfig
+        rpu_config = self.get_rpu_config()
+        layer = self.get_layer(rpu_config=rpu_config)
 
-        # Assert that the internal analog tile is `CustomAnalogTile`.
+        # Assert that the internal analog tile is of the correct type
         analog_tile = next(layer.analog_tiles())
-        self.assertIsInstance(analog_tile, CustomAnalogTile)
+        self.assertIsInstance(analog_tile, rpu_config.tile_class)

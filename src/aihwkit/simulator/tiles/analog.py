@@ -10,14 +10,17 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=abstract-method
+
 """High level analog tiles (analog)."""
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 from torch import Tensor
 
 from aihwkit.simulator.tiles.rpucuda import RPUCudaSimulatorTileWrapper
 from aihwkit.simulator.tiles.module import TileModule
+from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.tiles.periphery import TileWithPeriphery
 from aihwkit.simulator.tiles.functions import AnalogFunction
 from aihwkit.simulator.parameters.base import RPUConfigGeneric
@@ -228,3 +231,117 @@ class AnalogTile(TileModule, TileWithPeriphery, RPUCudaSimulatorTileWrapper):
         if self.digital_bias:
             return out + self.bias.view(*tensor_view)
         return out
+
+
+class AnalogTileWithoutPeriphery(TileModule, BaseTile, RPUCudaSimulatorTileWrapper):
+    """Analog tile without the periphery.
+
+    Same basic functionality as class:`AnalogTile`, however, without
+    the digital periphery, such as weight scaling and bias.
+    """
+
+    supports_indexed = False
+
+    def __init__(
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: RPUConfigGeneric,
+        bias: bool = False,
+        in_trans: bool = False,
+        out_trans: bool = False,
+    ):
+        TileModule.__init__(self)
+        RPUCudaSimulatorTileWrapper.__init__(
+            self, out_size, in_size, rpu_config, bias, in_trans, out_trans
+        )
+
+    def _create_simulator_tile(
+        self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
+    ) -> tiles.AnalogTile:
+        """Create a simulator tile.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+
+        meta_parameter = rpu_config.as_bindings()
+        device_parameter = rpu_config.device.as_bindings(self.get_data_type())
+
+        return meta_parameter.create_array(x_size, d_size, device_parameter)
+
+    def forward(self, x_input: Tensor) -> Tensor:
+        """Torch forward function that calls the analog forward"""
+
+        return AnalogFunction.apply(
+            self.get_analog_ctx(), self, x_input, self.shared_weights, not self.training
+        )
+
+    def joint_forward(self, x_input: Tensor, is_test: bool = False, ctx: Any = None) -> Tensor:
+        """Perform the joint forward method.
+
+        Args:
+            x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+            is_test: whether to assume testing mode.
+            ctx: torch auto-grad context [Optional]
+
+        Returns:
+            torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+        """
+        return self.tile.forward(
+            x_input, self.analog_bias, self.in_trans, self.out_trans, is_test, self.non_blocking
+        )
+
+    def backward(self, d_input: Tensor, ctx: Any = None) -> Tensor:
+        """Perform the backward pass.
+
+        Args:
+            d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+            ctx: torch auto-grad context [Optional]
+
+        Returns:
+            torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+        """
+        return self.tile.backward(
+            d_input, self.analog_bias, self.out_trans, self.in_trans, self.non_blocking
+        )
+
+    def update(self, x_input: Tensor, d_input: Tensor) -> None:
+        """Perform the update pass.
+
+        Args:
+            x_input: ``[..., in_size]`` tensor. If ``in_trans`` is set, ``[in_size, ...]``.
+            d_input: ``[..., out_size]`` tensor. If ``out_trans`` is set, ``[out_size, ...]``.
+
+        Returns:
+            None
+        """
+        return self.tile.update(  # type: ignore
+            x_input, d_input, self.analog_bias, self.in_trans, self.out_trans, self.non_blocking
+        )
+
+    def set_learning_rate(self, learning_rate: Optional[float]) -> None:
+        """Set the tile learning rate.
+
+        Set the tile learning rate to ``-learning_rate``. Note that the
+        learning rate is always taken to be negative (because of the meaning in
+        gradient descent) and positive learning rates are not supported.
+
+        Args:
+            learning_rate: the desired learning rate.
+        """
+        if learning_rate is not None:
+            self.tile.set_learning_rate(learning_rate)
+
+    def get_learning_rate(self) -> float:
+        """Return the tile learning rate.
+
+        Returns:
+            float: the tile learning rate.
+        """
+        return self.tile.get_learning_rate()

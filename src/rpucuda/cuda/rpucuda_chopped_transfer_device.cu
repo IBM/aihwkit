@@ -432,7 +432,6 @@ T ChoppedTransferRPUDeviceCuda<T>::getPulseCountLearningRate(
     // scale so that it is constant for tile size / dw_min / bl - change
     // out_count_lr /= par.getInSize() * fabs(par.transfer_every);
   }
-
   return out_count_lr;
 }
 
