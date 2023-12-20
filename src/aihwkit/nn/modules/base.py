@@ -266,8 +266,8 @@ class AnalogLayerBase:
 
         Raises:
 
-            ModuleError: In case analog tiles are used that do not
-                support data-parallel model, ie. all analog training
+            ModuleError: In case analog tiles with are used that do not
+                support data-parallel model, ie. all RPUCUda training
                 tiles.
         """
         # pylint: disable=attribute-defined-outside-init
@@ -275,9 +275,9 @@ class AnalogLayerBase:
         for module in self.modules():  # type: ignore
             if isinstance(module, AnalogLayerBase):
                 for analog_tile in module.analog_tiles():
-                    if analog_tile.shared_weights is None:
+                    if not analog_tile.supports_ddp:
                         raise ModuleError(
-                            "DDP is only supported with shared weights (e.g. InferenceTile)"
+                            "DDP is only supported with some tiles (e.g. Torch/InferenceTile)"
                         )
                 exclude_list += [
                     AnalogTileStateNames.CONTEXT,

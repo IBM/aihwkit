@@ -180,6 +180,8 @@ class AnalogTile(TileModule, TileWithPeriphery, RPUCudaSimulatorTileWrapper):
     .. _Gokmen & Vlasov (2016): https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
 
+    supports_ddp: bool = False
+
     def __init__(
         self,
         out_size: int,
@@ -240,7 +242,7 @@ class AnalogTileWithoutPeriphery(TileModule, BaseTile, RPUCudaSimulatorTileWrapp
     the digital periphery, such as weight scaling and bias.
     """
 
-    supports_indexed = False
+    supports_indexed: bool = False
 
     def __init__(
         self,

@@ -155,7 +155,7 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
         device = torch_device("cuda", cuda_device(device).idx)
 
         if self.is_cuda and device != self.device:
-            raise CudaError("Cannot switch CUDA devices of existing Cuda tiles")
+            return self.cpu().cuda(device)
         if self.tile.__class__ in MAP_TILE_CLASS_TO_CUDA:
             with cuda_device(device):
                 self.tile = MAP_TILE_CLASS_TO_CUDA[self.tile.__class__](self.tile)
