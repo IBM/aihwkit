@@ -36,7 +36,8 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
     tile from RPUCuda).
     """
 
-    supports_indexed = False
+    supports_indexed: bool = False
+    supports_ddp: bool = True
 
     def __init__(
         self,

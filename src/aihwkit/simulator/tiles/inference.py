@@ -336,6 +336,8 @@ class InferenceTile(TileModule, InferenceTileWithPeriphery, RPUCudaSimulatorTile
 
     """
 
+    supports_ddp: bool = True
+
     def __init__(
         self,
         out_size: int,

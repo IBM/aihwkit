@@ -40,6 +40,8 @@ class TileModule(Module, TileModuleBase):
     help to go through all these classes, such as ``cuda``.
     """
 
+    supports_ddp: bool = False
+
     def __init__(self) -> None:
         super().__init__()
 
