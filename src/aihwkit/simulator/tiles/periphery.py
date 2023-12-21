@@ -384,10 +384,15 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
         # forward pass in eval mode
         was_training = self.training
+        is_indexed = self.is_indexed()
         self.eval()
+        if is_indexed:
+            self.analog_ctx.set_indexed(False)
         y_values = self.forward(x_values)
         if was_training:
             self.train()
+        if is_indexed:
+            self.analog_ctx.set_indexed(True)
 
         if self.bias is not None:
             y_values -= self.bias
@@ -1050,10 +1055,12 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             Whether index matrix has been set
 
         Raises:
-            TileError: if indexed not supported.
+            TileError: if `has_matrix_indices` method is not avialable
         """
-        if isinstance(self.tile, SimulatorTile):
-            raise TileError("Only RPUCuda simulator tiles support indexed interface.")
+        if not self.supports_indexed:
+            return False
+        if not hasattr(self.tile, "has_matrix_indices"):
+            raise TileError("Expects to find `has_matrix_indices` for indexed interface.")
         return self.tile.has_matrix_indices()
 
     def set_indexed(self, indices: Tensor, image_sizes: List) -> None:
