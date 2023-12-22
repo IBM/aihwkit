@@ -5,6 +5,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
     :maxdepth: 3
     :caption: Get started
     :hidden:
+    
 
     install
     advanced_install
@@ -25,7 +26,8 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
     :maxdepth: 3
     :caption: Cloud/Composer
     :hidden:
-     
+
+    composer_overview    
     using_experiments
 
 .. toctree::
