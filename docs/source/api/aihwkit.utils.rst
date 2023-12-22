@@ -13,6 +13,7 @@ Submodules
    :maxdepth: 4
 
    aihwkit.utils.analog_info
+   aihwkit.utils.export
    aihwkit.utils.fitting
    aihwkit.utils.legacy
    aihwkit.utils.visualization
