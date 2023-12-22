@@ -24,8 +24,19 @@ import os
 from time import time
 
 # Imports from PyTorch.
-import torch
+from torch import (
+    device as torch_device,
+    cat,
+    zeros,
+    tensor,
+    float32,
+    int32,
+    max as torch_max,
+    load,
+    save,
+)
 from torch import nn
+from torch.utils.data import DistributedSampler, DataLoader
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -41,7 +52,7 @@ from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.rpu_base import cuda
 
 # Check device
-DEVICE = torch.device("cuda" if cuda.is_compiled() else "cpu")
+DEVICE = torch_device("cuda" if cuda.is_compiled() else "cpu")
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join("data", "DATASET")
@@ -55,12 +66,19 @@ OUTPUT_SIZE = 10
 EPOCHS = 30
 BATCH_SIZE = 64
 
+# rpu config
+RPU_CONFIG = InferenceRPUConfig()
+
+# simple checkpointing
+LOAD_FROM_CHECKPOINT = False
+CHECKPOINT_FILE = "checkpoint.pt"
+
 
 def init_process(rank, size, fn, backend="nccl"):
     """Initialize the distributed environment."""
     print("init process: ", rank)
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "29411"
+    os.environ["MASTER_PORT"] = "29412"
     dist.init_process_group(backend, rank=rank, world_size=size)
     fn()
 
@@ -81,11 +99,11 @@ def load_images():
 
     val_set = datasets.MNIST(PATH_DATASET, download=True, train=False, transform=transform)
 
-    train_sampler = torch.utils.data.DistributedSampler(
+    train_sampler = DistributedSampler(
         train_set, num_replicas=size, rank=rank, shuffle=True, seed=42
     )
 
-    train_data = torch.utils.data.DataLoader(
+    train_data = DataLoader(
         train_set,
         batch_size=BATCH_SIZE,
         shuffle=False,
@@ -94,7 +112,7 @@ def load_images():
         pin_memory=True,
     )
 
-    validation_data = torch.utils.data.DataLoader(
+    validation_data = DataLoader(
         val_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=size, pin_memory=True
     )
 
@@ -113,11 +131,11 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         nn.Module: created analog model
     """
     model = AnalogSequential(
-        AnalogLinear(input_size, hidden_sizes[0], True, rpu_config=InferenceRPUConfig()),
+        AnalogLinear(input_size, hidden_sizes[0], True, rpu_config=RPU_CONFIG),
         nn.Sigmoid(),
-        AnalogLinear(hidden_sizes[0], hidden_sizes[1], True, rpu_config=InferenceRPUConfig()),
+        AnalogLinear(hidden_sizes[0], hidden_sizes[1], True, rpu_config=RPU_CONFIG),
         nn.Sigmoid(),
-        AnalogLinearMapped(hidden_sizes[1], output_size, True, rpu_config=InferenceRPUConfig()),
+        AnalogLinearMapped(hidden_sizes[1], output_size, True, rpu_config=RPU_CONFIG),
         nn.LogSoftmax(dim=1),
     )
 
@@ -132,7 +150,7 @@ def create_sgd_optimizer(model):
     Returns:
         nn.Module: optimizer
     """
-    optimizer = AnalogSGD(model.parameters(), lr=0.05)
+    optimizer = AnalogSGD(model.parameters(), lr=0.1)
     optimizer.regroup_param_groups(model)
 
     return optimizer
@@ -147,17 +165,17 @@ def train(model, train_set):
     """
     rank = dist.get_rank()
     size = dist.get_world_size()
-    device = torch.device("cuda", rank)
+    device = torch_device("cuda", rank)
 
     classifier = nn.NLLLoss()
     optimizer = create_sgd_optimizer(model)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
     time_init = time()
-    total_time = [torch.zeros(1, dtype=torch.float).to(device) for _ in range(size)]
+    total_time = [zeros(1, dtype=float32).to(device) for _ in range(size)]
     for epoch_number in range(EPOCHS):
-        total_loss = torch.zeros(1, dtype=torch.float).to(device)
-        total_images = torch.zeros(1, dtype=torch.int).to(device)
+        total_loss = zeros(1, dtype=float32).to(device)
+        total_images = zeros(1, dtype=int32).to(device)
         for images, labels in train_set:
             images = images.to(device)
             labels = labels.to(device)
@@ -185,13 +203,19 @@ def train(model, train_set):
             train_loss = total_loss.item() / total_images.item()
             print("Epoch {} - Training loss: {:.16f}".format(epoch_number, train_loss))
 
+        # save checkpoint
+        dist.barrier()
+        if rank == 0:
+            print(f"saving checkpoint to '{CHECKPOINT_FILE}'")
+            save(model.module.state_dict(), CHECKPOINT_FILE)
+
         # Decay learning rate if needed.
         scheduler.step()
 
-    dist.all_gather(total_time, torch.tensor(time() - time_init).to(device))
+    dist.all_gather(total_time, tensor(time() - time_init).to(device))
 
     if rank == 0:
-        avg_train_time = torch.mean(torch.cat(total_time, 0))
+        avg_train_time = cat(total_time, 0).mean()
         print("\nAverage Training Time (s) = {}".format(avg_train_time))
 
 
@@ -204,14 +228,14 @@ def test_evaluation(model, val_set):
     """
     rank = dist.get_rank()
     size = dist.get_world_size()
-    device = torch.device("cuda", rank)
+    device = torch_device("cuda", rank)
 
     # Setup counter of images predicted to 0.
     predicted_ok = 0
     total_images = 0
 
     # make list to collect test ccuracies for each gpu
-    acc_list = [torch.zeros(1, dtype=torch.float).to(device) for _ in range(size)]
+    acc_list = [zeros(1, dtype=float32).to(device) for _ in range(size)]
 
     model.eval()
 
@@ -223,14 +247,14 @@ def test_evaluation(model, val_set):
         images = images.view(images.shape[0], -1)
         pred = model(images)
 
-        _, predicted = torch.max(pred.data, 1)
+        _, predicted = torch_max(pred.data, 1)
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
 
-    dist.all_gather(acc_list, torch.tensor(predicted_ok / total_images).to(device))
+    dist.all_gather(acc_list, tensor(predicted_ok / total_images).to(device))
 
     if rank == 0:
-        acc = torch.mean(torch.cat(acc_list, 0))
+        acc = cat(acc_list, 0).mean()
         print("\nNumber Of Images Tested = {}".format(total_images))
         print("Model Accuracy = {}".format(acc))
 
@@ -238,7 +262,7 @@ def test_evaluation(model, val_set):
 def main():
     """Train a PyTorch analog model with the MNIST dataset."""
     rank = dist.get_rank()
-    device = torch.device("cuda", rank)
+    device = torch_device("cuda", rank)
 
     # Load datasets.
     train_dataset, validation_dataset = load_images()
@@ -246,11 +270,15 @@ def main():
     # Prepare the model.
     model = create_analog_network(INPUT_SIZE, HIDDEN_SIZES, OUTPUT_SIZE)
 
-    if rank == 0:
-        print(model)
+    if LOAD_FROM_CHECKPOINT and os.path.exists(CHECKPOINT_FILE):
+        print(f"rank {rank}: load from checkpoint.")
+        model.load_state_dict(load(CHECKPOINT_FILE), load_rpu_config=True)
 
     model.prepare_for_ddp()
     model.to(device)
+
+    if rank == 0:
+        print(model)
 
     # enable parallel training
     model = DDP(model, device_ids=[rank], output_device=rank)

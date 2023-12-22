@@ -27,7 +27,8 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
     :caption: Cloud/Composer
     :hidden:
 
-    composer_overview    
+
+    composer_overview  
     using_experiments
 
 .. toctree::
