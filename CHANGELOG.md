@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * To digital feature for analog layers (\#563)
 * New `PCM_NOISE` type for hardware-aware training for inference (\#563)
 * Transfer compounds using torch implementation (`TorchTransferTile`) (\#567)
+* Weight programming error plotting utility (\#572)
 * Add optimizer checkpoint in example 20 (\#573) 
 
 ### Fixed
