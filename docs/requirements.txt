@@ -2,3 +2,6 @@ Sphinx==6.2.1
 sphinx-rtd-theme==1.2.2
 recommonmark==0.6.0
 myst-parser==2.0.0
+# Dependencies for extras in `setup.py` needed for documentation.
+matplotlib>=3.0
+lmfit

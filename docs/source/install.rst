@@ -7,16 +7,17 @@ The preferred way to install this package is by using the `Python package index`
 
 Similarly this package can also be installed using ``Conda`` package for AIHWKIT
 available in Conda-forge,
- * CPU ::
+
+* CPU ::
 
     conda install -c conda-forge aihwkit
 
- * GPU ::
+* GPU ::
 
     conda install -c conda-forge aihwkit-gpu
 
 Similarly for GPU support, you can also build a ``docker`` container following the `CUDA Dockerfile instructions`_. 
-You can then run a GPU enabled docker container using the follwing command from your peoject dircetory ::
+You can then run a GPU enabled docker container using the following command from your project directory ::
 
     docker run --rm -it --gpus all -v $(pwd):$HOME --name aihwkit aihwkit:cuda bash
 

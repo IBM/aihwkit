@@ -15,4 +15,3 @@ Submodules
    aihwkit.simulator.parameters.base
    aihwkit.simulator.parameters.enums
    aihwkit.simulator.parameters.helpers
-   aihwkit.simulator.parameters.utils

@@ -14,3 +14,4 @@ Submodules
 
    aihwkit.inference.converter.base
    aihwkit.inference.converter.conductance
+   aihwkit.inference.converter.fusion
