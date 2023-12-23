@@ -142,33 +142,37 @@ def create_analog_network(input_size, hidden_sizes, output_size):
     return model
 
 
-def create_sgd_optimizer(model):
+def create_sgd_optimizer(model, opt_state_dict=None):
     """Create the analog-aware optimizer.
 
     Args:
-        model (nn.Module): model to be trained.
+        model (nn.Module): model to be trained
+        opt_state_dict (Dict): optimizer state dict from checkpoint
+
     Returns:
         nn.Module: optimizer
     """
-    optimizer = AnalogSGD(model.parameters(), lr=0.1)
-    optimizer.regroup_param_groups(model)
-
+    optimizer = AnalogSGD(model.parameters(), lr=0.1, momentum=0.1)
+    if opt_state_dict is not None:
+        optimizer.load_state_dict(opt_state_dict)
     return optimizer
 
 
-def train(model, train_set):
+def train(model, train_set, opt_state_dict=None):
     """Train the network.
 
     Args:
         model (nn.Module): model to be trained.
         train_set (DataLoader): dataset of elements to use as input for training.
+        opt_state_dict (Dict): optimizer state dict from checkpoint
+
     """
     rank = dist.get_rank()
     size = dist.get_world_size()
     device = torch_device("cuda", rank)
 
     classifier = nn.NLLLoss()
-    optimizer = create_sgd_optimizer(model)
+    optimizer = create_sgd_optimizer(model, opt_state_dict)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
     time_init = time()
@@ -207,7 +211,10 @@ def train(model, train_set):
         dist.barrier()
         if rank == 0:
             print(f"saving checkpoint to '{CHECKPOINT_FILE}'")
-            save(model.module.state_dict(), CHECKPOINT_FILE)
+            save(
+                {"model": model.module.state_dict(), "optimizer": optimizer.state_dict()},
+                CHECKPOINT_FILE,
+            )
 
         # Decay learning rate if needed.
         scheduler.step()
@@ -270,12 +277,15 @@ def main():
     # Prepare the model.
     model = create_analog_network(INPUT_SIZE, HIDDEN_SIZES, OUTPUT_SIZE)
 
-    if LOAD_FROM_CHECKPOINT and os.path.exists(CHECKPOINT_FILE):
-        print(f"rank {rank}: load from checkpoint.")
-        model.load_state_dict(load(CHECKPOINT_FILE), load_rpu_config=True)
-
+    opt_state_dict = None
     model.prepare_for_ddp()
     model.to(device)
+
+    if LOAD_FROM_CHECKPOINT and os.path.exists(CHECKPOINT_FILE):
+        print(f"rank {rank}: load from checkpoint.")
+        checkpoint = load(CHECKPOINT_FILE, map_location=device)
+        model.load_state_dict(checkpoint["model"], load_rpu_config=True)
+        opt_state_dict = checkpoint["optimizer"]
 
     if rank == 0:
         print(model)
@@ -284,7 +294,7 @@ def main():
     model = DDP(model, device_ids=[rank], output_device=rank)
 
     # Train the model.
-    train(model, train_dataset)
+    train(model, train_dataset, opt_state_dict)
 
     # Evaluate the trained model.
     test_evaluation(model, validation_dataset)

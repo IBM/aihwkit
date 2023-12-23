@@ -34,10 +34,10 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from numpy import ndarray
 from torch import device as torch_device
-from torch import eye, from_numpy, ones, stack
+from torch import eye, from_numpy, ones, stack, concatenate
 from torch.autograd import no_grad
 
-from aihwkit.exceptions import ConfigError
+from aihwkit.exceptions import ConfigError, TileError
 from aihwkit.simulator.parameters.base import RPUConfigBase
 from aihwkit.simulator.configs import SingleRPUConfig, UnitCellRPUConfig, InferenceRPUConfig
 from aihwkit.simulator.configs.devices import PulsedDevice
@@ -55,6 +55,7 @@ from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
+from aihwkit.nn.modules.base import AnalogLayerBase
 
 
 @no_grad()
@@ -818,5 +819,95 @@ def plot_programming_error(
 
     axes.set_xlabel("Weight value")
     axes.set_ylabel("Programming error [% of gmax]")
+
+    return axes
+
+
+def plot_model_programming_error(
+    analog_model: AnalogLayerBase,
+    n_bins: int = 51,
+    apply_weight_scaling: bool = False,
+    axes: Optional[Axes] = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot weight programming error between the programmed weights
+    and the target weight values.
+
+    The target values are read out from the internal reference
+    structure and drift compensation and any analog aspect is turned
+    off.
+
+    Weight of the `analog_model` are read out using realistic read,
+    that is with a estimation of the operator that takes into account
+    all the analog noise sources and non-idealities.
+
+    Args:
+        analog_model: Programmed (and drifted) analog model
+        n_bins: Number of bins for plotting
+        apply_weight_scaling: Whether to apply the weight scaling factors when combining the weights
+        axes: Plot axes (default current axis)
+        kwargs: additional plotting arguments such as `label`
+
+    Returns:
+        the axis used for the plot.
+
+    Raises:
+        TileError: In case not inference tile with programmed weights is used.
+    """
+    # pylint: disable=too-many-locals
+    if axes is None:
+        axes = plt.gca()
+
+    targets_lst = []
+    weights_lst = []
+
+    for tile in analog_model.analog_tiles():
+        if (
+            not hasattr(tile, "reference_combined_weights")
+            or tile.reference_combined_weights is None
+        ):
+            raise TileError(
+                "Reference weights not found. Have you programmed the inference weights?"
+            )
+        tile.tile.set_weights(tile.reference_combined_weights)
+        target_weights, _ = tile.get_weights(
+            apply_weight_scaling=apply_weight_scaling, realistic=False
+        )
+        tile.tile.set_weights(tile.programmed_weights)
+
+        # still applies the drift compensation, but all other scales are removed.
+        programmed_weights, _ = tile.get_weights(
+            apply_weight_scaling=apply_weight_scaling, realistic=True
+        )
+
+        targets_lst.append(target_weights.flatten())
+        weights_lst.append(programmed_weights.flatten())
+
+    all_targets = concatenate(targets_lst)
+    all_weights = concatenate(weights_lst)
+
+    w_max = all_targets.abs().max().item()
+    x = np.abs((all_weights - all_targets).numpy())
+    bins = np.linspace(-w_max, w_max, n_bins)
+    indices = np.digitize(all_targets.numpy(), bins)
+    num_samples = np.bincount(indices, minlength=n_bins)[:n_bins]
+    msk = num_samples != 0.0
+
+    mean_error = np.bincount(indices, weights=x, minlength=n_bins)[:n_bins]
+    mean_error[msk] /= num_samples[msk]
+
+    std_error = np.bincount(indices, weights=x**2, minlength=n_bins)[:n_bins]
+    std_error[msk] /= num_samples[msk]
+    std_error = np.sqrt(np.abs(std_error - mean_error**2))
+    std_error[msk] /= np.sqrt(num_samples[msk])
+
+    scale = 100 / w_max
+    axes.errorbar(
+        bins[:-1] + (bins[1] - bins[0]) / 2, mean_error[1:] * scale, std_error[1:] * scale, **kwargs
+    )
+
+    axes.set_xlabel("Normalized weight value")
+    axes.set_ylabel("Programming error\n[% of abs max weight]")
+    axes.set_xlim((-1.0, 1.0))
 
     return axes
