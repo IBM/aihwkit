@@ -1,4 +1,4 @@
-Using Experiments
+Composer CLI
 =================
 
 Since version ``0.3``, the toolkit includes support for running ``Experiments``.

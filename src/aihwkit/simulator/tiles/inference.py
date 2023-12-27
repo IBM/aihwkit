@@ -306,6 +306,12 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             )
         self.tile.modify_weights(self._tmp["weight_modify_params"])  # type: ignore
 
+    def __getstate__(self) -> Dict:
+        # pylint: disable=no-member
+        self.__dict__.pop("_tmp", None)
+        state = super().__getstate__()
+        return state
+
     def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "BaseTile":
         self.alpha = self.alpha.cuda(device)
         ret = super().cuda(device)
