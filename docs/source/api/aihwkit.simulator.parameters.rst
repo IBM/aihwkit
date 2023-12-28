@@ -15,3 +15,8 @@ Submodules
    aihwkit.simulator.parameters.base
    aihwkit.simulator.parameters.enums
    aihwkit.simulator.parameters.helpers
+   aihwkit.simulator.parameters.inference
+   aihwkit.simulator.parameters.mapping
+   aihwkit.simulator.parameters.pre_post
+   aihwkit.simulator.parameters.runtime
+   aihwkit.simulator.parameters.training

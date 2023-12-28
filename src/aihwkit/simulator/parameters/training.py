@@ -184,6 +184,7 @@ class IOParameters(_PrintableMixin):
     analog output (before the ADC), i.e. :math:`\frac{y_i}{1 +
     n_i*|y_i|}` where :math:`n_i` is drawn at the instantiation time
     by::
+
         out_nonlinearity / out_bound * (1 + out_nonlinearity_std * rand)
     """
 
