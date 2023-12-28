@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -152,6 +152,7 @@ inline void DenseBitLineMaker<T>::generateCountsMean(
     const T *v,
     const int v_inc,
     const int v_size,
+    int &v_noz,
     const T p,
     RNG<T> *rng,
     const int BL,
@@ -161,18 +162,19 @@ inline void DenseBitLineMaker<T>::generateCountsMean(
   int j_v = 0;
   for (int j = 0; j < v_size; j++) {
 
-    T v_value = lr < 0 ? -v[j_v] : v[j_v];
+    T v_value = lr < (T)0.0 ? -v[j_v] : v[j_v];
     j_v += v_inc;
 
-    if (v_value == 0) {
+    T pp = getDiscretizedValue((T)fabsf((T)v_value) * p, res, sto_round, *rng);
+
+    if (pp == (T)0.0) {
       counts[j] = 0;
+      v_noz++;
       continue;
     }
 
-    T pp = getDiscretizedValue((T)fabs(v_value) * p, res, sto_round, *rng);
-
-    int ntimes = (int)MAX(MIN(RPU_ROUNDFUN(BL * pp), BL), 0);
-    counts[j] = (v_value >= 0) ? ntimes : -ntimes;
+    int ntimes = MAX(MIN((int)RPU_ROUNDFUNF((T)BL * pp), BL), 0);
+    counts[j] = (v_value >= (T)0.0) ? ntimes : -ntimes;
   }
 }
 
@@ -191,11 +193,11 @@ void DenseBitLineMaker<T>::generateCoincidences(
   int idx = 0;
   for (int i = 0; i < d_size; ++i) {
     T dc = (T)d_counts[i];
-    if (dc != 0.0) {
+    if (dc != (T)0.0) {
       dc /= bl;
       PRAGMA_SIMD
       for (int j = 0; j < x_size; ++j) {
-        coincidences[idx++] = (int)RPU_ROUNDFUN(dc * x_counts[j]);
+        coincidences[idx++] = (int)RPU_ROUNDFUNF(dc * (T)x_counts[j]);
       }
     } else {
       // need to set to zero
@@ -216,6 +218,7 @@ inline void DenseBitLineMaker<T>::generateDetImplicit(
     const T *v,
     const int v_inc,
     const int v_size,
+    int &v_noz,
     const T p,
     RNG<T> *rng,
     const int BL,
@@ -225,18 +228,17 @@ inline void DenseBitLineMaker<T>::generateDetImplicit(
   int j_v = 0;
   for (int j = 0; j < v_size; j++) {
 
-    T v_value = lr < 0 ? -v[j_v] : v[j_v];
+    T v_value = lr < (T)0.0 ? -v[j_v] : v[j_v];
     j_v += v_inc;
 
-    if (v_value == 0) {
-      pcounts[j] = 0;
-      continue;
+    T pp = getDiscretizedValue<T>((T)fabsf(v_value) * p, res, sto_round, *rng);
+
+    if (pp == (T)0.0) {
+      v_noz++;
     }
 
-    T pp = getDiscretizedValue<T>((T)fabs(v_value) * p, res, sto_round, *rng);
-
-    pp = MAX(MIN(pp, 1), 0);
-    pcounts[j] = (v_value >= 0) ? pp : -pp;
+    pp = MAX(MIN(pp, (T)1.0), (T)0.0);
+    pcounts[j] = (v_value >= (T)0.0) ? pp : -pp;
   }
 }
 
@@ -251,11 +253,11 @@ void DenseBitLineMaker<T>::generateCoincidencesDetI(
   int idx = 0;
   for (int i = 0; i < d_size; ++i) {
     T dc = d_values[i];
-    if (dc != 0.0) {
+    if (dc != (T)0.0) {
       dc *= BL;
       PRAGMA_SIMD
       for (int j = 0; j < x_size; ++j) {
-        coincidences[idx++] = (int)RPU_ROUNDFUN(dc * x_values[j]);
+        coincidences[idx++] = (int)RPU_ROUNDFUNF(dc * x_values[j]);
       }
     } else {
       // need to set to zero
@@ -272,8 +274,10 @@ template <typename T>
 int *DenseBitLineMaker<T>::makeCoincidences(
     const T *x_in,
     const int x_inc,
+    int &x_noz,
     const T *d_in,
     const int d_inc,
+    int &d_noz,
     RNG<T> *rng,
     const T lr,
     const T dw_min,
@@ -282,16 +286,17 @@ int *DenseBitLineMaker<T>::makeCoincidences(
   T A = 0;
   T B = 0;
   int BL = 0;
-  // negative lr allowed in the below, thus fabs(lr)
+  // negative lr allowed in the below, thus (T)fabsf(lr)
   if (up.update_bl_management || up.update_management) {
 
     T x_abs_max = Find_Absolute_Max<T>(x_in, x_size_, x_inc);
     T d_abs_max = Find_Absolute_Max<T>(d_in, d_size_, d_inc);
 
-    up.performUpdateManagement(BL, A, B, up.desired_BL, x_abs_max, d_abs_max, fabs(lr), dw_min);
+    up.performUpdateManagement(
+        BL, A, B, up.desired_BL, x_abs_max, d_abs_max, (T)fabsf((float)lr), dw_min);
   } else {
 
-    up.calculateBlAB(BL, A, B, fabs(lr), dw_min);
+    up.calculateBlAB(BL, A, B, (T)fabsf((float)lr), dw_min);
   }
 
   if (!containers_allocated_) {
@@ -302,9 +307,11 @@ int *DenseBitLineMaker<T>::makeCoincidences(
 
   case PulseType::MeanCount:
     // x counts
-    generateCountsMean(x_counts_, x_in, x_inc, x_size_, B, rng, BL, up.res, up.sto_round, lr);
+    generateCountsMean(
+        x_counts_, x_in, x_inc, x_size_, x_noz, B, rng, BL, up.res, up.sto_round, lr);
     // d counts
-    generateCountsMean(d_counts_, d_in, d_inc, d_size_, A, rng, BL, up.res, up.sto_round, lr);
+    generateCountsMean(
+        d_counts_, d_in, d_inc, d_size_, d_noz, A, rng, BL, up.res, up.sto_round, lr);
 
     generateCoincidences(coincidences_, x_counts_, x_size_, d_counts_, d_size_, BL);
     break;
@@ -314,11 +321,11 @@ int *DenseBitLineMaker<T>::makeCoincidences(
 
     // x counts
     generateDetImplicit(
-        x_values_, x_in, x_inc, x_size_, B, rng, BL, up.x_res_implicit, up.sto_round, lr);
+        x_values_, x_in, x_inc, x_size_, x_noz, B, rng, BL, up.x_res_implicit, up.sto_round, lr);
 
     // d counts
     generateDetImplicit(
-        d_values_, d_in, d_inc, d_size_, A, rng, BL, up.d_res_implicit, up.sto_round, lr);
+        d_values_, d_in, d_inc, d_size_, d_noz, A, rng, BL, up.d_res_implicit, up.sto_round, lr);
 
     generateCoincidencesDetI(coincidences_, x_values_, x_size_, d_values_, d_size_, BL);
   } break;
@@ -353,6 +360,9 @@ template <typename T> void DenseBitLineMaker<T>::printCounts(int max_n) const {
 template class DenseBitLineMaker<float>;
 #ifdef RPU_USE_DOUBLE
 template class DenseBitLineMaker<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class DenseBitLineMaker<half_t>;
 #endif
 
 } // namespace RPU

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -43,7 +43,7 @@ void BufferedTransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream 
 
   if (forget_buffer) {
     ss << "\t forget_buffer:\t\t";
-    ss << forget_buffer;
+    ss << std::boolalpha << forget_buffer;
     ss << std::endl;
   }
   TransferRPUDeviceMetaParameter<T>::printToStream(ss);
@@ -56,7 +56,7 @@ T BufferedTransferRPUDeviceMetaParameter<T>::getTransferLR(
   T lr_gamma =
       TransferRPUDeviceMetaParameter<T>::getTransferLR(to_device_idx, from_device_idx, current_lr);
 
-  if (this->gamma_vec[to_device_idx] > 0 && this->gamma_vec[from_device_idx] > 0) {
+  if (this->gamma_vec[to_device_idx] > (T)0.0 && this->gamma_vec[from_device_idx] > (T)0.0) {
     lr_gamma *= this->gamma_vec[from_device_idx] / this->gamma_vec[to_device_idx];
   }
   return lr_gamma;
@@ -65,6 +65,9 @@ T BufferedTransferRPUDeviceMetaParameter<T>::getTransferLR(
 template struct BufferedTransferRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct BufferedTransferRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct BufferedTransferRPUDeviceMetaParameter<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -144,9 +147,11 @@ void BufferedTransferRPUDevice<T>::readAndUpdate(
     const T *vec,
     const int n_vec,
     const T reset_prob_in,
-    const int i_slice_start) {
+    const int i_slice_start,
+    const int m_batch_info) {
 
   UNUSED(reset_prob_in);
+  UNUSED(m_batch_info);
 
   if (lr == (T)0.0) {
     return;
@@ -166,7 +171,7 @@ void BufferedTransferRPUDevice<T>::readAndUpdate(
   T buffer_granularity = par.thres_scale * weight_granularity;
   T sub_momentum = (T)1.0 - MAX(MIN(par.momentum, (T)1.0), (T)0.0);
   T step = par.step;
-  T lr_abs = fabs(lr);
+  T lr_abs = (T)fabsf(lr);
   T *v_out = this->transfer_tmp_.data();
   bool forget_buffer = par.forget_buffer;
   T max_steps = (T)this->transfer_pwu_->getUpPar().desired_BL;
@@ -193,12 +198,13 @@ void BufferedTransferRPUDevice<T>::readAndUpdate(
       T omega = fp_w[i_w];
       omega += v_out[j] * lr_abs;
 
-      T n_steps = MAX(MIN((T)trunc(omega / buffer_granularity), max_steps), -max_steps);
+      T n_steps = MAX(MIN((T)truncf(omega / buffer_granularity), max_steps), -max_steps);
 
       if (forget_buffer) {
-        fp_w[i_w] = (n_steps != 0) ? omega * par.momentum : omega;
+        fp_w[i_w] = (n_steps != (T)0.0) ? omega * par.momentum : omega;
       } else {
-        fp_w[i_w] = (n_steps != 0) ? omega - sub_momentum * n_steps * buffer_granularity : omega;
+        fp_w[i_w] =
+            (n_steps != (T)0.0) ? omega - sub_momentum * n_steps * buffer_granularity : omega;
       }
 
       non_zero_count += ((int)n_steps) != 0;
@@ -314,6 +320,9 @@ void BufferedTransferRPUDevice<T>::setDeviceParameter(
 template class BufferedTransferRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class BufferedTransferRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class BufferedTransferRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -44,7 +44,8 @@ public:
   template <typename InputIteratorT> void applyToInput(InputIteratorT dev_input);
 
   template <typename OutputIteratorT>
-  bool applyToOutput(OutputIteratorT dev_output, const bool trans = false);
+  bool applyToOutput(
+      OutputIteratorT dev_output, const bool trans = false, const bool with_out_noise = true);
 
   // only valid after init
   inline T *getInBuffer() const { return temp_input_applied_; };
@@ -66,10 +67,13 @@ public:
   }
   void copyExceededArrayToHost(int *host_array) { dev_bound_exceeded_->copyTo(host_array); }
 
-  bool applyToOutputInPlace(T *dev_output, const bool trans = false) {
+  bool
+  applyToOutputInPlace(T *dev_output, const bool trans = false, const bool with_out_noise = true) {
     RPU::math::copy<T>(context_, getMBatch() * getOutSize(), dev_output, 1, getOutBuffer(), 1);
-    return applyToOutput(dev_output, trans);
+    return applyToOutput(dev_output, trans, with_out_noise);
   }
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
   NoiseManager<T> *getNM() { return &*noise_manager_; };
 
@@ -106,7 +110,8 @@ private:
   template <typename InputIteratorT> void applyToInputWithBoundManagement(InputIteratorT dev_input);
 
   template <typename OutputIteratorT>
-  bool applyToOutputWithBoundManagement(OutputIteratorT dev_output, const bool trans);
+  bool applyToOutputWithBoundManagement(
+      OutputIteratorT dev_output, const bool trans, const bool with_out_noise = true);
 
   CudaContextPtr context_ = nullptr;
   int in_size_ = 0;
@@ -133,7 +138,7 @@ private:
   T *temp_input_applied_ = nullptr;
   T *temp_output_applied_ = nullptr;
 
-  std::unique_ptr<CudaArray<float>> dev_scale_values_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_scale_values_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_bound_exceeded_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_any_exceeded_ = nullptr;
 };

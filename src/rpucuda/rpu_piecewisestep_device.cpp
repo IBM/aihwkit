@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -61,8 +61,8 @@ inline void update_once(
 
   } else {
     // interpolation
-    T w_scaled = MAX((w - min_bound) / (max_bound - min_bound) * n_sections, (T)0.0);
-    size_t w_index = MIN((size_t)floor(w_scaled), n_sections - 1);
+    T w_scaled = MAX((w - min_bound) / (max_bound - min_bound) * (T)n_sections, (T)0.0);
+    size_t w_index = MIN((size_t)floorf(w_scaled), n_sections - 1);
     T t = MIN(w_scaled - (T)w_index, (T)1.0); // convex fraction
     T t1 = (T)1.0 - t;
 
@@ -129,6 +129,9 @@ void PiecewiseStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RN
 template class PiecewiseStepRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class PiecewiseStepRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class PiecewiseStepRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

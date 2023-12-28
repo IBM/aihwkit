@@ -18,23 +18,26 @@ from enum import Enum
 from typing import Any, Optional
 
 from aihwkit.cloud.client.exceptions import ExperimentStatusError
+
 # pylint: disable=no-name-in-module,import-error
 from aihwkit.cloud.converter.definitions.input_file_pb2 import (  # type: ignore[attr-defined]
-     TrainingInput
+    TrainingInput,
 )
 from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: ignore[attr-defined]
-     InferenceInput
+    InferenceInput,
 )
 from aihwkit.cloud.converter.definitions.output_file_pb2 import (  # type: ignore[attr-defined]
-     TrainingOutput
+    TrainingOutput,
 )
 from aihwkit.cloud.converter.definitions.i_output_file_pb2 import (  # type: ignore[attr-defined]
-     InferencingOutput
+    InferencingOutput,
 )
 from aihwkit.cloud.converter.v1.training import BasicTrainingConverter, BasicTrainingResultConverter
 from aihwkit.cloud.converter.v1.inferencing import (
-     BasicInferencingConverter, BasicInferencingResultConverter
+    BasicInferencingConverter,
+    BasicInferencingResultConverter,
 )
+
 # from aihwkit.experiments import BasicTraining, BasicInferencing
 
 
@@ -86,11 +89,11 @@ class CloudExperiment:
             ExperimentStatusError: if the Experiment is not in a valid status.
         """
         if self.status() == CloudJobStatus.UNKNOWN:
-            raise ExperimentStatusError('Experiment input is not available')
+            raise ExperimentStatusError("Experiment input is not available")
 
         input_ = self._api_client.input_get(self.input_id)
 
-        if 'InferenceRPUConfig' in str(input_):
+        if "InferenceRPUConfig" in str(input_):
             input_proto = InferenceInput()
             input_proto.ParseFromString(input_)
             proto = BasicInferencingConverter().from_proto(input_proto)
@@ -111,8 +114,9 @@ class CloudExperiment:
             ExperimentStatusError: if the Experiment is not completed.
         """
         if self.status() != CloudJobStatus.COMPLETED:
-            raise ExperimentStatusError('Output cannot be retrieved unless the '
-                                        'experiment is completed')
+            raise ExperimentStatusError(
+                "Output cannot be retrieved unless the experiment is completed"
+            )
 
         if self.category == CloudExperimentCategory.BASIC_TRAINING:
             # Fetch the protobuf output.
@@ -122,7 +126,7 @@ class CloudExperiment:
             training_output.ParseFromString(output_)
             converter = BasicTrainingResultConverter()
             output = converter.from_proto(training_output)
-            result = output['epochs']
+            result = output["epochs"]
         if self.category == CloudExperimentCategory.BASIC_INFERENCE:
             output_ = self._api_client.output_get(self.job.output_id)  # type: ignore
             # Convert from protobuf.

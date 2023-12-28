@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -40,6 +40,35 @@ PulsedWeightUpdater<T>::PulsedWeightUpdater(CudaContextPtr c, int x_size, int d_
   up_context_ = nullptr;
   is_async_update_ = false;
 };
+
+template <typename T>
+void PulsedWeightUpdater<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPU::state_t state;
+  context_->synchronize();
+
+  RPU::insert(state, "is_async_update", is_async_update_);
+  RPU::insert(state, "update_count", update_count_);
+  RPU::insert(state, "verbose", verbose_);
+
+  blm_->dumpExtra(state, "blm");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void PulsedWeightUpdater<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  context_->synchronize();
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "is_async_update", is_async_update_, strict);
+  RPU::load(state, "update_count", update_count_, strict);
+  RPU::load(state, "verbose", verbose_, strict);
+
+  blm_->loadExtra(state, "blm", strict);
+}
 
 template <typename T>
 pwukpvec_t<T> PulsedWeightUpdater<T>::getValidUpdateKernels(
@@ -204,6 +233,15 @@ PulsedWeightUpdater<double>::copyIterator2Buffer(const double *vec, double *buff
 }
 #endif
 
+#ifdef RPU_USE_FP16
+template <>
+template <>
+const half_t *
+PulsedWeightUpdater<half_t>::copyIterator2Buffer(const half_t *vec, half_t *buffer, int size) {
+  return vec;
+}
+#endif
+
 template <typename T>
 template <typename XInputIteratorT, typename DInputIteratorT>
 void PulsedWeightUpdater<T>::doFPupdate(
@@ -222,7 +260,7 @@ void PulsedWeightUpdater<T>::doFPupdate(
   const T *x_out = copyIterator2Buffer(x_in, fpx_buffer, x_size_ * m_batch);
   const T *d_out = copyIterator2Buffer(d_in, fpd_buffer, d_size_ * m_batch);
 
-  if (m_batch == 1 && beta == 1.0) {
+  if (m_batch == 1 && beta == (T)1.0) {
     RPU::math::ger<T>(context_, d_size_, x_size_, -lr, d_out, 1, x_out, 1, dev_weights, d_size_);
   } else {
 
@@ -234,7 +272,6 @@ void PulsedWeightUpdater<T>::doFPupdate(
         -lr, d_out, d_trans ? m_batch : d_size_, x_out, x_trans ? m_batch : x_size_, beta,
         dev_weights, d_size_);
   }
-
   context_->template releaseSharedBuffer<T>(RPU_BUFFER_IN);
   context_->template releaseSharedBuffer<T>(RPU_BUFFER_OUT);
 }
@@ -458,6 +495,33 @@ RPU_PWU_ITER_TEMPLATE(double, EyeInputIterator<double>, const double *);
 RPU_PWU_ITER_TEMPLATE(double, const double *, EyeInputIterator<double>);
 
 #undef TRANSDOUBLE
+#endif
+
+#ifdef RPU_USE_FP16
+#define TRANSHALF(TRANS) TRANS, half_t
+
+template class PulsedWeightUpdater<half_t>;
+
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderTransInputIterator<half_t>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderInputIterator<half_t>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, const half_t *);
+RPU_PWU_ITER_TEMPLATE(
+    half_t, IndexReaderTransInputIterator<half_t>, PermuterTransInputIterator<half_t>);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, PermuterTransInputIterator<half_t>);
+
+RPU_PWU_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, SliceInputIterator<TRANSHALF(true)>);
+RPU_PWU_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, SliceInputIterator<TRANSHALF(false)>);
+
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(true)>);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(false)>);
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, EyeInputIterator<half_t>, const half_t *);
+RPU_PWU_ITER_TEMPLATE(half_t, const half_t *, EyeInputIterator<half_t>);
+
+#undef TRANSHALF
 #endif
 
 #undef RPU_PWU_ITER_TEMPLATE

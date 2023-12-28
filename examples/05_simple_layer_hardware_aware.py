@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,7 +25,10 @@ from torch.nn.functional import mse_loss
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
-    InferenceRPUConfig, WeightNoiseType, WeightClipType, WeightModifierType
+    InferenceRPUConfig,
+    WeightNoiseType,
+    WeightClipType,
+    WeightModifierType,
 )
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.simulator.rpu_base import cuda
@@ -36,7 +39,7 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 # Define a single-layer network, using inference/hardware-aware training tile
 rpu_config = InferenceRPUConfig()
-rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
+rpu_config.forward.out_res = -1.0  # Turn off (output) ADC discretization.
 rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
 rpu_config.forward.w_noise = 0.02  # Short-term w-noise.
 
@@ -55,8 +58,7 @@ rpu_config.drift_compensation = GlobalDriftCompensation()
 
 print(rpu_config)
 
-model = AnalogLinear(4, 2, bias=True,
-                     rpu_config=rpu_config)
+model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
@@ -68,9 +70,11 @@ if cuda.is_compiled():
 opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
-print(model.analog_tile.tile)
+print(next(model.analog_tiles()).tile)
 
 for epoch in range(100):
+    # Delete old gradient
+    opt.zero_grad()
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.
@@ -79,19 +83,24 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
-    print('Loss error: {:.16f}'.format(loss))
+
+    print("Loss error: {:.16f}".format(loss))
 
 model.eval()
 
 # Do inference with drift.
 pred_before = model(x)
 
-print('Correct value:\t {}'.format(y.detach().cpu().numpy().flatten()))
-print('Prediction after training:\t {}'.format(pred_before.detach().cpu().numpy().flatten()))
+print("Correct value:\t {}".format(y.detach().cpu().numpy().flatten()))
+print("Prediction after training:\t {}".format(pred_before.detach().cpu().numpy().flatten()))
 
-for t_inference in [0., 1., 20., 1000., 1e5]:
+for t_inference in [0.0, 1.0, 20.0, 1000.0, 1e5]:
     model.drift_analog_weights(t_inference)
     pred_drift = model(x)
-    print('Prediction after drift (t={}, correction={:1.3f}):\t {}'.format(
-        t_inference, model.analog_tile.alpha.cpu().numpy(),
-        pred_drift.detach().cpu().numpy().flatten()))
+    print(
+        "Prediction after drift (t={}, correction={:1.3f}):\t {}".format(
+            t_inference,
+            next(model.analog_tiles()).alpha.cpu().numpy(),
+            pred_drift.detach().cpu().numpy().flatten(),
+        )
+    )

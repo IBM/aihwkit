@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -15,22 +15,24 @@
 # pylint: disable=too-many-instance-attributes, too-many-lines
 
 from dataclasses import dataclass, field
-from typing import ClassVar, List, Type
+from typing import ClassVar, List, Type, Optional, Union, Any
 from numpy import exp
 
-from aihwkit.simulator.configs.helpers import (
-    _PrintableMixin, parameters_to_bindings
-)
-from aihwkit.simulator.configs.utils import (
-    DriftParameter, SimpleDriftParameter
-)
-from aihwkit.simulator.rpu_base import devices
+from aihwkit.simulator.parameters.enums import RPUDataType
+from aihwkit.simulator.parameters.helpers import _PrintableMixin, parameters_to_bindings
+from aihwkit.simulator.parameters.inference import DriftParameter, SimpleDriftParameter
 
 # legacy
 from aihwkit.simulator.configs.compounds import (  # pylint: disable=unused-import
-    VectorUnitCell, ReferenceUnitCell,
-    OneSidedUnitCell, DifferenceUnitCell, TransferCompound,
-    BufferedTransferCompound, MixedPrecisionCompound
+    VectorUnitCell,
+    ReferenceUnitCell,
+    OneSidedUnitCell,
+    DifferenceUnitCell,
+    TransferCompound,
+    BufferedTransferCompound,
+    MixedPrecisionCompound,
+    DynamicTransferCompound,
+    ChoppedTransferCompound,
 )
 
 
@@ -41,7 +43,8 @@ class FloatingPointDevice(_PrintableMixin):
     Implements ideal devices forward/backward/update behavior.
     """
 
-    bindings_class: ClassVar[Type] = devices.FloatingPointTileParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "FloatingPointTileParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     diffusion: float = 0.0
     """Standard deviation of diffusion process."""
@@ -52,9 +55,9 @@ class FloatingPointDevice(_PrintableMixin):
     drift: SimpleDriftParameter = field(default_factory=SimpleDriftParameter)
     """Parameter governing a power-law drift."""
 
-    def as_bindings(self) -> devices.FloatingPointTileParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -131,7 +134,7 @@ class PulsedDevice(_PrintableMixin):
     **Drift**:
 
     Optional power-law drift setting, as described in
-    :class:`~aihwkit.similar.configs.utils.DriftParameter`.
+    :class:`~aihwkit.similar.parameters.inference.DriftParameter`.
 
     Important:
         Similar to reset, drift is *not* applied automatically each
@@ -141,7 +144,8 @@ class PulsedDevice(_PrintableMixin):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PulsedResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PulsedResistiveDeviceParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     construction_seed: int = 0
     """If not equal 0, will set a unique seed for hidden parameters during
@@ -160,8 +164,9 @@ class PulsedDevice(_PrintableMixin):
     diffusion_dtod: float = 0.0
     """Device-to device variation of diffusion rate in relative units."""
 
-    drift: DriftParameter = field(default_factory=DriftParameter,
-                                  metadata={'hide_if': DriftParameter()})
+    drift: DriftParameter = field(
+        default_factory=DriftParameter, metadata={"hide_if": DriftParameter()}
+    )
     """Parameter governing a power-law drift."""
 
     dw_min: float = 0.001
@@ -270,9 +275,17 @@ class PulsedDevice(_PrintableMixin):
     respectively.
     """
 
-    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+    count_pulses: bool = False
+    """Whether to count the positive and negative pulses that were applied.
+
+    Only for GPU devices currently implemented. Some runtime penalty expected.
+
+    Pulses can be obtained by ``analog_tile.tile.get_pulse_counters()``
+    """
+
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -287,6 +300,7 @@ class PulsedDevice(_PrintableMixin):
 # Specific devices based on ``pulsed``.
 ###############################################################################
 
+
 @dataclass
 class IdealDevice(_PrintableMixin):
     """Ideal update behavior (using floating point), but forward/backward
@@ -296,7 +310,8 @@ class IdealDevice(_PrintableMixin):
     forward/backward might still have a non-ideal ADC or noise added.
     """
 
-    bindings_class: ClassVar[Type] = devices.IdealResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "IdealResistiveDeviceParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     construction_seed: int = 0
     """If not ``0``, set a unique seed for hidden parameters during
@@ -308,9 +323,12 @@ class IdealDevice(_PrintableMixin):
     lifetime: float = 0.0
     r"""One over `decay_rate`, ie :math:`1/r_\text{decay}`."""
 
-    def as_bindings(self) -> devices.IdealResistiveDeviceParameter:
+    reset_std: float = 0.01
+    """Standard deviation around zero mean in case reset is called."""
+
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -354,7 +372,7 @@ class ConstantStepDevice(PulsedDevice):
     :class:`~PulsedDevice`.
     """
 
-    bindings_class: ClassVar[Type] = devices.ConstantStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "ConstantStepResistiveDeviceParameter"
 
 
 @dataclass
@@ -419,7 +437,7 @@ class LinearStepDevice(PulsedDevice):
         :class:`~PulsedDevice`.
     """
 
-    bindings_class: ClassVar[Type] = devices.LinearStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "LinearStepResistiveDeviceParameter"
 
     gamma_up: float = 0.0
     r"""The value of :math:`\gamma^+`.
@@ -489,6 +507,14 @@ class LinearStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
     reverse_up: bool = False
     """Whether to increase the step size in up direction with increasing
     weights (default decreases).
@@ -524,7 +550,7 @@ class SoftBoundsDevice(PulsedDevice):
     parameters set to model soft bounds.
     """
 
-    bindings_class: ClassVar[Type] = devices.SoftBoundsResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "SoftBoundsResistiveDeviceParameter"
 
     mult_noise: bool = True
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
@@ -545,6 +571,14 @@ class SoftBoundsDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
     reverse_up: bool = False
@@ -618,7 +652,7 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     p_max: int = 1000
     """Number of pulses to drive the synapse from ``range_min`` to ``range_max``."""
 
-    alpha: float = 0.001/2
+    alpha: float = 0.001 / 2
     r"""The slope of the soft bounds model :math:`dw \propto \alpha w` for both
     up and down direction."""
 
@@ -630,25 +664,25 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     """Value of the weight for :math:`P_max` number of up pulses."""
 
     #  these values will be set from the above, so we hide it.
-    w_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    w_max: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    dw_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    up_down: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
+    w_min: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    w_max: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    dw_min: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    up_down: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
 
-    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         params = SoftBoundsDevice()
         for key, value in self.__dict__.items():
-            if key not in ['range_min', 'range_max', 'alpha', 'p_max']:
+            if key not in ["range_min", "range_max", "alpha", "p_max"]:
                 setattr(params, key, value)
 
-        b_factor = (self.range_max - self.range_min)/(1 - exp(-self.p_max * self.alpha))
+        b_factor = (self.range_max - self.range_min) / (1 - exp(-self.p_max * self.alpha))
         params.w_min = self.range_min
         params.w_max = self.range_min + b_factor
         params.dw_min = b_factor * self.alpha
         params.up_down = 1 + 2 * self.range_min / b_factor
 
-        return parameters_to_bindings(params)
+        return parameters_to_bindings(params, data_type)
 
 
 @dataclass
@@ -674,7 +708,9 @@ class SoftBoundsReferenceDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.SoftBoundsReferenceResistiveDeviceParameter
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "SoftBoundsReferenceResistiveDeviceParameter"
 
     mult_noise: bool = False
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
@@ -695,6 +731,14 @@ class SoftBoundsReferenceDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
     slope_up_dtod: float = 0.0
@@ -791,7 +835,7 @@ class ExpStepDevice(PulsedDevice):
     """
     # pylint: disable=invalid-name
 
-    bindings_class: ClassVar[Type] = devices.ExpStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "ExpStepResistiveDeviceParameter"
 
     A_up: float = 0.00081
     """Factor ``A`` for the up direction."""
@@ -833,6 +877,14 @@ class ExpStepDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
 
@@ -898,7 +950,7 @@ class PowStepDevice(PulsedDevice):
     ..  _Frascaroli et al. (2108): https://www.nature.com/articles/s41598-018-25376-x
     """
 
-    bindings_class: ClassVar[Type] = devices.PowStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PowStepResistiveDeviceParameter"
 
     pow_gamma: float = 1.0
     r"""The value of :math:`\gamma` as explained above.
@@ -947,6 +999,14 @@ class PowStepDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
 
@@ -1027,7 +1087,9 @@ class PowStepReferenceDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PowStepReferenceResistiveDeviceParameter
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "PowStepReferenceResistiveDeviceParameter"
 
     pow_gamma: float = 1.0
     r"""The value of :math:`\gamma` as explained above.
@@ -1128,7 +1190,7 @@ class PiecewiseStepDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PiecewiseStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PiecewiseStepResistiveDeviceParameter"
 
     piecewise_up: List[float] = field(default_factory=lambda: [1])
     r"""Array of values that characterize the update steps in upwards direction.
@@ -1171,4 +1233,12 @@ class PiecewiseStepDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """

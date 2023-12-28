@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -62,6 +62,8 @@ public:
   };
 
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   VectorRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<VectorRPUDeviceMetaParameter<T> &>(SimpleRPUDeviceCuda<T>::getPar());
@@ -90,6 +92,7 @@ public:
       const PulsedUpdateMetaParameter<T> &up) override;
 
   std::vector<T> getReduceWeightening() const;
+  std::vector<uint64_t> getPulseCounters() const override;
 
 protected:
   virtual void reduceToWeights(CudaContextPtr c, T *dev_weights);

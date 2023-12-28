@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,12 +18,9 @@
 # pylint: disable=invalid-name, too-many-locals, import-error
 
 from datetime import datetime
-import argparse
-import collections
-import os
-
-import numpy as np
-
+from argparse import ArgumentParser
+from collections import OrderedDict, defaultdict
+from numpy import log10, logspace, argsort
 from transformers.integrations import TensorBoardCallback
 
 from transformers import (
@@ -54,8 +51,7 @@ from aihwkit.simulator.configs import (
 
 from aihwkit.simulator.presets import PresetIOParameters
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
-from aihwkit.nn.conversion import convert_to_analog_mapped
-from aihwkit.nn import AnalogSequential
+from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.optim import AnalogSGD
 
 
@@ -64,10 +60,8 @@ MODEL_NAME = "csarron/bert-base-uncased-squad-v1"
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 # Parse some arguments
-PARSER = argparse.ArgumentParser("Analog BERT on SQuAD example")
-PARSER.add_argument(
-    "-d", "--digital", help="Add to use digital inference", action="store_true"
-)
+PARSER = ArgumentParser("Analog BERT on SQuAD example")
+PARSER.add_argument("-d", "--digital", help="Add to use digital inference", action="store_true")
 PARSER.add_argument(
     "-i",
     "--ideal",
@@ -83,9 +77,7 @@ PARSER.add_argument(
     default=datetime.now().strftime("%Y%m%d-%H%M%S"),
     type=str,
 )
-PARSER.add_argument(
-    "-t", "--train_hwa", help="Use Hardware-Aware training", action="store_true"
-)
+PARSER.add_argument("-t", "--train_hwa", help="Use Hardware-Aware training", action="store_true")
 PARSER.add_argument(
     "-L", "--load", help="Use when loadiung from training checkpoint", action="store_true"
 )
@@ -115,8 +107,6 @@ if ARGS.wandb:
     }
 
     SWEEP_ID = wandb.sweep(sweep=SWEEP_CONFIG, project="bert-weight-noise-experiment")
-else:
-    os.environ["WANDB_DISABLED"] = "true"
 
 # max length and stride specific to pretrained model
 MAX_LENGTH = 320
@@ -136,11 +126,7 @@ def create_ideal_rpu_config(tile_size=512):
             max_output_size=0,
         ),
         forward=PresetIOParameters(is_perfect=True),
-        noise_model=PCMLikeNoiseModel(
-            prog_noise_scale=0.0,
-            read_noise_scale=0.0,
-            drift_scale=0.0,
-        ),
+        noise_model=PCMLikeNoiseModel(prog_noise_scale=0.0, read_noise_scale=0.0, drift_scale=0.0),
         drift_compensation=None,
     )
     return rpu_config
@@ -154,9 +140,7 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     rpu_config = InferenceRPUConfig(
         clip=WeightClipParameter(type=WeightClipType.FIXED_VALUE, fixed_value=1.0),
         modifier=WeightModifierParameter(
-            rel_to_actual_wmax=True,
-            type=WeightModifierType.ADD_NORMAL,
-            std_dev=modifier_noise,
+            rel_to_actual_wmax=True, type=WeightModifierType.ADD_NORMAL, std_dev=modifier_noise
         ),
         mapping=MappingParameter(
             digital_bias=True,
@@ -189,7 +173,7 @@ def create_model(rpu_config):
     model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
 
     if not ARGS.digital:
-        model = AnalogSequential(convert_to_analog_mapped(model, rpu_config))
+        model = convert_to_analog(model, rpu_config)
         model.remap_analog_weights()
 
     print(model)
@@ -283,8 +267,7 @@ def preprocess_train(dataset):
                 # Note: we could go after the last offset
                 # if the answer is the last word (edge case).
                 while (
-                    token_start_index < len(offsets)
-                    and offsets[token_start_index][0] <= start_char
+                    token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char
                 ):
                     token_start_index += 1
                 tokenized_dataset["start_positions"].append(token_start_index - 1)
@@ -354,23 +337,21 @@ def postprocess_predictions(
     examples, features, raw_predictions, n_best_size=20, max_answer_length=30
 ):
     """Postprocess raw predictions"""
-    features.set_format(
-        type=features.format["type"], columns=list(features.features.keys())
-    )
+    features.set_format(type=features.format["type"], columns=list(features.features.keys()))
     all_start_logits, all_end_logits = raw_predictions
 
     # Map examples ids to index
     example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
 
     # Create dict of lists, mapping example indices with corresponding feature indices
-    features_per_example = collections.defaultdict(list)
+    features_per_example = defaultdict(list)
 
     for i, feature in enumerate(features):
         # For each example, take example_id, map to corresponding index
         features_per_example[example_id_to_index[feature["example_id"]]].append(i)
 
     # The dictionaries we have to fill
-    predictions = collections.OrderedDict()
+    predictions = OrderedDict()
 
     print(
         f"Post-processing {len(examples)} example predictions "
@@ -398,8 +379,8 @@ def postprocess_predictions(
             offset_mapping = features[feature_index]["offset_mapping"]
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1: -n_best_size - 1: -1].tolist()
-            end_indexes = np.argsort(end_logits)[-1: -n_best_size - 1: -1].tolist()
+            start_indexes = argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            end_indexes = argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are
@@ -415,10 +396,7 @@ def postprocess_predictions(
 
                     # Don't consider answers with a length
                     # that is either < 0 or > max_answer_length.
-                    if (
-                        end_index < start_index
-                        or end_index - start_index + 1 > max_answer_length
-                    ):
+                    if end_index < start_index or end_index - start_index + 1 > max_answer_length:
                         continue
 
                     # Map the start token to the index of the start of that token in the context
@@ -438,9 +416,7 @@ def postprocess_predictions(
 
         # If we have valid answers, choose the best one
         if len(valid_answers) > 0:
-            best_answer = sorted(valid_answers, key=lambda x: x["score"], reverse=True)[
-                0
-            ]
+            best_answer = sorted(valid_answers, key=lambda x: x["score"], reverse=True)[0]
         else:
             # In the very rare edge case we have not a single non-null prediction,
             # we create a fake prediction to avoid
@@ -463,9 +439,7 @@ def create_datasets():
         preprocess_train, batched=True, remove_columns=squad["train"].column_names
     )
     eval_data = squad["validation"].map(
-        preprocess_validation,
-        batched=True,
-        remove_columns=squad["validation"].column_names,
+        preprocess_validation, batched=True, remove_columns=squad["validation"].column_names
     )
 
     return squad, tokenized_data, eval_data
@@ -498,7 +472,7 @@ def make_trainer(model, optimizer, tokenized_data):
     writer = SummaryWriter(log_dir=log_dir)
 
     trainer = Trainer(
-        model=model if ARGS.digital else model[0],
+        model=model,
         args=training_args,
         data_collator=collator,
         train_dataset=tokenized_data["train"],
@@ -511,9 +485,7 @@ def make_trainer(model, optimizer, tokenized_data):
     return trainer, writer
 
 
-def do_inference(
-    model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9
-):
+def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9):
     """Perform inference experiment at weight noise level specified at runtime.
     SQuAD exact match and f1 metrics are captured in Tensorboard
     """
@@ -527,13 +499,9 @@ def do_inference(
         )
 
         # Format to list of dicts instead of a large dict
-        formatted_preds = [
-            {"id": k, "prediction_text": v} for k, v in predictions.items()
-        ]
+        formatted_preds = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
 
-        out_metric = metric.compute(
-            predictions=formatted_preds, references=ground_truth
-        )
+        out_metric = metric.compute(predictions=formatted_preds, references=ground_truth)
 
         return out_metric["f1"], out_metric["exact_match"]
 
@@ -543,27 +511,17 @@ def do_inference(
         writer.add_scalar("val/exact_match", exact_match, t_inference)
 
         if ARGS.wandb:
-            wandb.log(
-                {"t_inference": t_inference, "f1": f1, "exact_match": exact_match}
-            )
+            wandb.log({"t_inference": t_inference, "f1": f1, "exact_match": exact_match})
 
-        print(
-            f"Exact match: {exact_match: .2f}\t"
-            f"F1: {f1: .2f}\t"
-            f"Drift: {t_inference: .2e}"
-        )
+        print(f"Exact match: {exact_match: .2f}\t" f"F1: {f1: .2f}\t" f"Drift: {t_inference: .2e}")
 
     model.eval()
 
     metric = load("squad")
 
-    ground_truth = [
-        {"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]
-    ]
+    ground_truth = [{"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]]
 
-    t_inference_list = np.logspace(
-        0, np.log10(float(max_inference_time)), n_times
-    ).tolist()
+    t_inference_list = logspace(0, log10(float(max_inference_time)), n_times).tolist()
 
     # Get the initial metrics
     f1, exact_match = predict()

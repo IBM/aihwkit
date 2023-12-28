@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -11,10 +11,40 @@
  */
 
 #pragma once
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string.h>
+#include <unordered_map>
+#include <vector>
+#ifdef RPU_USE_WITH_TORCH
+#include <ATen/ATen.h>
+#endif
+
+// NOTE: fp16 only available for CUDA
+#ifdef RPU_USE_CUDA
+
+#ifdef RPU_USE_FP16
+#define RPU_DEFINE_CUDA_HALF_ARRAY
+#ifdef RPU_BFLOAT_AS_FP16
+#include "cuda_bf16.h"
+typedef __nv_bfloat16 half_t;
+typedef __nv_bfloat162 half2_t;
+#else
+#include "cuda_fp16.h"
+typedef half half_t;
+typedef half2 half2_t;
+#endif
+#else
+#ifdef RPU_PARAM_FP16
+#define RPU_DEFINE_CUDA_HALF_ARRAY
+#include "cuda_fp16.h"
+typedef half half_t;
+typedef half2 half2_t;
+#endif
+#endif
+#endif
 
 #define UNUSED(X) (void)X
 
@@ -88,9 +118,50 @@
 // default should be anyway to-neareast (for GPU this even cannot be
 // changed apparently) so we should be fine using RINT here.
 #define RPU_ROUNDFUN rint
+#define RPU_ROUNDFUNF rintf
+
+// for testing
+#ifdef RPU_USE_DOUBLE
+using num_t = double;
+#else
+#ifdef RPU_USE_FP16
+using num_t = half_t;
+#else
+using num_t = float;
+#endif
+#endif
+
+#ifdef RPU_USE_FP16
+#ifdef RPU_BFLOAT_AS_FP16
+#define RPU_DATA_TYPE_NAME(T)                                                                      \
+  (std::is_same<T, half_t>::value ? "bfloat16"                                                     \
+                                  : (std::is_same<T, double>::value ? "double" : "float"))
+#else
+#define RPU_DATA_TYPE_NAME(T)                                                                      \
+  (std::is_same<T, half_t>::value ? "float16"                                                      \
+                                  : (std::is_same<T, double>::value ? "double" : "float"))
+#endif
+#else
+#define RPU_DATA_TYPE_NAME(T) (std::is_same<T, double>::value ? "double" : "float")
+#endif
 
 namespace RPU {
 
+using state_t = std::unordered_map<std::string, std::vector<double>>;
+
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+std::ostream &operator<<(std::ostream &out, const half_t &value);
+#endif
+
+/* state helper functions */
+template <typename T_VEC>
+void load(RPU::state_t &state, std::string key, T_VEC &value, bool strict);
+template <typename T_VEC> void insert(RPU::state_t &state, std::string key, const T_VEC &value);
+
+void insertWithPrefix(RPU::state_t &extra, const RPU::state_t &state, std::string prefix);
+RPU::state_t selectWithPrefix(const RPU::state_t &extra, std::string prefix);
+
+/* Context class */
 class Context {
 public:
   virtual ~Context() = default;
@@ -106,18 +177,19 @@ template <typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&..
 template <typename T, typename RNGClass>
 inline T getDiscretizedValue(T value, T res, bool sto_round, RNGClass &rng) {
 
-  return (res <= 0)
+  return (res <= (T)0.0)
              ? value
-             : (sto_round ? (RPU_ROUNDFUN(value / res + (rng.sampleUniform() - (T)0.5)) * res)
-                          : (RPU_ROUNDFUN(value / res) * res));
+             : (sto_round ? (T)RPU_ROUNDFUNF(value / res + (rng.sampleUniform() - (T)0.5)) * res
+                          : (T)RPU_ROUNDFUNF(value / res) * res);
 }
 
 template <typename T, typename RNGClass>
 inline T getDiscretizedValueRound(T value, T res, bool sto_round, RNGClass &rng) {
 
-  return (res <= 0) ? value
-                    : (sto_round ? (round(value / res + (rng.sampleUniform() - (T)0.5)) * res)
-                                 : (round(value / res) * res));
+  return (res <= (T)0.0)
+             ? value
+             : (sto_round ? (T)roundf(value / res + (rng.sampleUniform() - (T)0.5)) * res
+                          : (T)roundf(value / res) * res);
 }
 
 template <bool sto_round, typename T, typename RNGClass>
@@ -125,7 +197,7 @@ inline T getDiscretizedValueSR(T value, T res, RNGClass &rng) {
   if (sto_round) {
     return getDiscretizedValue(value, res, true, rng);
   }
-  return (res <= 0) ? value : (RPU_ROUNDFUN(value / res) * res);
+  return (res <= (T)0.0) ? value : ((T)RPU_ROUNDFUNF(value / res) * res);
 }
 
 template <typename T> inline T **Array_2D_Get(size_t r, size_t c) {
@@ -194,7 +266,7 @@ template <typename T> void Array_3D_Free(T ***arr, size_t n) {
 template <typename T> T Find_Absolute_Max(const T *data, int data_length, int inc = 1) {
   T max_input_value = 0;
   for (int i = 0; i < data_length * inc; i += inc) {
-    T abs_value = (data[i] >= 0) ? data[i] : -data[i];
+    T abs_value = (data[i] >= (T)0.0) ? data[i] : -data[i];
     if (abs_value > max_input_value) {
       max_input_value = abs_value;
     }

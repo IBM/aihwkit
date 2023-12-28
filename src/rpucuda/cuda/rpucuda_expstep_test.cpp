@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,12 +23,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -111,15 +105,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(context, x_size);
@@ -209,11 +203,11 @@ TYPED_TEST_CASE(RPUCudaExpstepStateTestFixture, Tios);
     for (int i = 0; i < this->d_size; i++) {                                                       \
       for (int j = 0; j < this->x_size; j++) {                                                     \
         int k = j + i * this->x_size;                                                              \
-        cuavg[k] += cuweights[i][j] / nloop;                                                       \
-        avg[k] += weights[i][j] / nloop;                                                           \
+        cuavg[k] += cuweights[i][j] / (num_t)nloop;                                                \
+        avg[k] += weights[i][j] / (num_t)nloop;                                                    \
                                                                                                    \
-        cusig[k] += cuweights[i][j] * cuweights[i][j] / nloop;                                     \
-        sig[k] += weights[i][j] * weights[i][j] / nloop;                                           \
+        cusig[k] += cuweights[i][j] * cuweights[i][j] / (num_t)nloop;                              \
+        sig[k] += weights[i][j] * weights[i][j] / (num_t)nloop;                                    \
                                                                                                    \
         weights[i][j] = refweights[i][j];                                                          \
       }                                                                                            \
@@ -223,14 +217,14 @@ TYPED_TEST_CASE(RPUCudaExpstepStateTestFixture, Tios);
     this->layer_pulsed->setWeights(refweights[0]);                                                 \
   }                                                                                                \
                                                                                                    \
-  std::cout << BOLD_ON << "\nCUDA Updates done in: " << (num_t)cudur / 1000. / nloop << " msec. "  \
+  std::cout << BOLD_ON << "\nCUDA Updates done in: " << (float)cudur / 1000. / nloop << " msec. "  \
             << BOLD_OFF << std::endl;                                                              \
-  std::cout << BOLD_ON << "RPU Updates done in: " << (num_t)dur / 1000. / nloop << " msec.\n "     \
+  std::cout << BOLD_ON << "RPU Updates done in: " << (float)dur / 1000. / nloop << " msec.\n "     \
             << BOLD_OFF << std::endl;                                                              \
                                                                                                    \
   for (int k = 0; k < n; k++) {                                                                    \
-    num_t sigi = sqrt(fabs(sig[k] - avg[k] * avg[k]));                                             \
-    num_t cusigi = sqrt(fabs(cusig[k] - cuavg[k] * cuavg[k]));                                     \
+    num_t sigi = sqrt(fabsf(sig[k] - avg[k] * avg[k]));                                            \
+    num_t cusigi = sqrt(fabsf(cusig[k] - cuavg[k] * cuavg[k]));                                    \
                                                                                                    \
     EXPECT_NEAR(avg[k], cuavg[k], 2. / sqrtf(nloop));                                              \
     EXPECT_NEAR(sigi, cusigi, 2. / sqrtf(nloop));                                                  \

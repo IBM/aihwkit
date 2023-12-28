@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -26,8 +26,8 @@ public:
       PowStepReferenceRPUDeviceCuda,
       PowStepReferenceRPUDevice,
       /*ctor body*/
-      dev_gamma_ = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
-      dev_reference_ = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
+      dev_gamma_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 2 * this->size_);
+      dev_reference_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
       ,
       /*dtor body*/
       ,
@@ -49,7 +49,7 @@ public:
       T **w_reference = rpu_device.getReference();
       T **w_gamma_up = rpu_device.getGammaUp();
       T **w_gamma_down = rpu_device.getGammaDown();
-      float *tmp_gamma = new float[2 * this->size_];
+      param_t *tmp_gamma = new param_t[2 * this->size_];
       T *tmp_reference = new T[this->size_];
 
       for (int i = 0; i < d_size; ++i) {
@@ -76,11 +76,11 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
   T *getGlobalParamsData() override { return nullptr; };
-  float *get2ParamsData() override { return dev_gamma_->getData(); };
+  param_t *get2ParamsData() override { return dev_gamma_->getData(); };
   T *get1ParamsData() override { return dev_reference_->getData(); };
 
 private:
-  std::unique_ptr<CudaArray<float>> dev_gamma_ = nullptr;
+  std::unique_ptr<CudaArray<param_t>> dev_gamma_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_reference_ = nullptr;
 };
 

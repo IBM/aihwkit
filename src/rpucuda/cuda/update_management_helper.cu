@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,6 +17,7 @@
 #include <iostream>
 #include <memory>
 
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 #include "cuda_util.h"
 #include "io_iterator.h"
@@ -410,14 +411,20 @@ debugKernelTranslateTransFormatToBatchOrder64Format<double, true>(double *, int,
 template int
 debugKernelTranslateTransFormatToBatchOrder64Format<double, false>(double *, int, int, double, int);
 #endif
+#ifdef RPU_USE_FP16
+template int
+debugKernelTranslateTransFormatToBatchOrder64Format<half_t, true>(half_t *, int, int, half_t, int);
+template int
+debugKernelTranslateTransFormatToBatchOrder64Format<half_t, false>(half_t *, int, int, half_t, int);
+#endif
 } // namespace test_helper
 
 template <typename T>
 __global__ void kernelUMGetScaleAndKValues(
     T *scale_values,
     int *K_values,
-    float *x_amax_values,
-    float *d_amax_values,
+    T *x_amax_values,
+    T *d_amax_values,
     const int m_batch,
     const bool ublm_in,
     const T weight_granularity_in,
@@ -437,7 +444,7 @@ __global__ void kernelUMGetScaleAndKValues(
     T k_val = lr * x_val * d_val / weight_granularity;
 
     if (k_val > (T)0.0) {
-      if (k_val > Kmax) {
+      if (k_val > (T)Kmax) {
         d_val *= (T)Kmax / k_val;
       }
       scale_values[tid] = sqrt(x_val / d_val);
@@ -463,7 +470,8 @@ __global__ void kernelGetKBlockAggregate(
 
   const int m_batch = m_batch_in;
   const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-  __shared__ typename RPU::cub::BlockScan<kagg_t, thread_block_size>::TempStorage temp_storage;
+  __shared__
+      typename RPU_CUB_NS_QUALIFIER BlockScan<kagg_t, thread_block_size>::TempStorage temp_storage;
 
   int K = 0;
   if (tid < m_batch) {
@@ -471,7 +479,8 @@ __global__ void kernelGetKBlockAggregate(
   }
   kagg_t Kc = 0;
   kagg_t block_aggregate = 0;
-  RPU::cub::BlockScan<kagg_t, thread_block_size>(temp_storage).ExclusiveSum(K, Kc, block_aggregate);
+  RPU_CUB_NS_QUALIFIER BlockScan<kagg_t, thread_block_size>(temp_storage)
+      .ExclusiveSum(K, Kc, block_aggregate);
 
   if (tid < m_batch) {
     Kc_block[tid] = Kc;
@@ -516,14 +525,14 @@ template <typename T> void UpdateManagementHelper<T>::initializeBuffers(int m_ba
   size_t temp_storage_bytes = 0;
   auto s = context_->getStream();
 
-  CUDA_CALL(RPU::cub::DeviceScan::InclusiveSum(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceScan::InclusiveSum(
       temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kc_values_->getData() + 1,
       m_batch, s));
   context_->synchronize();
   dev_Kc_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
 
   // average max sum
-  CUDA_CALL(RPU::cub::DeviceReduce::Sum(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       nullptr, temp_storage_bytes, x_maximizer_->getMaxValues(), dev_sumabsmax_value_->getData(),
       m_batch, s));
   dev_sumabsmax_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
@@ -545,7 +554,7 @@ template <typename T> void UpdateManagementHelper<T>::computeKc(int m_batch) {
 
   // CAUTION: needs K_values to be already computed !!
   size_t temp_storage_bytes = dev_Kc_temp_storage_->getSize();
-  CUDA_CALL(RPU::cub::DeviceScan::InclusiveSum(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceScan::InclusiveSum(
       (void *)dev_Kc_temp_storage_->getData(), temp_storage_bytes, dev_K_values_->getData(),
       dev_Kc_values_->getData() + 1, m_batch, context_->getStream()));
 }
@@ -577,16 +586,16 @@ void UpdateManagementHelper<T>::getAverageAbsMax(T &m_x, T &m_d, int m_batch) co
 
   // first compute the average of the max over batch
   size_t ssz = dev_sumabsmax_temp_storage_->getSize();
-  CUDA_CALL(RPU::cub::DeviceReduce::Sum(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_maximizer_->getMaxValues(),
       dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
-  CUDA_CALL(RPU::cub::DeviceReduce::Sum(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_maximizer_->getMaxValues(),
       dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
   dev_sumabsmax_value_->copyTo(result);
-  m_x = result[0] / m_batch;
-  m_d = result[1] / m_batch;
+  m_x = result[0] / (T)m_batch;
+  m_d = result[1] / (T)m_batch;
 }
 
 template <typename T>
@@ -604,16 +613,16 @@ void UpdateManagementHelper<T>::getAverageLogAbsMax(T &m_x, T &m_d, int m_batch)
   LogInputIterator<T> x_input_iter(x_maximizer_->getMaxValues());
   LogInputIterator<T> d_input_iter(d_maximizer_->getMaxValues());
 
-  CUDA_CALL(RPU::cub::DeviceReduce::Sum(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_input_iter,
       dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
-  CUDA_CALL(RPU::cub::DeviceReduce::Sum(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_input_iter,
       dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
   dev_sumabsmax_value_->copyTo(result);
-  m_x = expf(result[0] / m_batch);
-  m_d = expf(result[1] / m_batch);
+  m_x = expf(result[0] / (T)m_batch);
+  m_d = expf(result[1] / (T)m_batch);
 }
 
 template <typename T> void UpdateManagementHelper<T>::getAbsMax(T &m_x, T &m_d, int m_batch) const {
@@ -627,10 +636,10 @@ template <typename T> void UpdateManagementHelper<T>::getAbsMax(T &m_x, T &m_d, 
 
   // first compute the average of the max over batch
   size_t ssz = dev_sumabsmax_temp_storage_->getSize();
-  CUDA_CALL(RPU::cub::DeviceReduce::Max(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
       (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_maximizer_->getMaxValues(),
       dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
-  CUDA_CALL(RPU::cub::DeviceReduce::Max(
+  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
       (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_maximizer_->getMaxValues(),
       dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
@@ -776,6 +785,33 @@ RPU_UMH_ITER_TEMPLATE(double, EyeInputIterator<double>, const double *);
 RPU_UMH_ITER_TEMPLATE(double, const double *, EyeInputIterator<double>);
 
 #undef TRANSDOUBLE
+#endif
+
+#ifdef RPU_USE_FP16
+#define TRANSHALF(TRANS) TRANS, half_t
+
+template class UpdateManagementHelper<half_t>;
+
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, half_t *, half_t *);
+RPU_UMH_ITER_TEMPLATE(
+    half_t, IndexReaderTransInputIterator<half_t>, PermuterTransInputIterator<half_t>);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderInputIterator<half_t>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderTransInputIterator<half_t>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, SliceInputIterator<TRANSHALF(true)>);
+RPU_UMH_ITER_TEMPLATE(
+    half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, SliceInputIterator<TRANSHALF(false)>);
+
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, PermuterTransInputIterator<half_t>);
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(true)>);
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, SliceInputIterator<TRANSHALF(false)>);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(true)>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, IndexReaderSliceInputIterator<TRANSHALF(false)>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, EyeInputIterator<half_t>, const half_t *);
+RPU_UMH_ITER_TEMPLATE(half_t, const half_t *, EyeInputIterator<half_t>);
+
+#undef TRANSHALF
 #endif
 
 #undef RPU_UMH_ITER_TEMPLATE

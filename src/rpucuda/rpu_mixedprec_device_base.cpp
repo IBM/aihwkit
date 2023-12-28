@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,7 +25,7 @@ namespace RPU {
 template <typename T>
 void MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(std::stringstream &ss) const {
 
-  if (granularity > 0) {
+  if (granularity > (T)0.0) {
     ss << "\t granularity: \t\t";
     ss << granularity << std::endl;
   }
@@ -139,6 +139,9 @@ template struct MixedPrecRPUDeviceBaseMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct MixedPrecRPUDeviceBaseMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct MixedPrecRPUDeviceBaseMetaParameter<half_t>;
+#endif
 
 /******************************************************************************************/
 
@@ -232,13 +235,50 @@ void MixedPrecRPUDeviceBase<T>::populate(
   if (dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_) != nullptr) {
     granularity_ = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)->getWeightGranularity();
   }
-  if (par.granularity > 0) {
+  if (par.granularity > (T)0.0) {
     // overwrites
     granularity_ = par.granularity;
   }
-  if (granularity_ <= 0) {
+  if (granularity_ <= (T)0.0) {
     RPU_FATAL("Cannot establish granularity from device. Need explicit setting >=0.");
   }
+}
+
+template <typename T>
+void MixedPrecRPUDeviceBase<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  SimpleRPUDevice<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  rpu_device_->dumpExtra(state, "rpu_device");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+
+  RPU::insert(state, "granularity", granularity_);
+  RPU::insert(state, "transfer_tmp", transfer_tmp_);
+  RPU::insert(state, "current_row_index", current_row_index_);
+  RPU::insert(state, "current_update_index", current_update_index_);
+  RPU::insert(state, "avg_sparsity", avg_sparsity_);
+
+  // transfer_d_vecs not handled (generated on the fly)
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void MixedPrecRPUDeviceBase<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  SimpleRPUDevice<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  rpu_device_->loadExtra(state, "rpu_device", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+
+  RPU::load(state, "granularity", granularity_, strict);
+  RPU::load(state, "transfer_tmp", transfer_tmp_, strict);
+  RPU::load(state, "current_row_index", current_row_index_, strict);
+  RPU::load(state, "current_update_index", current_update_index_, strict);
+  RPU::load(state, "avg_sparsity", avg_sparsity_, strict);
 }
 
 /*********************************************************************************/
@@ -269,7 +309,7 @@ void MixedPrecRPUDeviceBase<T>::setUpPar(const PulsedUpdateMetaParameter<T> &up)
 template <typename T> void MixedPrecRPUDeviceBase<T>::computeSparsity(const int kx, const int kd) {
   const auto &par = getPar();
   if (par.compute_sparsity) {
-    avg_sparsity_ = (current_update_index_ * avg_sparsity_ +
+    avg_sparsity_ = ((T)current_update_index_ * avg_sparsity_ +
                      (T)((this->d_size_ - kd) * (this->x_size_ - kx)) / (T)this->size_) /
                     (T)(current_update_index_ + 1);
   }
@@ -279,7 +319,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
   // updating the matrix with rows of using one-hot transfer vectors
 
   const auto &par = getPar();
-  if (par.n_rows_per_transfer == 0 || fabs(lr) == (T)0) {
+  if (par.n_rows_per_transfer == 0 || (T)fabsf(lr) == (T)0) {
     return;
   }
   int n_transfers = par.n_rows_per_transfer;
@@ -289,8 +329,8 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
   n_transfers = MIN(n_transfers, this->d_size_);
   int i_row = current_row_index_;
   if (par.random_row && (n_transfers < this->d_size_)) {
-    i_row =
-        MAX(MIN((int)floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
+    i_row = MAX(
+        MIN((int)floorf(this->rw_rng_.sampleUniform() * (T)this->d_size_), this->d_size_ - 1), 0);
   }
 
   int d2_size = this->d_size_ * this->d_size_;
@@ -457,6 +497,9 @@ void MixedPrecRPUDeviceBase<T>::resetCols(
 template class MixedPrecRPUDeviceBase<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecRPUDeviceBase<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class MixedPrecRPUDeviceBase<half_t>;
 #endif
 
 } // namespace RPU

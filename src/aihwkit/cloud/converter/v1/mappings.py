@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,55 +18,79 @@ from collections import namedtuple
 from typing import Any, Dict
 
 from torch.nn import (
-    BCELoss, BatchNorm2d, Conv2d, ConvTranspose2d, CrossEntropyLoss, Flatten,
-    LeakyReLU, Linear, LogSigmoid, LogSoftmax, MSELoss, MaxPool2d, NLLLoss,
-    ReLU, Sigmoid, Softmax, Tanh
+    BCELoss,
+    BatchNorm2d,
+    Conv2d,
+    ConvTranspose2d,
+    CrossEntropyLoss,
+    Flatten,
+    LeakyReLU,
+    Linear,
+    LogSigmoid,
+    LogSoftmax,
+    MSELoss,
+    MaxPool2d,
+    NLLLoss,
+    ReLU,
+    Sigmoid,
+    Softmax,
+    Tanh,
 )
 from torchvision.datasets import FashionMNIST, SVHN
 
 from aihwkit.cloud.converter.definitions.onnx_common_pb2 import (  # type: ignore[attr-defined]
-    AttributeProto
+    AttributeProto,
 )
 from aihwkit.cloud.converter.exceptions import ConversionError
 from aihwkit.nn import AnalogConv2d, AnalogLinear
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.presets import (
-    CapacitorPreset, EcRamPreset, IdealizedPreset, ReRamESPreset, ReRamSBPreset,
+    CapacitorPreset,
+    EcRamPreset,
+    IdealizedPreset,
+    ReRamESPreset,
+    ReRamSBPreset,
     PCMPreset,
-    MixedPrecisionCapacitorPreset, MixedPrecisionEcRamPreset,
-    MixedPrecisionIdealizedPreset, MixedPrecisionPCMPreset,
-    MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset,
-    TikiTakaCapacitorPreset, TikiTakaEcRamPreset, TikiTakaIdealizedPreset,
-    TikiTakaReRamESPreset, TikiTakaReRamSBPreset
+    MixedPrecisionCapacitorPreset,
+    MixedPrecisionEcRamPreset,
+    MixedPrecisionIdealizedPreset,
+    MixedPrecisionPCMPreset,
+    MixedPrecisionReRamESPreset,
+    MixedPrecisionReRamSBPreset,
+    TikiTakaCapacitorPreset,
+    TikiTakaEcRamPreset,
+    TikiTakaIdealizedPreset,
+    TikiTakaReRamESPreset,
+    TikiTakaReRamSBPreset,
 )
 
-Type = namedtuple('Type', ['attribute_type', 'field', 'fn'])
+Type = namedtuple("Type", ["attribute_type", "field", "fn"])
 
 TYPES = {
-    int: Type(AttributeProto.AttributeType.INT, 'i', lambda x: x),  # type: ignore
-    bool: Type(AttributeProto.AttributeType.BOOL, 'b', lambda x: x),  # type: ignore
-    str: Type(AttributeProto.AttributeType.STRING, 's',  # type: ignore
-              lambda x: x.encode('utf-8')),
-    float: Type(AttributeProto.AttributeType.FLOAT, 'f', lambda x: x)  # type: ignore
+    int: Type(AttributeProto.AttributeType.INT, "i", lambda x: x),  # type: ignore
+    bool: Type(AttributeProto.AttributeType.BOOL, "b", lambda x: x),  # type: ignore
+    str: Type(
+        AttributeProto.AttributeType.STRING, "s", lambda x: x.encode("utf-8")  # type: ignore
+    ),
+    float: Type(AttributeProto.AttributeType.FLOAT, "f", lambda x: x),  # type: ignore
 }
 
 TYPES_LISTS = {
-    int: Type(AttributeProto.AttributeType.INTS, 'ints', lambda x: x),  # type: ignore
-    bool: Type(AttributeProto.AttributeType.BOOLS, 'bools', lambda x: x),  # type: ignore
-    str: Type(AttributeProto.AttributeType.STRINGS, 'strings',  # type: ignore
-              lambda x: [y.encode('utf-8') for y in x]),
-    float: Type(AttributeProto.AttributeType.FLOATS, 'floats', lambda x: x)  # type: ignore
+    int: Type(AttributeProto.AttributeType.INTS, "ints", lambda x: x),  # type: ignore
+    bool: Type(AttributeProto.AttributeType.BOOLS, "bools", lambda x: x),  # type: ignore
+    str: Type(
+        AttributeProto.AttributeType.STRINGS,
+        "strings",  # type: ignore
+        lambda x: [y.encode("utf-8") for y in x],
+    ),
+    float: Type(AttributeProto.AttributeType.FLOATS, "floats", lambda x: x),  # type: ignore
 }
 
 
 class Function:
     """Mapping for a function-like entity."""
 
-    def __init__(
-            self,
-            id_: str,
-            args: Dict
-    ):
+    def __init__(self, id_: str, args: Dict):
         self.id_ = id_
         self.args = args
 
@@ -113,6 +137,13 @@ class Function:
                 new_argument[argument.name] = list(new_argument[argument.name])
             kwargs.update(new_argument)
 
+        # handle the weights_scaling_omega legacy
+        weight_scaling_omega = kwargs.pop("weight_scaling_omega", None)
+        if weight_scaling_omega is not None:
+            if "rpu_config" not in kwargs or not hasattr(kwargs["rpu_config"], "mapping"):
+                raise ConversionError("Expect Mappable RPUConfig")
+            kwargs["rpu_config"].mapping.weights_scaling_omega = weight_scaling_omega
+
         return cls(**kwargs)
 
     def get_field_value_to_proto(self, source: Any, field: str, default: Any = None) -> Any:
@@ -129,159 +160,155 @@ class LayerFunction(Function):
 
     def get_field_value_to_proto(self, source: Any, field: str, default: Any = None) -> Any:
         """Get the value of a field."""
-        if field == 'bias':
-            return getattr(source, 'bias', None) is not None
+        if field == "bias":
+            return getattr(source, "bias", None) is not None
 
-        if field == 'weight_scaling_omega':
-            return list(source.analog_tiles())[0].rpu_config.mapping.weight_scaling_omega
+        if field == "weight_scaling_omega":
+            return next(source.analog_tiles()).rpu_config.mapping.weight_scaling_omega
 
-        if field == 'rpu_config':
-            preset_cls = type(source.analog_tile.rpu_config)
+        if field == "rpu_config":
+            preset_cls = type(next(source.analog_tiles()).rpu_config)
             try:
                 return Mappings.presets[preset_cls]
             except KeyError as ex:
-                raise ConversionError('Invalid rpu_config in layer: {} not '
-                                      'among the presets'.format(preset_cls)) from ex
+                raise ConversionError(
+                    "Invalid rpu_config in layer: {} not among the presets".format(preset_cls)
+                ) from ex
 
         return super().get_field_value_to_proto(source, field, default)
 
     def get_argument_from_proto(self, source: Any, field: str, default: Any = None) -> Dict:
         """Get the value of an argument."""
-        if source.name == 'rpu_config':
-            preset_str = getattr(source, field, default).decode('utf-8')
+        if source.name == "rpu_config":
+            preset_str = getattr(source, field, default).decode("utf-8")
             try:
                 preset = InverseMappings.presets[preset_str]
             except KeyError as ex:
-                raise ConversionError('Invalid rpu_config in layer: {} not '
-                                      'among the presets'.format(preset_str)) from ex
-            return {'rpu_config': preset()}
+                raise ConversionError(
+                    "Invalid rpu_config in layer: {} not among the presets".format(preset_str)
+                ) from ex
+            return {"rpu_config": preset()}
 
         return super().get_argument_from_proto(source, field, default)
 
 
 class Mappings:
     """Mappings between Python entities and AIHW format."""
+
     # pylint: disable=too-few-public-methods
 
-    datasets = {
-        FashionMNIST: 'fashion_mnist',
-        SVHN: 'svhn'
-    }
+    datasets = {FashionMNIST: "fashion_mnist", SVHN: "svhn"}
 
     layers = {
-        AnalogConv2d: LayerFunction('AnalogConv2d', {
-            'in_channels': int,
-            'out_channels': int,
-            'kernel_size': [int],
-            'stride': [int],
-            'padding': [int],
-            'dilation': [int],
-            'bias': bool,
-            'rpu_config': str,
-            'weight_scaling_omega': float
-        }),
-        AnalogLinear: LayerFunction('AnalogLinear', {
-            'in_features': int,
-            'out_features': int,
-            'bias': bool,
-            'rpu_config': str,
-            'weight_scaling_omega': float
-        }),
-        BatchNorm2d: LayerFunction('BatchNorm2d', {
-            'num_features': int
-        }),
-        Conv2d: LayerFunction('Conv2d', {
-            'in_channels': int,
-            'out_channels': int,
-            'kernel_size': [int],
-            'stride': [int],
-            'padding': [int],
-            'dilation': [int],
-            'bias': bool
-        }),
-        ConvTranspose2d: LayerFunction('ConvTranspose2d', {
-            'in_channels': int,
-            'out_channels': int,
-            'kernel_size': [int],
-            'stride': [int],
-            'padding': [int],
-            'output_padding': [int],
-            'dilation': [int],
-            'bias': bool
-        }),
-        Flatten: LayerFunction('Flatten', {}),
-        Linear: LayerFunction('Linear', {
-            'in_features': int,
-            'out_features': int,
-            'bias': bool
-        }),
-        MaxPool2d: LayerFunction('MaxPool2d', {
-            'kernel_size': int,
-            'stride': int,
-            'padding': int,
-            'dilation': int,
-            'ceil_mode': bool
-        })
+        AnalogConv2d: LayerFunction(
+            "AnalogConv2d",
+            {
+                "in_channels": int,
+                "out_channels": int,
+                "kernel_size": [int],
+                "stride": [int],
+                "padding": [int],
+                "dilation": [int],
+                "bias": bool,
+                "rpu_config": str,
+                "weight_scaling_omega": float,
+            },
+        ),
+        AnalogLinear: LayerFunction(
+            "AnalogLinear",
+            {
+                "in_features": int,
+                "out_features": int,
+                "bias": bool,
+                "rpu_config": str,
+                "weight_scaling_omega": float,
+            },
+        ),
+        BatchNorm2d: LayerFunction("BatchNorm2d", {"num_features": int}),
+        Conv2d: LayerFunction(
+            "Conv2d",
+            {
+                "in_channels": int,
+                "out_channels": int,
+                "kernel_size": [int],
+                "stride": [int],
+                "padding": [int],
+                "dilation": [int],
+                "bias": bool,
+            },
+        ),
+        ConvTranspose2d: LayerFunction(
+            "ConvTranspose2d",
+            {
+                "in_channels": int,
+                "out_channels": int,
+                "kernel_size": [int],
+                "stride": [int],
+                "padding": [int],
+                "output_padding": [int],
+                "dilation": [int],
+                "bias": bool,
+            },
+        ),
+        Flatten: LayerFunction("Flatten", {}),
+        Linear: LayerFunction("Linear", {"in_features": int, "out_features": int, "bias": bool}),
+        MaxPool2d: LayerFunction(
+            "MaxPool2d",
+            {"kernel_size": int, "stride": int, "padding": int, "dilation": int, "ceil_mode": bool},
+        ),
     }
 
     activation_functions = {
-        LeakyReLU: Function('LeakyReLU', {
-            'negative_slope': float
-        }),
-        LogSigmoid: Function('LogSigmoid', {}),
-        LogSoftmax: Function('LogSoftmax', {
-            'dim': int
-        }),
-        ReLU: Function('ReLU', {}),
-        Sigmoid: Function('Sigmoid', {}),
-        Softmax: Function('Softmax', {
-            'dim': int
-        }),
-        Tanh: Function('Tanh', {})
+        LeakyReLU: Function("LeakyReLU", {"negative_slope": float}),
+        LogSigmoid: Function("LogSigmoid", {}),
+        LogSoftmax: Function("LogSoftmax", {"dim": int}),
+        ReLU: Function("ReLU", {}),
+        Sigmoid: Function("Sigmoid", {}),
+        Softmax: Function("Softmax", {"dim": int}),
+        Tanh: Function("Tanh", {}),
     }
 
     loss_functions = {
-        BCELoss: Function('BCELoss', {}),
-        CrossEntropyLoss: Function('CrossEntropyLoss', {}),
-        MSELoss: Function('MSELoss', {}),
-        NLLLoss: Function('NLLLoss', {})
+        BCELoss: Function("BCELoss", {}),
+        CrossEntropyLoss: Function("CrossEntropyLoss", {}),
+        MSELoss: Function("MSELoss", {}),
+        NLLLoss: Function("NLLLoss", {}),
     }
 
-    optimizers = {
-        AnalogSGD: Function('AnalogSGD', {
-            'lr': float
-        })
-    }
+    optimizers = {AnalogSGD: Function("AnalogSGD", {"lr": float})}
 
     presets = {
-        ReRamESPreset: 'ReRamESPreset',
-        ReRamSBPreset: 'ReRamSBPreset',
-        CapacitorPreset: 'CapacitorPreset',
-        EcRamPreset: 'EcRamPreset',
-        IdealizedPreset: 'IdealizedPreset',
-        PCMPreset: 'PCMPreset',
-        MixedPrecisionReRamESPreset: 'MixedPrecisionReRamESPreset',
-        MixedPrecisionReRamSBPreset: 'MixedPrecisionReRamSBPreset',
-        MixedPrecisionCapacitorPreset: 'MixedPrecisionCapacitorPreset',
-        MixedPrecisionEcRamPreset: 'MixedPrecisionEcRamPreset',
-        MixedPrecisionIdealizedPreset: 'MixedPrecisionIdealizedPreset',
-        MixedPrecisionPCMPreset: 'MixedPrecisionPCMPreset',
-        TikiTakaReRamESPreset: 'TikiTakaReRamESPreset',
-        TikiTakaReRamSBPreset: 'TikiTakaReRamSBPreset',
-        TikiTakaCapacitorPreset: 'TikiTakaCapacitorPreset',
-        TikiTakaEcRamPreset: 'TikiTakaEcRamPreset',
-        TikiTakaIdealizedPreset: 'TikiTakaIdealizedPreset',
+        ReRamESPreset: "ReRamESPreset",
+        ReRamSBPreset: "ReRamSBPreset",
+        CapacitorPreset: "CapacitorPreset",
+        EcRamPreset: "EcRamPreset",
+        IdealizedPreset: "IdealizedPreset",
+        PCMPreset: "PCMPreset",
+        MixedPrecisionReRamESPreset: "MixedPrecisionReRamESPreset",
+        MixedPrecisionReRamSBPreset: "MixedPrecisionReRamSBPreset",
+        MixedPrecisionCapacitorPreset: "MixedPrecisionCapacitorPreset",
+        MixedPrecisionEcRamPreset: "MixedPrecisionEcRamPreset",
+        MixedPrecisionIdealizedPreset: "MixedPrecisionIdealizedPreset",
+        MixedPrecisionPCMPreset: "MixedPrecisionPCMPreset",
+        TikiTakaReRamESPreset: "TikiTakaReRamESPreset",
+        TikiTakaReRamSBPreset: "TikiTakaReRamSBPreset",
+        TikiTakaCapacitorPreset: "TikiTakaCapacitorPreset",
+        TikiTakaEcRamPreset: "TikiTakaEcRamPreset",
+        TikiTakaIdealizedPreset: "TikiTakaIdealizedPreset",
     }
 
 
 def build_inverse_mapping(mapping: Dict) -> Dict:
     """Create the inverse mapping between Python entities and AIHW Composer formats."""
-    return {value if not isinstance(value, Function) else value.id_: key
-            for key, value in mapping.items()}
+    return {
+        value if not isinstance(value, Function) else value.id_: key
+        for key, value in mapping.items()
+    }
 
 
 class InverseMappings:
     """Mappings between AIHW Composer format and Python entities."""
+
     # pylint: disable=too-few-public-methods
 
     datasets = build_inverse_mapping(Mappings.datasets)

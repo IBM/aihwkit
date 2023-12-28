@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -189,10 +189,10 @@ DEFINE_PWU_KERNEL_PARAMETER(
     /*run*/
     if (this->implicit_pulses) {
       START_SINGLE_FUNCTOR(
-          float, (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
-                  rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
-                  rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1,
-                  rpucuda_device->getWeightGranularityNoise(), dev_states));
+          T, (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
+              rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
+              rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1,
+              rpucuda_device->getWeightGranularityNoise(), dev_states));
     } else {
       START_SINGLE_FUNCTOR(
           uint32_t,
@@ -221,6 +221,18 @@ DEFINE_PWU_KERNEL_BASE(
     this->nstates = this->nthreads * this->nblocks;);
 
 /********************************************************************************
+ * PWUKernelParameterBatchBaseInf // no limit on size
+ *********************************************************************************/
+DEFINE_PWU_KERNEL_BASE(BatchBaseInf,
+                       /*ctor*/
+                       this->nthreads = MIN(RPU_THREADS_PER_BLOCK_UPDATE, this->size);
+                       this->nthreads = (this->nthreads + 31) / 32 * 32;
+                       this->nblocks =
+                           MIN(this->max_block_count,
+                               construction_context->getNBlocks(this->size, this->nthreads));
+                       this->nstates = this->nthreads * this->nblocks;);
+
+/********************************************************************************
  * PWUKernelParameterBatchFunctor
  *********************************************************************************/
 
@@ -231,7 +243,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
     /*run*/
     if (this->implicit_pulses) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
-          T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
+          T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
           this->shared_mem, kernelUpdateWBatchFunctor, FunctorT, gp_count,
           (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
@@ -264,7 +276,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
 #define RPU_PWU_START_BATCH_KERNEL(KNAME)                                                          \
   if (this->implicit_pulses) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
-        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,       \
         this->shared_mem, KNAME,                                                                   \
         (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,                \
          rpucuda_device->get4ParamsData(), 1, m_batch,                                             \
@@ -347,7 +359,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
     RPU_PWU_START_BATCH_SHARED_INIT;
     if (this->implicit_pulses) {
       RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
-          T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
+          T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
           shared_mem, kernelUpdateWBatchSharedFunctor, FunctorT, gp_count,
           (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
            rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
@@ -381,7 +393,7 @@ DEFINE_PWU_KERNEL_PARAMETER(
   RPU_PWU_START_BATCH_SHARED_INIT;                                                                 \
   if (this->implicit_pulses) {                                                                     \
     RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
-        T, one_sided, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,   \
+        T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,       \
         shared_mem, KNAME,                                                                         \
         (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,                \
          rpucuda_device->get4ParamsData(), 1, m_batch, batch_load_stride,                          \
@@ -446,7 +458,7 @@ DEFINE_PWU_KERNEL_BASE(
     RPU_FATAL("nK32 changed. This is not supported");                                              \
   };                                                                                               \
                                                                                                    \
-  int batch_load_stride = MIN(this->max_batch_load_stride, m_batch);                               \
+  int batch_load_stride = MIN(this->max_batch_load_stride, (m_batch + 1) / 2 * 2);                 \
   int shared_mem = this->shared_mem_per_batch * batch_load_stride;
 
 /********************************************************************************
@@ -475,8 +487,8 @@ DEFINE_PWU_KERNEL_PARAMETER(
 
       if (this->implicit_pulses) {
         RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR_OS(
-            T, 0, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
-            shared_mem, kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
+            T, 0, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads, shared_mem,
+            kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
             (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
              rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
              rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
@@ -523,8 +535,8 @@ DEFINE_PWU_KERNEL_PARAMETER(
     } else {
       if (this->implicit_pulses) {
         RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR_OS(
-            T, 0, float, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,
-            shared_mem, kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
+            T, 0, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads, shared_mem,
+            kernelUpdateWBatchSharedWeightOutputFunctor, FunctorT, gp_count,
             (dev_weights, blm->getXData(), this->x_size, blm->getDData(), this->d_size,
              rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
              rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), 1, m_batch,
@@ -553,6 +565,43 @@ DEFINE_PWU_KERNEL_PARAMETER(
              nullptr, dev_states));
       }
     });
+
+/********************************************************************************
+ * PWUKernelCounter
+ *********************************************************************************/
+
+#define RPU_PWU_COUNTER_KERNEL                                                                     \
+  if (this->implicit_pulses) {                                                                     \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, T, this->out_trans, this->out_trans, s, this->nblocks, this->nthreads,       \
+        this->shared_mem, kernelPulseCounter,                                                      \
+        (rpucuda_device->getPosPulseCountData(), rpucuda_device->getNegPulseCountData(),           \
+         blm->getXData(), this->x_size, blm->getDData(), this->d_size, 1, m_batch));               \
+  } else if (this->use_bo64) {                                                                     \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, uint64_t, this->out_trans, this->out_trans, s, this->nblocks,                \
+        this->nthreads, this->shared_mem, kernelPulseCounter,                                      \
+        (rpucuda_device->getPosPulseCountData(), rpucuda_device->getNegPulseCountData(),           \
+         blm->getXCountsBo64Data(), this->x_size, blm->getDCountsBo64Data(), this->d_size,         \
+         this->nK32, blm->getBo64Batch(m_batch),                                                   \
+         blm->getKnData(up.update_bl_management, m_batch)));                                       \
+  } else {                                                                                         \
+    RPU_SWITCH_TRANS_TEMPLATE(                                                                     \
+        T, one_sided, uint32_t, this->out_trans, this->out_trans, s, this->nblocks,                \
+        this->nthreads, this->shared_mem, kernelPulseCounter,                                      \
+        (rpucuda_device->getPosPulseCountData(), rpucuda_device->getNegPulseCountData(),           \
+         x_counts_chunk ? x_counts_chunk : blm->getXCountsData(), this->x_size,                    \
+         d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size, this->nK32,        \
+         m_batch));                                                                                \
+  }
+
+template <typename T>
+DEFINE_PWU_KERNEL_PARAMETER(PulseCounter,
+                            BatchBaseInf,
+                            /*run*/
+                            RPU_PWU_COUNTER_KERNEL;);
+
+#undef RPU_PWU_COUNTER_KERNEL
 
 #undef RPU_PWU_START_BATCH_SHARED_KERNEL
 #undef RPU_PWU_START_BATCH_SHARED_INIT

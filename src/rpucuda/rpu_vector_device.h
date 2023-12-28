@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -93,14 +93,14 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   T calcWeightGranularity() const override {
     T weight_granularity = 0.0;
     for (size_t k = 0; k < vec_par.size(); k++) {
-      weight_granularity += vec_par[k]->calcWeightGranularity() / vec_par.size();
+      weight_granularity += vec_par[k]->calcWeightGranularity() / (T)vec_par.size();
     }
     return weight_granularity;
   }
   T calcNumStates() const override {
     T num_states = 0.0;
     for (size_t k = 0; k < vec_par.size(); k++) {
-      num_states += vec_par[k]->calcNumStates() / vec_par.size();
+      num_states += vec_par[k]->calcNumStates() / (T)vec_par.size();
     }
     return num_states;
   }
@@ -168,8 +168,10 @@ public:
   void setHiddenWeights(const std::vector<T> &data) override;
   int getHiddenUpdateIdx() const override;
   void setHiddenUpdateIdx(int idx) override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
-  void printDP(int x_cunt, int d_count) const override;
+  void printDP(int x_count, int d_count) const override;
   void printToStream(std::stringstream &ss) const override { this->getPar().printToStream(ss); };
   void disp(std::stringstream &ss) const override {
     ss << this->getPar().getName() << " [" << this->x_size_ << "," << this->d_size_ << "]\n";
@@ -224,7 +226,7 @@ protected:
   T ***weights_vec_ = nullptr;
   std::vector<T> reduce_weightening_;
   int current_device_idx_ = 0;
-  unsigned long current_update_idx_ = 0;
+  uint64_t current_update_idx_ = 0;
   RealWorldRNG<T> rw_rng_{0};
 
   virtual int resetCounters(bool force = false);

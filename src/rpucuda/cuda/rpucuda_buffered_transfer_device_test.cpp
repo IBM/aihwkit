@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,12 +22,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -72,7 +66,7 @@ public:
     dp = new BufferedTransferRPUDeviceMetaParameter<num_t>(dp_cs, 2);
 
     dp->gamma = 0.0;
-    dp->thres_scale = 0.5 / dp_cs.dw_min;
+    dp->thres_scale = (num_t)0.5 / dp_cs.dw_min;
     dp->transfer_columns = GetParam();
     dp->transfer_every = GetParam() ? x_size : d_size;
     dp->n_reads_per_transfer = 1;
@@ -100,15 +94,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weight matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     up_pwu = RPU::make_unique<PulsedWeightUpdater<num_t>>(context, x_size, d_size);
@@ -245,7 +239,7 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransfer) {
   // hidden weights updated
   num_t s = 0;
   for (int i = 0; i < size; i++) {
-    ASSERT_EQ(w_vec[i], (num_t)max_size);
+    ASSERT_FLOAT_EQ(w_vec[i], (num_t)max_size);
     s += w_vec[i];
   }
   // only first col of  weights should be transferred
@@ -263,9 +257,9 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransfer) {
     // std::cout << "[" << i / x_size << "," << i % x_size << "]: " << this->weights[0][i] <<
     // std::endl;
     if (GetParam()) {
-      ASSERT_FLOAT_EQ(this->weights[0][i], i % x_size ? 0.0 : dp_cs.dw_min * rw[1]);
+      ASSERT_FLOAT_EQ(this->weights[0][i], i % x_size ? (num_t)0.0 : dp_cs.dw_min * rw[1]);
     } else {
-      ASSERT_FLOAT_EQ(this->weights[0][i], i >= x_size ? 0.0 : dp_cs.dw_min * rw[1]);
+      ASSERT_FLOAT_EQ(this->weights[0][i], i >= x_size ? (num_t)0.0 : dp_cs.dw_min * rw[1]);
     }
   }
 }

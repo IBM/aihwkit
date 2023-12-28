@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,12 +20,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -348,7 +342,7 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, UpdateAndTransfer) {
 
   num_t lr = 0.05;
   dp.compute_sparsity = false;
-  dp.transfer_every = round(dw_min / lr);
+  dp.transfer_every = roundf(dw_min / lr);
 
   // just newly create from paramerers
   rpu_device = dp.createDeviceUnique(this->x_size, this->d_size, &this->rw_rng);

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,12 +22,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -58,15 +52,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weight matrix
     for (int i = 0; i < x_size * m_batch_large; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch_large; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     up.pulse_type =
@@ -265,7 +259,7 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransferColumns) {
   // hidden weights updated
   num_t s = 0;
   for (int i = 0; i < size; i++) {
-    ASSERT_EQ(w_vec[i], (num_t)this->x_size);
+    ASSERT_FLOAT_EQ(w_vec[i], (num_t)this->x_size);
     s += w_vec[i];
   }
   // only first col of  weights should be transferred
@@ -276,9 +270,9 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransferColumns) {
 
   for (int i = 0; i < size; i++) {
     if (GetParam()) {
-      ASSERT_FLOAT_EQ(w_vec[i + size], i % x_size ? 0.0 : (num_t)this->x_size);
+      ASSERT_FLOAT_EQ(w_vec[i + size], i % x_size ? (num_t)0.0 : (num_t)this->x_size);
     } else {
-      ASSERT_FLOAT_EQ(w_vec[i + size], 0.0); // should not be used
+      ASSERT_FLOAT_EQ(w_vec[i + size], (num_t)0.0); // should not be used
     }
   }
 
@@ -297,7 +291,7 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransferColumns) {
       // std::endl;
       ASSERT_FLOAT_EQ(this->weights[0][i], rw[0] * w_vec[i] + rw[1] * w_vec[i + size]);
     } else {
-      ASSERT_FLOAT_EQ(this->weights[0][i], i % x_size ? 0.0 : (num_t)this->x_size * rw[1]);
+      ASSERT_FLOAT_EQ(this->weights[0][i], i % x_size ? (num_t)0.0 : (num_t)this->x_size * rw[1]);
     }
   }
 }
@@ -342,7 +336,7 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransferRows) {
   // hidden weights updated
   num_t s = 0;
   for (int i = 0; i < size; i++) {
-    ASSERT_EQ(w_vec[i], (num_t)this->d_size);
+    ASSERT_FLOAT_EQ(w_vec[i], (num_t)this->d_size);
     s += w_vec[i];
   }
   // only first row of  weights should be transferred
@@ -354,9 +348,9 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransferRows) {
   for (int i = 0; i < size; i++) {
     // wvec should be x_size major
     if (GetParam()) {
-      ASSERT_FLOAT_EQ(w_vec[i + size], i >= x_size ? 0.0 : (num_t)this->d_size);
+      ASSERT_FLOAT_EQ(w_vec[i + size], i >= x_size ? (num_t)0.0 : (num_t)this->d_size);
     } else {
-      ASSERT_FLOAT_EQ(w_vec[i + size], 0.0); // should not be used
+      ASSERT_FLOAT_EQ(w_vec[i + size], (num_t)0.0); // should not be used
     }
   }
 
@@ -368,7 +362,7 @@ TEST_P(RPUDeviceCudaTestFixture, UpdateAndTransferRows) {
     if (GetParam()) {
       ASSERT_FLOAT_EQ(this->weights[0][i], rw[0] * w_vec[i] + rw[1] * w_vec[i + size]);
     } else {
-      ASSERT_FLOAT_EQ(this->weights[0][i], i >= x_size ? 0.0 : (num_t)this->d_size * rw[1]);
+      ASSERT_FLOAT_EQ(this->weights[0][i], i >= x_size ? (num_t)0.0 : (num_t)this->d_size * rw[1]);
     }
   }
 }

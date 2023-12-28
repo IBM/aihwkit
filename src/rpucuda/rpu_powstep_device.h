@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -36,7 +36,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
        << std::endl;
     ,
     /* calc weight granularity body */
-    return this->dw_min * pow((T)0.5, ps_gamma);
+    return this->dw_min * (T)powf((T)0.5, ps_gamma);
     ,
     /*Add*/
     bool implementsWriteNoise() const override { return true; };);

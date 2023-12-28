@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -10,67 +10,54 @@
  * that they have been altered from the originals.
  */
 
+#include "rpu.h"
 #include "rpu_base.h"
+#include "rpu_pulsed.h"
+#include "utility_functions.h"
+#include "weight_clipper.h"
+#include "weight_modifier.h"
+#include "weight_remapper.h"
 
 #define CHECK_CPU(x) TORCH_CHECK(x.device() == torch::kCPU, #x " must be a CPU tensor")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+#define CHECK_DTYPE(x)                                                                             \
+  TORCH_CHECK(x.dtype() == DEFAULT_DTYPE, #x " must be of the right data type.")
 #define CHECK_TORCH_INPUT(x)                                                                       \
   CHECK_CPU(x);                                                                                    \
-  CHECK_CONTIGUOUS(x)
+  CHECK_CONTIGUOUS(x);                                                                             \
+  CHECK_DTYPE(x)
 
-void declare_rpu_tiles(py::module &m) {
-  using Class = RPU::RPUSimple<T>;
-  using ClassPulsed = RPU::RPUPulsed<T>;
+#define NAME(S) (S + type_name_add).c_str()
 
-  py::class_<RPU::WeightModifierParameter<T>>(m, "WeightModifierParameter")
+template <typename T, typename T_RPU>
+void declare_rpu_tiles(py::module &m, std::string type_name_add) {
+  using Class = RPU::RPUSimple<T_RPU>;
+  using ClassPulsed = RPU::RPUPulsed<T_RPU>;
+
+  py::class_<RPU::WeightModifierParameter<T_RPU>>(m, NAME("WeightModifierParameter"))
       .def(py::init<>())
-      .def_readwrite("std_dev", &RPU::WeightModifierParameter<T>::std_dev)
-      .def_readwrite("res", &RPU::WeightModifierParameter<T>::res)
-      .def_readwrite("sto_round", &RPU::WeightModifierParameter<T>::sto_round)
-      .def_readwrite("dorefa_clip", &RPU::WeightModifierParameter<T>::dorefa_clip)
-      .def_readwrite("pdrop", &RPU::WeightModifierParameter<T>::pdrop)
-      .def_readwrite("enable_during_test", &RPU::WeightModifierParameter<T>::enable_during_test)
-      .def_readwrite("copy_last_column", &RPU::WeightModifierParameter<T>::copy_last_column)
-      .def_readwrite("rel_to_actual_wmax", &RPU::WeightModifierParameter<T>::rel_to_actual_wmax)
-      .def_readwrite("assumed_wmax", &RPU::WeightModifierParameter<T>::assumed_wmax)
-      .def_readwrite("type", &RPU::WeightModifierParameter<T>::type)
-      .def_readwrite("coeffs", &RPU::WeightModifierParameter<T>::coeffs);
-
-  py::enum_<RPU::WeightModifierType>(m, "WeightModifierType")
-      .value("Copy", RPU::WeightModifierType::Copy)
-      .value("Discretize", RPU::WeightModifierType::Discretize)
-      .value("MultNormal", RPU::WeightModifierType::MultNormal)
-      .value("AddNormal", RPU::WeightModifierType::AddNormal)
-      .value("DiscretizeAddNormal", RPU::WeightModifierType::DiscretizeAddNormal)
-      .value("DoReFa", RPU::WeightModifierType::DoReFa)
-      .value("Poly", RPU::WeightModifierType::Poly);
-
-  py::class_<RPU::WeightClipParameter>(m, "WeightClipParameter")
-      .def(py::init<>())
-      .def_readwrite("fixed_value", &RPU::WeightClipParameter::fixed_value)
-      .def_readwrite("sigma", &RPU::WeightClipParameter::sigma)
-      .def_readwrite("type", &RPU::WeightClipParameter::type);
-
-  py::enum_<RPU::WeightClipType>(m, "WeightClipType")
-      .value("None", RPU::WeightClipType::None)
-      .value("FixedValue", RPU::WeightClipType::FixedValue)
-      .value("LayerGaussian", RPU::WeightClipType::LayerGaussian)
-      .value("AverageChannelMax", RPU::WeightClipType::AverageChannelMax);
-
-  py::class_<RPU::WeightRemapParameter>(m, "WeightRemapParameter")
-      .def(py::init<>())
-      .def_readwrite("remapped_wmax", &RPU::WeightRemapParameter::remapped_wmax)
-      .def_readwrite("max_scale_range", &RPU::WeightRemapParameter::max_scale_range)
-      .def_readwrite("max_scale_ref", &RPU::WeightRemapParameter::max_scale_ref)
-      .def_readwrite("type", &RPU::WeightRemapParameter::type);
-
-  py::enum_<RPU::WeightRemapType>(m, "WeightRemapType")
-      .value("None", RPU::WeightRemapType::None)
-      .value("LayerwiseSymmetric", RPU::WeightRemapType::LayerwiseSymmetric)
-      .value("ChannelwiseSymmetric", RPU::WeightRemapType::ChannelwiseSymmetric);
+      .def_readwrite("std_dev", &RPU::WeightModifierParameter<T_RPU>::std_dev)
+      .def_readwrite("per_batch_sample", &RPU::WeightModifierParameter<T_RPU>::per_batch_sample)
+      .def_readwrite("res", &RPU::WeightModifierParameter<T_RPU>::res)
+      .def_readwrite("sto_round", &RPU::WeightModifierParameter<T_RPU>::sto_round)
+      .def_readwrite("dorefa_clip", &RPU::WeightModifierParameter<T_RPU>::dorefa_clip)
+      .def_readwrite("pdrop", &RPU::WeightModifierParameter<T_RPU>::pdrop)
+      .def_readwrite("enable_during_test", &RPU::WeightModifierParameter<T_RPU>::enable_during_test)
+      .def_readwrite("copy_last_column", &RPU::WeightModifierParameter<T_RPU>::copy_last_column)
+      .def_readwrite("rel_to_actual_wmax", &RPU::WeightModifierParameter<T_RPU>::rel_to_actual_wmax)
+      .def_readwrite("assumed_wmax", &RPU::WeightModifierParameter<T_RPU>::assumed_wmax)
+      .def_readwrite("type", &RPU::WeightModifierParameter<T_RPU>::type)
+      .def_readwrite("coeffs", &RPU::WeightModifierParameter<T_RPU>::coeffs)
+      .def_readwrite("pcm_zero_thres", &RPU::WeightModifierParameter<T_RPU>::pcm_zero_thres)
+      .def_readwrite("pcm_t_inference", &RPU::WeightModifierParameter<T_RPU>::pcm_t_inference)
+      .def_readwrite("pcm_prob_at_reset", &RPU::WeightModifierParameter<T_RPU>::pcm_prob_at_reset)
+      .def_readwrite("pcm_prob_at_gmax", &RPU::WeightModifierParameter<T_RPU>::pcm_prob_at_gmax)
+      .def_readwrite("pcm_prob_at_random", &RPU::WeightModifierParameter<T_RPU>::pcm_prob_at_random)
+      .def_readwrite("pcm_t0", &RPU::WeightModifierParameter<T_RPU>::pcm_t0)
+      .def_readwrite("g_max", &RPU::WeightModifierParameter<T_RPU>::g_max);
 
   py::class_<Class>(
-      m, "FloatingPointTile",
+      m, NAME("FloatingPointTile"),
       R"pbdoc(
     Floating point tile.
 
@@ -102,6 +89,44 @@ void declare_rpu_tiles(py::module &m) {
             self.printToStream(ss);
             return ss.str();
           })
+      .def("__copy__", [](const Class &self) { return Class(self); })
+      .def(
+          "__deepcopy__", [](const Class &self, py::dict) { return Class(self); }, py::arg("memo"))
+      .def(
+          "dump_extra",
+          [](Class &self) {
+            RPU::state_t state;
+            self.dumpExtra(state, "rpu");
+            return state;
+          },
+          R"pbdoc(
+           Return additional state vraiables for pickling. 
+ 
+           Returns:
+               state: dictionary of extra variables states
+           )pbdoc")
+      .def(
+          "load_extra",
+          [](Class &self, RPU::state_t state, bool strict) {
+            self.loadExtra(state, "rpu", strict);
+          },
+          py::arg("state"), py::arg("strict"),
+          R"pbdoc(
+           Load the state dictionary generated by dump_extra.
+
+           Args:
+               strict: Whether to throw a runtime error when a field is not found. 
+           )pbdoc")
+      .def(
+          "set_verbosity_level", [](Class &self, int verbose) { self.setVerbosityLevel(verbose); },
+          py::arg("verbose"),
+          R"pbdoc(
+           Sets the verbosity level for debugging. 
+
+           Args:
+               verbose: verbosity level
+
+           )pbdoc")
       .def(
           "get_learning_rate", &Class::getLearningRate,
           R"pbdoc(
@@ -142,11 +167,13 @@ void declare_rpu_tiles(py::module &m) {
       .def(
           "get_weights",
           [](Class &self) {
-            torch::Tensor weights = torch::empty({self.getDSize(), self.getXSize()});
+            DEFAULT_TENSOR_OPTIONS;
+            torch::Tensor weights =
+                torch::empty({self.getDSize(), self.getXSize()}, default_options);
 
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.getWeights(weights.data_ptr<T>());
+            self.getWeights(reinterpret_cast<T_RPU *>(weights.data_ptr<T>()));
             return weights;
           },
           R"pbdoc(
@@ -171,12 +198,13 @@ void declare_rpu_tiles(py::module &m) {
                   "Invalid weights dimensions: expected [" + std::to_string(self.getDSize()) + "," +
                   std::to_string(self.getXSize()) + "] tensor");
             }
-            auto cpu_weights = weights.detach().cpu().contiguous();
+            DEFAULT_TENSOR_OPTIONS;
+            auto cpu_weights = weights.detach().cpu().to(default_options).contiguous();
             CHECK_CONTIGUOUS(cpu_weights);
 
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.setWeights(cpu_weights.data_ptr<T>());
+            return self.setWeights(reinterpret_cast<T_RPU *>(cpu_weights.template data_ptr<T>()));
           },
           py::arg("weights"),
           R"pbdoc(
@@ -202,7 +230,7 @@ void declare_rpu_tiles(py::module &m) {
             }
             CHECK_CONTIGUOUS(weights);
             std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.setSharedWeights(weights.data_ptr<T>());
+            return self.setSharedWeights(reinterpret_cast<T_RPU *>(weights.data_ptr<T>()));
           },
           py::arg("weights"))
       .def(
@@ -217,12 +245,13 @@ void declare_rpu_tiles(py::module &m) {
                   "," + std::to_string(self.getXSize()) + "] tensor");
             }
             std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.setDeltaWeights(delta_weights.data_ptr<T>());
+            return self.setDeltaWeights(reinterpret_cast<T_RPU *>(delta_weights.data_ptr<T>()));
           },
           py::arg("delta_weights"))
       .def(
           "reset_delta_weights",
           [](Class &self) {
+            self.finishUpdateCalculations();
             std::lock_guard<std::mutex> lock(self.mutex_);
             return self.setDeltaWeights(nullptr);
           })
@@ -232,7 +261,7 @@ void declare_rpu_tiles(py::module &m) {
            Returns whether weight is shared.
            )pbdoc")
       .def(
-          "get_parameters", &Class::getPar,
+          "get_meta_parameters", &Class::getPar,
           R"pbdoc(
            Returns the current meta parameter structure.
            )pbdoc")
@@ -314,7 +343,7 @@ void declare_rpu_tiles(py::module &m) {
                   "] tensor");
             }
             std::lock_guard<std::mutex> lock(self.mutex_);
-            self.remapWeights(wrmpar, scales.data_ptr<T>());
+            self.remapWeights(wrmpar, reinterpret_cast<T_RPU *>(scales.data_ptr<T>()));
             return scales;
           },
           py::arg("weight_remap_params"), py::arg("scales"),
@@ -333,7 +362,7 @@ void declare_rpu_tiles(py::module &m) {
            )pbdoc")
       .def(
           "modify_weights",
-          [](Class &self, ::RPU::WeightModifierParameter<T> &wmpar) {
+          [](Class &self, ::RPU::WeightModifierParameter<T_RPU> &wmpar) {
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.modifyFBWeights(wmpar);
           },
@@ -365,7 +394,7 @@ void declare_rpu_tiles(py::module &m) {
           "reset_columns",
           [](Class &self, int start_col, int n_cols, T reset_prob) {
             std::lock_guard<std::mutex> lock(self.mutex_);
-            return self.resetCols(start_col, n_cols, reset_prob);
+            return self.resetCols(start_col, n_cols, (T_RPU)reset_prob);
           },
           py::arg("start_column_idx") = 0, py::arg("num_columns") = 1, py::arg("reset_prob") = 1.0,
           R"pbdoc(
@@ -415,8 +444,9 @@ void declare_rpu_tiles(py::module &m) {
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.forward(
-                x_input.template data_ptr<T>(), d_output.template data_ptr<T>(), bias, m_batch,
-                x_trans, d_trans, is_test);
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_output.template data_ptr<T>()), bias, m_batch, x_trans,
+                d_trans, is_test);
             return d_output;
           },
           py::arg("x_input"), py::arg("bias") = false, py::arg("x_trans") = false,
@@ -484,8 +514,9 @@ void declare_rpu_tiles(py::module &m) {
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.backward(
-                d_input.template data_ptr<T>(), x_output.template data_ptr<T>(), bias, m_batch,
-                d_trans, x_trans);
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(x_output.template data_ptr<T>()), bias, m_batch, d_trans,
+                x_trans);
             return x_output;
           },
           py::arg("d_input"), py::arg("bias") = false, py::arg("d_trans") = false,
@@ -518,6 +549,11 @@ void declare_rpu_tiles(py::module &m) {
           [](Class &self, const torch::Tensor &x_input_, const torch::Tensor &d_input_,
              bool bias = false, bool x_trans = false, bool d_trans = false,
              bool non_blocking = false) {
+            T_RPU lr = self.getLearningRate();
+            if (lr == (T_RPU)0.0) {
+              return;
+            }
+
             auto d_input = d_input_.contiguous();
             auto x_input = x_input_.contiguous();
 
@@ -560,8 +596,9 @@ void declare_rpu_tiles(py::module &m) {
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.update(
-                x_input.template data_ptr<T>(), d_input.template data_ptr<T>(), bias, m_batch,
-                x_trans, d_trans);
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()), bias, m_batch, x_trans,
+                d_trans);
           },
           py::arg("x_input"), py::arg("d_input"), py::arg("bias"), py::arg("d_trans") = false,
           py::arg("x_trans") = false, py::arg("non_blocking") = false,
@@ -602,7 +639,8 @@ void declare_rpu_tiles(py::module &m) {
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.forwardIndexed(
-                x_input.template data_ptr<T>(), d_tensor.template data_ptr<T>(), x_input.numel(),
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_tensor.template data_ptr<T>()), x_input.numel(),
                 d_image_size, N, true, is_test);
             return d_tensor;
           },
@@ -637,7 +675,8 @@ void declare_rpu_tiles(py::module &m) {
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.backwardIndexed(
-                d_input.template data_ptr<T>(), x_tensor.template data_ptr<T>(), x_tensor.numel(),
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(x_tensor.template data_ptr<T>()), x_tensor.numel(),
                 d_image_size, N, true);
             return x_tensor;
           },
@@ -670,7 +709,8 @@ void declare_rpu_tiles(py::module &m) {
             // Call RPU function.
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.updateIndexed(
-                x_input.template data_ptr<T>(), d_input.template data_ptr<T>(), x_input.numel(),
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_input.template data_ptr<T>()), x_input.numel(),
                 d_image_size, N, true);
           },
           py::arg("x_input"), py::arg("d_input"), py::arg("non_blocking") = false,
@@ -732,17 +772,17 @@ void declare_rpu_tiles(py::module &m) {
             std::vector<std::string> v;
             self.getDeviceParameterNames(v);
 
-            // TODO choose correct tensor options (CPU, float32) probably standard though
+            DEFAULT_TENSOR_OPTIONS;
             if (!v.size()) {
-              return torch::empty({0});
+              return torch::empty({0}, default_options);
             }
             torch::Tensor hidden_parameters =
-                torch::empty({(int)v.size(), self.getDSize(), self.getXSize()});
+                torch::empty({(int)v.size(), self.getDSize(), self.getXSize()}, default_options);
 
-            std::vector<T *> data_ptrs(v.size());
+            std::vector<T_RPU *> data_ptrs(v.size());
             size_t size = self.getDSize() * self.getXSize();
             for (size_t i = 0; i < v.size(); i++) {
-              data_ptrs[i] = hidden_parameters.data_ptr<T>() + i * size;
+              data_ptrs[i] = reinterpret_cast<T_RPU *>(hidden_parameters.data_ptr<T>()) + i * size;
             }
             self.getDeviceParameter(data_ptrs);
 
@@ -774,10 +814,10 @@ void declare_rpu_tiles(py::module &m) {
               throw std::runtime_error("Hidden parameter shape mismatch!");
             }
 
-            std::vector<T *> data_ptrs(v.size());
+            std::vector<T_RPU *> data_ptrs(v.size());
             size_t size = self.getDSize() * self.getXSize();
             for (size_t i = 0; i < v.size(); i++) {
-              data_ptrs[i] = hidden_parameters.data_ptr<T>() + i * size;
+              data_ptrs[i] = reinterpret_cast<T_RPU *>(hidden_parameters.data_ptr<T>()) + i * size;
             }
             std::lock_guard<std::mutex> lock(self.mutex_);
             self.setDeviceParameter(data_ptrs);
@@ -807,10 +847,36 @@ void declare_rpu_tiles(py::module &m) {
 
            Args:
                idx: index of the (unit cell) devices, returns 0 in all other cases.
-           )pbdoc");
+           )pbdoc")
+      .def(
+          "get_pulse_counters",
+          [](Class &self) {
+            std::vector<uint64_t> v = self.getPulseCounters();
+            auto options = torch::TensorOptions().dtype(torch::kInt64);
+            if (!v.size()) {
+              return torch::empty({0}, options);
+            }
+            size_t size = self.getDSize() * self.getXSize();
+
+            torch::Tensor pulse_counters =
+                torch::empty({(int)(v.size() / size), self.getDSize(), self.getXSize()}, options);
+
+            std::copy_n(
+                (int64_t *)v.data(), v.size(), pulse_counters.contiguous().data_ptr<int64_t>());
+
+            return pulse_counters;
+          },
+          R"pbdoc(
+           Get the pulse counters if available.
+
+           Returns:
+               3D tensor: Pulse counters: pos, neg (and for each sub-device)
+          )pbdoc")
+
+      ;
 
   py::class_<ClassPulsed, Class>(
-      m, "AnalogTile",
+      m, NAME("AnalogTile"),
       R"pbdoc(
     Analog tile.
 
@@ -819,5 +885,19 @@ void declare_rpu_tiles(py::module &m) {
         d_size: ``D`` size of the tile.
     )pbdoc")
       .def(py::init<int, int>(), py::arg("x_size"), py::arg("d_size"))
-      .def("get_parameters", &ClassPulsed::getMetaPar);
-}
+      .def("__copy__", [](const ClassPulsed &self) { return ClassPulsed(self); })
+      .def(
+          "__deepcopy__", [](const ClassPulsed &self, py::dict) { return ClassPulsed(self); },
+          py::arg("memo"))
+      .def("get_meta_parameters", &ClassPulsed::getMetaPar);
+};
+
+#undef NAME
+
+template void declare_rpu_tiles<float, float>(py::module &, std::string);
+#ifdef RPU_USE_DOUBLE
+template void declare_rpu_tiles<double, double>(py::module &, std::string);
+#endif
+#ifdef RPU_USE_FP16
+template void declare_rpu_tiles<at::Half, half_t>(py::module &, std::string);
+#endif

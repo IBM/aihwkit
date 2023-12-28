@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -26,7 +26,7 @@ public:
       PowStepRPUDeviceCuda,
       PowStepRPUDevice,
       /*ctor body*/
-      dev_gamma_ = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
+      dev_gamma_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 2 * this->size_);
       dev_write_noise_std_ = RPU::make_unique<CudaArray<T>>(this->context_, 1);
       ,
       /*dtor body*/
@@ -48,7 +48,7 @@ public:
       int x_size = this->x_size_;
       T **w_gamma_up = rpu_device.getGammaUp();
       T **w_gamma_down = rpu_device.getGammaDown();
-      float *tmp_gamma = new float[2 * this->size_];
+      param_t *tmp_gamma = new param_t[2 * this->size_];
 
       for (int i = 0; i < d_size; ++i) {
         for (int j = 0; j < x_size; ++j) {
@@ -69,19 +69,19 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
   T *getGlobalParamsData() override { return dev_write_noise_std_->getData(); };
-  float *get2ParamsData() override { return dev_gamma_->getData(); };
+  param_t *get2ParamsData() override { return dev_gamma_->getData(); };
   T *get1ParamsData() override {
     return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
   };
   T getWeightGranularityNoise() const override {
     // need to make sure that random states are enabled
     return getPar().usesPersistentWeight()
-               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + 1e-6
+               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + (T)1e-6
                : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
 
 private:
-  std::unique_ptr<CudaArray<float>> dev_gamma_ = nullptr;
+  std::unique_ptr<CudaArray<param_t>> dev_gamma_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_write_noise_std_ = nullptr;
 };
 

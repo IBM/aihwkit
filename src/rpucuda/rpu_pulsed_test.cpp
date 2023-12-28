@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,24 +21,19 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double T;
-#else
-typedef float T;
-#endif
-
 namespace {
 
 using namespace RPU;
+// using num_t=float;
 
 class RPUTestNoiseFreeFixture : public ::testing::TestWithParam<int> {
 public:
   void SetUp() {
 
-    x_size = 100;
-    d_size = 101;
+    x_size = 10;
+    d_size = 11;
 
-    IOMetaParameter<T> p_io;
+    IOMetaParameter<num_t> p_io;
     // noise free
 
     p.up.desired_BL = 20;
@@ -85,27 +80,28 @@ public:
     p.f_io = p_io;
     p.b_io = p_io;
 
-    rx.resize(x_size);
-    rd.resize(d_size);
+    int m_batch = 2;
+    rx.resize(x_size * m_batch);
+    rd.resize(d_size * m_batch);
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
-    for (int i = 0; i < x_size; i++)
-      rx[i] = urnd();
+    for (int i = 0; i < x_size * m_batch; i++)
+      rx[i] = (num_t)urnd();
 
-    for (int j = 0; j < d_size; j++) {
-      rd[j] = urnd();
+    for (int j = 0; j < d_size * m_batch; j++) {
+      rd[j] = (num_t)urnd();
     }
 
-    std::uniform_real_distribution<T> udist2(-0.2, 0.2);
+    std::uniform_real_distribution<float> udist2(-0.2, 0.2);
     auto urnd2 = std::bind(udist2, generator);
     w.resize(d_size * x_size);
     for (int j = 0; j < d_size * x_size; j++) {
-      w[j] = urnd2();
+      w[j] = (num_t)urnd2();
     }
     w2 = w;
     x = rx;
@@ -115,7 +111,7 @@ public:
   }
 
   void constructRPU() {
-    rpu = RPU::make_unique<RPUPulsed<T>>(x_size, d_size);
+    rpu = RPU::make_unique<RPUPulsed<num_t>>(x_size, d_size);
     rpu->populateParameter(&p, &dp);
     rpu->setLearningRate(0.1);
     rpu->setWeightsUniformRandom(-0.5, 0.5);
@@ -123,17 +119,55 @@ public:
 
   void TearDown() {}
 
-  PulsedMetaParameter<T> p;
-  ConstantStepRPUDeviceMetaParameter<T> dp;
+  PulsedMetaParameter<num_t> p;
+  ConstantStepRPUDeviceMetaParameter<num_t> dp;
 
-  std::unique_ptr<RPUPulsed<T>> rpu;
+  std::unique_ptr<RPUPulsed<num_t>> rpu;
   int x_size;
   int d_size;
-  std::vector<T> rx, rd, w, x, d, x2, d2, w2;
+  std::vector<num_t> rx, rd, w, x, d, x2, d2, w2;
 };
 
 // types
 INSTANTIATE_TEST_CASE_P(MVType, RPUTestNoiseFreeFixture, ::testing::Range(0, 2));
+
+TEST_P(RPUTestNoiseFreeFixture, ConstructAndTestFP) {
+
+  p.f_io.is_perfect = true;
+  p.b_io.is_perfect = true;
+  p.up.pulse_type = RPU::PulseType::None;
+  constructRPU();
+  auto rpu2 = RPUSimple<num_t>(x_size, d_size);
+
+  // rpu->printWeights(3, 3);
+  rpu->getWeights(w.data());
+  rpu2.setWeights(w.data());
+  rpu2.setLearningRate(0.1);
+  // rpu2.printWeights(3, 3);
+
+  int m_batch = GetParam() + 1;
+  rpu->forward(rx.data(), d.data(), false, m_batch);
+  rpu->backward(rd.data(), x.data(), false, m_batch);
+  rpu->update(rd.data(), rx.data(), false, m_batch);
+  rpu->getWeights(w.data());
+
+  rpu2.forward(rx.data(), d2.data(), false, m_batch);
+  rpu2.backward(rd.data(), x2.data(), false, m_batch);
+  rpu2.update(rd.data(), rx.data(), false, m_batch);
+  rpu2.getWeights(w2.data());
+
+  for (int i = 0; i < m_batch * d_size; i++) {
+    std::cout << "Di " << i << ":" << (float)d[i] << " vs. " << (float)d2[i] << std::endl;
+    EXPECT_NEAR((float)d[i], (float)d2[i], TOLERANCE);
+  }
+  for (int i = 0; i < m_batch * x_size; i++) {
+    std::cout << "Xi " << i << ":" << x[i] << " vs. " << x2[i] << std::endl;
+    EXPECT_NEAR((float)x[i], (float)x2[i], TOLERANCE);
+  }
+  for (int i = 0; i < x_size * d_size; i++) {
+    ASSERT_NEAR((float)w[i], (float)w2[i], TOLERANCE);
+  }
+}
 
 TEST_P(RPUTestNoiseFreeFixture, ConstructAndCopy) {
 
@@ -202,7 +236,6 @@ TEST_P(RPUTestNoiseFreeFixture, ConstructAndMove) {
 }
 
 } // namespace
-  // namespace
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

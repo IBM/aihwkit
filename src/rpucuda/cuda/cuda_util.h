@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "cuda_buffer.h"
 #include "utility_functions.h"
 
 #include <iostream>
@@ -20,13 +21,12 @@
 #include <queue>
 #include <string.h>
 
+#include "cublas_v2.h"
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <curand.h>
 #include <curand_kernel.h>
-
-#include "cublas_v2.h"
 
 #define RPU_BUFFER_IN 0
 #define RPU_BUFFER_OUT 1
@@ -34,14 +34,15 @@
 #define RPU_BUFFER_WEIGHT 3
 #define RPU_BUFFER_POS_NEG_IN 4
 #define RPU_BUFFER_POS_NEG_OUT 5
-#define RPU_BUFFER_TEMP_0 6
-#define RPU_BUFFER_TEMP_1 7
-#define RPU_BUFFER_TEMP_2 8
-#define RPU_BUFFER_TEMP_3 9
-#define RPU_BUFFER_TEMP_4 10
-#define RPU_BUFFER_DEVICE_0 11
-#define RPU_BUFFER_DEVICE_1 12
-#define RPU_BUFFER_CWO 13
+#define RPU_BUFFER_TEMP_BLAS 6
+#define RPU_BUFFER_TEMP_0 7
+#define RPU_BUFFER_TEMP_1 8
+#define RPU_BUFFER_TEMP_2 9
+#define RPU_BUFFER_TEMP_3 10
+#define RPU_BUFFER_TEMP_4 11
+#define RPU_BUFFER_DEVICE_0 12
+#define RPU_BUFFER_DEVICE_1 13
+#define RPU_BUFFER_CWO 14
 
 #define RPU_MAX_BUFFER 15
 
@@ -183,10 +184,20 @@
 #define RPU_CUDA_1D_KERNEL_LOOP(i, n)                                                              \
   for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i += blockDim.x * gridDim.x)
 
+#define RPU_CUDA_1D_KERNEL_LOOP_HALF(i, n)                                                         \
+  int size2 =                                                                                      \
+      ((n) + 1) / 2; /* CudaArray makes sure that last idx is dummy allocated for odd sizes*/      \
+  RPU_CUDA_1D_KERNEL_LOOP(i, size2)
+
+#define HALF2PTR(PTR) reinterpret_cast<half2_t *>(PTR)
+#define HALF2PTRCONST(PTR) reinterpret_cast<const half2_t *>(PTR)
+
 #define RPU_THREADS_PER_BLOCK 512
-#define RPU_THREADS_PER_BLOCK_UPDATE 512
+#define RPU_THREADS_PER_BLOCK_UPDATE 256
 #define RPU_MAX_RAND_STATE_SIZE 10000
-#define RPU_UPDATE_BLOCKS_PER_SM 1.1
+#define RPU_UPDATE_BLOCKS_PER_SM 8.1
+
+#define RPU_GET_BLOCKS(SIZE) (SIZE + RPU_THREADS_PER_BLOCK - 1) / RPU_THREADS_PER_BLOCK
 
 #define RPU_GEN_IITER_TEMPLATES(NUM_T, OUT_T, FUNC, ARGS)                                          \
   template OUT_T FUNC(const NUM_T *ARGS);                                                          \
@@ -222,6 +233,17 @@ namespace RPU {
 typedef uint32_t kagg_t; // K aggregate type
 typedef int8_t chop_t;   // chopper type
 
+#ifdef RPU_PARAM_FP16
+typedef half_t param_t;
+typedef half2_t param2_t;
+typedef struct __align__(8) { half_t x, y, z, w; }
+param4_t;
+#else
+typedef float param_t;
+typedef float2 param2_t;
+typedef float4 param4_t;
+#endif
+
 class CublasEnvironment {
 
 public:
@@ -251,37 +273,9 @@ private:
 };
 
 template <typename T> class CudaArray;
+
 class CudaContext;
 typedef CudaContext *CudaContextPtr;
-
-template <typename T> class CudaBuffer {
-public:
-  CudaBuffer(){};
-  CudaBuffer(const CudaBuffer<T> &);
-  CudaBuffer &operator=(const CudaBuffer<T> &);
-  CudaBuffer(CudaBuffer<T> &&);
-  CudaBuffer<T> &operator=(CudaBuffer<T> &&);
-  ~CudaBuffer() = default;
-
-  friend void swap(CudaBuffer<T> &a, CudaBuffer<T> &b) noexcept {
-    using std::swap;
-    const std::lock_guard<std::recursive_mutex> locka(a.mutex_);
-    const std::lock_guard<std::recursive_mutex> lockb(b.mutex_);
-    swap(a.buffer_, b.buffer_);
-  }
-
-  T *get(CudaContextPtr context, int size);
-  void release();
-
-  const CudaArray<T> *getCudaArray() {
-    const std::lock_guard<std::recursive_mutex> lock(mutex_);
-    return &*buffer_;
-  };
-
-private:
-  std::unique_ptr<CudaArray<T>> buffer_ = nullptr;
-  std::recursive_mutex mutex_;
-};
 
 class CudaContext : public std::enable_shared_from_this<CudaContext>, public Context {
 
@@ -320,11 +314,17 @@ public:
 
     swap(a.shared_random_states_, b.shared_random_states_);
     swap(a.shared_float_buffer_, b.shared_float_buffer_);
+#ifdef RPU_USE_DOUBLE
     swap(a.shared_double_buffer_, b.shared_double_buffer_);
+    swap(a.double_buffer_, b.double_buffer_);
+#endif
+#ifdef RPU_USE_FP16
+    swap(a.shared_half_t_buffer_, b.shared_half_t_buffer_);
+    swap(a.half_t_buffer_, b.half_t_buffer_);
+#endif
 
     swap(a.random_states_, b.random_states_);
     swap(a.float_buffer_, b.float_buffer_);
-    swap(a.double_buffer_, b.double_buffer_);
   }
 
   void synchronizeDevice() const;
@@ -336,7 +336,20 @@ public:
   void synchronizeWith(CudaContextPtr ca, CudaContextPtr cb) const;
   void synchronize() const override { this->synchronizeStream(); }; // default current stream only
 
-  int getNBlocks(int size, int nthreads = RPU_THREADS_PER_BLOCK) const;
+  template <typename T = float>
+  int getNBlocks(
+      int size, int nthreads = RPU_THREADS_PER_BLOCK, bool half_for_half_t = false) const {
+#ifdef RPU_USE_FP16
+    if (std::is_same<T, half_t>::value && half_for_half_t) {
+      int size2 = (size + 1) / 2; // ceil
+      nthreads = MIN(maxThreadsPerBlock(), nthreads);
+      return (size2 + nthreads - 1) / nthreads;
+    }
+#endif
+    nthreads = MIN(maxThreadsPerBlock(), nthreads);
+    return (size + nthreads - 1) / nthreads;
+  }
+
   int getNStrideBlocks(int size, int nthreads = RPU_THREADS_PER_BLOCK) const;
   inline int getNThreads() const { return MIN(RPU_THREADS_PER_BLOCK, maxThreadsPerBlock()); };
   inline int getNThreads(int n) const { return MIN((n + 31) / 32 * 32, getNThreads()); };
@@ -402,10 +415,15 @@ private:
   std::vector<std::unique_ptr<CudaArray<curandState_t>>> shared_random_states_ = {};
   std::vector<std::unique_ptr<CudaArray<curandState_t>>> random_states_ = {};
   std::vector<std::vector<CudaBuffer<float>>> shared_float_buffer_ = {};
-  std::vector<std::vector<CudaBuffer<double>>> shared_double_buffer_ = {};
   std::vector<std::vector<CudaBuffer<float>>> float_buffer_ = {};
+#ifdef RPU_USE_DOUBLE
+  std::vector<std::vector<CudaBuffer<double>>> shared_double_buffer_ = {};
   std::vector<std::vector<CudaBuffer<double>>> double_buffer_ = {};
-
+#endif
+#ifdef RPU_USE_FP16
+  std::vector<std::vector<CudaBuffer<half_t>>> shared_half_t_buffer_ = {};
+  std::vector<std::vector<CudaBuffer<half_t>>> half_t_buffer_ = {};
+#endif
   void init();
 };
 
@@ -448,6 +466,7 @@ public:
 
   void copyTo(T *host_array) const;
   void copyTo(std::vector<T> &host_vector) const;
+  std::vector<T> cpu() const;
 
   void setConst(T set_value);
 
@@ -479,9 +498,9 @@ private:
   CudaContextPtr context_ = nullptr;
 };
 
+/****************************************************/
 void resetCuda(int gpu_id = -1);
 
-// helper for random init
 void curandSetup(CudaArray<curandState_t> &, unsigned long long rseed = 0, bool same_seed = false);
 void curandSetup(
     CudaContextPtr c,
@@ -489,5 +508,9 @@ void curandSetup(
     int n,
     unsigned long long rseed = 0,
     bool same_seed = false);
+
+/* state helper functions*/
+template <typename T>
+void load(CudaContextPtr context, RPU::state_t &state, std::string key, T &value, bool strict);
 
 } // namespace RPU

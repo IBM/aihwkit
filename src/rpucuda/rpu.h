@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,6 +23,7 @@
 #include <mutex>
 #include <random>
 #include <sstream>
+#include <unordered_map>
 
 // #pragma STDC FENV_ACCESS ON
 
@@ -86,6 +87,7 @@ public:
     printToStream(ss);
     std::cout << ss.str();
   };
+  std::string getDataTypeName() const;
   virtual void printToStream(std::stringstream &ss) const;
   virtual void setLearningRate(T lrate) { learning_rate_ = lrate; };
 
@@ -146,6 +148,24 @@ protected:
   T learning_rate_ = (T)0.0;
 };
 
+template <typename T> struct FlickerParameter {
+
+  int n = 64;                      // pink diffusion
+  T r = (T)sqrt(sqrt((float)2.0)); // frequency ratio
+  T q = (T)0.5;                    // flip prob
+  T h = (T)0.0; // reset time constant: if set to flicker_r^k, reset will mostly effect the first k
+                // traps
+  bool wreset = false;
+  T wreset_tol = (T)1e-5;
+
+  void printToStream(std::stringstream &ss) const;
+  void print() const {
+    std::stringstream ss;
+    printToStream(ss);
+    std::cout << ss.str();
+  };
+};
+
 template <typename T> struct SimpleMetaParameter {
 
   SimpleMetaParameter() { drift.setSimpleDrift(); }
@@ -155,6 +175,7 @@ template <typename T> struct SimpleMetaParameter {
   T alpha_std = (T)0.0; // one-time relative error when setting alpha scale
   bool use_delayed_update = false;
 
+  FlickerParameter<T> flicker;
   DriftParameter<T> drift;
 
   virtual void printToStream(std::stringstream &ss) const;
@@ -167,6 +188,8 @@ template <typename T> struct SimpleMetaParameter {
   RPUSimple<T> *createRPUArray(int x_size, int d_size) {
     auto *rpu = new RPUSimple<T>(x_size, d_size);
     rpu->populateParameter(this);
+    rpu->setWeightsUniformRandom(-0.1, 0.1);
+    rpu->setLearningRate(0.1);
     return rpu;
   };
 };
@@ -191,8 +214,6 @@ public:
     using std::swap;
     swap(static_cast<RPUAbstract<T> &>(a), static_cast<RPUAbstract<T> &>(b));
 
-    swap(a.temp_x_vector_bias_, b.temp_x_vector_bias_);
-
     swap(a.rng_, b.rng_);
     swap(a.rw_rng_, b.rw_rng_);
     swap(a.par_, b.par_);
@@ -203,11 +224,12 @@ public:
     swap(a.weights_buffer_, b.weights_buffer_);
     swap(a.use_delayed_update_, b.use_delayed_update_);
 
+    swap(a.temp_x_vector_bias_, b.temp_x_vector_bias_);
     swap(a.temp_x_matrix_bias_, b.temp_x_matrix_bias_);
-    swap(a.temp_x_matrix_bias_size_, b.temp_x_matrix_bias_size_);
-
     swap(a.temp_tensor_, b.temp_tensor_);
-    swap(a.temp_tensor_size_, b.temp_tensor_size_);
+
+    swap(a.flicker_states_, b.flicker_states_);
+    swap(a.flicker_probs_, b.flicker_probs_);
 
     swap(a.matrix_indices_, b.matrix_indices_);
     swap(a.matrix_indices_set_, b.matrix_indices_set_);
@@ -305,6 +327,11 @@ public:
   virtual void getDeviceParameter(std::vector<T *> &data_ptrs){};
   virtual void setDeviceParameter(const std::vector<T *> &data_ptrs){};
 
+  /* These dumps extra state vectors that are not returned by
+     getDeviuceParameters or getWeights*/
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+
   virtual int getHiddenUpdateIdx() const { return 0; };
   virtual void setHiddenUpdateIdx(int idx){};
 
@@ -329,9 +356,21 @@ public:
   /* conductance drift */
   virtual void driftWeights(T time_since_last_call);
 
+  /* 1/f pink noise process (flicker noise) */
+  virtual void diffuseWeightsPink();
+  uint64_t *initFlickerStates();
+
   /* Remapping the weights. Scales and Biases need to be handled
      from outside for now*/
   virtual void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr);
+
+  /* Using stochastic weight averaging, together with remapping [thus the scales/biases]*/
+  virtual bool swaWeights(
+      const WeightRemapParameter &wrmpar,
+      T *swa_weights,
+      uint64_t iter,
+      T *scales = nullptr,
+      T *biases = nullptr);
 
   /* Modify forward/backward weights (while keeping the update
      weights to a reference). This essentially copies the weight
@@ -376,6 +415,8 @@ public:
      means that only DW is stored in w */
   virtual void setDeltaWeights(T *dw_extern);
   virtual T *getDeltaWeights() const { return delta_weights_extern_[0]; };
+
+  virtual void setVerbosityLevel(int verbose){};
 
   /* public interfaces for forward/backward/update. Format is
      expected in x-major order. However, the batch dimension comes
@@ -473,6 +514,7 @@ public:
 
   virtual ContextPtr getContext() const { return nullptr; };
   virtual bool hasInternalContext() const { return true; };
+  virtual std::vector<uint64_t> getPulseCounters() const { return std::vector<uint64_t>(); }
 
 protected:
   /* for specialized forward/backward. To be used in any forward pass
@@ -536,7 +578,7 @@ protected:
   /* when overriding copy methods below, _Vector_Bias can be used in derived */
   virtual T *copyToVectorBiasBuffer(const T *x_input_without_bias, int x_inc);
   virtual void copyFromVectorBiasBuffer(T *x_output_without_bias, int x_inc);
-  virtual T *getVectorBiasBuffer() const { return temp_x_vector_bias_; };
+  virtual T *getVectorBiasBuffer() { return temp_x_vector_bias_.data(); };
 
   void forwardVector(const T *x_input, T *d_output, int x_inc, int d_inc, bool is_test) override;
   void backwardVector(const T *d_input, T *x_output, int d_inc = 1, int x_inc = 1) override;
@@ -566,7 +608,7 @@ protected:
       bool d_trans = false) override;
 
   /* only these need to be overloaded for the Tensor interface */
-  virtual void getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, int dim3);
+  virtual void getTensorBuffer(T **x_tensor_ptr, T **d_tensor_ptr, int m_batch, int dim3);
   virtual void
   permute132(T *out_tensor, const T *in_tensor, int dim1, int dim2, int dim3, bool bias2);
 
@@ -649,11 +691,11 @@ private:
 
   SimpleMetaParameter<T> par_;
 
-  T *temp_x_vector_bias_ = nullptr;
-  T *temp_x_matrix_bias_ = nullptr;
-  int temp_x_matrix_bias_size_ = 0;
-  T *temp_tensor_ = nullptr;
-  int temp_tensor_size_ = 0;
+  std::vector<T> temp_x_vector_bias_;
+  std::vector<T> temp_x_matrix_bias_;
+  std::vector<T> temp_tensor_;
+  std::vector<uint64_t> flicker_states_;
+  std::vector<T> flicker_probs_;
 
   std::unique_ptr<WeightDrifter<T>> wdrifter_ = nullptr;
   std::unique_ptr<WeightRemapper<T>> wremapper_ = nullptr;

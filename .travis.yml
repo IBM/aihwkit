@@ -1,4 +1,4 @@
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,7 +25,7 @@ stages:
 # Parent stage definition, to avoid copy-pasting.
 job_compile_common: &job_compile_common
   os: linux
-  dist: bionic
+  dist: focal
   language: python
   before_install:
     - sudo apt-get -qq install -y ca-certificates
@@ -37,10 +37,10 @@ job_compile_common: &job_compile_common
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
     - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
+    - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt	
     # Install the package in editable mode.
     - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization, fitting]"
   script:
-    - $PYTHON_EXECUTABLE -m pip install "parameterized==0.7.4"
     - make pytest
 
 build_deploy_common: &build_deploy_common
@@ -57,58 +57,58 @@ build_deploy_common: &build_deploy_common
 
 jobs:
   include:
-  - name: "Compile and test. Python 3.8"
+  - name: "Compile and test. Python 3.10"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.8"
+    python: "3.10"
     env:
       - TEST_DATASET=true
 
-  - name: "Compile and lint. Python 3.8"
+  - name: "Compile and lint. Python 3.10"
     <<: *job_compile_common
     stage: Test and lint
-    python: "3.8"
+    python: "3.10"
     script:
-      - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
       - make pycodestyle
       - make pylint
       - make mypy
+
+  - name: "Compile and test. Python 3.8"
+    <<: *job_compile_common
+    stage: Test multiple python versions
+    python: "3.8"
 
   - name: "Compile and test. Python 3.9"
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.9"
-
-  - name: "Compile and test. Python 3.10"
-    <<: *job_compile_common
-    stage: Test multiple python versions
-    python: "3.10"
-
+    
   - name: "Build wheel for Python 3.8, 3.9, 3.10 on Linux x86_64"
     os: linux
-    dist: bionic
+    dist: focal
     language: python
     services: docker
     stage: Build wheels
     if: branch =~ /^release\/.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.13.0'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.13.0 torchvision==0.14.0 && pip install -r requirements.txt"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.0.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==2.0.1 torchvision && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
-      - CIBW_BUILD="cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64"
+      - CIBW_REPAIR_WHEEL_COMMAND="auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
+      - CIBW_BUILD="cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
     before_install:
       - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
-      - python3 -m pip install cibuildwheel==1.10.0
+      - python3 -m pip install cibuildwheel==2.8.1
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.7, 3.8, 3.9, 3.10 on OS X"
+  - name: "Build wheel for Python 3.8, 3.9 on OS X"
     os: osx
-    osx_image: xcode12.2
+    osx_image: xcode12.4
     stage: Build wheels
     if: branch =~ /^release\/.*$/
     addons:
@@ -118,27 +118,27 @@ jobs:
         update: true
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.8.1 torchvision==0.9.1 && pip install ./delocate && pip install -r requirements.txt"
-      - CIBW_BUILD="cp37-macosx_x86_64 cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.0.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==2.0.1 torchvision && pip install ./delocate && pip install -r requirements.txt"
+      - CIBW_BUILD="cp38-macosx_x86_64 cp39-macosx_x86_64"
     before_install:
       - git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
     install:
-      - python3 -m pip install cibuildwheel==1.10.0
+      - python3 -m pip install cibuildwheel==2.8.1
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse --platform macos
     <<: *build_deploy_common
 
-  - name: "Build wheel for Python 3.7, 3.8, 3.9, 3.10 on win64"
+  - name: "Build wheel for Python 3.8, 3.9, 3.10 on win64"
     os: windows
     language: shell
     stage: Build wheels
     if: branch =~ /^release\/win.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==1.8.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==1.8.1+cpu -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.0.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==2.0.1 && pip install -r requirements.txt"
       - CIBW_BUILD="cp37-win_amd64 cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
       # Use unzipped OpenBLAS.
       - OPENBLAS_ROOT=C:\\BLAS
@@ -153,7 +153,7 @@ jobs:
       - mkdir C:\\BLAS
       - 7z x openblas.zip -oc:\\BLAS
     install:
-      - python3 -m pip install cibuildwheel==1.6.4
+      - python3 -m pip install cibuildwheel==2.8.1
     script:
       # Build the wheels into './wheelhouse'.
       - python3 -m cibuildwheel --output-dir wheelhouse

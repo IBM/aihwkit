@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -10,24 +10,24 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=abstract-method
+
 """High level analog tiles (analog)."""
 
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, Tuple, Any
 
-from torch import device as torch_device
-from torch.cuda import device as cuda_device
+from torch import Tensor
 
-from aihwkit.exceptions import CudaError
-from aihwkit.simulator.rpu_base import cuda, tiles
+from aihwkit.simulator.tiles.rpucuda import RPUCudaSimulatorTileWrapper
+from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.simulator.tiles.base import BaseTile
+from aihwkit.simulator.tiles.periphery import TileWithPeriphery
+from aihwkit.simulator.tiles.functions import AnalogFunction
+from aihwkit.simulator.parameters.base import RPUConfigGeneric
+from aihwkit.simulator.rpu_base import tiles
 
-if TYPE_CHECKING:
-    from aihwkit.simulator.configs import (
-        InferenceRPUConfig, SingleRPUConfig, UnitCellRPUConfig
-    )
 
-
-class AnalogTile(BaseTile):
+class AnalogTile(TileModule, TileWithPeriphery, RPUCudaSimulatorTileWrapper):
     r"""Analog tile.
 
     This analog tile implements an abstract analog tile where many
@@ -180,64 +180,25 @@ class AnalogTile(BaseTile):
     .. _Gokmen & Vlasov (2016): https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
     """
 
+    supports_ddp: bool = False
+
     def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            rpu_config: Optional[Union['SingleRPUConfig', 'UnitCellRPUConfig',
-                                       'InferenceRPUConfig']] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False,
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: RPUConfigGeneric,
+        bias: bool = False,
+        in_trans: bool = False,
+        out_trans: bool = False,
     ):
-        if not rpu_config:
-            # Import `SingleRPUConfig` dynamically to avoid import cycles.
-            # pylint: disable=import-outside-toplevel
-            from aihwkit.simulator.configs import SingleRPUConfig
-            rpu_config = SingleRPUConfig()
-
-        super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
-
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'BaseTile':
-        """Return a copy of this tile in CUDA memory.
-
-        Args:
-            device: CUDA device
-
-        Returns:
-            Self with the underlying C++ tile moved to CUDA memory.
-
-        Raises:
-            CudaError: if the library has not been compiled with CUDA.
-        """
-        if not cuda.is_compiled():
-            raise CudaError('aihwkit has not been compiled with CUDA support')
-
-        device = torch_device('cuda', cuda_device(device).idx)
-
-        if self.is_cuda and device != self.device:
-            raise CudaError('Cannot switch CUDA devices of existing Cuda tiles')
-
-        if isinstance(self.tile, tiles.AnalogTile):
-            with cuda_device(device):
-                self.tile = tiles.CudaAnalogTile(self.tile)
-                self.is_cuda = True
-                self.device = device
-                self.analog_ctx.cuda(device)
-                if self.mapping_scales is not None:
-                    self.mapping_scales = self.mapping_scales.cuda(device)
-                if self.out_scaling_alpha is not None:
-                    self.out_scaling_alpha.data = self.out_scaling_alpha.data.cuda(device)
-        return self
+        TileModule.__init__(self)
+        RPUCudaSimulatorTileWrapper.__init__(
+            self, out_size, in_size, rpu_config, bias, in_trans, out_trans
+        )
+        TileWithPeriphery.__init__(self)
 
     def _create_simulator_tile(
-            self,
-            x_size: int,
-            d_size: int,
-            rpu_config: Union['SingleRPUConfig', 'UnitCellRPUConfig', 'InferenceRPUConfig']
+        self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
     ) -> tiles.AnalogTile:
         """Create a simulator tile.
 
@@ -249,7 +210,140 @@ class AnalogTile(BaseTile):
         Returns:
             a simulator tile based on the specified configuration.
         """
+
         meta_parameter = rpu_config.as_bindings()
-        device_parameter = rpu_config.device.as_bindings()
+        device_parameter = rpu_config.device.as_bindings(self.get_data_type())
 
         return meta_parameter.create_array(x_size, d_size, device_parameter)
+
+    def forward(
+        self, x_input: Tensor, tensor_view: Optional[Tuple] = None  # type: ignore
+    ) -> Tensor:
+        """Torch forward function that calls the analog forward"""
+        # pylint: disable=arguments-differ
+
+        out = AnalogFunction.apply(
+            self.get_analog_ctx(), self, x_input, self.shared_weights, not self.training
+        )
+
+        if tensor_view is None:
+            tensor_view = self.get_tensor_view(out.dim())
+        out = self.apply_out_scaling(out, tensor_view)
+
+        if self.digital_bias:
+            return out + self.bias.view(*tensor_view)
+        return out
+
+
+class AnalogTileWithoutPeriphery(TileModule, BaseTile, RPUCudaSimulatorTileWrapper):
+    """Analog tile without the periphery.
+
+    Same basic functionality as class:`AnalogTile`, however, without
+    the digital periphery, such as weight scaling and bias.
+    """
+
+    supports_indexed: bool = False
+
+    def __init__(
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: RPUConfigGeneric,
+        bias: bool = False,
+        in_trans: bool = False,
+        out_trans: bool = False,
+    ):
+        TileModule.__init__(self)
+        RPUCudaSimulatorTileWrapper.__init__(
+            self, out_size, in_size, rpu_config, bias, in_trans, out_trans
+        )
+
+    def _create_simulator_tile(
+        self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
+    ) -> tiles.AnalogTile:
+        """Create a simulator tile.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+
+        meta_parameter = rpu_config.as_bindings()
+        device_parameter = rpu_config.device.as_bindings(self.get_data_type())
+
+        return meta_parameter.create_array(x_size, d_size, device_parameter)
+
+    def forward(self, x_input: Tensor) -> Tensor:
+        """Torch forward function that calls the analog forward"""
+
+        return AnalogFunction.apply(
+            self.get_analog_ctx(), self, x_input, self.shared_weights, not self.training
+        )
+
+    def joint_forward(self, x_input: Tensor, is_test: bool = False, ctx: Any = None) -> Tensor:
+        """Perform the joint forward method.
+
+        Args:
+            x_input: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+            is_test: whether to assume testing mode.
+            ctx: torch auto-grad context [Optional]
+
+        Returns:
+            torch.Tensor: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+        """
+        return self.tile.forward(
+            x_input, self.analog_bias, self.in_trans, self.out_trans, is_test, self.non_blocking
+        )
+
+    def backward(self, d_input: Tensor, ctx: Any = None) -> Tensor:
+        """Perform the backward pass.
+
+        Args:
+            d_input: ``[N, out_size]`` tensor. If ``out_trans`` is set, transposed.
+            ctx: torch auto-grad context [Optional]
+
+        Returns:
+            torch.Tensor: ``[N, in_size]`` tensor. If ``in_trans`` is set, transposed.
+        """
+        return self.tile.backward(
+            d_input, self.analog_bias, self.out_trans, self.in_trans, self.non_blocking
+        )
+
+    def update(self, x_input: Tensor, d_input: Tensor) -> None:
+        """Perform the update pass.
+
+        Args:
+            x_input: ``[..., in_size]`` tensor. If ``in_trans`` is set, ``[in_size, ...]``.
+            d_input: ``[..., out_size]`` tensor. If ``out_trans`` is set, ``[out_size, ...]``.
+
+        Returns:
+            None
+        """
+        return self.tile.update(  # type: ignore
+            x_input, d_input, self.analog_bias, self.in_trans, self.out_trans, self.non_blocking
+        )
+
+    def set_learning_rate(self, learning_rate: Optional[float]) -> None:
+        """Set the tile learning rate.
+
+        Set the tile learning rate to ``-learning_rate``. Note that the
+        learning rate is always taken to be negative (because of the meaning in
+        gradient descent) and positive learning rates are not supported.
+
+        Args:
+            learning_rate: the desired learning rate.
+        """
+        if learning_rate is not None:
+            self.tile.set_learning_rate(learning_rate)
+
+    def get_learning_rate(self) -> float:
+        """Return the tile learning rate.
+
+        Returns:
+            float: the tile learning rate.
+        """
+        return self.tile.get_learning_rate()

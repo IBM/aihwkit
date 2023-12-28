@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -14,6 +14,6 @@
 
 import os
 
-VERSION_FILE = os.path.join(os.path.dirname(__file__), 'VERSION.txt')
-with open(VERSION_FILE, encoding='utf-8') as version_file:
+VERSION_FILE = os.path.join(os.path.dirname(__file__), "VERSION.txt")
+with open(VERSION_FILE, encoding="utf-8") as version_file:
     __version__ = version_file.read().strip()

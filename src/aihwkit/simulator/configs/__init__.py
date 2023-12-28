@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -12,29 +12,62 @@
 
 """Configurations for resistive processing units."""
 
-from .configs import (
-    FloatingPointRPUConfig, InferenceRPUConfig, SingleRPUConfig,
-    UnitCellRPUConfig, DigitalRankUpdateRPUConfig
+from aihwkit.simulator.parameters import (
+    IOParameters,
+    UpdateParameters,
+    WeightModifierParameter,
+    WeightClipParameter,
+    WeightRemapParameter,
+    SimpleDriftParameter,
+    DriftParameter,
+    MappingParameter,
+    InputRangeParameter,
+    PrePostProcessingParameter,
 )
-from .enums import (
-    BoundManagementType, NoiseManagementType,
-    WeightNoiseType, PulseType, WeightModifierType, WeightClipType,
-    WeightRemapType, VectorUnitCellUpdatePolicy, AnalogMVType
-)
-from .utils import (
-    IOParameters, UpdateParameters,
-    WeightModifierParameter, WeightClipParameter,
-    WeightRemapParameter, SimpleDriftParameter, DriftParameter,
-    MappingParameter, InputRangeParameter, PrePostProcessingParameter
+from aihwkit.simulator.parameters.enums import (
+    RPUDataType,
+    BoundManagementType,
+    NoiseManagementType,
+    WeightNoiseType,
+    PulseType,
+    WeightModifierType,
+    WeightClipType,
+    WeightRemapType,
+    VectorUnitCellUpdatePolicy,
+    AnalogMVType,
+    CountLRFeedbackPolicy,
 )
 from .devices import (
-    FloatingPointDevice, IdealDevice, ConstantStepDevice,
-    LinearStepDevice, SoftBoundsDevice, SoftBoundsPmaxDevice,
-    SoftBoundsReferenceDevice, ExpStepDevice, PowStepDevice,
-    PowStepReferenceDevice, PiecewiseStepDevice
+    FloatingPointDevice,
+    IdealDevice,
+    ConstantStepDevice,
+    LinearStepDevice,
+    SoftBoundsDevice,
+    SoftBoundsPmaxDevice,
+    SoftBoundsReferenceDevice,
+    ExpStepDevice,
+    PowStepDevice,
+    PowStepReferenceDevice,
+    PiecewiseStepDevice,
 )
 from .compounds import (
-    VectorUnitCell, ReferenceUnitCell,
-    OneSidedUnitCell, DifferenceUnitCell, TransferCompound,
-    BufferedTransferCompound, MixedPrecisionCompound
+    VectorUnitCell,
+    ReferenceUnitCell,
+    OneSidedUnitCell,
+    DifferenceUnitCell,
+    TransferCompound,
+    BufferedTransferCompound,
+    ChoppedTransferCompound,
+    DynamicTransferCompound,
+    MixedPrecisionCompound,
 )
+from .configs import (
+    FloatingPointRPUConfig,
+    InferenceRPUConfig,
+    SingleRPUConfig,
+    UnitCellRPUConfig,
+    DigitalRankUpdateRPUConfig,
+    TorchInferenceRPUConfig,
+)
+
+from .helpers import build_config

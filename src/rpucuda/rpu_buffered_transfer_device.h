@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -148,7 +148,8 @@ public:
       const T *vec,
       const int n_vec,
       const T reset_prob,
-      const int i_col) override;
+      const int i_col,
+      const int m_batch_info) override;
 
   std::vector<std::vector<T>> getTransferBuffers() const { return transfer_buffer_vec_; };
 

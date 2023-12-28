@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,16 +16,46 @@ from torch import Tensor
 
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.presets import (
-    ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, EcRamMOPreset, IdealizedPreset,
-    GokmenVlasovPreset, PCMPreset,
-    ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, EcRamMO2Preset,
-    Idealized2Preset, ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset,
-    EcRamMO4Preset, Idealized4Preset, TikiTakaReRamESPreset, TikiTakaReRamSBPreset,
-    TikiTakaCapacitorPreset, TikiTakaEcRamPreset, TikiTakaEcRamMOPreset, TikiTakaIdealizedPreset,
-    MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
-    MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
-    MixedPrecisionGokmenVlasovPreset, MixedPrecisionPCMPreset, TTv2ReRamESPreset, TTv2ReRamSBPreset,
-    TTv2CapacitorPreset, TTv2EcRamPreset, TTv2EcRamMOPreset, TTv2IdealizedPreset,
+    ReRamESPreset,
+    ReRamSBPreset,
+    CapacitorPreset,
+    EcRamPreset,
+    EcRamMOPreset,
+    IdealizedPreset,
+    GokmenVlasovPreset,
+    PCMPreset,
+    ReRamES2Preset,
+    ReRamSB2Preset,
+    Capacitor2Preset,
+    EcRam2Preset,
+    EcRamMO2Preset,
+    Idealized2Preset,
+    ReRamES4Preset,
+    ReRamSB4Preset,
+    Capacitor4Preset,
+    EcRam4Preset,
+    EcRamMO4Preset,
+    Idealized4Preset,
+    TikiTakaReRamESPreset,
+    TikiTakaReRamSBPreset,
+    TikiTakaCapacitorPreset,
+    TikiTakaEcRamPreset,
+    TikiTakaEcRamMOPreset,
+    TikiTakaIdealizedPreset,
+    MixedPrecisionReRamESPreset,
+    MixedPrecisionReRamSBPreset,
+    MixedPrecisionCapacitorPreset,
+    MixedPrecisionEcRamPreset,
+    MixedPrecisionEcRamMOPreset,
+    MixedPrecisionIdealizedPreset,
+    MixedPrecisionGokmenVlasovPreset,
+    MixedPrecisionPCMPreset,
+    TTv2ReRamESPreset,
+    TTv2ReRamSBPreset,
+    TTv2CapacitorPreset,
+    TTv2EcRamPreset,
+    TTv2EcRamMOPreset,
+    TTv2IdealizedPreset,
 )
 from .helpers.decorators import parametrize_over_presets
 from .helpers.testcases import AihwkitTestCase
@@ -33,18 +63,46 @@ from .helpers.testcases import AihwkitTestCase
 
 @parametrize_over_presets(
     [
-        ReRamESPreset, ReRamSBPreset, CapacitorPreset, EcRamPreset, EcRamMOPreset, IdealizedPreset,
-        GokmenVlasovPreset, PCMPreset,
-        ReRamES2Preset, ReRamSB2Preset, Capacitor2Preset, EcRam2Preset, EcRamMO2Preset,
-        Idealized2Preset, ReRamES4Preset, ReRamSB4Preset, Capacitor4Preset, EcRam4Preset,
-        EcRamMO4Preset, Idealized4Preset, TikiTakaReRamESPreset, TikiTakaReRamSBPreset,
-        TikiTakaCapacitorPreset, TikiTakaEcRamPreset, TikiTakaEcRamMOPreset,
+        ReRamESPreset,
+        ReRamSBPreset,
+        CapacitorPreset,
+        EcRamPreset,
+        EcRamMOPreset,
+        IdealizedPreset,
+        GokmenVlasovPreset,
+        PCMPreset,
+        ReRamES2Preset,
+        ReRamSB2Preset,
+        Capacitor2Preset,
+        EcRam2Preset,
+        EcRamMO2Preset,
+        Idealized2Preset,
+        ReRamES4Preset,
+        ReRamSB4Preset,
+        Capacitor4Preset,
+        EcRam4Preset,
+        EcRamMO4Preset,
+        Idealized4Preset,
+        TikiTakaReRamESPreset,
+        TikiTakaReRamSBPreset,
+        TikiTakaCapacitorPreset,
+        TikiTakaEcRamPreset,
+        TikiTakaEcRamMOPreset,
         TikiTakaIdealizedPreset,
-        MixedPrecisionReRamESPreset, MixedPrecisionReRamSBPreset, MixedPrecisionCapacitorPreset,
-        MixedPrecisionEcRamPreset, MixedPrecisionEcRamMOPreset, MixedPrecisionIdealizedPreset,
-        MixedPrecisionGokmenVlasovPreset, MixedPrecisionPCMPreset, TTv2ReRamESPreset,
-        TTv2ReRamSBPreset, TTv2CapacitorPreset, TTv2EcRamPreset, TTv2EcRamMOPreset,
-        TTv2IdealizedPreset
+        MixedPrecisionReRamESPreset,
+        MixedPrecisionReRamSBPreset,
+        MixedPrecisionCapacitorPreset,
+        MixedPrecisionEcRamPreset,
+        MixedPrecisionEcRamMOPreset,
+        MixedPrecisionIdealizedPreset,
+        MixedPrecisionGokmenVlasovPreset,
+        MixedPrecisionPCMPreset,
+        TTv2ReRamESPreset,
+        TTv2ReRamSBPreset,
+        TTv2CapacitorPreset,
+        TTv2EcRamPreset,
+        TTv2EcRamMOPreset,
+        TTv2IdealizedPreset,
     ]
 )
 class PresetTest(AihwkitTestCase):
@@ -69,8 +127,9 @@ class PresetTest(AihwkitTestCase):
 
         # Assert over learning rate.
         self.assertAlmostEqual(analog_tile.get_learning_rate(), learning_rate)
-        self.assertAlmostEqual(analog_tile.get_learning_rate(),
-                               analog_tile.tile.get_learning_rate())
+        self.assertAlmostEqual(
+            analog_tile.get_learning_rate(), analog_tile.tile.get_learning_rate()
+        )
 
         # Assert over weights and biases.
         tile_weights, tile_biases = analog_tile.get_weights()

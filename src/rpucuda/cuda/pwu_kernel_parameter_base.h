@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -120,6 +120,7 @@ public:
   inline std::string getName() const { return this->name; };
   inline bool getOutTrans() const { return this->out_trans; };
   inline int getUseBo64() const { return this->use_bo64; };
+  inline int getnK32() const { return this->nK32; };
   inline int getImplicitPulses() const { return this->implicit_pulses; };
 
   inline void forceBo64Translate() {

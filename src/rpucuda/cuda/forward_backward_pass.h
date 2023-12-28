@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -33,7 +33,6 @@ void forwardMatrix(
     const T alpha,
     const T beta = 0.0) {
   if (m_batch == 1) {
-
     RPU::math::gemv<T>(
         context, false, d_size, x_size, alpha, dev_weights, d_size, X_input,
         1, // x_inc
@@ -99,6 +98,7 @@ void backwardMatrix(
 template <typename T> class MVParameterCuda {
 public:
   MVParameterCuda(){};
+  CudaArray<T> out_noise_values;
   CudaArray<T> v_offset;
   CudaArray<T> w_asymmetry;
   CudaArray<T> out_nonlinearity;
@@ -106,6 +106,7 @@ public:
 
   friend void swap(MVParameterCuda<T> &a, MVParameterCuda<T> &b) noexcept {
     using std::swap;
+    swap(a.out_noise_values, b.out_noise_values);
     swap(a.v_offset, b.v_offset);
     swap(a.w_asymmetry, b.w_asymmetry);
     swap(a.out_nonlinearity_factor, b.out_nonlinearity_factor);
@@ -147,11 +148,13 @@ public:
     swap(a.context_, b.context_);
     swap(a.fb_pars_, b.fb_pars_);
   }
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
   void populateFrom(const FBParameter<T> &fb_pars_host);
   bool checkFlexibleInSize(const IOMetaParameter<T> &io) {
     // TODO: need to check whether that is all correct...
-    if (io.w_noise > 0 || io.ir_drop > 0 || io.w_read_asymmetry_dtod > 0) {
+    if (io.w_noise > (T)0.0 || io.ir_drop > (T)0.0 || io.w_read_asymmetry_dtod > (T)0.0) {
       return false;
     } else {
       return true;
@@ -295,8 +298,16 @@ protected:
 private:
   inline void
   applyOutputWeightNoise(InputOutputManager<T> &iom, const bool out_trans, const bool tranposed);
+
+  inline void applyOutputNoiseOtoO(
+      InputOutputManager<T> &iom,
+      const MVParameterCuda<T> &mv_pars,
+      const bool out_trans,
+      const bool tranposed);
+
   inline void applyOutputPCMReadNoise(
       const T *dev_weights, InputOutputManager<T> &iom, const bool out_trans, const bool tranposed);
+
   inline void applyIrDrop(
       const T *dev_weights,
       InputOutputManager<T> &iom,
@@ -313,6 +324,10 @@ private:
     auto io = iom.getIO();
     if (io.hasNLCalibration()) {
       applyOutputNonLinearity(iom, mv_pars, out_trans, transposed);
+    }
+    if (io.out_noise_std > (T)0.0) {
+      applyOutputNoiseOtoO(iom, mv_pars, out_trans, transposed);
+      return iom.applyToOutput(out_values, out_trans, false);
     }
     return iom.applyToOutput(out_values, out_trans);
   }

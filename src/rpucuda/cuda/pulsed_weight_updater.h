@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -69,6 +69,8 @@ public:
       const bool d_trans,
       const T beta = (T)1.0);
   void setVerbosityLevel(int level) { verbose_ = level; };
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
 private:
   // void setUpdateType(PulsedUpdateType update_type);
@@ -114,7 +116,6 @@ private:
   bool is_async_update_ = false;
   int verbose_ = 0;
   DeviceUpdateType update_type_ = DeviceUpdateType::Undefined;
-  int n_states = 0;
   pwukp_t<T> kernel_pars_;
   pwukpvec_t<T> valid_kernels_;
   std::unique_ptr<BitLineMaker<T>> blm_ = nullptr;

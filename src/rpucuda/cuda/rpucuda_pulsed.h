@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -157,6 +157,13 @@ public:
   void clipWeights(const WeightClipParameter &wclpar) override;
 
   void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
+  bool swaWeights(
+      const WeightRemapParameter &wrmpar,
+      T *swa_weights,
+      uint64_t iter,
+      T *scales = nullptr,
+      T *biases = nullptr) override;
+
   void resetCols(int start_col, int n_cols, T reset_prob) override;
 
   void setLearningRate(T rate) override;
@@ -170,6 +177,8 @@ public:
   void getDeviceParameterNames(std::vector<std::string> &names) const override;
   void getDeviceParameter(std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   int getHiddenUpdateIdx() const override;
   void setHiddenUpdateIdx(int idx) override;
@@ -182,6 +191,10 @@ public:
   void finishUpdateCalculations() override;
   void makeUpdateAsync() override;
 
+  std::vector<uint64_t> getPulseCounters() const override {
+    return rpucuda_device_ != nullptr ? rpucuda_device_->getPulseCounters()
+                                      : std::vector<uint64_t>();
+  }
   // for debugging
   void getCountsDebug(uint32_t *x_counts, uint32_t *d_counts) {
     up_pwu_->getCountsDebug(x_counts, d_counts);
@@ -190,6 +203,12 @@ public:
   virtual const PulsedMetaParameter<T> &getMetaPar() const { return par_; };
 
   const AbstractRPUDeviceCuda<T> &getRPUDeviceCuda() { return *rpucuda_device_; };
+
+  void setVerbosityLevel(int verbose) {
+    if (up_pwu_) {
+      up_pwu_->setVerbosityLevel(verbose);
+    }
+  };
 
 protected:
   std::unique_ptr<AbstractRPUDevice<T>> rpu_device_ = nullptr;

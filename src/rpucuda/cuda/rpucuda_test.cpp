@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,12 +21,6 @@
 
 #define TOLERANCE 1e-3
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -42,8 +36,8 @@ public:
     d_size = 56;
     repeats = 3;
 
-    T bmin = (-1. / sqrt((T)x_size));
-    T bmax = (1. / sqrt((T)x_size));
+    T bmin = (-1. / sqrtf(x_size));
+    T bmax = (1. / sqrtf(x_size));
 
     x1.resize(x_size);
     x2.resize(x_size);
@@ -63,14 +57,14 @@ public:
     // generate random numbers
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1, 1);
+    std::uniform_real_distribution<float> udist(-1, 1);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < x_size; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size; j++)
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
 
     x_cuvec = RPU::make_unique<CudaArray<T>>(context, x_size);
     x_vec.resize(x_size);
@@ -106,8 +100,8 @@ public:
     repeats = 1;
     m_batch = 3;
 
-    num_t bmin = (-1. / sqrt((num_t)x_size));
-    num_t bmax = (1. / sqrt((num_t)x_size));
+    num_t bmin = (-1. / sqrtf(x_size));
+    num_t bmax = (1. / sqrtf(x_size));
 
     x1.resize(x_size * m_batch);
     x2.resize(x_size * m_batch);
@@ -127,14 +121,14 @@ public:
     // generate random numbers
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++)
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(context, x_size * m_batch);
     x_vec.resize(x_size * m_batch);
@@ -162,11 +156,7 @@ public:
 };
 
 // types
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> CudaTypes;
-#else
-typedef ::testing::Types<float> CudaTypes;
-#endif
+typedef ::testing::Types<num_t> CudaTypes;
 
 TYPED_TEST_CASE(RPUCudaSimpleTestFixture, CudaTypes);
 INSTANTIATE_TEST_CASE_P(Batched, RPUCudaSimpleTestFixtureBatch, ::testing::Bool());
@@ -318,8 +308,8 @@ TYPED_TEST(RPUCudaSimpleTestFixture, BackwardVectorBias) {
   }
 
   // should not be changed (vector longer by one)
-  ASSERT_EQ(last, this->x1[this->x_size - 1]);
-  ASSERT_EQ(last, this->x2[this->x_size - 1]);
+  ASSERT_FLOAT_EQ(last, this->x1[this->x_size - 1]);
+  ASSERT_FLOAT_EQ(last, this->x2[this->x_size - 1]);
 }
 
 TYPED_TEST(RPUCudaSimpleTestFixture, UpdateVector) {

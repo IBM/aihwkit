@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -66,9 +66,50 @@ void ForwardBackwardPass<T>::gemv(
   }
 }
 
+template <typename T>
+void ForwardBackwardPass<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPU::state_t state;
+
+  RPU::insert(state, "fwd.v_offset", fb_pars_.fwd.v_offset);
+  RPU::insert(state, "fwd.w_asymmetry", fb_pars_.fwd.w_asymmetry);
+  RPU::insert(state, "fwd.out_nonlinearity", fb_pars_.fwd.out_nonlinearity);
+  RPU::insert(state, "fwd.out_nonlinearity_factor", fb_pars_.fwd.out_nonlinearity_factor);
+  RPU::insert(state, "fwd.out_noise_values", fb_pars_.fwd.out_noise_values);
+
+  RPU::insert(state, "bwd.v_offset", fb_pars_.bwd.v_offset);
+  RPU::insert(state, "bwd.w_asymmetry", fb_pars_.bwd.w_asymmetry);
+  RPU::insert(state, "bwd.out_nonlinearity", fb_pars_.bwd.out_nonlinearity);
+  RPU::insert(state, "bwd.out_nonlinearity_factor", fb_pars_.bwd.out_nonlinearity_factor);
+  RPU::insert(state, "bwd.out_noise_values", fb_pars_.bwd.out_noise_values);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void ForwardBackwardPass<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+  RPU::load(state, "fwd.v_offset", fb_pars_.fwd.v_offset, strict);
+  RPU::load(state, "fwd.w_asymmetry", fb_pars_.fwd.w_asymmetry, strict);
+  RPU::load(state, "fwd.out_nonlinearity", fb_pars_.fwd.out_nonlinearity, strict);
+  RPU::load(state, "fwd.out_nonlinearity_factor", fb_pars_.fwd.out_nonlinearity_factor, strict);
+  RPU::load(state, "fwd.out_noise_values", fb_pars_.fwd.out_noise_values, strict);
+
+  RPU::load(state, "bwd.v_offset", fb_pars_.bwd.v_offset, strict);
+  RPU::load(state, "bwd.w_asymmetry", fb_pars_.bwd.w_asymmetry, strict);
+  RPU::load(state, "bwd.out_nonlinearity", fb_pars_.bwd.out_nonlinearity, strict);
+  RPU::load(state, "bwd.out_nonlinearity_factor", fb_pars_.bwd.out_nonlinearity_factor, strict);
+  RPU::load(state, "bwd.out_noise_values", fb_pars_.bwd.out_noise_values, strict);
+}
+
 template class ForwardBackwardPass<float>;
 #ifdef RPU_USE_DOUBLE
 template class ForwardBackwardPass<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ForwardBackwardPass<half_t>;
 #endif
 
 /**********************************************/
@@ -89,21 +130,21 @@ inline T computeNoiseManagement(
   switch (nm_type) {
   case NoiseManagementType::AbsMax: {
     int max_index = RPU::math::iamax<T>(size, input, inc);
-    T amax_input_value = fabs(input[max_index * inc]);
+    T amax_input_value = (T)fabsf(input[max_index * inc]);
 
-    return io.nm_thres > 0 ? MIN(amax_input_value, io.nm_thres) : amax_input_value;
+    return io.nm_thres > (T)0.0 ? MIN(amax_input_value, io.nm_thres) : amax_input_value;
   }
   case NoiseManagementType::Constant: {
-    return io.nm_thres > 0 ? (T)io.nm_thres : (T)1.0;
+    return io.nm_thres > (T)0.0 ? (T)io.nm_thres : (T)1.0;
   }
   case NoiseManagementType::Max: {
     T max_input_value = RPU::math::max<T>(size, input, inc);
-    return io.nm_thres > 0 ? MIN(max_input_value, io.nm_thres) : max_input_value;
+    return io.nm_thres > (T)0.0 ? MIN(max_input_value, io.nm_thres) : max_input_value;
   }
   case NoiseManagementType::AverageAbsMax:
   case NoiseManagementType::AverageAbsMaxSingleValue: {
     int max_index = RPU::math::iamax<T>(size, input, inc);
-    T amax_input_value = fabs(input[max_index * inc]);
+    T amax_input_value = (T)fabsf(input[max_index * inc]);
     if (auxilary_variable < (T)0.0) {
       auxilary_variable = amax_input_value;
     } else {
@@ -115,24 +156,24 @@ inline T computeNoiseManagement(
 
   case NoiseManagementType::AbsMaxNPSum: {
     int max_index = RPU::math::iamax<T>(size, input, inc);
-    T amax_input_value = fabs(input[max_index * inc]);
+    T amax_input_value = (T)fabsf(input[max_index * inc]);
 
-    T bound = isinf(io.out_bound) ? (T)1.0 : io.out_bound;
+    T bound = isinf((float)io.out_bound) ? (T)1.0 : io.out_bound;
     T psum = 0;
     T nsum = 0;
     int j_x = 0;
     PRAGMA_SIMD
     for (int j = 0; j < size; j++) {
       T x = input[j_x];
-      psum += x > 0 ? x : (T)0.0;
-      nsum += x < 0 ? x : (T)0.0;
+      psum += x > (T)0.0 ? x : (T)0.0;
+      nsum += x < (T)0.0 ? x : (T)0.0;
       j_x += inc;
     }
     T sum = MAX(psum, -nsum);
-    amax_input_value = io.nm_thres > 0 ? MIN(amax_input_value, io.nm_thres) : amax_input_value;
+    amax_input_value = io.nm_thres > (T)0.0 ? MIN(amax_input_value, io.nm_thres) : amax_input_value;
 
     T npsum_scale = sum * io.nm_assumed_wmax / bound;
-    if (io.inp_res > 0) {
+    if (io.inp_res > (T)0.0) {
       npsum_scale = MIN(amax_input_value / io.inp_res * io.max_bm_res, npsum_scale);
     }
     return MAX(amax_input_value, npsum_scale);
@@ -230,7 +271,7 @@ void ForwardBackwardPassIOManaged<T>::populateFBParameter(
 
     mv_pars.out_nonlinearity = io.out_nonlinearity_vec;
     mv_pars.out_nonlinearity_factor = (T)1.0;
-    T out_bound = io.out_bound > 0 && io.out_bound < std::numeric_limits<T>::infinity()
+    T out_bound = io.out_bound > (T)0.0 && io.out_bound < std::numeric_limits<T>::infinity()
                       ? io.out_bound
                       : (T)1.0;
 
@@ -239,9 +280,9 @@ void ForwardBackwardPassIOManaged<T>::populateFBParameter(
         mv_pars.out_nonlinearity.resize(out_size);
 
         for (size_t i = 0; i < out_size; i++) {
-          mv_pars.out_nonlinearity[i] = (T)fabs(
+          mv_pars.out_nonlinearity[i] = (T)fabsf(
               io.out_nonlinearity / out_bound *
-              (1 + MAX(io.out_nonlinearity_std, (T)0.0) * rng_->sampleGauss()));
+              ((T)1.0 + MAX(io.out_nonlinearity_std, (T)0.0) * rng_->sampleGauss()));
         }
       }
     }
@@ -249,7 +290,7 @@ void ForwardBackwardPassIOManaged<T>::populateFBParameter(
       T sum_nonlinearity = (T)0.0;
       if (io.hasOutNonlinearity()) {
         for (size_t i = 0; i < out_size; i++) {
-          sum_nonlinearity += fabs(mv_pars.out_nonlinearity[i]);
+          sum_nonlinearity += (T)fabsf(mv_pars.out_nonlinearity[i]);
         }
       }
       // T r_correction  = (1 + io.v_offset_w_min*io.v_offset_w_min) * io.r_series;
@@ -265,6 +306,15 @@ void ForwardBackwardPassIOManaged<T>::populateFBParameter(
 
       for (size_t i = 0; i < size; i++) {
         mv_pars.w_asymmetry[i] = ((T)1.0 + io.w_read_asymmetry_dtod * rng_->sampleGauss());
+      }
+    }
+
+    if (io.out_noise_std > (T)0.0) {
+      mv_pars.out_noise_values.resize(out_size);
+
+      for (size_t i = 0; i < out_size; i++) {
+        mv_pars.out_noise_values[i] =
+            (T)fabsf(io.out_noise * ((T)1.0 + io.out_noise_std * rng_->sampleGauss()));
       }
     }
   };
@@ -295,7 +345,7 @@ void ForwardBackwardPassIOManaged<T>::applyOutputWeightNoise(
 
   switch (io.w_noise_type) {
   case OutputWeightNoiseType::AdditiveConstant:
-    if (io.w_noise > 0) {
+    if (io.w_noise > (T)0.0) {
       T x_norm = RPU::math::nrm2<T>(in_size, in_values, 1);
       T w_std = io.w_noise * x_norm;
       int i_out = 0;
@@ -307,7 +357,7 @@ void ForwardBackwardPassIOManaged<T>::applyOutputWeightNoise(
     }
     break;
   case OutputWeightNoiseType::PCMRead:
-    if (io.w_noise > 0) {
+    if (io.w_noise > (T)0.0) {
       T w_std = io.w_noise;
       tmp_in_values_.resize(in_size);
 
@@ -322,15 +372,15 @@ void ForwardBackwardPassIOManaged<T>::applyOutputWeightNoise(
         if (transposed) {
           PRAGMA_SIMD
           for (int j = 0; j < in_size; ++j) {
-            accum += fabs(weights[j][i]) * tmp_in_values_[j];
+            accum += (T)fabsf(weights[j][i]) * tmp_in_values_[j];
           }
         } else {
           PRAGMA_SIMD
           for (int j = 0; j < in_size; ++j) {
-            accum += fabs(weights[i][j]) * tmp_in_values_[j];
+            accum += (T)fabsf(weights[i][j]) * tmp_in_values_[j];
           }
         }
-        out_values[i_out] += (T)w_std * sqrt(accum) * rng_->sampleGauss();
+        out_values[i_out] += (T)w_std * (T)sqrtf(accum) * rng_->sampleGauss();
         i_out += out_inc;
       }
     }
@@ -352,14 +402,14 @@ void ForwardBackwardPassIOManaged<T>::applyIrDrop(
     const IOMetaParameter<T> &io,
     const bool transposed) {
 
-  if (io.ir_drop <= 0.0) {
+  if (io.ir_drop <= (T)0.0) {
     return;
   }
   tmp_in_values_.resize(in_size);
   tmp_c_values_.resize(out_size);
   tmp_out_values_.resize(out_size);
 
-  T a_scale = in_size / io.ir_drop_Gw_div_gmax;
+  T a_scale = (T)in_size / io.ir_drop_Gw_div_gmax;
   // a_i = sum_j(|w_ij|*|x_j|)*n/Gw*gmax
   for (int i = 0; i < out_size; ++i) {
     T a = a_scale * current_values[i];
@@ -370,8 +420,8 @@ void ForwardBackwardPassIOManaged<T>::applyIrDrop(
   // compute x_j*(1-(1-j/n)^2)
   PRAGMA_SIMD
   for (int j = 0; j < in_size; ++j) {
-    T p = ((T)1 - (T)j / in_size);
-    tmp_in_values_[j] = in_values[j] * (1 - p * p);
+    T p = ((T)1 - (T)j / (T)in_size);
+    tmp_in_values_[j] = in_values[j] * ((T)1.0 - p * p);
   }
 
   // y_i = y_i_ideal - ir_drop*c_i*sum_j(w_ij * x'_j)
@@ -401,7 +451,7 @@ void ForwardBackwardPassIOManaged<T>::applyVoltageOffsets(
   T rs = MAX(io.r_series, (T)0.0);
   T rs_max_total = io.r_series_max_total;
 
-  if (io.v_offset_w_min == 0.0) {
+  if (io.v_offset_w_min == (T)0.0) {
 
     int i_out = 0;
     if (rs <= (T)0.0) {
@@ -410,7 +460,7 @@ void ForwardBackwardPassIOManaged<T>::applyVoltageOffsets(
       for (int i = 0; i < out_size; ++i) {
         T y = out_values[i_out];
         T v_offs = mv_pars.v_offset[i];
-        out_values[i_out] = y * (1 - v_offs);
+        out_values[i_out] = y * ((T)1.0 - v_offs);
         i_out += out_inc;
       }
     } else {
@@ -419,8 +469,8 @@ void ForwardBackwardPassIOManaged<T>::applyVoltageOffsets(
       for (int i = 0; i < out_size; ++i) {
         T y = out_values[i_out];
         T v_offs = mv_pars.v_offset[i];
-        T nom = (1 + MIN(rs * fabs(y), rs_max_total));
-        out_values[i_out] = (1 - v_offs) * y / nom;
+        T nom = ((T)1.0 + MIN(rs * (T)fabsf(y), rs_max_total));
+        out_values[i_out] = ((T)1.0 - v_offs) * y / nom;
         i_out += out_inc;
       }
     }
@@ -433,14 +483,14 @@ void ForwardBackwardPassIOManaged<T>::applyVoltageOffsets(
     }
 
     int i_out = 0;
-    if (rs <= 0.0) {
+    if (rs <= (T)0.0) {
       // (1 - Vo_i) * y_i - 2 * Vo_i * g_ref \sum_j x_j
       T y_ref2 = (T)(-io.v_offset_w_min) * x_accum * (T)2.0;
       PRAGMA_SIMD
       for (int i = 0; i < out_size; ++i) {
         T y = out_values[i_out];
         T v_offs = mv_pars.v_offset[i];
-        out_values[i_out] = y * (1 - v_offs) - v_offs * y_ref2;
+        out_values[i_out] = y * ((T)1.0 - v_offs) - v_offs * y_ref2;
         i_out += out_inc;
       }
     } else {
@@ -452,9 +502,9 @@ void ForwardBackwardPassIOManaged<T>::applyVoltageOffsets(
         T y = out_values[i_out];
         T v_offs = mv_pars.v_offset[i];
         T y_pos = y + y_ref;
-        T p_nom = (1 + MIN(rs * fabs(y_pos), rs_max_total));
-        T n_nom = (1 + MIN(rs * fabs(y_ref), rs_max_total));
-        out_values[i_out] = (1 - v_offs) * y_pos / p_nom - (1 + v_offs) * y_ref / n_nom;
+        T p_nom = ((T)1.0 + MIN(rs * (T)fabsf(y_pos), rs_max_total));
+        T n_nom = ((T)1.0 + MIN(rs * (T)fabsf(y_ref), rs_max_total));
+        out_values[i_out] = ((T)1.0 - v_offs) * y_pos / p_nom - ((T)1.0 + v_offs) * y_ref / n_nom;
         i_out += out_inc;
       }
     }
@@ -471,12 +521,12 @@ const T *ForwardBackwardPassIOManaged<T>::computeTotalCurrent(
     if (transposed) {
       PRAGMA_SIMD
       for (int j = 0; j < in_size; ++j) {
-        accum += fabs(weights[j][i]) * fabs(in_values[j]);
+        accum += (T)fabsf(weights[j][i]) * (T)fabsf(in_values[j]);
       }
     } else {
       PRAGMA_SIMD
       for (int j = 0; j < in_size; ++j) {
-        accum += fabs(weights[i][j]) * fabs(in_values[j]);
+        accum += (T)fabsf(weights[i][j]) * (T)fabsf(in_values[j]);
       }
     }
     current_buffer_values_[i] = accum;
@@ -527,7 +577,7 @@ void ForwardBackwardPassIOManaged<T>::applyNonIdealities(
 template <typename T, bool scaling, bool with_noise, bool sto_round_if, bool with_asymmetry>
 inline void prepareInputImplStage4(ARGS) {
 
-  T bound = io.inp_bound > 0 ? io.inp_bound : std::numeric_limits<T>::infinity();
+  T bound = io.inp_bound > (T)0.0 ? io.inp_bound : std::numeric_limits<T>::infinity();
   T noise = io.inp_noise;
   T asymmetry_scale = ((T)1.0 - io.inp_asymmetry);
   T res = io.inp_res;
@@ -547,7 +597,7 @@ inline void prepareInputImplStage4(ARGS) {
     value = (value < -bound) ? -bound : value;
 
     // inp noise after the bound + DAC ?!
-    if (noise > 0) {
+    if (noise > (T)0.0) {
       value += noise * rng->sampleGauss();
     }
 
@@ -629,11 +679,10 @@ template <
 inline bool finalizeOutputImplStage5(ARGS) {
   int idx = 0;
   bool bound_test_passed = true;
-  T bound = io.out_bound > 0 ? io.out_bound : std::numeric_limits<T>::infinity();
-  T noise = io.out_noise;
-  T asymmetry_scale = ((T)1.0 - io.out_asymmetry);
-  T res = io.out_res;
-  T nlf = mv_pars.out_nonlinearity_factor;
+  const T bound = io.out_bound > (T)0.0 ? io.out_bound : std::numeric_limits<T>::infinity();
+  const T asymmetry_scale = ((T)1.0 - io.out_asymmetry);
+  const T res = io.out_res;
+  const T nlf = mv_pars.out_nonlinearity_factor;
 
   PRAGMA_SIMD
   for (int i = 0; i < out_size; ++i) {
@@ -641,7 +690,7 @@ inline bool finalizeOutputImplStage5(ARGS) {
     T value = out_values[idx];
 
     if (with_nonlinearity) {
-      value = nlf * value / (1 + fabs(mv_pars.out_nonlinearity[i] * value));
+      value = nlf * value / ((T)1.0 + (T)fabsf(mv_pars.out_nonlinearity[i] * value));
     }
 
     if (with_asymmetry) {
@@ -650,7 +699,8 @@ inline bool finalizeOutputImplStage5(ARGS) {
     }
 
     if (with_noise) {
-      value += noise * rng->sampleGauss();
+      const T noise_std = io.out_noise_std > (T)0.0 ? mv_pars.out_noise_values[i] : io.out_noise;
+      value += noise_std * rng->sampleGauss();
     }
 
     value = getDiscretizedValueSR<sto_round_if>(value, res, *rng);
@@ -704,7 +754,7 @@ inline bool finalizeOutputImplStage2(ARGS) {
 }
 
 template <typename T, bool with_asymmetry> inline bool finalizeOutputImplStage1(ARGS) {
-  if (io.out_noise > (T)0.0) {
+  if (io.out_noise > (T)0.0 || io.out_noise_std > (T)0.0) {
     return finalizeOutputImplStage2<T, true, with_asymmetry>(ARGS_CALL);
   } else {
     return finalizeOutputImplStage2<T, true, with_asymmetry>(ARGS_CALL);
@@ -798,7 +848,7 @@ inline bool ForwardBackwardPassIOManaged<T>::computeAnalogMV(
 
     // this will be extremely ineffecient...
     T **neg_weights = weights;
-    if (io.w_read_asymmetry_dtod > 0) {
+    if (io.w_read_asymmetry_dtod > (T)0.0) {
       if (neg_weights_ == nullptr) {
         neg_weights_ = Array_2D_Get<T>(this->d_size_, this->x_size_);
       }
@@ -877,7 +927,7 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
   bool nm = f_io_.noise_management != NoiseManagementType::None;
   bool bm = f_io_.bound_management != BoundManagementType::None;
 
-  if (nm && (nm_scale_value <= 0.0) && (f_io_.inp_noise <= 0.0)) {
+  if (nm && (nm_scale_value <= (T)0.0) && (f_io_.inp_noise <= (T)0.0)) {
     // short cut. output will be zero anyway
     int i_d = 0;
     PRAGMA_SIMD
@@ -914,7 +964,7 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
     scaling = false;
     scale = (T)1.0;
 
-    if (nm && nm_scale_value > 0.) {
+    if (nm && nm_scale_value > (T)0.0) {
       scale /= nm_scale_value;
       scaling = true;
     }
@@ -930,15 +980,15 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
 
     if (bm) {
       bound_test_passed =
-          bound_test_passed || ((reduction_due_to_bound_management > f_io_.max_bm_factor) ||
-                                ((f_io_.inp_res > 0) && (reduction_due_to_bound_management >
-                                                         f_io_.max_bm_res / f_io_.inp_res)));
+          bound_test_passed || (((int)reduction_due_to_bound_management > f_io_.max_bm_factor) ||
+                                ((f_io_.inp_res > (T)0.0) && (reduction_due_to_bound_management >
+                                                              f_io_.max_bm_res / f_io_.inp_res)));
     } else {
       bound_test_passed = true;
     }
   }
 
-  if (scaling || out_scale != 1.0) {
+  if (scaling || out_scale != (T)1.0) {
     RPU::math::scal<T>(this->d_size_, out_scale / scale, d_output, d_inc);
   }
 };
@@ -960,9 +1010,9 @@ void ForwardBackwardPassIOManaged<T>::backwardVector(
       d_input, this->d_size_, d_inc, b_io_.noise_management, aux_nm_value_, b_io_);
   bool nm = b_io_.noise_management != NoiseManagementType::None;
   T out_scale = b_io_.out_scale * alpha;
-  bool scaling = nm && nm_scale_value > 0.0;
+  bool scaling = nm && nm_scale_value > (T)0.0;
 
-  if (nm && (nm_scale_value <= 0.0)) {
+  if (nm && (nm_scale_value <= (T)0.0)) {
     // max is zero. output is just zero. short-cut
     int j_x = 0;
     PRAGMA_SIMD
@@ -977,15 +1027,38 @@ void ForwardBackwardPassIOManaged<T>::backwardVector(
       weights, d_input, this->d_size_, d_inc, x_output, this->x_size_, x_inc,
       (T)1.0 / nm_scale_value, scaling, this->fb_pars_.bwd, b_io_, true, false);
 
-  if (scaling || out_scale != 1.0) {
+  if (scaling || out_scale != (T)1.0) {
     RPU::math::scal<T>(this->x_size_, out_scale * nm_scale_value, x_output, x_inc);
   }
 };
 #undef CHECK_INPUT_BOUNDS
 
+template <typename T>
+void ForwardBackwardPassIOManaged<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  ForwardBackwardPass<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+  RPU::insert(state, "aux_nm_value", aux_nm_value_);
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void ForwardBackwardPassIOManaged<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  ForwardBackwardPass<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+  RPU::load(state, "aux_nm_value", aux_nm_value_, strict);
+}
+
 template class ForwardBackwardPassIOManaged<float>;
 #ifdef RPU_USE_DOUBLE
 template class ForwardBackwardPassIOManaged<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ForwardBackwardPassIOManaged<half_t>;
 #endif
 
 } // namespace RPU

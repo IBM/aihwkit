@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -15,8 +15,6 @@
 # Convenience imports for easier access to the classes.
 
 from aihwkit.simulator.tiles.analog import AnalogTile
-from aihwkit.simulator.tiles.base import BaseTile
-from aihwkit.simulator.tiles.floating_point import (
-    FloatingPointTile
-)
+from aihwkit.simulator.tiles.floating_point import FloatingPointTile
 from aihwkit.simulator.tiles.inference import InferenceTile
+from aihwkit.simulator.tiles.inference_torch import TorchInferenceTile

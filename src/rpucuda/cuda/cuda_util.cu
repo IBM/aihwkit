@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -42,6 +42,129 @@ int64_t rpu_global_mem_counter = 0;
 std::mutex rpu_global_mem_counter_mutex;
 
 namespace RPU {
+
+/*****************************************************/
+/*  states */
+
+#define RPU_LOAD_ARRAY(T)                                                                          \
+  template <>                                                                                      \
+  void load(                                                                                       \
+      CudaContextPtr context, RPU::state_t &state, std::string key, CudaArray<T> &value,           \
+      bool strict) {                                                                               \
+    std::vector<double> tmp;                                                                       \
+    try {                                                                                          \
+      tmp = state.at(key);                                                                         \
+    } catch (const std::out_of_range &oor) {                                                       \
+      if (strict) {                                                                                \
+        RPU_FATAL("Cannot find the cuda unique vector key `" << key << "` in state.");             \
+      }                                                                                            \
+      return;                                                                                      \
+    }                                                                                              \
+    std::vector<T> out(tmp.begin(), tmp.end());                                                    \
+    if (!out.size()) {                                                                             \
+      value = CudaArray<T>(context, 0);                                                            \
+    } else {                                                                                       \
+      value = CudaArray<T>(context, out);                                                          \
+    }                                                                                              \
+  }
+
+RPU_LOAD_ARRAY(float);
+#ifdef RPU_USE_DOUBLE
+RPU_LOAD_ARRAY(double);
+#endif
+RPU_LOAD_ARRAY(int);
+RPU_LOAD_ARRAY(chop_t);
+RPU_LOAD_ARRAY(uint64_t);
+RPU_LOAD_ARRAY(char);
+RPU_LOAD_ARRAY(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_LOAD_ARRAY(half_t);
+#endif
+#undef RPU_LOAD_ARRAY
+
+#define RPU_LOAD_UNIQUE(T)                                                                         \
+  template <>                                                                                      \
+  void load(                                                                                       \
+      CudaContextPtr context, RPU::state_t &state, std::string key,                                \
+      std::unique_ptr<CudaArray<T>> &value, bool strict) {                                         \
+    std::vector<double> tmp;                                                                       \
+    try {                                                                                          \
+      tmp = state.at(key);                                                                         \
+    } catch (const std::out_of_range &oor) {                                                       \
+      if (strict) {                                                                                \
+        RPU_FATAL("Cannot find the cuda vector key `" << key << "` in state.");                    \
+      }                                                                                            \
+      return;                                                                                      \
+    }                                                                                              \
+    std::vector<T> out(tmp.begin(), tmp.end());                                                    \
+    if (!out.size()) {                                                                             \
+      value = nullptr;                                                                             \
+    } else {                                                                                       \
+      value = RPU::make_unique<CudaArray<T>>(context, out);                                        \
+    }                                                                                              \
+  }
+
+RPU_LOAD_UNIQUE(float);
+#ifdef RPU_USE_DOUBLE
+RPU_LOAD_UNIQUE(double);
+#endif
+RPU_LOAD_UNIQUE(int);
+RPU_LOAD_UNIQUE(chop_t);
+RPU_LOAD_UNIQUE(uint64_t);
+RPU_LOAD_UNIQUE(char);
+RPU_LOAD_UNIQUE(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_LOAD_UNIQUE(half_t);
+#endif
+#undef RPU_LOAD_UNIQUE
+
+#define RPU_INSERT_CUDA(TYPE)                                                                      \
+  template <> void insert(RPU::state_t &state, std::string key, const CudaArray<TYPE> &value) {    \
+    std::vector<TYPE> tmp = value.cpu();                                                           \
+    std::vector<double> out(tmp.begin(), tmp.end());                                               \
+    state[key] = out;                                                                              \
+  }
+
+RPU_INSERT_CUDA(float);
+#ifdef RPU_USE_DOUBLE
+RPU_INSERT_CUDA(double);
+#endif
+RPU_INSERT_CUDA(int);
+RPU_INSERT_CUDA(chop_t);
+RPU_INSERT_CUDA(uint64_t);
+RPU_INSERT_CUDA(char);
+RPU_INSERT_CUDA(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_INSERT_CUDA(half_t);
+#endif
+#undef RPU_INSERT_CUDA
+
+#define RPU_INSERT_UNIQUE_CUDA(TYPE)                                                               \
+  template <>                                                                                      \
+  void insert(                                                                                     \
+      RPU::state_t &state, std::string key, const std::unique_ptr<CudaArray<TYPE>> &value) {       \
+    if (value != nullptr) {                                                                        \
+      std::vector<TYPE> tmp = value->cpu();                                                        \
+      std::vector<double> out(tmp.begin(), tmp.end());                                             \
+      state[key] = out;                                                                            \
+    } else {                                                                                       \
+      state[key] = std::vector<double>{};                                                          \
+    }                                                                                              \
+  }
+
+RPU_INSERT_UNIQUE_CUDA(float);
+#ifdef RPU_USE_DOUBLE
+RPU_INSERT_UNIQUE_CUDA(double);
+#endif
+RPU_INSERT_UNIQUE_CUDA(int);
+RPU_INSERT_UNIQUE_CUDA(chop_t);
+RPU_INSERT_UNIQUE_CUDA(uint64_t);
+RPU_INSERT_UNIQUE_CUDA(char);
+RPU_INSERT_UNIQUE_CUDA(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_INSERT_UNIQUE_CUDA(half_t);
+#endif
+#undef RPU_INSERT_UNIQUE_CUDA
 
 __global__ void kernelCurandSetup(unsigned long long rseed, curandState_t *state, int n) {
   int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -299,54 +422,6 @@ int CublasEnvironment::runTestDevice() {
 #endif
 
 //**********************************************************************//
-
-template <typename T> T *CudaBuffer<T>::get(CudaContextPtr c, int size) {
-  mutex_.lock(); // need to be explicitely released to avoid multi-threading issues
-  if (buffer_ == nullptr || buffer_->getSize() < size || &*(buffer_->getContext()) != &*c) {
-    if (buffer_ != nullptr) {
-      buffer_->synchronize();
-    }
-    buffer_ = RPU::make_unique<CudaArray<T>>(c, size);
-    c->synchronize();
-  }
-  return buffer_->getData();
-}
-
-template <typename T> void CudaBuffer<T>::release() { mutex_.unlock(); }
-
-// copy constructor
-template <typename T> CudaBuffer<T>::CudaBuffer(const CudaBuffer<T> &other) {
-  if (other.buffer_ != nullptr) {
-    buffer_ = RPU::make_unique<CudaArray<T>>(*other.buffer_);
-    buffer_->synchronize();
-  }
-}
-
-// copy assignment
-template <typename T> CudaBuffer<T> &CudaBuffer<T>::operator=(const CudaBuffer &other) {
-  CudaBuffer tmp(other);
-  swap(*this, tmp);
-  if (tmp.buffer_ != nullptr) {
-    tmp.buffer_->context_.synchronize();
-  }
-  return *this;
-}
-
-// move constructor
-template <typename T> CudaBuffer<T>::CudaBuffer(CudaBuffer<T> &&other) {
-  { const std::lock_guard<std::recursive_mutex> lock(other.mutex_); }
-  *this = std::move(other);
-}
-
-// move assignment
-template <typename T> CudaBuffer<T> &CudaBuffer<T>::operator=(CudaBuffer<T> &&other) {
-
-  const std::lock_guard<std::recursive_mutex> lock(other.mutex_);
-  buffer_ = std::move(other.buffer_);
-  return *this;
-}
-
-//**********************************************************************//
 void CudaContext::init() {
   DEBUG_OUT("Init context...");
 
@@ -393,11 +468,21 @@ CudaContext::~CudaContext() {
 
   shared_random_states_.clear();
   shared_float_buffer_.clear();
+#ifdef RPU_USE_DOUBLE
   shared_double_buffer_.clear();
+#endif
+#ifdef RPU_USE_FP16
+  shared_half_t_buffer_.clear();
+#endif
 
   random_states_.clear();
   float_buffer_.clear();
+#ifdef RPU_USE_DOUBLE
   double_buffer_.clear();
+#endif
+#ifdef RPU_USE_FP16
+  half_t_buffer_.clear();
+#endif
 
   int i_start = shared_ ? 1 : 0;
   for (int i = i_start; i < streams_.size(); i++) {
@@ -499,10 +584,15 @@ CudaContext &CudaContext::operator=(CudaContext &&other) {
   shared_random_states_ = std::move(other.shared_random_states_);
 
   shared_float_buffer_ = std::move(other.shared_float_buffer_);
-  shared_double_buffer_ = std::move(other.shared_double_buffer_);
-
   float_buffer_ = std::move(other.float_buffer_);
+#ifdef RPU_USE_DOUBLE
+  shared_double_buffer_ = std::move(other.shared_double_buffer_);
   double_buffer_ = std::move(other.double_buffer_);
+#endif
+#ifdef RPU_USE_FP16
+  shared_half_t_buffer_ = std::move(other.shared_half_t_buffer_);
+  half_t_buffer_ = std::move(other.half_t_buffer_);
+#endif
 
   return *this;
 }
@@ -519,7 +609,7 @@ void CudaContext::enforceDeviceId() const {
   int gpu_id;
   CUDA_CALL(cudaGetDevice(&gpu_id));
   if (gpu_id != gpu_id_) {
-    std::cout << "WARNING wrong device detected: " << gpu_id << " vs. " << gpu_id_ << std::endl;
+    // std::cout << "WARNING wrong device detected: " << gpu_id << " vs. " << gpu_id_ << std::endl;
     CUDA_CALL(cudaSetDevice(gpu_id_));
   }
 #endif
@@ -563,13 +653,9 @@ void CudaContext::synchronizeStream() const {
   CUDA_CALL(cudaStreamSynchronize(streams_[stream_id_]));
 }
 
-int CudaContext::getNBlocks(int size, int nthreads) const {
-  DEBUG_OUT("get NBlocks for  size " << size);
-  return (size + nthreads - 1) / nthreads;
-}
-
 int CudaContext::getNStrideBlocks(int size, int nthreads) const {
   DEBUG_OUT("get N Stride Blocks for  size " << size);
+  nthreads = MIN(maxThreadsPerBlock(), nthreads);
   int max_blocks = getSMCount() * maxThreadsPerBlock() / nthreads;
   return MIN(getNBlocks(size, nthreads), max_blocks);
 }
@@ -758,14 +844,11 @@ template <> void CudaContext::printSharedBuffer<float>(int id, int size) {
     buffer = &shared_float_buffer_;
     stream_id = shared_stream_id_;
   }
-  const auto *array = (*buffer)[stream_id][id].getCudaArray();
-  if (!array) {
-    return;
-  }
   RPU_INFO("Float buffer " << id);
-  array->printValues(size);
+  (*buffer)[stream_id][id].print(size);
 }
 
+#ifdef RPU_USE_DOUBLE
 template <> double *CudaContext::getSharedBuffer<double>(int id, int size) {
   // somehow this needs to be a MAX_BUFFER vector to avoid dynamical
   // resizing. Not sure why, but dynamical allocation of the
@@ -806,13 +889,58 @@ template <> void CudaContext::printSharedBuffer<double>(int id, int size) {
     stream_id = shared_stream_id_;
   }
 
-  const auto *array = (*buffer)[stream_id][id].getCudaArray();
-  if (!array) {
-    return;
-  }
   RPU_INFO("Double buffer " << id);
-  array->printValues(size);
+  (*buffer)[stream_id][id].print(size);
 }
+
+#endif
+
+#ifdef RPU_USE_FP16
+template <> half_t *CudaContext::getSharedBuffer<half_t>(int id, int size) {
+  // somehow this needs to be a MAX_BUFFER vector to avoid dynamical
+  // resizing. Not sure why, but dynamical allocation of the
+  // CudaBuffer vector elements does not work without uniptr (which
+  // then has sync problems)
+
+  auto *buffer = &half_t_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_half_t_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  while (buffer->size() <= stream_id) {
+    buffer->push_back(std::vector<CudaBuffer<half_t>>{RPU_MAX_BUFFER});
+  }
+  return (*buffer)[stream_id][id].get(this, size);
+}
+
+template <> void CudaContext::releaseSharedBuffer<half_t>(int id) {
+
+  auto *buffer = &half_t_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_half_t_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  (*buffer)[stream_id][id].release();
+}
+
+template <> void CudaContext::printSharedBuffer<half_t>(int id, int size) {
+
+  auto *buffer = &half_t_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_half_t_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  RPU_INFO("Bfloat buffer " << id);
+  (*buffer)[stream_id][id].print(size);
+}
+
+#endif
 
 void CudaContext::recordWaitEvent(CudaContextPtr wait_on_context) {
   this->recordWaitEvent(wait_on_context->getStream(), wait_on_context->getEvent());
@@ -847,8 +975,10 @@ template <typename T> CudaArray<T>::CudaArray(CudaContextPtr c, int n) : CudaArr
   height_ = 1; // this needs to be one! No height>1 supported yet
   if (n > 0) {
     context_->enforceDeviceId();
-    CUDA_CALL(cudaMallocPitch(&values_, &pitch_, n * sizeof(T), height_));
-    ADDTOMEMCOUNTER(size_ * sizeof(T));
+    int mem_size = size_ * sizeof(T);
+    mem_size = (mem_size + 3) / 4 * 4; // align on 32-bit word
+    CUDA_CALL(cudaMallocPitch(&values_, &pitch_, mem_size, height_));
+    ADDTOMEMCOUNTER(mem_size);
   }
 }
 
@@ -857,7 +987,6 @@ CudaArray<T>::CudaArray(CudaContextPtr c, int n, const T *host_array) : CudaArra
   if (n > 0) {
     this->assign(host_array);
     context_->synchronize(); // better syncrhonize. Constructing is considered slow anyway
-    ADDTOMEMCOUNTER(size_ * sizeof(T));
   }
 }
 
@@ -868,7 +997,6 @@ CudaArray<T>::CudaArray(CudaContextPtr c, const std::vector<T> &host_vector)
   if (n > 0) {
     this->assign(host_vector.data());
     context_->synchronize(); // better syncrhonize. Constructing is considered slow anyway
-    ADDTOMEMCOUNTER(size_ * sizeof(T));
   }
 }
 
@@ -906,7 +1034,6 @@ template <typename T> CudaArray<T>::CudaArray(const CudaArray<T> &other) {
     } else {
       CUDA_CALL(cudaMallocPitch(&values_, &pitch_, size_ * sizeof(T), height_));
       this->assign(other);
-      ADDTOMEMCOUNTER(size_ * sizeof(T));
     }
     context_->synchronize(); // better synchronize. Constructing is slow anyway
   }
@@ -921,7 +1048,6 @@ template <typename T> CudaArray<T> &CudaArray<T>::operator=(const CudaArray<T> &
   if (size_ > 0) {
     context_->synchronize(); // need sync because of tmp
   }
-  ADDTOMEMCOUNTER(size_ * sizeof(T));
   return *this;
 }
 
@@ -961,7 +1087,7 @@ template <typename T> void CudaArray<T>::setConst(T set_value) {
                             << height_);
   if (size_ > 0) {
     context_->enforceDeviceId();
-    if (set_value != 0) {
+    if (set_value != (T)0.0) {
       RPU::math::elemconst(context_, values_, size_, set_value);
     } else {
       CUDA_CALL(cudaMemset2DAsync(
@@ -974,9 +1100,16 @@ template <> void CudaArray<curandStateXORWOW>::setConst(curandStateXORWOW set_va
   RPU_FATAL("Cannot set curandstates to some values.");
 }
 
+#ifdef RPU_USE_DOUBLE
 template <> void CudaArray<double *>::setConst(double *set_value) {
   RPU_FATAL("Cannot set pointer types to some values.");
 }
+#endif
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+template <> void CudaArray<half_t *>::setConst(half_t *set_value) {
+  RPU_FATAL("Cannot set pointer types to some values.");
+}
+#endif
 
 template <> void CudaArray<float *>::setConst(float *set_value) {
   RPU_FATAL("Cannot set pointer types to some values.");
@@ -1048,6 +1181,45 @@ template <> void CudaArray<int8_t>::printNZValues(int nmax) const {
   std::cout << std::endl;
   delete[] values;
 }
+
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+template <> void CudaArray<half_t>::printValues(int nmax) const {
+  half_t *values = new half_t[size_];
+  this->copyTo(values); // will synchronize
+  int n = nmax > 0 ? MIN(nmax, size_) : size_;
+  for (int i = 0; i < n; ++i) {
+    std::cout << "[" << i << "]:" << static_cast<float>(values[i]) << ", ";
+  }
+  if (n < size_) {
+    std::cout << "...";
+  }
+  std::cout << std::endl;
+  delete[] values;
+}
+
+template <> void CudaArray<half_t>::printNZValues(int nmax) const {
+  half_t *values = new half_t[size_];
+  this->copyTo(values); // will synchronize
+  int n = nmax > 0 ? MIN(nmax, size_) : size_;
+  for (int i = 0; i < n; ++i) {
+    if (values[i] != (half_t)0.0) {
+      std::cout << "[" << i << "]:" << static_cast<float>(values[i]) << ", ";
+    }
+  }
+  if (n < size_) {
+    std::cout << "...";
+  }
+  std::cout << std::endl;
+  delete[] values;
+}
+
+template <> void CudaArray<half_t *>::printValues(int nmax) const {
+  RPU_FATAL("Cannot print half_t* values.");
+}
+template <> void CudaArray<half_t *>::printNZValues(int nmax) const {
+  RPU_FATAL("Cannot print half_t* values.");
+}
+#endif
 
 template <typename T> void CudaArray<T>::assign(const T *host_array) {
   int sz = size_ * sizeof(T);
@@ -1159,14 +1331,27 @@ template <typename T> void CudaArray<T>::copyTo(std::vector<T> &host_vector) con
   copyTo(host_vector.data());
 }
 
+template <typename T> std::vector<T> CudaArray<T>::cpu() const {
+  if (!size_) {
+    return std::vector<T>{};
+  }
+  std::vector<T> host_vector(size_);
+  copyTo(host_vector.data());
+  return host_vector;
+}
+
 template <typename T> T *CudaArray<T>::getDataSafe(CudaContextPtr c) {
   context_->synchronizeWith(c);
   return values_;
 }
 
 #ifdef RPU_USE_DOUBLE
-template class CudaArray<double>;
 template class CudaArray<double *>;
+template class CudaArray<double>;
+#endif
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+template class CudaArray<half_t *>;
+template class CudaArray<half_t>;
 #endif
 
 template class CudaArray<float>;

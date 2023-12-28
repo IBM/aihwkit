@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -34,9 +34,9 @@ template <typename T> struct NonZeroFunctor {
 
 template <typename T>
 __global__ void kernelAbsMaxNPSum(
-    float *scale_values,
+    T *scale_values,
     const int m_batch,
-    const float *amax_values,
+    const T *amax_values,
     const T *psum_values,
     const T *nsum_values,
     const T out_bound,
@@ -97,7 +97,7 @@ __global__ void kernelNPSumBatchTrans(
     T value = input[tid];
     int midx = tid % m_batch;
 
-    if (value >= 0) {
+    if (value >= (T)0.0) {
       atomicAdd(&(block_psum_values[midx]), value);
     } else {
       atomicAdd(&(block_nsum_values[midx]), value);
@@ -140,7 +140,7 @@ __global__ void kernelNPSumBatchTrans_LargeBatch(
     T value = input[tid];
     int midx = tid % m_batch;
 
-    if (value >= 0) {
+    if (value >= (T)0.0) {
       atomicAdd(&psum_values[midx], value);
     } else {
       atomicAdd(&nsum_values[midx], value);
@@ -150,43 +150,43 @@ __global__ void kernelNPSumBatchTrans_LargeBatch(
 
 template <typename T>
 __global__ void kernelAverageAbsMaxSetScales(
-    float *scales, float *ravg, const float *sum, const int m_batch_in, T decay_rate_in) {
+    T *scales, T *ravg, const T *sum, const int m_batch_in, T decay_rate_in) {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   const int m_batch = m_batch_in;
   T decay_rate = decay_rate_in;
-  T max_avg = (*sum) / m_batch;
+  T max_avg = (*sum) / (T)m_batch;
   T run_avg = *ravg;
 
   if (tid < m_batch) {
-    scales[tid] = (float)(run_avg * (1.0 - decay_rate) + decay_rate * max_avg);
+    scales[tid] = run_avg * ((T)1.0 - decay_rate) + decay_rate * max_avg;
   }
   if (tid == m_batch) {
-    *ravg = (float)(run_avg * (1.0 - decay_rate) + decay_rate * max_avg);
+    *ravg = run_avg * ((T)1.0 - decay_rate) + decay_rate * max_avg;
   }
 }
 
 template <typename T>
 __global__ void kernelAverageAbsMaxSingleMomentum(
-    float *ravg, const float *sum, const int m_batch, const T *nz_value, T decay_rate) {
+    T *ravg, const T *sum, const int m_batch, const T *nz_value, T decay_rate) {
   // just single block!
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   if (tid == 0) {
     T sum_value = *sum;
-    T nz = m_batch > 1 ? *nz_value : (sum_value != 0.0 ? 1.0 : 0.0);
+    T nz = m_batch > 1 ? *nz_value : (sum_value != (T)0.0 ? (T)1.0 : (T)0.0);
     if (nz > (T)0.5) { // at least one non-zero
       T max_avg = (sum_value) / nz;
-      *ravg = (float)(*ravg * (1.0 - decay_rate) + decay_rate * max_avg);
+      *ravg = *ravg * ((T)1.0 - decay_rate) + decay_rate * max_avg;
     }
   }
 }
 
 template <typename T>
-__global__ void kernelAbsMaxSingleMomentum(float *ravg, const float *amax, T decay_rate) {
+__global__ void kernelAbsMaxSingleMomentum(T *ravg, const T *amax, T decay_rate) {
   // just single block!
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
   if (tid == 0) {
     T amax_value = *amax;
-    *ravg = (float)(*ravg * (1.0 - decay_rate) + decay_rate * amax_value);
+    *ravg = *ravg * ((T)1.0 - decay_rate) + decay_rate * amax_value;
   }
 }
 
@@ -200,20 +200,20 @@ template <typename T>
 NoiseManager<T>::NoiseManager(CudaContextPtr c, int size)
     : size_(size), context_(c), buffer_m_batch_(0), last_m_batch_(0), const_set_if_(false) {
   // initialize for m_batch=1
-  dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);
+  dev_scale_values_ = RPU::make_unique<CudaArray<T>>(context_, 1);
   dev_psum_values_ = RPU::make_unique<CudaArray<T>>(context_, 1);
   dev_nsum_values_ = RPU::make_unique<CudaArray<T>>(context_, 1);
-  dev_ravg_scale_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
+  dev_ravg_scale_value_ = RPU::make_unique<CudaArray<T>>(context_, 1);
   dev_ravg_scale_value_->setConst(1.0);
-  dev_nzeros_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
+  dev_nzeros_value_ = RPU::make_unique<CudaArray<T>>(context_, 1);
 
   amaximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, true);
   maximizer_ = RPU::make_unique<Maximizer<T>>(context_, size, false);
 
   size_t temp_storage_bytes = 0;
-  RPU::cub::DeviceReduce::Reduce(
+  RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
       nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(), size_,
-      nsum_op_, 0, context_->getStream());
+      nsum_op_, (T)0.0, context_->getStream());
 
   dev_v_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
   context_->synchronize();
@@ -243,7 +243,7 @@ template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
     dev_offsets_ = RPU::make_unique<CudaArray<int>>(context_, m_batch + 1, offsets);
 
     size_t temp_storage_bytes = 0;
-    RPU::cub::DeviceSegmentedReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
         nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(),
         m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, 0,
         context_->getStream());
@@ -256,16 +256,55 @@ template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
 }
 
 template <typename T>
+void NoiseManager<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  using V = std::vector<T>;
+  RPU::state_t state;
+  context_->synchronize();
+
+  RPU::insert(state, "ravg_initialized", ravg_initialized_);
+  RPU::insert(state, "const_set_if", const_set_if_);
+
+  RPU::insert(state, "dev_ravg_scale_value", dev_ravg_scale_value_);
+  RPU::insert(state, "dev_scale_values", dev_scale_values_);
+  RPU::insert(state, "dev_nzeros_value", dev_nzeros_value_);
+
+  // amaximizer_->dumpExtra(state, "amaximizer");
+  // maximizer_->dumpExtra(state, "maximizer");
+
+  // will not handle buffers in to store data between applyToInput and applyToOutput
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void NoiseManager<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  context_->synchronize();
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  // amaximizer_->loadExtra(state, "amaximizer", strict);
+  // maximizer_->loadExtra(state, "maximizer", strict);
+
+  RPU::load(state, "ravg_initialized", ravg_initialized_, strict);
+  RPU::load(state, "const_set_if", const_set_if_, strict);
+
+  RPU::load(context_, state, "dev_ravg_scale_value", dev_ravg_scale_value_, strict);
+  RPU::load(context_, state, "dev_scale_values", dev_scale_values_, strict);
+  RPU::load(context_, state, "dev_nzeros_value", dev_nzeros_value_, strict);
+}
+
+template <typename T>
 template <typename InputIteratorT>
 void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool trans) {
   cudaStream_t s = context_->getStream();
 
   if (m_batch == 1) {
     size_t ssz = dev_v_temp_storage_->getSize();
-    RPU::cub::DeviceReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
         (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_psum_values_->getData(), size_,
         psum_op_, (T)0, s);
-    RPU::cub::DeviceReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
         (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_nsum_values_->getData(), size_,
         nsum_op_, (T)0, s);
 
@@ -303,25 +342,25 @@ void NoiseManager<T>::computeNPSum(InputIteratorT dev_input, int m_batch, bool t
 
       // Fast Segmented reduction
       size_t ssz = dev_m_temp_storage_->getSize();
-      RPU::cub::DeviceSegmentedReduce::Reduce(
+      RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
           (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_psum_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, (T)0.0, s);
-      RPU::cub::DeviceSegmentedReduce::Reduce(
+      RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
           (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_nsum_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, nsum_op_, (T)0.0, s);
     }
   }
 }
 
-template <typename T> void NoiseManager<T>::setAverageAbsMax(float value) {
+template <typename T> void NoiseManager<T>::setAverageAbsMax(T value) {
   dev_ravg_scale_value_->setConst(value);
   dev_scale_values_->setConst(value);
   ravg_initialized_ = true;
   context_->synchronize();
 }
 
-template <typename T> float NoiseManager<T>::getAverageAbsMax() const {
-  float tmp;
+template <typename T> T NoiseManager<T>::getAverageAbsMax() const {
+  T tmp;
   dev_ravg_scale_value_->copyTo(&tmp);
   return tmp;
 };
@@ -346,11 +385,11 @@ void NoiseManager<T>::compute(
   }
   case NoiseManagementType::Constant: {
     if (m_batch > dev_scale_values_->getSize()) {
-      dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
+      dev_scale_values_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
       const_set_if_ = false;
     }
     if (!const_set_if_) {
-      dev_scale_values_->setConst(io.nm_thres > 0 ? (float)io.nm_thres : (float)1.0);
+      dev_scale_values_->setConst(io.nm_thres > (T)0.0 ? (T)io.nm_thres : (T)1.0);
       const_set_if_ = true;
     }
     return;
@@ -358,7 +397,7 @@ void NoiseManager<T>::compute(
 
   case NoiseManagementType::Max: {
     this->maximizer_->compute(dev_input, m_batch, trans);
-    if (io.nm_thres > 0) {
+    if (io.nm_thres > (T)0.0) {
       this->maximizer_->saturateAbove(io.nm_thres);
     }
 
@@ -367,7 +406,7 @@ void NoiseManager<T>::compute(
 
   case NoiseManagementType::AbsMax: {
     this->amaximizer_->compute(dev_input, m_batch, trans);
-    if (io.nm_thres > 0) {
+    if (io.nm_thres > (T)0.0) {
       this->amaximizer_->saturateAbove(io.nm_thres);
     }
 
@@ -375,12 +414,12 @@ void NoiseManager<T>::compute(
   }
   case NoiseManagementType::AbsMaxNPSum: {
     if (m_batch > dev_scale_values_->getSize()) {
-      dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
+      dev_scale_values_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
     }
 
     // get amax and npsum
     this->amaximizer_->compute(dev_input, m_batch, trans);
-    if (io.nm_thres > 0) {
+    if (io.nm_thres > (T)0.0) {
       this->amaximizer_->saturateAbove(io.nm_thres);
     }
 
@@ -394,8 +433,8 @@ void NoiseManager<T>::compute(
     kernelAbsMaxNPSum<T><<<nblocks, nthreads, 0, s>>>(
         dev_scale_values_->getData(), m_batch, this->amaximizer_->getMaxValues(),
         dev_psum_values_->getDataConst(), dev_nsum_values_->getDataConst(),
-        isinf(io.out_bound) ? (T)1.0 : io.out_bound, io.nm_assumed_wmax,
-        io.inp_res > 0 ? io.max_bm_res / io.inp_res : 1.0);
+        isinf((float)io.out_bound) ? (T)1.0 : io.out_bound, io.nm_assumed_wmax,
+        io.inp_res > (T)0.0 ? io.max_bm_res / io.inp_res : (T)1.0);
     return;
   }
 
@@ -409,7 +448,7 @@ void NoiseManager<T>::compute(
     if ((nm_type_ == NoiseManagementType::AverageAbsMax) &&
         (m_batch > dev_scale_values_->getSize())) {
 
-      dev_scale_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
+      dev_scale_values_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
 
       cudaStream_t s = context_->getStream();
       int nthreads = context_->getNThreads();
@@ -432,10 +471,10 @@ void NoiseManager<T>::compute(
       if (m_batch > 1) {
         // first compute the average of the max over batch
         if (!dev_a_temp_storage_ || m_batch > last_m_batch_) {
-          dev_avgmax_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
+          dev_avgmax_value_ = RPU::make_unique<CudaArray<T>>(context_, 1);
 
           size_t temp_storage_bytes = 0;
-          RPU::cub::DeviceReduce::Sum(
+          RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
               nullptr, temp_storage_bytes, amaximizer_->getMaxValues(),
               dev_avgmax_value_->getData(), m_batch, s);
           dev_a_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
@@ -444,7 +483,7 @@ void NoiseManager<T>::compute(
         }
 
         size_t ssz = dev_a_temp_storage_->getSize();
-        RPU::cub::DeviceReduce::Sum(
+        RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
             (void *)dev_a_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
             dev_avgmax_value_->getData(), m_batch, s);
       }
@@ -455,18 +494,19 @@ void NoiseManager<T>::compute(
             <<<context_->getNBlocks(m_batch + 1, nthreads), nthreads, 0, s>>>(
                 dev_scale_values_->getData(), dev_ravg_scale_value_->getData(),
                 m_batch > 1 ? dev_avgmax_value_->getData() : amaximizer_->getMaxValues(),
-                dev_scale_values_->getSize(), ravg_initialized_ ? MIN(io.nm_decay, 1.) : 1.0);
+                dev_scale_values_->getSize(),
+                ravg_initialized_ ? MIN(io.nm_decay, (T)1.0) : (T)1.0);
 
       } else {
         // count non-zero
 
         if (m_batch > 1) {
           NonZeroFunctor<T> nonzero_functor;
-          RPU::cub::TransformInputIterator<T, NonZeroFunctor<T>, T *> nz_input(
+          RPU_CUB_NS_QUALIFIER TransformInputIterator<T, NonZeroFunctor<T>, T *> nz_input(
               amaximizer_->getMaxValues(), nonzero_functor);
           // temp storage already requested above
           size_t ssz = dev_a_temp_storage_->getSize();
-          RPU::cub::DeviceReduce::Sum(
+          RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
               (void *)dev_a_temp_storage_->getData(), ssz, nz_input, dev_nzeros_value_->getData(),
               m_batch, s);
         }
@@ -475,16 +515,14 @@ void NoiseManager<T>::compute(
             dev_ravg_scale_value_->getData(),
             m_batch > 1 ? dev_avgmax_value_->getData() : amaximizer_->getMaxValues(), m_batch,
             m_batch > 1 ? dev_nzeros_value_->getData() : nullptr,
-            ravg_initialized_ ? MIN(io.nm_decay, 1.0)
-                              : 1.0); // Note that meaning of decay is per batch here
+            ravg_initialized_ ? (T)MIN(io.nm_decay, (T)1.0)
+                              : (T)1.0); // Note that meaning of decay is per batch here
       }
       ravg_initialized_ = true;
     }
     return;
   }
   case NoiseManagementType::AbsMaxSingleValue: {
-    // CAUTION: the running average will not be saved for checkpointing... so there might be a
-    // glitch when continueing training from checkpoint...
 
     // this is overall max over m_batch
     if (!is_test) {
@@ -498,10 +536,10 @@ void NoiseManager<T>::compute(
       if (m_batch > 1) {
         // another max pass
         if (!dev_a_temp_storage_ || m_batch > last_m_batch_) {
-          dev_avgmax_value_ = RPU::make_unique<CudaArray<float>>(context_, 1);
+          dev_avgmax_value_ = RPU::make_unique<CudaArray<T>>(context_, 1);
 
           size_t temp_storage_bytes = 0;
-          RPU::cub::DeviceReduce::Sum(
+          RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
               nullptr, temp_storage_bytes, amaximizer_->getMaxValues(),
               dev_avgmax_value_->getData(), m_batch, s);
           dev_a_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
@@ -510,7 +548,7 @@ void NoiseManager<T>::compute(
         }
 
         size_t ssz = dev_a_temp_storage_->getSize();
-        RPU::cub::DeviceReduce::Max(
+        RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
             (void *)dev_a_temp_storage_->getData(), ssz, amaximizer_->getMaxValues(),
             dev_avgmax_value_->getData(), m_batch, s);
       }
@@ -519,8 +557,8 @@ void NoiseManager<T>::compute(
       kernelAbsMaxSingleMomentum<T><<<1, 1, 0, s>>>(
           dev_ravg_scale_value_->getData(),
           m_batch > 1 ? dev_avgmax_value_->getData() : amaximizer_->getMaxValues(),
-          ravg_initialized_ ? MIN(io.nm_decay, 1.0)
-                            : 1.0); // Note that meaning of decay is per batch here
+          ravg_initialized_ ? MIN(io.nm_decay, (T)1.0)
+                            : (T)1.0); // Note that meaning of decay is per batch here
 
       ravg_initialized_ = true;
     }
@@ -532,7 +570,7 @@ void NoiseManager<T>::compute(
   }
 }
 
-template <typename T> float *NoiseManager<T>::getScaleValues() const {
+template <typename T> T *NoiseManager<T>::getScaleValues() const {
   switch (nm_type_) {
   case NoiseManagementType::None:
     return nullptr;
@@ -566,6 +604,12 @@ RPU_GEN_IITER_TEMPLATES(float, void, NoiseManager<float>::computeNPSum, ARGS2);
 template class NoiseManager<double>;
 RPU_GEN_IITER_TEMPLATES(double, void, NoiseManager<double>::compute, ARGS1(double));
 RPU_GEN_IITER_TEMPLATES(double, void, NoiseManager<double>::computeNPSum, ARGS2);
+#endif
+
+#ifdef RPU_USE_FP16
+template class NoiseManager<half_t>;
+RPU_GEN_IITER_TEMPLATES(half_t, void, NoiseManager<half_t>::compute, ARGS1(half_t));
+RPU_GEN_IITER_TEMPLATES(half_t, void, NoiseManager<half_t>::computeNPSum, ARGS2);
 #endif
 
 #undef ARGS1

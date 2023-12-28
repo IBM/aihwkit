@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -35,8 +35,8 @@ void PowStepReferenceRPUDevice<T>::populate(
   T up_down_std = par.ps_gamma_up_down_dtod;
   T up_down = par.ps_gamma_up_down;
 
-  T up_bias = up_down > 0 ? (T)0.0 : up_down;
-  T down_bias = up_down > 0 ? -up_down : (T)0.0;
+  T up_bias = up_down > (T)0.0 ? (T)0.0 : up_down;
+  T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
 
   for (int i = 0; i < this->d_size_; ++i) {
     for (int j = 0; j < this->x_size_; ++j) {
@@ -48,15 +48,15 @@ void PowStepReferenceRPUDevice<T>::populate(
       w_gamma_down_[i][j] = (down_bias + gain - r) * gamma;
 
       if (par.enforce_consistency) {
-        w_gamma_up_[i][j] = fabs(w_gamma_up_[i][j]);
-        w_gamma_down_[i][j] = fabs(w_gamma_down_[i][j]);
+        w_gamma_up_[i][j] = (T)fabsf(w_gamma_up_[i][j]);
+        w_gamma_down_[i][j] = (T)fabsf(w_gamma_down_[i][j]);
       }
 
       // reference
       w_reference_[i][j] = par.reference_mean + par.reference_std * rng->sampleGauss();
 
       if (par.subtract_symmetry_point &&
-          (this->w_max_bound_[i][j] > 0 && this->w_min_bound_[i][j] < 0)) {
+          (this->w_max_bound_[i][j] > (T)0.0 && this->w_min_bound_[i][j] < (T)0.0)) {
 
         T gu = w_gamma_up_[i][j];
         T gd = w_gamma_down_[i][j];
@@ -70,10 +70,10 @@ void PowStepReferenceRPUDevice<T>::populate(
         T r = (bu - bd);
         int n_steps = par.n_estimation_steps;
         if (n_steps <= 0) {
-          n_steps = MIN(round(10 * (r / MIN(fabs(sd), fabs(su)))), (T)10000);
+          n_steps = MIN((int)roundf((T)10 * (r / MIN((T)fabsf(sd), (T)fabsf(su)))), 10000);
         }
         for (int ii = 0; ii < n_steps; ii++) {
-          sp += -sd * pow((sp - bd) / r, gd) + su * pow((bu - sp) / r, gu);
+          sp += -sd * (T)powf((sp - bd) / r, gd) + su * (T)powf((bu - sp) / r, gu);
         }
         w_reference_[i][j] += sp;
 
@@ -134,16 +134,16 @@ inline void update_once_reference(
     const T &dw_min_std,
     RNG<T> *rng) {
   T range = max_bound - min_bound;
-  if (range == 0.0) {
+  if (range == (T)0.0) {
     return;
   }
   w += ref; // first add
 
   if (sign > 0) {
-    w -= scale_down * pow((w - min_bound) / range, gamma_down) *
+    w -= scale_down * (T)powf((w - min_bound) / range, gamma_down) *
          ((T)1.0 + dw_min_std * rng->sampleGauss());
   } else {
-    w += scale_up * pow((max_bound - w) / range, gamma_up) *
+    w += scale_up * (T)powf((max_bound - w) / range, gamma_up) *
          ((T)1.0 + dw_min_std * rng->sampleGauss());
   }
   w = MAX(w, min_bound);
@@ -196,6 +196,9 @@ void PowStepReferenceRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences,
 template class PowStepReferenceRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class PowStepReferenceRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class PowStepReferenceRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

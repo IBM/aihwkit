@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -44,7 +44,9 @@ template <typename T> struct ChoppedWeightOutputParameter {
     ss << "\t in_chop_random:\t" << std::boolalpha << in_chop_random << std::endl;
   };
 
-  inline bool isEnabled() const { return in_chop_prob > 0 || out_chop_prob > 0 || every > 0; };
+  inline bool isEnabled() const {
+    return in_chop_prob > (T)0.0 || out_chop_prob > (T)0.0 || every > 0;
+  };
 };
 
 template <typename T> class ChoppedWeightOutput {
@@ -98,6 +100,10 @@ public:
   void printToStream(std::stringstream &ss) const;
   void makeWeightOutputChoppers(const BitLineMaker<T> *blm);
   void releaseBuffers();
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+
   inline void setPar(const ChoppedWeightOutputParameter<T> &par) { par_ = par; };
   inline void setInChopRandom(bool in_chop_random) { par_.in_chop_random = in_chop_random; };
   inline void setInChopProb(T in_chop_prob) { par_.in_chop_prob = in_chop_prob; };

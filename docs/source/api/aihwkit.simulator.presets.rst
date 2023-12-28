@@ -12,6 +12,9 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   aihwkit.simulator.presets.compounds
    aihwkit.simulator.presets.configs
    aihwkit.simulator.presets.devices
+   aihwkit.simulator.presets.inference
    aihwkit.simulator.presets.utils
+   aihwkit.simulator.presets.web

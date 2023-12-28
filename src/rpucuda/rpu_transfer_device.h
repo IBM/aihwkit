@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -91,7 +91,7 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   virtual void initializeWithSize(int x_size, int d_size);
   void initialize() override{/* do nothing */};
 
-  inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == 1.0); };
+  inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == (T)1.0); };
 
   inline int getInSize() const { return _in_size; };
   inline int getOutSize() const { return _out_size; };
@@ -191,7 +191,7 @@ public:
   virtual int
   getTransferEvery(int from_device_idx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const;
   virtual void setTransferVecs(const T *transfer_vecs = nullptr);
-  virtual void transfer(int to_device_idx, int from_device_idx, T current_lr);
+  virtual void transfer(int to_device_idx, int from_device_idx, T current_lr, int m_batch_info);
   virtual void readAndUpdate(
       int to_device_idx,
       int from_device_idx,
@@ -199,7 +199,8 @@ public:
       const T *x_input,
       const int n_vec,
       const T reset_prob,
-      const int i_col);
+      const int i_col,
+      const int m_batch_info);
   virtual const T *getTransferVecs() const { return &transfer_vecs_[0]; };
   virtual void writeVector(
       int device_idx, const T *in_vec, const T *out_vec, const T lr, const int m_batch_info);
@@ -213,6 +214,8 @@ public:
   inline const ForwardBackwardPassIOManaged<T> &getTransferFBPass() const {
     return *transfer_fb_pass_;
   };
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
   void populate(const TransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);

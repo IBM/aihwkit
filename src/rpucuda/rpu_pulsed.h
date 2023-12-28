@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -56,9 +56,16 @@ public:
   void decayWeights(T alpha, bool bias_no_decay) override;
   void driftWeights(T time_since_last_call) override;
   void diffuseWeights() override;
+  void diffuseWeightsPink() override;
   void clipWeights(T clip) override;
   void clipWeights(const WeightClipParameter &wclpar) override;
   void remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases = nullptr) override;
+  bool swaWeights(
+      const WeightRemapParameter &wrmpar,
+      T *swa_weights,
+      uint64_t iter,
+      T *scales = nullptr,
+      T *biases = nullptr) override;
   void resetCols(int start_col, int n_cols, T reset_prob) override;
 
   void updateVectorWithCounts(
@@ -81,6 +88,8 @@ public:
   void getDeviceParameterNames(std::vector<std::string> &names) const override;
   void getDeviceParameter(std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(const std::vector<T *> &data_ptrs) override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   int getHiddenUpdateIdx() const override;
   void setHiddenUpdateIdx(int idx) override;

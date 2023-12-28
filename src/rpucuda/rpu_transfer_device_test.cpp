@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,12 +21,6 @@
 // #include "test_helper.h"
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -152,7 +146,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdate) {
   rpu_device->initUpdateCycle(this->weights, this->up, 1, 1);
 
   // last row update, net 1 (n_pos-n_neg)
-  float dx = rpu_device->getWeightGranularity() * (n_pos - n_neg);
+  float dx = rpu_device->getWeightGranularity() * (num_t)(n_pos - n_neg);
   int rowidx = this->d_size - 1;
   rpu_device->doSparseUpdate(
       this->weights, rowidx, this->x_indices, this->n_neg + this->n_pos, (num_t)-1.0, this->rng);
@@ -192,7 +186,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransfer) {
   rpu_device->initUpdateCycle(this->weights, this->up, 1, 1);
 
   // last row update, net 1 (n_pos-n_neg)
-  float dx = rpu_device->getWeightGranularity() * (n_pos - n_neg);
+  float dx = rpu_device->getWeightGranularity() * (num_t)(n_pos - n_neg);
   int rowidx = this->d_size - 1;
   rpu_device->doSparseUpdate(
       this->weights, rowidx, this->x_indices, this->n_neg + this->n_pos, (num_t)-1.0, this->rng);
@@ -231,7 +225,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransfer) {
   for (int j = 0; j < this->d_size; j++) {
     for (int i = 0; i < this->x_size; i++) {
       if (j == rowidx && i == this->colidx) {
-        ASSERT_FLOAT_EQ(this->weights[j][i], sc * dx);
+        ASSERT_FLOAT_EQ(this->weights[j][i], sc * (num_t)dx);
       } else {
         ASSERT_FLOAT_EQ(this->weights[j][i], 0);
       }
@@ -247,7 +241,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransferRows) {
   rpu_device->initUpdateCycle(this->weights, this->up, 1, 1);
 
   // last row update, net 1 (n_pos-n_neg)
-  float dx = rpu_device->getWeightGranularity() * (n_pos - n_neg);
+  float dx = rpu_device->getWeightGranularity() * (num_t)(n_pos - n_neg);
   int rowidx = this->d_size - 1;
   rpu_device->doSparseUpdate(
       this->weights, rowidx, this->x_indices, this->n_neg + this->n_pos, (num_t)-1.0, this->rng);
@@ -286,7 +280,7 @@ TEST_P(RPUDeviceTestFixture, doSparseUpdateWithTransferRows) {
   for (int j = 0; j < this->d_size; j++) {
     for (int i = 0; i < this->x_size; i++) {
       if (j == rowidx && i == this->colidx) {
-        ASSERT_FLOAT_EQ(this->weights[j][i], sc * dx);
+        ASSERT_FLOAT_EQ(this->weights[j][i], sc * (num_t)dx);
       } else {
         ASSERT_FLOAT_EQ(this->weights[j][i], 0);
       }
@@ -299,7 +293,7 @@ TEST_P(RPUDeviceTestFixture, Decay) {
 
   for (int i = 0; i < this->x_size * this->d_size; i++) {
     this->weights[0][i] = w_ref[0][i];
-    w_ref[0][i] *= (1 - 1.0 / this->lifetime);
+    w_ref[0][i] *= ((num_t)1.0 - (num_t)1.0 / this->lifetime);
   }
 
   rpu_device = this->dp->createDevice(this->x_size, this->d_size, &this->rw_rng);
@@ -318,7 +312,7 @@ TEST_P(RPUDeviceTestFixture, DecayNoBiasDecay) {
   for (int i = 0; i < this->x_size * this->d_size; i++) {
     this->weights[0][i] = w_ref[0][i];
     if (i % this->x_size != this->x_size - 1) {
-      w_ref[0][i] *= (1 - 1.0 / this->lifetime);
+      w_ref[0][i] *= ((num_t)1.0 - (num_t)1.0 / this->lifetime);
     }
   }
 

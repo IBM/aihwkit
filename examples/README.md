@@ -533,6 +533,44 @@ For example:
 to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training
 
+## Example 25: [`25_torch_tile_lenet5_hardware_aware.py`]
+
+Hardware-aware training example using the `TorchInferenceRPUConfig`
+which has currently has more limited functionality than using the
+`InferenceRPUConfig`, however, it lets torch autograd define the
+backward pass instead of explicitely defining it. Note that for
+hardware-aware training, the backward and update step is not needed to
+be custom-defined as for analog training. Using autograd has the
+advantage of ease of implementation of new hardware-aware training
+methods. This is show-cased by using a sample-by-sample noise
+injection method that is only available for the autograd-based tile.
+
+## Example 26: [`26_correlation_detection.py`]
+
+Show-casing and plotting different specialized analog training
+algorithms in an simple example of constant gradients.
+
+The example plots similar figures as discussed in [Rasch MJ, Carta F,
+Fagbohungbe O and Gokmen T (2023) Fast offset-corrected in-memeory
+training. ArXiv preprint].
+
+## Example 27: [`27_input_range_calibration`]
+
+Make sure to first run the simple HW-aware training of LeNet using
+`python examples/25_torch_tile_lenet5_hardware_aware.py`. This saves
+the pretrained model that is used in this example.
+This script calibrates the input ranges of the model post-training
+using three techniques:
+- `CACHE_QUANTILE` simply caches the tile inputs and calculates a
+hard-coded quantile as the input range.
+- `MOVING_QUANTILE` approximates the quantile on-the-fly using
+a moving average. This saves memory since we don't need to cache
+everything.
+- `MOVING_STD` also uses a moving average but uses the X-th
+standard deviaiton as the input range.
+
+For each method, the performance (under quantization) is printed.
+
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
@@ -553,6 +591,8 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [Generative Adversarial Network (GAN)]: https://arxiv.org/abs/1406.2661
 [PyTorch library]: https://pytorch.org/vision/stable/models.html
 [ImageNet]: https://www.image-net.org/
+[Rasch MJ, Carta F, Fagbohungbe O and Gokmen T (2023) Fast
+offset-corrected in-memeory training. ArXiv preprint]: https://arxiv.org/abs/2303.04721
 
 [`01_simple_layer.py`]: 01_simple_layer.py
 [`02_multiple_layer.py`]: 02_multiple_layer.py
@@ -578,3 +618,6 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [`22_war_and_peace_lstm.py`]: 22_war_and_peace_lstm.py
 [`23_using_analog_tile_as_matrix.py`]: 23_using_analog_tile_as_matrix.py
 [`24_bert_on_squad.py`]: 24_bert_on_squad.py
+[`25_torch_tile_lenet5_hardware_aware.py`]: 25_torch_tile_lenet5_hardware_aware.py
+[`26_correlation_detection.py`]: 26_correlation_detection.py
+[`27_input_range_calibration`]: 27_input_range_calibration.py

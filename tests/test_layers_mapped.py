@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,18 +25,17 @@ from torch.nn.functional import mse_loss
 
 # Imports from aihwkit.
 from aihwkit.nn import (
-    AnalogLinearMapped, AnalogConv1dMapped,
-    AnalogConv2dMapped,  AnalogConv3dMapped
+    AnalogLinearMapped,
+    AnalogConv1dMapped,
+    AnalogConv2dMapped,
+    AnalogConv3dMapped,
 )
 from aihwkit.optim import AnalogSGD
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import FloatingPoint, Inference, Ideal
-from .helpers.layers import (
-    Linear, LinearCuda, Conv1d, Conv1dCuda, Conv2d,
-    Conv2dCuda, Conv3dCuda
-)
+from .helpers.layers import Linear, LinearCuda, Conv1d, Conv1dCuda, Conv2d, Conv2dCuda, Conv3dCuda
 
 DECIMAL = 4
 
@@ -44,39 +43,42 @@ DECIMAL = 4
 @parametrize_over_layers(
     layers=[Linear, LinearCuda, Conv1d, Conv2d, Conv1dCuda, Conv2dCuda, Conv3dCuda],
     tiles=[FloatingPoint, Inference, Ideal],
-    biases=['digital', None])
+    biases=["digital", None],
+)
 class MappedLayerLinearTest(ParametrizedTestCase):
-    """Tests for the AnalogMappedLayer functionality """
+    """Tests for the AnalogMappedLayer functionality"""
 
     def get_mapped_class(self, model):
         """Returns the mapped class"""
         name = model.__class__.__name__
-        if name == 'AnalogLinear':
+        if name == "AnalogLinear":
             return AnalogLinearMapped
-        if name == 'AnalogConv1d':
+        if name == "AnalogConv1d":
             return AnalogConv1dMapped
-        if name == 'AnalogConv2d':
+        if name == "AnalogConv2d":
             return AnalogConv2dMapped
-        if name == 'AnalogConv3d':
+        if name == "AnalogConv3d":
             return AnalogConv3dMapped
 
         raise RuntimeError("Cannot find mapped module.")
 
     def get_mapped_model(self, model, rpu_config):
         """Returns the mapped model"""
-        mapped_model = self.get_mapped_class(model).from_digital(
-            model, rpu_config=rpu_config)
+        weight, bias = model.weight, model.bias
+        model.weight, model.bias = model.get_weights()
+        mapped_model = self.get_mapped_class(model).from_digital(model, rpu_config=rpu_config)
         mapped_model.reset_parameters()  # should set it explicitly below
+        model.weight, model.bias = weight, bias
         return mapped_model
 
     def get_image_size(self, model):
         """Returns the image size"""
-        if not hasattr(model, 'kernel_size'):
+        if not hasattr(model, "kernel_size"):
             return []
         return (array(model.kernel_size) * 2).tolist()
 
     def train_model(self, model, in_vectors, out_vectors):
-        """Trains a model """
+        """Trains a model"""
 
         opt = AnalogSGD(model.parameters(), lr=0.1)
 
@@ -94,7 +96,7 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         return loss_value
 
     def test_construction(self):
-        """ Test construction of a mapped layer"""
+        """Test construction of a mapped layer"""
         manual_seed(123)
         in_features = 14
         out_features = 5
@@ -124,7 +126,7 @@ class MappedLayerLinearTest(ParametrizedTestCase):
             self.assertTensorAlmostEqual(bias, mapped_bias, decimal=DECIMAL)
 
     def test_training(self):
-        """ Test of training of a mapped linear layer"""
+        """Test of training of a mapped linear layer"""
         manual_seed(123)
 
         in_features = 12
@@ -132,8 +134,6 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         batch_size = 10
 
         rpu_config = self.get_rpu_config()
-        rpu_config.mapping.max_input_size = 10
-        rpu_config.mapping.max_output_size = 6
 
         model = self.get_layer(in_features, out_features, rpu_config=rpu_config)
         weight, bias = model.get_weights()
@@ -142,6 +142,9 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         if self.bias:
             bias = randn(*bias.shape)
         model.set_weights(weight, bias)
+
+        rpu_config.mapping.max_input_size = 10
+        rpu_config.mapping.max_output_size = 6
 
         mapped_model = self.get_mapped_model(model, rpu_config)
         mapped_model.set_weights(weight, bias)
@@ -156,7 +159,7 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         if self.use_cuda:
             out_vectors = out_vectors.cuda()
 
-        # compare predictions for analog linear and analog spit linear layers
+        # compare predictions for analog linear and analog split linear layers
         self.assertTensorAlmostEqual(model(in_vectors), mapped_model(in_vectors), decimal=DECIMAL)
 
         # Define an analog-aware optimizer, preparing it for using the layers.
@@ -169,7 +172,7 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         self.assertTensorAlmostEqual(model(in_vectors), mapped_model(in_vectors), decimal=DECIMAL)
 
     def test_training_after_save(self):
-        """ Test training after it was saved """
+        """Test training after it was saved"""
         manual_seed(123)
 
         in_features = 11
@@ -177,8 +180,6 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         batch_size = 10
 
         rpu_config = self.get_rpu_config()
-        rpu_config.mapping.max_input_size = 10
-        rpu_config.mapping.max_output_size = 4
 
         model = self.get_layer(in_features, out_features, rpu_config=rpu_config)
         weight, bias = model.get_weights()
@@ -187,6 +188,9 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         if self.bias:
             bias = randn(*bias.shape)
         model.set_weights(weight, bias)
+
+        rpu_config.mapping.max_input_size = 10
+        rpu_config.mapping.max_output_size = 4
 
         mapped_model = self.get_mapped_model(model, rpu_config)
         mapped_model.set_weights(weight, bias)
@@ -215,11 +219,10 @@ class MappedLayerLinearTest(ParametrizedTestCase):
         self.assertTensorAlmostEqual(new_weight, weight, decimal=DECIMAL)
         if self.bias:
             self.assertTensorAlmostEqual(new_bias, bias, decimal=DECIMAL)
-            self.assertTensorAlmostEqual(model.bias, bias, decimal=DECIMAL)
-            self.assertTensorAlmostEqual(mapped_model.bias, bias, decimal=DECIMAL)
 
-        for new_tile, tile in zip(list(new_model.analog_tiles()),
-                                  list(mapped_model.analog_tiles())):
+        for new_tile, tile in zip(
+            list(new_model.analog_tiles()), list(mapped_model.analog_tiles())
+        ):
             new_tile_weight, _ = new_tile.get_weights()
             tile_weight, _ = tile.get_weights()
             self.assertTensorAlmostEqual(tile_weight, new_tile_weight, decimal=DECIMAL)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -32,7 +32,7 @@ class CloudRunnerTest(AihwkitTestCase):
     def setUp(self) -> None:
         config = ClientConfiguration()
         if not config.token:
-            raise SkipTest('API token not found')
+            raise SkipTest("API token not found")
 
         self.api_url = config.url
         self.api_token = config.token
@@ -43,15 +43,16 @@ class CloudRunnerTest(AihwkitTestCase):
         cloud_experiments = cloud_runner.list_cloud_experiments()
 
         self.assertIsInstance(cloud_experiments, list)
-        self.assertTrue(all(isinstance(experiment, CloudExperiment)
-                            for experiment in cloud_experiments))
+        self.assertTrue(
+            all(isinstance(experiment, CloudExperiment) for experiment in cloud_experiments)
+        )
 
     def test_get_cloud_experiment(self):
         """Test getting an experiment from an execution."""
         cloud_runner = CloudRunner(self.api_url, self.api_token)
         experiments = cloud_runner.list_cloud_experiments()
         if len(experiments) == 0:
-            raise SkipTest('No executions found')
+            raise SkipTest("No executions found")
 
         listed_experiment = experiments[0]
         cloud_experiment = cloud_runner.get_cloud_experiment(listed_experiment.id_)
@@ -64,10 +65,10 @@ class CloudRunnerTest(AihwkitTestCase):
         cloud_runner = CloudRunner(self.api_url, self.api_token)
         experiments = cloud_runner.list_cloud_experiments()
         if len(experiments) == 0:
-            raise SkipTest('No executions found')
+            raise SkipTest("No executions found")
 
         cloud_experiment = experiments[-1].get_experiment()
-        if 'BasicInferencing' in str(cloud_experiment):
+        if "BasicInferencing" in str(cloud_experiment):
             self.assertIsInstance(cloud_experiment, BasicInferencing)
         else:
             self.assertIsInstance(cloud_experiment, BasicTraining)
@@ -77,7 +78,7 @@ class CloudRunnerTest(AihwkitTestCase):
         cloud_runner = CloudRunner(self.api_url, self.api_token)
         cloud_experiments = cloud_runner.list_cloud_experiments()
         if len(cloud_experiments) == 0:
-            raise SkipTest('No executions found')
+            raise SkipTest("No executions found")
 
         for experiment in cloud_experiments:
             if experiment.job.status == CloudJobStatus.COMPLETED:
@@ -85,22 +86,20 @@ class CloudRunnerTest(AihwkitTestCase):
                 self.assertIsInstance(output, list)
                 break
         else:
-            raise SkipTest('No completed executions found')
+            raise SkipTest("No completed executions found")
 
 
-@parametrize_over_experiments([
-    FullyConnectedFashionMNIST
-])
+@parametrize_over_experiments([FullyConnectedFashionMNIST])
 class CloudRunnerCreateTest(AihwkitTestCase):
     """Tests for the AIHW Composer CloudRunner involving experiment creation."""
 
     def setUp(self) -> None:
-        if not os.getenv('TEST_CREATE'):
-            raise SkipTest('TEST_CREATE not set')
+        if not os.getenv("TEST_CREATE"):
+            raise SkipTest("TEST_CREATE not set")
 
         config = ClientConfiguration()
         if not config.token:
-            raise SkipTest('API token not found')
+            raise SkipTest("API token not found")
 
         self.api_url = config.url
         self.api_token = config.token
@@ -110,8 +109,7 @@ class CloudRunnerCreateTest(AihwkitTestCase):
         cloud_runner = CloudRunner(self.api_url, self.api_token)
         cloud_experiment = self.get_experiment()
 
-        api_experiment = cloud_runner.run(cloud_experiment,
-                                          device='cpu')
+        api_experiment = cloud_runner.run(cloud_experiment, device="cpu")
         self.assertIsInstance(api_experiment, CloudExperiment)
 
         # Assert the experiment shows in the list.

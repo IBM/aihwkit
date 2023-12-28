@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,18 +27,12 @@
 
 #define TOLERANCE 1e-4
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
 
 #define NO_REFERENCE_CHECK                                                                         \
-  if ((m_batch != m_batch_test) || (dw_min_std > 0)) {                                             \
+  if ((m_batch != m_batch_test) || (dw_min_std > (num_t)0.0)) {                                    \
     std::cout << BOLD_ON                                                                           \
               << "\n**WARNING: No reference check possible [adjust noise and batch settings]!\n\n" \
               << BOLD_OFF;                                                                         \
@@ -159,7 +153,7 @@ public:
               x_counts + i_batch * x_size * nK32, x_size, d_counts + i_batch * d_size * nK32,
               d_size, K, j, i);
 
-          ref_w_batch[k] -= dw_min * n;
+          ref_w_batch[k] -= dw_min * (num_t)n;
           if (n < 0)
             ref_w_batch[k] = (ref_w_batch[k] > bound) ? bound : ref_w_batch[k];
           else
@@ -217,12 +211,20 @@ public:
     ChoppedWeightOutput<num_t> cwo(c, x_size, d_size);
     cwo.setFlexibleInSize(flexible_in_size);
     cwo.setPar(cwo_par);
-    // make longer for curand
-    CudaArray<num_t> dev_x_in(c, ((x_size * m_batch) + 31) / 32 * 32);
-    CudaArray<num_t> dev_d_in(c, ((d_size * m_batch) + 31) / 32 * 32);
 
-    c->randNormal(dev_x_in.getData(), dev_x_in.getSize(), 0.0, 1.0);
-    c->randNormal(dev_d_in.getData(), dev_d_in.getSize(), 0.0, dw_min * K / sparsity);
+    int n_x = ((x_size * m_batch) + 31) / 32 * 32;
+    int n_d = ((d_size * m_batch) + 31) / 32 * 32;
+
+    CudaArray<float> dev_x_in_float(c, n_x);
+    CudaArray<float> dev_d_in_float(c, n_d);
+
+    CudaArray<num_t> dev_x_in(c, n_x);
+    CudaArray<num_t> dev_d_in(c, n_d);
+
+    c->randNormal(dev_x_in_float.getData(), n_x, 0.0, 1.0);
+    c->randNormal(dev_d_in_float.getData(), n_d, 0.0, dw_min * (num_t)K / sparsity);
+    RPU::math::elemcopy(c, dev_x_in.getData(), n_x, 1, dev_x_in_float.getDataConst(), 1);
+    RPU::math::elemcopy(c, dev_d_in.getData(), n_d, 1, dev_d_in_float.getDataConst(), 1);
 
     bool implicit_pulses = false;
     up.desired_BL = K;

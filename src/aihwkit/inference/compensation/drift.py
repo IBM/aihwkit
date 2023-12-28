@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -39,4 +39,4 @@ class GlobalDriftCompensation(BaseDriftCompensation):
         return eye(in_size)
 
     def __str__(self) -> str:
-        return '{}()'.format(self.__class__.__name__)
+        return "{}()".format(self.__class__.__name__)

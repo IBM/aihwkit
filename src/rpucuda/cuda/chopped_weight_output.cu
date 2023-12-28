@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -184,6 +184,53 @@ template <typename T> void ChoppedWeightOutput<T>::printToStream(std::stringstre
   ss << std::endl;
 };
 
+template <typename T>
+void ChoppedWeightOutput<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+
+  // don't handle maximizers (no states)
+  RPU::insert(state, "current_m_batch", current_m_batch_);
+  RPU::insert(state, "cwo_counter", cwo_counter_);
+  RPU::insert(state, "nwo_counter", nwo_counter_);
+  RPU::insert(state, "flexible_in_size", flexible_in_size_);
+  RPU::insert(state, "swapped_choppers", swapped_choppers_);
+  RPU::insert(state, "dev_switching_probs", dev_switching_probs_);
+  RPU::insert(state, "dev_weight_output_out_chopper", dev_weight_output_out_chopper_);
+  RPU::insert(state, "dev_weight_output_in_chopper", dev_weight_output_in_chopper_);
+  RPU::insert(state, "dev_weight_output_signals", dev_weight_output_signals_);
+  RPU::insert(state, "dev_x_chopper_buffer_1", dev_x_chopper_buffer_1_);
+  RPU::insert(state, "dev_x_chopper_buffer_2", dev_x_chopper_buffer_2_);
+  RPU::insert(state, "dev_d_chopper_buffer_1", dev_d_chopper_buffer_1_);
+  RPU::insert(state, "dev_d_chopper_buffer_2", dev_d_chopper_buffer_2_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void ChoppedWeightOutput<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  using V = std::vector<T>;
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "current_m_batch", current_m_batch_, strict);
+  RPU::load(state, "cwo_counter", cwo_counter_, strict);
+  RPU::load(state, "nwo_counter", nwo_counter_, strict);
+  RPU::load(state, "flexible_in_size", flexible_in_size_, strict);
+  RPU::load(state, "swapped_choppers", swapped_choppers_, strict);
+  RPU::load(this->context_, state, "dev_switching_probs", dev_switching_probs_, strict);
+  RPU::load(
+      this->context_, state, "dev_weight_output_out_chopper", dev_weight_output_out_chopper_,
+      strict);
+  RPU::load(
+      this->context_, state, "dev_weight_output_in_chopper", dev_weight_output_in_chopper_, strict);
+  RPU::load(this->context_, state, "dev_weight_output_signals", dev_weight_output_signals_, strict);
+  RPU::load(this->context_, state, "dev_x_chopper_buffer_1", dev_x_chopper_buffer_1_, strict);
+  RPU::load(this->context_, state, "dev_x_chopper_buffer_2", dev_x_chopper_buffer_2_, strict);
+  RPU::load(this->context_, state, "dev_d_chopper_buffer_1", dev_d_chopper_buffer_1_, strict);
+  RPU::load(this->context_, state, "dev_d_chopper_buffer_2", dev_d_chopper_buffer_2_, strict);
+}
+
 /******************************************************************************************************************/
 
 template <typename T> int ChoppedWeightOutput<T>::getValStart() const {
@@ -285,7 +332,7 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
 
   int max_weight_outputs = par_.every > 0 ? (current_m_batch_ + par_.every - 1) / par_.every : 0;
   int sw_size = (x_size_ + d_size_) * max_weight_outputs;
-  if (max_weight_outputs > 0 && (par_.in_chop_random || par_.out_chop_prob > 0)) {
+  if (max_weight_outputs > 0 && (par_.in_chop_random || par_.out_chop_prob > (T)0.0)) {
     RPU_GET_CUDA_BUFFER(context_, float, dev_switching_probs_, sw_size);
   }
 
@@ -300,19 +347,18 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
           context_, chop_t, dev_weight_output_out_chopper_, n_weight_outputs * getOutSize());
       RPU_GET_CUDA_BUFFER(context_, chop_t, dev_weight_output_in_chopper_, n_weight_outputs);
 
-      if (par_.in_chop_random || par_.out_chop_prob > 0) {
+      if (par_.in_chop_random || par_.out_chop_prob > (T)0.0) {
         context_->randUniform(dev_switching_probs_->getData(), sw_size);
 
         x_switching_probs_ = dev_switching_probs_->getData();
         d_switching_probs_ = dev_switching_probs_->getData() + x_size_ * max_weight_outputs;
       }
+      // out put is done in the correct row/col of a weight matrix
+      // (where the non-output rows/cols are random). In case that n_wo
+      // is larger than in_size then a second weight matrix is populated
+      // and so on
+      weight_outputs_ = context_->template getSharedBuffer<T>(RPU_BUFFER_CWO, getWODataSize());
     }
-
-    // out put is done in the correct row/col of a weight matrix
-    // (where the non-output rows/cols are random). In case that n_wo
-    // is larger than in_size then a second weight matrix is populated
-    // and so on
-    weight_outputs_ = context_->template getSharedBuffer<T>(RPU_BUFFER_CWO, getWODataSize());
   }
 
   if (blm->usesBo64() && blm->getCurrentUBLM()) {
@@ -335,6 +381,9 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
 template class ChoppedWeightOutput<float>;
 #ifdef RPU_USE_DOUBLE
 template class ChoppedWeightOutput<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ChoppedWeightOutput<half_t>;
 #endif
 
 } // namespace RPU

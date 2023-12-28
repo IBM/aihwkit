@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -89,7 +89,7 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weight matrix
@@ -181,8 +181,8 @@ public:
       // std::cout << i << ": d1 " << this->d1[i] << " vs d2 " << this->d2[i] << std::endl;
       ASSERT_NEAR(this->d1[i], this->d2[i], TOLERANCE);
 
-      accum += fabs(this->d2[i] - this->d3[i]);
-      accum += fabs(this->d1[i] - this->d3[i]);
+      accum += fabsf((double)(this->d2[i] - this->d3[i]));
+      accum += fabsf((double)(this->d1[i] - this->d3[i]));
     }
     ASSERT_TRUE(accum > TOLERANCE);
 
@@ -229,8 +229,8 @@ public:
 
       ASSERT_NEAR(this->x1[i], this->x2[i], TOLERANCE);
 
-      accum += fabs(this->x2[i] - this->x3[i]);
-      accum += fabs(this->x1[i] - this->x3[i]);
+      accum += fabs((double)(this->x2[i] - this->x3[i]));
+      accum += fabs((double)(this->x1[i] - this->x3[i]));
     }
     ASSERT_TRUE(accum > TOLERANCE);
 
@@ -264,13 +264,7 @@ public:
   T noise_value;
 };
 
-// types
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> Tios;
-#else
-typedef ::testing::Types<float> Tios;
-#endif
-
+typedef ::testing::Types<num_t, float> Tios;
 TYPED_TEST_CASE(FBTestFixtureNoNoise, Tios);
 
 TYPED_TEST(FBTestFixtureNoNoise, IRDrop) {

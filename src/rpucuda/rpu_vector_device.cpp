@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -90,6 +90,9 @@ bool VectorRPUDeviceMetaParameter<T>::appendVecPar(const AbstractRPUDeviceMetaPa
 template struct VectorRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct VectorRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct VectorRPUDeviceMetaParameter<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -326,6 +329,39 @@ void VectorRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
   this->setWeightGranularity(weight_granularity);
 };
 
+template <typename T>
+void VectorRPUDevice<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  PulsedRPUDeviceBase<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+    rpu_device_vec_[k]->dumpExtra(state, std::to_string(k));
+  }
+  RPU::insert(state, "reduce_weightening", reduce_weightening_);
+  RPU::insert(state, "current_device_idx", current_device_idx_);
+  RPU::insert(state, "current_update_idx", current_update_idx_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void VectorRPUDevice<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  PulsedRPUDeviceBase<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+    rpu_device_vec_[k]->loadExtra(state, std::to_string(k), strict);
+  }
+  RPU::load(state, "reduce_weightening", reduce_weightening_, strict);
+  RPU::load(state, "current_device_idx", current_device_idx_, strict);
+  RPU::load(state, "current_update_idx", current_update_idx_, strict);
+}
+
 template <typename T> void VectorRPUDevice<T>::printDP(int x_count, int d_count) const {
 
   int x_count1 = x_count;
@@ -383,9 +419,9 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
         par.vec_par[k]->createDevice(this->x_size_, this->d_size_, rng)));
     weight_granularity += rpu_device_vec_.back()->getWeightGranularity();
 
-    reduce_weightening_.push_back((T)1.0 / n_devices_); // average per default
+    reduce_weightening_.push_back((T)1.0 / (T)n_devices_); // average per default
   }
-  weight_granularity = weight_granularity / n_devices_;
+  weight_granularity = weight_granularity / (T)n_devices_;
   this->setWeightGranularity(weight_granularity);
 
   // default weightening can be overwritten by given gamma_vec
@@ -413,7 +449,7 @@ void VectorRPUDevice<T>::initUpdateCycle(
 
   switch (par.update_policy) {
   case VectorDeviceUpdatePolicy::SingleRandom: {
-    this->current_device_idx_ = (int)floor(rw_rng_.sampleUniform() * this->n_devices_);
+    this->current_device_idx_ = (int)floorf(rw_rng_.sampleUniform() * (T)this->n_devices_);
     break;
   }
   case VectorDeviceUpdatePolicy::SingleSequential: {
@@ -581,6 +617,9 @@ template <typename T> bool VectorRPUDevice<T>::onSetWeights(T **weights) {
 template class VectorRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class VectorRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class VectorRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -34,11 +34,12 @@ from aihwkit.simulator.configs.devices import PulsedDevice
 from aihwkit.simulator.configs.configs import SingleRPUConfig
 from aihwkit.simulator.tiles.analog import AnalogTile
 
-RPUConfigGeneric = TypeVar('RPUConfigGeneric')
+RPUConfigGeneric = TypeVar("RPUConfigGeneric")
 
 
-def _apply_parameters_to_config(device_config: Union[PulsedDevice, RPUConfigGeneric],
-                                params: Parameters) -> None:
+def _apply_parameters_to_config(
+    device_config: Union[PulsedDevice, RPUConfigGeneric], params: Parameters
+) -> None:
     """Apply the fit parameters to the device config.
 
     Args:
@@ -51,7 +52,7 @@ def _apply_parameters_to_config(device_config: Union[PulsedDevice, RPUConfigGene
     if isinstance(device_config, PulsedDevice):
         device = device_config
     else:
-        device = getattr(device_config, 'device')  # type ignore
+        device = getattr(device_config, "device")  # type ignore
 
     for par, value in parvals.items():
         if not hasattr(device, par):
@@ -59,20 +60,19 @@ def _apply_parameters_to_config(device_config: Union[PulsedDevice, RPUConfigGene
         setattr(device, par, value)
 
 
-def fit_measurements(parameters: Union[Dict, Parameters],
-                     pulse_data: Union[Tuple[ndarray], ndarray],
-                     response_data: Union[Tuple[ndarray], ndarray],
-                     device_config: Union[PulsedDevice, RPUConfigGeneric],
-                     suppress_device_noise: bool = True,
-                     max_pulses: Optional[int] = 1,
-                     n_traces: int = 1,
-                     fit_weights: Optional[Union[Tuple[int], int]] = None,
-                     method: str = 'powell',
-                     verbose: bool = False,
-                     **fit_kwargs: Any
-                     ) -> Tuple[Any,
-                                Union[PulsedDevice, RPUConfigGeneric],
-                                List[ndarray]]:
+def fit_measurements(
+    parameters: Union[Dict, Parameters],
+    pulse_data: Union[Tuple[ndarray], ndarray],
+    response_data: Union[Tuple[ndarray], ndarray],
+    device_config: Union[PulsedDevice, RPUConfigGeneric],
+    suppress_device_noise: bool = True,
+    max_pulses: Optional[int] = 1,
+    n_traces: int = 1,
+    fit_weights: Optional[Union[Tuple[int], int]] = None,
+    method: str = "powell",
+    verbose: bool = False,
+    **fit_kwargs: Any,
+) -> Tuple[Any, Union[PulsedDevice, RPUConfigGeneric], List[ndarray]]:
     """Fit pulse response measurement to the given device model using lmfit.
 
     For example:
@@ -167,7 +167,7 @@ def fit_measurements(parameters: Union[Dict, Parameters],
 
     if suppress_device_noise:
         for field in fields(rpu_config.device):
-            if field.name.endswith('dtod') or field.name.endswith('std'):
+            if field.name.endswith("dtod") or field.name.endswith("std"):
                 setattr(rpu_config.device, field.name, 0.0)
 
     params = Parameters()
@@ -185,8 +185,7 @@ def fit_measurements(parameters: Union[Dict, Parameters],
 
     # fit parameters
     args = (pulse_data, response_data, rpu_config, n_traces, fit_weights, verbose)
-    result = minimize(model_response, params, args=args,
-                      method=method, **fit_kwargs)
+    result = minimize(model_response, params, args=args, method=method, **fit_kwargs)
     if verbose:
         report_fit(result)
 
@@ -196,15 +195,16 @@ def fit_measurements(parameters: Union[Dict, Parameters],
     return result, device_config, best_model_res  # type: ignore
 
 
-def model_response(params: Parameters,
-                   pulse_data: Union[Tuple[ndarray], ndarray],
-                   response_data: Union[Tuple[ndarray], ndarray],
-                   rpu_config: RPUConfigGeneric,
-                   n_traces: int = 1,
-                   fit_weights: Optional[Union[Tuple[int], int]] = None,
-                   verbose: bool = True,
-                   only_response: bool = False,
-                   ) -> Union[ndarray, List[ndarray]]:
+def model_response(
+    params: Parameters,
+    pulse_data: Union[Tuple[ndarray], ndarray],
+    response_data: Union[Tuple[ndarray], ndarray],
+    rpu_config: RPUConfigGeneric,
+    n_traces: int = 1,
+    fit_weights: Optional[Union[Tuple[int], int]] = None,
+    verbose: bool = True,
+    only_response: bool = False,
+) -> Union[ndarray, List[ndarray]]:
     """Compute the model respunses given the pulses.
 
     Args:
@@ -248,10 +248,10 @@ def model_response(params: Parameters,
     # tile, repeats are quick though
     no_list = False
     if not isinstance(pulse_data, tuple):
-        pulse_data = (pulse_data, )
-        response_data = (response_data, )  # type: ignore
+        pulse_data = (pulse_data,)
+        response_data = (response_data,)  # type: ignore
         if fit_weights is not None:
-            fit_weights = (fit_weights, )  # type: ignore
+            fit_weights = (fit_weights,)  # type: ignore
         no_list = True
 
     numpy_pulses = array(pulse_data[0])
@@ -262,29 +262,35 @@ def model_response(params: Parameters,
     analog_tile = AnalogTile(n_traces, n_devices, rpu_config)  # type: ignore
     analog_tile.set_learning_rate(1)
 
-    deviation = array([])
+    deviation = array([], "float")
     model_responses = []
     for idx, (numpy_pulses, response) in enumerate(zip(pulse_data, response_data)):
+        if numpy_pulses.ndim == 1:
+            numpy_pulses = numpy_pulses.reshape(-1, 1)
+        if response.ndim == 1:
+            response = response.reshape(-1, 1)
+
         w_init = response[0, :]
-        weights = from_numpy(array(w_init).flatten()[newaxis, :]
-                             ).to(dtype=float32) * ones((n_traces, n_devices), dtype=float32)
+        weights = from_numpy(array(w_init).flatten()[newaxis, :]).to(dtype=float32) * ones(
+            (n_traces, n_devices), dtype=float32
+        )
         analog_tile.set_weights(weights)
         pulses = from_numpy(numpy_pulses).to(dtype=float32)
         w_trace = [weights]
         for pulse in pulses[:-1]:
-            analog_tile.update(pulse * ones(n_devices, dtype=float32),
-                               -ones((n_traces), dtype=float32))
+            analog_tile.update(
+                pulse * ones(n_devices, dtype=float32), -ones((n_traces), dtype=float32)
+            )
             w_trace.append(analog_tile.tile.get_weights())
 
         stacked_w_trace = stack(w_trace).cpu().numpy()
-
         # compute square error
         num_samples = response.shape[0]
         avg_w_trace = stacked_w_trace.mean(axis=1)[:num_samples, :]
         model_responses.append(avg_w_trace)
-        dev = (avg_w_trace - response)
+        dev = avg_w_trace - response
         if fit_weights is not None:
-            dev = dev * array(fit_weights[idx])[:dev.shape[1]]  # type: ignore
+            dev = dev * array(fit_weights[idx])[: dev.shape[1]]  # type: ignore
         deviation = concatenate([deviation, dev.flatten()])
 
     if only_response:

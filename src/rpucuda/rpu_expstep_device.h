@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,28 +41,29 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t es_gamma_down:\t\t" << es_gamma_down << std::endl;
     ss << "\t es_a:\t\t\t" << es_a << std::endl;
     ss << "\t es_b:\t\t\t" << es_b << std::endl;
-    if (dw_min_std_add != 0.0) {
+    if (dw_min_std_add != (T)0.0) {
       ss << "\t dw_min_std_add:\t " << dw_min_std_add << std::endl;
-    } if (dw_min_std_slope != 0.0) {
+    } if (dw_min_std_slope != (T)0.0) {
       ss << "\t dw_min_std_slope:\t " << dw_min_std_slope << std::endl;
     },
     /* calc weight granularity body */
     T up_down = this->up_down;
-    T up_bias = up_down > 0.0 ? (T)0.0 : up_down;
-    T down_bias = up_down > 0.0 ? -up_down : (T)0.0;
+    T up_bias = up_down > (T)0.0 ? (T)0.0 : up_down;
+    T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
     T scale_up = (T)(up_bias + (T)1.0) * this->dw_min;
     T scale_down = (T)(down_bias + (T)1.0) * this->dw_min;
     T w = (T)0.0; // just take at zero
     T z = (T)2.0 * w / (this->w_max - this->w_min) * es_a + es_b;
-    T dw_down = scale_down * MAX((T)1.0 - (T)es_A_down * exp(es_gamma_down * (-z)), (T)0.0);
-    T dw_up = scale_up * MAX((T)1.0 - (T)es_A_up * exp(es_gamma_up * z), (T)0.0);
+    T dw_down = scale_down * MAX((T)1.0 - (T)es_A_down * (T)expf((es_gamma_down * (-z))), (T)0.0);
+    T dw_up = scale_up * MAX((T)1.0 - (T)es_A_up * (T)expf((es_gamma_up * z)), (T)0.0);
     T weight_granularity = MAX((dw_down + dw_down) / (T)2.0, (T)0.0);
     return weight_granularity > (T)0.0 ? weight_granularity : this->dw_min;
     ,
     /*add */
     bool implementsWriteNoise() const override { return true; };
     inline bool hasComplexNoise() const {
-      return ((this->dw_min_std > 0) && (dw_min_std_slope != 0.0f || dw_min_std_add != 0.0f));
+      return (
+          (this->dw_min_std > (T)0.0) && (dw_min_std_slope != (T)0.0 || dw_min_std_add != (T)0.0));
     };);
 
 template <typename T> class ExpStepRPUDevice : public PulsedRPUDevice<T> {

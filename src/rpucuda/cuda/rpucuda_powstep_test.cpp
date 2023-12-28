@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -24,17 +24,11 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
 
-class RPUCudaPowStepTestFixture : public ::testing::TestWithParam<num_t> {
+class RPUCudaPowStepTestFixture : public ::testing::TestWithParam<float> {
 public:
   void SetUp() {
 
@@ -115,15 +109,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(context, x_size);
@@ -193,7 +187,7 @@ INSTANTIATE_TEST_CASE_P(GammaTest, RPUCudaPowStepTestFixture, ::testing::Values(
     count_diff = 0;                                                                                \
     for (int i = 0; i < this->d_size; i++) {                                                       \
       for (int j = 0; j < this->x_size; j++) {                                                     \
-        ASSERT_NEAR(weights[i][j], cuweights[i][j], TOLERANCE);                                    \
+        ASSERT_NEAR((float)weights[i][j], (float)cuweights[i][j], TOLERANCE);                      \
         count_diff += weights[i][j] != refweights[i][j];                                           \
       }                                                                                            \
     }                                                                                              \
@@ -204,9 +198,9 @@ INSTANTIATE_TEST_CASE_P(GammaTest, RPUCudaPowStepTestFixture, ::testing::Values(
       this->layer_pulsed->setWeights(refweights[0]);                                               \
     }                                                                                              \
   }                                                                                                \
-  std::cout << BOLD_ON << "\nCUDA Updates done in: " << (num_t)cudur / 1000. / nloop << " msec. "  \
+  std::cout << BOLD_ON << "\nCUDA Updates done in: " << (float)cudur / 1000. / nloop << " msec. "  \
             << BOLD_OFF << std::endl;                                                              \
-  std::cout << BOLD_ON << "RPU Updates done in: " << (num_t)dur / 1000. / nloop << " msec.\n "     \
+  std::cout << BOLD_ON << "RPU Updates done in: " << (float)dur / 1000. / nloop << " msec.\n "     \
             << BOLD_OFF << std::endl;                                                              \
                                                                                                    \
   Array_2D_Free(refweights);

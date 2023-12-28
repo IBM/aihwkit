@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -38,14 +38,10 @@ extern "C" {
 #endif
 
 namespace RPU {
-#ifdef RPU_USE_DOUBLE
-template <> void RPUAbstract<double>::printToStream(std::stringstream &ss) const {
-  ss << "RPUAbstract<double>(" << d_size_ << "," << x_size_ << ")\n";
-}
-#endif
 
-template <> void RPUAbstract<float>::printToStream(std::stringstream &ss) const {
-  ss << "RPUAbstract<float>(" << d_size_ << "," << x_size_ << ")\n";
+template <typename T> void RPUAbstract<T>::printToStream(std::stringstream &ss) const {
+  ss << "RPUAbstract<" << this->getDataTypeName() << ">(" << d_size_ << "," << x_size_ << ")"
+     << std::endl;
 }
 
 /********************************************************************************/
@@ -154,11 +150,30 @@ void RPUAbstract<T>::updateMatrixBias(
   }
 }
 
+template <> std::string RPUAbstract<float>::getDataTypeName() const { return "float"; }
+
+#ifdef RPU_USE_DOUBLE
+template <> std::string RPUAbstract<double>::getDataTypeName() const { return "double"; }
+#endif
+
+#ifdef RPU_USE_FP16
+template <> std::string RPUAbstract<half_t>::getDataTypeName() const {
+#ifdef RPU_BFLOAT_AS_FP16
+  return "bfloat16";
+#else
+  return "float16";
+#endif
+}
+#endif
+
 /********************************************************************************/
+template class RPUAbstract<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUAbstract<double>;
 #endif
-template class RPUAbstract<float>;
+#ifdef RPU_USE_FP16
+template class RPUAbstract<half_t>;
+#endif
 
 /********************************************************************************
  * SimpleMetaParameter
@@ -169,23 +184,40 @@ template <typename T> void SimpleMetaParameter<T>::printToStream(std::stringstre
   if (use_delayed_update) {
     ss << "Using DELAYED update." << std::endl;
   }
-  if (lifetime > 0) {
+  if (lifetime > (T)0.0) {
     ss << "\t lifetime [decay]:\t" << lifetime << std::endl;
   }
-  if (drift.nu > 0) {
+  if (drift.nu > (T)0.0) {
     drift.printToStream(ss);
   }
-  if (diffusion > 0) {
+  if (diffusion > (T)0.0) {
     ss << "\t diffusion:\t\t" << diffusion << std::endl;
+    flicker.printToStream(ss);
   }
 }
 
+template <typename T> void FlickerParameter<T>::printToStream(std::stringstream &ss) const {
+  ss << "\t n_flicker:\t\t" << n << std::endl;
+  ss << "\t flicker_r:\t\t" << r << std::endl;
+  ss << "\t flicker_q:\t\t" << q << std::endl;
+  ss << "\t flicker_h:\t\t" << h << std::endl;
+  ss << "\t flicker_wreset:\t" << std::boolalpha << wreset << std::endl;
+  ss << "\t flicker_wreset_tol:\t" << wreset_tol << std::endl;
+}
+
+template struct SimpleMetaParameter<float>;
+template struct FlickerParameter<float>;
+template struct DriftParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct SimpleMetaParameter<double>;
+template struct FlickerParameter<double>;
 template struct DriftParameter<double>;
 #endif
-template struct SimpleMetaParameter<float>;
-template struct DriftParameter<float>;
+#ifdef RPU_USE_FP16
+template struct SimpleMetaParameter<half_t>;
+template struct FlickerParameter<half_t>;
+template struct DriftParameter<half_t>;
+#endif
 
 /********************************************************************************
  * RPUSimple<T>
@@ -204,21 +236,15 @@ template <typename T> void RPUSimple<T>::initialize(int x_sz, int d_sz) {
 
   for (int i = 0; i < d_sz; ++i) {
     for (int j = 0; j < x_sz; ++j) {
-      weights_[i][j] = (i + 1) * (T)100.0 + (j + 1);
+      weights_[i][j] = (T)((i + 1) * 0.01 + (0.01 * j + 1));
     }
   }
   weights_buffer_ = Array_2D_Get<T>(d_sz, x_sz);
 
-  temp_x_matrix_bias_size_ = 0;
-  temp_x_matrix_bias_ = nullptr;
-
-  temp_tensor_size_ = 0;
-  temp_tensor_ = nullptr;
-
   matrix_indices_ = nullptr;
   matrix_indices_set_ = false;
 
-  temp_x_vector_bias_ = new T[x_sz];
+  temp_x_vector_bias_.resize(x_sz);
 
   rng_ = std::make_shared<RNG<T>>(0);
   rw_rng_ = std::make_shared<RealWorldRNG<T>>(0);
@@ -241,9 +267,6 @@ template <typename T> RPUSimple<T>::RPUSimple(int x_sz, int d_sz) : RPUAbstract<
 /*********************************************************************************/
 template <typename T> RPUSimple<T>::~RPUSimple() {
 
-  delete[] temp_x_vector_bias_;
-
-  temp_x_vector_bias_ = nullptr;
   rng_ = nullptr;
   rw_rng_ = nullptr;
 
@@ -259,16 +282,6 @@ template <typename T> RPUSimple<T>::~RPUSimple() {
   if (fb_weights_ != nullptr) {
     Array_2D_Free<T>(fb_weights_);
   }
-
-  if (temp_x_matrix_bias_ != nullptr) {
-    delete[] temp_x_matrix_bias_;
-  }
-  temp_x_matrix_bias_ = nullptr;
-
-  if (temp_tensor_ != nullptr) {
-    delete[] temp_tensor_;
-  }
-  temp_tensor_ = nullptr;
 
   matrix_indices_ = nullptr; // memory externally governed
 
@@ -310,13 +323,10 @@ template <typename T> RPUSimple<T>::RPUSimple(const RPUSimple<T> &other) : RPUAb
 
   use_delayed_update_ = other.use_delayed_update_;
 
-  temp_x_matrix_bias_size_ = 0;
-  temp_x_matrix_bias_ = nullptr; // will be generated a new if needed
-
-  temp_tensor_size_ = 0;
-  temp_tensor_ = nullptr; // will be generated a new if needed
-
   par_ = other.par_;
+
+  flicker_probs_ = other.flicker_probs_;
+  flicker_states_ = other.flicker_states_;
 
   matrix_indices_ = other.matrix_indices_;
   matrix_indices_set_ = other.matrix_indices_set_;
@@ -348,9 +358,6 @@ template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(RPUSimple<T> &&other
 
   RPUAbstract<T>::operator=(std::move(other));
 
-  temp_x_vector_bias_ = other.temp_x_vector_bias_;
-  other.temp_x_vector_bias_ = nullptr;
-
   use_delayed_update_ = other.use_delayed_update_;
 
   rng_ = std::move(other.rng_);
@@ -373,17 +380,11 @@ template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(RPUSimple<T> &&other
 
   fb_weight_modifier_ = std::move(other.fb_weight_modifier_);
 
+  temp_x_vector_bias_ = other.temp_x_vector_bias_;
   temp_x_matrix_bias_ = other.temp_x_matrix_bias_;
-  other.temp_x_matrix_bias_ = nullptr;
-
-  temp_x_matrix_bias_size_ = other.temp_x_matrix_bias_size_;
-  other.temp_x_matrix_bias_size_ = 0;
-
   temp_tensor_ = other.temp_tensor_;
-  other.temp_tensor_ = nullptr;
-
-  temp_tensor_size_ = other.temp_tensor_size_;
-  other.temp_tensor_size_ = 0;
+  flicker_states_ = other.flicker_states_;
+  flicker_probs_ = other.flicker_probs_;
 
   matrix_indices_ = other.matrix_indices_;
   other.matrix_indices_ = nullptr;
@@ -400,6 +401,109 @@ template <typename T> RPUSimple<T> &RPUSimple<T>::operator=(RPUSimple<T> &&other
   bwd_alpha_ = other.bwd_alpha_;
 
   return *this;
+}
+
+/*********************************************************************************/
+/* dump / load state */
+
+template <typename T> void RPUSimple<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  // This dumps all the temporary buffers needed for setting the
+  // state.  It will not store the meta-parameters and the sizes it
+  // will also not store the buffers that are already handled by
+  // getDeviceParameters
+  using V = std::vector<T>;
+
+  V tmp(this->x_size_ * this->d_size_);
+  RPU::state_t state;
+
+  if (this->fb_weights_) {
+    RPU::math::copy<T>(tmp.size(), this->fb_weights_[0], 1, tmp.data(), 1);
+    RPU::insert(state, "fb_weights", tmp);
+    fb_weight_modifier_->dumpExtra(state, "fb_weight_modifier");
+  }
+
+  RPU::math::copy<T>(tmp.size(), this->weights_buffer_[0], 1, tmp.data(), 1);
+  if (use_delayed_update_) {
+    RPU::insert(state, "weights_buffer", tmp);
+  }
+
+  if (wdrifter_) {
+    wdrifter_->dumpExtra(state, "wdrifter");
+  }
+  if (wclipper_) {
+    wclipper_->dumpExtra(state, "wclipper");
+  }
+  if (wremapper_) {
+    wremapper_->dumpExtra(state, "wremapper");
+  }
+
+  // ignore the temporary buffers
+  // matrix_indices_ not handled... set from outside
+  // RNG (seeds) not copied
+
+  RPU::insert(state, "learning_rate", this->learning_rate_);
+  RPU::insert(state, "flicker_probs", flicker_probs_);
+  RPU::insert(state, "flicker_states", flicker_states_);
+  RPU::insert(state, "use_delayed_update", use_delayed_update_);
+  RPU::insert(state, "last_update_m_batch", last_update_m_batch_);
+  RPU::insert(state, "fwd_alpha", fwd_alpha_);
+  RPU::insert(state, "bwd_alpha", bwd_alpha_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void RPUSimple<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  using V = std::vector<T>;
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  if (state.count("fb_weights")) {
+    V tmp;
+    RPU::load(state, "fb_weights", tmp, strict);
+    if (tmp.size()) {
+      if (fb_weights_ == nullptr) {
+        fb_weights_ = Array_2D_Get<T>(this->d_size_, this->x_size_);
+        fb_weight_modifier_ = RPU::make_unique<WeightModifier<T>>(this->x_size_, this->d_size_);
+      }
+      RPU::math::copy<T>(tmp.size(), tmp.data(), 1, fb_weights_[0], 1);
+    }
+  }
+
+  if (state.count("wdrifter")) {
+    if (!wdrifter_) {
+      wdrifter_ = RPU::make_unique<WeightDrifter<T>>(this->x_size_ * this->d_size_, getPar().drift);
+    }
+    wdrifter_->loadExtra(state, "wdrifter", strict);
+  }
+
+  if (state.count("wclipper")) {
+    if (!wclipper_) {
+      wclipper_ = RPU::make_unique<WeightClipper<T>>(this->x_size_, this->d_size_);
+    }
+    wclipper_->loadExtra(state, "wclipper", strict);
+  }
+
+  if (state.count("wremapper")) {
+    if (!wremapper_) {
+      wremapper_ = RPU::make_unique<WeightRemapper<T>>(this->x_size_, this->d_size_);
+    }
+    wremapper_->loadExtra(state, "wremapper", strict);
+  }
+
+  RPU::load(state, "flicker_probs", flicker_probs_, strict);
+  RPU::load(state, "learning_rate", this->learning_rate_, strict);
+  RPU::load(state, "use_delayed_update", use_delayed_update_, strict);
+  RPU::load(state, "last_update_m_batch", last_update_m_batch_, strict);
+  RPU::load(state, "fwd_alpha", fwd_alpha_, strict);
+  RPU::load(state, "bwd_alpha", bwd_alpha_, strict);
+  RPU::load(state, "flicker_states", flicker_states_, strict);
+
+  if (use_delayed_update_) {
+    V tmp;
+    RPU::load(state, "weights_buffer", tmp, strict);
+    RPU::math::copy<T>(tmp.size(), tmp.data(), 1, weights_buffer_[0], 1);
+  }
 }
 
 /*********************************************************************************/
@@ -451,7 +555,7 @@ void RPUSimple<T>::backward(
 template <typename T>
 void RPUSimple<T>::update(
     const T *X_input, const T *D_input, bool bias, int m_batch, bool x_trans, bool d_trans) {
-  last_update_m_batch_ = m_batch; // this is mini-batchsize*reuse_factor !
+  last_update_m_batch_ = m_batch; // this is mini-batchsize * reuse_factor !
 
   // update weights
   if ((m_batch == 1) && (!x_trans) && (!d_trans)) {
@@ -561,16 +665,8 @@ void RPUSimple<T>::updateMatrixBias(
 }
 
 template <typename T> T *RPUSimple<T>::getMatrixBiasBuffer(int m_batch) {
-
-  if (temp_x_matrix_bias_size_ < m_batch) {
-    DEBUG_OUT("Get new buffer size " << m_batch);
-    if (temp_x_matrix_bias_ != nullptr) {
-      delete[] temp_x_matrix_bias_;
-    }
-    temp_x_matrix_bias_ = new T[(size_t)m_batch * this->x_size_];
-    temp_x_matrix_bias_size_ = m_batch;
-  }
-  return temp_x_matrix_bias_;
+  temp_x_matrix_bias_.resize((size_t)m_batch * this->x_size_);
+  return temp_x_matrix_bias_.data();
 }
 
 template <typename T>
@@ -623,14 +719,15 @@ void RPUSimple<T>::updateVector(const T *x_input, const T *d_input, int x_inc, i
 
 template <typename T>
 void RPUSimple<T>::copyFromVectorBiasBuffer(T *x_output_without_bias, int x_inc) {
-  RPU::math::copy<T>(this->x_size_ - 1, temp_x_vector_bias_, 1, x_output_without_bias, x_inc);
+  RPU::math::copy<T>(
+      this->x_size_ - 1, temp_x_vector_bias_.data(), 1, x_output_without_bias, x_inc);
 }
 
 template <typename T>
 T *RPUSimple<T>::copyToVectorBiasBuffer(const T *x_input_without_bias, int x_inc) {
-  RPU::math::copy<T>(this->x_size_ - 1, x_input_without_bias, x_inc, temp_x_vector_bias_, 1);
+  RPU::math::copy<T>(this->x_size_ - 1, x_input_without_bias, x_inc, temp_x_vector_bias_.data(), 1);
   temp_x_vector_bias_[this->x_size_ - 1] = 1.;
-  return temp_x_vector_bias_;
+  return temp_x_vector_bias_.data();
 }
 
 template <typename T>
@@ -658,22 +755,14 @@ void RPUSimple<T>::updateVectorBias(
 /* Tensor forward/backward/update */
 
 template <typename T>
-void RPUSimple<T>::getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, int dim3) {
-  int x_size = this->getXSize();
-  int d_size = this->getDSize();
+void RPUSimple<T>::getTensorBuffer(T **x_tensor_ptr, T **d_tensor_ptr, int m_batch, int dim3) {
 
-  int n = (x_size + d_size) * dim3 * m_batch;
-  if (temp_tensor_size_ < n) {
-    if (temp_tensor_ != nullptr) {
-      delete[] temp_tensor_;
-    }
-    temp_tensor_ = new T[n];
-    temp_tensor_size_ = n;
-  }
+  int n = (this->x_size_ + this->d_size_) * dim3 * m_batch;
+  temp_tensor_.resize(n);
 
   // permute 132
-  *x_tensor = temp_tensor_;
-  *d_tensor = &temp_tensor_[(x_size)*dim3 * m_batch];
+  *x_tensor_ptr = temp_tensor_.data();
+  *d_tensor_ptr = temp_tensor_.data() + this->x_size_ * dim3 * m_batch;
 }
 
 template <typename T>
@@ -692,7 +781,9 @@ void RPUSimple<T>::forwardTensor(
     int x_size = this->getXSize();
     int d_size = this->getDSize();
 
-    T *x_tensor, *d_tensor;
+    T *x_tensor = nullptr;
+    T *d_tensor = nullptr;
+
     this->getTensorBuffer(&x_tensor, &d_tensor, m_batch, dim3);
 
     this->permute132(x_tensor, X_input, m_batch, x_size, dim3, bias);
@@ -712,7 +803,9 @@ void RPUSimple<T>::backwardTensor(
     int x_size = this->getXSize();
     int d_size = this->getDSize();
 
-    T *x_tensor, *d_tensor;
+    T *x_tensor = nullptr;
+    T *d_tensor = nullptr;
+
     this->getTensorBuffer(&x_tensor, &d_tensor, m_batch, dim3);
 
     this->permute132(d_tensor, D_input, m_batch, d_size, dim3, false);
@@ -733,7 +826,9 @@ void RPUSimple<T>::updateTensor(
     int x_size = this->getXSize();
     int d_size = this->getDSize();
 
-    T *x_tensor, *d_tensor;
+    T *x_tensor = nullptr;
+    T *d_tensor = nullptr;
+
     this->getTensorBuffer(&x_tensor, &d_tensor, m_batch, dim3);
 
     this->permute132(x_tensor, X_input, m_batch, x_size, dim3, bias);
@@ -1028,7 +1123,8 @@ void RPUSimple<T>::forwardIndexed(
   // EXPECTS forward index to be set properly !!
   // total_input_size is size of X_input
 
-  T *x_tensor, *d_tensor;
+  T *x_tensor = nullptr;
+  T *d_tensor = nullptr;
   this->getTensorBuffer(&x_tensor, &d_tensor, m_batch, dim3);
 
   this->copyIndexedInput(
@@ -1053,7 +1149,9 @@ void RPUSimple<T>::forwardIndexedSlice(
     int m_batch_slice,
     const int *batch_indices,
     bool is_test) {
-  T *x_tensor, *d_tensor;
+  T *x_tensor = nullptr;
+  T *d_tensor = nullptr;
+
   this->getTensorBuffer(&x_tensor, &d_tensor, m_batch_slice, dim3);
 
   this->copyIndexedInput(
@@ -1073,7 +1171,9 @@ void RPUSimple<T>::backwardIndexed(
   // -- total_output_size is size of X_output
   // -- bias is handled within the indeces
 
-  T *x_tensor, *d_tensor;
+  T *x_tensor = nullptr;
+  T *d_tensor = nullptr;
+
   this->getTensorBuffer(&x_tensor, &d_tensor, m_batch, dim3);
 
   if ((dim3 == 1) || (!trans)) {
@@ -1101,7 +1201,9 @@ void RPUSimple<T>::backwardIndexedSlice(
     bool trans,
     int m_batch_slice,
     const int *batch_indices) {
-  T *x_tensor, *d_tensor;
+  T *x_tensor = nullptr;
+  T *d_tensor = nullptr;
+
   this->getTensorBuffer(&x_tensor, &d_tensor, m_batch_slice, dim3);
 
   this->copySliceInput(
@@ -1117,7 +1219,9 @@ void RPUSimple<T>::backwardIndexedSlice(
 template <typename T>
 void RPUSimple<T>::updateIndexed(
     const T *X_input, const T *D_input, int total_x_input_size, int m_batch, int dim3, bool trans) {
-  T *x_tensor, *d_tensor;
+  T *x_tensor = nullptr;
+  T *d_tensor = nullptr;
+
   this->getTensorBuffer(&x_tensor, &d_tensor, m_batch, dim3);
 
   this->copyIndexedInput(
@@ -1142,7 +1246,9 @@ void RPUSimple<T>::updateIndexedSlice(
     int m_batch_slice,
     const int *batch_indices) {
 
-  T *x_tensor, *d_tensor;
+  T *x_tensor = nullptr;
+  T *d_tensor = nullptr;
+
   this->getTensorBuffer(&x_tensor, &d_tensor, m_batch_slice, dim3);
 
   this->copyIndexedInput(
@@ -1207,7 +1313,7 @@ template <typename T> void RPUSimple<T>::setWeights(const T *weightsptr) {
 
 template <typename T> void RPUSimple<T>::setWeightsWithAlpha(const T *weightsptr, T assumed_wmax) {
 
-  if (assumed_wmax <= 0.0) {
+  if (assumed_wmax <= (T)0.0) {
     this->setWeights(weightsptr);
   } else {
     DEBUG_OUT("WARNING: scaling weights with ALPHA scale!");
@@ -1216,7 +1322,7 @@ template <typename T> void RPUSimple<T>::setWeightsWithAlpha(const T *weightsptr
     memcpy(w, weightsptr, sz * sizeof(T));
 
     int imax = RPU::math::iamax<T>(sz, w, 1);
-    T alpha = fabs(w[imax] / assumed_wmax);
+    T alpha = (T)fabsf(w[imax] / assumed_wmax);
     RPU::math::scal<T>(sz, (T)1.0 / alpha, w, 1);
 
     this->setAlphaScale(alpha);
@@ -1250,10 +1356,10 @@ void RPUSimple<T>::setWeightsAndBiasWithAlpha(
   T *w = new T[sz];
   detail::combine_wb(w, weightsptr, biasptr, this->x_size_, this->d_size_);
 
-  if (assumed_wmax > 0.0) {
+  if (assumed_wmax > (T)0.0) {
     DEBUG_OUT("WARNING: scaling weights with ALPHA scale!");
     int imax = RPU::math::iamax<T>(sz, w, 1);
-    T alpha = fabs(w[imax] / assumed_wmax);
+    T alpha = (T)fabsf(w[imax] / assumed_wmax);
     RPU::math::scal<T>(sz, (T)1.0 / alpha, w, 1);
     this->setAlphaScale(alpha);
   }
@@ -1276,7 +1382,7 @@ void RPUSimple<T>::setWeightsAndBias(
 template <typename T> void RPUSimple<T>::setSharedWeights(T *weightsptr) {
   if (!shared_weights_if_) {
     this->getWeights(weightsptr); // copy existing weights to given workspace.
-    delete[] * weights_;          // delete allocated memory array but not the pointer
+    delete[] *weights_;           // delete allocated memory array but not the pointer
   }
   *weights_ = weightsptr;
   shared_weights_if_ = true;
@@ -1427,15 +1533,10 @@ template <typename T> void RPUSimple<T>::printWeights(int x_count, int d_count) 
   }
 }
 
-template <> void RPUSimple<float>::printToStream(std::stringstream &ss) const {
-  ss << "RPUSimple<float>(" << this->d_size_ << "," << this->x_size_ << ")\n";
+template <typename T> void RPUSimple<T>::printToStream(std::stringstream &ss) const {
+  ss << "RPUSimple<" << this->getDataTypeName() << ">(" << this->d_size_ << "," << this->x_size_
+     << ")" << std::endl;
 }
-
-#ifdef RPU_USE_DOUBLE
-template <> void RPUSimple<double>::printToStream(std::stringstream &ss) const {
-  ss << "RPUSimple<double>(" << this->d_size_ << "," << this->x_size_ << ")\n";
-}
-#endif
 
 template <typename T> void RPUSimple<T>::printParametersToStream(std::stringstream &ss) const {
   getPar().printToStream(ss);
@@ -1453,10 +1554,10 @@ template <typename T> void RPUSimple<T>::setLearningRate(T lr) {
 template <typename T> void RPUSimple<T>::decayWeights(T alpha, bool bias_no_decay) {
 
   T lifetime = getPar().lifetime;
-  T decay_rate = (lifetime > 1.0) ? ((T)1.0 / lifetime) : (T)0.0;
+  T decay_rate = (lifetime > (T)1.0) ? ((T)1.0 / lifetime) : (T)0.0;
   T decay_scale = (T)1.0 - alpha * decay_rate;
 
-  if (decay_scale > 0 && decay_scale < 1.0) {
+  if (decay_scale > (T)0.0 && decay_scale < (T)1.0) {
     if (!bias_no_decay) {
       RPU::math::scal<T>(this->x_size_ * this->d_size_, decay_scale, this->getWeightsPtr()[0], 1);
     } else {
@@ -1485,7 +1586,7 @@ template <typename T> void RPUSimple<T>::driftWeights(T time_since_last_call) {
 
 template <typename T> void RPUSimple<T>::clipWeights(T clip) {
 
-  if (clip >= 0) {
+  if (clip >= (T)0.0) {
     int size = this->d_size_ * this->x_size_;
     T *w = this->getWeightsPtr()[0];
     PRAGMA_SIMD
@@ -1500,14 +1601,13 @@ template <typename T> void RPUSimple<T>::clipWeights(const WeightClipParameter &
   if (wclipper_ == nullptr) {
     wclipper_ = RPU::make_unique<WeightClipper<T>>(this->x_size_, this->d_size_);
   }
-
   wclipper_->apply(getWeightsPtr()[0], wclpar);
 }
 
 template <typename T> void RPUSimple<T>::diffuseWeights() {
 
   T diffusion = getPar().diffusion;
-  if (diffusion > 0.0) {
+  if (diffusion > (T)0.0) {
     int size = this->d_size_ * this->x_size_;
     T *w = this->getWeightsPtr()[0];
     PRAGMA_SIMD
@@ -1518,6 +1618,122 @@ template <typename T> void RPUSimple<T>::diffuseWeights() {
 }
 
 /*********************************************************************************/
+/*********************************************************************************/
+template <typename T> uint64_t *RPUSimple<T>::initFlickerStates() {
+
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  const auto &flicker = getPar().flicker;
+
+  if (flicker.n > 64) {
+    RPU_FATAL("only <=64 flicker supported");
+  }
+
+  int size = this->d_size_ * this->x_size_;
+
+  flicker_states_.resize(size);
+  for (int j = 0; j < size; j++) {
+    for (int i = 0; i < flicker.n; i++) {
+      flicker_states_[j] ^=
+          (rng_->sampleUniform() < flicker.q) ? ((uint64_t)1 << (uint64_t)i) : (uint64_t)0;
+    }
+  }
+  flicker_probs_.resize(flicker.n);
+  flicker_probs_[0] = flicker.q; // flicker.q is 0->1
+  for (int i = 1; i < flicker.n; i++) {
+    flicker_probs_[i] = flicker_probs_[i - 1] / flicker.r;
+  }
+
+  if (flicker.wreset) {
+    // delayed anyway not supported for pink. use weight buffer
+    this->copyWeightsToBuffer();
+  }
+
+  return flicker_states_.data();
+}
+
+template <typename T> void RPUSimple<T>::diffuseWeightsPink() {
+
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  T diffusion = getPar().diffusion;
+  if (diffusion <= (T)0.0) {
+    return;
+  }
+
+  const auto &flicker = getPar().flicker;
+  int size = this->d_size_ * this->x_size_;
+
+  if (flicker_states_.size() == (size_t)0) {
+    initFlickerStates();
+  }
+
+  T amp = (T)sqrtf((T)logf(flicker.r) * diffusion / (flicker.q * ((T)1.0 - flicker.q)));
+
+  T *w = this->getWeightsPtr()[0];
+  T *wb = this->getWeightsBuffer()[0];
+  T sc = ((T)1.0 - flicker.q) / flicker.q;
+  T H = -flicker.h / flicker.q;
+  const uint64_t zero = 0;
+  const uint64_t one = 1;
+
+  PRAGMA_SIMD
+  for (int j = 0; j < size; j++) {
+    uint64_t fls = flicker_states_[j];
+#ifdef _MSC_VER
+    T last_noise_value = ((T)__popcnt64(fls));
+#else
+    T last_noise_value = ((T)__builtin_popcountll(fls));
+#endif
+    if (flicker.wreset && (T)fabsf(w[j] - wb[j]) > flicker.wreset_tol) {
+
+      if (flicker.h > (T)0.0) {
+        // only reset 1's with prob 1-exp(-h/r^i)
+        for (int i = 0; i < flicker.n; i++) {
+          uint64_t cbit = one << (uint64_t)i;
+          fls ^= ((fls & cbit) > 0)
+                     ? ((rng_->sampleUniform() >= (T)expf(H * flicker_probs_[i])) ? cbit : zero)
+                     : zero; // use >= to get 1-exp
+        }
+      } else {
+        // reset all with eq
+        fls = 0;
+        for (int i = 0; i < flicker.n; i++) {
+          fls ^= (rng_->sampleUniform() < flicker.q) ? (one << (uint64_t)i) : zero;
+        }
+      }
+    } else {
+      for (int i = 0; i < flicker.n; i++) {
+        T prob = flicker_probs_[i]; // based on flicker.q
+        uint64_t cbit = one << (uint64_t)i;
+        T stoch_value = rng_->sampleUniform();
+        fls ^= ((fls & cbit) > 0) ? ((stoch_value < prob * sc) ? cbit : zero)
+                                  :                      // 1->0  therefore change prop to q1
+                   ((stoch_value < prob) ? cbit : zero); // 0->1	q0
+      }
+    }
+#ifdef _MSC_VER
+    T noise_value = ((T)__popcnt64(fls));
+#else
+    T noise_value = ((T)__builtin_popcountll(fls));
+#endif
+    w[j] += amp * (noise_value - last_noise_value);
+    flicker_states_[j] = fls;
+    if (flicker.wreset) {
+      wb[j] = w[j];
+    }
+  }
+}
+
+template <typename T>
+bool RPUSimple<T>::swaWeights(
+    const WeightRemapParameter &wrmpar, T *swa_weights, uint64_t iter, T *scales, T *biases) {
+  if (wremapper_ == nullptr) {
+    wremapper_ = RPU::make_unique<WeightRemapper<T>>(this->x_size_, this->d_size_);
+  }
+  return wremapper_->applySWA(
+      swa_weights, getWeightsPtr()[0], iter, wrmpar, this->getAlphaLearningRate(), scales, biases);
+}
 
 template <typename T>
 void RPUSimple<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases) {
@@ -1541,9 +1757,12 @@ template <typename T> void RPUSimple<T>::modifyFBWeights(const WeightModifierPar
 
 /*********************************************************************************/
 
+template class RPUSimple<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUSimple<double>;
 #endif
-template class RPUSimple<float>;
+#ifdef RPU_USE_FP16
+template class RPUSimple<half_t>;
+#endif
 
 } // namespace RPU

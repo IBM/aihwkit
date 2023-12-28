@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -38,15 +38,15 @@ inline void update_once(
     const T &write_noise_std,
     RNG<T> *rng) {
   T b_diff = (max_bound - min_bound);
-  if (b_diff > 0.0) {
+  if (b_diff > (T)0.0) {
     T z = (T)2.0 * w / b_diff * es_a + es_b;
 
     if (sign > 0) {
-      T y_down = MAX((T)1.0 - (T)es_A_down * exp(es_gamma_down * (-z)), (T)0.0);
+      T y_down = MAX((T)1.0 - es_A_down * (T)expf(es_gamma_down * (-z)), (T)0.0);
       w -= y_down * ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_down;
 
     } else {
-      T y_up = MAX((T)1.0 - (T)es_A_up * exp(es_gamma_up * z), (T)0.0);
+      T y_up = MAX((T)1.0 - es_A_up * (T)expf(es_gamma_up * z), (T)0.0);
       w += y_up * ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_up;
     }
 
@@ -81,20 +81,20 @@ inline void update_once_complex_noise(
     const T &write_noise_std,
     RNG<T> *rng) {
   T b_diff = (max_bound - min_bound);
-  if (b_diff > 0.0) {
+  if (b_diff > (T)0.0) {
     T z = (T)2.0 * w / b_diff * es_a + es_b;
     T dw;
 
     if (sign > 0) {
-      T y_down = MAX((T)1.0 - (T)es_A_down * exp(es_gamma_down * (-z)), (T)0);
+      T y_down = MAX((T)1.0 - (T)es_A_down * (T)expf(es_gamma_down * (-z)), (T)0);
       dw = -y_down * scale_down;
 
     } else {
-      T y_up = MAX((T)1.0 - (T)es_A_up * exp(es_gamma_up * z), (T)0);
+      T y_up = MAX((T)1.0 - (T)es_A_up * (T)expf(es_gamma_up * z), (T)0);
       dw = y_up * scale_up;
     }
 
-    T dw_std = dw_min_std * (fabs(dw) + dw_min_std_add + dw_min_std_slope * fabs(w));
+    T dw_std = dw_min_std * ((T)fabsf(dw) + dw_min_std_add + dw_min_std_slope * (T)fabsf(w));
     w += dw + dw_std * rng->sampleGauss();
 
     // always check both bounds
@@ -169,6 +169,9 @@ template class ExpStepRPUDevice<float>;
 
 #ifdef RPU_USE_DOUBLE
 template class ExpStepRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ExpStepRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

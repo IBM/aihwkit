@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,10 +16,14 @@
 #include <memory>
 
 #include "rpucuda_buffered_transfer_device.h"
+#include "rpucuda_chopped_transfer_device.h"
 #include "rpucuda_constantstep_device.h"
+#include "rpucuda_dynamic_transfer_device.h"
 #include "rpucuda_expstep_device.h"
+#include "rpucuda_hidden_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_mixedprec_device.h"
+#include "rpucuda_mixedprec_int_device.h"
 #include "rpucuda_onesided_device.h"
 #include "rpucuda_piecewisestep_device.h"
 #include "rpucuda_powstep_device.h"
@@ -41,6 +45,9 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
   case DeviceUpdateType::ConstantStep:
     return new ConstantStepRPUDeviceCuda<T>(
         c, static_cast<const ConstantStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::HiddenStep:
+    return new HiddenStepRPUDeviceCuda<T>(
+        c, static_cast<const HiddenStepRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::LinearStep:
   case DeviceUpdateType::SoftBounds:
     return new LinearStepRPUDeviceCuda<T>(
@@ -60,6 +67,9 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
     return new SimpleRPUDeviceCuda<T>(c, static_cast<const SimpleRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::MixedPrec:
     return new MixedPrecRPUDeviceCuda<T>(c, static_cast<const MixedPrecRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::MixedPrecInt:
+    return new MixedPrecIntRPUDeviceCuda<T>(
+        c, static_cast<const MixedPrecIntRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::PowStep:
     return new PowStepRPUDeviceCuda<T>(c, static_cast<const PowStepRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::PowStepReference:
@@ -68,6 +78,12 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
   case DeviceUpdateType::PiecewiseStep:
     return new PiecewiseStepRPUDeviceCuda<T>(
         c, static_cast<const PiecewiseStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::ChoppedTransfer:
+    return new ChoppedTransferRPUDeviceCuda<T>(
+        c, static_cast<const ChoppedTransferRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::DynamicTransfer:
+    return new DynamicTransferRPUDeviceCuda<T>(
+        c, static_cast<const DynamicTransferRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::SoftBoundsReference:
     return new SoftBoundsReferenceRPUDeviceCuda<T>(
         c, static_cast<const SoftBoundsReferenceRPUDevice<T> &>(rpu_device));
@@ -87,6 +103,9 @@ std::unique_ptr<AbstractRPUDeviceCuda<T>> AbstractRPUDeviceCuda<T>::createFromUn
 template class AbstractRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class AbstractRPUDeviceCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class AbstractRPUDeviceCuda<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -126,6 +145,8 @@ SimpleRPUDeviceCuda<T>::SimpleRPUDeviceCuda(const SimpleRPUDeviceCuda<T> &other)
   if (other.wdrifter_cuda_) {
     wdrifter_cuda_ = RPU::make_unique<WeightDrifterCuda<T>>(*other.wdrifter_cuda_);
   }
+
+  // rnd buffers are not copied.
 };
 
 template <typename T>
@@ -146,7 +167,33 @@ SimpleRPUDeviceCuda<T> &SimpleRPUDeviceCuda<T>::operator=(SimpleRPUDeviceCuda<T>
   initialize(other.context_, other.x_size_, other.d_size_);
   par_storage_ = std::move(other.par_storage_);
   wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
+
+  dev_reset_nrnd_ = std::move(dev_reset_nrnd_);
+  dev_reset_flag_ = std::move(dev_reset_flag_);
+  rnd_context_ = std::move(rnd_context_);
+  dev_diffusion_nrnd_ = std::move(dev_diffusion_nrnd_);
+
   return *this;
+};
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+  context_->synchronize();
+  if (wdrifter_cuda_) {
+    wdrifter_cuda_->dumpExtra(state, "wdrifter_cuda");
+    RPU::insertWithPrefix(extra, state, prefix);
+  }
+}
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  context_->synchronize();
+  if (wdrifter_cuda_) {
+    auto state = RPU::selectWithPrefix(extra, prefix);
+    wdrifter_cuda_->loadExtra(state, "wdrifter", strict);
+  }
 };
 
 template <typename T>
@@ -182,7 +229,7 @@ void SimpleRPUDeviceCuda<T>::doDirectUpdate(
     const RPU::PulsedUpdateMetaParameter<T> &up,
     T *x_buffer,
     T *d_buffer) {
-  if (m_batch == 1 && beta == 1.0) {
+  if (m_batch == 1 && beta == (T)1.0) {
     RPU::math::ger<T>(
         context_, d_size_, x_size_, -lr, d_input, 1, x_input, 1, dev_weights, d_size_);
   } else {
@@ -203,12 +250,12 @@ template <typename T>
 void SimpleRPUDeviceCuda<T>::decayWeights(T *weights, T alpha, bool bias_no_decay) {
 
   T lifetime = this->getPar().lifetime;
-  T decay_rate = (lifetime > 1) ? (1.0 / lifetime) : 0.0;
-  T decay_scale = 1.0 - alpha * decay_rate;
+  T decay_rate = (lifetime > (T)1) ? ((T)1.0 / lifetime) : (T)0.0;
+  T decay_scale = (T)1.0 - alpha * decay_rate;
 
-  if (decay_scale > 0.0 && decay_scale < 1.0) {
+  if (decay_scale > (T)0.0 && decay_scale < (T)1.0) {
     RPU::math::scal<T>(
-        context_, bias_no_decay ? MAX(size_ - d_size_, 0) : size_, decay_scale, weights, 1);
+        context_, bias_no_decay ? MAX(size_ - d_size_, 0) : size_, decay_scale, weights);
   }
 }
 
@@ -241,7 +288,7 @@ template <typename T> void SimpleRPUDeviceCuda<T>::initDiffusionRnd() {
 template <typename T> void SimpleRPUDeviceCuda<T>::diffuseWeights(T *weights) {
 
   T diffusion = this->getPar().diffusion;
-  if (diffusion <= 0) {
+  if (diffusion <= (T)0.0) {
     return;
   }
 
@@ -260,14 +307,90 @@ template <typename T> void SimpleRPUDeviceCuda<T>::diffuseWeights(T *weights) {
 
 template <typename T> void SimpleRPUDeviceCuda<T>::clipWeights(T *weights, T clip) {
 
-  if (clip >= 0) {
+  if (clip >= (T)0.0) {
     RPU::math::aclip<T>(context_, weights, size_, clip);
+  }
+}
+template <typename T> void SimpleRPUDeviceCuda<T>::initResetRnd() {
+
+  if (this->rnd_context_ == nullptr) {
+    this->initRndContext();
+  }
+  dev_reset_nrnd_ =
+      RPU::make_unique<CudaArray<float>>(&*this->rnd_context_, (this->size_ + 31) / 32 * 32);
+  dev_reset_flag_ =
+      RPU::make_unique<CudaArray<float>>(&*this->rnd_context_, (this->size_ + 31) / 32 * 32);
+  dev_reset_flag_->setConst(0);
+  this->rnd_context_->synchronize();
+}
+
+template <typename T>
+void SimpleRPUDeviceCuda<T>::resetCols(T *weights, int start_col, int n_cols_in, T reset_prob) {
+  // col-major in CUDA.
+
+  T *w = weights;
+
+  int n_cols = (n_cols_in >= 0) ? n_cols_in : this->x_size_;
+
+  int n = n_cols * this->d_size_;
+  int offset = start_col * this->d_size_;
+  bool with_flag = false;
+  bool with_nrnd = false;
+
+  if (getPar().reset_std > (T)0.0) {
+    if (dev_reset_nrnd_ == nullptr) {
+      initResetRnd();
+    }
+    this->rnd_context_->randNormal(
+        dev_reset_nrnd_->getData(), n_cols * this->d_size_, 0.0, getPar().reset_std);
+    with_nrnd = true;
+  }
+  if (reset_prob < (T)1.0) {
+    if (dev_reset_flag_ == nullptr) {
+      initResetRnd();
+    }
+    this->rnd_context_->randUniform(dev_reset_flag_->getData(), n_cols * this->d_size_);
+    with_flag = true;
+  }
+  if (with_flag || with_nrnd) {
+    this->context_->recordWaitEvent(this->rnd_context_->getStream());
+  }
+
+  if (n >= this->size_) {
+    // reset whole matrix
+    RPU::math::elemreset<T>(
+        this->context_, w, this->size_, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob);
+
+  } else if (offset + n <= this->size_) {
+    // one pass enough
+    RPU::math::elemreset<T>(
+        this->context_, w + offset, n, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob);
+  } else {
+    // two passes
+    int m = this->size_ - offset;
+
+    RPU::math::elemreset<T>(
+        this->context_, w + offset, m, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() : nullptr, reset_prob);
+
+    RPU::math::elemreset<T>(
+        this->context_, w, n - m, nullptr,
+        with_nrnd ? dev_reset_nrnd_->getDataConst() + m : nullptr,
+        with_flag ? dev_reset_flag_->getDataConst() + m : nullptr, reset_prob);
   }
 }
 
 template class SimpleRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class SimpleRPUDeviceCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class SimpleRPUDeviceCuda<half_t>;
 #endif
 
 } // namespace RPU

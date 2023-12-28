@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -233,8 +233,8 @@ template <typename T> int OneSidedRPUDeviceCuda<T>::refreshWeights() {
   int nblocks = MIN(this->context_->getNBlocks(this->size_, nthreads), nblocks_batch_max_);
 
   // both max because of the one-sided-ness
-  T w_max = fabs(static_cast<PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device_p->getPar()).w_max);
-  T w_min = fabs(static_cast<PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device_m->getPar()).w_max);
+  T w_max = fabsf(static_cast<PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device_p->getPar()).w_max);
+  T w_min = fabsf(static_cast<PulsedRPUDeviceMetaParameter<T> &>(rpucuda_device_m->getPar()).w_max);
   T upper_thres = par.refresh_upper_thres;
   T lower_thres = par.refresh_lower_thres;
 
@@ -388,4 +388,8 @@ template class OneSidedRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class OneSidedRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class OneSidedRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

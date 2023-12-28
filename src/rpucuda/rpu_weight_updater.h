@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,6 +41,9 @@ public:
       const int d_inc,
       const T learning_rate);
 
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix){};
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+
 protected:
   int x_size_ = 0;
   int d_size_ = 0;
@@ -68,7 +71,14 @@ public:
     swap(a.sblm_, b.sblm_);
     swap(a.dblm_, b.dblm_);
     swap(a.rng_, b.rng_);
+
+    swap(a.x_noz_, b.x_noz_);
+    swap(a.d_noz_, b.d_noz_);
   }
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
+
   bool checkForFPUpdate(AbstractRPUDevice<T> *rpu_device_in);
 
   virtual void updateVectorWithDevice(
@@ -95,6 +105,8 @@ public:
 
   void setUpPar(const PulsedUpdateMetaParameter<T> &up);
   inline const PulsedUpdateMetaParameter<T> &getUpPar() const { return up_; };
+  inline const T getCurrentDSparsity() { return (T)d_noz_ / (T)this->d_size_; };
+  inline const T getCurrentXSparsity() { return (T)x_noz_ / (T)this->x_size_; };
 
 private:
   void freeContainers();
@@ -105,6 +117,9 @@ private:
   std::unique_ptr<DenseBitLineMaker<T>> dblm_ = nullptr;
 
   PulsedUpdateMetaParameter<T> up_;
+
+  int d_noz_ = 0;
+  int x_noz_ = 0;
 };
 
 } // namespace RPU

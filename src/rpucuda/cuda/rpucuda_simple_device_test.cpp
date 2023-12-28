@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -29,12 +29,6 @@
 #include "io_manager.h"
 
 #define TOLERANCE 1e-6
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -116,15 +110,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weight matrix
     for (int i = 0; i < x_size; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     rx_cuda = RPU::make_unique<CudaArray<num_t>>(context, x_size, rx);
@@ -198,7 +192,7 @@ public:
               << BOLD_OFF;
     // this->pulsed_cuda->printWeights(3, 1);
     std::cout << BOLD_ON << "\tRPU Pulsed: done in "
-              << (num_t)pulsed_dur / 1000. / (this->repeats - 1) << " msec" << std::endl
+              << (float)pulsed_dur / 1000. / (this->repeats - 1) << " msec" << std::endl
               << BOLD_OFF;
     // this->pulsed->printWeights(3, 1);
     std::cout << BOLD_ON << "\tRPU Simple Cuda: done in " << simple_cuda_dur / (this->repeats - 1)
@@ -206,7 +200,7 @@ public:
               << BOLD_OFF;
     // this->simple_cuda->printWeights(3, 1);
     std::cout << BOLD_ON << "\tRPU Simple: done in "
-              << (num_t)simple_dur / 1000. / (this->repeats - 1) << " msec" << std::endl
+              << (float)simple_dur / 1000. / (this->repeats - 1) << " msec" << std::endl
               << BOLD_OFF;
     // this->simple->printWeights(3, 1);
 

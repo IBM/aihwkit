@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,6 +17,7 @@
 #include "rpu_pulsed.h"
 #include "rpucuda_constantstep_device.h"
 #include "rpucuda_expstep_device.h"
+#include "rpucuda_hidden_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_piecewisestep_device.h"
 #include "rpucuda_powstep_device.h"
@@ -31,12 +32,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -141,15 +136,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-2.0, 2.0);
+    std::uniform_real_distribution<float> udist(-2.0, 2.0);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(this->context, this->x_size);
@@ -212,10 +207,10 @@ public:
     int diff_count_rpucuda = 0;
     for (int i = 0; i < this->d_size; i++) {
       for (int j = 0; j < this->x_size; j++) {
-        if (fabs(weights[i][j] - refweights[i][j]) > 1e-4) {
+        if (fabsf(weights[i][j] - refweights[i][j]) > 1e-4) {
           diff_count_rpu++;
         }
-        if (fabs(cuweights[i][j] - refweights[i][j]) > 1e-4) {
+        if (fabsf(cuweights[i][j] - refweights[i][j]) > 1e-4) {
           diff_count_rpucuda++;
         }
       }
@@ -248,6 +243,7 @@ public:
 
 // types
 typedef ::testing::Types<
+    HiddenStepRPUDeviceMetaParameter<num_t>,
     LinearStepRPUDeviceMetaParameter<num_t>,
     ExpStepRPUDeviceMetaParameter<num_t>,
     PowStepRPUDeviceMetaParameter<num_t>,

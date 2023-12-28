@@ -1,7 +1,6 @@
-
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,6 +17,7 @@ from aihwkit.inference.converter.base import BaseConductanceConverter
 from aihwkit.inference.converter.conductance import SinglePairConductanceConverter
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
+from aihwkit.inference.noise.reram import ReRamWan2022NoiseModel
 from aihwkit.inference.noise.custom import StateIndependentNoiseModel
 from aihwkit.inference.compensation.base import BaseDriftCompensation
 from aihwkit.inference.compensation.drift import GlobalDriftCompensation

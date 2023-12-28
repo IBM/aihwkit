@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -145,6 +145,40 @@ void TransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_devi
   fully_hidden_ = par.fullyHidden();
 }
 
+template <typename T>
+void TransferRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  VectorRPUDeviceCuda<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  RPU::insert(state, "current_slice_indices", current_slice_indices_);
+  // RPU::insert(state, "transfer_vecs", transfer_vecs_);
+
+  transfer_fb_pass_->dumpExtra(state, "transfer_fb_pass");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+  transfer_iom_->dumpExtra(state, "transfer_iom");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void TransferRPUDeviceCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  VectorRPUDeviceCuda<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "current_slice_indices", current_slice_indices_, strict);
+  if (state.count("transfer_vecs")) {
+    RPU::load(this->context_, state, "transfer_vecs", transfer_vecs_, strict);
+  }
+  transfer_fb_pass_->loadExtra(state, "transfer_fb_pass", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+  transfer_iom_->loadExtra(state, "transfer_iom", strict);
+}
+
 /*********************************************************************************/
 /* getPulseCountLearningRate */
 /* Here we compute the LR for the A matrix (the SGD update). Because
@@ -157,7 +191,7 @@ T TransferRPUDeviceCuda<T>::getPulseCountLearningRate(
 
   const auto &par = getPar();
 
-  if (par.fast_lr > 0) {
+  if (par.fast_lr > (T)0.0) {
     return par.fast_lr;
   } else {
     return PulsedRPUDeviceCudaBase<T>::getPulseCountLearningRate(
@@ -198,11 +232,11 @@ void TransferRPUDeviceCuda<T>::writeMatrix(
 
   if (par.transfer_columns) {
     transfer_pwu_->update(
-        in_vec, out_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
+        in_vec, out_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabsf(lr), m_batch, false,
         false);
   } else {
     transfer_pwu_->update(
-        out_vec, in_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabs(lr), m_batch, false,
+        out_vec, in_vec, W, &*this->rpucuda_device_vec_[device_idx], up, fabsf(lr), m_batch, false,
         false);
   }
 }
@@ -236,7 +270,7 @@ void TransferRPUDeviceCuda<T>::readAndUpdate(
   // accordingly
   readMatrix(from_device_idx, vec, out_vec, n_vec, -1.0);
   // update according to device
-  writeMatrix(to_device_idx, vec, out_vec, n_vec, fabs(lr), up);
+  writeMatrix(to_device_idx, vec, out_vec, n_vec, fabsf(lr), up);
 
   this->context_->template releaseSharedBuffer<T>(RPU_BUFFER_DEVICE_0);
 }
@@ -257,7 +291,7 @@ void TransferRPUDeviceCuda<T>::transfer(
   int out_size = par.getOutSize();
 
   if (par.random_selection) {
-    i_slice = MAX(MIN(floor(this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
+    i_slice = MAX(MIN(floorf((float)this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0.0f);
   }
 
   // transfer_vecs_ is always in_size-major (that is trans==false)
@@ -299,9 +333,9 @@ int TransferRPUDeviceCuda<T>::getTransferEvery(
     int didx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const {
   UNUSED(up);
   if (getPar().units_in_mbatch) {
-    return MAX(ceil(getPar().transfer_every_vec[didx] * m_batch), 0);
+    return MAX((int)ceilf((float)getPar().transfer_every_vec[didx] * m_batch), 0);
   } else {
-    return MAX(round(getPar().transfer_every_vec[didx]), 0);
+    return MAX((int)roundf(getPar().transfer_every_vec[didx]), 0);
   }
 }
 
@@ -310,7 +344,7 @@ template <typename T> inline int getNChunks(int m_batch, T every) {
   if (every <= 0) {
     return 1;
   } else {
-    return MAX((int)(round((T)m_batch / every)), 1); // take next integer for period
+    return MAX((int)(round((float)m_batch / every)), 1); // take next integer for period
   }
 }
 
@@ -491,7 +525,6 @@ void TransferRPUDeviceCuda<T>::decayWeights(T *dev_weights, T alpha, bool bias_n
   if (fully_hidden_) {
     this->dev_weights_ptrs_[this->n_devices_ - 1] = dev_weights;
   }
-
   VectorRPUDeviceCuda<T>::decayWeights(dev_weights, alpha, bias_no_decay);
 }
 
@@ -546,4 +579,8 @@ template class TransferRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class TransferRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class TransferRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -30,7 +30,8 @@ from torchvision.datasets import FashionMNIST, SVHN
 from torchvision.transforms import Compose, Normalize, ToTensor
 
 from aihwkit.experiments.experiments.base import Experiment, Signals
-from aihwkit.nn.modules.base import AnalogModuleBase
+from aihwkit.nn.modules.base import AnalogLayerBase
+from aihwkit.utils.legacy import convert_legacy_checkpoint
 
 
 WEIGHT_TEMPLATE_URL = "https://github.com/IBM-AI-Hardware-Center/Composer/raw/main/"
@@ -65,15 +66,15 @@ class BasicInferencing(Experiment):
     """
 
     def __init__(
-            self,
-            dataset: Type[Dataset],
-            model: Module,
-            batch_size: int = 10,
-            loss_function: type = CrossEntropyLoss,
-            weight_template_id: str = "",
-            inference_repeats: int = 2,
-            inference_time: int = 86400,
-            remap_weights: bool = True
+        self,
+        dataset: Type[Dataset],
+        model: Module,
+        batch_size: int = 10,
+        loss_function: type = CrossEntropyLoss,
+        weight_template_id: str = "",
+        inference_repeats: int = 2,
+        inference_time: int = 86400,
+        remap_weights: bool = True,
     ):
         """Create a new ``BasicInferencing``.
 
@@ -100,9 +101,9 @@ class BasicInferencing(Experiment):
 
     def get_dataset_arguments(self, dataset: type) -> Tuple[Dict, Dict]:
         """Return the dataset constructor arguments for specifying subset."""
-        if dataset in (SVHN, ):
-            return {'split': 'train'}, {'split': 'test'}
-        return {'train': True}, {'train': False}
+        if dataset in (SVHN,):
+            return {"split": "train"}, {"split": "test"}
+        return {"train": True}, {"train": False}
 
     def get_dataset_transform(self, dataset: type) -> Any:
         """Return the dataset transform."""
@@ -124,11 +125,11 @@ class BasicInferencing(Experiment):
         return transform
 
     def get_data_loader(
-            self,
-            dataset: type,
-            batch_size: int,
-            max_elements: int = 0,
-            dataset_root: str = '/tmp/datasets'
+        self,
+        dataset: type,
+        batch_size: int,
+        max_elements: int = 0,
+        dataset_root: str = "/tmp/datasets",
     ) -> DataLoader:
         """Return `DataLoaders` for the selected dataset.
 
@@ -157,11 +158,7 @@ class BasicInferencing(Experiment):
 
         return validation_loader
 
-    def get_model(
-            self,
-            weight_template_id: str,
-            device: torch_device
-    ) -> Module:
+    def get_model(self, weight_template_id: str, device: torch_device) -> Module:
         """Get a copy of the set-up model (with load the weights and biases)
         from the original experiment model.
 
@@ -177,12 +174,12 @@ class BasicInferencing(Experiment):
         model = deepcopy(self.model)
 
         if weight_template_id != "":
-            if weight_template_id[0:1] == "." or weight_template_id[0:1] == '/':
+            if weight_template_id[0:1] == "." or weight_template_id[0:1] == "/":
                 # This is the case where it is a local file
                 template_path = weight_template_id
             else:
                 template_dir = "/tmp/weight_templates"
-                if weight_template_id.startswith('http'):
+                if weight_template_id.startswith("http"):
                     template_url = weight_template_id
                 else:
                     # print('weights_template_id: ', weight_template_id)
@@ -196,24 +193,24 @@ class BasicInferencing(Experiment):
 
             # print('template_path: ', template_path)
             if path.exists(template_path):
-                model.load_state_dict(load(template_path, map_location=device),
-                                      load_rpu_config=False)
+                state_dict = load(template_path, map_location=device)
+                state_dict, _ = convert_legacy_checkpoint(state_dict, model)
+                model.load_state_dict(state_dict, load_rpu_config=False)
             else:
-                print('Checkpoint file: ', template_path, ' does not exist.')
+                print("Checkpoint file: ", template_path, " does not exist.")
 
             if self.remap_weights:
-                for module in model.analog_modules():
-                    module.remap_weights()
+                model.remap_analog_weights()
 
         return model.to(device)
 
     def inferencing_step(
-            self,
-            validation_loader: DataLoader,
-            model: Module,
-            loss_function: _Loss,
-            t_inference_list: list,
-            device: torch_device
+        self,
+        validation_loader: DataLoader,
+        model: Module,
+        loss_function: _Loss,
+        t_inference_list: list,
+        device: torch_device,
     ) -> Tuple[ndarray, ndarray, ndarray]:
         """Run a single inferencing.
 
@@ -268,22 +265,22 @@ class BasicInferencing(Experiment):
                 predicted_ok += (predicted == labels).sum().item()
 
             # Save the information in the np arrays and return
-            accuracy_post = predicted_ok / total_images * 100.
+            accuracy_post = predicted_ok / total_images * 100.0
             infer_accuracy[idx] = accuracy_post
-            infer_error[idx] = 100. - accuracy_post
+            infer_error[idx] = 100.0 - accuracy_post
             infer_loss[idx] = total_loss / total_images
 
         return infer_accuracy, infer_error, infer_loss
 
     def inference(
-            self,
-            validation_loader: DataLoader,
-            model: Module,
-            loss_function: _Loss,
-            inference_repeats: int,
-            inference_time: int,
-            device: torch_device,
-            n_inference_times: int = 10,
+        self,
+        validation_loader: DataLoader,
+        model: Module,
+        loss_function: _Loss,
+        inference_repeats: int,
+        inference_time: int,
+        device: torch_device,
+        n_inference_times: int = 10,
     ) -> Dict:
         """Run the inferencing loop.
 
@@ -307,17 +304,19 @@ class BasicInferencing(Experiment):
 
         # Create the t_inference_list using inference_time.
         # Generate the 9 values between 0 and the inference time using log10
-        t_inference_list = [0.0] + logspace(0, log10(float(inference_time)),
-                                            n_inference_times - 1).tolist()
+        t_inference_list = [0.0] + logspace(
+            0, log10(float(inference_time)), n_inference_times - 1
+        ).tolist()
         repeat_results = {}
-        accuracy_array = array([])
-        error_array = array([])
-        loss_array = array([])
+        accuracy_array = array([], "float")
+        error_array = array([], "float")
+        loss_array = array([], "float")
 
         for repeat in range(inference_repeats):
             self._call_hook(Signals.INFERENCE_REPEAT_START, repeat)
             infer_accuracy, infer_error, infer_loss = self.inferencing_step(
-                validation_loader, model, loss_function, t_inference_list, device)
+                validation_loader, model, loss_function, t_inference_list, device
+            )
 
             # Save the info
             accuracy_array = concatenate([accuracy_array, infer_accuracy])  # type: ignore
@@ -327,37 +326,41 @@ class BasicInferencing(Experiment):
             # call the metric hook function with the average information
             # to write out the partial result to standard out.
             shape = (repeat + 1, n_inference_times)
-            repeat_results = self._call_hook(Signals.INFERENCE_REPEAT_END,
-                                             array(t_inference_list),
-                                             accuracy_array.reshape(shape).mean(axis=0),
-                                             accuracy_array.reshape(shape).std(axis=0),
-                                             error_array.reshape(shape).mean(axis=0),
-                                             loss_array.reshape(shape).mean(axis=0),
-                                             self.inference_repeats)
+            repeat_results = self._call_hook(
+                Signals.INFERENCE_REPEAT_END,
+                array(t_inference_list),
+                accuracy_array.reshape(shape).mean(axis=0),
+                accuracy_array.reshape(shape).std(axis=0),
+                error_array.reshape(shape).mean(axis=0),
+                loss_array.reshape(shape).mean(axis=0),
+                self.inference_repeats,
+            )
         return deepcopy(repeat_results)
 
     def _print_rpu_fields(self, model: Module) -> None:
         """Print the Inference RPU Config fields"""
 
-        print('\n>>> inferenceworker.py: STARTING _print_rpu_fields() ')
+        print("\n>>> inferenceworker.py: STARTING _print_rpu_fields() ")
 
         for name, module in model.named_modules():
-            if not isinstance(module, AnalogModuleBase):
+            if not isinstance(module, AnalogLayerBase):
                 continue
 
-            print(f'RPUConfig of module {name}:')
+            print(f"RPUConfig of module {name}:")
             tile = next(module.analog_tiles())
             print(tile.rpu_config)
             print(tile.tile)
-            print('-------------')
+            print("-------------")
 
-        print('\n>>> inferenceworker.py: ENDING _print_rpu_fields() ')
+        print("\n>>> inferenceworker.py: ENDING _print_rpu_fields() ")
 
-    def run(self, max_elements: int = 0,
-            dataset_root: str = '/tmp/data',
-            device: Optional[torch_device] = None,
-            ) -> Dict:
-        """ Sets up the internal model and runs the inference.
+    def run(
+        self,
+        max_elements: int = 0,
+        dataset_root: str = "/tmp/data",
+        device: Optional[torch_device] = None,
+    ) -> Dict:
+        """Sets up the internal model and runs the inference.
 
         Results are returned and the internal model is updated.
         """
@@ -365,36 +368,37 @@ class BasicInferencing(Experiment):
         # Build the objects needed for inferencing.
         # Get valication dataset
         validation_loader = self.get_data_loader(
-            self.dataset, self.batch_size,
-            max_elements=max_elements,
-            dataset_root=dataset_root
+            self.dataset, self.batch_size, max_elements=max_elements, dataset_root=dataset_root
         )
 
         # Load the weights and biases to the model.
         # Assumption: the model already includes the customer-specified InferenceRPUConfig.
         model = self.get_model(self.weight_template_id, device)
-
         self._print_rpu_fields(model)
 
         # Invoke the inference step
-        result = self.inference(validation_loader,
-                                model,
-                                self.loss_function(),
-                                self.inference_repeats,
-                                self.inference_time,
-                                device)
+        result = self.inference(
+            validation_loader,
+            model,
+            self.loss_function(),
+            self.inference_repeats,
+            self.inference_time,
+            device,
+        )
         self.model = model  # update the stored model with the trained one
         return result
 
     def __str__(self) -> str:
         """Return a string representation of a BasicInferencing experiment."""
-        return ('{}(dataset={}, batch_size={}, loss_function={}, inference_repeats={}, '
-                'inference_time={}, model={})'.format(
-                    self.__class__.__name__,
-                    getattr(self.dataset, '__name__', self.dataset),
-                    self.batch_size,
-                    getattr(self.loss_function, '__name__', self.loss_function),
-                    self.inference_repeats,
-                    self.inference_time,
-                    self.model
-                ))
+        return (
+            "{}(dataset={}, batch_size={}, loss_function={}, inference_repeats={}, "
+            "inference_time={}, model={})".format(
+                self.__class__.__name__,
+                getattr(self.dataset, "__name__", self.dataset),
+                self.batch_size,
+                getattr(self.loss_function, "__name__", self.loss_function),
+                self.inference_repeats,
+                self.inference_time,
+                self.model,
+            )
+        )

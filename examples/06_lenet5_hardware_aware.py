@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -32,9 +32,13 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
+    RPUDataType,
     InferenceRPUConfig,
-    WeightRemapType, WeightModifierType, WeightClipType,
-    NoiseManagementType, BoundManagementType
+    WeightRemapType,
+    WeightModifierType,
+    WeightClipType,
+    NoiseManagementType,
+    BoundManagementType,
 )
 from aihwkit.inference import PCMLikeNoiseModel
 from aihwkit.simulator.rpu_base import cuda
@@ -43,13 +47,14 @@ from aihwkit.simulator.rpu_base import cuda
 USE_CUDA = 0
 if cuda.is_compiled():
     USE_CUDA = 1
-DEVICE = device('cuda' if USE_CUDA else 'cpu')
+DEVICE = device("cuda" if USE_CUDA else "cpu")
+DATA_TYPE = RPUDataType.FLOAT
 
 # Path to store datasets
-PATH_DATASET = os.path.join('data', 'DATASET')
+PATH_DATASET = os.path.join("data", "DATASET")
 
 # Path to store results
-RESULTS = os.path.join(os.getcwd(), 'results', 'LENET5')
+RESULTS = os.path.join(os.getcwd(), "results", "LENET5")
 N_CLASSES = 10
 
 
@@ -82,12 +87,18 @@ def create_analog_network(rpu_config):
     """
     channel = [16, 32, 512, 128]
     model = AnalogSequential(
-        AnalogConv2d(in_channels=1, out_channels=channel[0], kernel_size=5, stride=1,
-                     rpu_config=rpu_config),
+        AnalogConv2d(
+            in_channels=1, out_channels=channel[0], kernel_size=5, stride=1, rpu_config=rpu_config
+        ),
         nn.Tanh(),
         nn.MaxPool2d(kernel_size=2),
-        AnalogConv2d(in_channels=channel[0], out_channels=channel[1], kernel_size=5, stride=1,
-                     rpu_config=rpu_config),
+        AnalogConv2d(
+            in_channels=channel[0],
+            out_channels=channel[1],
+            kernel_size=5,
+            stride=1,
+            rpu_config=rpu_config,
+        ),
         nn.Tanh(),
         nn.MaxPool2d(kernel_size=2),
         nn.Tanh(),
@@ -95,7 +106,7 @@ def create_analog_network(rpu_config):
         AnalogLinear(in_features=channel[2], out_features=channel[3], rpu_config=rpu_config),
         nn.Tanh(),
         AnalogLinear(in_features=channel[3], out_features=N_CLASSES, rpu_config=rpu_config),
-        nn.LogSoftmax(dim=1)
+        nn.LogSoftmax(dim=1),
     )
 
     return model
@@ -135,7 +146,7 @@ def train_step(data, model, criterion, optimizer):
     model.train()
 
     for images, labels in data:
-        images = images.to(DEVICE)
+        images = images.to(device=DEVICE, dtype=DATA_TYPE.as_torch())
         labels = labels.to(DEVICE)
         optimizer.zero_grad()
 
@@ -174,7 +185,7 @@ def test_evaluation(data, model, criterion):
     model.eval()
 
     for images, labels in data:
-        images = images.to(DEVICE)
+        images = images.to(device=DEVICE, dtype=DATA_TYPE.as_torch())
         labels = labels.to(DEVICE)
 
         pred = model(images)
@@ -185,8 +196,8 @@ def test_evaluation(data, model, criterion):
         total_images += labels.size(0)
         predicted_ok += (predicted == labels).sum().item()
 
-    accuracy = predicted_ok/total_images*100
-    error = (1-predicted_ok/total_images)*100
+    accuracy = predicted_ok / total_images * 100
+    error = (1 - predicted_ok / total_images) * 100
     epoch_loss = total_loss / len(data.dataset)
 
     return epoch_loss, error, accuracy
@@ -225,12 +236,14 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
         test_error.append(error)
 
         if epoch % print_every == (print_every - 1):
-            print(f'{datetime.now().time().replace(microsecond=0)} --- '
-                  f'Epoch: {epoch}\t'
-                  f'Train loss: {train_loss:.4f}\t'
-                  f'Valid loss: {valid_loss:.4f}\t'
-                  f'Test error: {error:.2f}%\t'
-                  f'Accuracy: {accuracy:.2f}%\t')
+            print(
+                f"{datetime.now().time().replace(microsecond=0)} --- "
+                f"Epoch: {epoch}\t"
+                f"Train loss: {train_loss:.4f}\t"
+                f"Valid loss: {valid_loss:.4f}\t"
+                f"Test error: {error:.2f}%\t"
+                f"Accuracy: {accuracy:.2f}%\t"
+            )
 
     # Save results and plot figures
     np.savetxt(os.path.join(RESULTS, "Test_error.csv"), test_error, delimiter=",")
@@ -240,8 +253,7 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
     return model, optimizer, (train_losses, valid_losses, test_error)
 
 
-def plot_results(train_losses, valid_losses, test_error,
-                 t_inference_times, inference_test_error):
+def plot_results(train_losses, valid_losses, test_error, t_inference_times, inference_test_error):
     """Plot results.
 
     Args:
@@ -254,33 +266,33 @@ def plot_results(train_losses, valid_losses, test_error,
     plt.ion()
     plt.figure(figsize=[14, 5])
     plt.subplot(1, 3, 1)
-    h = plt.plot(train_losses, 'r-s', valid_losses, 'b-o')
-    plt.title('LeNet5 - HWA training')
-    plt.legend(h[:2], ['Training Losses', 'Validation Losses'])
-    plt.xlabel('Epoch number')
-    plt.ylabel('Loss [A.U.]')
-    plt.grid(which='both', linestyle='--')
+    h = plt.plot(train_losses, "r-s", valid_losses, "b-o")
+    plt.title("LeNet5 - HWA training")
+    plt.legend(h[:2], ["Training Losses", "Validation Losses"])
+    plt.xlabel("Epoch number")
+    plt.ylabel("Loss [A.U.]")
+    plt.grid(which="both", linestyle="--")
 
     plt.subplot(1, 3, 2)
-    handle = plt.plot(test_error, 'r-s')
-    plt.title('Test w/o prog. noise and drift')
-    plt.legend(handle[:1], ['Validation test error'])
-    plt.xlabel('Epoch number')
-    plt.ylabel('Test Error [%]')
-    plt.yscale('log')
+    handle = plt.plot(test_error, "r-s")
+    plt.title("Test w/o prog. noise and drift")
+    plt.legend(handle[:1], ["Validation test error"])
+    plt.xlabel("Epoch number")
+    plt.ylabel("Test Error [%]")
+    plt.yscale("log")
     plt.ylim((5e-1, 1e2))
-    plt.grid(which='both', linestyle='--')
+    plt.grid(which="both", linestyle="--")
 
     plt.subplot(1, 3, 3)
-    handle = plt.plot(t_inference_times, inference_test_error, 'r-s')
-    plt.title('Eval. w/ prog. noise and drift)')
-    plt.legend(handle[:1], ['Validation test error'])
-    plt.xlabel('Time of inference [s]')
-    plt.ylabel('Test Error [%]')
-    plt.yscale('log')
-    plt.xscale('log')
+    handle = plt.plot(t_inference_times, inference_test_error, "r-s")
+    plt.title("Eval. w/ prog. noise and drift)")
+    plt.legend(handle[:1], ["Validation test error"])
+    plt.xlabel("Time of inference [s]")
+    plt.ylabel("Test Error [%]")
+    plt.yscale("log")
+    plt.xscale("log")
     plt.ylim((5e-1, 1e2))
-    plt.grid(which='both', linestyle='--')
+    plt.grid(which="both", linestyle="--")
 
     plt.show()
     plt.tight_layout()
@@ -299,17 +311,14 @@ def training_phase(model, criterion, optimizer, train_data, validation_data):
     Returns:
        Tuple: results from the training phase
     """
-    print('\n ********************************************************* \n')
-    print(f'\n{datetime.now().time().replace(microsecond=0)} --- '
-          f'Started LeNet5 Training')
+    print("\n ********************************************************* \n")
+    print(f"\n{datetime.now().time().replace(microsecond=0)} --- " f"Started LeNet5 Training")
 
-    model, optimizer, res = training_loop(model, criterion,
-                                          optimizer, train_data,
-                                          validation_data,
-                                          N_EPOCHS)
+    model, optimizer, res = training_loop(
+        model, criterion, optimizer, train_data, validation_data, N_EPOCHS
+    )
 
-    print(f'{datetime.now().time().replace(microsecond=0)} --- '
-          f'Completed LeNet5 Training')
+    print(f"{datetime.now().time().replace(microsecond=0)} --- " f"Completed LeNet5 Training")
 
     return res
 
@@ -330,9 +339,11 @@ def inference_phase(t_inference_times, model, criterion, validation_data):
     # pylint: disable=too-many-locals
 
     _, error_pre, accuracy_pre = test_evaluation(validation_data, model, criterion)
-    print(f'{datetime.now().time().replace(microsecond=0)} --- '
-          f'Error after training: {error_pre:.2f}%\t'
-          f'Accuracy after training: {accuracy_pre:.2f}%\t')
+    print(
+        f"{datetime.now().time().replace(microsecond=0)} --- "
+        f"Error after training: {error_pre:.2f}%\t"
+        f"Accuracy after training: {accuracy_pre:.2f}%\t"
+    )
 
     error_lst = []
     accuracy_lst = []
@@ -343,10 +354,12 @@ def inference_phase(t_inference_times, model, criterion, validation_data):
 
         _, error_post, accuracy_post = test_evaluation(validation_data, model, criterion)
 
-        print(f'{datetime.now().time().replace(microsecond=0)} --- '
-              f'Error after inference: {error_post:.2f}%\t'
-              f'Accuracy after inference: {accuracy_post:.2f}%\t'
-              f'Drift t={t_inference: .2e}\t')
+        print(
+            f"{datetime.now().time().replace(microsecond=0)} --- "
+            f"Error after inference: {error_post:.2f}%\t"
+            f"Accuracy after inference: {accuracy_post:.2f}%\t"
+            f"Drift t={t_inference: .2e}\t"
+        )
 
         error_lst.append(error_post)
         accuracy_lst.append(accuracy_post)
@@ -354,60 +367,65 @@ def inference_phase(t_inference_times, model, criterion, validation_data):
     return error_lst, accuracy_lst
 
 
-# Make sure the directory where to save the results exist.
-# Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
-os.makedirs(RESULTS, exist_ok=True)
-manual_seed(1)
+if __name__ == "__main__":
+    # Make sure the directory where to save the results exist.
+    # Results include: Loss vs Epoch graph, Accuracy vs Epoch graph and vector data.
 
-# Training parameters
-N_EPOCHS = 30
-BATCH_SIZE = 50
-LEARNING_RATE = 0.1
+    os.makedirs(RESULTS, exist_ok=True)
+    manual_seed(1)
 
-# Load datasets.
-training_data, valid_data = load_images(BATCH_SIZE)
+    # Training parameters
+    N_EPOCHS = 30
+    BATCH_SIZE = 50
+    LEARNING_RATE = 0.1
 
-# Define the properties of the neural network in terms of noise simulated during
-# the inference/training pass
-my_rpu_config = InferenceRPUConfig()
-my_rpu_config.mapping.digital_bias = True
-my_rpu_config.mapping.out_scaling_columnwise = True
-my_rpu_config.mapping.learn_out_scaling = True
-my_rpu_config.mapping.weight_scaling_omega = 1.0
-my_rpu_config.mapping.weight_scaling_columnwise = False
+    # Load datasets.
+    training_data, valid_data = load_images(BATCH_SIZE)
 
-my_rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
-my_rpu_config.remap.type = WeightRemapType.CHANNELWISE_SYMMETRIC
-my_rpu_config.clip.type = WeightClipType.LAYER_GAUSSIAN
-my_rpu_config.clip.sigma = 2.5
+    # Define the properties of the neural network in terms of noise simulated during
+    # the inference/training pass
+    my_rpu_config = InferenceRPUConfig()
+    my_rpu_config.mapping.digital_bias = True
+    my_rpu_config.mapping.out_scaling_columnwise = True
+    my_rpu_config.mapping.learn_out_scaling = True
+    my_rpu_config.mapping.weight_scaling_omega = 1.0
+    my_rpu_config.mapping.weight_scaling_columnwise = False
+    my_rpu_config.mapping.max_input_size = 512
+    my_rpu_config.mapping.max_output_size = 512
 
-# train input clipping
-my_rpu_config.forward.noise_management = NoiseManagementType.NONE
-my_rpu_config.forward.bound_management = BoundManagementType.NONE
-my_rpu_config.forward.out_bound = 10.0  # quite restrictive
-my_rpu_config.pre_post.input_range.enable = True
-my_rpu_config.pre_post.input_range.manage_output_clipping = True
-my_rpu_config.pre_post.input_range.decay = 0.001
-my_rpu_config.pre_post.input_range.input_min_percentage = 0.95
-my_rpu_config.pre_post.input_range.output_min_percentage = 0.95
+    my_rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
+    my_rpu_config.remap.type = WeightRemapType.CHANNELWISE_SYMMETRIC
+    my_rpu_config.clip.type = WeightClipType.LAYER_GAUSSIAN
+    my_rpu_config.clip.sigma = 2.5
 
-my_rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
-my_rpu_config.modifier.std_dev = 0.1
+    # train input clipping
+    my_rpu_config.forward.noise_management = NoiseManagementType.NONE
+    my_rpu_config.forward.bound_management = BoundManagementType.NONE
+    my_rpu_config.forward.out_bound = 10.0  # quite restrictive
+    my_rpu_config.pre_post.input_range.enable = True
+    my_rpu_config.pre_post.input_range.manage_output_clipping = True
+    my_rpu_config.pre_post.input_range.decay = 0.001
+    my_rpu_config.pre_post.input_range.input_min_percentage = 0.95
+    my_rpu_config.pre_post.input_range.output_min_percentage = 0.95
 
-# Prepare the model.
-analog_model = create_analog_network(my_rpu_config)
-if USE_CUDA:
-    analog_model = analog_model.cuda()
-print(analog_model)
+    my_rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
+    my_rpu_config.modifier.std_dev = 0.1
 
-opt = create_sgd_optimizer(analog_model, LEARNING_RATE)
-crit = nn.CrossEntropyLoss()
+    my_rpu_config.runtime.data_type = DATA_TYPE
 
-# Train the model
-results = training_phase(analog_model, crit, opt, training_data, valid_data)
+    # Prepare the model.
+    analog_model = create_analog_network(my_rpu_config)
+    if USE_CUDA:
+        analog_model = analog_model.cuda()
+    print(analog_model)
 
+    opt = create_sgd_optimizer(analog_model, LEARNING_RATE)
+    crit = nn.CrossEntropyLoss()
 
-# Test model inference over time
-t_inference_lst = [0., 1., 20., 1000., 1e5, 1e7]
-inference_error, _ = inference_phase(t_inference_lst, analog_model, crit, valid_data)
-plot_results(*results, t_inference_lst, inference_error)
+    # Train the model
+    results = training_phase(analog_model, crit, opt, training_data, valid_data)
+
+    # Test model inference over time
+    t_inference_lst = [0.0, 1.0, 20.0, 1000.0, 1e5, 1e7]
+    inference_error, _ = inference_phase(t_inference_lst, analog_model, crit, valid_data)
+    plot_results(*results, t_inference_lst, inference_error)

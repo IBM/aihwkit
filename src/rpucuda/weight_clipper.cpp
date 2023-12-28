@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -52,7 +52,7 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
     PRAGMA_SIMD
     for (int i = 0; i < size_; i++) {
       int row_idx = i / x_size_;
-      T a = fabs(weights[i]);
+      T a = (T)fabsf(weights[i]);
       T mv = amax_values_[row_idx];
 
       amax_values_[row_idx] = a > mv ? a : mv;
@@ -64,7 +64,7 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
       sum_amax += amax_values_[i];
     }
 
-    clip_value = fabs(sum_amax / d_size_);
+    clip_value = (T)fabsf(sum_amax / (T)d_size_);
 
     if (wclpar.fixed_value > 0) {
       clip_value = MIN(clip_value, (T)wclpar.fixed_value);
@@ -91,11 +91,11 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
       T m = weights[i] - mean_value;
       std_value += m * m / s;
     }
-    std_value = sqrt(std_value);
+    std_value = (T)sqrtf(std_value);
 
     clip_value = std_value * (T)wclpar.sigma;
-    if (wclpar.fixed_value > 0) {
-      clip_value = (T)MIN(clip_value, wclpar.fixed_value);
+    if ((T)wclpar.fixed_value > (T)0.0) {
+      clip_value = (T)MIN(clip_value, (T)wclpar.fixed_value);
     }
     break;
   }
@@ -109,7 +109,7 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
   } // switch
 
   // do the clippping
-  if (clip_value > 0) {
+  if (clip_value > (T).00) {
     clip(weights, clip_value);
   }
 }
@@ -117,6 +117,9 @@ template <typename T> void WeightClipper<T>::apply(T *weights, const WeightClipP
 template class WeightClipper<float>;
 #ifdef RPU_USE_DOUBLE
 template class WeightClipper<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class WeightClipper<half_t>;
 #endif
 
 } // namespace RPU
