@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -24,17 +24,11 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
 
-class RPUCudaPowStepTestFixture : public ::testing::TestWithParam<num_t> {
+class RPUCudaPowStepTestFixture : public ::testing::TestWithParam<float> {
 public:
   void SetUp() {
 
@@ -95,7 +89,7 @@ public:
     dp.ps_gamma_up_down = 0.1;
     dp.ps_gamma_up_down_dtod = 0.01;
 
-    dp.print();
+    // dp.print();
 
     rx.resize(x_size * m_batch);
     rd.resize(d_size * m_batch);
@@ -107,23 +101,23 @@ public:
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
 
-    layer_pulsed->disp();
+    // layer_pulsed->disp();
 
     // culayer
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->disp();
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(context, x_size);
@@ -140,8 +134,7 @@ public:
   }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<num_t>> culayer_pulsed;
   std::vector<num_t> x_vec, x_vec_batch, d_vec, d_vec_batch, rx, rd;
@@ -162,13 +155,6 @@ INSTANTIATE_TEST_CASE_P(GammaTest, RPUCudaPowStepTestFixture, ::testing::Values(
 
 #define RPU_TEST_UPDATE(CUFUN, FUN, NLOOP)                                                         \
   this->context->synchronizeDevice();                                                              \
-  this->culayer_pulsed->printWeights(3, 1);                                                        \
-  this->layer_pulsed->printWeights(3, 1);                                                          \
-                                                                                                   \
-  std::cout << "RPU Cuda:\n";                                                                      \
-  this->culayer_pulsed->printRPUParameter(1, 1);                                                   \
-  std::cout << "RPU:\n";                                                                           \
-  this->layer_pulsed->printRPUParameter(1, 1);                                                     \
                                                                                                    \
   num_t **refweights = Array_2D_Get<num_t>(this->d_size, this->x_size);                            \
   num_t **w = this->layer_pulsed->getWeights();                                                    \
@@ -201,7 +187,7 @@ INSTANTIATE_TEST_CASE_P(GammaTest, RPUCudaPowStepTestFixture, ::testing::Values(
     count_diff = 0;                                                                                \
     for (int i = 0; i < this->d_size; i++) {                                                       \
       for (int j = 0; j < this->x_size; j++) {                                                     \
-        ASSERT_NEAR(weights[i][j], cuweights[i][j], TOLERANCE);                                    \
+        ASSERT_NEAR((float)weights[i][j], (float)cuweights[i][j], TOLERANCE);                      \
         count_diff += weights[i][j] != refweights[i][j];                                           \
       }                                                                                            \
     }                                                                                              \
@@ -212,10 +198,9 @@ INSTANTIATE_TEST_CASE_P(GammaTest, RPUCudaPowStepTestFixture, ::testing::Values(
       this->layer_pulsed->setWeights(refweights[0]);                                               \
     }                                                                                              \
   }                                                                                                \
-  std::cout << "changed weights: " << count_diff << std::endl;                                     \
-  std::cout << BOLD_ON << "\nCUDA Updates done in: " << (num_t)cudur / 1000. / nloop << " msec. "  \
+  std::cout << BOLD_ON << "\nCUDA Updates done in: " << (float)cudur / 1000. / nloop << " msec. "  \
             << BOLD_OFF << std::endl;                                                              \
-  std::cout << BOLD_ON << "RPU Updates done in: " << (num_t)dur / 1000. / nloop << " msec.\n "     \
+  std::cout << BOLD_ON << "RPU Updates done in: " << (float)dur / 1000. / nloop << " msec.\n "     \
             << BOLD_OFF << std::endl;                                                              \
                                                                                                    \
   Array_2D_Free(refweights);

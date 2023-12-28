@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -62,8 +62,8 @@ public:
 private:
   unsigned int seed_ = 0;
   std::unique_ptr<std::default_random_engine> gen_;
-  std::uniform_real_distribution<T> udist_{(T)0.0, (T)1.0};
-  std::normal_distribution<T> ndist_{(T)0.0, (T)1.0};
+  std::uniform_real_distribution<float> udist_{0.0f, 1.0f};
+  std::normal_distribution<float> ndist_{0.0f, 1.0f};
 };
 
 /* Faster approximative RNG for CPU. This is used for everything
@@ -79,8 +79,8 @@ public:
 
   RNG(const RNG<T> &);
   RNG<T> &operator=(const RNG<T> &);
-  RNG(RNG<T> &&);
-  RNG<T> &operator=(RNG<T> &&);
+  RNG(RNG<T> &&) noexcept;
+  RNG<T> &operator=(RNG<T> &&) noexcept;
 
   friend void swap(RNG<T> &a, RNG<T> &b) noexcept {
     using std::swap;
@@ -97,14 +97,14 @@ public:
 
   FORCE_INLINE randomint_t sample() { return RANDFUN(); }
 
-  FORCE_INLINE T sampleUniform() { return RANDFUN() / ((T)RPU_MAX_RAND_RANGE); }
+  FORCE_INLINE T sampleUniform() { return (float)RANDFUN() / (float)RPU_MAX_RAND_RANGE; }
 
-  FORCE_INLINE T sampleUniform(T min_max) {
-    return ((RANDFUN() / ((T)RPU_MAX_RAND_RANGE)) - (T)0.5) * 2 * min_max;
+  FORCE_INLINE T sampleUniform(float min_max) {
+    return (((float)RANDFUN() / (float)RPU_MAX_RAND_RANGE) - 0.5f) * 2.0f * min_max;
   }
 
-  FORCE_INLINE T sampleUniform(T min_value, T max_value) {
-    return ((RANDFUN() / ((T)RPU_MAX_RAND_RANGE)) * (max_value - min_value)) + min_value;
+  FORCE_INLINE T sampleUniform(float min_value, float max_value) {
+    return (((float)RANDFUN() / (float)RPU_MAX_RAND_RANGE) * (max_value - min_value)) + min_value;
   }
 
   FORCE_INLINE T sampleGauss() {
@@ -126,7 +126,7 @@ public:
 private:
   int gauss_list_size_;
   unsigned int seed_;
-  T *gauss_numbers_list_ = nullptr;
+  float *gauss_numbers_list_ = nullptr;
 };
 
 } // namespace RPU

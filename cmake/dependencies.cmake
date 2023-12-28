@@ -1,4 +1,4 @@
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -83,9 +83,10 @@ else()
 endif()
 
 # Python and pybind11
-find_package(PythonInterp REQUIRED)
-find_package(PythonLibs REQUIRED)
-include_directories(${PYTHON_INCLUDE_DIRS})  # order matters (before pybind)
+find_package(Python3 COMPONENTS Interpreter Development)
+include_directories(${Python3_INCLUDE_DIRS})  # order matters (before pybind)
+
+set(ignoreMe "${Python3_EXECUTABLE}${Python3_FIND_REGISTRY}${Python3_INCLUDE_DIR}${Python3_NumPy_INCLUDE_DIRS}${Python3_ROOT_DIR}${Python_INCLUDE_DIR}${Python_NumPy_INCLUDE_DIRS}")
 
 # Find pybind11Config.cmake
 execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"

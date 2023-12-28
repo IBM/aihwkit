@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,6 +28,7 @@ int debugKernelUpdateW(
     T dw_min_std,
     T bound,
     T *timings);
+
 template <typename T>
 int debugKernelUpdateWBatch(
     T *weights,
@@ -59,6 +60,6 @@ int debugKernelUpdateWBatchShared(
     T bound,
     int kernel_type,
     T *timings);
-
 } // namespace test_helper
 } // namespace RPU
+  // namespace RPU

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -15,76 +15,127 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <random>
 
 #include "cuda_math_util.h"
 #include "cuda_util.h"
-#include <cub/cub.cuh>
-
 #include "io_iterator.h"
+#include "rpu_cub.h"
 
 namespace RPU {
 
-template <typename InputIteratorT, bool abs_if = true>
+namespace {
+template <typename T> __forceinline__ __device__ T atomicMaxFP(T *addr, T value);
+
+template <> __forceinline__ __device__ float atomicMaxFP(float *addr, float value) {
+  float old = *addr, assumed;
+  if (old >= value)
+    return old;
+  do {
+    assumed = old;
+    old = __int_as_float(atomicCAS((int *)addr, __float_as_int(assumed), __float_as_int(value)));
+  } while (old != assumed || old < value);
+  return old;
+}
+
+#ifdef RPU_USE_DOUBLE
+template <> __forceinline__ __device__ double atomicMaxFP(double *addr, double value) {
+  double old = *addr, assumed;
+  if (old >= value)
+    return old;
+  do {
+    assumed = old;
+    old = __longlong_as_double(atomicCAS(
+        (long long int *)addr, __double_as_longlong(assumed), __double_as_longlong(value)));
+  } while (old != assumed || old < value);
+  return old;
+}
+#endif
+
+#ifdef RPU_USE_FP16
+#ifdef RPU_BFLOAT_AS_FP16
+template <> __forceinline__ __device__ half_t atomicMaxFP(half_t *addr, half_t value) {
+  half_t old = *addr, assumed;
+  if (old >= value)
+    return old;
+  do {
+    assumed = old;
+    old = __short_as_bfloat16(atomicCAS(
+        (unsigned short *)addr, __bfloat16_as_short(assumed), __bfloat16_as_short(value)));
+  } while (old != assumed || old < value);
+  return old;
+}
+#else
+template <> __forceinline__ __device__ half_t atomicMaxFP(half_t *addr, half_t value) {
+  half_t old = *addr, assumed;
+  if (old >= value)
+    return old;
+  do {
+    assumed = old;
+    old = __short_as_half(
+        atomicCAS((unsigned short *)addr, __half_as_short(assumed), __half_as_short(value)));
+  } while (old != assumed || old < value);
+  return old;
+}
+#endif
+#endif
+} // namespace
+
+template <typename InputIteratorT, typename T, bool abs_if = true>
 __global__ void kernelMaximizeBatchTrans(
     InputIteratorT input,
     const int total_size_in,
     const int m_batch_in,
-    float *max_values,
-    float *max_values0) {
+    T *max_values,
+    T *max_values0,
+    const T min_value) {
 
   // -- only use this version if m_batch < blockDim.x !!!
   // -- probably: strided version would be faster...
 
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
-  extern __shared__ int block_max_values[]; // assumes that shared is of size nthreads*sizeof(int)
+  extern __shared__ float
+      block_max_values[]; // assumes that shared is of size nthreads*sizeof(float)
 
   const int size = total_size_in;
   const int m_batch = m_batch_in;
 
-  if (abs_if) {
-    block_max_values[threadIdx.x] = 0;
-  } else {
-    block_max_values[threadIdx.x] = INT_MIN;
-  }
+  block_max_values[threadIdx.x] = (float)min_value;
   __syncthreads();
 
   if (tid < m_batch) {
-    if (abs_if) {
-      max_values0[tid] = 0; // for next round
-    } else {
-      max_values0[tid] = -FLT_MAX; // for next round
-    }
+    max_values0[tid] = min_value;
   }
 
   if (tid < size) {
 
-    float value = input[tid]; // typecast to float. (because float to int)
-
+    T value = (T)input[tid];
     int midx = tid % m_batch;
 
     if (abs_if) {
-      value = (value >= 0) ? value : -value;
+      value = (value >= (T)0.0) ? value : -value;
     }
 
-    atomicMax(&(block_max_values[midx]), __float_as_int(value));
+    atomicMaxFP(&(block_max_values[midx]), (float)value);
   }
   __syncthreads();
 
   int bidx = threadIdx.x;
   if (bidx < m_batch) {
-    atomicMax((int *)&(max_values[bidx]), block_max_values[bidx]);
+    atomicMaxFP(&(max_values[bidx]), (T)block_max_values[bidx]);
   }
 }
 
-template <typename InputIteratorT, bool abs_if = true>
+template <typename InputIteratorT, typename T, bool abs_if = true>
 __global__ void kernelMaximizeBatchTrans_LargeBatch(
     InputIteratorT input,
     const int total_size_in,
     const int m_batch_in,
-    float *max_values,
-    float *max_values0) {
+    T *max_values,
+    T *max_values0,
+    const T min_value) {
 
   // -- use this version if m_batch >= blockDim.x
   // -- just uses atomic on global memory
@@ -95,31 +146,27 @@ __global__ void kernelMaximizeBatchTrans_LargeBatch(
   const int m_batch = m_batch_in;
 
   if (tid < m_batch) {
-    if (abs_if) {
-      max_values0[tid] = 0; // for next round
-    } else {
-      max_values0[tid] = -FLT_MAX; // for next round
-    }
+    max_values0[tid] = min_value;
   }
 
   if (tid < size) {
 
-    float value = input[tid];
+    T value = input[tid];
 
     int midx = tid % m_batch;
 
     if (abs_if) {
-      value = (value >= 0) ? value : -value;
+      value = (value >= (T)0.0) ? value : -value;
     }
 
-    atomicMax((int *)&max_values[midx], __float_as_int(value));
+    atomicMaxFP(&max_values[midx], value);
   }
 }
 
 template <typename T> struct IndexReader {
   __host__ __device__ IndexReader(T *data_in) { data = data_in; }
   __host__ __device__ __forceinline__ T operator()(const int &idx) const {
-    return (idx > 0) ? data[idx - 1] : 0;
+    return (idx > 0) ? data[idx - 1] : (T)0.0;
   }
 
   __host__ __device__ __forceinline__ void setData(T *data_in) { data = data_in; }
@@ -152,21 +199,21 @@ template <typename T> struct BatchTransposer {
 namespace test_helper {
 
 template <typename T>
-void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *max_values) {
+void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, T *max_values) {
 
   int *offsets = new int[m_batch + 1];
 
   for (int i = 0; i <= m_batch; i++) {
     offsets[i] = i * size;
   }
-
-  CudaContext c(-1, false);
-  CudaArray<T> dev_in(&c, size * m_batch, indata);
-  CudaArray<float> dev_max_values(&c, m_batch);
+  auto c_container = CudaContext(-1, false);
+  CudaContextPtr c = &c_container;
+  CudaArray<T> dev_in(c, size * m_batch, indata);
+  CudaArray<T> dev_max_values(c, m_batch);
   dev_max_values.setConst(0);
-  CudaArray<float> dev_max_values0(&c, m_batch);
+  CudaArray<T> dev_max_values0(c, m_batch);
 
-  CudaArray<int> dev_offsets(&c, m_batch + 1, offsets);
+  CudaArray<int> dev_offsets(c, m_batch + 1, offsets);
 
   CUDA_CALL(cudaPeekAtLastError());
   CUDA_CALL(cudaDeviceSynchronize());
@@ -176,36 +223,38 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   for (int i = 0; i < size * m_batch; i++) {
     tmp[i] = i + 1;
   }
-  CudaArray<int> dev_in_index(&c, size * m_batch, tmp);
+  CudaArray<int> dev_in_index(c, size * m_batch, tmp);
   CUDA_CALL(cudaDeviceSynchronize());
 
   IndexReader<T> idx_reader(dev_in.getData());
-  RPU::cub::TransformInputIterator<T, IndexReader<T>, int *> in_itr(
+  RPU_CUB_NS_QUALIFIER TransformInputIterator<T, IndexReader<T>, int *> in_itr(
       dev_in_index.getData(), idx_reader);
 
-  RPU::cub::CountingInputIterator<int> index(0);
+  RPU_CUB_NS_QUALIFIER CountingInputIterator<int> index(0);
   BatchTransposer<T> batch_transposer(dev_in.getData(), size, m_batch);
-  RPU::cub::TransformInputIterator<T, BatchTransposer<T>, RPU::cub::CountingInputIterator<int>>
+  RPU_CUB_NS_QUALIFIER
+  TransformInputIterator<T, BatchTransposer<T>, RPU_CUB_NS_QUALIFIER CountingInputIterator<int>>
       in_trans_itr(index, batch_transposer);
 
   IndexReader<int> idx_reader_host(tmp);
-  RPU::cub::TransformInputIterator<int, IndexReader<int>, int *> test_host(tmp, idx_reader_host);
+  RPU_CUB_NS_QUALIFIER TransformInputIterator<int, IndexReader<int>, int *> test_host(
+      tmp, idx_reader_host);
   std::cout << test_host[0] << std::endl;
 
   CustomMaxAbs max_abs;
   // Determine temporary device storage requirements
   void *d_temp_storage = NULL;
   size_t temp_storage_bytes = 0;
-  RPU::cub::DeviceSegmentedReduce::Reduce(
+  RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
       d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
-      dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c.getStream());
+      dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, (T)0.0, c->getStream());
   // Allocate temporary storage
   cudaMalloc(&d_temp_storage, temp_storage_bytes);
   CUDA_CALL(cudaDeviceSynchronize());
 
-  int nthreads = c.getNThreads();
-  int nblocks = c.getNBlocks(size * m_batch, nthreads);
-  cudaStream_t s = c.getStream();
+  int nthreads = c->getNThreads();
+  int nblocks = c->getNBlocks(size * m_batch, nthreads);
+  cudaStream_t s = c->getStream();
 
   CUDA_TIMING_INIT;
   CUDA_TIMING_START(c);
@@ -213,26 +262,28 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   if (trans) {
 
     // this works, too, but has some performance hit, because of non-aligned memory reads
-    // RPU::cub::DeviceSegmentedReduce::Reduce(d_temp_storage, temp_storage_bytes,
+    // RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(d_temp_storage, temp_storage_bytes,
     // 				   in_trans_itr, dev_max_values.getData(),
     // 				   m_batch, dev_offsets.getData(),
     // 				   dev_offsets.getData()+1, max_abs,0,c.getStream());
 
     if (m_batch > nthreads) {
       kernelMaximizeBatchTrans_LargeBatch<<<nblocks, nthreads, 0, s>>>(
-          in_itr, size * m_batch, m_batch, dev_max_values.getData(), dev_max_values0.getData());
+          in_itr, size * m_batch, m_batch, dev_max_values.getData(), dev_max_values0.getData(),
+          (T)0.0);
 
     } else {
-      kernelMaximizeBatchTrans<<<nblocks, nthreads, nthreads * sizeof(int), s>>>(
-          in_itr, size * m_batch, m_batch, dev_max_values.getData(), dev_max_values0.getData());
+      kernelMaximizeBatchTrans<<<nblocks, nthreads, nthreads * sizeof(float), s>>>(
+          in_itr, size * m_batch, m_batch, dev_max_values.getData(), dev_max_values0.getData(),
+          (T)0.0);
     }
 
   } else {
     // only trans==false
     // Fast Segmented reduction (much faster than loop from outside)
-    RPU::cub::DeviceSegmentedReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
         d_temp_storage, temp_storage_bytes, in_itr, dev_max_values.getData(), m_batch,
-        dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, 0, c.getStream());
+        dev_offsets.getData(), dev_offsets.getData() + 1, max_abs, (T)0.0, c->getStream());
   }
 
   CUDA_TIMING_STOP(c, "Max Batch");
@@ -245,10 +296,14 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *
   delete[] offsets;
   delete[] tmp;
 }
-#ifdef RPU_USE_DOUBLE
-template void debugMaxBatched<double>(double const *, int, int, bool, float *);
-#endif
 template void debugMaxBatched<float>(float const *, int, int, bool, float *);
+#ifdef RPU_USE_DOUBLE
+template void debugMaxBatched<double>(double const *, int, int, bool, double *);
+#endif
+#ifdef RPU_USE_FP16
+template void debugMaxBatched<half_t>(half_t const *, int, int, bool, half_t *);
+#endif
+
 } // namespace test_helper
 
 /****************************************************************************************************************/
@@ -256,23 +311,25 @@ template void debugMaxBatched<float>(float const *, int, int, bool, float *);
 /******************************************************************************************************************/
 #define LAUNCH_MAX_KERNEL(KNAME, SHARED_MEM, ARGS)                                                 \
   if (abs_if_) {                                                                                   \
-    KNAME<InputIteratorT, true><<<nblocks, nthreads, SHARED_MEM, s>>> ARGS;                        \
+    T min_value = 0.0;                                                                             \
+    KNAME<InputIteratorT, T, true><<<nblocks, nthreads, SHARED_MEM, s>>> ARGS;                     \
   } else {                                                                                         \
-    KNAME<InputIteratorT, false><<<nblocks, nthreads, SHARED_MEM, s>>> ARGS;                       \
+    T min_value = std::numeric_limits<T>::lowest();                                                \
+    KNAME<InputIteratorT, T, false><<<nblocks, nthreads, SHARED_MEM, s>>> ARGS;                    \
   }
 
 template <typename T>
-Maximizer<T>::Maximizer(CudaContext *c, int size, bool abs_if)
+Maximizer<T>::Maximizer(CudaContextPtr c, int size, bool abs_if)
     : size_{size}, context_{c}, buffer_m_batch_{0}, abs_if_{abs_if} {
   // initialize for m_batch=1
-  dev_max_values_ = RPU::make_unique<CudaArray<float>>(context_, 1);
+  dev_max_values_ = RPU::make_unique<CudaArray<T>>(context_, 1);
   size_t temp_storage_bytes = 0;
   if (abs_if_) {
-    RPU::cub::DeviceReduce::Reduce(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
         nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(), size_,
-        max_abs_op_, 0, context_->getStream());
+        max_abs_op_, (T)0, context_->getStream());
   } else {
-    RPU::cub::DeviceReduce::Max(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
         nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(), size_,
         context_->getStream());
   }
@@ -285,9 +342,9 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
   if ((m_batch > 1) && (buffer_m_batch_ < m_batch)) {
     buffer_m_batch_ = m_batch;
 
-    dev_max_values_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
-    dev_max_values0_ = RPU::make_unique<CudaArray<float>>(context_, m_batch);
-    dev_max_values0_->setConst(abs_if_ ? 0 : std::numeric_limits<T>::min());
+    dev_max_values_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
+    dev_max_values0_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
+    dev_max_values0_->setConst(abs_if_ ? (T)0.0 : std::numeric_limits<T>::lowest());
 
     int *offsets = new int[m_batch + 1];
 
@@ -300,12 +357,12 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
 
     size_t temp_storage_bytes = 0;
     if (abs_if_) {
-      RPU::cub::DeviceSegmentedReduce::Reduce(
+      RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
           nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(),
-          m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, max_abs_op_, 0,
+          m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, max_abs_op_, (T)0.0,
           context_->getStream());
     } else {
-      RPU::cub::DeviceSegmentedReduce::Max(
+      RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Max(
           nullptr, temp_storage_bytes, dev_max_values_->getData(), dev_max_values_->getData(),
           m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, context_->getStream());
     }
@@ -313,18 +370,16 @@ template <typename T> void Maximizer<T>::initializeBatchBuffer(int m_batch) {
 
     context_->synchronize();
     delete[] offsets;
-    // dev_offsets_->printValues();
   }
 }
 
 template <typename T> void Maximizer<T>::setZeroBelow(T thres) {
   RPU::math::elemsetbelowzero(
-      context_, dev_max_values_->getData(), dev_max_values_->getSize(), (float)thres);
+      context_, dev_max_values_->getData(), dev_max_values_->getSize(), (T)thres);
 }
 
 template <typename T> void Maximizer<T>::saturateAbove(T thres) {
-  RPU::math::elemmin<float>(
-      context_, dev_max_values_->getData(), dev_max_values_->getSize(), (float)thres);
+  RPU::math::elemmin(context_, dev_max_values_->getData(), dev_max_values_->getSize(), (T)thres);
 }
 
 template <typename T>
@@ -337,11 +392,11 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
   if (m_batch == 1) {
     size_t ssz = dev_v_temp_storage_->getSize();
     if (abs_if_) {
-      RPU::cub::DeviceReduce::Reduce(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Reduce(
           (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(), size_,
           max_abs_op_, (T)0, s);
     } else {
-      RPU::cub::DeviceReduce::Max(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
           (void *)dev_v_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(), size_,
           s);
     }
@@ -359,17 +414,18 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
       int n = size_ * m_batch;
       int nblocks = context_->getNBlocks(n, nthreads);
       if (m_batch <= nthreads) {
-        int shared_mem = nthreads * sizeof(int);
-
+        int shared_mem = nthreads * sizeof(float);
         LAUNCH_MAX_KERNEL(
             kernelMaximizeBatchTrans, shared_mem,
-            (dev_input, n, m_batch, dev_max_values_->getData(), dev_max_values0_->getData()));
+            (dev_input, n, m_batch, dev_max_values_->getData(), dev_max_values0_->getData(),
+             min_value));
 
       } else {
         // simple atomic global memory version
         LAUNCH_MAX_KERNEL(
             kernelMaximizeBatchTrans_LargeBatch, 0,
-            (dev_input, n, m_batch, dev_max_values_->getData(), dev_max_values0_->getData()));
+            (dev_input, n, m_batch, dev_max_values_->getData(), dev_max_values0_->getData(),
+             min_value));
       }
 
     } else {
@@ -377,11 +433,11 @@ void Maximizer<T>::compute(InputIteratorT dev_input, int m_batch, bool trans) {
       // Fast Segmented reduction (much faster than loop from outside)
       size_t ssz = dev_m_temp_storage_->getSize();
       if (abs_if_) {
-        RPU::cub::DeviceSegmentedReduce::Reduce(
+        RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
             (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(),
             m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, max_abs_op_, (T)0.0, s);
       } else {
-        RPU::cub::DeviceSegmentedReduce::Max(
+        RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Max(
             (void *)dev_m_temp_storage_->getData(), ssz, dev_input, dev_max_values_->getData(),
             m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, s);
       }
@@ -399,6 +455,12 @@ template void Maximizer<float>::compute(NegateInputIterator<float> ARGS1);
 template class Maximizer<double>;
 RPU_GEN_IITER_TEMPLATES(double, void, Maximizer<double>::compute, ARGS1);
 template void Maximizer<double>::compute(NegateInputIterator<double> ARGS1);
+#endif
+
+#ifdef RPU_USE_FP16
+template class Maximizer<half_t>;
+RPU_GEN_IITER_TEMPLATES(half_t, void, Maximizer<half_t>::compute, ARGS1);
+template void Maximizer<half_t>::compute(NegateInputIterator<half_t> ARGS1);
 #endif
 
 #undef RPU_MX_TEMPLATE

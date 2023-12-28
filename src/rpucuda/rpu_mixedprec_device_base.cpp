@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,7 +25,7 @@ namespace RPU {
 template <typename T>
 void MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(std::stringstream &ss) const {
 
-  if (granularity > 0) {
+  if (granularity > (T)0.0) {
     ss << "\t granularity: \t\t";
     ss << granularity << std::endl;
   }
@@ -51,13 +51,11 @@ void MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(std::stringstream &ss
   ss << std::endl;
 
   if (compute_sparsity) {
-    ss << "\t compute_sparsity: \t" << compute_sparsity;
+    ss << "\t compute_sparsity: \t" << compute_sparsity << std::endl;
   }
-  ss << std::endl;
 
   if (device_par) {
-    ss << "   Device Parameter "
-       << ": " << device_par->getName() << std::endl;
+    ss << "\t\bDevice Parameter: " << device_par->getName() << std::endl;
     ss << "   ";
     device_par->printToStream(ss);
   }
@@ -102,15 +100,15 @@ MixedPrecRPUDeviceBaseMetaParameter<T> &MixedPrecRPUDeviceBaseMetaParameter<T>::
 // move constructor
 template <typename T>
 MixedPrecRPUDeviceBaseMetaParameter<T>::MixedPrecRPUDeviceBaseMetaParameter(
-    MixedPrecRPUDeviceBaseMetaParameter<T> &&other) {
+    MixedPrecRPUDeviceBaseMetaParameter<T> &&other) noexcept {
 
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
-MixedPrecRPUDeviceBaseMetaParameter<T> &
-MixedPrecRPUDeviceBaseMetaParameter<T>::operator=(MixedPrecRPUDeviceBaseMetaParameter<T> &&other) {
+MixedPrecRPUDeviceBaseMetaParameter<T> &MixedPrecRPUDeviceBaseMetaParameter<T>::operator=(
+    MixedPrecRPUDeviceBaseMetaParameter<T> &&other) noexcept {
 
   SimpleRPUDeviceMetaParameter<T>::operator=(std::move(other));
 
@@ -141,6 +139,9 @@ template struct MixedPrecRPUDeviceBaseMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct MixedPrecRPUDeviceBaseMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct MixedPrecRPUDeviceBaseMetaParameter<half_t>;
+#endif
 
 /******************************************************************************************/
 
@@ -159,7 +160,7 @@ template <typename T>
 MixedPrecRPUDeviceBase<T>::MixedPrecRPUDeviceBase(const MixedPrecRPUDeviceBase<T> &other)
     : SimpleRPUDevice<T>(other) {
 
-  transfer_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(*other.transfer_pwu_);
+  transfer_pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(*other.transfer_pwu_);
   rpu_device_ = other.rpu_device_->cloneUnique();
 
   current_row_index_ = other.current_row_index_;
@@ -182,13 +183,14 @@ MixedPrecRPUDeviceBase<T>::operator=(const MixedPrecRPUDeviceBase<T> &other) {
 
 // move constructor
 template <typename T>
-MixedPrecRPUDeviceBase<T>::MixedPrecRPUDeviceBase(MixedPrecRPUDeviceBase<T> &&other) {
+MixedPrecRPUDeviceBase<T>::MixedPrecRPUDeviceBase(MixedPrecRPUDeviceBase<T> &&other) noexcept {
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
-MixedPrecRPUDeviceBase<T> &MixedPrecRPUDeviceBase<T>::operator=(MixedPrecRPUDeviceBase<T> &&other) {
+MixedPrecRPUDeviceBase<T> &
+MixedPrecRPUDeviceBase<T>::operator=(MixedPrecRPUDeviceBase<T> &&other) noexcept {
   SimpleRPUDevice<T>::operator=(std::move(other));
 
   transfer_pwu_ = std::move(other.transfer_pwu_);
@@ -233,13 +235,50 @@ void MixedPrecRPUDeviceBase<T>::populate(
   if (dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_) != nullptr) {
     granularity_ = dynamic_cast<PulsedRPUDeviceBase<T> *>(&*rpu_device_)->getWeightGranularity();
   }
-  if (par.granularity > 0) {
+  if (par.granularity > (T)0.0) {
     // overwrites
     granularity_ = par.granularity;
   }
-  if (granularity_ <= 0) {
+  if (granularity_ <= (T)0.0) {
     RPU_FATAL("Cannot establish granularity from device. Need explicit setting >=0.");
   }
+}
+
+template <typename T>
+void MixedPrecRPUDeviceBase<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  SimpleRPUDevice<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  rpu_device_->dumpExtra(state, "rpu_device");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+
+  RPU::insert(state, "granularity", granularity_);
+  RPU::insert(state, "transfer_tmp", transfer_tmp_);
+  RPU::insert(state, "current_row_index", current_row_index_);
+  RPU::insert(state, "current_update_index", current_update_index_);
+  RPU::insert(state, "avg_sparsity", avg_sparsity_);
+
+  // transfer_d_vecs not handled (generated on the fly)
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void MixedPrecRPUDeviceBase<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  SimpleRPUDevice<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  rpu_device_->loadExtra(state, "rpu_device", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+
+  RPU::load(state, "granularity", granularity_, strict);
+  RPU::load(state, "transfer_tmp", transfer_tmp_, strict);
+  RPU::load(state, "current_row_index", current_row_index_, strict);
+  RPU::load(state, "current_update_index", current_update_index_, strict);
+  RPU::load(state, "avg_sparsity", avg_sparsity_, strict);
 }
 
 /*********************************************************************************/
@@ -270,7 +309,7 @@ void MixedPrecRPUDeviceBase<T>::setUpPar(const PulsedUpdateMetaParameter<T> &up)
 template <typename T> void MixedPrecRPUDeviceBase<T>::computeSparsity(const int kx, const int kd) {
   const auto &par = getPar();
   if (par.compute_sparsity) {
-    avg_sparsity_ = (current_update_index_ * avg_sparsity_ +
+    avg_sparsity_ = ((T)current_update_index_ * avg_sparsity_ +
                      (T)((this->d_size_ - kd) * (this->x_size_ - kx)) / (T)this->size_) /
                     (T)(current_update_index_ + 1);
   }
@@ -280,7 +319,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
   // updating the matrix with rows of using one-hot transfer vectors
 
   const auto &par = getPar();
-  if (par.n_rows_per_transfer == 0 || fabs(lr) == (T)0) {
+  if (par.n_rows_per_transfer == 0 || (T)fabsf(lr) == (T)0) {
     return;
   }
   int n_transfers = par.n_rows_per_transfer;
@@ -290,7 +329,8 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
   n_transfers = MIN(n_transfers, this->d_size_);
   int i_row = current_row_index_;
   if (par.random_row && (n_transfers < this->d_size_)) {
-    i_row = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
+    i_row = MAX(
+        MIN((int)floorf(this->rw_rng_.sampleUniform() * (T)this->d_size_), this->d_size_ - 1), 0);
   }
 
   int d2_size = this->d_size_ * this->d_size_;
@@ -302,7 +342,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::transfer(T **weights, cons
     }
   }
 
-  T *tvec = transfer_d_vecs_.data() + i_row * this->d_size_;
+  T *tvec = transfer_d_vecs_.data() + (size_t)i_row * this->d_size_;
   int n_rest = this->d_size_ - i_row;
 
   if (n_rest < n_transfers) {
@@ -344,7 +384,7 @@ void MixedPrecRPUDeviceBase<T>::getDPNames(std::vector<std::string> &names) cons
 }
 
 template <typename T>
-void MixedPrecRPUDeviceBase<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+void MixedPrecRPUDeviceBase<T>::getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) {
 
   CHECK_RPU_DEVICE_INIT;
 
@@ -356,10 +396,10 @@ void MixedPrecRPUDeviceBase<T>::getDeviceParameter(std::vector<T *> &data_ptrs) 
   }
 
   std::vector<T *> v(data_ptrs.begin(), data_ptrs.end() - 1);
-  rpu_device_->getDeviceParameter(v);
+  rpu_device_->getDeviceParameter(weights, v);
 
   // "hidden weights Chi"
-  int m = names.size() - 1;
+  size_t m = names.size() - 1;
   getChi(data_ptrs[m]);
 }
 
@@ -374,7 +414,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::setHiddenWeights(const std
 
   CHECK_RPU_DEVICE_INIT;
 
-  int m = rpu_device_->getHiddenWeightsCount();
+  size_t m = rpu_device_->getHiddenWeightsCount();
   if (data.size() < (size_t)((m + 1) * this->size_)) {
     RPU_FATAL("Size mismatch for hidden weights.");
   }
@@ -382,7 +422,7 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::setHiddenWeights(const std
   std::vector<T> v(data.begin(), data.end() - this->size_);
   rpu_device_->setHiddenWeights(v);
 
-  int offset = m * this->size_;
+  size_t offset = m * this->size_;
   setChi(data.data() + offset);
 }
 
@@ -398,17 +438,17 @@ template <typename T> void MixedPrecRPUDeviceBase<T>::printDP(int x_count, int d
 
   CHECK_RPU_DEVICE_INIT;
 
-  int x_count1 = MAX(MIN(x_count, this->x_size_), 0);
-  int d_count1 = MAX(MIN(d_count, this->d_size_), 0);
+  size_t x_count1 = MAX(MIN(x_count, this->x_size_), 0);
+  size_t d_count1 = MAX(MIN(d_count, this->d_size_), 0);
 
-  rpu_device_->printDP(x_count1, d_count1);
+  rpu_device_->printDP((int)x_count1, (int)d_count1);
 
   T *chi = new T[this->size_];
   getChi(chi);
   std::cout << "  Hidden weight [Chi] " << std::endl;
-  for (int i = 0; i < d_count1; ++i) {
-    for (int j = 0; j < x_count1; ++j) {
-      int k = j + i * this->x_size_;
+  for (size_t i = 0; i < d_count1; ++i) {
+    for (size_t j = 0; j < x_count1; ++j) {
+      size_t k = j + i * this->x_size_;
       std::cout << chi[k] << ", ";
     }
     std::cout << ";" << std::endl;
@@ -457,6 +497,9 @@ void MixedPrecRPUDeviceBase<T>::resetCols(
 template class MixedPrecRPUDeviceBase<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecRPUDeviceBase<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class MixedPrecRPUDeviceBase<half_t>;
 #endif
 
 } // namespace RPU

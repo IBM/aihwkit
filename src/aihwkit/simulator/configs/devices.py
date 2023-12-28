@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -10,25 +10,30 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Configuration for Analog (Resistive Device) tiles."""
+"""Configuration for NVM devices for Analog (Resistive Device) tiles."""
 
 # pylint: disable=too-many-instance-attributes, too-many-lines
 
-from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import ClassVar, List, Type, Union
-from warnings import warn
+from typing import ClassVar, List, Type, Optional, Union, Any
 from numpy import exp
 
-from aihwkit.exceptions import ConfigError
-from aihwkit.simulator.configs.helpers import (
-    _PrintableMixin, parameters_to_bindings
+from aihwkit.simulator.parameters.enums import RPUDataType
+from aihwkit.simulator.parameters.helpers import _PrintableMixin, parameters_to_bindings
+from aihwkit.simulator.parameters.inference import DriftParameter, SimpleDriftParameter
+
+# legacy
+from aihwkit.simulator.configs.compounds import (  # pylint: disable=unused-import
+    VectorUnitCell,
+    ReferenceUnitCell,
+    OneSidedUnitCell,
+    DifferenceUnitCell,
+    TransferCompound,
+    BufferedTransferCompound,
+    MixedPrecisionCompound,
+    DynamicTransferCompound,
+    ChoppedTransferCompound,
 )
-from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy,
-    DriftParameter, SimpleDriftParameter
-)
-from aihwkit.simulator.rpu_base import devices
 
 
 @dataclass
@@ -38,7 +43,8 @@ class FloatingPointDevice(_PrintableMixin):
     Implements ideal devices forward/backward/update behavior.
     """
 
-    bindings_class: ClassVar[Type] = devices.FloatingPointTileParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "FloatingPointTileParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     diffusion: float = 0.0
     """Standard deviation of diffusion process."""
@@ -49,9 +55,9 @@ class FloatingPointDevice(_PrintableMixin):
     drift: SimpleDriftParameter = field(default_factory=SimpleDriftParameter)
     """Parameter governing a power-law drift."""
 
-    def as_bindings(self) -> devices.FloatingPointTileParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -128,7 +134,7 @@ class PulsedDevice(_PrintableMixin):
     **Drift**:
 
     Optional power-law drift setting, as described in
-    :class:`~aihwkit.similar.configs.utils.DriftParameter`.
+    :class:`~aihwkit.similar.parameters.inference.DriftParameter`.
 
     Important:
         Similar to reset, drift is *not* applied automatically each
@@ -138,7 +144,8 @@ class PulsedDevice(_PrintableMixin):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PulsedResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PulsedResistiveDeviceParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     construction_seed: int = 0
     """If not equal 0, will set a unique seed for hidden parameters during
@@ -148,7 +155,7 @@ class PulsedDevice(_PrintableMixin):
     """Probability for devices to be corrupt (weights fixed to random value
     with hard bounds, that is min and max bounds are set to equal)."""
 
-    corrupt_devices_range: int = 1000
+    corrupt_devices_range: float = 0.1
     """Range around zero for establishing corrupt devices."""
 
     diffusion: float = 0.0
@@ -157,16 +164,21 @@ class PulsedDevice(_PrintableMixin):
     diffusion_dtod: float = 0.0
     """Device-to device variation of diffusion rate in relative units."""
 
-    drift: DriftParameter = field(default_factory=DriftParameter,
-                                  metadata={'hide_if': DriftParameter()})
+    drift: DriftParameter = field(
+        default_factory=DriftParameter, metadata={"hide_if": DriftParameter()}
+    )
     """Parameter governing a power-law drift."""
 
     dw_min: float = 0.001
     """Mean of the minimal update step sizes across devices and directions."""
 
     dw_min_dtod: float = 0.3
-    """Device-to-device std deviation of dw_min (in relative units to
+    """Device-to-device std deviation of ``dw_min`` (in relative units to
     ``dw_min``)."""
+
+    dw_min_dtod_log_normal: bool = False
+    """Device-to-device std deviation ``dw_min_dtod`` given using a
+    log-normal instead of normal distribution."""
 
     dw_min_std: float = 0.3
     r"""Cycle-to-cycle variation size of the update step (related to
@@ -263,9 +275,17 @@ class PulsedDevice(_PrintableMixin):
     respectively.
     """
 
-    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+    count_pulses: bool = False
+    """Whether to count the positive and negative pulses that were applied.
+
+    Only for GPU devices currently implemented. Some runtime penalty expected.
+
+    Pulses can be obtained by ``analog_tile.tile.get_pulse_counters()``
+    """
+
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -276,40 +296,10 @@ class PulsedDevice(_PrintableMixin):
         return self.lifetime > 0.0
 
 
-@dataclass
-class UnitCell(_PrintableMixin):
-    """Parameters that modify the behaviour of a unit cell."""
-
-    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
-
-    bindings_ignore: ClassVar[List] = ['diffusion', 'lifetime']
-
-    unit_cell_devices: List = field(default_factory=list)
-    """Devices that compose this unit cell."""
-
-    construction_seed: int = 0
-    """If not ``0``, set a unique seed for hidden parameters during
-    construction.
-
-    Applies to all ``unit_cell_devices``.
-    """
-
-    def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        raise NotImplementedError
-
-    def requires_diffusion(self) -> bool:
-        """Return whether device has diffusion enabled."""
-        return any(dev.requires_diffusion() for dev in self.unit_cell_devices)
-
-    def requires_decay(self) -> bool:
-        """Return whether device has decay enabled."""
-        return any(dev.requires_decay() for dev in self.unit_cell_devices)
-
-
 ###############################################################################
 # Specific devices based on ``pulsed``.
 ###############################################################################
+
 
 @dataclass
 class IdealDevice(_PrintableMixin):
@@ -320,7 +310,8 @@ class IdealDevice(_PrintableMixin):
     forward/backward might still have a non-ideal ADC or noise added.
     """
 
-    bindings_class: ClassVar[Type] = devices.IdealResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "IdealResistiveDeviceParameter"
+    bindings_module: ClassVar[str] = "devices"
 
     construction_seed: int = 0
     """If not ``0``, set a unique seed for hidden parameters during
@@ -332,9 +323,12 @@ class IdealDevice(_PrintableMixin):
     lifetime: float = 0.0
     r"""One over `decay_rate`, ie :math:`1/r_\text{decay}`."""
 
-    def as_bindings(self) -> devices.IdealResistiveDeviceParameter:
+    reset_std: float = 0.01
+    """Standard deviation around zero mean in case reset is called."""
+
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
+        return parameters_to_bindings(self, data_type)
 
     def requires_diffusion(self) -> bool:
         """Return whether device has diffusion enabled."""
@@ -378,7 +372,7 @@ class ConstantStepDevice(PulsedDevice):
     :class:`~PulsedDevice`.
     """
 
-    bindings_class: ClassVar[Type] = devices.ConstantStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "ConstantStepResistiveDeviceParameter"
 
 
 @dataclass
@@ -443,7 +437,7 @@ class LinearStepDevice(PulsedDevice):
         :class:`~PulsedDevice`.
     """
 
-    bindings_class: ClassVar[Type] = devices.LinearStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "LinearStepResistiveDeviceParameter"
 
     gamma_up: float = 0.0
     r"""The value of :math:`\gamma^+`.
@@ -513,6 +507,14 @@ class LinearStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
     reverse_up: bool = False
     """Whether to increase the step size in up direction with increasing
     weights (default decreases).
@@ -548,7 +550,7 @@ class SoftBoundsDevice(PulsedDevice):
     parameters set to model soft bounds.
     """
 
-    bindings_class: ClassVar[Type] = devices.SoftBoundsResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "SoftBoundsResistiveDeviceParameter"
 
     mult_noise: bool = True
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
@@ -569,6 +571,14 @@ class SoftBoundsDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
     reverse_up: bool = False
@@ -642,7 +652,7 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     p_max: int = 1000
     """Number of pulses to drive the synapse from ``range_min`` to ``range_max``."""
 
-    alpha: float = 0.001/2
+    alpha: float = 0.001 / 2
     r"""The slope of the soft bounds model :math:`dw \propto \alpha w` for both
     up and down direction."""
 
@@ -654,25 +664,126 @@ class SoftBoundsPmaxDevice(SoftBoundsDevice):
     """Value of the weight for :math:`P_max` number of up pulses."""
 
     #  these values will be set from the above, so we hide it.
-    w_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    w_max: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    dw_min: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
-    up_down: float = field(default_factory=lambda: None, metadata={'hide_if': None})  # type: ignore
+    w_min: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    w_max: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    dw_min: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
+    up_down: float = field(default_factory=lambda: None, metadata={"hide_if": None})  # type: ignore
 
-    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
+    def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         params = SoftBoundsDevice()
         for key, value in self.__dict__.items():
-            if key not in ['range_min', 'range_max', 'alpha', 'p_max']:
+            if key not in ["range_min", "range_max", "alpha", "p_max"]:
                 setattr(params, key, value)
 
-        b_factor = (self.range_max - self.range_min)/(1 - exp(-self.p_max * self.alpha))
+        b_factor = (self.range_max - self.range_min) / (1 - exp(-self.p_max * self.alpha))
         params.w_min = self.range_min
         params.w_max = self.range_min + b_factor
         params.dw_min = b_factor * self.alpha
         params.up_down = 1 + 2 * self.range_min / b_factor
 
-        return parameters_to_bindings(params)
+        return parameters_to_bindings(params, data_type)
+
+
+@dataclass
+class SoftBoundsReferenceDevice(PulsedDevice):
+    r"""Pulsed update behavioral model: soft bounds with reference device.
+
+    Pulsed update behavioral model, where the update step response size
+    of the material is linearly dependent.
+
+    In particular, the update behavior is
+
+    .. math::
+        \delta W_+ &=& \alpha_{+}(1 - \frac{w}{\bmax}) (1 + \sigma \xi)
+        \delta W_- &=& \alpha_{-}(1 - \frac{w}{\bmin}) (1 + \sigma \xi)
+
+    Where the same device-to-device varition can be given as for the
+    ``PulsedDevice``. In addition, a device-to-device variation can be
+    directly given on the slope.
+
+    Moreover, a fixed reference conductance can be subtracted from the
+    resulting weight, which implemented a differential read of $W -
+    R$.
+
+    """
+
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "SoftBoundsReferenceResistiveDeviceParameter"
+
+    mult_noise: bool = False
+    """Whether to use multiplicative noise instead of additive cycle-to-cycle
+    noise."""
+
+    write_noise_std: float = 0.0
+    r"""Whether to use update write noise.
+
+    Whether to use update write noise that is added to the updated
+    devices weight, while the update is done on a hidden persistent weight. The
+    update write noise is then sampled anew when the device is touched
+    again.
+
+    Thus it is:
+
+    .. math::
+        w_\text{apparent}{ij} = w_{ij} + \sigma_\text{write_noise} \Delta w_\text{min}\xi
+
+    and the update is done on :math:`w_{ij}` but the forward sees the
+    :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
+    slope_up_dtod: float = 0.0
+    r"""Device-to-device variation on the up-pulse slope.
+
+    Note:
+
+        Since the up slope is proportional to
+        :math:`\propto\frac{1}{b_\text{max}}` the device-to-device variation
+        of the weight max ``w_max_dtod`` will also introduce a slope
+        variation. Turn that off, if the variation should be only on
+        the slope directly.
+
+    """
+
+    slope_down_dtod: float = 0.0
+    r"""Device-to-device variation on the down-pulse slope.
+
+    Note:
+
+        Since the up slope is proportional to
+        :math:`\propto\frac{1}{b_\text{min}}` the device-to-device variation
+        of the weight max ``w_min_dtod`` will also introduce a slope
+        variation. Turn that off, if the variation should be only on
+        the slope directly.
+    """
+
+    reference_mean: float = 0.0
+    """Added to all devices of the reference $R$.
+    """
+
+    reference_std: float = 0.0
+    """Normal distributed device-to-device variation added to the reference $R$.
+    """
+
+    subtract_symmetry_point: bool = False
+    r"""Whether to add the computed symmetry point of the devices onto the
+    reference $R$.
+
+    The symmetry point is given by:
+
+    .. math::
+        w_* = \frac{alpha_{+} - \alpha_{-}}{\frac{\alpha_{+}}{b_\text{max}}
+                    - \frac{\alpha_{-}}{b_\text{min}}}
+    """
 
 
 @dataclass
@@ -724,7 +835,7 @@ class ExpStepDevice(PulsedDevice):
     """
     # pylint: disable=invalid-name
 
-    bindings_class: ClassVar[Type] = devices.ExpStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "ExpStepResistiveDeviceParameter"
 
     A_up: float = 0.00081
     """Factor ``A`` for the up direction."""
@@ -766,6 +877,14 @@ class ExpStepDevice(PulsedDevice):
 
     and the update is done on :math:`w_{ij}` but the forward sees the
     :math:`w_\text{apparent}`.
+    """
+
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
     """
 
 
@@ -831,7 +950,7 @@ class PowStepDevice(PulsedDevice):
     ..  _Frascaroli et al. (2108): https://www.nature.com/articles/s41598-018-25376-x
     """
 
-    bindings_class: ClassVar[Type] = devices.PowStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PowStepResistiveDeviceParameter"
 
     pow_gamma: float = 1.0
     r"""The value of :math:`\gamma` as explained above.
@@ -882,6 +1001,152 @@ class PowStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
+
+@dataclass
+class PowStepReferenceDevice(PulsedDevice):
+    r"""Pulsed update behavioral model: power-dependent step.
+
+    Pulsed update behavioral model, where the update step response
+    size of the material has a power-dependent with resistance. This
+    device model implements (a shifted from of) the `Fusi & Abott
+    (2007)`_ synapse model (see also `Frascaroli et al. (2108)`_).
+
+    This device model is identical to
+    :class:`~aihwkit.simulator.configs.devices.PowStepDevice`,
+    however, here it does not implement any write noise functionality
+    but instead has an additional option to subtract a reference
+    conductance from the weights which is statically set during
+    initialization.
+
+    The model based on :class:`~PulsedDevice` and thus shares most
+    parameters and functionality. However, it implements new ``update
+    once`` function, where the update step size depends in the
+    following way. If we set :math:`\omega_{ij} =
+    \frac{b_{ij}^\text{max} - w_{ij}}{b_{ij}^\text{max} -
+    b_{ij}^\text{min}}` the relative distance of the current weight to
+    the upper bound, then the update per pulse is for the upwards
+    direction:
+
+    .. math::
+        w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^+\,(\omega_{ij})^{\gamma_{ij}^+}
+        \left(1 + \sigma_\text{c-to-c}\,\xi\right)
+
+    and in downwards direction:
+
+    .. math::
+        w_{ij}  \leftarrow  w_{ij} + \Delta w_{ij}^-\,(1 - \omega_{ij})^{\gamma_{ij}^-}
+        \left(1 + \sigma_\text{c-to-c}\,\xi\right)
+
+    Similar to :math:`\Delta w_{ij}^d` the exponent :math:`\gamma_{ij}` can be
+    defined with device-to-device variation and bias in up and down
+    direction:
+
+    .. math::
+
+        \gamma_{ij}^d = \gamma\, \left(1 + d\, \beta_{ij}
+        + \sigma_\text{pow-gamma-d-to-d}\xi\right)
+
+    where :math:`\xi` is again a standard Gaussian. :math:`\beta_{ij}`
+    is the directional up `versus` down bias.  At initialization
+    ``pow_up_down_dtod`` and ``pow_up_down`` defines this bias term:
+
+    .. math::
+
+        \beta_{ij} = \beta_\text{pow-up-down} + \xi\sigma_\text{pow-up-down-dtod}
+
+    where :math:`\xi` is again a standard Gaussian number and
+    :math:`\beta_\text{pow-up-down}` corresponds to ``pow_up_down``.
+
+    Note:
+        The ``pow_gamma_dtod`` and ``pow_up_down_dtod``
+        device-to-device variation parameters are given in relative
+        units to ``pow_gamma``.
+
+    Note:
+        :math:`\Delta w_{ij}^d` is defined as for the
+        :class:`~PulsedDevice`, however, for this device, the update step
+        size will *not* be given by :math:`\Delta w_{ij}` at
+        :math:`w_{ij}=0` as for most other devices models
+
+    Note:
+
+        In contrast to
+        :class:`~aihwkit.simulator.configs.devices.PowStepDevice`,
+        write noise is not supported.
+
+    ..  _Fusi & Abott (2007): https://www.nature.com/articles/nn1859
+    ..  _Frascaroli et al. (2108): https://www.nature.com/articles/s41598-018-25376-x
+
+    """
+
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "PowStepReferenceResistiveDeviceParameter"
+
+    pow_gamma: float = 1.0
+    r"""The value of :math:`\gamma` as explained above.
+
+    Note:
+        :math:`\gamma` reduces essentially to the
+        :class:`SoftBoundsDevice` (if no device-to-device variation of
+        gamma is used additionally). However, the
+        :class:`SoftBoundsDevice` will be much faster, as it does not
+        need to compute the slow `pow` function.
+    """
+
+    pow_gamma_dtod: float = 0.1
+    r"""Device-to-device variation for ``pow_gamma``.
+
+    i.e. the value of :math:`\gamma_\text{pow-gamma-d-to-d}` given in relative
+    units to ``pow_gamma``.
+    """
+
+    pow_up_down: float = 0.0
+    r"""The up versus down bias of the :math:`\gamma` as described above.
+
+    It is :math:`\gamma^+ = \gamma (1 + \beta_\text{pow-up-down})` and
+    :math:`\gamma^- = \gamma (1 - \beta_\text{pow-up-down})` .
+    """
+
+    pow_up_down_dtod: float = 0.0
+    r"""Device-to-device variation in the up versus down bias of
+    :math:`\gamma` as descibed above.
+
+    In units of ``pow_gamma``.
+    """
+
+    subtract_symmetry_point: bool = False
+    r"""Whether store the symmetry point of each device onto the reference device.
+
+    The symmetry point is only numerically estimated, since an
+    analytically for is not available due to the power step model.
+    """
+
+    n_estimation_steps: int = -1
+    """The number of times to run an (noise-free) up / down pulse
+    combination for the numerical estimation of the symmetry points.
+
+    In case of a non-positive number, the number of estimations steps
+    is set 10 times the expected number of states of each device
+    (maxed out at 10000).
+    """
+
+    reference_mean: float = 0.0
+    """Added to all devices of the reference :math:`r`.
+    """
+
+    reference_std: float = 0.0
+    """Normal distributed device-to-device variation added to the reference :math:`r`.
+    """
+
 
 @dataclass
 class PiecewiseStepDevice(PulsedDevice):
@@ -925,7 +1190,7 @@ class PiecewiseStepDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Type] = devices.PiecewiseStepResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]] = "PiecewiseStepResistiveDeviceParameter"
 
     piecewise_up: List[float] = field(default_factory=lambda: [1])
     r"""Array of values that characterize the update steps in upwards direction.
@@ -970,6 +1235,15 @@ class PiecewiseStepDevice(PulsedDevice):
     :math:`w_\text{apparent}`.
     """
 
+    apply_write_noise_on_set: bool = True
+    r"""Whether setting the weights with ``set_weights`` will add
+    write noise to the apparent weight state or not.
+
+    If ``False`` the persistent weight state will be equal to the
+    apparent state initially.
+    """
+
+
 @dataclass
 class JARTv1bDevice(PulsedDevice):
     """Device update characteristics based on Jülich Aachen Resistive
@@ -1011,7 +1285,7 @@ class JARTv1bDevice(PulsedDevice):
     .. _`V. Ntinas & al., IEEE Transactions on Circuits and Systems II, 2022`: https://ieeexplore.ieee.org/document/9737221
     """
 
-    bindings_class: ClassVar[Type] = devices.JARTv1bResistiveDeviceParameter
+    bindings_class: ClassVar[Optional[Union[Type, str]]]= "JARTv1bResistiveDeviceParameter"
 
     w_max: float = 0.6
     """See ``w_min``."""
@@ -1489,10 +1763,6 @@ class JARTv1bDevice(PulsedDevice):
     for ``rdisc`` during the random walk process.
     Read `Zhenming Yu & al., Asilomar, 2022`_ for more information."""
 
-    def as_bindings(self) -> devices.PulsedResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        return parameters_to_bindings(self)
-
     def requires_diffusion(self) -> bool:
         """Diffusion not supported for RRAM."""
         return False
@@ -1500,661 +1770,3 @@ class JARTv1bDevice(PulsedDevice):
     def requires_decay(self) -> bool:
         """Decay not supported for RRAM."""
         return False
-
-
-###############################################################################
-# Specific devices based on ``unit cell``.
-###############################################################################
-
-@dataclass
-class VectorUnitCell(UnitCell):
-    """Abstract resistive device that combines multiple pulsed resistive
-    devices in a single 'unit cell'.
-
-    For instance, a vector device can consist of 2 resistive devices
-    where the sum of the two resistive values are coded for each
-    weight of a cross point.
-    """
-
-    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
-
-    update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.ALL
-    """The update policy of which if the devices will be receiving the update
-    of a mini-batch."""
-
-    first_update_idx: int = 0
-    """Device that receives the first mini-batch.
-
-    Useful only for ``VectorUnitCellUpdatePolicy.SINGLE_FIXED``.
-    """
-
-    gamma_vec: List[float] = field(default_factory=list, metadata={'hide_if': []})
-    """Weighting of the unit cell devices to reduce to final weight.
-
-    User-defined weightening can be given as a list if factors. If not
-    given, each device index of the unit cell is weighted by equal
-    amounts (:math:`1/n`).
-    """
-
-    def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        vector_parameters = parameters_to_bindings(self)
-
-        if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
-
-        for param in self.unit_cell_devices:
-            device_parameters = param.as_bindings()
-            if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError('Could not add unit cell device parameter')
-
-        return vector_parameters
-
-
-@dataclass
-class ReferenceUnitCell(UnitCell):
-    """Abstract device model takes two arbitrary device per cross-point and
-    implements an device with reference pair.
-
-    The update will only be on the 0-th device whereas the other will
-    stay fixed. The resulting effective weight is the difference of
-    the two.
-
-    Note:
-        Exactly 2 devices are used, if more are given the are
-        discarded, if less, the same device will be used twice.
-
-    Note:
-        The reference device weights will all zero on default. To set
-        the reference device with a particular value one can select the
-        device update index::
-
-            analog_tile.set_hidden_update_index(1)
-            analog_tile.set_weights(W)
-            analog_tile.set_hidden_update_index(0) # set back to 0 for the following updates
-    """
-
-    bindings_class: ClassVar[Type] = devices.VectorResistiveDeviceParameter
-
-    update_policy: VectorUnitCellUpdatePolicy = VectorUnitCellUpdatePolicy.SINGLE_FIXED
-    """The update policy of which if the devices will be receiving the
-    update of a mini-batch.
-
-    Caution:
-        This parameter should be kept to SINGLE_FIXED for this device.
-    """
-
-    first_update_idx: int = 0
-    """Device that receives the update."""
-
-    gamma_vec: List[float] = field(default_factory=lambda: [1., -1.],
-                                   metadata={'hide_if': [1., -1.]})
-    """Weighting of the unit cell devices to reduce to final weight.
-
-    Note:
-        While user-defined weighting can be given it is suggested to keep it to
-        the default ``[1, -1]`` to implement the reference device subtraction.
-    """
-
-    def as_bindings(self) -> devices.VectorResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        vector_parameters = parameters_to_bindings(self)
-
-        if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
-
-        if len(self.unit_cell_devices) > 2:
-            self.unit_cell_devices = self.unit_cell_devices[:2]
-        elif len(self.unit_cell_devices) == 1:
-            self.unit_cell_devices = [self.unit_cell_devices[0],
-                                      deepcopy(self.unit_cell_devices[0])]
-        elif len(self.unit_cell_devices) != 2:
-            raise ConfigError('ReferenceUnitCell expects two unit_cell_devices')
-
-        for param in self.unit_cell_devices:
-            device_parameters = param.as_bindings()
-            if not vector_parameters.append_parameter(device_parameters):
-                raise ConfigError('Could not add unit cell device parameter')
-
-        return vector_parameters
-
-
-@dataclass
-class OneSidedUnitCell(UnitCell):
-    """Abstract device model takes an arbitrary device per crosspoint and
-    implements an explicit plus-minus device pair with one sided update.
-
-    One device will receive all positive updated and the other all
-    negative updates. Since the devices will quickly saturate, the
-    device implements a refresh strategy.
-
-    With fixed frequency per update call (``refresh_every``, in units
-    of single vector updates) a refresh is performed. During the
-    refresh, each column will be read using a forward pass (parameters
-    are specified with ``refresh_forward``) to read out the positive and
-    negative device weights.
-
-    Whether a weight needs refreshing is determined by the following
-    criterion: The larger weight (normalized by the tile-wise fixed
-    w_max setting) is tested against the upper threshold. If larger
-    than the upper threshold, and the normalized lower weight is
-    larger than the lower threshold, then a reset and rewriting will
-    be performed.
-
-    Note that this abstract device needs single devices that are
-    derived from :class:`~PulsedDevice`. The reset properties (bias
-    and cycle-to-cycle noise) can be thus adjusted (see
-    :class:`~PulsedDevice`).
-
-    The rewriting of the computed difference is only done onto one of
-    the two devices using the update properties defined in
-    ``refresh_update``.
-
-    Note:
-        This device will take only the first ``unit_cell_device`` to
-        generate two devices. Both positive and negative device will
-        thus have the same (reversed) parameters, e.g. the specified
-        ``w_min``, will become the w_max of the negative device.
-    """
-
-    bindings_class: ClassVar[Type] = devices.OneSidedResistiveDeviceParameter
-
-    refresh_every: int = 0
-    """How often a refresh is performed (in units of the number of vector
-    updates).
-
-    Note:
-        If a refresh is done, full reads of both positive and negative
-        devices are performed. Additionally, if single devices deemed
-        to be refreshed, an (open-loop) re-write is done (once per
-        column). Thus, refresh might have considerable runtime
-        impacts.
-    """
-
-    units_in_mbatch: bool = True
-    """If set, the ``refresh_every`` counter is given in ``m_batch``
-    which is the re-use factor. Smaller numbers are not possible.
-
-    Caution:
-        For CUDA devices, refresh is always done in  ``m_batch`` (ie
-        the number of re-use per layer for a mini-batch). Smaller
-        numbers will have no effect.
-    """
-
-    refresh_upper_thres: float = 0.75
-    """Upper threshold for determining the refresh, see above."""
-
-    refresh_lower_thres: float = 0.25
-    """Lower threshold for determining the refresh, see above."""
-
-    refresh_forward: IOParameters = field(
-        default_factory=IOParameters)
-    """Input-output parameters that define the read during a refresh event.
-
-    :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters`
-    that define the read (forward) of an refresh event. For instance
-    the amount of noise or whether refresh is done using a ADC/DAC
-    etc.
-    """
-
-    refresh_update: UpdateParameters = field(default_factory=UpdateParameters)
-    """Update parameters that define the type of update used for each refresh
-    event.
-
-    Update parameters
-    :class:`~aihwkit.simulator.config.utils.AnalogTileUpdateParameters`
-    that define the type of update used for each refresh event.
-    """
-
-    copy_inverted: bool = False
-    """Whether the use the "down" update behavior of the first device for
-    the negative updates instead of the positive half of the second
-    device."""
-
-    def as_bindings(self) -> devices.OneSidedResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator
-        bindings object."""
-        if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
-
-        onesided_parameters = parameters_to_bindings(self)
-        device_parameter0 = self.unit_cell_devices[0].as_bindings()
-
-        if len(self.unit_cell_devices) == 0 or len(self.unit_cell_devices) > 2:
-            raise ConfigError('Need 1 or 2 unit_cell_devices')
-
-        if len(self.unit_cell_devices) == 1:
-            device_parameter1 = device_parameter0
-        else:
-            device_parameter1 = self.unit_cell_devices[1].as_bindings()
-
-        # need to be exactly 2 and same parameters
-        if not onesided_parameters.append_parameter(device_parameter0):
-            raise ConfigError('Could not add unit cell device parameter')
-
-        if not onesided_parameters.append_parameter(device_parameter1):
-            raise ConfigError('Could not add unit cell device parameter ' +
-                              '(both devices need to be of the same type)')
-
-        return onesided_parameters
-
-
-@dataclass
-class DifferenceUnitCell(OneSidedUnitCell):
-    """Deprecated alias to ``OneSidedUnitCell``."""
-
-    def __post__init__(self) -> None:
-        warn('The DifferenceUnitCell class is deprecated. Please use '
-             'OneSidedUnitCell instead.',
-             DeprecationWarning)
-
-
-@dataclass
-class TransferCompound(UnitCell):
-    r"""Abstract device model that takes 2 or more devices and
-    implements a transfer-based learning rule.
-
-    It uses a (partly) hidden weight (where the SGD update is
-    accumulated), which then is transferred partly and occasionally to
-    the visible weight. This can implement an analog friendly variant
-    of stochastic gradient descent (Tiki-taka), as described in
-    `Gokmen & Haensch (2020)`_.
-
-    The hidden weight is always the first in the list of
-    ``unit_cell_devices`` given, and the transfer is done from left to
-    right. The first of the ``unit_cell_devices`` can have different
-    HW specifications from the rest, but the others need to be of
-    identical specs. In detail, when specifying the list of devices
-    only the first two will actually be used and the rest discarded
-    and instead replaced by the second device specification. In this
-    manner, the *fast* crossbar (receiving the SGD updates) and the
-    *slow* crossbar (receiving the occasional partial transfers from
-    the fast) can have different specs, but all additional slow
-    crossbars (receiving transfers from the left neighboring crossbar
-    in the list of ``unit_cell_devices``) need to be of the same spec.
-
-    The rate of transfer (e.g. learning rate and how often and how
-    many columns/rows per transfer) and the type (ie. with ADC or without,
-    with noise etc.) can be adjusted.
-
-    Each transfer event that is triggered by counting the update
-    cycles (in units of either mini-batch or single mat-vecs),
-    ``n_reads_per_transfer`` columns/rows are read from the left device
-    using the forward pass with transfer vectors as input and
-    transferred to the right (taking the order of the
-    ``unit_cell_devices`` list) using the outer-product update with
-    the read-out vectors and the transfer vectors. Currently, transfer
-    vectors are fixed to be one-hot vectors. The columns/rows to take are
-    in sequential order and warped around at the edge of the
-    crossbar. The learning rate and forward and update specs of the
-    transfer can be user-defined.
-
-    The weight that is seen in the forward and backward pass is
-    governed by the :math:`\gamma` weightening setting.
-
-    Note:
-        Here the devices could be either transferred in analog
-        (essentially within the unit cell) or on separate arrays (using
-        the usual (non-ideal) forward pass and update steps. This can be
-        set with ``transfer_forward`` and ``transfer_update``.
-
-    .. _Gokmen & Haensch (2020): https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
-    """
-
-    bindings_class: ClassVar[Type] = devices.TransferResistiveDeviceParameter
-
-    gamma: float = 0.0
-    r"""Weighting factor to compute the effective SGD weight from the hidden
-    matrices.
-
-    The default scheme is:
-
-    .. math:: g^{n-1} W_0 + g^{n-2} W_1 + \ldots + g^0  W_{n-1}
-    """
-
-    gamma_vec: List[float] = field(default_factory=list,
-                                   metadata={'hide_if': []})
-    """User-defined weightening.
-
-    User-defined weightening can be given as a list if weights in which case
-    the default weightening scheme with ``gamma`` is not used.
-    """
-
-    transfer_every: float = 1.0
-    """Transfers every :math:`n` mat-vec operations or :math:`n` batches.
-
-    Transfers every :math:`n` mat-vec operations (rounded to multiples/ratios
-    of ``m_batch`` for CUDA). If ``units_in_mbatch`` is set, then the units are
-    in ``m_batch`` instead of mat-vecs, which is equal to the overall the
-    weight re-use during a while mini-batch.
-
-    Note:
-        If ``transfer_every`` is 0.0 *no transfer* will be made.
-
-    If not given explicitely with ``transfer_every_vec``, then the higher
-    transfer cycles are geometrically scaled, the first is set to
-    transfer_every. Each next transfer cycle is multiplied by ``x_size
-    / n_reads_per_transfer``.
-    """
-
-    no_self_transfer: bool = True
-    """Whether to set the transfer rate of the last device (which is applied to
-    itself) to zero."""
-
-    transfer_every_vec: List[float] = field(default_factory=list,
-                                            metadata={'hide_if': []})
-    """Transfer cycles lengths.
-
-    A list of :math:`n` entries, to explicitly set the transfer cycles lengths.
-    In this case, the above defaults are ignored.
-    """
-
-    units_in_mbatch: bool = True
-    """Units for ``transfer_every``.
-
-    If set, then the cycle length units of ``transfer_every`` are in
-    ``m_batch`` instead of mat-vecs, which is equal to the overall of the
-    weight re-use during a while mini-batch.
-    """
-
-    n_reads_per_transfer: int = 1
-    """Number of consecutive reads to use during transfer events.
-
-    How many consecutive columns or rows to read (from one tile) and write (to the next
-    tile) every transfer event. For read, the input is a 1-hot vector. Once the
-    final columns or row is reached, reading starts again from the first.
-    """
-
-    transfer_columns: bool = True
-    """Whether to read and transfer columns or rows.
-
-    If set, read is done with an additional forward pass
-    determined by the ``transfer_forward`` settings. If not set, rows
-    are transferred instead, that is, the read is done internally
-    with a backward pass instead. However, the parameters defining the
-    backward are still given by setting the ``transfer_forward`` field for
-    convenience.
-    """
-
-    with_reset_prob: float = 0.0
-    """Whether to apply reset of the columns that were transferred with a given
-    probability.
-
-    Note:
-        Reset is only available in case of column reads
-        (``transfer_columns==True``).
-    """
-
-    random_selection: bool = False
-    """Whether to select a random starting column or row.
-
-    Whether to select a random starting column or row for each
-    transfer event and not take the next column or row that was
-    previously not transferred as a starting column or row (the
-    default).
-    """
-
-    fast_lr: float = 0.0
-    """Whether to set the `fast` tile's learning rate.
-
-    If set, then the SGD gradient update onto the first (fast) tile is
-    set to this learning rate and is kept constant even when the SGD
-    learning rate is scheduled. The SGD learning rate is then only
-    used to scale the transfer LR (see ``scale_transfer_lr``).
-    """
-
-    transfer_lr: float = 1.0
-    """Learning rate (LR) for the update step of the transfer event.
-
-    Per default all learning rates are identical. If ``scale_transfer_lr`` is
-    set, the transfer LR is scaled by current learning rate of the SGD.
-
-    Note:
-        LR is always a positive number, sign will be correctly
-        applied internally.
-    """
-
-    transfer_lr_vec: List[float] = field(default_factory=list,
-                                         metadata={'hide_if': []})
-    """Transfer LR for each individual transfer in the device chain can be
-    given."""
-
-    scale_transfer_lr: bool = True
-    """Whether to give the transfer_lr in relative units.
-
-    ie. whether to scale the transfer LR with the current LR of the SGD.
-    """
-
-    transfer_forward: IOParameters = field(
-        default_factory=IOParameters)
-    """Input-output parameters that define the read of a transfer event.
-
-    :class:`~aihwkit.simulator.config.utils.AnalogTileInputOutputParameters` that define the read
-    (forward or backward) of an transfer event. For instance the amount of noise
-    or whether transfer is done using a ADC/DAC etc.
-    """
-
-    transfer_update: UpdateParameters = field(
-        default_factory=UpdateParameters)
-    """Update parameters that define the type of update used for each transfer
-    event.
-
-    Update parameters :class:`~aihwkit.simulator.config.utils.AnalogTileUpdateParameters` that
-    define the type of update used for each transfer event.
-    """
-
-    def as_bindings(self) -> devices.TransferResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        if not isinstance(self.unit_cell_devices, list):
-            raise ConfigError('unit_cell_devices should be a list of devices')
-
-        n_devices = len(self.unit_cell_devices)
-
-        transfer_parameters = parameters_to_bindings(self)
-
-        param_fast = self.unit_cell_devices[0].as_bindings()
-        param_slow = self.unit_cell_devices[1].as_bindings()
-
-        if not transfer_parameters.append_parameter(param_fast):
-            raise ConfigError('Could not add unit cell device parameter')
-
-        for _ in range(n_devices - 1):
-            if not transfer_parameters.append_parameter(param_slow):
-                raise ConfigError('Could not add unit cell device parameter')
-
-        return transfer_parameters
-
-
-@dataclass
-class BufferedTransferCompound(TransferCompound):
-    r"""Abstract device model that takes 2 or more devices and
-    implements a buffered transfer-based learning rule.
-
-    Different to :class:`TransferCompound`, however,  readout is done
-    first onto a digital buffer (in floating point precision), from
-    which then the second analog matrix is updated. This second step is
-    very similar to the analog update in :class:`MixedPrecisionCompound`.
-
-    Note, however, that in contrast to :class:`MixedPrecisionCompound`
-    the rank-update is still done in analog with parallel update using
-    pulse trains.
-
-    The buffer is assumed to be in floating point precision and
-    only one row/column at a time needs to be processed in one update cycle,
-    thus greatly reducing on-chip memory requirements.
-
-    For details, see `Gokmen (2021)`_.
-
-    .. _Gokmen (2021): https://www.frontiersin.org/articles/10.3389/frai.2021.699148/full
-    """
-
-    bindings_class: ClassVar[Type] = devices.BufferedTransferResistiveDeviceParameter
-
-    thres_scale: float = 1.0
-    """Threshold scale for buffer to determine whether to transfer to next
-    device. Will be multiplied by the device granularity to get the
-    threshold.
-    """
-
-    step: float = 1.0
-    """Value to fill the ``d`` vector for the update if buffered value is
-    above threshold.
-    """
-
-    momentum: float = 0.0
-    """Momentum of the buffer.
-
-    After transfer, this momentum fraction stays on the buffer instead
-    of subtracting all of what was transferred.
-    """
-
-###############################################################################
-# Specific compound-devices with digital rank update
-###############################################################################
-
-
-@dataclass
-class DigitalRankUpdateCell(_PrintableMixin):
-    """Parameters that modify the behavior of the digital rank update cell.
-
-    This is the base class for devices that compute the rank update in
-    digital and then (occasionally) transfer the information to the
-    (analog) crossbar array that is used during forward and backward.
-    """
-
-    bindings_class: ClassVar[Type] = devices.AbstractResistiveDeviceParameter
-
-    bindings_ignore: ClassVar[List] = ['diffusion', 'lifetime']
-
-    device: Union[PulsedDevice,
-                  OneSidedUnitCell,
-                  VectorUnitCell,
-                  ReferenceUnitCell] = field(default_factory=ConstantStepDevice)
-    """(Analog) device that are used for forward and backward."""
-
-    construction_seed: int = 0
-    """If not ``0``, set a unique seed for hidden parameters during
-    construction.
-
-    Applies to ``device``.
-    """
-
-    def as_bindings(self) -> devices.AbstractResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        raise NotImplementedError
-
-    def requires_diffusion(self) -> bool:
-        """Return whether device has diffusion enabled."""
-        return self.device.requires_diffusion()
-
-    def requires_decay(self) -> bool:
-        """Return whether device has decay enabled."""
-        return self.device.requires_decay()
-
-
-@dataclass
-class MixedPrecisionCompound(DigitalRankUpdateCell):
-    r"""Abstract device model that takes 1 (analog) device and
-    implements a transfer-based learning rule, where the outer product
-    is computed in digital.
-
-    Here, the outer product of the activations and error is done on a
-    full-precision floating-point :math:`\chi` matrix. Then, with a
-    threshold given by the ``granularity``, pulses will be applied to
-    transfer the information row-by-row to the analog matrix.
-
-    For details, see `Nandakumar et al. Front. in Neurosci. (2020)`_.
-
-    Note:
-        This version of update is different from a parallel update in
-        analog other devices are implementing with stochastic pulsing,
-        as here :math:`{\cal O}(n^2)` digital computations are needed
-        to compute the outer product (rank update). This need for
-        digital compute in potentially high precision might result in
-        inferior run time and power estimates in real-world
-        applications, although sparse integer products can potentially
-        be employed to speed up to improve run time estimates. For
-        details, see discussion in `Nandakumar et al. Front. in
-        Neurosci. (2020)`_.
-
-    .. _`Nandakumar et al. Front. in Neurosci. (2020)`: https://doi.org/10.3389/fnins.2020.00406
-    """
-
-    bindings_class: ClassVar[Type] = devices.MixedPrecResistiveDeviceParameter
-
-    transfer_every: int = 1
-    """Transfers every :math:`n` mat-vec operations.
-    Transfers every :math:`n` mat-vec operations (rounded to multiples/ratios
-    of ``m_batch``).
-
-    Standard setting is 1.0 for mixed precision, but it could potentially be
-    reduced to get better run time estimates.
-    """
-
-    n_rows_per_transfer: int = -1
-    r"""How many consecutive rows to write to the tile from the :math:`\chi`
-    matrix.
-
-    ``-1`` means full matrix read each transfer event.
-    """
-
-    random_row: bool = False
-    """Whether to select a random starting row.
-
-    Whether to select a random starting row for each transfer event and not
-    take the next row that was previously not transferred as a starting row
-    (the default).
-    """
-
-    granularity: float = 0.0
-    r"""Granularity of the device.
-
-    Granularity :math:`\varepsilon` of the device that is used to
-    calculate the number of pulses transferred from :math:`\chi` to
-    analog.
-
-    If 0, it will take granularity from the analog device used.
-    """
-
-    transfer_lr: float = 1.0
-    r"""Scale of the transfer to analog .
-
-    The update onto the analog tile will be proportional to
-    :math:`\langle\chi/\varepsilon\rangle\varepsilon\lambda_\text{tr}`,
-    where :math:`\lambda_\text{tr}` is given by ``transfer_lr`` and
-    :math:`\varepsilon` is the granularity.
-    """
-
-    n_x_bins: int = 0
-    """The number of bins to discretize (symmetrically around zero) the
-    activation before computing the outer product.
-
-    Dynamic quantization is used by computing the absolute max value of each
-    input. Quantization can be turned off by setting this to 0.
-    """
-
-    n_d_bins: int = 0
-    """The number of bins to discretize (symmetrically around zero) the
-    error before computing the outer product.
-
-    Dynamic quantization is used by computing the absolute max value of each
-    error vector. Quantization can be turned off by setting this to 0.
-    """
-
-    stoc_round_x: bool = True
-    """Whether to use stochastic rounding in case of quantization of the input x.
-    """
-
-    stoc_round_d: bool = True
-    """Whether to use stochastic rounding in case of quantization of the error d.
-    """
-
-    def as_bindings(self) -> devices.MixedPrecResistiveDeviceParameter:
-        """Return a representation of this instance as a simulator bindings object."""
-        mixed_prec_parameter = parameters_to_bindings(self)
-        param_device = self.device.as_bindings()
-
-        if not mixed_prec_parameter.set_device_parameter(param_device):
-            raise ConfigError('Could not add device parameter')
-
-        return mixed_prec_parameter

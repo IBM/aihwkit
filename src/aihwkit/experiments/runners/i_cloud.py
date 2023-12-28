@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,12 +28,12 @@ class InferenceCloudRunner(Runner):
 
     Class that allows executing Experiments in the cloud.
     """
+
     # pylint: disable=too-few-public-methods
 
-    def __init__(self,
-                 api_url: Optional[str] = None,
-                 api_token: Optional[str] = None,
-                 verify: bool = False):
+    def __init__(
+        self, api_url: Optional[str] = None, api_token: Optional[str] = None, verify: bool = False
+    ):
         """Create a new ``InferenceCloudRunner``.
 
         Note:
@@ -57,7 +57,7 @@ class InferenceCloudRunner(Runner):
             api_token = api_token or config.token
 
             if not api_url or not api_token:
-                raise CredentialsError('No credentials could be found')
+                raise CredentialsError("No credentials could be found")
 
         self.api_url = api_url
         self.api_token = api_token
@@ -86,13 +86,13 @@ class InferenceCloudRunner(Runner):
         return self.api_client.experiments_list()
 
     def run(  # type: ignore[override]
-            self,
-            experiment: BasicInferencing,
-            analog_info: Dict,
-            noise_model_info: Dict,
-            name: str = '',
-            device: str = 'gpu',
-            **_: Any
+        self,
+        experiment: BasicInferencing,
+        analog_info: Dict,
+        noise_model_info: Dict,
+        name: str = "",
+        device: str = "gpu",
+        **_: Any,
     ) -> CloudExperiment:
         """Run a single Experiment.
 
@@ -118,10 +118,10 @@ class InferenceCloudRunner(Runner):
         # pylint: disable=arguments-differ
         # Generate an experiment name if not given.
         if not name:
-            name = 'aihwkit inference cloud experiment ({}, {} layers)'.format(
-                experiment.dataset.__name__,
-                len(experiment.model)
+            name = "aihwkit inference cloud experiment ({}, {} layers)".format(
+                experiment.dataset.__name__, len(experiment.model)
             )
 
-        return self.api_client.experiment_create(experiment, analog_info,
-                                                 noise_model_info, name, device)
+        return self.api_client.experiment_create(
+            experiment, analog_info, noise_model_info, name, device
+        )

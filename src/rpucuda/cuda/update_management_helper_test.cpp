@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,12 +41,12 @@ public:
 
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < size * m_batch; i++) {
-      x1[i] = urnd();
-      d1[i] = 5 * urnd();
+      x1[i] = (num_t)urnd();
+      d1[i] = (num_t)(5 * urnd());
     }
   };
 
@@ -60,11 +60,7 @@ public:
   T *x1, *d1;
 };
 
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> num_types;
-#else
-typedef ::testing::Types<float> num_types;
-#endif
+typedef ::testing::Types<num_t> num_types;
 
 TYPED_TEST_CASE(UMHTestFixture, num_types);
 
@@ -84,11 +80,12 @@ TYPED_TEST(UMHTestFixture, TranslateBatchOrder64) {
 
 TYPED_TEST(UMHTestFixture, computeScaleAndK) {
 
-  CudaContext c{-1, false};
-  UpdateManagementHelper<TypeParam> umh(&c, this->size, this->size);
-  CudaArray<TypeParam> cu_x(&c, this->size * this->m_batch, this->x1);
-  CudaArray<TypeParam> cu_d(&c, this->size * this->m_batch, this->d1);
-  c.synchronize();
+  CudaContext context_container{-1, false};
+  CudaContextPtr c = &context_container;
+  UpdateManagementHelper<TypeParam> umh(c, this->size, this->size);
+  CudaArray<TypeParam> cu_x(c, this->size * this->m_batch, this->x1);
+  CudaArray<TypeParam> cu_d(c, this->size * this->m_batch, this->d1);
+  c->synchronize();
 
   TypeParam dw_min = 0.001;
   TypeParam lr = 0.01;
@@ -100,16 +97,16 @@ TYPED_TEST(UMHTestFixture, computeScaleAndK) {
       cu_x.getData(), cu_d.getData(), dw_min, lr,
       true, // update_management,
       true, // update_bl_management,
-      this->m_batch, x_trans, d_trans, BL);
+      this->m_batch, x_trans, d_trans, BL, 1.0, 1.0);
 
-  c.synchronize();
+  c->synchronize();
   TypeParam *scale_val = new TypeParam[this->m_batch];
   int *K_val = new int[this->m_batch];
 
   umh.getScaleValues(scale_val);
   umh.getKValues(K_val);
 
-  c.synchronize();
+  c->synchronize();
   // reference:
   for (int i_batch = 0; i_batch < this->m_batch; i_batch++) {
 
@@ -118,14 +115,14 @@ TYPED_TEST(UMHTestFixture, computeScaleAndK) {
     TypeParam d_abs_max_value =
         Find_Absolute_Max<TypeParam>(this->d1 + this->size * i_batch, this->size);
 
-    int bl = ceil(lr * x_abs_max_value * d_abs_max_value / dw_min);
+    int bl = ceilf(lr * x_abs_max_value * d_abs_max_value / dw_min);
     if (bl > BL) {
       bl = BL;
     }
 
     TypeParam reg = dw_min;
 
-    TypeParam scale = sqrt(MAX(x_abs_max_value, reg) / MAX(d_abs_max_value, reg));
+    TypeParam scale = sqrtf((float)MAX(x_abs_max_value, reg) / (float)MAX(d_abs_max_value, reg));
 
     EXPECT_FLOAT_EQ(scale, scale_val[i_batch]); // large error ?
     ASSERT_EQ(bl, K_val[i_batch]);

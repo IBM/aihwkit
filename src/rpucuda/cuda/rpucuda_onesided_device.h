@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "forward_backward_pass.h"
 #include "io_manager.h"
 #include "pulsed_weight_updater.h"
 #include "rpu_onesided_device.h"
@@ -24,7 +25,7 @@ template <typename T> class OneSidedRPUDeviceCuda : public VectorRPUDeviceCuda<T
 
 public:
   explicit OneSidedRPUDeviceCuda(){};
-  explicit OneSidedRPUDeviceCuda(CudaContext *c, const OneSidedRPUDevice<T> &other);
+  explicit OneSidedRPUDeviceCuda(CudaContextPtr c, const OneSidedRPUDevice<T> &other);
 
   ~OneSidedRPUDeviceCuda(){};
   OneSidedRPUDeviceCuda(const OneSidedRPUDeviceCuda<T> &other);
@@ -42,6 +43,7 @@ public:
     swap(a.dev_refresh_vecs_, b.dev_refresh_vecs_);
     swap(a.refresh_pwu_, b.refresh_pwu_);
     swap(a.refresh_iom_, b.refresh_iom_);
+    swap(a.refresh_fb_pass_, b.refresh_fb_pass_);
   };
   void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override;
 
@@ -55,7 +57,7 @@ public:
 
   void runUpdateKernel(
       pwukp_t<T> kpars,
-      CudaContext *up_context,
+      CudaContextPtr up_context,
       T *dev_weights,
       int m_batch,
       const BitLineMaker<T> *blm,
@@ -64,7 +66,8 @@ public:
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
-      uint32_t *d_counts_chunk = nullptr) override;
+      uint32_t *d_counts_chunk = nullptr,
+      const ChoppedWeightOutput<T> *cwo = nullptr) override;
 
   pwukpvec_t<T> getUpdateKernels(
       int m_batch,
@@ -81,6 +84,7 @@ protected:
   std::unique_ptr<CudaArray<T>> dev_refresh_vecs_ = nullptr;
   std::unique_ptr<InputOutputManager<T>> refresh_iom_ = nullptr;
   std::unique_ptr<PulsedWeightUpdater<T>> refresh_pwu_ = nullptr;
+  std::unique_ptr<ForwardBackwardPassIOManagedCuda<T>> refresh_fb_pass_ = nullptr;
   uint64_t refresh_counter_ = 0;
 
   // tmp: no need to copy

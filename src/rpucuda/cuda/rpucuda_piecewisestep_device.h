@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -44,7 +44,7 @@ public:
       /*host copy from cpu (rpu_device). Parent device params are copyied automatically*/
       const auto &par = getPar();
       int n_points = (int)par.piecewise_up_vec.size();
-      gp_count_ = MAX(exp2((int)ceil(log2((T)(n_points + 1))) + 1), 32);
+      gp_count_ = MAX(exp2((int)ceil(log2((float)(n_points + 1))) + 1), 32);
       if (n_points != par.piecewise_down_vec.size()) {
         RPU_FATAL("Down and up interpolation node numbers need to be the same.");
       }
@@ -71,19 +71,19 @@ public:
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
   T *getGlobalParamsData() override { return dev_global_pars_->getData(); };
-  float *get2ParamsData() override { return nullptr; };
+  param_t *get2ParamsData() override { return nullptr; };
   T *get1ParamsData() override {
     return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
   };
   T getWeightGranularityNoise() const override {
     // need to make sure that random states are enabled
     return getPar().usesPersistentWeight()
-               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + 1e-6
+               ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + (T)1e-6
                : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
 
 private:
-  std::unique_ptr<CudaArray<float>> dev_global_pars_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_global_pars_ = nullptr;
   int gp_count_ = 0;
 };
 

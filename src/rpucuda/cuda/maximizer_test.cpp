@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,12 +23,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -46,23 +40,24 @@ class MaximizerTestFixture : public ::testing::TestWithParam<bool> {
 public:
   void SetUp() {
 
+    c = &context_container;
     x_size = 1000;
     m_batch = 1025; // for the batched versions
 
     x1 = new num_t[x_size * m_batch];
     rx = new num_t[x_size * m_batch];
 
-    max_values = new float[this->m_batch];
-    max_values2 = new float[this->m_batch];
+    max_values = new num_t[this->m_batch];
+    max_values2 = new num_t[this->m_batch];
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++) {
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
     }
     rx[0] = -2.6;
   }
@@ -76,8 +71,9 @@ public:
 
   int x_size;
   int m_batch;
-
-  float *max_values, *max_values2;
+  CudaContext context_container{-1, false};
+  CudaContextPtr c;
+  num_t *max_values, *max_values2;
   num_t *x1, *rx;
 };
 
@@ -145,13 +141,11 @@ TEST_P(MaximizerTestFixture, MaximizerSingle) {
   } else {
     max_values[0] = Find_Max<num_t>(this->rx, this->x_size);
   }
-
-  CudaContext c(-1, false);
-  Maximizer<num_t> mxm(&c, this->x_size, GetParam());
-  CudaArray<num_t> dev_x(&c, this->x_size, this->rx);
-  c.synchronize();
+  Maximizer<num_t> mxm(c, this->x_size, GetParam());
+  CudaArray<num_t> dev_x(c, this->x_size, this->rx);
+  c->synchronize();
   mxm.compute(dev_x.getDataConst(), 1, false); // to init batch buffers etc
-  c.synchronize();
+  c->synchronize();
 
   CUDA_TIMING_START(c);
   mxm.compute(dev_x.getDataConst(), 1, false);
@@ -161,9 +155,9 @@ TEST_P(MaximizerTestFixture, MaximizerSingle) {
     CUDA_TIMING_STOP(c, "Max Single");
   }
 
-  c.synchronize();
+  c->synchronize();
   mxm.copyMaxValuesToHost(this->max_values2);
-  c.synchronize();
+  c->synchronize();
 
   EXPECT_FLOAT_EQ(this->max_values[0], this->max_values2[0]);
   std::cout << "max value : " << this->max_values[0] << std::endl;
@@ -185,12 +179,11 @@ TEST_P(MaximizerTestFixture, MaximizerAbsBatch) {
     temp = this->rx;
   }
 
-  CudaContext c(-1, false);
-  Maximizer<num_t> mxm(&c, this->x_size, true);
-  CudaArray<num_t> dev_x(&c, this->x_size * this->m_batch, temp);
-  c.synchronize();
+  Maximizer<num_t> mxm(c, this->x_size, true);
+  CudaArray<num_t> dev_x(c, this->x_size * this->m_batch, temp);
+  c->synchronize();
   mxm.compute(dev_x.getDataConst(), this->m_batch, GetParam()); // to init batch buffers etc
-  c.synchronize();
+  c->synchronize();
 
   CUDA_TIMING_START(c);
   mxm.compute(dev_x.getDataConst(), this->m_batch, GetParam());
@@ -200,12 +193,11 @@ TEST_P(MaximizerTestFixture, MaximizerAbsBatch) {
     CUDA_TIMING_STOP(c, "Max Abs Batched");
   }
 
-  c.synchronize();
+  c->synchronize();
   mxm.copyMaxValuesToHost(this->max_values2);
-  c.synchronize();
+  c->synchronize();
 
   for (int i = 0; i < this->m_batch; i++) {
-    // std::cout << max_values[i] << " vs " << max_values2[i] << std::endl;
     EXPECT_FLOAT_EQ(this->max_values[i], this->max_values2[i]);
   }
 
@@ -227,12 +219,11 @@ TEST_P(MaximizerTestFixture, MaximizerBatch) {
     temp = this->rx;
   }
 
-  CudaContext c(-1, false);
-  Maximizer<num_t> mxm(&c, this->x_size, false);
-  CudaArray<num_t> dev_x(&c, this->x_size * this->m_batch, temp);
-  c.synchronize();
+  Maximizer<num_t> mxm(c, this->x_size, false);
+  CudaArray<num_t> dev_x(c, this->x_size * this->m_batch, temp);
+  c->synchronize();
   mxm.compute(dev_x.getDataConst(), this->m_batch, GetParam()); // to init batch buffers etc
-  c.synchronize();
+  c->synchronize();
 
   CUDA_TIMING_START(c);
   mxm.compute(dev_x.getDataConst(), this->m_batch, GetParam());
@@ -242,12 +233,11 @@ TEST_P(MaximizerTestFixture, MaximizerBatch) {
     CUDA_TIMING_STOP(c, "Max Batched");
   }
 
-  c.synchronize();
+  c->synchronize();
   mxm.copyMaxValuesToHost(this->max_values2);
-  c.synchronize();
+  c->synchronize();
 
   for (int i = 0; i < this->m_batch; i++) {
-    // std::cout << max_values[i] << " vs " << max_values2[i] << std::endl;
     EXPECT_FLOAT_EQ(this->max_values[i], this->max_values2[i]);
   }
 

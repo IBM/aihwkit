@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -27,17 +27,21 @@ template <typename T> class BufferedTransferRPUDevice;
 template <typename T>
 struct BufferedTransferRPUDeviceMetaParameter : TransferRPUDeviceMetaParameter<T> {
 
-  T thres_scale = 1.0;
+  T thres_scale = (T)1.0;
   // threshold for buffer to determine whether to
   // transfer to next device. NOTE: Will be multiplied
   // with dw_min
 
-  T step = 1.0; // step size to transfer to if buffer is above
-                // thres. Note, however, the step size is equal to
-                // dw_min by default (for anything step>dw_min)
-                // because of the below default update setting
+  T step = (T)1.0; // step size to transfer to if buffer is above
+                   // thres. Note, however, the step size is equal to
+                   // dw_min by default (for anything step>dw_min)
+                   // because of the below default update setting
 
-  T momentum = 0.0; // momentum on H. after transfer the momentum fraction stays on H
+  T momentum = (T)0.0; // momentum on H. after transfer the momentum fraction stays on H
+
+  bool forget_buffer = true; // whether to forget buffer after pulse
+                             // (rather than subtracting transferred
+                             // fraction only)
 
   BufferedTransferRPUDeviceMetaParameter() : TransferRPUDeviceMetaParameter<T>() {
     initDefaults();
@@ -113,8 +117,8 @@ public:
 
   BufferedTransferRPUDevice(const BufferedTransferRPUDevice<T> &);
   BufferedTransferRPUDevice<T> &operator=(const BufferedTransferRPUDevice<T> &);
-  BufferedTransferRPUDevice(BufferedTransferRPUDevice<T> &&);
-  BufferedTransferRPUDevice<T> &operator=(BufferedTransferRPUDevice<T> &&);
+  BufferedTransferRPUDevice(BufferedTransferRPUDevice<T> &&) noexcept;
+  BufferedTransferRPUDevice<T> &operator=(BufferedTransferRPUDevice<T> &&) noexcept;
 
   friend void swap(BufferedTransferRPUDevice<T> &a, BufferedTransferRPUDevice<T> &b) noexcept {
     using std::swap;
@@ -132,7 +136,7 @@ public:
   };
 
   void getDPNames(std::vector<std::string> &names) const override;
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override;
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   int getHiddenWeightsCount() const override;
   void setHiddenWeights(const std::vector<T> &data) override;
@@ -144,14 +148,13 @@ public:
       const T *vec,
       const int n_vec,
       const T reset_prob,
-      const int i_col) override;
+      const int i_col,
+      const int m_batch_info) override;
 
   std::vector<std::vector<T>> getTransferBuffers() const { return transfer_buffer_vec_; };
 
 protected:
   void populate(const BufferedTransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
-
-private:
   std::vector<std::vector<T>> transfer_buffer_vec_;
 };
 

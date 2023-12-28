@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,12 +21,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 template <typename T> void transpose(T *w_trans, T *w, int x_size, int d_size) {
@@ -42,6 +36,7 @@ using namespace RPU;
 class MixedPrecRPUDeviceCudaTestFixtureSmall : public ::testing::Test {
 public:
   void SetUp() {
+    context = &context_container;
     x_size = 2;
     d_size = 3;
 
@@ -53,8 +48,8 @@ public:
 
   int x_size, d_size;
   MixedPrecRPUDeviceMetaParameter<num_t> dp;
-
-  CudaContext context;
+  CudaContext context_container{-1, false};
+  CudaContextPtr context;
   std::unique_ptr<AbstractRPUDevice<num_t>> rpu_device;
   std::unique_ptr<AbstractRPUDeviceCuda<num_t>> rpucuda_device;
 };
@@ -64,6 +59,7 @@ public:
   void SetUp() {
     x_size = 2;
     d_size = 3;
+    context = &context_container;
 
     w_ref = Array_2D_Get<num_t>(d_size, x_size);
 
@@ -110,14 +106,14 @@ public:
     dp.transfer_every = x_size;
     dp.n_rows_per_transfer = 1;
 
-    up_pwu = RPU::make_unique<PulsedWeightUpdater<num_t>>(&context, x_size, d_size);
+    up_pwu = RPU::make_unique<PulsedWeightUpdater<num_t>>(context, x_size, d_size);
 
-    dev_weights = RPU::make_unique<CudaArray<num_t>>(&context, x_size * d_size);
-    context.synchronize();
+    dev_weights = RPU::make_unique<CudaArray<num_t>>(context, x_size * d_size);
+    context->synchronize();
   };
 
   void printChiCuda() {
-    context.synchronize();
+    context->synchronize();
     auto chi_cuda =
         static_cast<MixedPrecRPUDeviceCuda<num_t> *>(&*rpucuda_device)->getHiddenWeights();
 
@@ -137,14 +133,17 @@ public:
     std::cout << std::endl;
   }
 
-  void printWeightsCuda() {
+  void getWeightsAll() {
     // also sets host weights
-    context.synchronizeDevice();
+    context->synchronizeDevice();
     std::vector<num_t> weights2(x_size * d_size);
     dev_weights->copyTo(weights2.data());
-    context.synchronizeDevice();
+    context->synchronizeDevice();
 
     transpose(weights[0], weights2.data(), x_size, d_size);
+  }
+
+  void printWeightsCuda() {
     std::cout << "\t\tweights CUDA:\t";
     for (int i = 0; i < x_size * d_size; i++) {
       std::cout << weights[0][i] << ", ";
@@ -169,6 +168,8 @@ public:
     delete[] d_vec2;
   };
 
+  CudaContext context_container{-1, false};
+  CudaContextPtr context;
   int x_size, d_size, colidx;
   num_t lifetime;
   num_t **weights;
@@ -179,8 +180,6 @@ public:
   ConstantStepRPUDeviceMetaParameter<num_t> dp_cs;
   std::unique_ptr<PulsedWeightUpdater<num_t>> up_pwu;
   std::unique_ptr<CudaArray<num_t>> dev_weights;
-
-  CudaContext context;
   RealWorldRNG<num_t> rw_rng;
   std::unique_ptr<AbstractRPUDevice<num_t>> rpu_device;
   std::unique_ptr<AbstractRPUDeviceCuda<num_t>> rpucuda_device;
@@ -192,8 +191,8 @@ INSTANTIATE_TEST_CASE_P(Binsize, MixedPrecRPUDeviceCudaTestFixture, ::testing::V
 TEST_F(MixedPrecRPUDeviceCudaTestFixtureSmall, createDevice) {
   RealWorldRNG<num_t> rw_rng;
   rpu_device = dp.createDeviceUnique(x_size, d_size, &rw_rng);
-  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(&context, *rpu_device);
-  context.synchronize();
+  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(context, *rpu_device);
+  context->synchronize();
 
   ASSERT_TRUE(dynamic_cast<MixedPrecRPUDevice<num_t> *>(&*rpu_device) != nullptr);
   ASSERT_TRUE(dynamic_cast<MixedPrecRPUDeviceCuda<num_t> *>(&*rpucuda_device) != nullptr);
@@ -209,20 +208,21 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, CudaCPUDifference) {
   dp.transfer_every = 1;
   dp.n_rows_per_transfer = 1;
   dp.compute_sparsity = true;
+  // dp.print();
 
   rpu_device = dp.createDeviceUnique(x_size, d_size, &this->rw_rng);
-  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(&context, *rpu_device);
+  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(context, *rpu_device);
 
   dev_weights->assignTranspose(w_ref[0], d_size, x_size);
-  CudaArray<num_t> dev_x(&context, x_size, x_vec);
-  CudaArray<num_t> dev_d(&context, d_size, d_vec);
-  CudaArray<num_t> dev_x2(&context, x_size, x_vec2);
-  CudaArray<num_t> dev_d2(&context, d_size, d_vec2);
+  CudaArray<num_t> dev_x(context, x_size, x_vec);
+  CudaArray<num_t> dev_d(context, d_size, d_vec);
+  CudaArray<num_t> dev_x2(context, x_size, x_vec2);
+  CudaArray<num_t> dev_d2(context, d_size, d_vec2);
 
-  CudaArray<num_t> dev_x_buffer(&context, x_size);
-  CudaArray<num_t> dev_d_buffer(&context, d_size);
+  CudaArray<num_t> dev_x_buffer(context, x_size);
+  CudaArray<num_t> dev_d_buffer(context, d_size);
 
-  context.synchronize();
+  context->synchronize();
   num_t lr = 0.5;
   int reps = 3;
   std::vector<num_t> chi(x_size * d_size);
@@ -233,10 +233,11 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, CudaCPUDifference) {
         dev_x.getData(), dev_d.getData(), dev_weights->getData(), lr, 1, false, false, 1.0f, up,
         dev_x_buffer.getData(), dev_d_buffer.getData());
 
-    printChi();
-    printChiCuda();
-    printWeights();
-    printWeightsCuda();
+    getWeightsAll();
+    // printChi();
+    // printChiCuda();
+    // printWeights();
+    // printWeightsCuda();
   }
 
   for (int i = 0; i < reps; i++) {
@@ -244,13 +245,15 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, CudaCPUDifference) {
     rpucuda_device->doDirectUpdate(
         dev_x2.getData(), dev_d2.getData(), dev_weights->getData(), lr, 1, false, false, 1.0f, up,
         dev_x_buffer.getData(), dev_d_buffer.getData());
-    printChi();
-    printChiCuda();
-    printWeights();
-    printWeightsCuda();
+
+    getWeightsAll();
+    // printChi();
+    // printChiCuda();
+    // printWeights();
+    // printWeightsCuda();
   }
 
-  context.synchronize();
+  context->synchronize();
 
   auto chi_cuda =
       static_cast<MixedPrecRPUDeviceCuda<num_t> *>(&*rpucuda_device)->getHiddenWeights();
@@ -283,19 +286,19 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, Update) {
 
   // just newly create from paramerers
   rpu_device = dp.createDeviceUnique(this->x_size, this->d_size, &this->rw_rng);
-  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(&context, *rpu_device);
+  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(context, *rpu_device);
 
-  CudaArray<num_t> dev_x(&context, this->x_size);
+  CudaArray<num_t> dev_x(context, this->x_size);
   dev_x.setConst(1.0);
-  CudaArray<num_t> dev_d(&context, this->d_size);
+  CudaArray<num_t> dev_d(context, this->d_size);
   dev_d.setConst(-1.0);
   dev_weights->assignTranspose(weights[0], d_size, x_size);
-  context.synchronize();
+  context->synchronize();
 
   if (rpu_device->onSetWeights(this->weights)) {
     rpucuda_device->populateFrom(*rpu_device); // device pars have changed (due to onSetWeights)
   }
-  context.synchronize();
+  context->synchronize();
 
   for (int i = 0; i < dp.transfer_every; i++) {
     up_pwu->update(
@@ -307,7 +310,7 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, Update) {
         false);
   }
   // should update all weight values of the hidden weight by -reps
-  context.synchronize();
+  context->synchronize();
   auto w_vec = static_cast<MixedPrecRPUDeviceCuda<num_t> *>(&*rpucuda_device)->getHiddenWeights();
 
   // update only on fast [nothing to transfer for first row]
@@ -339,18 +342,18 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, UpdateAndTransfer) {
 
   num_t lr = 0.05;
   dp.compute_sparsity = false;
-  dp.transfer_every = round(dw_min / lr);
+  dp.transfer_every = roundf(dw_min / lr);
 
   // just newly create from paramerers
   rpu_device = dp.createDeviceUnique(this->x_size, this->d_size, &this->rw_rng);
-  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(&context, *rpu_device);
+  rpucuda_device = AbstractRPUDeviceCuda<num_t>::createFromUnique(context, *rpu_device);
 
-  CudaArray<num_t> dev_x(&context, this->x_size);
+  CudaArray<num_t> dev_x(context, this->x_size);
   dev_x.setConst(1.0);
-  CudaArray<num_t> dev_d(&context, this->d_size);
+  CudaArray<num_t> dev_d(context, this->d_size);
   dev_d.setConst(-1.0);
   dev_weights->setConst(0.0);
-  context.synchronize();
+  context->synchronize();
 
   // Since all 1 updates, the weight update should be once every dw_min/lr times
   // thres is floord though. take one update step more
@@ -363,26 +366,17 @@ TEST_P(MixedPrecRPUDeviceCudaTestFixture, UpdateAndTransfer) {
         false, // trans
         false);
   }
-  context.synchronize();
+  context->synchronize();
 
   auto chi_cuda =
       static_cast<MixedPrecRPUDeviceCuda<num_t> *>(&*rpucuda_device)->getHiddenWeights();
 
-  std::cout << "\t\tChi CUDA:\t";
-  for (int i = 0; i < x_size * d_size; i++) {
-    std::cout << chi_cuda[i] << ", ";
-  }
-  std::cout << std::endl;
+  // printChiCuda();
+  // printWeightsCuda();
 
   dev_weights->copyTo(weights[0]);
   dev_weights->assignTranspose(weights[0], x_size, d_size);
   dev_weights->copyTo(weights[0]);
-
-  std::cout << "\t\tweights CUDA:\t";
-  for (int i = 0; i < x_size * d_size; i++) {
-    std::cout << weights[0][i] << ", ";
-  }
-  std::cout << std::endl;
 
   // weights should be constant dw_min as only one transfer-update occurred
   for (int i = 0; i < x_size * d_size; i++) {

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,8 +21,8 @@ template <typename T> class VectorRPUDeviceCuda : public PulsedRPUDeviceCudaBase
 
 public:
   explicit VectorRPUDeviceCuda(){};
-  // explicit VectorRPUDeviceCuda(CudaContext * c, int x_size, int d_size);
-  explicit VectorRPUDeviceCuda(CudaContext *c, const VectorRPUDevice<T> &other);
+  // explicit VectorRPUDeviceCuda(CudaContextPtr  c, int x_size, int d_size);
+  explicit VectorRPUDeviceCuda(CudaContextPtr c, const VectorRPUDevice<T> &other);
 
   ~VectorRPUDeviceCuda(){};
   VectorRPUDeviceCuda(const VectorRPUDeviceCuda<T> &other);
@@ -62,6 +62,8 @@ public:
   };
 
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   VectorRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<VectorRPUDeviceMetaParameter<T> &>(SimpleRPUDeviceCuda<T>::getPar());
@@ -70,7 +72,7 @@ public:
 
   void runUpdateKernel(
       pwukp_t<T> kpars,
-      CudaContext *up_context,
+      CudaContextPtr up_context,
       T *dev_weights,
       int m_batch,
       const BitLineMaker<T> *blm,
@@ -79,7 +81,8 @@ public:
       curandState_t *dev_states,
       int one_sided = 0,
       uint32_t *x_counts_chunk = nullptr,
-      uint32_t *d_counts_chunk = nullptr) override;
+      uint32_t *d_counts_chunk = nullptr,
+      const ChoppedWeightOutput<T> *cwo = nullptr) override;
 
   pwukpvec_t<T> getUpdateKernels(
       int m_batch,
@@ -89,9 +92,10 @@ public:
       const PulsedUpdateMetaParameter<T> &up) override;
 
   std::vector<T> getReduceWeightening() const;
+  std::vector<uint64_t> getPulseCounters() const override;
 
 protected:
-  virtual void reduceToWeights(CudaContext *c, T *dev_weights);
+  virtual void reduceToWeights(CudaContextPtr c, T *dev_weights);
 
   int n_devices_ = 0;
   RealWorldRNG<T> rw_rng_{0};

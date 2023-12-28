@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,8 +20,8 @@ namespace RPU {
 template <typename T> class WeightDrifterCuda {
 
 public:
-  explicit WeightDrifterCuda(CudaContext *context, int size);
-  explicit WeightDrifterCuda(CudaContext *, const WeightDrifter<T> &wd, int x_size, int d_size);
+  explicit WeightDrifterCuda(CudaContextPtr context, int size);
+  explicit WeightDrifterCuda(CudaContextPtr, const WeightDrifter<T> &wd, int x_size, int d_size);
   WeightDrifterCuda(){};
   virtual ~WeightDrifterCuda() = default;
 
@@ -34,11 +34,14 @@ public:
 
   inline bool isActive() { return active_; };
 
-  void saturate(T *weights, float *dev_4params);
+  void saturate(T *weights, param_t *dev_4params);
   const T *getNu() const { return dev_nu_ == nullptr ? nullptr : dev_nu_->getDataConst(); };
 
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
+
 protected:
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
   int size_ = 0;
   int max_size_ = 0;
   bool active_ = false;

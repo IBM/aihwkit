@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -42,12 +42,12 @@ namespace RPU {
  * PulsedMetaParameter<T>
  *********************************************************************************/
 
-template <typename T> void PulsedMetaParameter<T>::initialize() {
+template <typename T> void PulsedMetaParameter<T>::initialize(int x_size, int d_size) {
   if (!_par_initialized) {
     _par_initialized = true;
     this->up.initialize();
-    this->f_io.initializeForForward();
-    this->b_io.initializeForBackward();
+    this->f_io.initializeForForward(x_size, d_size);
+    this->b_io.initializeForBackward(x_size, d_size);
   }
 }
 
@@ -56,6 +56,8 @@ RPUPulsed<T> *PulsedMetaParameter<T>::createRPUArray(
     int x_size, int d_size, AbstractRPUDeviceMetaParameter<T> *dp) {
   auto *rpu = new RPUPulsed<T>(x_size, d_size);
   rpu->populateParameter(this, dp);
+  rpu->setWeightsUniformRandom(-0.1, 0.1);
+  rpu->setLearningRate(0.1);
   return rpu;
 };
 
@@ -81,23 +83,13 @@ template struct PulsedMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct PulsedMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct PulsedMetaParameter<half_t>;
+#endif
 
 /********************************************************************************
  * RPUPulsed<T>
  *********************************************************************************/
-
-template <typename T> void RPUPulsed<T>::initialize(PulsedMetaParameter<T> *p, int x_sz, int d_sz) {
-
-  // forward/backward pass
-  // one could even choose the favorate forward/backward here... (based on par)
-  fb_pass_ =
-      RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, this->rng_);
-  fb_pass_->setIOPar(p->f_io, p->b_io);
-
-  // pulsed update pass
-  pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, this->rng_);
-  pwu_->setUpPar(p->up);
-}
 
 // ctor
 template <typename T> RPUPulsed<T>::RPUPulsed(int x_sz, int d_sz) : RPUSimple<T>(x_sz, d_sz) {
@@ -107,10 +99,9 @@ template <typename T> RPUPulsed<T>::RPUPulsed(int x_sz, int d_sz) : RPUSimple<T>
 // copy construcutor
 template <typename T>
 RPUPulsed<T>::RPUPulsed(const RPUPulsed<T> &other) : RPUSimple<T>(other), par_(other.par_) {
-  int x_sz = other.x_size_;
-  int d_sz = other.d_size_;
 
-  this->initialize(&par_, x_sz, d_sz);
+  pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(*other.pwu_);
+  fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManaged<T>>(*other.fb_pass_);
 
   if (other.rpu_device_ != nullptr) {
     rpu_device_ = other.rpu_device_->cloneUnique();
@@ -129,10 +120,12 @@ template <typename T> RPUPulsed<T> &RPUPulsed<T>::operator=(const RPUPulsed<T> &
 }
 
 // move constructor
-template <typename T> RPUPulsed<T>::RPUPulsed(RPUPulsed<T> &&other) { *this = std::move(other); }
+template <typename T> RPUPulsed<T>::RPUPulsed(RPUPulsed<T> &&other) noexcept {
+  *this = std::move(other);
+}
 
 // move assignment
-template <typename T> RPUPulsed<T> &RPUPulsed<T>::operator=(RPUPulsed<T> &&other) {
+template <typename T> RPUPulsed<T> &RPUPulsed<T>::operator=(RPUPulsed<T> &&other) noexcept {
 
   RPUSimple<T>::operator=(std::move(other));
 
@@ -162,7 +155,8 @@ template <typename T> std::unique_ptr<AbstractRPUDevice<T>> RPUPulsed<T>::cloneD
 
 /*********************************************************************************/
 template <typename T> void RPUPulsed<T>::printParametersToStream(std::stringstream &ss) const {
-  getMetaPar().printToStream(ss, rpu_device_->hasDirectUpdate());
+  getMetaPar().printToStream(ss, !rpu_device_->usesUpdateParameter());
+  ss << "Device:" << std::endl;
   rpu_device_->printToStream(ss);
 }
 
@@ -175,13 +169,8 @@ template <typename T> void RPUPulsed<T>::printToStream(std::stringstream &ss) co
 
   std::string name;
   name = rpu_device_->getPar().getName();
-
-  std::string num = "float";
-  if (sizeof(T) == 8) {
-    num = "double";
-  }
-  ss << "RPUPulsed<" << num << ">[" << name << "](" << this->d_size_ << "," << this->x_size_
-     << ")\n";
+  ss << "RPUPulsed<" << this->getDataTypeName() << ">[" << name << "](" << this->d_size_ << ","
+     << this->x_size_ << ")" << std::endl;
 };
 
 template <typename T> void RPUPulsed<T>::setLearningRate(T lr) {
@@ -218,6 +207,21 @@ template <typename T> void RPUPulsed<T>::diffuseWeights() {
   rpu_device_->diffuseWeights(this->getWeightsPtr(), *this->rng_);
 }
 
+template <typename T> void RPUPulsed<T>::diffuseWeightsPink() {
+  CHECK_RPU_DEVICE_INIT;
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  RPUSimple<T>::diffuseWeightsPink();
+
+  if (rpu_device_->implements() == DeviceUpdateType::FloatingPoint) {
+    return;
+  } else if (rpu_device_->implements() == DeviceUpdateType::ConstantStep) {
+    rpu_device_->onSetWeights(this->getWeightsPtr());
+  } else {
+    RPU_FATAL("Pink noise NOT implemented for most devices");
+  }
+}
+
 template <typename T> void RPUPulsed<T>::resetCols(int start_col, int n_cols, T reset_prob) {
   if (reset_prob) {
     CHECK_RPU_DEVICE_INIT;
@@ -228,6 +232,38 @@ template <typename T> void RPUPulsed<T>::resetCols(int start_col, int n_cols, T 
 template <typename T> void RPUPulsed<T>::driftWeights(T time_since_last_call) {
   CHECK_RPU_DEVICE_INIT;
   rpu_device_->driftWeights(this->getWeightsPtr(), time_since_last_call, *this->rng_);
+}
+
+template <typename T>
+void RPUPulsed<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases) {
+
+  if (!pwu_->checkForFPUpdate(&*rpu_device_)) {
+    RPU_FATAL("Remapping is NOT implemented for most devices");
+  }
+
+  CHECK_RPU_DEVICE_INIT;
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  RPUSimple<T>::remapWeights(wrmpar, scales, biases);
+}
+
+template <typename T>
+bool RPUPulsed<T>::swaWeights(
+    const WeightRemapParameter &wrmpar, T *swa_weights, uint64_t iter, T *scales, T *biases) {
+
+  CHECK_RPU_DEVICE_INIT;
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  if (wrmpar.type != WeightRemapType::None && !pwu_->checkForFPUpdate(&*rpu_device_)) {
+    RPU_FATAL("SWA is NOT implemented for most devices");
+  }
+
+  bool modfied = RPUSimple<T>::swaWeights(wrmpar, swa_weights, iter, scales, biases);
+
+  if (modfied) {
+    rpu_device_->onSetWeights(this->getWeightsPtr());
+  }
+  return modfied;
 }
 
 template <typename T> void RPUPulsed<T>::clipWeights(T clip) {
@@ -241,7 +277,7 @@ template <typename T> void RPUPulsed<T>::clipWeights(const WeightClipParameter &
   CHECK_RPU_DEVICE_INIT;
 
   if (wclpar.type == WeightClipType::FixedValue) {
-    clipWeights(wclpar.fixed_value); // handle outside  to support devices
+    clipWeights((T)wclpar.fixed_value); // handle outside  to support devices
   } else if (rpu_device_->implements() == DeviceUpdateType::FloatingPoint) {
     RPUSimple<T>::clipWeights(wclpar);
   } else {
@@ -316,9 +352,9 @@ template <typename T> void RPUPulsed<T>::setWeightsReal(const T *weightsptr, int
   T B = (T)0.0;
   getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), weight_granularity);
 
-  T mx_change = BL * weight_granularity;
+  T mx_change = (T)BL * weight_granularity;
   T range = w_max - w_min;
-  int iter = (int)round(n_loops * range / mx_change);
+  int iter = (int)roundf((T)n_loops * range / mx_change);
 
   /*====*/
 
@@ -348,7 +384,7 @@ template <typename T> void RPUPulsed<T>::setWeightsReal(const T *weightsptr, int
 
   T avg_dev = 0.0;
   for (int i = 0; i < x_sz * d_sz; ++i) {
-    avg_dev += fabs(weightsptr[i] - w_current[i]);
+    avg_dev += (T)fabsf(weightsptr[i] - w_current[i]);
   }
   avg_dev /= x_sz * d_sz;
   DEBUG_OUT("Finished setting weights real [avg deviation=" << avg_dev << "]");
@@ -365,10 +401,10 @@ void RPUPulsed<T>::getDeviceParameterNames(std::vector<std::string> &names) cons
   rpu_device_->getDPNames(names);
 }
 
-template <typename T> void RPUPulsed<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+template <typename T> void RPUPulsed<T>::getDeviceParameter(std::vector<T *> &data_ptrs) {
   // note that memory (x_sz*d_sz per ptr) assumed to be initialized from outside !!
   CHECK_RPU_DEVICE_INIT;
-  rpu_device_->getDeviceParameter(data_ptrs);
+  rpu_device_->getDeviceParameter(this->getWeightsPtr(), data_ptrs);
 };
 
 template <typename T> void RPUPulsed<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
@@ -387,6 +423,44 @@ template <typename T> int RPUPulsed<T>::getHiddenUpdateIdx() const {
   return rpu_device_->getHiddenUpdateIdx();
 };
 
+template <typename T> const FBParameter<T> &RPUPulsed<T>::getFBParameter() const {
+  CHECK_RPU_DEVICE_INIT;
+  return fb_pass_->getFBParameter();
+};
+
+template <typename T> void RPUPulsed<T>::setFBParameter(FBParameter<T> &fb_pars) {
+  CHECK_RPU_DEVICE_INIT;
+  fb_pass_->setFBParameter(fb_pars);
+};
+
+/*********************************************************************************/
+/* dump / load state */
+
+template <typename T> void RPUPulsed<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPUSimple<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  pwu_->dumpExtra(state, "pwu");
+  fb_pass_->dumpExtra(state, "fb_pass");
+  rpu_device_->dumpExtra(state, "rpu_device");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void RPUPulsed<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  RPUSimple<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  pwu_->loadExtra(state, "pwu", strict);
+  fb_pass_->loadExtra(state, "fb_pass", strict);
+  rpu_device_->loadExtra(state, "rpu_device", strict);
+}
+
 /*********************************************************************************/
 
 template <typename T>
@@ -394,9 +468,16 @@ void RPUPulsed<T>::populateParameter(
     PulsedMetaParameter<T> *p, AbstractRPUDeviceMetaParameter<T> *dp) {
   // set parent meta pars (from device pars)
   RPUSimple<T>::populateParameter(dp);
-  p->initialize();
+  p->initialize(this->x_size_, this->d_size_);
 
-  this->initialize(p, this->x_size_, this->d_size_);
+  // forward
+  fb_pass_ =
+      RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, this->rng_);
+  fb_pass_->populateFBParameter(p->f_io, p->b_io);
+
+  // pwu
+  pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, this->rng_);
+  pwu_->setUpPar(p->up);
 
   // note: dp could also be SimpleRPUDeviceMetaParameter
   RealWorldRNG<T> rng(dp->construction_seed);
@@ -512,6 +593,9 @@ void RPUPulsed<T>::updateMatrix(
 template class RPUPulsed<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUPulsed<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class RPUPulsed<half_t>;
 #endif
 
 #undef CHECK_RPU_DEVICE_INIT

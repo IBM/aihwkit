@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,8 +22,8 @@ template <typename T> struct UpdateFunctorConstantStepLargeNoise {
       T &w,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 par_2,
+      const param4_t par_4,
+      const param2_t par_2,
       T &par_1,
       const T *global_par,
       const int global_params_count,
@@ -34,7 +34,7 @@ template <typename T> struct UpdateFunctorConstantStepLargeNoise {
     UNUSED(global_par);
     UNUSED(par_1);
     UNUSED(par_2);
-
+    // negative > 0 means going up here ...
     // here we assume that noise_std_dw>0 at least
     T wmax = par_4.z;                                   // [2];
     T wmin = par_4.x;                                   //[0];
@@ -74,25 +74,24 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
 
   pwukpvec_t<T> v;
 
-  if (getPar().dw_min_std > 0.33) { // 3 sigma
+  if (getPar().dw_min_std > (T)0.33) { // 3 sigma
     v.push_back(RPU::make_unique<PWUKernelParameterSingleFunctor<
                     T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
     v.push_back(RPU::make_unique<PWUKernelParameterBatchFunctor<
                     T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
     v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedFunctor<
                     T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+                    T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
 
   } else {
     // use summing approximation is save in this case
     // Update functor and kernels are in pwu_kernels.h
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStep<T>, 1>>
             ARGS(Functor));
-
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+                    T, UpdateFunctorConstantStep<T>, 1>> ARGS(Functor));
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
             Functor));
@@ -100,6 +99,11 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
     v.push_back(
         RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
             Functor));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
+
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
+    v.push_back(RPU::make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
   }
 
   return v;
@@ -110,6 +114,9 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
 template class ConstantStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class ConstantStepRPUDeviceCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ConstantStepRPUDeviceCuda<half_t>;
 #endif
 
 } // namespace RPU

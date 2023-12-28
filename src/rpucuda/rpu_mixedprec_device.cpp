@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -24,7 +24,7 @@ namespace RPU {
 
 template <typename T>
 void MixedPrecRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const {
-  ss << "Update using digital outer product + transfer to analog: " << std::endl;
+  ss << "\t\bUpdate using digital outer product + transfer to analog: " << std::endl;
 
   ss << "\t n_x_bins: \t\t";
   ss << n_x_bins << std::endl;
@@ -34,7 +34,7 @@ void MixedPrecRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) co
   ss << transfer_lr << std::endl;
   if (stoc_round_x || stoc_round_d) {
     ss << "\t stoc_round (x / d): \t";
-    ss << stoc_round_x << " / " << stoc_round_d << std::endl;
+    ss << std::boolalpha << stoc_round_x << " / " << stoc_round_d << std::endl;
   }
 
   MixedPrecRPUDeviceBaseMetaParameter<T>::printToStream(ss);
@@ -53,6 +53,9 @@ template <typename T> void MixedPrecRPUDeviceMetaParameter<T>::initialize() {
 template struct MixedPrecRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct MixedPrecRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct MixedPrecRPUDeviceMetaParameter<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -114,13 +117,14 @@ MixedPrecRPUDevice<T> &MixedPrecRPUDevice<T>::operator=(const MixedPrecRPUDevice
 }
 
 // move constructor
-template <typename T> MixedPrecRPUDevice<T>::MixedPrecRPUDevice(MixedPrecRPUDevice<T> &&other) {
+template <typename T>
+MixedPrecRPUDevice<T>::MixedPrecRPUDevice(MixedPrecRPUDevice<T> &&other) noexcept {
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
-MixedPrecRPUDevice<T> &MixedPrecRPUDevice<T>::operator=(MixedPrecRPUDevice<T> &&other) {
+MixedPrecRPUDevice<T> &MixedPrecRPUDevice<T>::operator=(MixedPrecRPUDevice<T> &&other) noexcept {
   MixedPrecRPUDeviceBase<T>::operator=(std::move(other));
 
   chi_ = std::move(other.chi_);
@@ -165,24 +169,24 @@ void MixedPrecRPUDevice<T>::forwardUpdate(
     this->transfer_tmp_.resize(this->x_size_);
   }
 
-  if (this->granularity_ <= 0) {
+  if (this->granularity_ <= (T)0.0) {
     RPU_FATAL("Granularity cannot be zero!");
   }
 
   // forward / update
-  for (int j = 0; j < n_vec; j++) {
+  for (size_t j = 0; j < (size_t)n_vec; j++) {
     T *chi_row = chi_[j_row_start + j];
 
     PRAGMA_SIMD
-    for (int i = 0; i < this->x_size_; i++) {
+    for (size_t i = 0; i < (size_t)this->x_size_; i++) {
       T value = chi_row[i];
-      T dw = truncf(value / this->granularity_);
+      T dw = (T)truncf(value / this->granularity_);
       this->transfer_tmp_[i] = dw;
       chi_row[i] = value - dw * this->granularity_;
     }
 
     this->transfer_pwu_->updateVectorWithDevice(
-        weights, this->transfer_tmp_.data(), 1, transfer_d_vec + this->d_size_ * j, 1,
+        weights, this->transfer_tmp_.data(), 1, transfer_d_vec + (size_t)this->d_size_ * j, 1,
         this->granularity_ * lr, n_vec, &*this->rpu_device_);
   }
 }
@@ -205,23 +209,23 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
   const auto &par = getPar();
 
   // NEED TO CHECK LEARNING RATE DIRECTION CORRECT ...
-  T x_width = 1.0;
-  T half_x_bins = par.n_x_bins / 2; // floor
+  T x_width = (T)1.0;
+  T half_x_bins = (T)(par.n_x_bins / 2); // floor
   if (par.n_x_bins > 0) {
     int max_index = RPU::math::iamax<T>(this->x_size_, x_input, x_inc);
-    T x_amax = fabs(x_input[max_index * x_inc]);
+    T x_amax = (T)fabsf(x_input[max_index * x_inc]);
     x_width = x_amax / ((T)half_x_bins);
-    x_width = x_width == 0 ? 1.0 : x_width;
+    x_width = x_width == (T)0.0 ? (T)1.0 : x_width;
   }
 
-  T d_width = 1.0;
-  T half_d_bins = par.n_d_bins / 2; // floor
+  T d_width = (T)1.0;
+  T half_d_bins = (T)(par.n_d_bins / 2); // floor
   if (par.n_d_bins > 0) {
 
     int max_index = RPU::math::iamax<T>(this->d_size_, d_input, d_inc);
-    T d_amax = fabs(d_input[max_index * d_inc]);
+    T d_amax = (T)fabsf(d_input[max_index * d_inc]);
     d_width = d_amax / ((T)half_d_bins);
-    d_width = d_width == 0 ? 1.0 : d_width;
+    d_width = d_width == (T)0.0 ? (T)1.0 : d_width;
   }
 
   int i_stop = this->x_size_ * x_inc;
@@ -254,10 +258,10 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
       if (par.n_x_bins > 0) {
 
         if (stochastic_rounding_x) {
-          stoch_value = this->rng_.sampleUniform() - 0.5;
+          stoch_value = this->rng_.sampleUniform() - (T)0.5;
         }
 
-        x = RPU_ROUNDFUN(x / x_width + stoch_value);
+        x = RPU_ROUNDFUNF(x / x_width + stoch_value);
         x = MIN(MAX(x, -half_x_bins), half_x_bins) * x_width;
       }
       qx_[i] = x;
@@ -275,10 +279,10 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
       if (par.n_d_bins > 0) {
 
         if (stochastic_rounding_d) {
-          stoch_value = this->rng_.sampleUniform() - 0.5;
+          stoch_value = this->rng_.sampleUniform() - (T)0.5;
         }
 
-        d = RPU_ROUNDFUN(d / d_width + stoch_value);
+        d = RPU_ROUNDFUNF(d / d_width + stoch_value);
         d = MIN(MAX(d, -half_d_bins), half_d_bins) * d_width;
       }
       qd_[i] = d;
@@ -303,10 +307,10 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
       // quantize (by abs max, thus already clipped)
 
       if (stochastic_rounding_x) {
-        stoch_value = this->rng_.sampleUniform() - 0.5;
+        stoch_value = this->rng_.sampleUniform() - (T)0.5;
       }
 
-      T qx = RPU_ROUNDFUN(x / x_width + stoch_value);
+      T qx = RPU_ROUNDFUNF(x / x_width + stoch_value);
 
       if (qx == (T)0.0) {
         continue;
@@ -325,10 +329,10 @@ void MixedPrecRPUDevice<T>::doDirectVectorUpdate(
 
       // quantize
       if (stochastic_rounding_d) {
-        stoch_value = this->rng_.sampleUniform() - 0.5;
+        stoch_value = this->rng_.sampleUniform() - (T)0.5;
       }
 
-      T qd = RPU_ROUNDFUN(d / d_width + stoch_value);
+      T qd = RPU_ROUNDFUNF(d / d_width + stoch_value);
       if (qd == (T)0) {
         continue;
       }
@@ -374,6 +378,9 @@ template <typename T> void MixedPrecRPUDevice<T>::setChi(const T *data) {
 template class MixedPrecRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class MixedPrecRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

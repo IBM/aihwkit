@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,12 +22,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -44,7 +38,7 @@ public:
     w_ref = Array_2D_Get<num_t>(d_size, x_size);
 
     for (int i = 0; i < x_size * d_size; i++) {
-      w_ref[0][i] = MIN(MAX(0.1 * rw_rng.sampleGauss(), -1.0f), 1.0f);
+      w_ref[0][i] = MIN(MAX((num_t)0.1 * rw_rng.sampleGauss(), (num_t)-1.0), (num_t)1.0);
     }
 
     weights = Array_2D_Get<num_t>(d_size, x_size);
@@ -81,6 +75,7 @@ public:
     dp->refresh_up = up;
     dp->refresh_up.pulse_type = PulseType::None; // perfect refresh
     dp->refresh_every = GetParam();
+    // dp->print();
 
     rng = new RNG<num_t>(0);
 
@@ -117,9 +112,8 @@ public:
   RealWorldRNG<num_t> rw_rng;
   std::unique_ptr<AbstractRPUDevice<num_t>> rpu_device;
   std::unique_ptr<AbstractRPUDeviceCuda<num_t>> rpucuda_device;
-
   CudaContext context_container{-1, false};
-  CudaContext *context;
+  CudaContextPtr context;
 };
 
 // define the tests
@@ -148,16 +142,16 @@ TEST_P(RPUDeviceCudaTestFixture, onSetWeights) {
   int size = this->x_size * this->d_size;
 
   for (int i = 0; i < size; i++) {
-    if (w_ref[0][i] < 0) {
-      ASSERT_FLOAT_EQ(w_vec[i], fabs(w_ref[0][i]));
+    if (w_ref[0][i] < (num_t)0.0) {
+      ASSERT_FLOAT_EQ(w_vec[i], (num_t)fabsf(w_ref[0][i]));
       ASSERT_FLOAT_EQ(w_vec[i + size], 0);
     } else {
-      ASSERT_FLOAT_EQ(w_vec[i + size], fabs(w_ref[0][i]));
+      ASSERT_FLOAT_EQ(w_vec[i + size], (num_t)fabsf(w_ref[0][i]));
       ASSERT_FLOAT_EQ(w_vec[i], 0);
     }
   }
-  ASSERT_FLOAT_EQ(reduce_weightening[g_minus], -1.0);
-  ASSERT_FLOAT_EQ(reduce_weightening[g_plus], 1.0);
+  ASSERT_FLOAT_EQ(reduce_weightening[g_minus], (num_t)-1.0);
+  ASSERT_FLOAT_EQ(reduce_weightening[g_plus], (num_t)1.0);
 }
 
 TEST_P(RPUDeviceCudaTestFixture, UpdatePos) {
@@ -343,7 +337,7 @@ TEST_P(RPUDeviceCudaTestFixture, LayerTest) {
   layer_pulsed.setWeights(w_ref[0]);
 
   auto culayer_pulsed = RPUCudaPulsed<num_t>(context, layer_pulsed);
-  culayer_pulsed.disp();
+  // culayer_pulsed.disp();
 
   int m_batch = 1; // note that CUDA will refresh less often then CPU
                    // in case the refresh is smaller than m_batch

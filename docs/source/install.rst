@@ -5,6 +5,21 @@ The preferred way to install this package is by using the `Python package index`
 
     pip install aihwkit
 
+Similarly this package can also be installed using ``Conda`` package for AIHWKIT
+available in Conda-forge,
+
+* CPU ::
+
+    conda install -c conda-forge aihwkit
+
+* GPU ::
+
+    conda install -c conda-forge aihwkit-gpu
+
+Similarly for GPU support, you can also build a ``docker`` container following the `CUDA Dockerfile instructions`_. 
+You can then run a GPU enabled docker container using the following command from your project directory ::
+
+    docker run --rm -it --gpus all -v $(pwd):$HOME --name aihwkit aihwkit:cuda bash
 
 .. note::
     During the initial beta stage, we do not provide pip *wheels* (as in,
@@ -46,14 +61,14 @@ creating an analog layer and predicting the output::
     from torch import Tensor
     from aihwkit.nn import AnalogLinear
 
-    model = AnalogLinear(3, 2)
+    model = AnalogLinear(2, 2)
     model(Tensor([[0.1, 0.2], [0.3, 0.4]]))
 
 If you encounter any issues during the installation or executing the snippet,
 please refer to the :doc:`advanced_install` section for more details and don't
 hesitate on using the `issue tracker`_ for additional support.
 
-Next steps
+Next Steps
 ----------
 
 You can read more about the PyTorch layers in the :doc:`using_pytorch`
@@ -68,3 +83,4 @@ section.
 .. _issue tracker: https://github.com/IBM/aihwkit/issues
 .. _issue: https://github.com/IBM/aihwkit/issues/52
 .. _Python package index: https://pypi.org/project/aihwkit/
+.. _CUDA Dockerfile instructions: https://github.com/IBM/aihwkit/blob/master/docs/source/advanced_install.rst#cuda-enabled-docker-image

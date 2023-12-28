@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -29,12 +29,6 @@
 #include "io_manager.h"
 
 #define TOLERANCE 1e-6
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -116,15 +110,15 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weight matrix
     for (int i = 0; i < x_size; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     rx_cuda = RPU::make_unique<CudaArray<num_t>>(context, x_size, rx);
@@ -137,15 +131,6 @@ public:
 
     this->populateLayers();
 
-    std::cout << "RPU Cuda Pulsed:\n";
-    this->pulsed_cuda->printWeights(3, 1);
-    std::cout << "RPU Pulsed:\n";
-    this->pulsed->printWeights(3, 1);
-    std::cout << "RPU Cuda Simple:\n";
-    this->simple_cuda->printWeights(3, 1);
-    std::cout << "RPU Simple:\n";
-    this->simple->printWeights(3, 1);
-
     CUDA_TIMING_INIT;
     // update
     double pulsed_dur = 0;
@@ -156,17 +141,17 @@ public:
     auto end_time = std::chrono::high_resolution_clock::now();
     for (int loop = 0; loop < this->repeats; loop++) {
 
-      CUDA_TIMING_START((*this->context));
+      CUDA_TIMING_START((this->context));
       this->pulsed_cuda->update(this->rx_cuda->getData(), rd_cuda->getData(), false, 1);
-      CUDA_TIMING_STOP_NO_OUTPUT((*this->context));
+      CUDA_TIMING_STOP_NO_OUTPUT((this->context));
       if (loop > 0)
         pulsed_cuda_dur += milliseconds;
 
       context->synchronize();
 
-      CUDA_TIMING_START((*this->context));
+      CUDA_TIMING_START((this->context));
       this->simple_cuda->update(this->rx_cuda->getData(), rd_cuda->getData(), false, 1);
-      CUDA_TIMING_STOP_NO_OUTPUT((*this->context));
+      CUDA_TIMING_STOP_NO_OUTPUT((this->context));
       if (loop > 0)
         simple_cuda_dur += milliseconds;
 
@@ -202,22 +187,22 @@ public:
       this->context->synchronizeDevice();
     }
 
-    std::cout << BOLD_ON << "RPU Pulsed Cuda: done in " << pulsed_cuda_dur / (this->repeats - 1)
+    std::cout << BOLD_ON << "\tRPU Pulsed Cuda: done in " << pulsed_cuda_dur / (this->repeats - 1)
+              << " msec" << std::endl
+              << BOLD_OFF;
+    // this->pulsed_cuda->printWeights(3, 1);
+    std::cout << BOLD_ON << "\tRPU Pulsed: done in "
+              << (float)pulsed_dur / 1000. / (this->repeats - 1) << " msec" << std::endl
+              << BOLD_OFF;
+    // this->pulsed->printWeights(3, 1);
+    std::cout << BOLD_ON << "\tRPU Simple Cuda: done in " << simple_cuda_dur / (this->repeats - 1)
               << " msec\n"
               << BOLD_OFF;
-    this->pulsed_cuda->printWeights(3, 1);
-    std::cout << BOLD_ON << "RPU Pulsed: done in "
-              << (num_t)pulsed_dur / 1000. / (this->repeats - 1) << " msec\n"
+    // this->simple_cuda->printWeights(3, 1);
+    std::cout << BOLD_ON << "\tRPU Simple: done in "
+              << (float)simple_dur / 1000. / (this->repeats - 1) << " msec" << std::endl
               << BOLD_OFF;
-    this->pulsed->printWeights(3, 1);
-    std::cout << BOLD_ON << "RPU Simple Cuda: done in " << simple_cuda_dur / (this->repeats - 1)
-              << " msec\n"
-              << BOLD_OFF;
-    this->simple_cuda->printWeights(3, 1);
-    std::cout << BOLD_ON << "RPU Simple: done in "
-              << (num_t)simple_dur / 1000. / (this->repeats - 1) << " msec\n"
-              << BOLD_OFF;
-    this->simple->printWeights(3, 1);
+    // this->simple->printWeights(3, 1);
 
     CUDA_TIMING_DESTROY;
   };
@@ -229,8 +214,7 @@ public:
   }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUPulsed<num_t>> pulsed;
   std::unique_ptr<RPUCudaPulsed<num_t>> pulsed_cuda;
   std::unique_ptr<RPUSimple<num_t>> simple;

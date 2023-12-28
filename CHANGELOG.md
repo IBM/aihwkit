@@ -16,31 +16,178 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 
-* Example 23: how to use ``AnalogTile`` directly to implement an
+* On-the-fly change of some `RPUConfig` fields (\# 539)
+* Fusion chip CSV file model weights exporter functionality (\#538)
+* Experimental support for RPU data types (\#563)
+* Optional AIHWKIT C++ extension module (\#563)
+* Variable mantissa / exponent tensor conversion operator (\#563)
+* To digital feature for analog layers (\#563)
+* New `PCM_NOISE` type for hardware-aware training for inference (\#563)
+* Transfer compounds using torch implementation (`TorchTransferTile`) (\#567)
+* Weight programming error plotting utility (\#572)
+* Add optimizer checkpoint in example 20 (\#573) 
+
+### Fixed
+
+* Repeated call of `cuda()` reset the weights for `InferenceTile` (\#540)
+* Custom tile bugfixes (\#563)
+* Bug-fixes for specialized learning algorithms (\#563)
+* Bug-fix for data-parallel hardware-aware training for inference (\#569)
+
+### Changed
+
+* Parameter structure changed into separate files to reduce file sizes (\#563)
+* `RPUConfig` has a new `runtime` field and inherits from additional base
+  classes (\#563)
+* `AnalogWrapper` now directly adds module classes to subclasses (\#563)
+* RNN linear layers more custonable (\#563)
+* Parameters for specialized learning algorithms changed somwhat (\#563)
+* RNN modules inherit from `Module` or `AnalogContainerBase` instead of `AnalogSequential` (\#563)
+* Adjustment of parameter to bindings for various number formats (\#563)
+
+### Removed
+
+## [0.8.0] - 2023/07/14
+
+### Added
+
+* Added new tutorial notebooks to cover the concepts of training,
+ hardware-aware training, post-training calibration, and extending aihwkit functionality (\#518, \#523, \#526)
+* Calibration of input ranges for inference (\#512)
+* New analog in-memory training algorithms: Chopped Tiki-taka II (\#512)
+* New analog in-memory training algorithms: AGAD (\#512)
+* New training presets: `ReRamArrayOMPresetDevice`,
+  `ReRamArrayHfO2PresetDevice`, `ChoppedTTv2*`, `AGAD*` (\#512)
+* New correlation detection example for comparing specialized analog SGD
+  algorithms (\#512)
+* Simplified `build_rpu_config` script for generating `RPUConfigs` for
+  analog in-memory SGD (\#512)
+* `CustomTile` for customization of in-memory training algorithms (\#512)
+* Pulse counters for pulsed analog training (\#512)
+* `TorchInferenceTile` for a fully torch-based analog tile for
+  inference (not using the C++ RPUCuda engine), supporting a subset of MVM nonidealities (\#512)
+* New inference preset `StandardHWATrainingPreset` (\#512)
+* New inference noise model `ReRamWan2022NoiseModel` (\#512)
+* Improved HWA-training for inference featuring input and output range
+  learning and more (\#512)
+* Improved CUDA memory management (using torch cached GPU memory for
+  internal RPUCuda buffer) (\#512)
+* New layer generator: `analog_layers()` loops over layer modules (except
+  container) (\#512)
+* `AnalogWrapper` for wrapping a full torch module (Without using
+  `AnalogSequential`) (\#512)
+* `convert_to_digital` utility (\# 512)
+* `TileModuleArray` for logical weight matrices larger than a single tile. (\#512)
+* Dumping of all C++ fields for accurate analog training saving and
+  training continuation after checkpoint load. (\#512)
+* `apply_write_noise_on_set` for pulsed devices. (\#512)
+* Reset device now also for simple devices. (\#512)
+* `SoftBoundsReference`, `PowStepReference` for explicit reference
+  subtraction of symmetry point in Tiki-taka (\#512)
+* Analog MVM with output-to-output std-deviation variability
+  (`output_noise_std`) (\#512)
+* Plotting utility for weight errors (\#512)
+* `per_batch_sample` weight noise injections for `TorchInferenceRPUConfig` (\#512)
+
+
+### Fixed
+
+* BERT example 24 using `AnalogWrapper` (\#514)
+* Cuda supported testing in examples based on AIHWKIT compilation (\#513)
+* Fixed compilation error for CUDA 12.1. (\#500)
+* Realistic read weights could have applied the scales wrongly (\#512)
+
+
+### Changed
+
+* Major re-organization of `AnalogTiles` for increased modularity
+  (`TileWithPeriphery`, `SimulatorTile`, `SimulatorTileWrapper`). Analog
+ tile modules (possibly array of analog tiles) are now also torch `Module`. (\#512)
+* Change in tile generators: `analog_model.analog_tiles()` now loops over
+  all available tiles (in all modules) (\#512)
+* Import and file position changes. However, user can still import `RPUConfig`
+  related modules from `aihwkit.simulator.config` (\#512)
+* `convert_to_analog` now also considered mapping. Set
+  `mapping.max_out_size = 0` and `mapping.max_out_size = 0` to avoid this. (\#512)
+* Mapped layers now use `TileModuleArray` array by default. (\#512)
+* Checkpoint structure is different than previous
+  versions. `utils.legacy_load` provides a way to load old checkpoints. (\#512)
+
+
+### Removed
+
+* `realistic_read_write` is removed from some high-level function. Use
+  `program_weights` (after setting the weights) or `read_weights`
+  for realistic reading (using weight estimation technique).  (\#512)
+
+
+## [0.7.1] - 2023/03/24
+
+### Added
+
+* Updated the CLI Cloud runner code to support inference experiment result. (\#491)
+* Read weights is done with least-square estimation method. (\#489)
+
+### Fixed
+
+* Realistic read / write behavior was broken for some tiles. (\#489)
+
+### Changed
+
+* Torch minimal version has changed to version 1.9. (\#489)
+* Realistic read / write is now achieved by `read_weights` and
+  `program_weights`. (\#489)
+
+### Removed
+
+* The tile methods `get/set_weights_realistic` are removed. (\#489)
+
+
+## [0.7.0] - 2023/01/04
+
+### Added
+* Reset tiles method (\#456)
+* Added many new analog MAC non-linearties (forward / backward pass). (\#456)
+* Polynomial weight noise for hardware-aware training. (\#456)
+* Remap functionality for hardware-aware training. (\#456)
+* Input range estimation for InferenceRPUConfig. (\#456)
+* CUDA always syncs and added non-blocking option if not wished. (\#456)
+* Fitting utility for fitting any device model to conductance measurements. (\#456)
+* Added ``PowStepReferenceDevice`` for easy subtraction of symmetry
+  point. (\#456)
+* Added ``SoftBoundsReferenceDevice`` for easy subtraction of symmetry
+  point. (\#456)
+* Added stand-alone functions for applying inference drift to any model. (\#419)
+* Added Example 24: analog inference and hardware-aware training on BERT with the SQUAD task. (\#440)
+* Added Example 23: how to use ``AnalogTile`` directly to implement an
   analog matrix-vector product without using pytorch modules. (\#393)
-* Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
-* Notebook for exploring analog sensitivities. (\#380)
+* Added Example 22: 2 layer LSTM network trained on War and Peace dataset. (\#391)
+* Added a new notebook for exploring analog sensitivities. (\#380)
 * Remapping functionality for ``InferenceRPUConfig``. (\#388)
-* Inference experiment and runners. (\#410)
+* Inference cloud experiment and runners. (\#410)
 * Added ``analog_modules`` generator in ``AnalogSequential``. (\#410)
-* Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests
+* Added ``SKIP_CUDA_TESTS`` to manually switch off the CUDA tests.
 * Enabling comparisons of ``RPUConfig`` instances. (\#410)
-* Specific use-defined function for layer-wise setting for RPUConfigs
+* Specific user-defined function for layer-wise setting for RPUConfigs
   in conversions. (\#412)
 * Added stochastic rounding options for ``MixedPrecisionCompound``. (\#418)
 * New `remap` parameter field and functionality in
   ``InferenceRPUConfig`` (\#423).
 * Tile-level weight getter and setter have `apply_weight_scaling`
-  argument (\#423)
-* Pre- and post update / backward / forward methods in `BaseTile` for
+  argument. (\#423)
+* Pre and post-update / backward / forward methods in `BaseTile` for
   easier user-defined modification of pre and/or post-processings of a tile. (\#423)
 * Type-checking for `RPUConfig` fields. (\#424)
 
 ### Fixed
 
-* Analog_summary error when model is on cuda device. (\#392)
+* Decay fix for compound devices. (\#463)
+* ``RPUCuda`` backend update with many fixes. (\#456)
+* Missing zero-grad call in example 02. (\#446)
+* Indexing error in ``OneSidedDevice`` for CPU. (\#447)
+* Analog summary error when model is on cuda device. (\#392)
 * Index error when loading the state dict with a model use previously. (\#387)
-* Weights that were not contiguous could have set wrongly. (\#388)
+* Weights that were not contiguous could have been set wrongly. (\#388)
 * Programming noise would not be applied if drift compensation was not
   used. (\#389)
 * Loading a new model state dict for inference does not overwrite the noise
@@ -60,15 +207,18 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
+* Pylint / mypy / pycodestyle / protobuf version bump (\#456)
+* All configs related classes can now be imported from
+  ``aihwkit.simulator.config``. (\#456)
 * Weight noise visualization now shows the programming noise and drift
-  noise difference. (\#389)
+  noise differences. (\#389)
 * Concatenate the gradients before applying to the tile update
   function (some speedup for CUDA expected). (\#390)
 * Drift compensation uses eye instead of ones for readout. (\#412)
 * `weight_scaling_omega_columnwise` parameter in `MappingParameter` is now called
   `weight_scaling_columnwise`. (\#423)
 * Tile-level weight getter and setter now use Tensors instead of numpy
-  arrays (\#423)
+  arrays. (\#423)
 * Output scaling and mapping scales are now distiniguished, only the
   former is learnable. (\#423)
 * Renamed `learn_out_scaling_alpha` parameter in `MappingParameter` to
@@ -77,12 +227,12 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Deprecated
 
-* Input `weight_scaling_omega` argument to layers is deprecated. (\#423)
+* Input `weight_scaling_omega` argument in analog layers is deprecated. (\#423)
 
 ### Removed
 
 * The `_scaled` versions of the weight getter and setter methods are
-removed (\#423)
+  removed. (\#423)
 
 
 ## [0.6.0] - 2022/05/16
@@ -419,7 +569,12 @@ removed (\#423)
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.4.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/IBM/aihwkit/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/IBM/aihwkit/compare/v0.7.0..v0.7.1
+[0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0
+[0.6.0]: https://github.com/IBM/aihwkit/compare/v0.5.1..0.6.0
+[0.5.1]: https://github.com/IBM/aihwkit/compare/v0.4.0..v0.5.1
 [0.4.0]: https://github.com/IBM/aihwkit/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/IBM/aihwkit/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/IBM/aihwkit/compare/v0.2.0..v0.2.1

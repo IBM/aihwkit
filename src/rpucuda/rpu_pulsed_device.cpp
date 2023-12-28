@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -26,7 +26,6 @@ void PulsedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const
   if (this->_device_parameter_mode_manual) {
     ss << "\n\t Device parameters set manually\n";
   } else {
-    ss << "Pulsed device parameter:" << std::endl;
     ss << "\t granularity (calc.):\t" << this->calcWeightGranularity() << std::endl;
     if (this->construction_seed != 0) {
       ss << "\t construction_seed:\t" << this->construction_seed << std::endl;
@@ -34,40 +33,47 @@ void PulsedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const
     ss << "\t enforce_consistency:\t" << std::boolalpha << enforce_consistency << std::endl;
     ss << "\t perfect_bias:\t\t" << std::boolalpha << perfect_bias << std::endl;
 
-    ss << "\t dw_min:\t\t" << dw_min << "\t(dtod=" << dw_min_dtod << ", ctoc=" << dw_min_std << ")"
-       << std::endl;
+    ss << "\t dw_min:\t\t" << dw_min << "\t(dtod=" << dw_min_dtod;
+    if (dw_min_dtod_log_normal) {
+      ss << " [log-normal]";
+    }
+    ss << ", ctoc=" << dw_min_std << ")" << std::endl;
 
     ss << "\t up_down:\t\t" << up_down << "\t(dtod=" << up_down_dtod << ")" << std::endl;
 
     ss << "\t w min:\t\t\t" << w_min << "\t(dtod=" << w_min_dtod << ")" << std::endl;
     ss << "\t w max:\t\t\t" << w_max << "\t(dtod=" << w_max_dtod << ")" << std::endl;
 
-    ss << "\t resets to:\t\t" << reset << "\t(dtod=" << reset_dtod << ", ctoc=" << reset_std << ")"
-       << std::endl;
+    ss << "\t resets to:\t\t" << reset << "\t(dtod=" << reset_dtod << ", ctoc=" << this->reset_std
+       << ")" << std::endl;
 
     if (this->implementsWriteNoise() && write_noise_std > (T)0.0) {
       ss << "\t write noise std:\t" << write_noise_std << std::endl;
     }
 
-    if (this->lifetime > 0) {
+    if (this->lifetime > (T)0.0) {
       ss << "\t lifetime [decay]:\t" << this->lifetime << "\t(dtod=" << lifetime_dtod << ")"
          << std::endl;
     }
 
-    if (corrupt_devices_prob > 0) {
+    if (corrupt_devices_prob > (T)0.0) {
       ss << "\t corrupt_devices_prob:\t" << corrupt_devices_prob << std::endl;
       ss << "\t corrupt_devices_range:\t" << corrupt_devices_range << std::endl;
     }
 
-    if (this->drift.nu > 0) {
-      ss << "   Drift:" << std::endl;
+    if (adjust_bounds_with_up_down) {
+      ss << "\t adjusted bounds with up/down (dev=" << adjust_bounds_with_up_down_dev << ")"
+         << std::endl;
+    }
+
+    if (this->drift.nu > (T)0.0) {
       this->drift.printToStream(ss);
     }
 
-    if (this->diffusion > 0) {
-      ss << "   Diffusion:" << std::endl;
+    if (this->diffusion > (T)0.0) {
       ss << "\t diffusion:\t\t" << this->diffusion << "\t(dtod=" << diffusion_dtod << ")"
          << std::endl;
+      this->flicker.printToStream(ss);
     }
   }
 }
@@ -78,6 +84,10 @@ template class AbstractRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template struct PulsedRPUDeviceMetaParameter<double>;
 template class AbstractRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct PulsedRPUDeviceMetaParameter<half_t>;
+template class AbstractRPUDevice<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -93,12 +103,9 @@ template <typename T> void PulsedRPUDevice<T>::allocateContainers() {
 
   w_max_bound_ = Array_2D_Get<T>(d_sz, x_sz);
   w_min_bound_ = Array_2D_Get<T>(d_sz, x_sz);
-
   w_scale_up_ = Array_2D_Get<T>(d_sz, x_sz);
   w_scale_down_ = Array_2D_Get<T>(d_sz, x_sz);
-
   w_decay_scale_ = Array_2D_Get<T>(d_sz, x_sz);
-
   w_diffusion_rate_ = Array_2D_Get<T>(d_sz, x_sz);
   w_reset_bias_ = Array_2D_Get<T>(d_sz, x_sz);
   w_persistent_ = Array_2D_Get<T>(d_sz, x_sz);
@@ -251,8 +258,9 @@ template <typename T> void PulsedRPUDevice<T>::getDPNames(std::vector<std::strin
 }
 
 template <typename T>
-void PulsedRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+void PulsedRPUDevice<T>::getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) {
   // note that memory (x_sz*d_sz per ptr) assumed to be initialized from outside !!
+  UNUSED(weights);
 
   std::vector<std::string> names;
   getDPNames(names);
@@ -313,7 +321,7 @@ void PulsedRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
       w_persistent_[0][i] = data_ptrs[n++][i];
     }
 
-    dw_min += (fabs(w_scale_up_[0][i]) + fabs(w_scale_down_[0][i])) / (T)2.0;
+    dw_min += ((T)fabsf(w_scale_up_[0][i]) + (T)fabsf(w_scale_down_[0][i])) / (T)2.0;
   }
 
   if (!getPar().legacy_params && this->hasWDrifter()) {
@@ -322,7 +330,7 @@ void PulsedRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
 
   dw_min /= this->size_;
   // need dw_min for update management
-  if (fabs(dw_min - getPar().dw_min) / getPar().dw_min > 2 * getPar().dw_min_dtod) {
+  if ((T)fabsf(dw_min - getPar().dw_min) / getPar().dw_min > (T)2.0 * getPar().dw_min_dtod) {
     RPU_WARNING("DW min seems to have changed during hidden parameter set. Will update parameter "
                 "with estimated value.");
     getPar().dw_min = dw_min; //!! update par. Should be possible since unique
@@ -397,7 +405,7 @@ void PulsedRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
   if (!bias_no_decay) {
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
-      T s = 1 + alpha * (wd[i] - 1);
+      T s = (T)1.0 + alpha * (wd[i] - (T)1.0);
       w[i] = (w[i] - b[i]) * s + b[i];
       w[i] = MIN(w[i], max_bound[i]);
       w[i] = MAX(w[i], min_bound[i]);
@@ -406,7 +414,7 @@ void PulsedRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) 
     const int last_col = this->x_size_ - 1; // x-major (ie row major)
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
-      T s = (i % this->x_size_ == last_col) ? (T)1.0 : (1 + alpha * (wd[i] - 1));
+      T s = (i % this->x_size_ == last_col) ? (T)1.0 : ((T)1.0 + alpha * (wd[i] - (T)1.0));
       w[i] = (w[i] - b[i]) * s + b[i];
       w[i] = MIN(w[i], max_bound[i]);
       w[i] = MAX(w[i], min_bound[i]);
@@ -446,7 +454,7 @@ template <typename T> void PulsedRPUDevice<T>::clipWeights(T **weights, T clip) 
   T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
   T *max_bound = &(w_max_bound_[0][0]);
   T *min_bound = &(w_min_bound_[0][0]);
-  if (clip < 0.0) { // only apply bounds
+  if (clip < (T)0.0) { // only apply bounds
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
       w[i] = MIN(w[i], max_bound[i]);
@@ -464,11 +472,10 @@ template <typename T> void PulsedRPUDevice<T>::clipWeights(T **weights, T clip) 
 
 template <typename T>
 void PulsedRPUDevice<T>::resetCols(
-    T **weights, int start_col, int n_col, T reset_prob, RealWorldRNG<T> &rng) {
+    T **weights, int start_col, int n_col_in, T reset_prob, RealWorldRNG<T> &rng) {
 
-  if (getPar().usesPersistentWeight()) {
-    RPU_FATAL("ResetCols is not supported with write_noise_std>0!");
-  }
+  T *w = getPar().usesPersistentWeight() ? w_persistent_[0] : weights[0];
+  int n_col = (n_col_in >= 0) ? n_col_in : this->x_size_;
 
   T reset_std = getPar().reset_std;
   for (int j = 0; j < this->x_size_; ++j) {
@@ -477,15 +484,17 @@ void PulsedRPUDevice<T>::resetCols(
          ((j >= start_col) || (j < n_col - (this->x_size_ - start_col))))) {
       PRAGMA_SIMD
       for (int i = 0; i < this->d_size_; ++i) {
-        if (reset_prob == 1 || rng.sampleUniform() < reset_prob) {
-          weights[i][j] =
-              w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
-          weights[i][j] = MIN(weights[i][j], w_max_bound_[i][j]);
-          weights[i][j] = MAX(weights[i][j], w_min_bound_[i][j]);
+        if (reset_prob == (T)1.0 || rng.sampleUniform() < reset_prob) {
+          int k = i * this->x_size_ + j;
+          w[k] =
+              w_reset_bias_[i][j] + (reset_std > (T)0.0 ? reset_std * rng.sampleGauss() : (T)0.0);
+          w[k] = MIN(w[k], w_max_bound_[i][j]);
+          w[k] = MAX(w[k], w_min_bound_[i][j]);
         }
       }
     }
   }
+  applyUpdateWriteNoise(weights);
 }
 
 template <typename T>
@@ -502,7 +511,8 @@ void PulsedRPUDevice<T>::resetAtIndices(
     int i = index / this->x_size_;
     int j = index % this->x_size_;
 
-    weights[i][j] = w_reset_bias_[i][j] + (reset_std > 0 ? reset_std * rng.sampleGauss() : (T)0.0);
+    weights[i][j] =
+        w_reset_bias_[i][j] + (reset_std > (T)0.0 ? reset_std * rng.sampleGauss() : (T)0.0);
     weights[i][j] = MIN(weights[i][j], w_max_bound_[i][j]);
     weights[i][j] = MAX(weights[i][j], w_min_bound_[i][j]);
   }
@@ -549,11 +559,15 @@ template <typename T> bool PulsedRPUDevice<T>::onSetWeights(T **weights) {
   }
 
   if (getPar().usesPersistentWeight()) {
+
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; i++) {
       w_persistent_[0][i] = w[i];
+      weights[0][i] = w[i];
     }
-    applyUpdateWriteNoise(weights);
+    if (getPar().apply_write_noise_on_set) {
+      applyUpdateWriteNoise(weights);
+    }
     return true; // modified device thus true
   } else {
     return false; // whether device was changed
@@ -562,14 +576,18 @@ template <typename T> bool PulsedRPUDevice<T>::onSetWeights(T **weights) {
 
 template <typename T> void PulsedRPUDevice<T>::applyUpdateWriteNoise(T **weights) {
   // applies new noise to ALL weight values
-  T uw_std = getPar().getScaledWriteNoise();
+  auto &par = getPar();
 
-  if (uw_std <= 0) {
+  if (!par.implementsWriteNoise() || !par.usesPersistentWeight()) {
     return; // nothing to be done, weights assumed to already updated
   }
-
+  T uw_std = getPar().getScaledWriteNoise();
   for (int i = 0; i < this->size_; i++) {
-    weights[0][i] = w_persistent_[0][i] + uw_std * write_noise_rng_.sampleGauss();
+    if (uw_std > (T)0.0) {
+      weights[0][i] = w_persistent_[0][i] + uw_std * write_noise_rng_.sampleGauss();
+    } else {
+      weights[0][i] = w_persistent_[0][i];
+    }
   }
 }
 
@@ -586,40 +604,45 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
   T up_down = par.up_down;
   T up_down_std = par.up_down_dtod;
 
-  T up_bias = up_down > 0 ? (T)0.0 : up_down;
-  T down_bias = up_down > 0 ? -up_down : (T)0.0;
+  T up_bias = up_down > (T)0.0 ? (T)0.0 : up_down;
+  T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
 
   T gain_std = par.dw_min_dtod;
 
-  // par.w_min = -fabs(par.w_min);
-  // par.w_max = fabs(par.w_max);
+  // par.w_min = -(T)fabsf(par.w_min);
+  // par.w_max = (T)fabsf(par.w_max);
 
-  if ((par.w_min > 0) || (par.w_max < 0)) {
+  if ((par.w_min > (T)0.0) || (par.w_max < (T)0.0)) {
     RPU_FATAL("The closed interval [w_min,w_max] needs to contain 0.");
   }
 
   for (int j = 0; j < this->x_size_; ++j) {
     for (int i = 0; i < this->d_size_; ++i) {
 
-      w_max_bound_[i][j] = par.w_max * (1 + par.w_max_dtod * rng->sampleGauss());
-      w_min_bound_[i][j] = par.w_min * (1 + par.w_min_dtod * rng->sampleGauss());
+      w_max_bound_[i][j] = par.w_max * ((T)1.0 + par.w_max_dtod * rng->sampleGauss());
+      w_min_bound_[i][j] = par.w_min * ((T)1.0 + par.w_min_dtod * rng->sampleGauss());
+      T gain;
+      if (par.dw_min_dtod_log_normal) {
+        gain = expf(gain_std * rng->sampleGauss());
+      } else {
+        gain = ((T)1.0 + gain_std * rng->sampleGauss());
+      }
 
-      T gain = ((T)1.0 + gain_std * rng->sampleGauss());
       T r = up_down_std * rng->sampleGauss();
-
       w_scale_up_[i][j] = (up_bias + gain + r) * par.dw_min; // to reduce mults in updates
       w_scale_down_[i][j] = (down_bias + gain - r) * par.dw_min;
 
       // enforce consistency
       if (par.enforce_consistency) {
-        w_scale_up_[i][j] = fabs(w_scale_up_[i][j]);
-        w_scale_down_[i][j] = fabs(w_scale_down_[i][j]);
+        w_scale_up_[i][j] = (T)fabsf(w_scale_up_[i][j]);
+        w_scale_down_[i][j] = (T)fabsf(w_scale_down_[i][j]);
 
         if (w_min_bound_[i][j] > w_max_bound_[i][j]) {
           std::swap(w_min_bound_[i][j], w_max_bound_[i][j]);
         }
-        w_max_bound_[i][j] = fabs(w_max_bound_[i][j]);
-        w_min_bound_[i][j] = -fabs(w_min_bound_[i][j]);
+        w_max_bound_[i][j] = (T)fabsf(w_max_bound_[i][j]);
+        w_min_bound_[i][j] = -(T)fabsf(w_min_bound_[i][j]);
+
       } else {
         // "turn off" weight if max<min
         if (w_min_bound_[i][j] > w_max_bound_[i][j]) {
@@ -629,11 +652,45 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
         }
       }
 
+      // adjust with up_down
+      if (par.adjust_bounds_with_up_down) {
+        // if up_down_deviation is close to zero, up_downetric devices will be
+        // close to one sided. If large, up_down all device bounds will be
+        // symmetric around the 0
+
+        if (w_min_bound_[i][j] > w_max_bound_[i][j]) {
+          std::swap(w_min_bound_[i][j], w_max_bound_[i][j]);
+        }
+
+        T up_down_alpha = w_scale_up_[i][j] / (w_scale_up_[i][j] + w_scale_down_[i][j]);
+        T mm = w_max_bound_[i][j] - w_min_bound_[i][j];
+
+        T new_min_bound = (T)0.0;
+        T up_down_deviation = par.adjust_bounds_with_up_down_dev;
+        if (up_down_deviation > (T)0.0) {
+          new_min_bound =
+              -(((T)tanh((float)((up_down_alpha - (T)0.5) / up_down_deviation)) + (T)1.0) /
+                ((T)2.0)) *
+              mm;
+        } else {
+          if (up_down_alpha < (T)0.5)
+            new_min_bound = 0;
+          else if (up_down_alpha == (T)0.5)
+            new_min_bound = -mm / ((T)2.0);
+          else
+            new_min_bound = -mm;
+        }
+        w_min_bound_[i][j] = new_min_bound;
+        w_max_bound_[i][j] = new_min_bound + mm;
+      }
+
       // corrupt devices
       if (par.corrupt_devices_prob > rng->sampleUniform()) {
         // stuck somewhere in min_max
-        T mn = MAX(MIN(w_max_bound_[i][j], w_min_bound_[i][j]), -fabs(par.corrupt_devices_range));
-        T mx = MIN(MAX(w_max_bound_[i][j], w_min_bound_[i][j]), fabs(par.corrupt_devices_range));
+        T mn =
+            MAX(MIN(w_max_bound_[i][j], w_min_bound_[i][j]), -(T)fabsf(par.corrupt_devices_range));
+        T mx =
+            MIN(MAX(w_max_bound_[i][j], w_min_bound_[i][j]), (T)fabsf(par.corrupt_devices_range));
 
         T value = mn + (mx - mn) * rng->sampleUniform();
         w_max_bound_[i][j] = value;
@@ -646,14 +703,14 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
       if ((par.perfect_bias) && (j == this->x_size_ - 1)) {
         w_scale_up_[i][j] = par.dw_min;
         w_scale_down_[i][j] = par.dw_min;
-        w_min_bound_[i][j] = 100 * par.w_min; // essentially no bound
-        w_max_bound_[i][j] = 100 * par.w_max; // essentially no bound
+        w_min_bound_[i][j] = (T)100. * par.w_min; // essentially no bound
+        w_max_bound_[i][j] = (T)100. * par.w_max; // essentially no bound
       }
 
       //--------------------
       // diffusion
       {
-        T t = fabs(par.diffusion * (1 + par.diffusion_dtod * rng->sampleGauss()));
+        T t = (T)fabsf(par.diffusion * ((T)1.0 + par.diffusion_dtod * rng->sampleGauss()));
         w_diffusion_rate_[i][j] = t;
       }
 
@@ -667,8 +724,13 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
       //--------------------
       // decay
       {
-        T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * rng->sampleGauss());
-        w_decay_scale_[i][j] = t > 1.0 ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
+        if (par.lifetime > (T)0.0) {
+          T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * rng->sampleGauss());
+          w_decay_scale_[i][j] = (t > (T)1.0) ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
+        } else {
+          // meaning no decay
+          w_decay_scale_[i][j] = (T)1.0;
+        }
       }
     }
   }
@@ -710,6 +772,9 @@ template <typename T> void PulsedRPUDevice<T>::printDP(int x_count, int d_count)
 template class PulsedRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class PulsedRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class PulsedRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

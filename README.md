@@ -60,15 +60,26 @@ Along with the two main components, the toolkit includes other
 functionalities such as:
 
 * A library of device presets that are calibrated to real hardware data and
-  based on models in the literature, along with configuration that specifies a particular device and optimizer choice.
+  based on models in the literature, along with a configuration that specifies a particular device and optimizer choice.
 * A module for executing high-level use cases ("experiments"), such as neural
   network training with minimal code overhead.
 * A utility to automatically convert a downloaded model (e.g., pre-trained) to its equivalent Analog
   model by replacing all linear/conv layers to Analog layers (e.g., for convenient hardware-aware training).
-* Integration with the [AIHW Composer] platform, a no-code web experience, that allows executing
+* Integration with the [AIHW Composer] platform, a no-code web experience that allows executing
   experiments in the cloud.
 
-## Example
+## How to cite?
+
+In case you are using the _IBM Analog Hardware Acceleration Kit_ for
+your research, please cite the AICAS21 paper that describes the toolkit:
+
+> Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
+> Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
+> ["A flexible and fast PyTorch toolkit for simulating training and inference on
+> analog crossbar arrays"](https://ieeexplore.ieee.org/abstract/document/9458494) (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
+>
+
+## Usage
 
 ### Training example
 
@@ -104,6 +115,19 @@ You can find more examples in the [`examples/`] folder of the project, and
 more information about the library in the [documentation]. Please note that
 the examples have some additional dependencies - you can install them via
 `pip install -r requirements-examples.txt`.
+You can find interactive notebooks and tutorials in the [`notebooks/`] directory.
+
+### Further reading
+
+We also recommend to take a look at the tutorial article that
+describes the usage of the toolkit that can be found here:
+
+> Manuel Le Gallo, Corey Lammie, Julian Buechel, Fabio Carta, Omobayode Fagbohungbe,
+> Charles Mackin, Hsinyu Tsai, Vijay Narayanan, Abu Sebastian, Kaoutar El Maghraoui,
+> Malte J. Rasch.
+> ["Using the IBM Analog In-Memory Hardware Acceleration Kit for Neural Network Training and Inference"](https://doi.org/10.1063/5.0168089)
+> (APL Machine Learning Journal:1(4) 2023)
+>
 
 
 ## What is Analog AI?
@@ -117,7 +141,7 @@ Analog AI delivers radical performance improvements by combining compute and
 memory in a single device, eliminating the von Neumann bottleneck. By leveraging
 the physical properties of memory devices, computation happens at the same place
 where the data is stored. Such in-memory computing hardware increases the speed
-and energy-efficiency needed for next generation AI workloads.
+and energy efficiency needed for next-generation AI workloads.
 
 ## What is an in-memory computing chip?
 
@@ -140,17 +164,11 @@ arrays, creating an artificial neural network where all matrix multiplications
 are performed in-place in an analog manner. This structure allows to run deep
 learning models at reduced energy consumption.
 
-## How to cite?
+## Awards and Media Mentions
 
-In case you are using the _IBM Analog Hardware Acceleration Kit_ for
-your research, please cite the AICAS21 paper that describes the toolkit:
-
-> Malte J. Rasch, Diego Moreda, Tayfun Gokmen, Manuel Le Gallo, Fabio Carta,
-> Cindy Goldberg, Kaoutar El Maghraoui, Abu Sebastian, Vijay Narayanan.
-> "A flexible and fast PyTorch toolkit for simulating training and inference on
-> analog crossbar arrays" (2021 IEEE 3rd International Conference on Artificial Intelligence Circuits and Systems)
->
-> https://ieeexplore.ieee.org/abstract/document/9458494
+* IBM Research blog: [Open-sourcing analog AI simulation]: <https://research.ibm.com/blog/analog-ai-for-efficient-computing>
+* We are proud to share that the AIHWKIT and the companion cloud composer received the IEEE OPEN SOURCE SCIENCE [award] in 2023.
+  <img width="817" alt="IEEE Award" src="https://github.com/IBM/aihwkit/assets/7916630/bd3347fe-49c0-4aa2-ba6e-455b0e2a91ce">
 
 ## Installation
 
@@ -159,26 +177,46 @@ your research, please cite the AICAS21 paper that describes the toolkit:
 The preferred way to install this package is by using the
 [Python package index]:
 
-```bash
-$ pip install aihwkit
+```shell
+pip install aihwkit
 ```
 
-> :warning: Note that currently we provide CPU-only pre-built packages for
-> specific combinations of architectures and versions, and in some cases a
-> pre-built package might still not be available.
+### Conda-based Installation
+There is a conda package for aihwkit available in conda-forge.   It can be  installed in a conda environment running on a Linux or WSL in a Windows system.  
+
+* CPU
+
+  ```shell
+  conda install -c conda-forge aihwkit
+  ```
+
+* GPU 
+
+  ```shell
+  conda install -c conda-forge aihwkit-gpu
+  ```
 
 If you encounter any issues during download or want to compile the package
-for your environment, please refer to the [advanced installation] guide.
+for your environment, please take a look at the [advanced installation] guide.
 That section describes the additional libraries and tools required for
-compiling the sources, using a build system based on `cmake`.
+compiling the sources using a build system based on `cmake`.
+
+### Docker Installation 
+
+For GPU support, you can also build a docker container following the [CUDA Dockerfile instructions].
+You can then run a GPU enabled docker container using the follwing command from your peoject dircetory
+
+```shell
+docker run --rm -it --gpus all -v $(pwd):$HOME --name aihwkit aihwkit:cuda bash
+```
 
 ## Authors
 
-IBM Analog Hardware Acceleration Kit has been developed by IBM Research,
-with Malte Rasch, Tayfun Gokmen, Diego Moreda, Manuel Le Gallo-Bourdeau, and Kaoutar El Maghraoui
+IBM Research has developed IBM Analog Hardware Acceleration Kit,
+with Malte Rasch, Diego Moreda, Fabio Carta, Julian Büchel, Corey Lammie, Charles Mackin, Kim Tran, Tayfun Gokmen, Manuel Le Gallo-Bourdeau, and Kaoutar El Maghraoui
 as the initial core authors, along with many [contributors].
 
-You can contact us by opening a new issue in the repository, or alternatively
+You can contact us by opening a new issue in the repository or alternatively
 at the ``aihwkit@us.ibm.com`` email address.
 
 ## License
@@ -186,12 +224,11 @@ at the ``aihwkit@us.ibm.com`` email address.
 This project is licensed under [Apache License 2.0].
 
 [Apache License 2.0]: LICENSE.txt
-[`CUDA Toolkit`]: https://developer.nvidia.com/accelerated-computing-toolkit
-[`OpenBLAS`]: https://www.openblas.net/
 [Python package index]: https://pypi.org/project/aihwkit
 [`PyTorch`]: https://pytorch.org/
 
 [`examples/`]: examples/
+[`notebooks/`]: notebooks/
 [documentation]: https://aihwkit.readthedocs.io/
 [contributors]: https://github.com/IBM/aihwkit/graphs/contributors
 [advanced installation]: https://aihwkit.readthedocs.io/en/latest/advanced_install.html
@@ -203,3 +240,5 @@ This project is licensed under [Apache License 2.0].
 [Kirchhoff’s circuits laws]: https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws
 [online demo]: https://analog-ai-demo.mybluemix.net/
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
+[award]: https://conferences.computer.org/services/2023/awards/
+[CUDA Dockerfile instructions]: https://github.com/IBM/aihwkit/blob/master/docs/source/advanced_install.rst#cuda-enabled-docker-image

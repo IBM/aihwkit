@@ -1,7 +1,6 @@
-
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -26,8 +25,7 @@ from torch.nn import Sequential
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
 
 # Prepare the datasets (input and expected output).
 x_b = Tensor([[0.1, 0.2, 0.0, 0.0], [0.2, 0.4, 0.0, 0.0]])
@@ -37,7 +35,7 @@ y_b = Tensor([[0.3], [0.6]])
 model = Sequential(
     AnalogLinear(4, 2, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
     AnalogLinear(2, 2, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
-    AnalogLinear(2, 1, rpu_config=SingleRPUConfig(device=ConstantStepDevice()))
+    AnalogLinear(2, 1, rpu_config=SingleRPUConfig(device=ConstantStepDevice())),
 )
 
 # Define an analog-aware optimizer, preparing it for using the layers.
@@ -45,6 +43,8 @@ opt = AnalogSGD(model.parameters(), lr=0.5)
 opt.regroup_param_groups(model)
 
 for epoch in range(100):
+    opt.zero_grad()
+
     # Add the training Tensor to the model (input).
     pred = model(x_b)
     # Add the expected output Tensor.
@@ -53,4 +53,5 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
-    print('Loss error: {:.16f}'.format(loss))
+
+    print("Loss error: {:.16f}".format(loss))

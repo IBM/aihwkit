@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,7 +16,7 @@
 #include "utility_functions.h"
 
 #include <iostream>
-//#include <random>
+// #include <random>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -26,7 +26,7 @@ namespace RPU {
 /********************************************************************************
  * RPUCudaSimple<T>
  *********************************************************************************/
-template <typename T> void RPUCudaSimple<T>::initialize(CudaContext *c) {
+template <typename T> void RPUCudaSimple<T>::initialize(CudaContextPtr c) {
 
   context_ = c;
   dev_weights_ = RPU::make_unique<CudaArray<T>>(c, this->x_size_ * this->d_size_);
@@ -40,16 +40,15 @@ template <typename T> void RPUCudaSimple<T>::initialize(CudaContext *c) {
   dev_d_vector_ = RPU::make_unique<CudaArray<T>>(c, this->d_size_);
   dev_x_vector_ = RPU::make_unique<CudaArray<T>>(c, this->x_size_);
 
-  dev_x_matrix_bias_ = nullptr;
-  dev_x_matrix_bias_size_ = 0;
-
   dev_temp_tensor_ = nullptr;
+  // init later only if needed
+  dev_flicker_states_ = nullptr;
 
   context_->synchronize();
 }
 
 template <typename T>
-RPUCudaSimple<T>::RPUCudaSimple(CudaContext *c, int x_size, int d_size)
+RPUCudaSimple<T>::RPUCudaSimple(CudaContextPtr c, int x_size, int d_size)
     : RPUSimple<T>(x_size, d_size) {
   this->initialize(c);
 
@@ -60,9 +59,9 @@ RPUCudaSimple<T>::RPUCudaSimple(CudaContext *c, int x_size, int d_size)
 template <typename T>
 RPUCudaSimple<T>::RPUCudaSimple(cudaStream_t s, int x_size, int d_size)
     : RPUSimple<T>(x_size, d_size) {
-  shared_context_ = RPU::make_unique<CudaContext>(s);
+  internal_context_ = RPU::make_unique<CudaContext>(s);
 
-  this->initialize(&*shared_context_);
+  this->initialize(&*internal_context_);
 
   DEBUG_CALL(this->disp(););
   DEBUG_OUT("RPUCudaSimple constructed (on shared stream)");
@@ -71,10 +70,11 @@ RPUCudaSimple<T>::RPUCudaSimple(cudaStream_t s, int x_size, int d_size)
 template <typename T> void RPUCudaSimple<T>::initFrom(const RPUSimple<T> &rpu) {
   // this is private and called from constructors below
   this->setWeights(rpu.getWeightsPtr()[0]);
+  // TODO:  copy flicker states etc to cuda  here !!!??
 }
 
 template <typename T>
-RPUCudaSimple<T>::RPUCudaSimple(CudaContext *c, RPUSimple<T> &o) : RPUSimple<T>(o) {
+RPUCudaSimple<T>::RPUCudaSimple(CudaContextPtr c, RPUSimple<T> &o) : RPUSimple<T>(o) {
 
   this->initialize(c);
   initFrom(o);
@@ -86,8 +86,8 @@ template <typename T>
 RPUCudaSimple<T>::RPUCudaSimple(cudaStream_t s, RPUSimple<T> &o) : RPUSimple<T>(o) {
 
   // we are using the copy constructor of the base class RPUSimple
-  shared_context_ = RPU::make_unique<CudaContext>(s);
-  this->initialize(&*shared_context_);
+  internal_context_ = RPU::make_unique<CudaContext>(s);
+  this->initialize(&*internal_context_);
   initFrom(o);
 
   DEBUG_OUT("RPUCudaSimple constructed from RPUSimple on shared stream");
@@ -104,7 +104,7 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
   this->initialize(other.context_); // private
 
   // note: CUDA event/stream logic should be unique. It is only copied if already shared
-  shared_context_ = other.shared_context_;
+  internal_context_ = RPU::make_unique<CudaContext>(*other.internal_context_);
 
   if (other.dev_weights_) {
     dev_weights_->assign(*other.dev_weights_);
@@ -146,6 +146,12 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
 
   // do not care to copy the matrix/tensor/rnd buffers (will init automatically)
 
+  if (other.dev_flicker_states_ != nullptr) {
+    dev_flicker_states_ =
+        RPU::make_unique<CudaArray<uint64_t>>(other.context_, other.dev_flicker_states_->getSize());
+    dev_flicker_states_->assign(*other.dev_flicker_states_);
+  }
+
   context_->synchronizeContext();
 
   DEBUG_CALL(this->disp(););
@@ -154,9 +160,9 @@ RPUCudaSimple<T>::RPUCudaSimple(const RPUCudaSimple<T> &other) : RPUSimple<T>(ot
 
 // copy assignment
 template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(const RPUCudaSimple<T> &other) {
-
   RPUCudaSimple<T> tmp(other);
   swap(*this, tmp);
+  context_->synchronize(); // need sync because of tmp
   return *this;
 }
 
@@ -173,8 +179,7 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
   context_ = other.context_;
   other.context_ = nullptr;
 
-  shared_context_ = other.shared_context_;
-  other.shared_context_ = nullptr;
+  internal_context_ = std::move(other.internal_context_);
 
   dev_weights_ = std::move(other.dev_weights_);
   dev_weights_buffer_ = std::move(other.dev_weights_buffer_);
@@ -186,21 +191,100 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
   dev_x_vector_ = std::move(other.dev_x_vector_);
   dev_d_vector_ = std::move(other.dev_d_vector_);
   dev_x_vector_bias_ = std::move(dev_x_vector_bias_);
-  dev_x_matrix_bias_ = std::move(other.dev_x_matrix_bias_);
-
-  dev_x_matrix_bias_size_ = other.dev_x_matrix_bias_size_;
-  other.dev_x_matrix_bias_size_ = 0;
 
   dev_temp_tensor_ = std::move(other.dev_temp_tensor_);
 
   rnd_diffusion_context_ = std::move(other.rnd_diffusion_context_);
   dev_diffusion_nrnd_ = std::move(other.dev_diffusion_nrnd_);
+  dev_flicker_states_ = std::move(other.dev_flicker_states_);
 
   wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
   wremapper_cuda_ = std::move(other.wremapper_cuda_);
 
   shared_weights_if_ = other.shared_weights_if_;
   return *this;
+}
+
+template <typename T>
+void RPUCudaSimple<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  context_->synchronize();
+
+  RPUSimple<T>::dumpExtra(extra, prefix);
+  RPU::state_t state;
+
+  if (this->use_delayed_update_) {
+    RPU::insert(state, "dev_weights_buffer", dev_weights_buffer_);
+  }
+  RPU::insert(state, "dev_flicker_states", dev_flicker_states_);
+  RPU::insert(state, "dev_fb_weights", dev_fb_weights_);
+
+  if (dev_fb_weights_) {
+    fb_wmodifier_cuda_->dumpExtra(state, "fb_wmodifier_cuda");
+  }
+  if (wdrifter_cuda_) {
+    wdrifter_cuda_->dumpExtra(state, "wdrifter_cuda");
+  }
+  if (wremapper_cuda_) {
+    wremapper_cuda_->dumpExtra(state, "wremapper_cuda");
+  }
+  if (wclipper_cuda_) {
+    wclipper_cuda_->dumpExtra(state, "wclipper_cuda");
+  }
+  RPU::insertWithPrefix(extra, state, prefix);
+
+  // extern not handled
+  // tmp buffers not needed
+}
+
+template <typename T>
+void RPUCudaSimple<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+  using V = std::vector<T>;
+  context_->synchronize();
+
+  RPUSimple<T>::loadExtra(extra, prefix, strict);
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  if (this->use_delayed_update_) {
+    RPU::load(context_, state, "dev_weights_buffer", dev_weights_buffer_, strict);
+  }
+  if (state.count("dev_fb_weights")) {
+    RPU::load(context_, state, "dev_fb_weights", dev_fb_weights_, strict);
+  }
+  RPU::load(context_, state, "dev_flicker_states", dev_flicker_states_, strict);
+
+  if (dev_fb_weights_) {
+    if (!fb_wmodifier_cuda_) {
+      fb_wmodifier_cuda_ =
+          RPU::make_unique<WeightModifierCuda<T>>(context_, this->x_size_, this->d_size_);
+    }
+    fb_wmodifier_cuda_->loadExtra(state, "fb_wmodifier_cuda", strict);
+  }
+
+  if (state.count("wdrifter_cuda")) {
+    if (!wdrifter_cuda_) {
+      auto wd = WeightDrifter<T>(this->x_size_ * this->d_size_, this->getPar().drift);
+      wdrifter_cuda_ =
+          RPU::make_unique<WeightDrifterCuda<T>>(this->context_, wd, this->x_size_, this->d_size_);
+    }
+    wdrifter_cuda_->loadExtra(state, "wdrifter_cuda", strict);
+  }
+
+  if (state.count("wremapper_cuda")) {
+    if (!wremapper_cuda_) {
+      wremapper_cuda_ =
+          RPU::make_unique<WeightRemapperCuda<T>>(context_, this->x_size_, this->d_size_);
+    }
+    wremapper_cuda_->loadExtra(state, "wremapper_cuda", strict);
+  }
+
+  if (state.count("wclipper_cuda")) {
+    if (!wclipper_cuda_) {
+      wclipper_cuda_ =
+          RPU::make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+    }
+    wclipper_cuda_->loadExtra(state, "wclipper_cuda", strict);
+  }
 }
 
 /***************************************************************************************/
@@ -274,11 +358,8 @@ template <typename T> void RPUCudaSimple<T>::setWeightsUniformRandom(T min_value
 }
 
 template <typename T> void RPUCudaSimple<T>::printToStream(std::stringstream &ss) const {
-  if (sizeof(T) == 4) {
-    ss << "RPUCudaSimple<float>(" << this->d_size_ << "," << this->x_size_ << ")\n";
-  } else {
-    ss << "RPUCudaSimple<double>(" << this->d_size_ << "," << this->x_size_ << ")\n";
-  }
+  ss << "RPUCudaSimple<" << this->getDataTypeName() << ">(" << this->d_size_ << "," << this->x_size_
+     << ")" << std::endl;
 };
 
 /*********************************************************************************/
@@ -288,6 +369,7 @@ template <typename T> T *RPUCudaSimple<T>::getWeightsBufferCuda() {
   if (dev_weights_buffer_ == nullptr) {
     dev_weights_buffer_ =
         RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * this->d_size_);
+    this->context_->synchronize();
   }
   return dev_weights_buffer_->getData();
 };
@@ -305,14 +387,11 @@ template <typename T> void RPUCudaSimple<T>::copyWeightsToBuffer() {
 }
 
 template <typename T> T *RPUCudaSimple<T>::getMatrixBiasBuffer(int m_batch) {
-
-  if (dev_x_matrix_bias_ == nullptr || m_batch * this->x_size_ > dev_x_matrix_bias_->getSize()) {
-    DEBUG_OUT("Get new buffer size " << m_batch);
-    dev_x_matrix_bias_ = nullptr;
-    dev_x_matrix_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, this->x_size_ * m_batch);
-  }
-  dev_x_matrix_bias_size_ = m_batch; // allow shrinking
-  return dev_x_matrix_bias_->getData();
+  T *bias_buffer = context_->template getSharedBuffer<T>(RPU_BUFFER_BIAS, m_batch * this->x_size_);
+  return bias_buffer;
+}
+template <typename T> void RPUCudaSimple<T>::releaseMatrixBiasBuffer() {
+  context_->template releaseSharedBuffer<T>(RPU_BUFFER_BIAS);
 }
 
 template <typename T>
@@ -327,13 +406,9 @@ T *RPUCudaSimple<T>::copyToMatrixBiasBuffer(
 
 template <typename T>
 void RPUCudaSimple<T>::copyFromMatrixBiasBuffer(
-    T *X_input_without_bias, int m_batch, bool x_trans) {
-  if ((m_batch < dev_x_matrix_bias_size_) || (dev_x_matrix_bias_ == nullptr)) {
-    RPU_FATAL("Buffer size mismatch. This should never happen!")
-  }
+    T *X_input_without_bias, int m_batch, bool x_trans, T *bias_buffer) {
   RPU::math::copyWithoutBias<T>(
-      this->context_, X_input_without_bias, dev_x_matrix_bias_->getData(), this->x_size_, m_batch,
-      x_trans);
+      this->context_, X_input_without_bias, bias_buffer, this->x_size_, m_batch, x_trans);
 };
 
 template <typename T>
@@ -352,16 +427,18 @@ void RPUCudaSimple<T>::copyFromVectorBiasBuffer(T *x_output_without_bias, int x_
 
 /*********************************************************************************/
 template <typename T>
-void RPUCudaSimple<T>::getTensorBuffer(T **x_tensor, T **d_tensor, int m_batch, int dim3) {
+void RPUCudaSimple<T>::getTensorBuffer(T **x_tensor_ptr, T **d_tensor_ptr, int m_batch, int dim3) {
   int x_size = this->getXSize();
   int d_size = this->getDSize();
 
   int n = (x_size + d_size) * dim3 * m_batch;
   if ((dev_temp_tensor_ == nullptr) || (dev_temp_tensor_->getSize() < n)) {
+    this->context_->synchronize();
     dev_temp_tensor_ = RPU::make_unique<CudaArray<T>>(context_, n);
+    this->context_->synchronize();
   }
-  *x_tensor = dev_temp_tensor_->getData();
-  *d_tensor = *x_tensor + (x_size)*dim3 * m_batch;
+  *x_tensor_ptr = dev_temp_tensor_->getData();
+  *d_tensor_ptr = *x_tensor_ptr + (x_size)*dim3 * m_batch;
 }
 
 template <typename T>
@@ -597,20 +674,20 @@ void RPUCudaSimple<T>::updateVector(const T *x_input, const T *d_input, int x_in
 /*********************************************************************************/
 template <typename T> void RPUCudaSimple<T>::decayWeights(T alpha, bool bias_no_decay) {
   T lifetime = this->getPar().lifetime;
-  T decay_rate = (lifetime > 1) ? (1.0 / lifetime) : 0.0;
-  T decay_scale = 1.0 - alpha * decay_rate;
+  T decay_rate = (lifetime > (T)1.0) ? ((T)1.0 / lifetime) : (T)0.0;
+  T decay_scale = (T)1.0 - alpha * decay_rate;
 
-  if (decay_scale > 0.0 && decay_scale < 1.0) {
+  if (decay_scale > (T)0.0 && decay_scale < (T)1.0) {
     int size = this->x_size_ * this->d_size_;
     // we have d_size major, ie col-major. Thus bias is just at the end
     RPU::math::scal<T>(
         context_, bias_no_decay ? MAX(size - this->d_size_, 0) : size, decay_scale,
-        dev_weights_->getData(), 1);
+        dev_weights_->getData());
   }
 }
 
 template <typename T> void RPUCudaSimple<T>::decayWeights(bool bias_no_decay) {
-  RPUCudaSimple<T>::decayWeights(1.0, bias_no_decay);
+  RPUCudaSimple<T>::decayWeights((T)1.0, bias_no_decay);
 }
 
 /*********************************************************************************/
@@ -629,7 +706,7 @@ template <typename T> void RPUCudaSimple<T>::driftWeights(T time_since_last_call
 /*********************************************************************************/
 template <typename T> void RPUCudaSimple<T>::clipWeights(T clip) {
 
-  if (clip >= 0) {
+  if (clip >= (T)0.0) {
     RPU::math::aclip<T>(context_, dev_weights_->getData(), dev_weights_->getSize(), clip);
   }
 }
@@ -638,7 +715,7 @@ template <typename T> void RPUCudaSimple<T>::clipWeights(const WeightClipParamet
 
   if (!wclipper_cuda_) {
     wclipper_cuda_ =
-        make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+        RPU::make_unique<WeightClipperCuda<T>>(this->context_, this->x_size_, this->d_size_);
   }
 
   wclipper_cuda_->apply(dev_weights_->getData(), wclpar);
@@ -649,7 +726,7 @@ template <typename T> void RPUCudaSimple<T>::diffuseWeights() {
 
   T diffusion = this->getPar().diffusion;
 
-  if (diffusion <= 0.0) {
+  if (diffusion <= (T)0.0) {
     return;
   }
 
@@ -675,6 +752,36 @@ template <typename T> void RPUCudaSimple<T>::diffuseWeights() {
       dev_diffusion_nrnd_->getData(), dev_diffusion_nrnd_->getSize());
 }
 
+/*********************************************************************************/
+template <typename T> void RPUCudaSimple<T>::diffuseWeightsPink() {
+
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  const auto &flicker = this->getPar().flicker;
+  T diffusion = this->getPar().diffusion;
+
+  if (diffusion <= (T)0.0) {
+    return;
+  }
+
+  int size = dev_weights_->getSize();
+
+  if (dev_flicker_states_ == nullptr) {
+    uint64_t *init_flicker_states = RPUSimple<T>::initFlickerStates();
+
+    dev_flicker_states_ =
+        RPU::make_unique<CudaArray<uint64_t>>(context_, size, init_flicker_states);
+    context_->synchronize();
+  }
+
+  const auto &par = this->getPar();
+
+  RPU::math::elemaddpinknoise<T>(
+      context_, dev_weights_->getData(), flicker.wreset ? getWeightsBufferCuda() : nullptr, size,
+      diffusion, flicker.n, flicker.r, flicker.q, flicker.h, flicker.wreset_tol,
+      dev_flicker_states_->getData(), context_->getRandomStates(size));
+}
+
 /***********************************************************************/
 
 template <typename T> void RPUCudaSimple<T>::setDeltaWeights(T *dw_extern) {
@@ -689,7 +796,8 @@ template <typename T> T *RPUCudaSimple<T>::getFBWeightsCuda(bool is_test) const 
   return use_fb ? dev_fb_weights_->getData() : dev_weights_->getData();
 }
 
-template <typename T> void RPUCudaSimple<T>::modifyFBWeights(const WeightModifierParameter &wmpar) {
+template <typename T>
+void RPUCudaSimple<T>::modifyFBWeights(const WeightModifierParameter<T> &wmpar) {
 
   ENFORCE_NO_DELAYED_UPDATE; // will get confused with the buffer
 
@@ -719,14 +827,41 @@ void RPUCudaSimple<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scale
       dev_weights_->getData(), this->getAlphaLearningRate(), wrmpar, scales, biases);
 }
 
+template <typename T>
+bool RPUCudaSimple<T>::swaWeights(
+    const WeightRemapParameter &wrmpar, T *hwa_weights, uint64_t iter, T *scales, T *biases) {
+
+  ENFORCE_NO_DELAYED_UPDATE; // will get confused with the buffer
+
+  if (wremapper_cuda_ == nullptr) {
+    wremapper_cuda_ =
+        RPU::make_unique<WeightRemapperCuda<T>>(context_, this->x_size_, this->d_size_);
+  }
+
+  // swa weights
+  return wremapper_cuda_->applySWA(
+      hwa_weights, dev_weights_->getData(), iter, wrmpar, this->getAlphaLearningRate(), scales,
+      biases);
+}
+
 /*********************************************************************************/
 template <typename T> void RPUCudaSimple<T>::printWeights(int x_count, int d_count) {
   this->copyWeightsToHost(this->weights_[0]);
   RPUSimple<T>::printWeights(x_count, d_count);
 }
 
+/*********************************************************************************/
+template <typename T> void RPUCudaSimple<T>::finishAllCalculations() {
+  this->finishUpdateCalculations();
+  this->context_->synchronizeContext();
+}
+
 template class RPUCudaSimple<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUCudaSimple<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class RPUCudaSimple<half_t>;
+#endif
+
 } // namespace RPU

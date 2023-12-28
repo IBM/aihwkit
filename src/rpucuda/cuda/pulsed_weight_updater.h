@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,7 +22,7 @@ namespace RPU {
 template <typename T> class PulsedWeightUpdater {
 
 public:
-  explicit PulsedWeightUpdater(CudaContext *c, int x_size, int d_size);
+  explicit PulsedWeightUpdater(CudaContextPtr c, int x_size, int d_size);
 
   template <typename XInputIteratorT, typename DInputIteratorT>
   void update(
@@ -68,11 +68,9 @@ public:
       const bool x_trans,
       const bool d_trans,
       const T beta = (T)1.0);
-
-  void setSharedBuffer(
-      int m_batch,
-      std::shared_ptr<CudaArray<T>> x_buffer = nullptr,
-      std::shared_ptr<CudaArray<T>> d_buffer = nullptr);
+  void setVerbosityLevel(int level) { verbose_ = level; };
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
 private:
   // void setUpdateType(PulsedUpdateType update_type);
@@ -82,7 +80,7 @@ private:
       const PulsedUpdateMetaParameter<T> &up);
 
   template <typename InputIteratorT>
-  const T *copyIterator2Buffer(InputIteratorT vec, std::shared_ptr<CudaArray<T>> &buffer, int size);
+  const T *copyIterator2Buffer(InputIteratorT vec, T *buffer, int size);
 
   template <typename XInputIteratorT, typename DInputIteratorT>
   void executeUpdate(
@@ -111,21 +109,17 @@ private:
       const bool x_trans_in,
       const bool d_trans_in);
 
-  void checkBuffers(int m_batch);
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
   int x_size_ = 0;
   int d_size_ = 0;
   int update_count_ = 0;
   bool is_async_update_ = false;
+  int verbose_ = 0;
   DeviceUpdateType update_type_ = DeviceUpdateType::Undefined;
-  int n_states = 0;
   pwukp_t<T> kernel_pars_;
   pwukpvec_t<T> valid_kernels_;
   std::unique_ptr<BitLineMaker<T>> blm_ = nullptr;
   std::unique_ptr<CudaContext> up_context_ = nullptr;
-
-  std::shared_ptr<CudaArray<T>> dev_fpx_buffer_ = nullptr;
-  std::shared_ptr<CudaArray<T>> dev_fpd_buffer_ = nullptr;
 };
 
 } // namespace RPU

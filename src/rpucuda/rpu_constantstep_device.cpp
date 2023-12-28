@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -13,7 +13,7 @@
 #include "rpu_constantstep_device.h"
 #include "utility_functions.h"
 #include <iostream>
-//#include <random>
+// #include <random>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -41,7 +41,7 @@ void ConstantStepRPUDevice<T>::doSparseUpdate(
   T *max_bound = this->w_max_bound_[i];
   T dw_min_std = getPar().dw_min_std;
 
-  if (dw_min_std > 0) {
+  if (dw_min_std > (T)0.0) {
     PULSED_UPDATE_W_LOOP(
         T dw = 0; if (sign > 0) {
           dw = ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_down[j];
@@ -71,7 +71,7 @@ void ConstantStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG
   T dw_min_std = getPar().dw_min_std;
 
   PULSED_UPDATE_W_LOOP_DENSE(
-      T dw = dw_min_std > 0 ? dw_min_std * rng->sampleGauss() : (T)0.0; if (sign > 0) {
+      T dw = dw_min_std > (T)0.0 ? dw_min_std * rng->sampleGauss() : (T)0.0; if (sign > 0) {
         dw = ((T)1.0 + dw) * scale_down[j];
         w[j] -= dw;
       } else {
@@ -86,6 +86,9 @@ void ConstantStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG
 template class ConstantStepRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class ConstantStepRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class ConstantStepRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,7 +17,7 @@ a simple temporal sequence. The experiment plots training perplexity,
 inference results on the test dataset using analog hardware, and inference
 results over time using analog hardware and drift compensation.
 """
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, arguments-differ, redefined-builtin
 
 import os
 
@@ -32,9 +32,12 @@ from torch import nn
 from aihwkit.nn import AnalogRNN
 from aihwkit.nn import AnalogGRUCell  # or one of AnalogGRUCell, AnalogVanillaRNNCell
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    WeightNoiseType, WeightClipType, WeightModifierType)
+from aihwkit.simulator.configs import (
+    InferenceRPUConfig,
+    WeightNoiseType,
+    WeightClipType,
+    WeightModifierType,
+)
 from aihwkit.simulator.presets import GokmenVlasovPreset
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn import AnalogLinear, AnalogSequential
@@ -56,7 +59,7 @@ RNN_CELL = AnalogGRUCell  # type of RNN cell
 WITH_EMBEDDING = True  # RNN with embedding
 WITH_BIDIR = False
 USE_ANALOG_TRAINING = False  # or hardware-aware training
-DEVICE = torch.device('cuda') if cuda.is_compiled() else torch.device('cpu')
+DEVICE = torch.device("cuda") if cuda.is_compiled() else torch.device("cpu")
 
 
 if USE_ANALOG_TRAINING:
@@ -66,7 +69,7 @@ if USE_ANALOG_TRAINING:
 else:
     # Define an RPU configuration using inference/hardware-aware training tile
     rpu_config = InferenceRPUConfig()
-    rpu_config.forward.out_res = -1.  # Turn off (output) ADC discretization.
+    rpu_config.forward.out_res = -1.0  # Turn off (output) ADC discretization.
     rpu_config.forward.w_noise_type = WeightNoiseType.ADDITIVE_CONSTANT
     rpu_config.forward.w_noise = 0.02  # Short-term w-noise.
 
@@ -87,19 +90,26 @@ else:
 # Various RNN Network definitions
 class AnalogBidirRNNNetwork(AnalogSequential):
     """Analog Bidirectional RNN Network definition using AnalogLinear for
-       embedding and decoder."""
+    embedding and decoder."""
 
     def __init__(self):
         super().__init__()
         self.dropout = nn.Dropout(DROPOUT_RATIO)
         self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
-        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
-                             dropout=DROPOUT_RATIO, bias=True,
-                             rpu_config=rpu_config)
-        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
+        self.rnn = AnalogRNN(
+            RNN_CELL,
+            EMBED_SIZE,
+            HIDDEN_SIZE,
+            bidir=True,
+            num_layers=1,
+            dropout=DROPOUT_RATIO,
+            bias=True,
+            rpu_config=rpu_config,
+        )
+        self.decoder = AnalogLinear(2 * HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        embed = self.dropout(self.embedding(x_in))
+    def forward(self, input, in_states=None):
+        embed = self.dropout(self.embedding(input))
         out, out_states = self.rnn(embed, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
@@ -107,39 +117,52 @@ class AnalogBidirRNNNetwork(AnalogSequential):
 
 class AnalogBidirRNNNetwork_noEmbedding(AnalogSequential):
     """Analog Bidirectional RNN Network definition without embedding layer
-       and using AnalogLinear for decoder."""
+    and using AnalogLinear for decoder."""
 
     def __init__(self):
         super().__init__()
         self.dropout = nn.Dropout(DROPOUT_RATIO)
-        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=True, num_layers=1,
-                             dropout=DROPOUT_RATIO, bias=True,
-                             rpu_config=rpu_config)
-        self.decoder = AnalogLinear(2*HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
-                                    rpu_config=rpu_config)
+        self.rnn = AnalogRNN(
+            RNN_CELL,
+            INPUT_SIZE,
+            HIDDEN_SIZE,
+            bidir=True,
+            num_layers=1,
+            dropout=DROPOUT_RATIO,
+            bias=True,
+            rpu_config=rpu_config,
+        )
+        self.decoder = AnalogLinear(2 * HIDDEN_SIZE, OUTPUT_SIZE, bias=True, rpu_config=rpu_config)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        """ Forward pass """
-        out, out_states = self.rnn(x_in, in_states)
+    def forward(self, input, in_states=None):
+        """Forward pass"""
+        out, out_states = self.rnn(input, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
 
 
 class AnalogRNNNetwork(AnalogSequential):
     """Analog RNN Network definition using AnalogLinear for embedding and
-       decoder."""
+    decoder."""
 
     def __init__(self):
         super().__init__()
         self.dropout = nn.Dropout(DROPOUT_RATIO)
         self.embedding = AnalogLinear(INPUT_SIZE, EMBED_SIZE, rpu_config=rpu_config)
-        self.rnn = AnalogRNN(RNN_CELL, EMBED_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
-                             dropout=DROPOUT_RATIO, bias=True,
-                             rpu_config=rpu_config)
+        self.rnn = AnalogRNN(
+            RNN_CELL,
+            EMBED_SIZE,
+            HIDDEN_SIZE,
+            bidir=False,
+            num_layers=1,
+            dropout=DROPOUT_RATIO,
+            bias=True,
+            rpu_config=rpu_config,
+        )
         self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        embed = self.dropout(self.embedding(x_in))
+    def forward(self, input, in_states=None):
+        embed = self.dropout(self.embedding(input))
         out, out_states = self.rnn(embed, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
@@ -151,38 +174,47 @@ class AnalogRNNNetwork_noEmbedding(AnalogSequential):
     def __init__(self):
         super().__init__()
         self.dropout = nn.Dropout(DROPOUT_RATIO)
-        self.rnn = AnalogRNN(RNN_CELL, INPUT_SIZE, HIDDEN_SIZE, bidir=False, num_layers=1,
-                             dropout=DROPOUT_RATIO, bias=True,
-                             rpu_config=rpu_config)
-        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True,
-                                    rpu_config=rpu_config)
+        self.rnn = AnalogRNN(
+            RNN_CELL,
+            INPUT_SIZE,
+            HIDDEN_SIZE,
+            bidir=False,
+            num_layers=1,
+            dropout=DROPOUT_RATIO,
+            bias=True,
+            rpu_config=rpu_config,
+        )
+        self.decoder = AnalogLinear(HIDDEN_SIZE, OUTPUT_SIZE, bias=True, rpu_config=rpu_config)
 
-    def forward(self, x_in, in_states=None):  # pylint: disable=arguments-differ
-        """ Forward pass """
-        out, out_states = self.rnn(x_in, in_states)
+    def forward(self, input, in_states=None):
+        """Forward pass"""
+        out, out_states = self.rnn(input, in_states)
         out = self.dropout(self.decoder(out))
         return [out, out_states]
 
 
 # Path to store results
-RESULTS = os.path.join(os.getcwd(), 'results', 'RNN')
+RESULTS = os.path.join(os.getcwd(), "results", "RNN")
 os.makedirs(RESULTS, exist_ok=True)
 
 # Make dataset
-x = torch.linspace(0, 8*np.pi, SEQ_LEN, device=DEVICE)
-y = torch.sin(x)*torch.cos(0.5*x) + 0.5
-y_in_1d = y[0:SEQ_LEN-1]
+x = torch.linspace(0, 8 * np.pi, SEQ_LEN, device=DEVICE)
+y = torch.sin(x) * torch.cos(0.5 * x) + 0.5
+y_in_1d = y[0 : SEQ_LEN - 1]
 y_out_1d = y[1:SEQ_LEN]
 
 y_in_2d, y_out_2d = [], []
 for i in range(BATCH_SIZE):
-    y_in_2d.append(torch.roll(y_in_1d, shifts=100*i, dims=0)
-                   + NOISE * torch.rand(y_in_1d.shape, device=DEVICE))
-    y_out_2d.append(torch.roll(y_out_1d, shifts=100*i, dims=0)
-                    + NOISE * torch.rand(y_out_1d.shape, device=DEVICE))
+    y_in_2d.append(
+        torch.roll(y_in_1d, shifts=100 * i, dims=0)
+        + NOISE * torch.rand(y_in_1d.shape, device=DEVICE)
+    )
+    y_out_2d.append(
+        torch.roll(y_out_1d, shifts=100 * i, dims=0)
+        + NOISE * torch.rand(y_out_1d.shape, device=DEVICE)
+    )
 y_in = torch.stack(y_in_2d, dim=0).transpose(0, 1).unsqueeze(2)
 y_out = torch.stack(y_out_2d, dim=0).transpose(0, 1).unsqueeze(2)
-
 
 if WITH_EMBEDDING:
     if WITH_BIDIR:
@@ -195,7 +227,7 @@ else:
     else:
         model = AnalogRNNNetwork_noEmbedding()
 
-model = model.to(DEVICE)
+model.to(DEVICE)
 optimizer = AnalogSGD(model.parameters(), lr=LEARNING_RATE)
 optimizer.regroup_param_groups(model)
 criterion = nn.MSELoss()
@@ -208,7 +240,7 @@ for i in range(EPOCHS):
     pred, states = model(y_in, None)
 
     loss = criterion(pred, y_out)
-    print('Epoch = %d: Train Perplexity = %f' % (i, np.exp(loss.detach().cpu().numpy())))
+    print("Epoch = %d: Train Perplexity = %f" % (i, np.exp(loss.detach().cpu().numpy())))
 
     loss.backward()
     optimizer.step()
@@ -217,9 +249,9 @@ for i in range(EPOCHS):
 
 plt.ion()
 plt.figure()
-plt.plot(np.exp(np.asarray(losses)), '-b')
-plt.xlabel('# Epochs')
-plt.ylabel('Perplexity [1]')
+plt.plot(np.exp(np.asarray(losses)), "-b")
+plt.xlabel("# Epochs")
+plt.ylabel("Perplexity [1]")
 plt.ylim([1.0, 1.4])
 
 # Test.
@@ -229,22 +261,22 @@ loss = criterion(pred, y_out)
 print("Test Perplexity = %f" % (np.exp(loss.detach().cpu().numpy())))
 
 plt.figure()
-plt.plot(y_out.detach().cpu().numpy()[:, 0, 0], '-b')
-plt.plot(pred.detach().cpu().numpy()[:, 0, 0], '-g')
-plt.xlabel('x')
-plt.ylabel('y')
+plt.plot(y_out.detach().cpu().numpy()[:, 0, 0], "-b")
+plt.plot(pred.detach().cpu().numpy()[:, 0, 0], "-g")
+plt.xlabel("x")
+plt.ylabel("y")
 plt.plot()
-plt.legend(['truth', 'analog prediction'])
+plt.legend(["truth", "analog prediction"])
 
 # Drift test.
 plt.figure()
-plt.plot(y_out.detach().cpu().numpy()[:, 0, 0], '-b', label='truth')
-for t_inference in [0., 1., 20., 1000., 1e5]:
+plt.plot(y_out.detach().cpu().numpy()[:, 0, 0], "-b", label="truth")
+for t_inference in [0.0, 1.0, 20.0, 1000.0, 1e5]:
     model.drift_analog_weights(t_inference)
     pred_drift, states = model(y_in)
-    plt.plot(pred_drift.detach().cpu().numpy()[:, 0, 0], label='t = ' + str(t_inference) + ' s')
-plt.xlabel('x')
-plt.ylabel('y')
+    plt.plot(pred_drift.detach().cpu().numpy()[:, 0, 0], label="t = " + str(t_inference) + " s")
+plt.xlabel("x")
+plt.ylabel("y")
 plt.legend()
 
 plt.show()

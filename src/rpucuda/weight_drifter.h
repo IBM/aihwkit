@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -85,12 +85,12 @@ template <typename T> struct DriftParameter {
       ss << "\t nu_k / log G0:\t" << nu_k << " / " << logG0 << std::endl;
     }
 
-    if (fabs(reset_tol) > (T)1e-6) {
+    if (fabsf(reset_tol) > (float)1e-6) {
       ss << "\t reset_tol:\t\t" << reset_tol << std::endl;
     }
   }
 
-  inline bool usesRandom() { return (w_read_std > 0 || nu_std > 0); };
+  inline bool usesRandom() { return (w_read_std > (T)0.0 || nu_std > (T)0.0); };
 };
 
 /***********************************************************************************/
@@ -128,6 +128,9 @@ public:
 
   inline const DriftParameter<T> &getPar() const { return par_; };
   inline int getSize() const { return size_; };
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
 protected:
   int size_ = 0;

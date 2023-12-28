@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -32,22 +32,19 @@ def parametrize_over_tiles(tiles: List) -> Callable:
 
     def object_to_dict(obj):
         """Convert the public members of an object to a dictionary."""
-        ret = {key: value for key, value in vars(obj).items()
-               if not key.startswith('_')}
-        ret['parameter'] = obj.__name__
+        ret = {key: value for key, value in vars(obj).items() if not key.startswith("_")}
+        ret["parameter"] = obj.__name__
 
         return ret
 
     def class_name(cls, _, params_dict):
         """Return a user-friendly name for a parametrized test."""
-        return '{}_{}'.format(cls.__name__, params_dict['parameter'])
+        return "{}_{}".format(cls.__name__, params_dict["parameter"])
 
-    return parameterized_class([object_to_dict(tile) for tile in tiles],
-                               class_name_func=class_name)
+    return parameterized_class([object_to_dict(tile) for tile in tiles], class_name_func=class_name)
 
 
-def parametrize_over_layers(layers: List, tiles: List, biases: List) \
-        -> Callable:
+def parametrize_over_layers(layers: List, tiles: List, biases: List) -> Callable:
     """Parametrize a TestCase over different kind of layers.
 
     The ``TestCase`` will be repeated for each combination of `layer`, `tile`
@@ -69,29 +66,28 @@ def parametrize_over_layers(layers: List, tiles: List, biases: List) \
 
     def object_to_dict(layer, tile, bias):
         """Convert the public members of an object to a dictionary."""
-        ret = {key: value for key, value in vars(layer).items()
-               if not key.startswith('_')}
-        ret['parameter'] = '{}_{}_{}Bias'.format(layer.__name__,
-                                                 tile.__name__,
-                                                 'No' if bias is None else bias.capitalize())
-        digital_bias = bias == 'digital'
-        analog_bias = bias == 'analog'
-        ret['get_rpu_config'] = partial(get_rpu_config, tile=tile, digital_bias=digital_bias)
-        ret['bias'] = bias is not None
-        ret['digital_bias'] = digital_bias
-        ret['analog_bias'] = analog_bias
-        ret['tile_class'] = tile
+        ret = {key: value for key, value in vars(layer).items() if not key.startswith("_")}
+        ret["parameter"] = "{}_{}_{}Bias".format(
+            layer.__name__, tile.__name__, "No" if bias is None else bias.capitalize()
+        )
+        digital_bias = bias == "digital"
+        analog_bias = bias == "analog"
+        ret["get_rpu_config"] = partial(get_rpu_config, tile=tile, digital_bias=digital_bias)
+        ret["bias"] = bias is not None
+        ret["digital_bias"] = digital_bias
+        ret["analog_bias"] = analog_bias
+        ret["tile_class"] = tile
 
         return ret
 
     def class_name(cls, _, params_dict):
         """Return a user-friendly name for a parametrized test."""
-        return '{}_{}'.format(cls.__name__, params_dict['parameter'])
+        return "{}_{}".format(cls.__name__, params_dict["parameter"])
 
     return parameterized_class(
-        [object_to_dict(layer, tile, bias) for
-         layer, tile, bias in product(layers, tiles, biases)],
-        class_name_func=class_name)
+        [object_to_dict(layer, tile, bias) for layer, tile, bias in product(layers, tiles, biases)],
+        class_name_func=class_name,
+    )
 
 
 def parametrize_over_presets(presets: List) -> Callable:
@@ -109,11 +105,11 @@ def parametrize_over_presets(presets: List) -> Callable:
 
     def class_name(cls, _, params_dict):
         """Return a user-friendly name for a parametrized test."""
-        return '{}_{}'.format(cls.__name__, params_dict['preset_cls'].__name__)
+        return "{}_{}".format(cls.__name__, params_dict["preset_cls"].__name__)
 
     return parameterized_class(
-        [{'preset_cls': preset} for preset in presets],
-        class_name_func=class_name)
+        [{"preset_cls": preset} for preset in presets], class_name_func=class_name
+    )
 
 
 def parametrize_over_experiments(models: List) -> Callable:
@@ -129,15 +125,15 @@ def parametrize_over_experiments(models: List) -> Callable:
 
     def object_to_dict(obj):
         """Convert the public members of an object to a dictionary."""
-        ret = {key: value for key, value in vars(obj).items()
-               if not key.startswith('_')}
-        ret['parameter'] = obj.__name__
+        ret = {key: value for key, value in vars(obj).items() if not key.startswith("_")}
+        ret["parameter"] = obj.__name__
 
         return ret
 
     def class_name(cls, _, params_dict):
         """Return a user-friendly name for a parametrized test."""
-        return '{}_{}'.format(cls.__name__, params_dict['parameter'])
+        return "{}_{}".format(cls.__name__, params_dict["parameter"])
 
-    return parameterized_class([object_to_dict(model) for model in models],
-                               class_name_func=class_name)
+    return parameterized_class(
+        [object_to_dict(model) for model in models], class_name_func=class_name
+    )

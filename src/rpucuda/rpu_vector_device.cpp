@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -57,15 +57,14 @@ VectorRPUDeviceMetaParameter<T>::operator=(const VectorRPUDeviceMetaParameter<T>
 // move constructor
 template <typename T>
 VectorRPUDeviceMetaParameter<T>::VectorRPUDeviceMetaParameter(
-    VectorRPUDeviceMetaParameter<T> &&other) {
-
+    VectorRPUDeviceMetaParameter<T> &&other) noexcept {
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
 VectorRPUDeviceMetaParameter<T> &
-VectorRPUDeviceMetaParameter<T>::operator=(VectorRPUDeviceMetaParameter<T> &&other) {
+VectorRPUDeviceMetaParameter<T>::operator=(VectorRPUDeviceMetaParameter<T> &&other) noexcept {
 
   SimpleRPUDeviceMetaParameter<T>::operator=(std::move(other));
   same_context = other.same_context;
@@ -91,6 +90,9 @@ bool VectorRPUDeviceMetaParameter<T>::appendVecPar(const AbstractRPUDeviceMetaPa
 template struct VectorRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct VectorRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct VectorRPUDeviceMetaParameter<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -164,14 +166,14 @@ VectorRPUDevice<T> &VectorRPUDevice<T>::operator=(const VectorRPUDevice<T> &othe
 }
 
 // move constructor
-template <typename T> VectorRPUDevice<T>::VectorRPUDevice(VectorRPUDevice<T> &&other) {
+template <typename T> VectorRPUDevice<T>::VectorRPUDevice(VectorRPUDevice<T> &&other) noexcept {
 
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
-VectorRPUDevice<T> &VectorRPUDevice<T>::operator=(VectorRPUDevice<T> &&other) {
+VectorRPUDevice<T> &VectorRPUDevice<T>::operator=(VectorRPUDevice<T> &&other) noexcept {
 
   PulsedRPUDeviceBase<T>::operator=(std::move(other));
 
@@ -223,21 +225,22 @@ template <typename T> void VectorRPUDevice<T>::setHiddenWeights(const std::vecto
   if (!n_devices_) {
     return;
   }
-  int offset = 0;
-  for (int k = 0; k < n_devices_; k++) {
-    int m = rpu_device_vec_[k]->getHiddenWeightsCount();
+  size_t offset = 0;
+  size_t size = this->size_;
+  for (size_t k = 0; k < (size_t)n_devices_; k++) {
+    size_t m = rpu_device_vec_[k]->getHiddenWeightsCount();
     if (data.size() <
         (size_t)offset +
-            (m + 1) * this->size_) { // m+1 because we have a hidden in vector. this is the first
+            (size_t)(m + 1) * size) { // m+1 because we have a hidden in vector. this is the first
       RPU_FATAL("Size mismatch for hidden weights.");
     }
     // first this device's hidden weights
-    for (int i = 0; i < this->size_; i++) {
+    for (size_t i = 0; i < size; i++) {
       weights_vec_[k][0][i] = data[offset + i];
     }
     offset += this->size_;
-    std::vector<T> tmp_data(m * this->size_);
-    for (int i = 0; i < m * this->size_; i++) {
+    std::vector<T> tmp_data(m * size);
+    for (size_t i = 0; i < m * size; i++) {
       tmp_data[i] = data[offset + i];
     }
     offset += this->size_ * m;
@@ -256,7 +259,8 @@ template <typename T> int VectorRPUDevice<T>::getHiddenUpdateIdx() const {
 }
 
 template <typename T>
-void VectorRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+void VectorRPUDevice<T>::getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) {
+  UNUSED(weights);
 
   std::vector<std::string> names;
   getDPNames(names);
@@ -274,7 +278,7 @@ void VectorRPUDevice<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
     for (size_t i = 0; i < n.size(); i++) {
       v.push_back(data_ptrs[m + i]);
     }
-    rpu_device_vec_[k]->getDeviceParameter(v);
+    rpu_device_vec_[k]->getDeviceParameter(weights_vec_[k], v);
     m += n.size();
 
     // "hidden weights"
@@ -321,10 +325,42 @@ void VectorRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
     m++;
   }
   this->reduceToWeights(out_weights); // need to update the weights
-
   weight_granularity /= rpu_device_vec_.size();
   this->setWeightGranularity(weight_granularity);
 };
+
+template <typename T>
+void VectorRPUDevice<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  PulsedRPUDeviceBase<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+    rpu_device_vec_[k]->dumpExtra(state, std::to_string(k));
+  }
+  RPU::insert(state, "reduce_weightening", reduce_weightening_);
+  RPU::insert(state, "current_device_idx", current_device_idx_);
+  RPU::insert(state, "current_update_idx", current_update_idx_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void VectorRPUDevice<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  PulsedRPUDeviceBase<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
+    rpu_device_vec_[k]->loadExtra(state, std::to_string(k), strict);
+  }
+  RPU::load(state, "reduce_weightening", reduce_weightening_, strict);
+  RPU::load(state, "current_device_idx", current_device_idx_, strict);
+  RPU::load(state, "current_update_idx", current_update_idx_, strict);
+}
 
 template <typename T> void VectorRPUDevice<T>::printDP(int x_count, int d_count) const {
 
@@ -383,9 +419,9 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
         par.vec_par[k]->createDevice(this->x_size_, this->d_size_, rng)));
     weight_granularity += rpu_device_vec_.back()->getWeightGranularity();
 
-    reduce_weightening_.push_back((T)1.0 / n_devices_); // average per default
+    reduce_weightening_.push_back((T)1.0 / (T)n_devices_); // average per default
   }
-  weight_granularity = weight_granularity / n_devices_;
+  weight_granularity = weight_granularity / (T)n_devices_;
   this->setWeightGranularity(weight_granularity);
 
   // default weightening can be overwritten by given gamma_vec
@@ -401,12 +437,19 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
 /* update */
 template <typename T>
 void VectorRPUDevice<T>::initUpdateCycle(
-    T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {
+    T **weights,
+    const PulsedUpdateMetaParameter<T> &up,
+    T current_lr,
+    int m_batch_info,
+    const T *x_input,
+    const int x_inc,
+    const T *d_input,
+    const int d_inc) {
   const auto &par = getPar();
 
   switch (par.update_policy) {
   case VectorDeviceUpdatePolicy::SingleRandom: {
-    this->current_device_idx_ = floor(rw_rng_.sampleUniform() * this->n_devices_);
+    this->current_device_idx_ = (int)floorf(rw_rng_.sampleUniform() * (T)this->n_devices_);
     break;
   }
   case VectorDeviceUpdatePolicy::SingleSequential: {
@@ -419,10 +462,12 @@ void VectorRPUDevice<T>::initUpdateCycle(
   }
 
   if (par.singleDeviceUpdate()) {
-    rpu_device_vec_[current_device_idx_]->initUpdateCycle(weights, up, current_lr, m_batch_info);
+    rpu_device_vec_[current_device_idx_]->initUpdateCycle(
+        weights, up, current_lr, m_batch_info, x_input, x_inc, d_input, d_inc);
   } else {
     for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
-      rpu_device_vec_[k]->initUpdateCycle(weights, up, current_lr, m_batch_info);
+      rpu_device_vec_[k]->initUpdateCycle(
+          weights, up, current_lr, m_batch_info, x_input, x_inc, d_input, d_inc);
     }
   }
 }
@@ -554,7 +599,6 @@ template <typename T> bool VectorRPUDevice<T>::onSetWeights(T **weights) {
 
   // e.g. apply hard bounds
   for (int k = 0; k < (int)rpu_device_vec_.size(); k++) {
-
     // only in case of SingleFixed policy set the weight chosen.
     if ((fixed_index >= 0 && fixed_index == k) || (fixed_index < 0)) {
       for (int i = 0; i < this->size_; i++) {
@@ -573,6 +617,9 @@ template <typename T> bool VectorRPUDevice<T>::onSetWeights(T **weights) {
 template class VectorRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class VectorRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class VectorRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

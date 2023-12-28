@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-.PHONY: build_inplace clean clean-doc clang-format mypy pycodestyle pylint pytest build_inplace_mkl build_inplace_cuda build_cuda build_inplace_cuda_abi
+.PHONY: build_inplace clean clean-doc clang-format mypy pycodestyle pylint pytest build_inplace_mkl build_inplace_cuda build_cuda
 
 build_inplace:
 	python setup.py build_ext -j8 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace ${flags}
@@ -30,22 +30,17 @@ build_cuda:
 build_inplace_cuda:
 	make build_inplace_mkl flags="-DUSE_CUDA=ON ${flags}"
 
-build_inplace_cuda_abi:
-	make build_inplace_mkl flags="-DUSE_CUDA=ON -DUSE_ABI_ZERO=OFF ${flags}"
-
 clean:
 	python setup.py clean
 	rm -rf _skbuild
-	rm -f src/aihwkit/simulator/rpu_base.*.so
+	rm -f src/aihwkit/simulator/rpu_base*.so
+	rm -f src/aihwkit/extension/*.so
 
 clean-doc:
 	cd docs && make clean
 
 clang-format:
-	clang-format -i src/aihwkit/simulator/rpu_base_src/*.cpp  \
-	src/aihwkit/simulator/rpu_base_src/*.h \
-	src/rpucuda/*.cpp src/rpucuda/*.h \
-	src/rpucuda/cuda/*.cpp src/rpucuda/cuda/*.h src/rpucuda/cuda/*.cu
+	git ls-files | grep -E ".*\.(cu|h|cpp)$$" | xargs clang-format -i
 
 doc:
 	cd docs && make html
@@ -61,3 +56,6 @@ pylint:
 
 pytest:
 	PYTHONPATH=src/ pytest -v -s tests/
+
+black:
+	git ls-files | grep \.py$$ | xargs black -t py310 -C --config .black

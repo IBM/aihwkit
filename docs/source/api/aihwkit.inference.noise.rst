@@ -14,4 +14,6 @@ Submodules
 
    aihwkit.inference.noise.base
    aihwkit.inference.noise.custom
+   aihwkit.inference.noise.fusion
    aihwkit.inference.noise.pcm
+   aihwkit.inference.noise.reram

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,12 +21,6 @@
 
 #define TOLERANCE 1e-3
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -36,15 +30,14 @@ public:
   void SetUp() {
 
     context = &context_container;
-
     is_test = true;
 
     x_size = 99;
     d_size = 56;
     repeats = 3;
 
-    T bmin = (-1. / sqrt((T)x_size));
-    T bmax = (1. / sqrt((T)x_size));
+    T bmin = (-1. / sqrtf(x_size));
+    T bmax = (1. / sqrtf(x_size));
 
     x1.resize(x_size);
     x2.resize(x_size);
@@ -64,14 +57,14 @@ public:
     // generate random numbers
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1, 1);
+    std::uniform_real_distribution<float> udist(-1, 1);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < x_size; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size; j++)
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
 
     x_cuvec = RPU::make_unique<CudaArray<T>>(context, x_size);
     x_vec.resize(x_size);
@@ -83,12 +76,10 @@ public:
   }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUSimple<T>> layer_simple;
   std::unique_ptr<RPUCudaSimple<T>> culayer_simple;
   std::vector<T> x_vec, x_vec2, d_vec, d_vec2, x1, x2, d1, d2, rx, rd;
-
   std::unique_ptr<CudaArray<T>> x_cuvec;
   std::unique_ptr<CudaArray<T>> d_cuvec;
   int x_size;
@@ -100,7 +91,7 @@ public:
 class RPUCudaSimpleTestFixtureBatch : public ::testing::TestWithParam<bool> {
 public:
   void SetUp() {
-    context = new CudaContext();
+    context = &context_container;
 
     is_test = true;
 
@@ -109,8 +100,8 @@ public:
     repeats = 1;
     m_batch = 3;
 
-    num_t bmin = (-1. / sqrt((num_t)x_size));
-    num_t bmax = (1. / sqrt((num_t)x_size));
+    num_t bmin = (-1. / sqrtf(x_size));
+    num_t bmax = (1. / sqrtf(x_size));
 
     x1.resize(x_size * m_batch);
     x2.resize(x_size * m_batch);
@@ -130,14 +121,14 @@ public:
     // generate random numbers
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++)
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(context, x_size * m_batch);
     x_vec.resize(x_size * m_batch);
@@ -148,12 +139,13 @@ public:
     d_vec2.resize(d_size * m_batch);
   }
 
-  void TearDown() { delete context; }
+  void TearDown() {}
 
+  CudaContext context_container{-1, false};
+  CudaContextPtr context;
   std::unique_ptr<RPUSimple<num_t>> layer_simple;
   std::unique_ptr<RPUCudaSimple<num_t>> culayer_simple;
   std::vector<num_t> x_vec, x_vec2, d_vec, d_vec2, x1, x2, d1, d2, rx, rd;
-
   std::unique_ptr<CudaArray<num_t>> x_cuvec;
   std::unique_ptr<CudaArray<num_t>> d_cuvec;
   int x_size;
@@ -161,16 +153,10 @@ public:
   int repeats;
   int m_batch;
   int is_test;
-
-  CudaContext *context;
 };
 
 // types
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> CudaTypes;
-#else
-typedef ::testing::Types<float> CudaTypes;
-#endif
+typedef ::testing::Types<num_t> CudaTypes;
 
 TYPED_TEST_CASE(RPUCudaSimpleTestFixture, CudaTypes);
 INSTANTIATE_TEST_CASE_P(Batched, RPUCudaSimpleTestFixtureBatch, ::testing::Bool());
@@ -322,8 +308,8 @@ TYPED_TEST(RPUCudaSimpleTestFixture, BackwardVectorBias) {
   }
 
   // should not be changed (vector longer by one)
-  ASSERT_EQ(last, this->x1[this->x_size - 1]);
-  ASSERT_EQ(last, this->x2[this->x_size - 1]);
+  ASSERT_FLOAT_EQ(last, this->x1[this->x_size - 1]);
+  ASSERT_FLOAT_EQ(last, this->x2[this->x_size - 1]);
 }
 
 TYPED_TEST(RPUCudaSimpleTestFixture, UpdateVector) {
@@ -685,14 +671,6 @@ TEST_P(RPUCudaSimpleTestFixtureBatch, ForwardMatrixBatchBias) {
     for (int j = 0; j < (this->x_size) * this->m_batch; j++) {
       this->rx[j] = this->x1[j];
     }
-    std::cout << "\n\n --------------------------- \nTEST\n\n";
-    for (int j = 0; j < m_batch; j++) {
-      for (int i = 0; i < this->x_size; i++) {
-        std::cout << this->rx[i + j * this->x_size] << ", ";
-      }
-      std::cout << " | \n";
-    }
-    std::cout << " ---------------------------\n\n\n";
   }
   this->x_vec = this->rx;
 

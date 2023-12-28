@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -24,29 +24,35 @@ enum class WeightModifierType {
   AddNormal,
   DiscretizeAddNormal,
   DoReFa,
-  Poly
+  Poly,
+  PCMNoise,
+  DropConnect,
+  ProgNoise,
 };
 
-// no template. Just double
-struct WeightModifierParameter {
-
-  double std_dev = 0.0;
-  double res = 0.1;
+template <typename T> struct WeightModifierParameter {
+  T std_dev = 0.0;
+  bool per_batch_sample = false;
+  T res = 0.1;
   bool sto_round = false;
-  double dorefa_clip = 0.6;
-  double pdrop = 0.0;
+  T dorefa_clip = 0.6;
+  T pdrop = 0.0;
   bool enable_during_test = false;
   bool copy_last_column = false;
   bool rel_to_actual_wmax = true;
-  double assumed_wmax = 1.0;
+  T assumed_wmax = 1.0;
+  T g_max = 25.0;
 
-  // expects to gmax normalized norm_prog_coeff.
-  // [0.26348 / 25.0, 0.0768, -0.001877 * 25.0]
-  double coeff0 = 0.26348 / 25.0;
-  double coeff1 = 0.0768;
-  double coeff2 = -0.001877 * 25.0;
+  T pcm_zero_thres = 0.0; // for PCMNoise in units of of baseline noise
+  T pcm_t_inference = 0.0;
+  T pcm_prob_at_reset = 0.0;
+  T pcm_prob_at_gmax = 0.0;
+  T pcm_prob_at_random = 0.0;
+
+  T pcm_t0 = 20.0;
 
   WeightModifierType type = WeightModifierType::Copy;
+  std::vector<T> coeffs = {0.26348 / 25.0, 0.0768, -0.001877 * 25.0};
 
   inline std::string getTypeName() const {
     switch (type) {
@@ -64,6 +70,12 @@ struct WeightModifierParameter {
       return "DiscretizeAddNormal";
     case WeightModifierType::Poly:
       return "Poly";
+    case WeightModifierType::ProgNoise:
+      return "ProgNoise";
+    case WeightModifierType::PCMNoise:
+      return "PCMNoise";
+    case WeightModifierType::DropConnect:
+      return "DropConnect";
     default:
       return "Unknown";
     }
@@ -79,8 +91,8 @@ struct WeightModifierParameter {
     ss << "\t weight modifier type:\t" << getTypeName() << std::endl;
     if (type != WeightModifierType::Copy) {
       if (type == WeightModifierType::Poly || type == WeightModifierType::MultNormal ||
-          type == WeightModifierType::AddNormal ||
-          type == WeightModifierType::DiscretizeAddNormal) {
+          type == WeightModifierType::AddNormal || type == WeightModifierType::ProgNoise ||
+          type == WeightModifierType::DiscretizeAddNormal || type == WeightModifierType::PCMNoise) {
         ss << "\t std_dev:\t\t" << std_dev << std::endl;
       }
       ss << "\t rel_to_actual_wmax:\t" << rel_to_actual_wmax << std::endl;
@@ -89,14 +101,34 @@ struct WeightModifierParameter {
     if (copy_last_column) {
       ss << "\t copy_last_column:\t" << copy_last_column << std::endl;
     }
+    if (type == WeightModifierType::PCMNoise) {
+      if (pcm_t_inference > 0) {
+        ss << "\t pcm_t_inference:\t\t" << pcm_t_inference << std::endl;
+      }
+      if (pcm_zero_thres > 0) {
+        ss << "\t pcm_zero_thres:\t\t" << pcm_zero_thres << std::endl;
+      }
+      if (pcm_prob_at_reset > 0) {
+        ss << "\t pcm_prob_at_reset:\t\t" << pcm_prob_at_reset << std::endl;
+      }
+      if (pcm_prob_at_gmax > 0) {
+        ss << "\t pcm_prob_at_gmax:\t\t" << pcm_prob_at_reset << std::endl;
+      }
+    }
     if (pdrop > 0.0) {
       ss << "\t pdrop:\t\t\t" << pdrop << std::endl;
     }
     if (type == WeightModifierType::DoReFa) {
       ss << "\t dorefa clip:\t\t" << dorefa_clip << std::endl;
     }
+    if (type == WeightModifierType::ProgNoise || type == WeightModifierType::PCMNoise) {
+      ss << "\t g_max:\t\t" << g_max << std::endl;
+    }
+
     if (type == WeightModifierType::Poly) {
-      ss << "\t coeff0,1,2:\t\t" << coeff0 << ", " << coeff1 << ", " << coeff2 << std::endl;
+      for (int i = 0; i < (int)coeffs.size(); i++) {
+        ss << "\t coeff [" << i << "]:\t" << coeffs[i] << std::endl;
+      }
     }
     if (type == WeightModifierType::Discretize || type == WeightModifierType::DiscretizeAddNormal ||
         type == WeightModifierType::DoReFa) {
@@ -113,7 +145,8 @@ struct WeightModifierParameter {
     return (
         pdrop > 0 || (type == WeightModifierType::Discretize && sto_round) ||
         type == WeightModifierType::MultNormal || type == WeightModifierType::Poly ||
-        type == WeightModifierType::AddNormal || type == WeightModifierType::DiscretizeAddNormal ||
+        type == WeightModifierType::PCMNoise || type == WeightModifierType::AddNormal ||
+        type == WeightModifierType::ProgNoise || type == WeightModifierType::DiscretizeAddNormal ||
         (type == WeightModifierType::DoReFa && sto_round));
   };
 };
@@ -125,9 +158,12 @@ public:
   WeightModifier(){};
 
   /* buffers the weight changes and redraws the drop connection*/
-  void apply(T *new_weights, const T *weights, const WeightModifierParameter &wmpar);
+  void apply(T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar);
 
   inline bool enableDuringTest() { return enable_during_test_; };
+
+  void dumpExtra(RPU::state_t &extra, const std::string prefix);
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
 private:
   void dropConnections(T *weights, T prob);

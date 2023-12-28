@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -45,8 +45,10 @@ public:
   virtual int *makeCoincidences(
       const T *x_in,
       const int x_inc,
+      int &x_noz,
       const T *d_in,
       const int d_inc,
+      int &d_noz,
       RNG<T> *rng,
       const T lr,
       const T dw_min,
@@ -54,6 +56,10 @@ public:
 
   void printCounts(int max_n) const;
   bool supports(RPU::PulseType pulse_type) const;
+
+  /* Ignore the buffer / counts, as they will be generated anew each sample.*/
+  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
 
 private:
   void freeContainers();
@@ -80,6 +86,7 @@ private:
       const T *v,
       const int v_inc,
       const int v_size,
+      int &v_noz,
       const T p,
       RNG<T> *rng,
       const int BL,
@@ -92,6 +99,7 @@ private:
       const T *v,
       const int v_inc,
       const int v_size,
+      int &v_noz,
       const T p,
       RNG<T> *rng,
       const int BL,

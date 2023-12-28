@@ -14,5 +14,8 @@ Submodules
 
    aihwkit.experiments.runners.base
    aihwkit.experiments.runners.cloud
+   aihwkit.experiments.runners.i_cloud
+   aihwkit.experiments.runners.i_local
+   aihwkit.experiments.runners.i_metrics
    aihwkit.experiments.runners.local
    aihwkit.experiments.runners.metrics

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,7 +23,8 @@ template <typename T> class BufferedTransferRPUDeviceCuda : public TransferRPUDe
 
 public:
   explicit BufferedTransferRPUDeviceCuda(){};
-  explicit BufferedTransferRPUDeviceCuda(CudaContext *c, const BufferedTransferRPUDevice<T> &other);
+  explicit BufferedTransferRPUDeviceCuda(
+      CudaContextPtr c, const BufferedTransferRPUDevice<T> &other);
 
   ~BufferedTransferRPUDeviceCuda(){};
   BufferedTransferRPUDeviceCuda(const BufferedTransferRPUDeviceCuda<T> &other);
@@ -36,7 +37,6 @@ public:
     using std::swap;
     swap(static_cast<TransferRPUDeviceCuda<T> &>(a), static_cast<TransferRPUDeviceCuda<T> &>(b));
     swap(a.transfer_buffer_vec_, b.transfer_buffer_vec_);
-    swap(a.transfer_out_, b.transfer_out_);
   };
 
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
@@ -53,16 +53,15 @@ public:
       int from_device_idx,
       int i_col_start,
       const T lr,
+      const T count_lr,
       const T *x_input,
       const int n_vec,
       const PulsedUpdateMetaParameter<T> &up) override;
 
   std::vector<T> getHiddenWeights() const override;
 
-private:
+protected:
   std::vector<std::unique_ptr<CudaArray<T>>> transfer_buffer_vec_;
-
-  std::unique_ptr<CudaArray<T>> transfer_out_ = nullptr; // no need to copy
 };
 
 } // namespace RPU

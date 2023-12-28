@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -11,9 +11,10 @@
 # that they have been altered from the originals.
 
 """Helper class for adding rpu_config to neural network model"""
+# pylint: disable=no-name-in-module,import-error
 
-from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (
-    AnalogProto
+from aihwkit.cloud.converter.definitions.i_input_file_pb2 import (  # type: ignore[attr-defined]
+    AnalogProto,
 )
 
 

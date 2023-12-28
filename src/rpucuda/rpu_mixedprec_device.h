@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -93,8 +93,8 @@ public:
 
   MixedPrecRPUDevice(const MixedPrecRPUDevice<T> &);
   MixedPrecRPUDevice<T> &operator=(const MixedPrecRPUDevice<T> &);
-  MixedPrecRPUDevice(MixedPrecRPUDevice<T> &&);
-  MixedPrecRPUDevice<T> &operator=(MixedPrecRPUDevice<T> &&);
+  MixedPrecRPUDevice(MixedPrecRPUDevice<T> &&) noexcept;
+  MixedPrecRPUDevice<T> &operator=(MixedPrecRPUDevice<T> &&) noexcept;
 
   friend void swap(MixedPrecRPUDevice<T> &a, MixedPrecRPUDevice<T> &b) noexcept {
     using std::swap;
@@ -141,10 +141,13 @@ private:
   void initialize(int x_size, int d_size);
   void freeContainers();
 
+  // handled in base
+  T **chi_ = nullptr;
+
+  // temporary
   std::vector<T> qx_;
   std::vector<T> qd_;
   std::vector<int> qx_index_;
-  T **chi_ = nullptr;
 };
 
 } // namespace RPU

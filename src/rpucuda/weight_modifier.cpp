@@ -1,5 +1,6 @@
+
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -35,7 +36,13 @@ template <typename T> void WeightModifier<T>::dropConnections(T *weights, T prob
 
 template <typename T>
 void WeightModifier<T>::apply(
-    T *new_weights, const T *weights, const WeightModifierParameter &wmpar) {
+    T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar) {
+
+  if (wmpar.type != WeightModifierType::Copy) {
+    if (wmpar.per_batch_sample) {
+      RPU_FATAL("Per batch sample is not implemented in RPUCuda");
+    }
+  }
 
   // just copy always if not in-place [also handles WeightModifierType::Copy]
   if (new_weights != weights) {
@@ -50,7 +57,7 @@ void WeightModifier<T>::apply(
   }
   enable_during_test_ = wmpar.enable_during_test;
 
-  T amax = wmpar.assumed_wmax; // assumed max
+  T amax = (T)wmpar.assumed_wmax; // assumed max
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
     amax = 0.0;
     PRAGMA_SIMD
@@ -58,10 +65,10 @@ void WeightModifier<T>::apply(
       if (wmpar.copy_last_column && (i % x_size_) == x_size_ - 1) {
         continue;
       }
-      T a = fabs(new_weights[i]);
+      T a = (T)fabsf(new_weights[i]);
       amax = a > amax ? a : amax;
     }
-    amax = amax > 0.0 ? amax : (T)1.0;
+    amax = amax > (T)0.0 ? amax : (T)1.0;
   }
 
   switch (wmpar.type) {
@@ -75,8 +82,8 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::Discretize: {
 
-    const T res = wmpar.res;
-    if (res > 0) {
+    const T res = (T)wmpar.res;
+    if (res > (T)0.0) {
       const bool sto_round = wmpar.sto_round;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
@@ -88,8 +95,8 @@ void WeightModifier<T>::apply(
   }
   case WeightModifierType::MultNormal: {
 
-    if (wmpar.std_dev > 0) {
-      const T std = wmpar.std_dev * amax;
+    if (wmpar.std_dev > (T)0.0) {
+      const T std = (T)wmpar.std_dev * amax;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
         T w = new_weights[i];
@@ -99,9 +106,9 @@ void WeightModifier<T>::apply(
     break;
   }
   case WeightModifierType::AddNormal: {
+    if (wmpar.std_dev > (T)0.0) {
 
-    if (wmpar.std_dev > 0) {
-      const T std = wmpar.std_dev * amax;
+      const T std = (T)wmpar.std_dev * amax;
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
         new_weights[i] += std * rw_rng_.sampleGauss();
@@ -113,34 +120,60 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::Poly: {
 
-    if (wmpar.std_dev > 0) {
+    if (wmpar.std_dev > (T)0.0 && wmpar.coeffs.size() > (size_t)0) {
       const T std = wmpar.std_dev;
-      const T p0 = wmpar.coeff0;
-      const T p1 = wmpar.coeff1;
-      const T p2 = wmpar.coeff2;
-
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
-        T aw = fabs(new_weights[i]) / amax;
-        T sig = std * (p0 + p1 * aw + p2 * aw * aw);
+        T aw = (T)fabsf(new_weights[i]) / amax;
+        T paw = 1;
+        T sig = wmpar.coeffs.at(0);
+        for (size_t j = 1; j < wmpar.coeffs.size(); j++) {
+          paw *= aw;
+          sig += wmpar.coeffs.at(j) * paw;
+        }
+        sig *= std;
         new_weights[i] += amax * sig * rw_rng_.sampleGauss();
       }
     }
+    break;
+  }
 
+  case WeightModifierType::ProgNoise: {
+
+    if (wmpar.std_dev > (T)0.0 && wmpar.coeffs.size() > (size_t)0) {
+      const T std = wmpar.std_dev / wmpar.g_max;
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        T aw = (T)fabsf(new_weights[i]) / amax;
+        T paw = 1;
+        T sig = wmpar.coeffs.at(0);
+        for (size_t j = 1; j < wmpar.coeffs.size(); j++) {
+          paw *= aw;
+          sig += wmpar.coeffs.at(j) * paw;
+        }
+        sig *= std;
+        T w = new_weights[i];
+        if (w < (T)0.0) {
+          new_weights[i] = -(T)fabsf(w + amax * sig * rw_rng_.sampleGauss());
+        } else {
+          new_weights[i] = (T)fabsf(w + amax * sig * rw_rng_.sampleGauss());
+        }
+      }
+    }
     break;
   }
 
   case WeightModifierType::DoReFa: {
 
-    const T res = wmpar.res;
+    const T res = (T)wmpar.res;
 
-    if (res > 0) {
+    if (res > (T)0.0) {
       const bool sto_round = wmpar.sto_round;
-      const T scale = fabs(wmpar.dorefa_clip / tanh(amax));
+      const T scale = (T)(T)fabsf(wmpar.dorefa_clip / (T)tanh((float)amax));
 
       PRAGMA_SIMD
       for (int i = 0; i < size_; i++) {
-        T w = tanh(new_weights[i]) * scale;
+        T w = (T)tanh((float)new_weights[i]) * scale;
         new_weights[i] = getDiscretizedValueRound(w, res, sto_round, rw_rng_);
       }
     }
@@ -150,10 +183,10 @@ void WeightModifier<T>::apply(
 
   case WeightModifierType::DiscretizeAddNormal: {
 
-    const T res = wmpar.res;
-    const T std = wmpar.std_dev * amax;
+    const T res = (T)wmpar.res;
+    const T std = (T)wmpar.std_dev * amax;
 
-    if (res > 0 || std > 0) {
+    if (res > (T)0.0 || std > (T)0.0) {
       const bool sto_round = wmpar.sto_round;
 
       PRAGMA_SIMD
@@ -171,8 +204,8 @@ void WeightModifier<T>::apply(
     RPU_FATAL("Requested WeightModifierType not implemented in CPU version.");
   }
 
-  if (wmpar.pdrop > 0.0) {
-    dropConnections(new_weights, wmpar.pdrop);
+  if (wmpar.pdrop > (T)0.0) {
+    dropConnections(new_weights, (T)wmpar.pdrop);
   }
 
   if (wmpar.copy_last_column) {
@@ -182,9 +215,33 @@ void WeightModifier<T>::apply(
   }
 }
 
+template <typename T>
+void WeightModifier<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPU::state_t state;
+
+  RPU::insert(state, "saved_bias", saved_bias_);
+  RPU::insert(state, "enable_during_test", enable_during_test_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void WeightModifier<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "saved_bias", saved_bias_, strict);
+  RPU::load(state, "enable_during_test", enable_during_test_, strict);
+}
+
 template class WeightModifier<float>;
 #ifdef RPU_USE_DOUBLE
 template class WeightModifier<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class WeightModifier<half_t>;
 #endif
 
 } // namespace RPU

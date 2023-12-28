@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,12 +22,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -66,7 +60,7 @@ template <typename T> T correlation(T *x, uint32_t *counts, int sz, int K, T sca
   for (int i = 0; i < sz; i++) {
     icounts = test_helper::getCounts(counts, i, K, sz, true);
     xi = x[i] * scaleprob;
-    T y = ((T)icounts) / K;
+    T y = ((T)icounts) / (T)K;
     corr += xi * y;
     mx += xi;
     my += y;
@@ -82,7 +76,7 @@ template <typename T> T correlation(T *x, uint32_t *counts, int sz, int K, T sca
   cy /= sz;
   cx /= sz;
   corr /= sz;
-  T cc = (corr - mx * my) / (sqrt(cx - mx * mx) * sqrt(cy - my * my));
+  float cc = (float)(corr - mx * my) / (sqrtf(cx - mx * mx) * sqrtf(cy - my * my));
   // std::cout << "Corr coeff:" << cc << std::endl;
   return cc;
 }
@@ -106,8 +100,9 @@ public:
     K[1] = 31;
     K[2] = 1023; // last biggest
 
-    scaleprob = 1;
+    scaleprob = 1; // needs to be 1 !
     timings = new T[nK * nsize];
+    resolution = 0.05;
 
     x1 = new T[size[0] * m_batch];
     x2 = new T[size[1] * m_batch];
@@ -119,23 +114,48 @@ public:
     z3 = new T[size[2] * m_batch];
     z4 = new T[size[3] * m_batch];
 
+    z4 = new T[size[3] * m_batch];
+
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
+    uint32_t noz = 0;
     for (int i = 0; i < size[0] * m_batch; i++) {
       x1[i] = urnd();
+      if (i < size[0] && fabsf(x1[i]) < (float)resolution / 2) {
+        noz++;
+      }
     }
+    d_zeros.push_back(noz);
+
+    noz = 0;
     for (int i = 0; i < size[1] * m_batch; i++) {
       x2[i] = urnd();
+      if (i < size[1] && fabsf(x2[i]) < (float)resolution / 2) {
+        noz++;
+      }
     }
+    d_zeros.push_back(noz);
+
+    noz = 0;
     for (int i = 0; i < size[2] * m_batch; i++) {
       x3[i] = urnd();
+      if (i < size[2] && fabsf(x3[i]) < (float)resolution / 2) {
+        noz++;
+      }
     }
+    d_zeros.push_back(noz);
+
+    noz = 0;
     for (int i = 0; i < size[3] * m_batch; i++) {
       x4[i] = urnd();
+      if (i < size[3] && fabsf(x4[i]) < (float)resolution / 2) {
+        noz++;
+      }
     }
+    d_zeros.push_back(noz);
 
     int nk32max = (K[nK - 1] + 1 + 31) / 32; // plus 1
     count1 = new uint32_t[size[0] * nk32max * m_batch];
@@ -195,9 +215,10 @@ public:
     delete[] timings;
   };
 
-  void testUpdateFunCorr(int (*fun)(T *, int, T, uint32_t *, int, T *, bool)) {
+  void testUpdateFunCorr(int (*fun)(T *, int, T, uint32_t *, uint32_t &, int, T, T *, bool)) {
 
     int ss = 0;
+    uint32_t d_noz = 0;
 
     for (int isz = 0; isz < this->nsize; isz++) {
       for (int ik = 0; ik < this->nK; ik++) {
@@ -205,18 +226,18 @@ public:
         std::cout << "[" << this->size[isz] << ", K=" << this->K[ik] << "]: \n";
 
         int errcode =
-            fun(this->xptr[isz], this->size[isz], this->scaleprob, this->cptr[isz], this->K[ik],
-                &this->timings[ss], false);
+            fun(this->xptr[isz], this->size[isz], this->scaleprob, this->cptr[isz], d_noz,
+                this->K[ik], this->resolution, &this->timings[ss], false);
         if (errcode != 0)
           continue;
         std::cout << BOLD_ON << this->timings[ss] << " msec." << BOLD_OFF << "\n\n";
 
         // add asserts
-
-        T cc = correlation(
+        float cc = correlation(
             this->xptr[isz], this->cptr[isz], this->size[isz], this->K[isz], this->scaleprob);
 
         EXPECT_GT(cc, 0.5);
+        ASSERT_EQ(d_noz, this->d_zeros[isz]);
 
         ss++;
         std::cout << "\n\n";
@@ -225,27 +246,31 @@ public:
   }
 
   void testUpdateFunEqual(
-      int (*fun1)(T *, int, T, uint32_t *, int, T *, bool),
-      int (*fun2)(T *, int, T, uint32_t *, int, T *, bool)) {
+      int (*fun1)(T *, int, T, uint32_t *, uint32_t &, int, T, T *, bool),
+      int (*fun2)(T *, int, T, uint32_t *, uint32_t &, int, T, T *, bool)) {
 
     int ss = 0;
 
     for (int isz = 0; isz < this->nsize; isz++) {
       for (int ik = 0; ik < this->nK; ik++) {
+        uint32_t d_noz_1 = 0;
+        uint32_t d_noz_2 = 0;
 
         std::cout << "[" << this->size[isz] << ", K=" << this->K[ik] << "]: \n";
         // same seed
         int errcode = fun1(
-            this->xptr[isz], this->size[isz], this->scaleprob, this->cptr[isz], this->K[ik],
-            &this->timings[ss], true);
+            this->xptr[isz], this->size[isz], this->scaleprob, this->cptr[isz], d_noz_1,
+            this->K[ik], this->resolution, &this->timings[ss], true);
         int errcode2 = fun2(
-            this->xptr[isz], this->size[isz], this->scaleprob, this->c2ptr[isz], this->K[ik],
-            &this->timings[ss], true);
+            this->xptr[isz], this->size[isz], this->scaleprob, this->c2ptr[isz], d_noz_2,
+            this->K[ik], this->resolution, &this->timings[ss], true);
 
         if (errcode != 0 || errcode2 != 0)
           continue;
 
         // add asserts
+        ASSERT_EQ(d_noz_1, d_noz_2);
+
         int nK32 = this->K[ik] / 32 + 1;
         for (int ii = 0; ii < this->size[isz] * nK32; ii++) {
           if (ii < 50)
@@ -256,10 +281,12 @@ public:
     }
   }
 
-  void testUpdateFunConst(T prob, int (*fun)(T *, int, T, uint32_t *, int, T *, bool)) {
+  void testUpdateFunConst(
+      float prob, int (*fun)(T *, int, T, uint32_t *, uint32_t &, int, T, T *, bool)) {
 
     int isz = 0;
     int ik = 0;
+    uint32_t d_noz = 0;
 
     T *x = this->xptr[isz];
     for (int i = 0; i < this->size[isz]; i++) {
@@ -268,14 +295,14 @@ public:
 
     std::cout << "[" << this->size[isz] << ", K=" << this->K[ik] << "]: \n";
     int errcode =
-        fun(this->xptr[isz], this->size[isz], 1, this->cptr[isz], this->K[ik], &this->timings[0],
-            false);
+        fun(this->xptr[isz], this->size[isz], 1, this->cptr[isz], d_noz, this->K[ik],
+            this->resolution, &this->timings[0], false);
     if (errcode != 0)
       return;
     for (int i = 0; i < this->size[isz]; i++) {
       int counts = test_helper::getCounts(this->cptr[isz], i, this->K[ik], this->size[isz], true);
-      T cprob = ((T)counts) / this->K[ik];
-      ASSERT_EQ(prob, cprob);
+      float cprob = ((float)counts) / this->K[ik];
+      ASSERT_FLOAT_EQ(prob, cprob);
     }
   }
 
@@ -284,10 +311,11 @@ public:
   uint32_t *count1, *count2, *count3, *count4;
   uint32_t *count21, *count22, *count23, *count24;
   T *timings;
-  T scaleprob;
+  T scaleprob, resolution;
   int nK, nsize, m_batch;
   int *size, *K;
   std::vector<T *> xptr, zptr;
+  std::vector<uint32_t> d_zeros;
   std::vector<uint32_t *> c2ptr;
   std::vector<uint32_t *> cptr;
 };
@@ -307,6 +335,7 @@ public:
     up.desired_BL = K;
     up.res = resolution;
     up.sto_round = false;
+    up.d_sparsity = true;
 
     context = &context_container;
 
@@ -325,14 +354,14 @@ public:
 
     unsigned int seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1., 1.);
+    std::uniform_real_distribution<float> udist(-1., 1.);
     auto urnd = std::bind(udist, generator);
 
     for (int i = 0; i < x_size * m_batch; i++) {
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
     }
     for (int i = 0; i < d_size * m_batch; i++) {
-      rd[i] = urnd();
+      rd[i] = (num_t)urnd();
     }
 
     transpose(rd_trans, rd, d_size, m_batch);
@@ -350,9 +379,8 @@ public:
     delete[] x_counts;
     delete[] d_counts;
   }
-
   CudaContext context_container{-1, false};
-  CudaContext *context;
+  CudaContextPtr context;
   int nK32;
   int x_size;
   int d_size;
@@ -367,11 +395,9 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(UM, BitLineMakerParTestFixture, ::testing::Bool());
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> num_types;
-#else
-typedef ::testing::Types<float> num_types;
-#endif
+
+typedef ::testing::Types<num_t> num_types;
+
 TYPED_TEST_CASE(BitLineMakerTestFixture, num_types);
 
 TYPED_TEST(BitLineMakerTestFixture, KernelUpdateGetCountsCorr_Linear1) {
@@ -548,12 +574,12 @@ TEST_P(BitLineMakerParTestFixture, BO64Direct) {
       if (ibit >= 32) {
         ASSERT_EQ(nx[j * 64 + ibit], nx_ref[j * 64 + ibit]);
       } else {
-        if (fabs(nx[j * 64 + ibit] - nx_ref[j * 64 + ibit]) > 2 * sqrt(nrepeats))
+        if (fabsf(nx[j * 64 + ibit] - nx_ref[j * 64 + ibit]) > 2 * sqrt(nrepeats))
           nfail++;
       }
     }
   }
-  ASSERT_NEAR(((num_t)nfail) / k / m_batch / x_size, 0, 0.05);
+  ASSERT_NEAR(((float)nfail) / k / m_batch / x_size, 0, 0.05);
 
   for (int j = 0; j < m_batch * d_size; j++) {
     for (int ibit = 0; ibit < 64; ibit++) {
@@ -587,13 +613,13 @@ TEST_P(BitLineMakerParTestFixture, BitlineMakerBatch) {
   context->synchronize();
 
   CUDA_TIMING_INIT;
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   blm->makeCounts(curx->getData(), curd->getData(), up, dw_min, lr, m_batch, trans, trans, trans);
 
   if (trans) {
-    CUDA_TIMING_STOP((*this->context), "Get Counts Batch [trans]");
+    CUDA_TIMING_STOP((this->context), "Get Counts Batch [trans]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "Get Counts Batch");
+    CUDA_TIMING_STOP((this->context), "Get Counts Batch");
   }
   if (up.update_bl_management)
     std::cout << "Update Management/ Update BL Management is on \n";
@@ -626,22 +652,22 @@ TEST_P(BitLineMakerParTestFixture, BitlineMakerBatch) {
       num_t x_abs_max_value = Find_Absolute_Max<num_t>(x_tmp + i * x_size, x_size);
       num_t d_abs_max_value = Find_Absolute_Max<num_t>(d_tmp + i * d_size, d_size);
 
-      num_t reg = pow(dw_min, 2);
+      num_t reg = powf(dw_min, (num_t)2.0);
       x_abs_max_value = MAX(x_abs_max_value, reg);
       d_abs_max_value = MAX(d_abs_max_value, reg);
 
-      Klocal = ceil(lr * x_abs_max_value * d_abs_max_value / dw_min);
+      Klocal = ceilf(lr * x_abs_max_value * d_abs_max_value / dw_min);
       Klocal = MIN(up.desired_BL, Klocal);
-      num_t scaleprob = sqrt(lr / (dw_min * Klocal));
+      num_t scaleprob = sqrtf(lr / (dw_min * (num_t)Klocal));
 
-      num_t scale = sqrt(x_abs_max_value / d_abs_max_value);
+      num_t scale = sqrtf(x_abs_max_value / d_abs_max_value);
       x_sc = scaleprob / scale;
       d_sc = scaleprob * scale;
     }
-    num_t cc_x = correlation(x_tmp + i * x_size, x_c_tmp + i * x_size * nK32, x_size, Klocal, x_sc);
+    float cc_x = correlation(x_tmp + i * x_size, x_c_tmp + i * x_size * nK32, x_size, Klocal, x_sc);
     ASSERT_GT(cc_x, 0.5);
 
-    num_t cc_d = correlation(d_tmp + i * d_size, d_c_tmp + i * d_size * nK32, d_size, Klocal, d_sc);
+    float cc_d = correlation(d_tmp + i * d_size, d_c_tmp + i * d_size * nK32, d_size, Klocal, d_sc);
     ASSERT_GT(cc_d, 0.5);
   }
 }

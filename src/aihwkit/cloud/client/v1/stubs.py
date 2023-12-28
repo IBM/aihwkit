@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,7 +18,7 @@ from typing import Dict
 from aihwkit.cloud.client.session import ApiSession
 
 
-Endpoint = namedtuple('Endpoint', ['url', 'method'])
+Endpoint = namedtuple("Endpoint", ["url", "method"])
 
 
 class ApiStub:
@@ -38,7 +38,7 @@ class ApiStub:
           multiple objects.
     """
 
-    base_url = ''
+    base_url = ""
     """Base url to be used in the endpoints."""
 
     def __init__(self, session: ApiSession):
@@ -57,9 +57,9 @@ class ApiStub:
             A dictionary of strings to endpoints.
         """
         return {
-            'list': Endpoint(self.base_url, 'GET'),
-            'get': Endpoint('{}/{{}}'.format(self.base_url), 'GET'),
-            'post': Endpoint(self.base_url, 'POST')
+            "list": Endpoint(self.base_url, "GET"),
+            "get": Endpoint("{}/{{}}".format(self.base_url), "GET"),
+            "post": Endpoint(self.base_url, "POST"),
         }
 
     def list(self) -> Dict:
@@ -68,10 +68,9 @@ class ApiStub:
         Returns:
             A list of entities.
         """
-        endpoint = self.endpoints['list']
+        endpoint = self.endpoints["list"]
 
-        return self.session.request(method=endpoint.method,
-                                    url=endpoint.url).json()
+        return self.session.request(method=endpoint.method, url=endpoint.url).json()
 
     def get(self, object_id: str) -> Dict:
         """Return a single entity by id.
@@ -82,10 +81,11 @@ class ApiStub:
         Returns:
             A dictionary with the entity.
         """
-        endpoint = self.endpoints['get']
+        endpoint = self.endpoints["get"]
 
-        return self.session.request(method=endpoint.method,
-                                    url=endpoint.url.format(object_id)).json()
+        return self.session.request(
+            method=endpoint.method, url=endpoint.url.format(object_id)
+        ).json()
 
     def post(self, content: Dict) -> Dict:
         """Create a single entity.
@@ -96,17 +96,15 @@ class ApiStub:
         Returns:
             A dictionary with the API response.
         """
-        endpoint = self.endpoints['post']
+        endpoint = self.endpoints["post"]
 
-        return self.session.request(method=endpoint.method,
-                                    url=endpoint.url,
-                                    json=content).json()
+        return self.session.request(method=endpoint.method, url=endpoint.url, json=content).json()
 
 
 class ExperimentStub(ApiStub):
     """Stub for ``experiment``."""
 
-    base_url = 'experiments'
+    base_url = "experiments"
 
     def _endpoint_map(self) -> Dict[str, Endpoint]:
         """Generate the mappings to the endpoints.
@@ -117,7 +115,7 @@ class ExperimentStub(ApiStub):
         ret = super()._endpoint_map()
 
         # Use a different url for listing.
-        ret['list'] = Endpoint('{}/me'.format(self.base_url), 'GET')
+        ret["list"] = Endpoint("{}/me".format(self.base_url), "GET")
 
         return ret
 
@@ -125,7 +123,7 @@ class ExperimentStub(ApiStub):
 class InputStub(ApiStub):
     """Stub for ``input``."""
 
-    base_url = 'inputs'
+    base_url = "inputs"
 
     def _endpoint_map(self) -> Dict[str, Endpoint]:
         """Generate the mappings to the endpoints.
@@ -136,7 +134,7 @@ class InputStub(ApiStub):
         ret = super()._endpoint_map()
 
         # Use a different url for getter.
-        ret['get'] = Endpoint('{}/{{}}/file'.format(self.base_url), 'GET')
+        ret["get"] = Endpoint("{}/{{}}/file".format(self.base_url), "GET")
 
         return ret
 
@@ -144,7 +142,7 @@ class InputStub(ApiStub):
 class OutputStub(ApiStub):
     """Stub for ``output``."""
 
-    base_url = 'outputs'
+    base_url = "outputs"
 
     def _endpoint_map(self) -> Dict[str, Endpoint]:
         """Generate the mappings to the endpoints.
@@ -155,7 +153,7 @@ class OutputStub(ApiStub):
         ret = super()._endpoint_map()
 
         # Use a different url for getter.
-        ret['get'] = Endpoint('{}/{{}}/file'.format(self.base_url), 'GET')
+        ret["get"] = Endpoint("{}/{{}}/file".format(self.base_url), "GET")
 
         return ret
 
@@ -163,10 +161,10 @@ class OutputStub(ApiStub):
 class JobStub(ApiStub):
     """Stub for ``job``."""
 
-    base_url = 'jobs'
+    base_url = "jobs"
 
 
 class LoginStub(ApiStub):
     """Stub for ``login``."""
 
-    base_url = 'token/login'
+    base_url = "token/login"

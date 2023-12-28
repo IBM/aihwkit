@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -162,7 +162,8 @@ inline void generateCountsPN(
     RNG<T> *rng,
     int BL,
     T res,
-    bool sto_round) {
+    bool sto_round,
+    int &noz) {
 
   PRAGMA_SIMD
   for (int k = 0; k < BL; k++) {
@@ -176,14 +177,15 @@ inline void generateCountsPN(
     T v_value = v[j_v];
     j_v += v_inc;
 
-    if (v_value == 0) {
+    T PP = getDiscretizedValue<T>((T)fabsf(v_value) * P, res, sto_round, *rng);
+
+    if (PP == (T)0.0) {
+      noz++;
       continue;
     }
 
-    T PP = getDiscretizedValue<T>(fabs(v_value) * P, res, sto_round, *rng);
-
-    int jplus1_signed = (v_value > 0) ? j + 1 : -(j + 1);
-    if (v_value > 0) {
+    int jplus1_signed = (v_value > (T)0.0) ? j + 1 : -(j + 1);
+    if (v_value > (T)0.0) {
       PRAGMA_SIMD
       for (int k = 0; k < BL; k++) {
         if (PP > rng->sampleUniform()) {
@@ -211,7 +213,8 @@ FORCE_INLINE void generateCounts(
     RNG<T> *rng,
     int BL,
     T res,
-    bool sto_round) {
+    bool sto_round,
+    int &noz) {
 
   PRAGMA_SIMD
   for (int k = 0; k < BL; k++) {
@@ -224,13 +227,13 @@ FORCE_INLINE void generateCounts(
     T v_value = v[j_v];
     j_v += v_inc;
 
-    if (v_value == 0) {
+    T PP = getDiscretizedValue<T>((T)fabsf(v_value) * P, res, sto_round, *rng);
+    if (PP == (T)0.0) {
+      noz++;
       continue;
     }
 
-    T PP = getDiscretizedValue<T>(fabs(v_value) * P, res, sto_round, *rng);
-
-    int jplus1_signed = (v_value > 0) ? j + 1 : -(j + 1);
+    int jplus1_signed = (v_value > (T)0.0) ? j + 1 : -(j + 1);
     PRAGMA_SIMD
     for (int k = 0; k < BL; k++) {
       if (PP > rng->sampleUniform()) {
@@ -254,6 +257,7 @@ inline void generateCountsFunctor(
     int BL,
     T res,
     bool sto_round,
+    int &noz,
     BitlineFunctorT blfun) {
 
   PRAGMA_SIMD
@@ -267,12 +271,13 @@ inline void generateCountsFunctor(
     T v_value = v[j_v];
     j_v += v_inc;
 
-    if (v_value == 0) {
+    // this is the scaled [0..1] input value
+    T PP = getDiscretizedValue<T>((T)fabsf(v_value) * P, res, sto_round, *rng);
+
+    if (PP == (T)0.0) {
+      noz++;
       continue;
     }
-
-    // this is the scaled [0..1] input value
-    T PP = getDiscretizedValue<T>(fabs(v_value) * P, res, sto_round, *rng);
 
     int jplus1_signed = (v_value > 0) ? j + 1 : -(j + 1);
     PRAGMA_SIMD
@@ -289,8 +294,10 @@ template <typename T>
 int SparseBitLineMaker<T>::makeCounts(
     const T *x_in,
     const int x_inc,
+    int &x_noz,
     const T *d_in,
     const int d_inc,
+    int &d_noz,
     RNG<T> *rng,
     const T lr,
     const T dw_min,
@@ -299,6 +306,7 @@ int SparseBitLineMaker<T>::makeCounts(
   T A = 0;
   T B = 0;
   int BL = 0;
+
   if (up.update_bl_management || up.update_management) {
 
     T x_abs_max = Find_Absolute_Max<T>(x_in, x_size_, x_inc);
@@ -309,6 +317,9 @@ int SparseBitLineMaker<T>::makeCounts(
     up.calculateBlAB(BL, A, B, lr, dw_min);
   }
 
+  if (BL == 0) {
+    return 0;
+  }
   if (MAX(BL, up.desired_BL) > max_BL_) {
     initialize(x_size_, d_size_, MAX(BL, up.desired_BL));
   }
@@ -319,10 +330,10 @@ int SparseBitLineMaker<T>::makeCounts(
     // x counts
     generateCountsPN<T>(
         x_counts_p_, x_counts_n_, x_indices_p_, x_indices_n_, x_in, x_inc, x_size_, B, rng, BL,
-        up.res, up.sto_round);
+        up.res, up.sto_round, x_noz);
     // d counts // can be compressed
     generateCounts<T>(
-        d_counts_, d_indices_, d_in, d_inc, d_size_, A, rng, BL, up.res, up.sto_round);
+        d_counts_, d_indices_, d_in, d_inc, d_size_, A, rng, BL, up.res, up.sto_round, d_noz);
 
     n_indices_used_ = true;
     break;
@@ -331,10 +342,11 @@ int SparseBitLineMaker<T>::makeCounts(
 
     // x counts
     generateCounts<T>(
-        x_counts_p_, x_indices_p_, x_in, x_inc, x_size_, B, rng, BL, up.res, up.sto_round);
+        x_counts_p_, x_indices_p_, x_in, x_inc, x_size_, B, rng, BL, up.res, up.sto_round, x_noz);
+
     // d counts
     generateCounts<T>(
-        d_counts_, d_indices_, d_in, d_inc, d_size_, A, rng, BL, up.res, up.sto_round);
+        d_counts_, d_indices_, d_in, d_inc, d_size_, A, rng, BL, up.res, up.sto_round, d_noz);
 
     n_indices_used_ = false;
     break;
@@ -407,6 +419,9 @@ bool SparseBitLineMaker<T>::getCountsAndIndices(
 template class SparseBitLineMaker<float>;
 #ifdef RPU_USE_DOUBLE
 template class SparseBitLineMaker<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class SparseBitLineMaker<half_t>;
 #endif
 
 } // namespace RPU

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -14,14 +14,12 @@
 
 # pylint: disable=too-many-instance-attributes
 
-from typing import List
-from dataclasses import dataclass, field
-from aihwkit.simulator.configs.utils import IOParameters, UpdateParameters
+from dataclasses import dataclass
 from aihwkit.simulator.configs.devices import (
-    ConstantStepDevice, ExpStepDevice, LinearStepDevice, SoftBoundsDevice, OneSidedUnitCell
-)
-from aihwkit.simulator.presets.utils import (
-    PresetIOParameters, PresetUpdateParameters
+    ConstantStepDevice,
+    ExpStepDevice,
+    LinearStepDevice,
+    SoftBoundsReferenceDevice,
 )
 
 
@@ -34,6 +32,7 @@ class ReRamESPresetDevice(ExpStepDevice):
 
     .. _`Gong & al., Nat. Commun., 2018`: https://www.nature.com/articles/s41467-018-04485-1
     """
+
     # pylint: disable=invalid-name
 
     dw_min: float = 0.00135
@@ -44,8 +43,8 @@ class ReRamESPresetDevice(ExpStepDevice):
 
     a: float = -0.5
     b: float = -0.5
-    gamma_up: float = 5.
-    gamma_down: float = 5.
+    gamma_up: float = 5.0
+    gamma_down: float = 5.0
     A_up: float = -1.18445
     A_down: float = -0.081404
 
@@ -62,7 +61,7 @@ class ReRamESPresetDevice(ExpStepDevice):
 
 
 @dataclass
-class ReRamSBPresetDevice(SoftBoundsDevice):
+class ReRamSBPresetDevice(SoftBoundsReferenceDevice):
     """Preset configuration for a single ReRAM analog resistive processing
     unit based on soft bounds device.
 
@@ -88,8 +87,8 @@ class ReRamSBPresetDevice(SoftBoundsDevice):
     dw_min_dtod: float = 0.3
     up_down_dtod: float = 0.01  # assumes symmetry point corrected.
 
-    w_max_dtod: float = 0.3/1.25
-    w_min_dtod: float = 0.3/0.75
+    w_max_dtod: float = 0.3 / 1.25
+    w_min_dtod: float = 0.3 / 0.75
 
     # Cycle-to_cycle.
     dw_min_std: float = 3.75
@@ -101,7 +100,7 @@ class CapacitorPresetDevice(LinearStepDevice):
     """Preset configuration for a single capacitor resistive processing
     unit based on linear step device.
 
-    Fit of the model :class:`LinearStepDevice` to  `Li & al., VLSI, 2018`_
+    Fit of the model :class:`LinearStepDevice` to  `Li et al., VLSI, 2018`_
 
     Here some capacitor leakage is assumed as well.
 
@@ -115,7 +114,7 @@ class CapacitorPresetDevice(LinearStepDevice):
 
         The parameter ``lifetime`` needs to be adjusted accordingly.
 
-    .. _`Li & al., VLSI, 2018`: https://ieeexplore.ieee.org/abstract/document/8510648
+    .. _`Li et al., VLSI, 2018`: https://ieeexplore.ieee.org/abstract/document/8510648
     """
 
     dw_min: float = 0.005
@@ -322,13 +321,14 @@ class PCMPresetDevice(ExpStepDevice):
     .. _`Nandakumar et al., Front. Neurosci. 2020`: \
         https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full
     """
+
     # pylint: disable=invalid-name
 
     dw_min: float = 0.01
     up_down: float = 0.0
 
-    w_max: float = 2.
-    w_min: float = 0.
+    w_max: float = 2.0
+    w_min: float = 0.0
 
     a: float = -1.0  # scales with w_max
     b: float = 0.0
@@ -357,20 +357,118 @@ class PCMPresetDevice(ExpStepDevice):
 
 
 @dataclass
-class PCMPresetUnitCell(OneSidedUnitCell):
-    """A unit cell that is comprised of two uni-directional PCM devices of
-    opposite sign (see :class:`~PCMPresetDevice`).
+class ReRamArrayOMPresetDevice(SoftBoundsReferenceDevice):
+    r"""Preset configuration for a single ReRAM analog resistive processing
+    unit based on soft bounds reference device.
 
-    Check for refresh is performed after each mini-batch update. See
-    :class:`~aihwkit.simulator.configs.device.OneSidedUnitCell` for
-    details on the refresh implementation.
+    This parameter setting was obtained from ReRAM device array measurements
+    as described in `Gong & Rasch et al., IEDM., 2022`_.
+
+    This setting is a fit to the "Optimized Material" ReRAM device
+    array in the article.
+
+    Here the :class:`SoftBoundsReferenceDevice` is used as device
+    model class, so that the symmetry point can be easily
+    subtracted. The subtraction is by default on, assuming 5 \% of
+    :math:`w_\max` error (adjustable with ``reference_std``).
+
+    Note:
+
+        Here the weight range is compliance adjusted as described in
+        the article.
+
+        The corrupt device probability (which is 13.5 \% for the array
+        measured) is by default set to zero. It can be set with the
+        ``corrupt_devices_prob`` parameter.
+
+    .. _`Gong & Rasch et al., IEDM., 2022`: \
+        https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10019569
+
     """
 
-    unit_cell_devices: List = field(
-        default_factory=lambda: [PCMPresetDevice(), PCMPresetDevice()])
+    enforce_consistency: bool = True
+    dw_min_dtod_log_normal: bool = True
 
-    refresh_every: int = 1
-    units_in_mbatch: bool = True
-    refresh_forward: IOParameters = field(default_factory=PresetIOParameters)
-    refresh_update: UpdateParameters = field(
-        default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+    dw_min: float = 0.0949
+    up_down: float = 0.0
+
+    w_max: float = 1.0  # 1.4839
+    w_min: float = -1.0  # -0.6192
+
+    mult_noise: bool = False
+
+    # Device-to-device var.
+    dw_min_dtod: float = 0.7829
+    up_down_dtod: float = 0.01
+
+    w_max_dtod: float = 0.3499
+    w_min_dtod: float = 0.5695
+
+    # Cycle-to_cycle.
+    dw_min_std: float = 0.4158
+    write_noise_std: float = 1.4113
+
+    corrupt_devices_range: float = 0.0100
+    corrupt_devices_prob: float = 0.0  # 0.1348
+
+    subtract_symmetry_point: bool = True
+    reference_std: float = 0.05
+
+
+@dataclass
+class ReRamArrayHfO2PresetDevice(SoftBoundsReferenceDevice):
+    r"""Preset configuration for a single ReRAM analog resistive processing
+    unit based on soft bounds reference device.
+
+    This parameter setting was obtained from ReRAM device array measurements
+    as described in `Gong & Rasch et al., IEDM., 2022`_.
+
+    This setting is a fit to the "Baseline HfO2" ReRAM device
+    array in the article.
+
+    Here the :class:`SoftBoundsReferenceDevice` is used as device
+    model class, so that the symmetry point can be easily
+    subtracted. The subtraction is by default on, assuming 5 \% of
+    :math:`w_\max` error (adjustable with ``reference_std``).
+
+    Note:
+
+        Here the weight range is compliance adjusted as described in
+        the article.
+
+        The corrupt device probability (which is 10 \% for the array
+        measured) is by default set to zero. It can be set with the
+        ``corrupt_devices_prob`` parameter.
+
+    .. _`Gong & Rasch et al., IEDM., 2022`: \
+        https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10019569
+
+    """
+
+    enforce_consistency: bool = True
+    dw_min_dtod_log_normal: bool = True
+
+    dw_min: float = 0.4622
+    up_down: float = 0.0
+
+    w_max: float = 1.0  # 1.1490
+    w_min: float = -1.0  # -1.0284
+
+    mult_noise: bool = False
+
+    # Device-to-device var.
+    dw_min_dtod: float = 0.7125
+    up_down_dtod: float = 0.01
+
+    w_max_dtod: float = 0.4295
+    w_min_dtod: float = 0.5990
+
+    # Cycle-to_cycle.
+    dw_min_std: float = 0.2174
+    write_noise_std: float = 0.5841
+
+    corrupt_devices_range: float = 0.0100
+    corrupt_devices_prob: float = 0.0  # 0.0977
+
+    subtract_symmetry_point: bool = True
+    reference_std: float = 0.05

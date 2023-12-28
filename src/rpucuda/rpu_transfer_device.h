@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -91,7 +91,7 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   virtual void initializeWithSize(int x_size, int d_size);
   void initialize() override{/* do nothing */};
 
-  inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == 1.0); };
+  inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == (T)1.0); };
 
   inline int getInSize() const { return _in_size; };
   inline int getOutSize() const { return _out_size; };
@@ -124,6 +124,14 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
     }
     return weight_granularity;
   }
+  T calcNumStates() const override {
+    T num_states = 0.0;
+    if (this->vec_par.size() > 0) {
+      // only take that from first (fast) device
+      num_states = this->vec_par[0]->calcNumStates();
+    }
+    return num_states;
+  }
 
   virtual T getTransferLR(int to_device_idx, int from_device_idx, T current_lr) const;
 };
@@ -140,8 +148,8 @@ public:
 
   TransferRPUDevice(const TransferRPUDevice<T> &);
   TransferRPUDevice<T> &operator=(const TransferRPUDevice<T> &);
-  TransferRPUDevice(TransferRPUDevice<T> &&);
-  TransferRPUDevice<T> &operator=(TransferRPUDevice<T> &&);
+  TransferRPUDevice(TransferRPUDevice<T> &&) noexcept;
+  TransferRPUDevice<T> &operator=(TransferRPUDevice<T> &&) noexcept;
 
   friend void swap(TransferRPUDevice<T> &a, TransferRPUDevice<T> &b) noexcept {
     using std::swap;
@@ -171,16 +179,19 @@ public:
   void
   resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
 
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
   void setHiddenUpdateIdx(int idx) override{};
 
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
-  T getPulseCountLearningRate(T learning_rate) override;
+  T getPulseCountLearningRate(
+      T lr, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) override;
 
-  virtual int getTransferEvery(int from_device_idx, int m_batch) const;
+  virtual int
+  getTransferEvery(int from_device_idx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const;
   virtual void setTransferVecs(const T *transfer_vecs = nullptr);
-  virtual void transfer(int to_device_idx, int from_device_idx, T current_lr);
+  virtual void transfer(int to_device_idx, int from_device_idx, T current_lr, int m_batch_info);
   virtual void readAndUpdate(
       int to_device_idx,
       int from_device_idx,
@@ -188,7 +199,8 @@ public:
       const T *x_input,
       const int n_vec,
       const T reset_prob,
-      const int i_col);
+      const int i_col,
+      const int m_batch_info);
   virtual const T *getTransferVecs() const { return &transfer_vecs_[0]; };
   virtual void writeVector(
       int device_idx, const T *in_vec, const T *out_vec, const T lr, const int m_batch_info);
@@ -199,6 +211,11 @@ public:
       override;
 
   void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
+  inline const ForwardBackwardPassIOManaged<T> &getTransferFBPass() const {
+    return *transfer_fb_pass_;
+  };
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
   void populate(const TransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,8 +18,8 @@ namespace RPU {
 
 struct CustomMaxAbs {
   template <typename T> __device__ __forceinline__ T operator()(const T &a, const T &b) const {
-    T bval = b > 0 ? b : -b;
-    T aval = a > 0 ? a : -a;
+    T bval = b >= (T)0.0 ? b : -b;
+    T aval = a >= (T)0.0 ? a : -a;
     return (bval > aval) ? bval : aval;
   }
 };
@@ -27,7 +27,7 @@ struct CustomMaxAbs {
 template <typename T> class Maximizer {
 
 public:
-  explicit Maximizer(CudaContext *c, int size, bool abs_if = true);
+  explicit Maximizer(CudaContextPtr c, int size, bool abs_if = true);
 
   /* computes the max/amax values */
   template <typename InputIteratorT>
@@ -38,8 +38,8 @@ public:
   void setZeroBelow(T thres);
   void saturateAbove(T thres);
 
-  inline float *getMaxValues() { return dev_max_values_->getData(); };
-  inline void copyMaxValuesToHost(float *dest) { dev_max_values_->copyTo(dest); };
+  inline T *getMaxValues() { return dev_max_values_->getData(); };
+  inline void copyMaxValuesToHost(T *dest) { dev_max_values_->copyTo(dest); };
 
   void printMaxValues() { dev_max_values_->printValues(); };
 
@@ -48,13 +48,13 @@ private:
 
   int buffer_m_batch_ = 0;
   int size_ = 0;
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
 
   CustomMaxAbs max_abs_op_;
   bool abs_if_ = true;
 
-  std::unique_ptr<CudaArray<float>> dev_max_values_ = nullptr; // need float here
-  std::unique_ptr<CudaArray<float>> dev_max_values0_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_max_values_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_max_values0_ = nullptr;
   std::unique_ptr<CudaArray<int>> dev_offsets_ = nullptr;
 
   std::unique_ptr<CudaArray<char>> dev_v_temp_storage_ = nullptr;
@@ -63,7 +63,7 @@ private:
 
 namespace test_helper {
 template <typename T>
-void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, float *max_values);
+void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, T *max_values);
 
 }
 

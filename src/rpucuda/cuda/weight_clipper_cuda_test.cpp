@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,12 +22,6 @@
 
 #define TOLERANCE 1e-5
 
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
-
 namespace {
 
 using namespace RPU;
@@ -47,7 +41,7 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::normal_distribution<num_t> ndist{0.0, 1.0};
+    std::normal_distribution<float> ndist{0.0, 1.0};
     auto nrnd = std::bind(ndist, generator);
 
     wclipper = RPU::make_unique<WeightClipper<num_t>>(x_size, d_size);
@@ -69,8 +63,7 @@ public:
   }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   int x_size, d_size;
   int size;
   WeightClipParameter wclpar;
@@ -93,7 +86,7 @@ TEST_F(WeightClipperTestFixture, FixedValue) {
 
   dev_w->copyTo(v);
   num_t dev_w_max = Find_Absolute_Max<num_t>(v, size);
-  std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
+  // std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
   EXPECT_FLOAT_EQ(w_max, dev_w_max);
   EXPECT_FLOAT_EQ(w_max, wclpar.fixed_value);
 }
@@ -111,7 +104,7 @@ TEST_F(WeightClipperTestFixture, LayerGaussian) {
 
   dev_w->copyTo(v);
   num_t dev_w_max = Find_Absolute_Max<num_t>(v, size);
-  std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
+  // std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
   EXPECT_NEAR(w_max, dev_w_max, 0.01);
   EXPECT_NEAR(w_max, wclpar.sigma, 0.01);
 }
@@ -128,7 +121,7 @@ TEST_F(WeightClipperTestFixture, AverageChannelMax) {
 
   dev_w->copyTo(v);
   num_t dev_w_max = Find_Absolute_Max<num_t>(v, size);
-  std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
+  // std::cout << "w_max " << w_max << ", dev_w_max " << dev_w_max << std::endl;
   EXPECT_NEAR(w_max, dev_w_max, 0.0001);
 }
 

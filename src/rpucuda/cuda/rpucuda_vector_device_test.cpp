@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -30,12 +30,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -125,7 +119,7 @@ public:
 
     setAdditionalValues(&vp, value);
 
-    vp.print();
+    // vp.print();
     num_t lr = 1;
 
     layer_pulsed = RPU::make_unique<RPUPulsed<num_t>>(x_size, d_size);
@@ -133,25 +127,25 @@ public:
     layer_pulsed->populateParameter(&p, &vp);
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
-    layer_pulsed->disp();
+    // layer_pulsed->disp();
 
     this->layer_pulsed->getWeights(refweights[0]);
 
     // culayer
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->disp();
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(this->context, this->x_size * m_batch);
@@ -174,13 +168,6 @@ public:
     this->d_vec = this->rd;
 
     this->context->synchronizeDevice();
-
-    std::cout << "RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    this->culayer_pulsed->printRPUParameter(3, 3);
-    std::cout << "RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-    this->layer_pulsed->printRPUParameter(3, 3);
 
     // update
     int nK32 = (K + 32) / 32;
@@ -230,11 +217,6 @@ public:
       this->context->synchronizeDevice();
     }
 
-    std::cout << "W results for RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    std::cout << "W results for RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-
     num_t **cuweights = this->culayer_pulsed->getWeights();
     num_t **weights = this->layer_pulsed->getWeights();
     this->context->synchronizeDevice();
@@ -243,10 +225,10 @@ public:
     int diff_count_rpucuda = 0;
     for (int i = 0; i < this->d_size; i++) {
       for (int j = 0; j < this->x_size; j++) {
-        if (fabs(weights[i][j] - refweights[i][j]) > 1e-4) {
+        if (fabsf(weights[i][j] - refweights[i][j]) > 1e-4) {
           diff_count_rpu++;
         }
-        if (fabs(cuweights[i][j] - refweights[i][j]) > 1e-4) {
+        if (fabsf(cuweights[i][j] - refweights[i][j]) > 1e-4) {
           diff_count_rpucuda++;
         }
       }
@@ -261,15 +243,12 @@ public:
   void TearDown() { Array_2D_Free(refweights); }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<num_t>> culayer_pulsed;
   std::vector<num_t> x_vec, d_vec, rx, rd;
-
   std::unique_ptr<CudaArray<num_t>> x_cuvec;
   std::unique_ptr<CudaArray<num_t>> d_cuvec;
-
   int x_size;
   int d_size;
   int m_batch;

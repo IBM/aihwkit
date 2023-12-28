@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,19 +20,18 @@ namespace RPU {
 
 template <typename T>
 void OneSidedRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const {
-  ss << this->getName() << std::endl;
   // every
-  ss << "   OneSided parameter: \n";
+  ss << "\t\bOneSided parameter: \n";
   ss << "\t refresh_every: \t" << refresh_every << " [MACC]" << std::endl;
   if (refresh_every > 0) {
-    ss << "      Refresh forward IO parameter:" << std::endl;
+    ss << "\t\bRefresh forward IO parameter:" << std::endl;
     refresh_io.printToStream(ss);
-    ss << "      Refresh update parameter:" << std::endl;
+    ss << "\t\bRefresh update parameter:" << std::endl;
     refresh_up.printToStream(ss);
   }
 
   if (this->vec_par.size() > 0) {
-    ss << "   ";
+    ss << "\t\bOneSided device parameter (" << this->vec_par[0]->getName() << "):" << std::endl;
     this->vec_par[0]->printToStream(ss);
   }
 };
@@ -78,13 +77,19 @@ template struct OneSidedRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct OneSidedRPUDeviceMetaParameter<double>;
 #endif
+#ifdef RPU_USE_FP16
+template struct OneSidedRPUDeviceMetaParameter<half_t>;
+#endif
 
 /************************************************************************************/
 /* OneSidedRPUDevice*/
 
 // ctor
 template <typename T>
-OneSidedRPUDevice<T>::OneSidedRPUDevice(int x_sz, int d_sz) : VectorRPUDevice<T>(x_sz, d_sz) {}
+OneSidedRPUDevice<T>::OneSidedRPUDevice(int x_sz, int d_sz) : VectorRPUDevice<T>(x_sz, d_sz) {
+  a_indices_.resize(x_sz);
+  b_indices_.resize(x_sz);
+}
 
 template <typename T>
 OneSidedRPUDevice<T>::OneSidedRPUDevice(
@@ -102,8 +107,8 @@ OneSidedRPUDevice<T>::OneSidedRPUDevice(const OneSidedRPUDevice<T> &other)
   a_indices_ = other.a_indices_;
   b_indices_ = other.b_indices_;
 
-  refresh_fb_pass_ = make_unique<ForwardBackwardPassIOManaged<T>>(*other.refresh_fb_pass_);
-  refresh_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(*other.refresh_pwu_);
+  refresh_fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManaged<T>>(*other.refresh_fb_pass_);
+  refresh_pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(*other.refresh_pwu_);
   refresh_counter_ = other.refresh_counter_;
   refresh_vecs_ = other.refresh_vecs_;
 }
@@ -186,7 +191,7 @@ void OneSidedRPUDevice<T>::populate(
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   refresh_fb_pass_ =
       RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
-  refresh_fb_pass_->setIOPar(par.refresh_io, par.refresh_io);
+  refresh_fb_pass_->populateFBParameter(par.refresh_io, par.refresh_io);
 
   refresh_pwu_ =
       RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
@@ -202,18 +207,6 @@ template <typename T> inline void OneSidedRPUDevice<T>::invert() {
   std::swap(g_plus_, g_minus_);
   this->reduce_weightening_[g_plus_] = 1;
   this->reduce_weightening_[g_minus_] = -1;
-}
-
-template <typename T>
-void OneSidedRPUDevice<T>::initUpdateCycle(
-    T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {
-
-  VectorRPUDevice<T>::initUpdateCycle(weights, up, current_lr, m_batch_info);
-
-  if (a_indices_.size() < (size_t)up.desired_BL) {
-    a_indices_.resize(up.desired_BL);
-    b_indices_.resize(up.desired_BL);
-  }
 }
 
 template <typename T>
@@ -325,12 +318,12 @@ template <typename T> int OneSidedRPUDevice<T>::refreshWeights() {
     refresh_m_vec_.resize(this->d_size_);
   }
 
-  T w_max =
-      fabs(static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_plus_]->getPar())
-               .w_max);
-  T w_min =
-      fabs(static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_minus_]->getPar())
-               .w_max); // also max because of the one-sided-ness
+  T w_max = (T)fabsf(
+      static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_plus_]->getPar())
+          .w_max);
+  T w_min = (T)fabsf(
+      static_cast<PulsedRPUDeviceMetaParameter<T> &>(this->rpu_device_vec_[g_minus_]->getPar())
+          .w_max); // also max because of the one-sided-ness
   T upper_thres = par.refresh_upper_thres;
   T lower_thres = par.refresh_lower_thres;
   T **weights_p = this->weights_vec_[g_plus_];
@@ -417,8 +410,8 @@ template <typename T> bool OneSidedRPUDevice<T>::onSetWeights(T **weights) {
 
   PRAGMA_SIMD
   for (int i = 0; i < this->size_; i++) {
-    this->weights_vec_[g_plus_][0][i] = w[i] > 0 ? w[i] : (T)0.0;
-    this->weights_vec_[g_minus_][0][i] = w[i] < 0 ? -w[i] : (T)0.0;
+    this->weights_vec_[g_plus_][0][i] = w[i] > (T)0.0 ? w[i] : (T)0.0;
+    this->weights_vec_[g_minus_][0][i] = w[i] < (T)0.0 ? -w[i] : (T)0.0;
   }
 
   this->rpu_device_vec_[g_plus_]->onSetWeights(this->weights_vec_[g_plus_]);
@@ -432,6 +425,9 @@ template <typename T> bool OneSidedRPUDevice<T>::onSetWeights(T **weights) {
 template class OneSidedRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class OneSidedRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class OneSidedRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

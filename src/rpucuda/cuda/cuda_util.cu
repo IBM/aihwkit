@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -13,9 +13,12 @@
 #include "cuda_math_util.h"
 #include "cuda_util.h"
 #include "utility_functions.h"
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <memory>
+
+#define DISABLE_SHARED_MUTEX 1
 
 #define IDX2F(i, j, ld) ((((j)-1) * (ld)) + ((i)-1))
 
@@ -24,7 +27,144 @@
 // thread, one needs it.
 #define RPU_EXPLICIT_ENFORCE_DEVICE_ID
 
+#define SUBTRACTMEMCOUNTER(BYTES)                                                                  \
+  {                                                                                                \
+    std::lock_guard<std::mutex> lock(rpu_global_mem_counter_mutex);                                \
+    rpu_global_mem_counter -= BYTES;                                                               \
+  }
+#define ADDTOMEMCOUNTER(BYTES)                                                                     \
+  {                                                                                                \
+    std::lock_guard<std::mutex> lock(rpu_global_mem_counter_mutex);                                \
+    rpu_global_mem_counter += BYTES;                                                               \
+  }
+
+int64_t rpu_global_mem_counter = 0;
+std::mutex rpu_global_mem_counter_mutex;
+
 namespace RPU {
+
+/*****************************************************/
+/*  states */
+
+#define RPU_LOAD_ARRAY(T)                                                                          \
+  template <>                                                                                      \
+  void load(                                                                                       \
+      CudaContextPtr context, RPU::state_t &state, std::string key, CudaArray<T> &value,           \
+      bool strict) {                                                                               \
+    std::vector<double> tmp;                                                                       \
+    try {                                                                                          \
+      tmp = state.at(key);                                                                         \
+    } catch (const std::out_of_range &oor) {                                                       \
+      if (strict) {                                                                                \
+        RPU_FATAL("Cannot find the cuda unique vector key `" << key << "` in state.");             \
+      }                                                                                            \
+      return;                                                                                      \
+    }                                                                                              \
+    std::vector<T> out(tmp.begin(), tmp.end());                                                    \
+    if (!out.size()) {                                                                             \
+      value = CudaArray<T>(context, 0);                                                            \
+    } else {                                                                                       \
+      value = CudaArray<T>(context, out);                                                          \
+    }                                                                                              \
+  }
+
+RPU_LOAD_ARRAY(float);
+#ifdef RPU_USE_DOUBLE
+RPU_LOAD_ARRAY(double);
+#endif
+RPU_LOAD_ARRAY(int);
+RPU_LOAD_ARRAY(chop_t);
+RPU_LOAD_ARRAY(uint64_t);
+RPU_LOAD_ARRAY(char);
+RPU_LOAD_ARRAY(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_LOAD_ARRAY(half_t);
+#endif
+#undef RPU_LOAD_ARRAY
+
+#define RPU_LOAD_UNIQUE(T)                                                                         \
+  template <>                                                                                      \
+  void load(                                                                                       \
+      CudaContextPtr context, RPU::state_t &state, std::string key,                                \
+      std::unique_ptr<CudaArray<T>> &value, bool strict) {                                         \
+    std::vector<double> tmp;                                                                       \
+    try {                                                                                          \
+      tmp = state.at(key);                                                                         \
+    } catch (const std::out_of_range &oor) {                                                       \
+      if (strict) {                                                                                \
+        RPU_FATAL("Cannot find the cuda vector key `" << key << "` in state.");                    \
+      }                                                                                            \
+      return;                                                                                      \
+    }                                                                                              \
+    std::vector<T> out(tmp.begin(), tmp.end());                                                    \
+    if (!out.size()) {                                                                             \
+      value = nullptr;                                                                             \
+    } else {                                                                                       \
+      value = RPU::make_unique<CudaArray<T>>(context, out);                                        \
+    }                                                                                              \
+  }
+
+RPU_LOAD_UNIQUE(float);
+#ifdef RPU_USE_DOUBLE
+RPU_LOAD_UNIQUE(double);
+#endif
+RPU_LOAD_UNIQUE(int);
+RPU_LOAD_UNIQUE(chop_t);
+RPU_LOAD_UNIQUE(uint64_t);
+RPU_LOAD_UNIQUE(char);
+RPU_LOAD_UNIQUE(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_LOAD_UNIQUE(half_t);
+#endif
+#undef RPU_LOAD_UNIQUE
+
+#define RPU_INSERT_CUDA(TYPE)                                                                      \
+  template <> void insert(RPU::state_t &state, std::string key, const CudaArray<TYPE> &value) {    \
+    std::vector<TYPE> tmp = value.cpu();                                                           \
+    std::vector<double> out(tmp.begin(), tmp.end());                                               \
+    state[key] = out;                                                                              \
+  }
+
+RPU_INSERT_CUDA(float);
+#ifdef RPU_USE_DOUBLE
+RPU_INSERT_CUDA(double);
+#endif
+RPU_INSERT_CUDA(int);
+RPU_INSERT_CUDA(chop_t);
+RPU_INSERT_CUDA(uint64_t);
+RPU_INSERT_CUDA(char);
+RPU_INSERT_CUDA(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_INSERT_CUDA(half_t);
+#endif
+#undef RPU_INSERT_CUDA
+
+#define RPU_INSERT_UNIQUE_CUDA(TYPE)                                                               \
+  template <>                                                                                      \
+  void insert(                                                                                     \
+      RPU::state_t &state, std::string key, const std::unique_ptr<CudaArray<TYPE>> &value) {       \
+    if (value != nullptr) {                                                                        \
+      std::vector<TYPE> tmp = value->cpu();                                                        \
+      std::vector<double> out(tmp.begin(), tmp.end());                                             \
+      state[key] = out;                                                                            \
+    } else {                                                                                       \
+      state[key] = std::vector<double>{};                                                          \
+    }                                                                                              \
+  }
+
+RPU_INSERT_UNIQUE_CUDA(float);
+#ifdef RPU_USE_DOUBLE
+RPU_INSERT_UNIQUE_CUDA(double);
+#endif
+RPU_INSERT_UNIQUE_CUDA(int);
+RPU_INSERT_UNIQUE_CUDA(chop_t);
+RPU_INSERT_UNIQUE_CUDA(uint64_t);
+RPU_INSERT_UNIQUE_CUDA(char);
+RPU_INSERT_UNIQUE_CUDA(kagg_t);
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+RPU_INSERT_UNIQUE_CUDA(half_t);
+#endif
+#undef RPU_INSERT_UNIQUE_CUDA
 
 __global__ void kernelCurandSetup(unsigned long long rseed, curandState_t *state, int n) {
   int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -50,7 +190,7 @@ void curandSetup(CudaArray<curandState_t> &dev_states, unsigned long long rseed,
   } else {
     seed = rseed;
   }
-  CudaContext *c = dev_states.getContext();
+  CudaContextPtr c = dev_states.getContext();
   int m = dev_states.getSize();
   int nthreads = c->getNThreads();
   int nblocks = c->getNBlocks(m, nthreads);
@@ -65,14 +205,14 @@ void curandSetup(CudaArray<curandState_t> &dev_states, unsigned long long rseed,
 }
 
 void curandSetup(
-    CudaContext *c,
+    CudaContextPtr c,
     std::unique_ptr<CudaArray<curandState_t>> &dev_states,
     int n,
     unsigned long long rseed,
     bool same_seed) {
   int m = (n + 31) / 32 * 32;
   c->synchronizeDevice();
-  dev_states = std::unique_ptr<CudaArray<curandState_t>>(new CudaArray<curandState_t>(c, m));
+  dev_states = RPU::make_unique<CudaArray<curandState_t>>(c, m);
   curandSetup(*dev_states, rseed, same_seed);
 }
 
@@ -92,8 +232,8 @@ CublasEnvironment::~CublasEnvironment() {
   if (device_handle_created_) {
     DEBUG_OUT("destroy device handle");
     kernelCublasDestroy<<<1, 1>>>(device_handle_);
-    cudaDeviceSynchronize();
-    cudaFree(device_handle_);
+    CUDA_CALL(cudaDeviceSynchronize());
+    CUDA_CALL(cudaFree(device_handle_));
     DEBUG_OUT("CUBLAS device destroyed");
   }
 #endif
@@ -169,18 +309,18 @@ int CublasEnvironment::runTest() {
   stat = cublasSetMatrix(M, N, sizeof(*a), a, M, devPtrA, M);
   if (stat != CUBLAS_STATUS_SUCCESS) {
     std::cerr << "CUBLAS test run failed (data download)\n";
-    cudaFree(devPtrA);
+    CUDA_CALL(cudaFree(devPtrA));
     free(a);
     return 1;
   }
   stat = cublasGetMatrix(M, N, sizeof(*a), devPtrA, M, a, M);
   if (stat != CUBLAS_STATUS_SUCCESS) {
     std::cerr << "CUBLAS test run failed (data upload)\n";
-    cudaFree(devPtrA);
+    CUDA_CALL(cudaFree(devPtrA));
     free(a);
     return 1;
   }
-  cudaFree(devPtrA);
+  CUDA_CALL(cudaFree(devPtrA));
   for (j = 1; j <= N; j++) {
     for (i = 1; i <= M; i++) {
       std::cout << a[IDX2F(i, j, M)] << ",";
@@ -297,7 +437,6 @@ void CudaContext::init() {
   rng_created_ = false;
   shared_ = false;
   non_blocking_ = true;
-  allocated_mem_ = 0;
 
   CUDA_CALL(cudaEventCreate(&event_));
 
@@ -316,33 +455,46 @@ CudaContext::CudaContext(cudaStream_t shared_stream, int gpu_id) : gpu_id_(gpu_i
   DEBUG_OUT("Create context on GPU " << gpu_id << " with shared stream (on id 0)\n");
   this->init();
 
-  // ignore the test for shared stream 0. Pytorch seem to like 0
-  // if (!shared_stream) {
-  //  RPU_FATAL("Shared stream should not be NULL!");
-  //} else {
   shared_ = true;
   streams_.push_back(shared_stream);
-  // }
+  stream_id_ = 0;
+
+  shared_stream_id_ = 0;
+  shared_streams_.push_back(shared_stream);
 }
 
 CudaContext::~CudaContext() {
-  DEBUG_OUT("Destroy Cuda Context...");
-  if (env_ != nullptr) {
-    int i_start = shared_ ? 1 : 0;
-    for (int i = i_start; i < streams_.size(); i++) {
-      cudaStreamSynchronize(streams_[i]);
-      cudaStreamDestroy(streams_[i]);
-    }
+  DEBUG_OUT("Destroy CudaContext...");
+
+  shared_random_states_.clear();
+  shared_float_buffer_.clear();
+#ifdef RPU_USE_DOUBLE
+  shared_double_buffer_.clear();
+#endif
+#ifdef RPU_USE_FP16
+  shared_half_t_buffer_.clear();
+#endif
+
+  random_states_.clear();
+  float_buffer_.clear();
+#ifdef RPU_USE_DOUBLE
+  double_buffer_.clear();
+#endif
+#ifdef RPU_USE_FP16
+  half_t_buffer_.clear();
+#endif
+
+  int i_start = shared_ ? 1 : 0;
+  for (int i = i_start; i < streams_.size(); i++) {
+    cudaStreamSynchronize(streams_[i]);
+    cudaStreamDestroy(streams_[i]);
   }
+
   if (event_ != nullptr) {
     cudaEventDestroy(event_);
     event_ = nullptr;
   }
 
-  if (env_ != nullptr) {
-    delete env_;
-    env_ = nullptr;
-  }
   if (rng_created_) {
     curandDestroyGenerator(rng_);
     rng_created_ = false;
@@ -352,29 +504,30 @@ CudaContext::~CudaContext() {
     delete prop_;
     prop_ = nullptr;
   }
-
-  DEBUG_OUT("Destroyed.");
+  if (env_ != nullptr) {
+    delete env_;
+    env_ = nullptr;
+  }
+  DEBUG_OUT("Destroyed CudaContext.");
 }
 
 // copy constructor
 CudaContext::CudaContext(const CudaContext &other) {
-  // only stream idx 0 is ever shared !
-  // copy construction will share the stream.
-  // random generator etc are NOT shared !
+  // NOTE: changed to non-shared copy
 
   gpu_id_ = other.gpu_id_;
   this->init();
 
-  shared_ = true;
+  shared_ = other.shared_;
   non_blocking_ = other.non_blocking_;
-  allocated_mem_ = 0; // start counting from 0
 
-  // only stream 0 is ever shared !!
-  if (other.streams_.size() > 0) {
+  if (other.shared_ && other.streams_.size() > 0) {
     streams_.push_back(other.streams_[0]);
   }
+  shared_streams_ = other.shared_streams_;
+  shared_stream_id_ = other.shared_stream_id_;
 
-  for (int i = 1; i < other.streams_.size(); i++) {
+  for (int i = other.shared_ ? 1 : 0; i < other.streams_.size(); i++) {
     // rest are new streams!!
     this->getStream(i);
   }
@@ -385,38 +538,36 @@ CudaContext::CudaContext(const CudaContext &other) {
     this->createRandomGenerator();
   }
 
-  // random states won't be copied. They will be created a new
+  // random states and buffers won't be copied. They will be created a new
 
   DEBUG_OUT("CudaContext copy constructed [but only first stream shared. New streams and event!].");
 }
 
 // copy assignment
 CudaContext &CudaContext::operator=(const CudaContext &other) {
-  DEBUG_OUT("Copy assignment ");
   CudaContext tmp(other);
   swap(*this, tmp);
+  synchronize();
   return *this;
 }
 
 // move constructor
-CudaContext::CudaContext(CudaContext &&other) {
-  *this = std::move(other);
-  DEBUG_OUT("Move constructor ");
-}
+CudaContext::CudaContext(CudaContext &&other) { *this = std::move(other); }
 
 // move assignment
 CudaContext &CudaContext::operator=(CudaContext &&other) {
 
   gpu_id_ = other.gpu_id_;
   stream_id_ = other.stream_id_;
+  shared_stream_id_ = other.shared_stream_id_;
   shared_ = other.shared_;
   non_blocking_ = other.non_blocking_;
-  allocated_mem_ = other.allocated_mem_;
 
   prop_ = other.prop_;
   other.prop_ = nullptr;
 
   streams_ = std::move(other.streams_);
+  shared_streams_ = std::move(other.shared_streams_);
 
   env_ = other.env_;
   other.env_ = nullptr;
@@ -429,9 +580,20 @@ CudaContext &CudaContext::operator=(CudaContext &&other) {
   event_ = other.event_;
   other.event_ = nullptr;
 
+  random_states_ = std::move(other.random_states_);
   shared_random_states_ = std::move(other.shared_random_states_);
 
-  DEBUG_OUT("Move assignment ");
+  shared_float_buffer_ = std::move(other.shared_float_buffer_);
+  float_buffer_ = std::move(other.float_buffer_);
+#ifdef RPU_USE_DOUBLE
+  shared_double_buffer_ = std::move(other.shared_double_buffer_);
+  double_buffer_ = std::move(other.double_buffer_);
+#endif
+#ifdef RPU_USE_FP16
+  shared_half_t_buffer_ = std::move(other.shared_half_t_buffer_);
+  half_t_buffer_ = std::move(other.half_t_buffer_);
+#endif
+
   return *this;
 }
 
@@ -458,7 +620,7 @@ void CudaContext::synchronizeDevice() const {
   CUDA_CALL(cudaDeviceSynchronize());
 }
 
-void CudaContext::synchronizeWith(CudaContext *c) const {
+void CudaContext::synchronizeWith(CudaContextPtr c) const {
 
   if (this->getStream() == c->getStream()) {
     // do nothing since work on the same stream
@@ -468,7 +630,7 @@ void CudaContext::synchronizeWith(CudaContext *c) const {
   }
 }
 
-void CudaContext::synchronizeWith(CudaContext *ca, CudaContext *cb) const {
+void CudaContext::synchronizeWith(CudaContextPtr ca, CudaContextPtr cb) const {
 
   if (ca->getStream() != cb->getStream()) {
     ca->synchronizeWith(cb);
@@ -491,13 +653,9 @@ void CudaContext::synchronizeStream() const {
   CUDA_CALL(cudaStreamSynchronize(streams_[stream_id_]));
 }
 
-int CudaContext::getNBlocks(int size, int nthreads) const {
-  DEBUG_OUT("get NBlocks for  size " << size);
-  return (size + nthreads - 1) / nthreads;
-}
-
 int CudaContext::getNStrideBlocks(int size, int nthreads) const {
   DEBUG_OUT("get N Stride Blocks for  size " << size);
+  nthreads = MIN(maxThreadsPerBlock(), nthreads);
   int max_blocks = getSMCount() * maxThreadsPerBlock() / nthreads;
   return MIN(getNBlocks(size, nthreads), max_blocks);
 }
@@ -533,8 +691,13 @@ cudaStream_t CudaContext::getStream(int idx) {
   }
 }
 
-void CudaContext::setStream(cudaStream_t s) {
+void CudaContext::setExternalStream(cudaStream_t s) {
   if (shared_) {
+
+#ifndef DISABLE_SHARED_MUTEX
+    shared_mutex_.lock();
+#endif
+
     enforceDeviceId();
     if (s != streams_[stream_id_]) {
       if (stream_id_ != 0) {
@@ -542,11 +705,29 @@ void CudaContext::setStream(cudaStream_t s) {
       } else {
         this->synchronizeStream();
       }
+      CUBLAS_CALL(cublasSetStream(this->getBlasHandle(), s));
     }
     streams_[0] = s;
     stream_id_ = 0;
+
+    auto it = std::find(shared_streams_.begin(), shared_streams_.end(), s);
+    if (it != shared_streams_.end()) {
+      shared_stream_id_ = it - shared_streams_.begin();
+    } else {
+      shared_streams_.push_back(s);
+      shared_stream_id_ = shared_streams_.size() - 1;
+    }
   } else {
-    RPU_FATAL("setStream: must be shared context.");
+    RPU_FATAL("setExternalStream: must be a shared context.");
+  }
+}
+
+void CudaContext::releaseExternalStream() {
+  if (shared_) {
+
+#ifndef DISABLE_SHARED_MUTEX
+    shared_mutex_.unlock();
+#endif
   }
 }
 
@@ -572,6 +753,7 @@ void CudaContext::setRandomSeed(unsigned long long rseed) {
   } else {
     seed = rseed;
   }
+  CURAND_CALL(curandSetStream(rng_, this->getStream()));
   CURAND_CALL(curandSetPseudoRandomGeneratorSeed(rng_, seed));
   this->synchronizeStream();
 }
@@ -582,6 +764,7 @@ void CudaContext::randNormal(float *dev_array, int size, float mean, float stdde
   }
 
   if (stddev > 0) {
+    CURAND_CALL(curandSetStream(rng_, this->getStream()));
     CURAND_CALL(curandGenerateNormal(rng_, dev_array, size, mean, stddev));
   } else {
     RPU::math::elemconst(this, dev_array, size, mean);
@@ -593,7 +776,7 @@ void CudaContext::randUniform(float *dev_array, int size) {
   if (!rng_created_) {
     setRandomSeed(0);
   }
-
+  CURAND_CALL(curandSetStream(rng_, this->getStream()));
   CURAND_CALL(curandGenerateUniform(rng_, dev_array, size));
 }
 
@@ -604,16 +787,162 @@ curandState_t *CudaContext::getRandomStates(int size) {
     n = getSMCount() * maxThreadsPerBlock();
   }
 
-  if (shared_random_states_.size() <= stream_id_) {
-    shared_random_states_.resize(stream_id_ + 1);
+  auto *rs = &random_states_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    rs = &shared_random_states_;
+    stream_id = shared_stream_id_;
   }
-  if (!shared_random_states_[stream_id_] || (n > shared_random_states_[stream_id_]->getSize())) {
-    curandSetup(this, shared_random_states_[stream_id_], n, 0, false);
+
+  if (rs->size() <= stream_id) {
+    rs->resize(stream_id + 1);
   }
-  return shared_random_states_[stream_id_]->getData();
+  if (!(*rs)[stream_id] || (n > (*rs)[stream_id]->getSize())) {
+    curandSetup(this, (*rs)[stream_id], n, 0, false);
+  }
+  return (*rs)[stream_id]->getData();
 }
 
-void CudaContext::recordWaitEvent(CudaContext *wait_on_context) {
+template <> float *CudaContext::getSharedBuffer<float>(int id, int size) {
+
+  auto *buffer = &float_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_float_buffer_;
+    stream_id = shared_stream_id_;
+    DEBUG_OUT("Get SHARED float buffer ID " << id << ", size " << size << ", stream " << stream_id);
+  } else {
+    DEBUG_OUT("Get float buffer ID " << id << ", size " << size << ", stream " << stream_id);
+  }
+
+  while (buffer->size() <= stream_id) {
+    buffer->push_back(std::vector<CudaBuffer<float>>{RPU_MAX_BUFFER});
+  }
+  return (*buffer)[stream_id][id].get(this, size);
+}
+
+template <> void CudaContext::releaseSharedBuffer<float>(int id) {
+
+  auto *buffer = &float_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_float_buffer_;
+    stream_id = shared_stream_id_;
+    DEBUG_OUT("Release SHARED float buffer ID " << id << ", stream " << stream_id);
+  } else {
+    DEBUG_OUT("Release float buffer ID " << id << ", stream " << stream_id);
+  }
+
+  (*buffer)[stream_id][id].release();
+}
+
+template <> void CudaContext::printSharedBuffer<float>(int id, int size) {
+
+  auto *buffer = &float_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_float_buffer_;
+    stream_id = shared_stream_id_;
+  }
+  RPU_INFO("Float buffer " << id);
+  (*buffer)[stream_id][id].print(size);
+}
+
+#ifdef RPU_USE_DOUBLE
+template <> double *CudaContext::getSharedBuffer<double>(int id, int size) {
+  // somehow this needs to be a MAX_BUFFER vector to avoid dynamical
+  // resizing. Not sure why, but dynamical allocation of the
+  // CudaBuffer vector elements does not work without uniptr (which
+  // then has sync problems)
+
+  auto *buffer = &double_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_double_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  while (buffer->size() <= stream_id) {
+    buffer->push_back(std::vector<CudaBuffer<double>>{RPU_MAX_BUFFER});
+  }
+  return (*buffer)[stream_id][id].get(this, size);
+}
+
+template <> void CudaContext::releaseSharedBuffer<double>(int id) {
+
+  auto *buffer = &double_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_double_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  (*buffer)[stream_id][id].release();
+}
+
+template <> void CudaContext::printSharedBuffer<double>(int id, int size) {
+
+  auto *buffer = &double_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_double_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  RPU_INFO("Double buffer " << id);
+  (*buffer)[stream_id][id].print(size);
+}
+
+#endif
+
+#ifdef RPU_USE_FP16
+template <> half_t *CudaContext::getSharedBuffer<half_t>(int id, int size) {
+  // somehow this needs to be a MAX_BUFFER vector to avoid dynamical
+  // resizing. Not sure why, but dynamical allocation of the
+  // CudaBuffer vector elements does not work without uniptr (which
+  // then has sync problems)
+
+  auto *buffer = &half_t_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_half_t_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  while (buffer->size() <= stream_id) {
+    buffer->push_back(std::vector<CudaBuffer<half_t>>{RPU_MAX_BUFFER});
+  }
+  return (*buffer)[stream_id][id].get(this, size);
+}
+
+template <> void CudaContext::releaseSharedBuffer<half_t>(int id) {
+
+  auto *buffer = &half_t_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_half_t_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  (*buffer)[stream_id][id].release();
+}
+
+template <> void CudaContext::printSharedBuffer<half_t>(int id, int size) {
+
+  auto *buffer = &half_t_buffer_;
+  auto stream_id = stream_id_;
+  if (shared_ && stream_id_ == 0) {
+    buffer = &shared_half_t_buffer_;
+    stream_id = shared_stream_id_;
+  }
+
+  RPU_INFO("Bfloat buffer " << id);
+  (*buffer)[stream_id][id].print(size);
+}
+
+#endif
+
+void CudaContext::recordWaitEvent(CudaContextPtr wait_on_context) {
   this->recordWaitEvent(wait_on_context->getStream(), wait_on_context->getEvent());
 }
 void CudaContext::recordEvent() { CUDA_CALL(cudaEventRecord(event_, streams_[stream_id_])); }
@@ -621,7 +950,7 @@ void CudaContext::waitEvent(cudaEvent_t wait_on_event) {
   CUDA_CALL(cudaStreamWaitEvent(streams_[stream_id_], wait_on_event, 0));
 }
 
-void CudaContext::waitEvent(CudaContext *wait_on_context) {
+void CudaContext::waitEvent(CudaContextPtr wait_on_context) {
   waitEvent(wait_on_context->getEvent());
 }
 
@@ -634,51 +963,58 @@ void CudaContext::recordWaitEvent(cudaStream_t s, cudaEvent_t e) {
   }
 }
 
-void CudaContext::addToMemCounter(int64_t n_bytes) {
-  allocated_mem_ += n_bytes;
-  std::lock_guard<std::mutex> lock(global_mem_counter_mutex);
-  global_mem_counter += n_bytes;
-  // std::cout << "MEM at " << global_mem_counter /1024 / 1024 << " MB\n";
-}
-
-void CudaContext::subtractMemCounter(int64_t n_bytes) {
-  allocated_mem_ -= n_bytes;
-  std::lock_guard<std::mutex> lock(global_mem_counter_mutex);
-  global_mem_counter -= n_bytes;
-}
-
 //**********************************************************************//
 
 template <typename T>
-CudaArray<T>::CudaArray(CudaContext *c) : size_(0), width_(0), height_(1), pitch_(0), context_(c) {}
+CudaArray<T>::CudaArray(CudaContextPtr c)
+    : size_(0), width_(0), height_(1), pitch_(0), context_(c) {}
 
-template <typename T> CudaArray<T>::CudaArray(CudaContext *c, int n) : CudaArray(c) {
+template <typename T> CudaArray<T>::CudaArray(CudaContextPtr c, int n) : CudaArray(c) {
   size_ = n;
   width_ = n;
   height_ = 1; // this needs to be one! No height>1 supported yet
   if (n > 0) {
     context_->enforceDeviceId();
-    CUDA_CALL(cudaMallocPitch(&values_, &pitch_, n * sizeof(T), height_));
-    context_->addToMemCounter(size_ * sizeof(T));
+    int mem_size = size_ * sizeof(T);
+    mem_size = (mem_size + 3) / 4 * 4; // align on 32-bit word
+    CUDA_CALL(cudaMallocPitch(&values_, &pitch_, mem_size, height_));
+    ADDTOMEMCOUNTER(mem_size);
   }
 }
 
 template <typename T>
-CudaArray<T>::CudaArray(CudaContext *c, int n, const T *host_array) : CudaArray(c, n) {
+CudaArray<T>::CudaArray(CudaContextPtr c, int n, const T *host_array) : CudaArray(c, n) {
   if (n > 0) {
     this->assign(host_array);
     context_->synchronize(); // better syncrhonize. Constructing is considered slow anyway
   }
 }
 
-template <typename T> CudaArray<T>::~CudaArray() {
+template <typename T>
+CudaArray<T>::CudaArray(CudaContextPtr c, const std::vector<T> &host_vector)
+    : CudaArray(c, host_vector.size()) {
+  size_t n = host_vector.size();
+  if (n > 0) {
+    this->assign(host_vector.data());
+    context_->synchronize(); // better syncrhonize. Constructing is considered slow anyway
+  }
+}
 
-  // no sync because no ownership of context !! (might be already destructed)
+template <typename T> CudaArray<T>::~CudaArray() {
+  if (values_ == nullptr) {
+    return;
+  }
+
   if ((size_ > 0) && (values_ != nullptr) && (!shared_if_)) {
-    context_->subtractMemCounter(size_ * sizeof(T));
+    // cudaDeviceSynchronize(); // too much?
+    SUBTRACTMEMCOUNTER(size_ * sizeof(T));
     cudaFree(values_);
     values_ = nullptr;
+    size_ = 0;
+    width_ = 0;
   }
+
+  values_ = nullptr;
 }
 
 // copy constructor
@@ -692,15 +1028,14 @@ template <typename T> CudaArray<T>::CudaArray(const CudaArray<T> &other) {
 
   if (size_ > 0) {
     context_->enforceDeviceId();
-    CUDA_CALL(cudaMallocPitch(&values_, &pitch_, size_ * sizeof(T), height_));
 
     if (other.shared_if_) {
       this->setShared(other.values_);
     } else {
+      CUDA_CALL(cudaMallocPitch(&values_, &pitch_, size_ * sizeof(T), height_));
       this->assign(other);
     }
     context_->synchronize(); // better synchronize. Constructing is slow anyway
-    context_->addToMemCounter(size_ * sizeof(T));
   }
 
   DEBUG_OUT("CudaArray copy constructed.");
@@ -708,18 +1043,16 @@ template <typename T> CudaArray<T>::CudaArray(const CudaArray<T> &other) {
 
 // copy assignment
 template <typename T> CudaArray<T> &CudaArray<T>::operator=(const CudaArray<T> &other) {
-  context_->enforceDeviceId();
-  CudaArray<T> tmp(other); // seems a bit inefficient...
+  CudaArray<T> tmp(other);
   swap(*this, tmp);
-  context_->synchronize(); // need sync because of tmp
+  if (size_ > 0) {
+    context_->synchronize(); // need sync because of tmp
+  }
   return *this;
 }
 
 // move constructor
-template <typename T> CudaArray<T>::CudaArray(CudaArray<T> &&other) {
-  context_->enforceDeviceId();
-  *this = std::move(other);
-}
+template <typename T> CudaArray<T>::CudaArray(CudaArray<T> &&other) { *this = std::move(other); }
 
 // move assignment
 template <typename T> CudaArray<T> &CudaArray<T>::operator=(CudaArray<T> &&other) {
@@ -754,7 +1087,7 @@ template <typename T> void CudaArray<T>::setConst(T set_value) {
                             << height_);
   if (size_ > 0) {
     context_->enforceDeviceId();
-    if (set_value != 0) {
+    if (set_value != (T)0.0) {
       RPU::math::elemconst(context_, values_, size_, set_value);
     } else {
       CUDA_CALL(cudaMemset2DAsync(
@@ -767,9 +1100,16 @@ template <> void CudaArray<curandStateXORWOW>::setConst(curandStateXORWOW set_va
   RPU_FATAL("Cannot set curandstates to some values.");
 }
 
+#ifdef RPU_USE_DOUBLE
 template <> void CudaArray<double *>::setConst(double *set_value) {
   RPU_FATAL("Cannot set pointer types to some values.");
 }
+#endif
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+template <> void CudaArray<half_t *>::setConst(half_t *set_value) {
+  RPU_FATAL("Cannot set pointer types to some values.");
+}
+#endif
 
 template <> void CudaArray<float *>::setConst(float *set_value) {
   RPU_FATAL("Cannot set pointer types to some values.");
@@ -789,24 +1129,118 @@ template <typename T> void CudaArray<T>::printValues(int nmax) const {
   delete[] values;
 }
 
+template <typename T> void CudaArray<T>::printNZValues(int nmax) const {
+  T *values = new T[size_];
+  this->copyTo(values); // will synchronize
+  int n = nmax > 0 ? MIN(nmax, size_) : size_;
+  for (int i = 0; i < n; ++i) {
+    if (values[i] != (T)0) {
+      std::cout << "[" << i << "]:" << values[i] << ", ";
+    }
+  }
+  if (n < size_) {
+    std::cout << "...";
+  }
+  std::cout << std::endl;
+  delete[] values;
+}
+
 template <> void CudaArray<curandStateXORWOW>::printValues(int nmax) const {
   RPU_FATAL("Cannot print curandstates.");
 }
+template <> void CudaArray<curandStateXORWOW>::printNZValues(int nmax) const {
+  RPU_FATAL("Cannot print curandstates.");
+}
+
+template <> void CudaArray<int8_t>::printValues(int nmax) const {
+  int8_t *values = new int8_t[size_];
+  this->copyTo(values); // will synchronize
+  int n = nmax > 0 ? MIN(nmax, size_) : size_;
+  for (int i = 0; i < n; ++i) {
+    std::cout << "[" << i << "]:" << static_cast<int>(values[i]) << ", ";
+  }
+  if (n < size_) {
+    std::cout << "...";
+  }
+  std::cout << std::endl;
+  delete[] values;
+}
+
+template <> void CudaArray<int8_t>::printNZValues(int nmax) const {
+  int8_t *values = new int8_t[size_];
+  this->copyTo(values); // will synchronize
+  int n = nmax > 0 ? MIN(nmax, size_) : size_;
+  for (int i = 0; i < n; ++i) {
+    if (values[i] != 0) {
+      std::cout << "[" << i << "]:" << static_cast<int>(values[i]) << ", ";
+    }
+  }
+  if (n < size_) {
+    std::cout << "...";
+  }
+  std::cout << std::endl;
+  delete[] values;
+}
+
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+template <> void CudaArray<half_t>::printValues(int nmax) const {
+  half_t *values = new half_t[size_];
+  this->copyTo(values); // will synchronize
+  int n = nmax > 0 ? MIN(nmax, size_) : size_;
+  for (int i = 0; i < n; ++i) {
+    std::cout << "[" << i << "]:" << static_cast<float>(values[i]) << ", ";
+  }
+  if (n < size_) {
+    std::cout << "...";
+  }
+  std::cout << std::endl;
+  delete[] values;
+}
+
+template <> void CudaArray<half_t>::printNZValues(int nmax) const {
+  half_t *values = new half_t[size_];
+  this->copyTo(values); // will synchronize
+  int n = nmax > 0 ? MIN(nmax, size_) : size_;
+  for (int i = 0; i < n; ++i) {
+    if (values[i] != (half_t)0.0) {
+      std::cout << "[" << i << "]:" << static_cast<float>(values[i]) << ", ";
+    }
+  }
+  if (n < size_) {
+    std::cout << "...";
+  }
+  std::cout << std::endl;
+  delete[] values;
+}
+
+template <> void CudaArray<half_t *>::printValues(int nmax) const {
+  RPU_FATAL("Cannot print half_t* values.");
+}
+template <> void CudaArray<half_t *>::printNZValues(int nmax) const {
+  RPU_FATAL("Cannot print half_t* values.");
+}
+#endif
 
 template <typename T> void CudaArray<T>::assign(const T *host_array) {
   int sz = size_ * sizeof(T);
   DEBUG_OUT(
       "Assign host (hsize,P,W,H): " << sz << ", " << pitch_ << ", " << width_ * sizeof(T) << ", "
                                     << height_);
-  context_->enforceDeviceId();
-  context_->synchronize();
-  CUDA_CALL(cudaMemcpy2DAsync(
-      values_, pitch_, host_array, sz, sz, 1, cudaMemcpyHostToDevice, context_->getStream()));
+  if (size_ > 0) {
+    context_->enforceDeviceId();
+    context_->synchronize();
+    CUDA_CALL(cudaMemcpy2DAsync(
+        values_, pitch_, host_array, sz, sz, 1, cudaMemcpyHostToDevice, context_->getStream()));
+  }
 }
 
 template <typename T>
 void CudaArray<T>::assignTranspose(const T *host_array, const int m, const int n) {
   // col major to row major
+  if (size_ <= 0) {
+    return;
+  }
+
   if (m * n != size_) {
     RPU_FATAL("Size mismatch");
   }
@@ -829,8 +1263,8 @@ void CudaArray<T>::assignTranspose(const T *host_array, const int m, const int n
 
 template <typename T> void CudaArray<T>::assign(const CudaArray<T> &source) {
   DEBUG_OUT(
-      "Assign device (P,W,H): "
-      << ", " << pitch_ << ", " << width_ * sizeof(T) << ", " << height_);
+      "Assign from CudaArray (S,P,W,H): " << size_ << ", " << pitch_ << ", " << width_ * sizeof(T)
+                                          << ", " << height_);
   if (source.getSize() != size_) {
     RPU_FATAL("Assignment of Cuda Array failed. Size mismatch.");
   }
@@ -845,8 +1279,8 @@ template <typename T> void CudaArray<T>::assign(const CudaArray<T> &source) {
 
 template <typename T> void CudaArray<T>::assignFromDevice(const T *device_array) {
   DEBUG_OUT(
-      "Assign device (P,W,H): "
-      << ", " << pitch_ << ", " << width_ * sizeof(T) << ", " << height_);
+      "Assign device (S, P,W,H): " << size_ << ", " << pitch_ << ", " << width_ * sizeof(T) << ", "
+                                   << height_);
   if ((size_ > 0)) {
     int sz = size_ * sizeof(T);
     cudaStream_t s = context_->getStream();
@@ -863,7 +1297,7 @@ template <typename T> void CudaArray<T>::setShared(T *device_array) {
   }
 
   // destruct
-  if (!shared_if_) {
+  if (!shared_if_ && values_ != nullptr) {
     context_->synchronize();
     context_->enforceDeviceId();
     CUDA_CALL(cudaFree(values_));
@@ -892,14 +1326,32 @@ template <typename T> void CudaArray<T>::copyTo(T *host_array) const {
   }
 }
 
-template <typename T> T *CudaArray<T>::getDataSafe(CudaContext *c) {
+template <typename T> void CudaArray<T>::copyTo(std::vector<T> &host_vector) const {
+  host_vector.resize(size_);
+  copyTo(host_vector.data());
+}
+
+template <typename T> std::vector<T> CudaArray<T>::cpu() const {
+  if (!size_) {
+    return std::vector<T>{};
+  }
+  std::vector<T> host_vector(size_);
+  copyTo(host_vector.data());
+  return host_vector;
+}
+
+template <typename T> T *CudaArray<T>::getDataSafe(CudaContextPtr c) {
   context_->synchronizeWith(c);
   return values_;
 }
 
 #ifdef RPU_USE_DOUBLE
-template class CudaArray<double>;
 template class CudaArray<double *>;
+template class CudaArray<double>;
+#endif
+#ifdef RPU_DEFINE_CUDA_HALF_ARRAY
+template class CudaArray<half_t *>;
+template class CudaArray<half_t>;
 #endif
 
 template class CudaArray<float>;
@@ -907,6 +1359,7 @@ template class CudaArray<float *>;
 
 template class CudaArray<int>;
 template class CudaArray<char>;
+template class CudaArray<int8_t>;
 template class CudaArray<uint32_t>;
 template class CudaArray<uint64_t>;
 template class CudaArray<curandStateXORWOW>;

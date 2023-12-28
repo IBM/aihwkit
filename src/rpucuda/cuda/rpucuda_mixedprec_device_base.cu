@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -10,10 +10,11 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_math_util.h"
 #include "io_iterator.h"
+#include "rpu_cub.h"
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_mixedprec_device.h"
-#include <cub/cub.cuh>
 #include <memory>
 
 namespace RPU {
@@ -26,7 +27,7 @@ namespace RPU {
 */
 
 template <typename T>
-MixedPrecRPUDeviceBaseCuda<T>::MixedPrecRPUDeviceBaseCuda(CudaContext *c, int x_size, int d_size)
+MixedPrecRPUDeviceBaseCuda<T>::MixedPrecRPUDeviceBaseCuda(CudaContextPtr c, int x_size, int d_size)
     : SimpleRPUDeviceCuda<T>(c, x_size, d_size){};
 
 template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::allocateContainers() {
@@ -89,6 +90,7 @@ MixedPrecRPUDeviceBaseCuda<T> &
 MixedPrecRPUDeviceBaseCuda<T>::operator=(const MixedPrecRPUDeviceBaseCuda<T> &other) {
   MixedPrecRPUDeviceBaseCuda<T> tmp(other);
   swap(*this, tmp);
+  this->context_->synchronize();
   return *this;
 };
 
@@ -151,6 +153,52 @@ void MixedPrecRPUDeviceBaseCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu
 }
 
 template <typename T>
+void MixedPrecRPUDeviceBaseCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  SimpleRPUDeviceCuda<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  rpucuda_device_->dumpExtra(state, "rpucuda_device");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+  noise_manager_x_->dumpExtra(state, "noise_manager_x");
+  noise_manager_d_->dumpExtra(state, "noise_manager_d");
+
+  RPU::insert(state, "current_update_index", current_update_index_);
+  RPU::insert(state, "current_row_index", current_row_index_);
+  RPU::insert(state, "granularity", granularity_);
+
+  RPU::insert(state, "dev_avg_sparsity", dev_avg_sparsity_);
+  RPU::insert(state, "dev_sparsity_d", dev_sparsity_d_);
+  RPU::insert(state, "dev_sparsity_x", dev_sparsity_x_);
+
+  // dev_transfer_d_vecs not handled (generated on the fly)
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void MixedPrecRPUDeviceBaseCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  SimpleRPUDeviceCuda<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+  using V = std::vector<T>;
+
+  rpucuda_device_->loadExtra(state, "rpucuda_device", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+  noise_manager_x_->loadExtra(state, "noise_manager_x", strict);
+  noise_manager_d_->loadExtra(state, "noise_manager_d", strict);
+
+  RPU::load(state, "granularity", granularity_, strict);
+  RPU::load(state, "current_row_index", current_row_index_, strict);
+  RPU::load(state, "current_update_index", current_update_index_, strict);
+
+  RPU::load(this->context_, state, "dev_avg_sparsity", dev_avg_sparsity_, strict);
+  RPU::load(this->context_, state, "dev_sparsity_d", dev_sparsity_d_, strict);
+  RPU::load(this->context_, state, "dev_sparsity_x", dev_sparsity_x_, strict);
+}
+
+template <typename T>
 __global__ void kernelAddSparsity(
     T *sparsity,
     const T *x_sparsity,
@@ -160,8 +208,8 @@ __global__ void kernelAddSparsity(
   volatile unsigned int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tid == 0) {
-    sparsity[0] = (sparsity[0] * current_update_index + x_sparsity[0] * d_sparsity[0]) /
-                  (current_update_index + m_batch);
+    sparsity[0] = (sparsity[0] * (T)current_update_index + x_sparsity[0] * d_sparsity[0]) /
+                  (T)(current_update_index + m_batch);
   }
 }
 
@@ -174,14 +222,14 @@ void MixedPrecRPUDeviceBaseCuda<T>::computeSparsityPartly(
     // init
     current_zero_size_ = size;
     size_t temp_storage_bytes = 0;
-    RPU::cub::DeviceReduce::Sum(
+    RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
         nullptr, temp_storage_bytes, input_values, sparsity, size, this->context_->getStream());
     dev_zc_temp_storage_ = RPU::make_unique<CudaArray<char>>(this->context_, temp_storage_bytes);
   }
 
   // Run sum-reduction (use T as output)
   size_t temp_storage_bytes = dev_zc_temp_storage_->getSize();
-  RPU::cub::DeviceReduce::Sum(
+  RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       dev_zc_temp_storage_->getData(), temp_storage_bytes, input_values, sparsity, size,
       this->context_->getStream());
 }
@@ -228,7 +276,7 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::transfer(T *dev_weight
   // updating the matrix with rows of using one-hot transfer vectors
 
   const auto &par = getPar();
-  if (par.n_rows_per_transfer == 0 || fabs(lr) == (T)0) {
+  if (par.n_rows_per_transfer == 0 || fabsf(lr) == 0.0f) {
     return;
   }
   int n_transfers = par.n_rows_per_transfer;
@@ -240,7 +288,8 @@ template <typename T> void MixedPrecRPUDeviceBaseCuda<T>::transfer(T *dev_weight
   //  << std::endl;
   int i_row = current_row_index_;
   if (par.random_row) {
-    i_row = MAX(MIN(floor(this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
+    i_row = MAX(
+        MIN(floorf((float)this->rw_rng_.sampleUniform() * this->d_size_), this->d_size_ - 1), 0);
   }
 
   int d2_size = this->d_size_ * this->d_size_;
@@ -323,4 +372,8 @@ template class MixedPrecRPUDeviceBaseCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecRPUDeviceBaseCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class MixedPrecRPUDeviceBaseCuda<half_t>;
+#endif
+
 } // namespace RPU

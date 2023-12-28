@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -23,8 +23,8 @@ template <typename T> class MixedPrecRPUDeviceBaseCuda : public SimpleRPUDeviceC
 
 public:
   explicit MixedPrecRPUDeviceBaseCuda(){};
-  explicit MixedPrecRPUDeviceBaseCuda(CudaContext *c, int x_size, int d_size);
-  explicit MixedPrecRPUDeviceBaseCuda(CudaContext *c, const MixedPrecRPUDeviceBase<T> &other);
+  explicit MixedPrecRPUDeviceBaseCuda(CudaContextPtr c, int x_size, int d_size);
+  explicit MixedPrecRPUDeviceBaseCuda(CudaContextPtr c, const MixedPrecRPUDeviceBase<T> &other);
 
   virtual ~MixedPrecRPUDeviceBaseCuda(){};
   MixedPrecRPUDeviceBaseCuda(const MixedPrecRPUDeviceBaseCuda<T> &other);
@@ -63,6 +63,8 @@ public:
   };
   bool hasDirectUpdate() const override { return true; };
   std::vector<T> getHiddenWeights() const override;
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
   void decayWeights(T *dev_weights, bool bias_no_decay) override;
   void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override;

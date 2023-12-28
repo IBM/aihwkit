@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -38,12 +38,12 @@ TransferRPUDeviceMetaParameter<T>::TransferRPUDeviceMetaParameter(
 
 template <typename T>
 void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) const {
-  ss << this->getName() << std::endl;
+
   // gamma
-  ss << "\tgamma:\t\t\t";
+  ss << "\t gamma:\t\t\t";
   if (this->_par_initialized)
     for (size_t k = 0; k < this->gamma_vec.size(); k++) {
-      ss << this->gamma_vec[k] << " ";
+      ss << this->gamma_vec[k] << "  ";
     }
   else {
     ss << gamma;
@@ -51,10 +51,14 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
   ss << std::endl;
 
   // every
-  ss << "\ttransfer_every [init]: \t";
+  ss << "\t transfer_every [init]:\t";
   if (this->_par_initialized)
-    for (size_t k = 0; k < transfer_every_vec.size(); k++) {
-      ss << transfer_every_vec[k] << " ";
+    for (size_t k = 0; k < transfer_every_vec.size() - 1; k++) {
+      if (transfer_every_vec[k] < (T)0.0) {
+        ss << "auto  ";
+      } else {
+        ss << transfer_every_vec[k] << "  ";
+      }
     }
   else {
     ss << transfer_every;
@@ -65,49 +69,48 @@ void TransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &ss) con
   ss << std::endl;
 
   // lr
-  if (fast_lr > 0) {
-    ss << "\tfast_lr:\t\t";
+  if (fast_lr > (T)0.0) {
+    ss << "\t fast_lr:\t\t";
     ss << fast_lr;
     ss << std::endl;
   }
 
-  ss << "\ttransfer_lr: \t\t";
+  ss << "\t transfer_lr: \t\t";
   if (this->_par_initialized)
     for (size_t k = 0; k < transfer_lr_vec.size(); k++) {
-      ss << transfer_lr_vec[k] << " ";
+      ss << transfer_lr_vec[k] << "  ";
     }
   else {
     ss << transfer_lr;
   }
   if (scale_transfer_lr) {
-    ss << "\t[scaled with current LR]";
+    ss << "\t [scaled with current LR]";
   }
   ss << std::endl;
 
-  ss << "\tn_reads_per_transfer: \t" << n_reads_per_transfer;
+  ss << "\t n_reads_per_transfer: \t" << n_reads_per_transfer;
   if (transfer_columns) {
-    ss << "\t[reading columns]";
+    ss << "\t [reading columns]";
   } else {
-    ss << "\t[reading rows]";
+    ss << "\t [reading rows]";
   }
-  ss << std::endl;
 
-  if (with_reset_prob) {
-    ss << "\t[with reset p=" << with_reset_prob << "]";
+  if (with_reset_prob > (T)0.0) {
+    ss << "\t [with reset p=" << with_reset_prob << "]";
   }
   if (random_selection) {
-    ss << "\t[random selection]";
+    ss << "\t [random selection]";
   }
   ss << std::endl;
 
-  ss << "   Transfer IO: \n";
+  ss << "\t\bTransfer IO: \n";
   transfer_io.printToStream(ss);
-  ss << "   Transfer Update Parameter: \n";
+  ss << "\t\bTransfer Update Parameter: \n";
   transfer_up.printToStream(ss);
 
   for (size_t k = 0; k < this->vec_par.size(); k++) {
-    ss << "   Device Parameter " << k << ": " << this->vec_par[k]->getName() << std::endl;
-    ss << "   ";
+    ss << "\t\bDevice Parameter " << k << ": " << this->vec_par[k]->getName() << std::endl;
+    ss << "\t\b";
     this->vec_par[k]->printToStream(ss);
   }
 };
@@ -155,7 +158,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     for (size_t i = 0; i < n_devices - 1; i++) {
       g += this->gamma_vec[i];
     }
-    if (this->gamma_vec[n_devices - 1] == 0) {
+    if (this->gamma_vec[n_devices - 1] == (T)0.0) {
       RPU_FATAL("Expect that last device has some constribution to the network weights. [otherwise "
                 "why transfer?]");
     }
@@ -164,7 +167,7 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
   if (this->gamma_vec.size() == 0) {
     this->gamma_vec.resize(n_devices);
     for (size_t i = 0; i < n_devices; i++) {
-      this->gamma_vec[n_devices - i - 1] = pow(gamma, (T)i);
+      this->gamma_vec[n_devices - i - 1] = (T)powf(gamma, (T)i);
     }
   }
 
@@ -182,13 +185,11 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     RPU_WARNING("too many transfers in one shot. Using full transfer instead.");
   }
 
-  // TODO: make an default value, where the value of the transfer depends on  x_size
-
   if (transfer_every_vec.size() == 0) {
     T n = transfer_every;
     for (size_t i = 0; i < n_devices; i++) {
       transfer_every_vec.push_back(n);
-      n *= (T)_in_size / n_reads_per_transfer;
+      n *= (T)_out_size / (T)n_reads_per_transfer;
     }
     if (no_self_transfer) {
       transfer_every_vec[n_devices - 1] = 0;
@@ -199,21 +200,25 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
     RPU_FATAL("Expect transfer_every_vec to be of length n_devices");
   }
 
-  if (with_reset_prob > 0 && !transfer_columns) {
+  if (with_reset_prob > (T)0.0 && !transfer_columns) {
     RPU_FATAL("Reset prob is only implemented for column-transfer so far.");
   }
 
   // IO
   if (transfer_columns) {
-    transfer_io.initializeForForward();
+    transfer_io.initializeForForward(x_size, d_size);
   } else {
-    transfer_io.initializeForBackward();
+    transfer_io.initializeForBackward(x_size, d_size);
   }
 
   // we turn BM off.
   if (transfer_io.bound_management != BoundManagementType::None) {
     RPU_WARNING("Transfer bound management turned off.");
     transfer_io.bound_management = BoundManagementType::None;
+  }
+  if (transfer_io.noise_management != NoiseManagementType::None) {
+    RPU_WARNING("Transfer noise management turned off.");
+    transfer_io.noise_management = NoiseManagementType::None;
   }
 
   // up
@@ -223,6 +228,8 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
 template <typename T>
 T TransferRPUDeviceMetaParameter<T>::getTransferLR(
     int to_device_idx, int from_device_idx, T current_lr) const {
+
+  UNUSED(to_device_idx);
 
   T lr = transfer_lr_vec[from_device_idx];
   if (scale_transfer_lr) {
@@ -234,6 +241,9 @@ T TransferRPUDeviceMetaParameter<T>::getTransferLR(
 template struct TransferRPUDeviceMetaParameter<float>;
 #ifdef RPU_USE_DOUBLE
 template struct TransferRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template struct TransferRPUDeviceMetaParameter<half_t>;
 #endif
 
 /******************************************************************************************/
@@ -256,8 +266,8 @@ template <typename T>
 TransferRPUDevice<T>::TransferRPUDevice(const TransferRPUDevice<T> &other)
     : VectorRPUDevice<T>(other) {
 
-  transfer_fb_pass_ = make_unique<ForwardBackwardPassIOManaged<T>>(*other.transfer_fb_pass_);
-  transfer_pwu_ = make_unique<PulsedRPUWeightUpdater<T>>(*other.transfer_pwu_);
+  transfer_fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManaged<T>>(*other.transfer_fb_pass_);
+  transfer_pwu_ = RPU::make_unique<PulsedRPUWeightUpdater<T>>(*other.transfer_pwu_);
 
   current_slice_indices_ = other.current_slice_indices_;
   transfer_vecs_ = other.transfer_vecs_;
@@ -276,13 +286,14 @@ TransferRPUDevice<T> &TransferRPUDevice<T>::operator=(const TransferRPUDevice<T>
 }
 
 // move constructor
-template <typename T> TransferRPUDevice<T>::TransferRPUDevice(TransferRPUDevice<T> &&other) {
+template <typename T>
+TransferRPUDevice<T>::TransferRPUDevice(TransferRPUDevice<T> &&other) noexcept {
   *this = std::move(other);
 }
 
 // move assignment
 template <typename T>
-TransferRPUDevice<T> &TransferRPUDevice<T>::operator=(TransferRPUDevice<T> &&other) {
+TransferRPUDevice<T> &TransferRPUDevice<T>::operator=(TransferRPUDevice<T> &&other) noexcept {
   VectorRPUDevice<T>::operator=(std::move(other));
 
   current_slice_indices_ = std::move(other.current_slice_indices_);
@@ -297,7 +308,7 @@ TransferRPUDevice<T> &TransferRPUDevice<T>::operator=(TransferRPUDevice<T> &&oth
 }
 
 template <typename T> void TransferRPUDevice<T>::setTransferVecs(const T *transfer_vecs) {
-  T in_size = getPar().getInSize();
+  size_t in_size = getPar().getInSize();
 
   transfer_vecs_.resize(in_size * in_size); //!!  square matrix
   std::fill(transfer_vecs_.begin(), transfer_vecs_.end(), (T)0.0);
@@ -331,13 +342,11 @@ void TransferRPUDevice<T>::populate(
   VectorRPUDevice<T>::populate(p, rng);
   auto &par = getPar();
   par.initializeWithSize(this->x_size_, this->d_size_);
-
   auto shared_rng = std::make_shared<RNG<T>>(0); // we just take a new one here (seeds...)
   transfer_fb_pass_ =
       RPU::make_unique<ForwardBackwardPassIOManaged<T>>(this->x_size_, this->d_size_, shared_rng);
 
-  transfer_fb_pass_->setIOPar(par.transfer_io, par.transfer_io);
-
+  transfer_fb_pass_->populateFBParameter(par.transfer_io, par.transfer_io);
   transfer_pwu_ =
       RPU::make_unique<PulsedRPUWeightUpdater<T>>(this->x_size_, this->d_size_, shared_rng);
   transfer_pwu_->setUpPar(par.transfer_up);
@@ -358,10 +367,16 @@ void TransferRPUDevice<T>::populate(
    of the device properties it is beneficial to use a constant LR
    here, but scale the buffer with the scheduled SGD learning rate
    later*/
-template <typename T> T TransferRPUDevice<T>::getPulseCountLearningRate(T learning_rate) {
+template <typename T>
+T TransferRPUDevice<T>::getPulseCountLearningRate(
+    T learning_rate, int current_m_batch, const PulsedUpdateMetaParameter<T> &up) {
+
+  UNUSED(current_m_batch);
+  UNUSED(up);
+
   const auto &par = getPar();
 
-  if (par.fast_lr > 0) {
+  if (par.fast_lr > (T)0.0) {
     return par.fast_lr;
   } else {
     return learning_rate;
@@ -380,12 +395,13 @@ template <typename T> T **TransferRPUDevice<T>::getDeviceWeights(int device_idx)
 }
 
 template <typename T>
-int TransferRPUDevice<T>::getTransferEvery(int from_device_idx, int m_batch) const {
-
+int TransferRPUDevice<T>::getTransferEvery(
+    int from_device_idx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const {
+  UNUSED(up);
   if (getPar().units_in_mbatch) {
-    return MAX(ceil(transfer_every_[from_device_idx] * m_batch), 0);
+    return MAX((int)ceilf((float)transfer_every_[from_device_idx] * (float)m_batch), 0);
   } else {
-    return MAX(round(transfer_every_[from_device_idx]), 0);
+    return MAX((int)roundf(transfer_every_[from_device_idx]), 0);
   }
 }
 
@@ -423,9 +439,10 @@ void TransferRPUDevice<T>::readAndUpdate(
     const T *vec, // these are the selected transfer vecs
     const int n_vec,
     const T reset_prob,
-    const int i_slice) {
+    const int i_slice,
+    const int m_batch_info) {
 
-  if (lr == 0.0) {
+  if (lr == (T)0.0) {
     return;
   }
 
@@ -441,7 +458,7 @@ void TransferRPUDevice<T>::readAndUpdate(
   transfer_tmp_.resize(out_size);
 
   // forward or backward / update
-  for (int i = 0; i < n_vec; i++) {
+  for (size_t i = 0; i < (size_t)n_vec; i++) {
     const T *v = vec + i * in_size;
 
     readVector(from_device_idx, v, transfer_tmp_.data(), -1.0); // scale -1 for pos update
@@ -459,7 +476,8 @@ void TransferRPUDevice<T>::readAndUpdate(
 }
 
 template <typename T>
-void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T current_lr) {
+void TransferRPUDevice<T>::transfer(
+    int to_device_idx, int from_device_idx, T current_lr, int m_batch_info) {
 
   int i_slice = current_slice_indices_[from_device_idx];
   const auto &par = getPar();
@@ -467,11 +485,11 @@ void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T cu
   int in_size = par.getInSize();
 
   if (par.random_selection) {
-    i_slice = MAX(MIN(floor(this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
+    i_slice = MAX(MIN((int)floorf((float)this->rw_rng_.sampleUniform() * in_size), in_size - 1), 0);
   }
 
   // transfer_vecs_ is always in_size-major (that is trans==false)
-  T *tvec = &transfer_vecs_[0] + i_slice * in_size;
+  T *tvec = &transfer_vecs_[0] + (size_t)(i_slice * in_size);
   int n_rest = in_size - i_slice;
 
   T lr = par.getTransferLR(to_device_idx, from_device_idx, current_lr);
@@ -481,15 +499,18 @@ void TransferRPUDevice<T>::transfer(int to_device_idx, int from_device_idx, T cu
   if (n_rest < n_transfer) {
     // rest
 
-    readAndUpdate(to_device_idx, from_device_idx, lr, tvec, n_rest, par.with_reset_prob, i_slice);
+    readAndUpdate(
+        to_device_idx, from_device_idx, lr, tvec, n_rest, par.with_reset_prob, i_slice,
+        m_batch_info);
     // from beginning
     readAndUpdate(
         to_device_idx, from_device_idx, lr, &transfer_vecs_[0], n_transfer - n_rest,
-        par.with_reset_prob, 0);
+        par.with_reset_prob, 0, m_batch_info);
 
   } else {
     readAndUpdate(
-        to_device_idx, from_device_idx, lr, tvec, n_transfer, par.with_reset_prob, i_slice);
+        to_device_idx, from_device_idx, lr, tvec, n_transfer, par.with_reset_prob, i_slice,
+        m_batch_info);
   }
 
   current_slice_indices_[from_device_idx] = (i_slice + n_transfer) % in_size;
@@ -527,10 +548,10 @@ void TransferRPUDevice<T>::finishUpdateCycle(
 
   // we transfer the device here to cope with the sparse update below.
   for (int j = 0; j < this->n_devices_; j++) {
-    int every = getTransferEvery(j, m_batch_info);
+    int every = getTransferEvery(j, m_batch_info, up);
     if (every > 0 && this->current_update_idx_ % every == 0) {
       // last is self-update (does nothing per default, but could implement refresh in child)
-      transfer(MIN(j + 1, this->n_devices_ - 1), j, current_lr);
+      transfer(MIN(j + 1, this->n_devices_ - 1), j, current_lr, m_batch_info);
     }
   }
   this->reduceToWeights(weights);
@@ -625,11 +646,19 @@ void TransferRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG
 template <typename T>
 void TransferRPUDevice<T>::resetCols(
     T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) {
-  LOOP_WITH_HIDDEN(resetCols, COMMA start_col COMMA n_cols COMMA reset_prob COMMA rng);
+  // only applied to the updated (first) device !
+  this->rpu_device_vec_[0]->resetCols(this->weights_vec_[0], start_col, n_cols, reset_prob, rng);
+  reduceToWeights(weights);
 }
 
-#undef COMMA
-#undef LOOP_WITH_HIDDEN
+template <typename T>
+void TransferRPUDevice<T>::getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) {
+  if (fully_hidden_) {
+    // weight might have changed because of hidden weight change
+    RPU::math::copy<T>(this->size_, weights[0], 1, this->weights_vec_[this->n_devices_ - 1][0], 1);
+  }
+  VectorRPUDevice<T>::getDeviceParameter(weights, data_ptrs);
+}
 
 template <typename T>
 void TransferRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) {
@@ -642,9 +671,51 @@ void TransferRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector
   }
 }
 
+template <typename T>
+void TransferRPUDevice<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  VectorRPUDevice<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  RPU::insert(state, "current_slice_indices", current_slice_indices_);
+
+  // RPU::insert(state, "transfer_vecs", transfer_vecs_);
+  RPU::insert(state, "transfer_every", transfer_every_);
+
+  transfer_fb_pass_->dumpExtra(state, "transfer_fb_pass");
+  transfer_pwu_->dumpExtra(state, "transfer_pwu");
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void TransferRPUDevice<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  VectorRPUDevice<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(state, "current_slice_indices", current_slice_indices_, strict);
+  if (state.count("transfer_vecs")) {
+    RPU::load(state, "transfer_vecs", transfer_vecs_, strict);
+  }
+  if (state.count("transfer_every")) {
+    RPU::load(state, "transfer_every", transfer_every_, strict);
+  }
+  transfer_fb_pass_->loadExtra(state, "transfer_fb_pass", strict);
+  transfer_pwu_->loadExtra(state, "transfer_pwu", strict);
+}
+
+#undef COMMA
+#undef LOOP_WITH_HIDDEN
+
 template class TransferRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class TransferRPUDevice<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class TransferRPUDevice<half_t>;
 #endif
 
 } // namespace RPU

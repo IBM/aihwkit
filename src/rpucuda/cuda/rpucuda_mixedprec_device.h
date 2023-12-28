@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,8 +21,8 @@ template <typename T> class MixedPrecRPUDeviceCuda : public MixedPrecRPUDeviceBa
 
 public:
   explicit MixedPrecRPUDeviceCuda(){};
-  explicit MixedPrecRPUDeviceCuda(CudaContext *c, int x_size, int d_size);
-  explicit MixedPrecRPUDeviceCuda(CudaContext *c, const MixedPrecRPUDevice<T> &other);
+  explicit MixedPrecRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
+  explicit MixedPrecRPUDeviceCuda(CudaContextPtr c, const MixedPrecRPUDevice<T> &other);
 
   ~MixedPrecRPUDeviceCuda(){};
   MixedPrecRPUDeviceCuda(const MixedPrecRPUDeviceCuda<T> &other);

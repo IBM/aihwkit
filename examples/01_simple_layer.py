@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -24,8 +24,7 @@ from torch.nn.functional import mse_loss
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda
 
 # Prepare the datasets (input and expected output).
@@ -34,20 +33,22 @@ y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 # Define a single-layer network, using a constant step device type.
 rpu_config = SingleRPUConfig(device=ConstantStepDevice())
-model = AnalogLinear(4, 2, bias=True,
-                     rpu_config=rpu_config)
+
+model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
     x = x.cuda()
     y = y.cuda()
-    model.cuda()
+    model = model.cuda()
 
 # Define an analog-aware optimizer, preparing it for using the layers.
 opt = AnalogSGD(model.parameters(), lr=0.1)
 opt.regroup_param_groups(model)
 
 for epoch in range(100):
+    # Delete old gradient
+    opt.zero_grad()
     # Add the training Tensor to the model (input).
     pred = model(x)
     # Add the expected output Tensor.
@@ -56,4 +57,5 @@ for epoch in range(100):
     loss.backward()
 
     opt.step()
-    print('Loss error: {:.16f}'.format(loss))
+
+    print("Loss error: {:.16f}".format(loss))

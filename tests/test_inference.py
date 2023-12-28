@@ -1,7 +1,6 @@
-
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -16,7 +15,9 @@
 from torch import randn
 
 from aihwkit.inference import (
-    PCMLikeNoiseModel, StateIndependentNoiseModel, SinglePairConductanceConverter
+    PCMLikeNoiseModel,
+    StateIndependentNoiseModel,
+    SinglePairConductanceConverter,
 )
 
 from .helpers.testcases import AihwkitTestCase
@@ -30,7 +31,7 @@ class NoiseModelTest(AihwkitTestCase):
         weights = randn(10, 35)
 
         noise_model = PCMLikeNoiseModel()
-        t_inference = 100.
+        t_inference = 100.0
         noisy_weights = noise_model.apply_noise(weights, t_inference)
 
         self.assertNotAlmostEqualTensor(noisy_weights, weights)
@@ -40,7 +41,7 @@ class NoiseModelTest(AihwkitTestCase):
         weights = randn(10, 35)
 
         noise_model = StateIndependentNoiseModel()
-        t_inference = 100.
+        t_inference = 100.0
         noisy_weights = noise_model.apply_noise(weights, t_inference)
 
         self.assertNotAlmostEqualTensor(noisy_weights, weights)
@@ -65,12 +66,15 @@ class ConductanceConverterTest(AihwkitTestCase):
 
         tolerance = 1e-6
 
-        self.assertTrue((g_plus > g_max - tolerance).sum()
-                        + (g_minus > g_max - tolerance).sum() > 0)
-        self.assertTrue((g_plus < g_min - tolerance).sum()
-                        + (g_minus < g_min - tolerance).sum() == 0)
-        self.assertTrue((g_plus > g_max + tolerance).sum()
-                        + (g_minus > g_max + tolerance).sum() == 0)
+        self.assertTrue(
+            (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum() > 0
+        )
+        self.assertTrue(
+            (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum() == 0
+        )
+        self.assertTrue(
+            (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum() == 0
+        )
 
         converted_weights = g_converter.convert_back_to_weights(g_lst, params)
 

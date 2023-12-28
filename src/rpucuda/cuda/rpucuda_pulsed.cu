@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -13,7 +13,7 @@
 #include "forward_backward_pass.h"
 #include "rpucuda_pulsed.h"
 #include <iostream>
-//#include <random>
+// #include <random>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -34,12 +34,8 @@ template <typename T> void RPUCudaPulsed<T>::initialize() {
   int d_size = this->getDSize();
   int x_size = this->getXSize();
 
-  CudaContext *c = this->context_;
+  CudaContextPtr c = this->context_;
   size_ = d_size * x_size;
-
-  // shared batch buffer for backward/forward (here m_batch=1, will resize)
-  dev_batch_buffer_x_size_ = std::make_shared<CudaArray<T>>(c, x_size);
-  dev_batch_buffer_d_size_ = std::make_shared<CudaArray<T>>(c, d_size);
 
   // forward arrays
   f_iom_ = RPU::make_unique<InputOutputManager<T>>(c, x_size, d_size);
@@ -50,6 +46,9 @@ template <typename T> void RPUCudaPulsed<T>::initialize() {
   b_iom_ = RPU::make_unique<InputOutputManager<T>>(c, d_size, x_size);
   dev_b_x_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, x_size);
   dev_b_d_vector_inc1_ = RPU::make_unique<CudaArray<T>>(c, d_size);
+
+  // fb pass
+  fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManagedCuda<T>>(c, x_size, d_size);
 
   // update arrays
   up_pwu_ = RPU::make_unique<PulsedWeightUpdater<T>>(c, x_size, d_size);
@@ -66,7 +65,7 @@ template <typename T> void RPUCudaPulsed<T>::initialize() {
 }
 
 template <typename T>
-RPUCudaPulsed<T>::RPUCudaPulsed(CudaContext *c, int x_size, int d_size)
+RPUCudaPulsed<T>::RPUCudaPulsed(CudaContextPtr c, int x_size, int d_size)
     : RPUCudaSimple<T>(c, x_size, d_size) {}
 
 template <typename T>
@@ -78,6 +77,10 @@ template <typename T> void RPUCudaPulsed<T>::initFrom(RPUPulsed<T> &rpu) {
 
   initialize();
 
+  // forward / backward
+  fb_pass_->populateFrom(rpu.getFBParameter());
+
+  // update
   rpu_device_ = rpu.cloneDevice();
   par_ = rpu.getMetaPar();
   if (rpu_device_) {
@@ -91,7 +94,7 @@ template <typename T> void RPUCudaPulsed<T>::initFrom(RPUPulsed<T> &rpu) {
 }
 
 template <typename T>
-RPUCudaPulsed<T>::RPUCudaPulsed(CudaContext *c, RPUPulsed<T> &o)
+RPUCudaPulsed<T>::RPUCudaPulsed(CudaContextPtr c, RPUPulsed<T> &o)
     : RPUCudaSimple<T>(c, static_cast<RPUSimple<T> &>(o)) {
   initFrom(o);
 }
@@ -124,7 +127,9 @@ RPUCudaPulsed<T>::RPUCudaPulsed(const RPUCudaPulsed<T> &other) : RPUCudaSimple<T
     rpu_device_ = nullptr;
   }
   par_ = other.par_;
+  fb_pass_ = RPU::make_unique<ForwardBackwardPassIOManagedCuda<T>>(*other.fb_pass_);
 
+  this->context_->synchronize();
   DEBUG_CALL(this->disp(););
   DEBUG_OUT("RPUCudaPulsed copy constructed.");
 }
@@ -155,6 +160,7 @@ template <typename T> RPUCudaPulsed<T> &RPUCudaPulsed<T>::operator=(RPUCudaPulse
   f_iom_ = std::move(other.f_iom_);
   b_iom_ = std::move(other.b_iom_);
   up_pwu_ = std::move(other.up_pwu_);
+  fb_pass_ = std::move(other.fb_pass_);
 
   dev_up_x_vector_inc1_ = std::move(other.dev_up_x_vector_inc1_);
   dev_up_d_vector_inc1_ = std::move(other.dev_up_d_vector_inc1_);
@@ -163,9 +169,6 @@ template <typename T> RPUCudaPulsed<T> &RPUCudaPulsed<T>::operator=(RPUCudaPulse
 
   dev_b_x_vector_inc1_ = std::move(other.dev_b_x_vector_inc1_);
   dev_b_d_vector_inc1_ = std::move(other.dev_b_d_vector_inc1_);
-
-  dev_batch_buffer_d_size_ = std::move(other.dev_batch_buffer_d_size_);
-  dev_batch_buffer_x_size_ = std::move(other.dev_batch_buffer_x_size_);
 
   size_ = other.size_;
 
@@ -178,11 +181,18 @@ template <typename T>
 void RPUCudaPulsed<T>::populateParameter(
     PulsedMetaParameter<T> *p, PulsedRPUDeviceMetaParameter<T> *dp) {
   RPUCudaSimple<T>::populateParameter(dp);
-  p->initialize();
+
+  // TODO: better to init the internal parameter only and pass this as const?
+  p->initialize(this->x_size_, this->d_size_);
 
   if (up_pwu_ == nullptr) {
     initialize();
   }
+
+  // use CPU populate for FB pass
+  auto fb_pass_host = ForwardBackwardPassIOManaged<T>(this->x_size_, this->d_size_, this->rng_);
+  fb_pass_host.populateFBParameter(p->f_io, p->b_io);
+  fb_pass_->populateFrom(fb_pass_host.getFBParameter());
 
   if (p->up.pulse_type == PulseType::None) {
 
@@ -234,12 +244,8 @@ template <typename T> void RPUCudaPulsed<T>::printToStream(std::stringstream &ss
   std::string name;
   name = rpucuda_device_->getPar().getName();
 
-  std::string num = "float";
-  if (sizeof(T) == 8) {
-    num = "double";
-  }
-  ss << "RPUCudaPulsed<" << num << ">[" << name << "](" << this->d_size_ << "," << this->x_size_
-     << ")" << std::endl;
+  ss << "RPUCudaPulsed<" << this->getDataTypeName() << ">[" << name << "](" << this->d_size_ << ","
+     << this->x_size_ << ")" << std::endl;
 };
 
 /*********************************************************************************/
@@ -281,6 +287,48 @@ template <typename T> void RPUCudaPulsed<T>::clipWeights(const WeightClipParamet
   } else {
     RPU_FATAL("Sophisticated clipping is NOT implemented for most training devices");
   }
+}
+
+template <typename T>
+void RPUCudaPulsed<T>::remapWeights(const WeightRemapParameter &wrmpar, T *scales, T *biases) {
+  // Same as Simple version, however, we can now suppport the exceeded channel BM
+
+  ENFORCE_NO_DELAYED_UPDATE; // will get confused with the buffer
+
+  if (this->wremapper_cuda_ == nullptr) {
+    if (!up_pwu_->checkForFPUpdate(&*rpucuda_device_, getMetaPar().up)) {
+      getMetaPar().print();
+      RPU_FATAL("Remapping is NOT implemented for most devices");
+    }
+    this->wremapper_cuda_ =
+        RPU::make_unique<WeightRemapperCuda<T>>(this->context_, this->x_size_, this->d_size_);
+  }
+
+  // remap weights
+  this->wremapper_cuda_->apply(
+      this->dev_weights_->getData(), this->getAlphaLearningRate(), wrmpar, scales, biases);
+}
+
+template <typename T>
+bool RPUCudaPulsed<T>::swaWeights(
+    const WeightRemapParameter &wrmpar, T *swa_weights, uint64_t iter, T *scales, T *biases) {
+
+  CHECK_RPU_DEVICE_INIT;
+  ENFORCE_NO_DELAYED_UPDATE;
+
+  if (wrmpar.type != WeightRemapType::None &&
+      !up_pwu_->checkForFPUpdate(&*rpucuda_device_, getMetaPar().up)) {
+    getMetaPar().print();
+    RPU_FATAL("SWA is NOT implemented for most devices");
+  }
+
+  bool modfied = RPUCudaSimple<T>::swaWeights(wrmpar, swa_weights, iter, scales, biases);
+
+  if (modfied) {
+    this->copyWeightsToHost();
+    this->setWeights(this->getWeightsPtr()[0]);
+  }
+  return modfied;
 }
 
 template <typename T> void RPUCudaPulsed<T>::resetCols(int start_col, int n_cols, T reset_prob) {
@@ -348,9 +396,9 @@ template <typename T> void RPUCudaPulsed<T>::setWeightsReal(const T *weightsptr,
   T B = 0;
   int BL = 0;
   getMetaPar().up.calculateBlAB(BL, A, B, this->getLearningRate(), weight_granularity);
-  T mx_change = BL * weight_granularity;
-  T range = fabs(w_max - w_min);
-  int iter = n_loops * range / mx_change;
+  T mx_change = (T)BL * weight_granularity;
+  T range = fabsf(w_max - w_min);
+  int iter = ceilf((T)n_loops * range / mx_change);
 
   /*==== */
 
@@ -384,7 +432,7 @@ template <typename T> void RPUCudaPulsed<T>::setWeightsReal(const T *weightsptr,
   T avg_dev = 0.0;
   T *w_current = this->copyWeightsToHost()[0];
   for (int i = 0; i < x_sz * d_sz; ++i) {
-    avg_dev += fabs(weightsptr[i] - w_current[i]);
+    avg_dev += fabsf(weightsptr[i] - w_current[i]);
   }
   avg_dev /= x_sz * d_sz;
   DEBUG_OUT("Finished setting weights real [avg deviation=" << avg_dev << "]");
@@ -399,11 +447,12 @@ void RPUCudaPulsed<T>::getDeviceParameterNames(std::vector<std::string> &names) 
   rpu_device_->getDPNames(names);
 }
 
-template <typename T> void RPUCudaPulsed<T>::getDeviceParameter(std::vector<T *> &data_ptrs) const {
+template <typename T> void RPUCudaPulsed<T>::getDeviceParameter(std::vector<T *> &data_ptrs) {
 
   CHECK_RPU_DEVICE_INIT;
   rpu_device_->setHiddenWeights(rpucuda_device_->getHiddenWeights());
-  rpu_device_->getDeviceParameter(data_ptrs);
+  this->copyWeightsToHost();
+  rpu_device_->getDeviceParameter(this->getWeightsPtr(), data_ptrs);
 };
 
 template <typename T> void RPUCudaPulsed<T>::setDeviceParameter(const std::vector<T *> &data_ptrs) {
@@ -415,6 +464,7 @@ template <typename T> void RPUCudaPulsed<T>::setDeviceParameter(const std::vecto
   // however weight_granularity is at least estimated.
   this->copyWeightsToHost();
   rpu_device_->setDeviceParameter(this->getWeightsPtr(), data_ptrs);
+
   rpucuda_device_->populateFrom(*rpu_device_);
 
   // set device weights which might have been updated because of the hidden parameters
@@ -432,6 +482,45 @@ template <typename T> void RPUCudaPulsed<T>::setHiddenUpdateIdx(int idx) {
   rpu_device_->setHiddenUpdateIdx(idx);
 };
 
+/*********************************************************************************/
+/* dump / load state */
+
+template <typename T>
+void RPUCudaPulsed<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPUCudaSimple<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  rpu_device_->dumpExtra(state, "rpu_device");
+  rpucuda_device_->dumpExtra(state, "rpucuda_device");
+
+  f_iom_->dumpExtra(state, "f_iom");
+  b_iom_->dumpExtra(state, "b_iom");
+
+  up_pwu_->dumpExtra(state, "up_pwu");
+  fb_pass_->dumpExtra(state, "fb_pass");
+
+  // tmp vectors are ignored
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void RPUCudaPulsed<T>::loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {
+  RPUCudaSimple<T>::loadExtra(extra, prefix, strict);
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  rpu_device_->loadExtra(state, "rpu_device", strict);
+  rpucuda_device_->loadExtra(state, "rpucuda_device", strict);
+
+  f_iom_->loadExtra(state, "f_iom", strict);
+  b_iom_->loadExtra(state, "b_iom", strict);
+
+  up_pwu_->loadExtra(state, "up_pwu", strict);
+  fb_pass_->loadExtra(state, "fb_pass", strict);
+}
+
+/*********************************************************************************/
 template <typename T> void RPUCudaPulsed<T>::setWeights(const T *host_source) {
 
   CHECK_RPU_DEVICE_INIT;
@@ -482,20 +571,18 @@ void RPUCudaPulsed<T>::forwardIndexed(
   if (trans && (dim3 > 1)) {
 
     IndexReaderTransInputIterator<T> iter(
-        X_input, indices, total_input_size / dim3, m_batch, this->getXSize() * m_batch,
+        X_input, indices, total_input_size / dim3, m_batch, this->x_size_ * m_batch,
         m_batch * dim3);
 
     PermuterTransOutputIterator<T> permute_iter(
-        D_output, m_batch, this->getDSize() * m_batch, m_batch * dim3);
+        D_output, m_batch, this->d_size_ * m_batch, m_batch * dim3);
 
     this->forwardMatrixIterator(iter, permute_iter, m_batch * dim3, trans, trans, is_test);
 
   } else {
-
     IndexReaderInputIterator<T> iter(
-        X_input, indices, total_input_size / dim3, this->getXSize() * m_batch);
+        X_input, indices, total_input_size / dim3, this->x_size_ * m_batch);
 
-    // in-place
     this->forwardMatrixIterator(iter, D_output, m_batch * dim3, trans, trans, is_test);
   }
 }
@@ -550,12 +637,9 @@ void RPUCudaPulsed<T>::forwardMatrixIterator(
     bool d_trans,
     bool is_test) {
 
-  checkBatchBuffers(m_batch);
-
-  RPU::detail::forwardMatrixIteratorIOManaged(
-      this->context_, this->getFBWeightsCuda(is_test), X_input, this->x_size_, x_trans, D_output,
-      this->d_size_, d_trans, m_batch, this->getFwdAlpha(), *f_iom_, getMetaPar().f_io, is_test,
-      dev_batch_buffer_x_size_, dev_batch_buffer_d_size_);
+  fb_pass_->forwardMatrixIterator(
+      this->getFBWeightsCuda(is_test), X_input, this->getXSize(), x_trans, D_output,
+      this->getDSize(), d_trans, m_batch, this->getFwdAlpha(), *f_iom_, getMetaPar().f_io, is_test);
 };
 
 template <typename T>
@@ -659,22 +743,14 @@ void RPUCudaPulsed<T>::backwardIndexedSlice(
   }
 }
 
-template <typename T> void RPUCudaPulsed<T>::checkBatchBuffers(const int m_batch) {
-  RPU_GET_CUDA_BUFFER(this->context_, T, dev_batch_buffer_x_size_, m_batch * this->x_size_);
-  RPU_GET_CUDA_BUFFER(this->context_, T, dev_batch_buffer_d_size_, m_batch * this->d_size_);
-}
-
 template <typename T>
 template <typename InputIteratorT, typename OutputIteratorT>
 void RPUCudaPulsed<T>::backwardMatrixIterator(
     InputIteratorT D_input, OutputIteratorT X_output, int m_batch, bool d_trans, bool x_trans) {
 
-  checkBatchBuffers(m_batch);
-
-  RPU::detail::backwardMatrixIteratorIOManaged(
-      this->context_, this->getFBWeightsCuda(false), D_input, this->d_size_, d_trans, X_output,
-      this->x_size_, x_trans, m_batch, this->getBwdAlpha(), *b_iom_, getMetaPar().b_io,
-      dev_batch_buffer_d_size_, dev_batch_buffer_x_size_);
+  fb_pass_->backwardMatrixIterator(
+      this->getFBWeightsCuda(false), D_input, this->getDSize(), d_trans, X_output, this->getXSize(),
+      x_trans, m_batch, this->getBwdAlpha(), *b_iom_, getMetaPar().b_io);
 };
 
 template <typename T>
@@ -734,6 +810,7 @@ void RPUCudaPulsed<T>::updateIndexed(
     updateMatrixIterator(in_iter, permute_iter, m_batch * dim3, trans, trans);
 
   } else {
+
     IndexReaderInputIterator<T> in_iter(
         X_input, indices, total_input_size / dim3, x_size * m_batch);
     updateMatrixIterator(in_iter, D_input, m_batch * dim3, trans, trans);
@@ -809,9 +886,6 @@ void RPUCudaPulsed<T>::updateMatrixIterator(
 
   const auto &up = getMetaPar().up;
 
-  checkBatchBuffers(m_batch);
-  up_pwu_->setSharedBuffer(m_batch, dev_batch_buffer_x_size_, dev_batch_buffer_d_size_);
-
   if (up_pwu_->checkForFPUpdate(&*rpucuda_device_, up)) {
     // we take a short-cut in case that FP update is requested:
     up_pwu_->doFPupdate(
@@ -842,6 +916,9 @@ void RPUCudaPulsed<T>::updateMatrixIterator(
 template class RPUCudaPulsed<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUCudaPulsed<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class RPUCudaPulsed<half_t>;
 #endif
 
 #undef CHECK_RPU_DEVICE_INIT

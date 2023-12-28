@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,12 +17,14 @@
 #include "rpu_pulsed.h"
 #include "rpucuda_constantstep_device.h"
 #include "rpucuda_expstep_device.h"
+#include "rpucuda_hidden_device.h"
 #include "rpucuda_linearstep_device.h"
 #include "rpucuda_piecewisestep_device.h"
 #include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_powstep_device.h"
 #include "rpucuda_pulsed.h"
 #include "rpucuda_pulsed_device.h"
+#include "rpucuda_softbounds_reference_device.h"
 #include "utility_functions.h"
 #include "gtest/gtest.h"
 #include <chrono>
@@ -31,12 +33,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -49,12 +45,17 @@ template <> void specific_settings(PiecewiseStepRPUDeviceMetaParameter<num_t> &p
   par.piecewise_down_vec = std::vector<num_t>{0.5, 0.3, 2.0, 0.6, 0.3};
 };
 
+template <> void specific_settings(SoftBoundsReferenceRPUDeviceMetaParameter<num_t> &par) {
+  par.reference_mean = 0.1;
+  par.reference_std = 0.4;
+  par.subtract_symmetry_point = true;
+};
+
 template <typename DeviceParT> class RPUDeviceTestFixture : public ::testing::Test {
 public:
   void SetUp() {
 
     context = &context_container;
-
     this->x_size = 53;
     this->d_size = 43;
     this->K = 10;
@@ -117,7 +118,7 @@ public:
       p.up.desired_BL = 5 * K;
     }
 
-    dp.print();
+    // dp.print();
 
     num_t lr = 0.05;
 
@@ -126,25 +127,25 @@ public:
     layer_pulsed->populateParameter(&p, &dp);
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
-    layer_pulsed->disp();
+    // layer_pulsed->disp();
 
     this->layer_pulsed->getWeights(refweights[0]);
 
     // culayer
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<num_t>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->disp();
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-2.0, 2.0);
+    std::uniform_real_distribution<float> udist(-2.0, 2.0);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<num_t>>(this->context, this->x_size);
@@ -166,13 +167,6 @@ public:
     this->d_vec = this->rd;
 
     this->context->synchronizeDevice();
-
-    std::cout << "RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    this->culayer_pulsed->printRPUParameter(3, 3);
-    std::cout << "RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-    this->layer_pulsed->printRPUParameter(3, 3);
 
     // update
     int nK32 = (K + 32) / 32;
@@ -206,11 +200,6 @@ public:
       this->context->synchronizeDevice();
     }
 
-    std::cout << "W results for RPU Cuda:\n";
-    this->culayer_pulsed->printWeights(3, 3);
-    std::cout << "W results for RPU:\n";
-    this->layer_pulsed->printWeights(3, 3);
-
     num_t **cuweights = this->culayer_pulsed->getWeights();
     num_t **weights = this->layer_pulsed->getWeights();
     this->context->synchronizeDevice();
@@ -219,10 +208,10 @@ public:
     int diff_count_rpucuda = 0;
     for (int i = 0; i < this->d_size; i++) {
       for (int j = 0; j < this->x_size; j++) {
-        if (fabs(weights[i][j] - refweights[i][j]) > 1e-4) {
+        if (fabsf(weights[i][j] - refweights[i][j]) > 1e-4) {
           diff_count_rpu++;
         }
-        if (fabs(cuweights[i][j] - refweights[i][j]) > 1e-4) {
+        if (fabsf(cuweights[i][j] - refweights[i][j]) > 1e-4) {
           diff_count_rpucuda++;
         }
       }
@@ -238,8 +227,7 @@ public:
   void TearDown() { Array_2D_Free(refweights); }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUPulsed<num_t>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<num_t>> culayer_pulsed;
   std::vector<num_t> x_vec, d_vec, rx, rd;
@@ -256,12 +244,14 @@ public:
 
 // types
 typedef ::testing::Types<
+    HiddenStepRPUDeviceMetaParameter<num_t>,
     LinearStepRPUDeviceMetaParameter<num_t>,
     ExpStepRPUDeviceMetaParameter<num_t>,
     PowStepRPUDeviceMetaParameter<num_t>,
     ConstantStepRPUDeviceMetaParameter<num_t>,
     PiecewiseStepRPUDeviceMetaParameter<num_t>,
-    JARTv1bRPUDeviceMetaParameter<num_t>>
+    JARTv1bRPUDeviceMetaParameter<num_t>,
+    SoftBoundsReferenceRPUDeviceMetaParameter<num_t>>
 
     MetaPar;
 

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -35,6 +35,9 @@ template class RPUWeightUpdater<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUWeightUpdater<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class RPUWeightUpdater<half_t>;
+#endif
 
 /*********************************************************************/
 /* Pulsed update */
@@ -51,6 +54,9 @@ template <typename T> void PulsedRPUWeightUpdater<T>::allocateContainers() {
 
     containers_allocated_ = true;
   }
+
+  x_noz_ = 0;
+  d_noz_ = 0;
 }
 
 template <typename T> void PulsedRPUWeightUpdater<T>::freeContainers() {
@@ -87,6 +93,8 @@ PulsedRPUWeightUpdater<T>::PulsedRPUWeightUpdater(const PulsedRPUWeightUpdater<T
     *sblm_ = *other.sblm_;
     *dblm_ = *other.dblm_;
   }
+  x_noz_ = other.x_noz_;
+  d_noz_ = other.d_noz_;
 }
 
 // copy assignment
@@ -120,8 +128,48 @@ PulsedRPUWeightUpdater<T> &PulsedRPUWeightUpdater<T>::operator=(PulsedRPUWeightU
   rng_ = std::move(other.rng_);
 
   containers_allocated_ = other.containers_allocated_;
-
+  x_noz_ = other.x_noz_;
+  d_noz_ = other.d_noz_;
   return *this;
+}
+
+template <typename T>
+void PulsedRPUWeightUpdater<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+
+  RPUWeightUpdater<T>::dumpExtra(extra, prefix);
+
+  RPU::state_t state;
+
+  if (containers_allocated_) {
+    dblm_->dumpExtra(state, "dblm");
+    sblm_->dumpExtra(state, "sblm");
+  }
+  RPU::insert(state, "containers_allocated", containers_allocated_);
+  RPU::insert(state, "d_noz", d_noz_);
+  RPU::insert(state, "x_noz", x_noz_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void PulsedRPUWeightUpdater<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  RPUWeightUpdater<T>::loadExtra(extra, prefix, strict);
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  bool was_allocated;
+  RPU::load(state, "containers_allocated", was_allocated, strict);
+  if (!containers_allocated_ && was_allocated) {
+    allocateContainers();
+  }
+  RPU::load(state, "d_noz", d_noz_, strict);
+  RPU::load(state, "x_noz", x_noz_, strict);
+
+  if (containers_allocated_) {
+    dblm_->loadExtra(state, "dblm", strict);
+    sblm_->loadExtra(state, "sblm", strict);
+  }
 }
 
 template <typename T>
@@ -187,17 +235,24 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
   T weight_granularity = rpu_device->getWeightGranularity();
 
   // pulsed device update
-  rpu_device->initUpdateCycle(weights, up_, learning_rate, m_batch_info);
+  if (up_.d_sparsity) {
+    up_._d_sparsity = getCurrentDSparsity();
+  }
+  rpu_device->initUpdateCycle(
+      weights, up_, learning_rate, m_batch_info, x_input, x_inc, d_input, d_inc);
   // potentially modify the LR from the device side
-  T pc_learning_rate = rpu_device->getPulseCountLearningRate(learning_rate);
+
+  T pc_learning_rate = rpu_device->getPulseCountLearningRate(learning_rate, m_batch_info, up_);
+  d_noz_ = 0;
+  x_noz_ = 0;
 
   if (sblm_->supports(up_.pulse_type)) {
     // envoke sparse bit line maker to get the counts and indices
     int BL = sblm_->makeCounts(
-        x_input, x_inc, d_input, d_inc, &*rng_,
-        pc_learning_rate < 0 ? -pc_learning_rate : pc_learning_rate, weight_granularity, up_);
+        x_input, x_inc, x_noz_, d_input, d_inc, d_noz_, &*rng_,
+        pc_learning_rate < (T)0.0 ? -pc_learning_rate : pc_learning_rate, weight_granularity, up_);
     // positive LR actually means that positive signs *decrease* the weight (as in SGD).
-    int lr_sign = pc_learning_rate < 0 ? -1 : 1;
+    int lr_sign = pc_learning_rate < (T)0.0 ? -1 : 1;
 
     if (BL > 0) {
 
@@ -236,7 +291,8 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
   } else {
     // use dense update
     int *coincidences = dblm_->makeCoincidences(
-        x_input, x_inc, d_input, d_inc, &*rng_, pc_learning_rate, weight_granularity, up_);
+        x_input, x_inc, x_noz_, d_input, d_inc, d_noz_, &*rng_, pc_learning_rate,
+        weight_granularity, up_);
     rpu_device->doDenseUpdate(weights, coincidences, &*rng_);
   }
   // always the current SGD learning rate is given here
@@ -292,9 +348,10 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDeviceAndCounts(
   if (!sblm_->supports(up_.pulse_type)) {
     RPU_FATAL("Requested pulse type not supported.");
   }
-
+  d_noz_ = 0;
+  x_noz_ = 0;
   int BL = sblm_->makeCounts(
-      x_input, x_inc, d_input, d_inc, &*rng_, fabs(learning_rate),
+      x_input, x_inc, x_noz_, d_input, d_inc, d_noz_, &*rng_, (T)fabsf(learning_rate),
       rpu_device->getWeightGranularity(), up_);
 
   // translate to sparse format
@@ -317,12 +374,13 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDeviceAndCounts(
   test_helper::getSparseCountsFromCounts(d_indices, d_counts, d_counts32, BL, this->d_size_);
 
   // pulsed device update
-  rpu_device->initUpdateCycle(weights, up_, learning_rate, m_batch_info);
+  rpu_device->initUpdateCycle(
+      weights, up_, learning_rate, m_batch_info, x_input, x_inc, d_input, d_inc);
 
   // sblm_->printCounts(BL);
   // for info: in BLM (cuda) makeCounts is additional info for debugging the bit line makers
   if (BL > 0) {
-    int lr_sign = learning_rate < 0 ? -1 : 1;
+    int lr_sign = learning_rate < (T)0.0 ? -1 : 1;
     for (int k = 0; k < BL; k++) {
       if (d_counts[k] > 0) {
         for (int ii = 0; ii < d_counts[k]; ii++) {
@@ -343,6 +401,9 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDeviceAndCounts(
 template class PulsedRPUWeightUpdater<float>;
 #ifdef RPU_USE_DOUBLE
 template class PulsedRPUWeightUpdater<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class PulsedRPUWeightUpdater<half_t>;
 #endif
 
 } // namespace RPU

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -22,12 +22,6 @@
 #include <random>
 
 #define TOLERANCE 1e-5
-
-#ifdef RPU_USE_DOUBLE
-typedef double num_t;
-#else
-typedef float num_t;
-#endif
 
 namespace {
 
@@ -65,9 +59,9 @@ int discretize(
     x = (x > bound_upper) ? bound_upper : x;
     x = (x < bound_lower) ? bound_lower : x;
 
-    if (resolution > 0) {
+    if (resolution > (num_t)0.0) {
       x /= resolution;
-      x = RPU_ROUNDFUN(x);
+      x = (num_t)RPU_ROUNDFUNF(x);
       x *= resolution;
     }
     vq[i] = x * post_scale;
@@ -126,21 +120,21 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<num_t> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (num_t)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (num_t)urnd();
     }
 
-    std::uniform_real_distribution<num_t> udist2(-0.2, 1.2);
+    std::uniform_real_distribution<float> udist2(-0.2, 1.2);
     auto urnd2 = std::bind(udist2, generator);
     for (int j = 0; j < d_size * x_size; j++) {
-      W[j] = urnd2();
+      W[j] = (num_t)urnd2();
     }
 
     transpose(rd_trans, rd, d_size, m_batch);
@@ -168,9 +162,8 @@ public:
 
     delete[] W;
   }
-
   CudaContext context_container{-1, false};
-  CudaContext *context;
+  CudaContextPtr context;
 
   int x_size;
   int d_size;
@@ -195,18 +188,19 @@ TEST_P(IOManagerTestFixture, InputManagement) {
   discretize(rxq, rx, x_size, io.inp_bound, io.inp_res, GetParam(), 1.0, 1.0);
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::None;
-  iom->initWithInput(curx->getDataConst(), io, 1, false);
+  iom->initWithInput(curx->getDataConst(), io, x_size, 1, false);
 
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   iom->applyToInput(curx->getDataConst());
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "IM [NM]");
+    CUDA_TIMING_STOP((this->context), "IM [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "IM [no NM]");
+    CUDA_TIMING_STOP((this->context), "IM [no NM]");
   }
 
   iom->copyTempArrayToHost(rx_res);
 
+  iom->releaseBuffer();
   // SR and noise is off
 
   for (int i = 0; i < x_size; i++) {
@@ -224,14 +218,14 @@ TEST_P(IOManagerTestFixture, InputManagementBatch) {
   }
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::None;
-  iom->initWithInput(curx->getDataConst(), io, m_batch, false);
+  iom->initWithInput(curx->getDataConst(), io, x_size, m_batch, false);
 
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   iom->applyToInput(curx->getDataConst());
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "IM Batched [NM]");
+    CUDA_TIMING_STOP((this->context), "IM Batched [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "IM Batched [no NM]");
+    CUDA_TIMING_STOP((this->context), "IM Batched [no NM]");
   }
 
   iom->copyTempArrayToHost(rx_res);
@@ -244,18 +238,18 @@ TEST_P(IOManagerTestFixture, InputManagementBatch) {
   transpose(rxq_trans, rxq, x_size, m_batch);
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::None;
-  iom->initWithInput(curx_trans->getDataConst(), io, m_batch, true);
+  iom->initWithInput(curx_trans->getDataConst(), io, x_size, m_batch, true);
 
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   iom->applyToInput(curx_trans->getDataConst());
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "IM Batched Trans [NM]");
+    CUDA_TIMING_STOP((this->context), "IM Batched Trans [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "IM Batched Trans [no NM]");
+    CUDA_TIMING_STOP((this->context), "IM Batched Trans [no NM]");
   }
 
   iom->copyTempArrayToHost(rx_res);
-
+  iom->releaseBuffer();
   for (int i = 0; i < x_size * m_batch; i++) {
     ASSERT_FLOAT_EQ(rxq_trans[i], rx_res[i]);
   }
@@ -276,14 +270,15 @@ TEST_P(IOManagerTestFixture, OutputManagement) {
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::None;
 
-  iom->initWithInput(curx->getDataConst(), io, 1, false);
+  iom->initWithInput(curx->getDataConst(), io, x_size, 1, false);
 
-  CUDA_TIMING_START((*this->context));
-  iom->applyToOutputInPlace(curd->getData(), nullptr, false);
+  CUDA_TIMING_START((this->context));
+  iom->applyToOutputInPlace(curd->getData(), false);
+  iom->releaseBuffer();
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "OM [NM]");
+    CUDA_TIMING_STOP((this->context), "OM [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "OM [no NM]");
+    CUDA_TIMING_STOP((this->context), "OM [no NM]");
   }
 
   curd->copyTo(rd_res);
@@ -309,16 +304,18 @@ TEST_P(IOManagerTestFixture, OutputManagementBatch) {
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::None;
 
-  iom->initWithInput(curx->getDataConst(), io, m_batch, false);
+  iom->initWithInput(curx->getDataConst(), io, x_size, m_batch, false);
   iom->applyToInput(curx->getDataConst()); // sets the scale values
   CUDA_TIMING_INIT;
 
-  CUDA_TIMING_START((*this->context));
-  iom->applyToOutputInPlace(curd->getData(), nullptr, false);
+  CUDA_TIMING_START((this->context));
+  iom->applyToOutputInPlace(curd->getData(), false);
+  iom->releaseBuffer();
+
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "OM Batched [NM]");
+    CUDA_TIMING_STOP((this->context), "OM Batched [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "OM Batched [no NM]");
+    CUDA_TIMING_STOP((this->context), "OM Batched [no NM]");
   }
   context->synchronize();
 
@@ -331,15 +328,16 @@ TEST_P(IOManagerTestFixture, OutputManagementBatch) {
   transpose(rdq_trans, rdq, d_size, m_batch);
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::None;
-  iom->initWithInput(curx_trans->getDataConst(), io, m_batch, true);
+  iom->initWithInput(curx_trans->getDataConst(), io, x_size, m_batch, true);
   iom->applyToInput(curx_trans->getDataConst()); // sets the scale values
 
-  CUDA_TIMING_START((*this->context));
-  iom->applyToOutputInPlace(curd_trans->getData(), nullptr, true);
+  CUDA_TIMING_START((this->context));
+  iom->applyToOutputInPlace(curd_trans->getData(), true);
+  iom->releaseBuffer();
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "OM Batched Trans [NM]");
+    CUDA_TIMING_STOP((this->context), "OM Batched Trans [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "OM Batched Trans [no NM]");
+    CUDA_TIMING_STOP((this->context), "OM Batched Trans [no NM]");
   }
   context->synchronize();
   curd_trans->copyTo(rd_res);
@@ -357,7 +355,7 @@ TEST_P(IOManagerTestFixture, InputBoundManagementBatch) {
   CUDA_TIMING_INIT;
 
   CudaArray<num_t> cubu(context, d_size * m_batch);
-  cubu.setConst(2.0 * io.out_bound);
+  cubu.setConst((num_t)2.0 * io.out_bound);
   context->synchronize();
 
   // make reference
@@ -367,49 +365,51 @@ TEST_P(IOManagerTestFixture, InputBoundManagementBatch) {
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::Iterative;
 
-  iom->initWithInput(curx->getDataConst(), io, m_batch, false);
+  iom->initWithInput(curx->getDataConst(), io, x_size, m_batch, false);
   iom->applyToInput(curx->getDataConst()); // first round
 
-  bool success = iom->applyToOutputInPlace(cubu.getData(), nullptr, false); // first round
+  bool success = iom->applyToOutputInPlace(cubu.getData(), false); // first round
   ASSERT_EQ(success, false);
 
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   iom->applyToInput(curx->getDataConst()); // second round (2.0 scaling)
 
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "IBM Batched [NM]");
+    CUDA_TIMING_STOP((this->context), "IBM Batched [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "IBM Batched [no NM]");
+    CUDA_TIMING_STOP((this->context), "IBM Batched [no NM]");
   }
 
   iom->copyTempArrayToHost(rx_res);
+  iom->releaseBuffer();
 
   for (int i = 0; i < x_size * m_batch; i++) {
     ASSERT_FLOAT_EQ(rxq[i], rx_res[i]);
   }
 
   // trans
-  cubu.setConst(2.0 * io.out_bound);
+  cubu.setConst((num_t)2.0 * io.out_bound);
   context->synchronize();
 
   transpose(rxq_trans, rxq, x_size, m_batch);
 
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::Iterative;
-  iom->initWithInput(curx_trans->getDataConst(), io, m_batch, true);
-  iom->applyToInput(curx_trans->getDataConst());                      // first round
-  success = iom->applyToOutputInPlace(cubu.getData(), nullptr, true); // first round
+  iom->initWithInput(curx_trans->getDataConst(), io, x_size, m_batch, true);
+  iom->applyToInput(curx_trans->getDataConst());             // first round
+  success = iom->applyToOutputInPlace(cubu.getData(), true); // first round
   ASSERT_EQ(success, false);
 
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   iom->applyToInput(curx_trans->getDataConst()); // second round
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "IBM Batched Trans [NM]");
+    CUDA_TIMING_STOP((this->context), "IBM Batched Trans [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "IBM Batched Trans [no NM]");
+    CUDA_TIMING_STOP((this->context), "IBM Batched Trans [no NM]");
   }
 
   iom->copyTempArrayToHost(rx_res);
+  iom->releaseBuffer();
 
   for (int i = 0; i < x_size * m_batch; i++) {
     ASSERT_FLOAT_EQ(rxq_trans[i], rx_res[i]);
@@ -432,16 +432,16 @@ TEST_P(IOManagerTestFixture, OutputBoundManagementBatch) {
 
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::Iterative;
-  iom->initWithInput(curx->getDataConst(), io, m_batch, false);
+  iom->initWithInput(curx->getDataConst(), io, x_size, m_batch, false);
   iom->applyToInput(curx->getDataConst());
 
-  CUDA_TIMING_START((*this->context));
-  bool success = iom->applyToOutputInPlace(curd->getData(), nullptr, false); // first round
+  CUDA_TIMING_START((this->context));
+  bool success = iom->applyToOutputInPlace(curd->getData(), false); // first round
 
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "OBM Batched [NM]");
+    CUDA_TIMING_STOP((this->context), "OBM Batched [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "OBM Batched [no NM]");
+    CUDA_TIMING_STOP((this->context), "OBM Batched [no NM]");
   }
 
   ASSERT_EQ(success, false);
@@ -455,6 +455,7 @@ TEST_P(IOManagerTestFixture, OutputBoundManagementBatch) {
       }
     }
   }
+  iom->releaseBuffer();
 
   // trans
   transpose(rd_trans, rd, d_size, m_batch);
@@ -463,20 +464,21 @@ TEST_P(IOManagerTestFixture, OutputBoundManagementBatch) {
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::Iterative;
 
-  iom->initWithInput(curx_trans->getDataConst(), io, m_batch, true);
+  iom->initWithInput(curx_trans->getDataConst(), io, x_size, m_batch, true);
   iom->applyToInput(curx_trans->getDataConst());
 
-  CUDA_TIMING_START((*this->context));
-  success = iom->applyToOutputInPlace(curd_trans->getData(), nullptr, true); // first round
+  CUDA_TIMING_START((this->context));
+  success = iom->applyToOutputInPlace(curd_trans->getData(), true); // first round
 
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "OBM Batched Trans [NM]");
+    CUDA_TIMING_STOP((this->context), "OBM Batched Trans [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "OBM Batched Trans [no NM]");
+    CUDA_TIMING_STOP((this->context), "OBM Batched Trans [no NM]");
   }
 
   ASSERT_EQ(success, false);
   iom->copyExceededArrayToHost(exceeding);
+  iom->releaseBuffer();
 
   if (m_batch > 1) {
     for (int i = 0; i < m_batch; i++) {
@@ -525,40 +527,41 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
 
   D_buffer.copyTo(rd_res);
 
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
 
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::Iterative;
 
-  iom->initWithInput(curx->getDataConst(), io, m_batch, false);
+  iom->initWithInput(curx->getDataConst(), io, x_size, m_batch, false);
 
   bool success = false;
   num_t *temp_x = iom->getInBuffer();
   num_t *temp_d = iom->getOutBuffer();
 
   while (!success) {
-    int current_m_batch = iom->applyToInput(curx->getDataConst());
+    iom->applyToInput(curx->getDataConst());
 
     x_trans = false;
     RPU::math::gemm<num_t>(
         context,
         false, // d_trans
         x_trans, d_size,
-        current_m_batch, // M
-        x_size,          // K
+        m_batch, // M
+        x_size,  // K
         (num_t)1.0, dev_W->getData(),
         d_size, // col major
-        temp_x, (x_trans) ? current_m_batch : x_size, (num_t)0.0, temp_d, d_size);
+        temp_x, (x_trans) ? m_batch : x_size, (num_t)0.0, temp_d, d_size);
 
-    success = iom->applyToOutput(curd->getData(), nullptr, false); // first round
+    success = iom->applyToOutput(curd->getData(), false); // first round
   }
 
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "IBM + OBM Batched [NM]");
+    CUDA_TIMING_STOP((this->context), "IBM + OBM Batched [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "IBM + OBM Batched [no NM]");
+    CUDA_TIMING_STOP((this->context), "IBM + OBM Batched [no NM]");
   }
 
+  iom->releaseBuffer();
   curd->copyTo(rd);
   for (int i = 0; i < d_size * m_batch; i++) {
 
@@ -573,96 +576,35 @@ TEST_P(IOManagerTestFixture, InputOutputBoundManagementBatch) {
   io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
   io.bound_management = BoundManagementType::Iterative;
 
-  iom->initWithInput(curx->getDataConst(), io, m_batch, true);
+  iom->initWithInput(curx->getDataConst(), io, x_size, m_batch, true);
   temp_x = iom->getInBuffer();
   temp_d = iom->getOutBuffer();
 
-  CUDA_TIMING_START((*this->context));
+  CUDA_TIMING_START((this->context));
   success = false;
   while (!success) {
-    int current_m_batch = iom->applyToInput(curx->getDataConst());
+    iom->applyToInput(curx->getDataConst());
 
     x_trans = true;
     RPU::math::gemm<num_t>(
-        context, !x_trans, true, current_m_batch, d_size, x_size, (num_t)1.0, temp_x,
-        (x_trans) ? current_m_batch : x_size, dev_W->getData(), d_size, (num_t)0.0, temp_d,
-        current_m_batch);
+        context, !x_trans, true, m_batch, d_size, x_size, (num_t)1.0, temp_x,
+        (x_trans) ? m_batch : x_size, dev_W->getData(), d_size, (num_t)0.0, temp_d, m_batch);
 
-    success = iom->applyToOutput(curd->getData(), nullptr, true); // first round
+    success = iom->applyToOutput(curd->getData(), true); // first round
   }
 
   if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "IBM + OBM Batched Trans [NM]");
+    CUDA_TIMING_STOP((this->context), "IBM + OBM Batched Trans [NM]");
   } else {
-    CUDA_TIMING_STOP((*this->context), "IBM + OBM Batched Trans [no NM]");
+    CUDA_TIMING_STOP((this->context), "IBM + OBM Batched Trans [no NM]");
   }
+  iom->releaseBuffer();
 
   curd->copyTo(rd);
   transpose(rd_trans, rd_res, d_size, m_batch);
   for (int i = 0; i < d_size * m_batch; i++) {
     ASSERT_NEAR(rd_trans[i], rd[i], 1e-3);
   }
-}
-
-TEST_P(IOManagerTestFixture, OutputManagementShiftBatch) {
-
-  // make reference
-  num_t scale_value = 1.0;
-  for (int i = 0; i < m_batch; i++) {
-    if (GetParam()) {
-      scale_value = Find_Absolute_Max(rx + i * x_size, x_size);
-    }
-    num_t out_max_value = Find_Max(rd + i * d_size, d_size);
-    for (int j = 0; j < d_size; j++) {
-      rd[i * d_size + j] += io.out_bound - out_max_value;
-    }
-
-    discretize(
-        rdq + i * d_size, rd + i * d_size, d_size, io.out_bound, io.out_res, false, 1.0,
-        scale_value);
-  }
-  io.noise_management = GetParam() ? NoiseManagementType::AbsMax : NoiseManagementType::None;
-  io.bound_management = BoundManagementType::Shift;
-
-  iom->initWithInput(curx->getDataConst(), io, m_batch, false);
-  iom->applyToInput(curx->getDataConst()); // sets the scale values
-  CUDA_TIMING_INIT;
-
-  CUDA_TIMING_START((*this->context));
-  iom->applyToOutputInPlace(curd->getData(), nullptr, false);
-  if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "OShift Batched [NM]");
-  } else {
-    CUDA_TIMING_STOP((*this->context), "OShift Batched [no NM]");
-  }
-  context->synchronize();
-
-  curd->copyTo(rd_res);
-
-  for (int i = 0; i < d_size * m_batch; i++) {
-    ASSERT_FLOAT_EQ(rdq[i], rd_res[i]);
-  }
-
-  // trans
-  transpose(rdq_trans, rdq, d_size, m_batch);
-  iom->initWithInput(curx_trans->getDataConst(), io, m_batch, true);
-  iom->applyToInput(curx_trans->getDataConst()); // sets the scale values
-
-  CUDA_TIMING_START((*this->context));
-  iom->applyToOutputInPlace(curd_trans->getData(), nullptr, true);
-  if (GetParam()) {
-    CUDA_TIMING_STOP((*this->context), "OShift Batched Trans [NM]");
-  } else {
-    CUDA_TIMING_STOP((*this->context), "OShift Batched Trans [no NM]");
-  }
-  context->synchronize();
-  curd_trans->copyTo(rd_res);
-
-  for (int i = 0; i < d_size * m_batch; i++) {
-    ASSERT_FLOAT_EQ(rdq_trans[i], rd_res[i]);
-  }
-
-  CUDA_TIMING_DESTROY;
 }
 
 } // namespace

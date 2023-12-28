@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -106,14 +106,14 @@ public:
     layer_pulsed->setLearningRate(lr);
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
 
-    layer_pulsed->dispParameter();
-    layer_pulsed->disp();
+    // layer_pulsed->dispParameter();
+    // layer_pulsed->disp();
 
     // copy-construct on GPU
     context = &context_container;
 
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->disp();
 
     x1.resize(x_size * m_batch);
     x2.resize(x_size * m_batch);
@@ -128,22 +128,22 @@ public:
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
     // just assign some numbers from the weigt matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (T)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (T)urnd();
     }
 
-    std::uniform_real_distribution<T> udist2(-0.2, 0.2);
+    std::uniform_real_distribution<float> udist2(-0.2, 0.2);
     auto urnd2 = std::bind(udist2, generator);
 
     for (int j = 0; j < d_size * x_size; j++) {
-      w_other[j] = urnd2();
+      w_other[j] = (T)urnd2();
     }
     transpose(w_other_trans, w_other, x_size, d_size);
 
@@ -173,8 +173,7 @@ public:
   }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUPulsed<T>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<T>> culayer_pulsed;
   std::vector<T> x_vec, x_vec_batch;
@@ -236,11 +235,13 @@ public:
     // dp.w_max_dtod = 0.0;
 
     // peripheral circuits specs
+    p_io.is_perfect = false;
     p_io.inp_res = -1;
     p_io.inp_sto_round = false;
     p_io.out_res = -1;
+    p_io.out_bound = 0.0;
 
-    p_io.ir_drop = 0.3;
+    non_linearities = false; // otherwise test will not pass for NL
 
     p_io.noise_management = NoiseManagementType::AbsMax;
     p_io.bound_management = BoundManagementType::Iterative;
@@ -258,7 +259,6 @@ public:
     p.b_io = p_io;
     p.b_io.bound_management = BoundManagementType::None;
     // p.print();
-
     p.f_io.out_bound = 12;
 
     x1.resize(x_size * m_batch);
@@ -280,23 +280,23 @@ public:
     layer_pulsed->setWeightsUniformRandom(bmin, bmax);
     layer->setWeights(layer_pulsed->getWeights()[0]);
 
-    layer_pulsed->disp();
+    // layer_pulsed->disp();
 
     // culayer
     culayer_pulsed = RPU::make_unique<RPUCudaPulsed<T>>(context, *layer_pulsed);
-    culayer_pulsed->disp();
+    // culayer_pulsed->dispParameter();
 
     unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator{seed};
-    std::uniform_real_distribution<T> udist(-1.2, 1.2);
+    std::uniform_real_distribution<float> udist(-1.2, 1.2);
     auto urnd = std::bind(udist, generator);
 
-    // just assign some numbers from the weigt matrix
+    // just assign some numbers from the weight matrix
     for (int i = 0; i < x_size * m_batch; i++)
-      rx[i] = urnd();
+      rx[i] = (T)urnd();
 
     for (int j = 0; j < d_size * m_batch; j++) {
-      rd[j] = urnd();
+      rd[j] = (T)urnd();
     }
 
     x_cuvec = RPU::make_unique<CudaArray<T>>(context, x_size);
@@ -333,8 +333,7 @@ public:
   void TearDown() { delete batch_indices; }
 
   CudaContext context_container{-1, false};
-  CudaContext *context;
-
+  CudaContextPtr context;
   std::unique_ptr<RPUSimple<T>> layer;
   std::unique_ptr<RPUPulsed<T>> layer_pulsed;
   std::unique_ptr<RPUCudaPulsed<T>> culayer_pulsed;
@@ -354,7 +353,7 @@ public:
   int dim3;
   int *batch_indices;
   bool is_test;
-
+  bool non_linearities = false;
   std::vector<T> x1, x2, x3;
   std::vector<T> d1, d2, d3;
   std::vector<T> rx, rd;
@@ -363,11 +362,7 @@ public:
 };
 
 // types
-#ifdef RPU_USE_DOUBLE
-typedef ::testing::Types<float, double> Tios;
-#else
-typedef ::testing::Types<float> Tios;
-#endif
+typedef ::testing::Types<num_t> Tios;
 
 TYPED_TEST_CASE(RPUCudaPulsedTestFixtureNoNoise, Tios);
 TYPED_TEST_CASE(RPUCudaPulsedTestFixture, Tios);
@@ -377,13 +372,13 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardVector) {
 
   this->x_cuvec->assign(this->rx.data());
   this->x_vec = this->rx;
-  T max_value = Find_Absolute_Max<T>(this->rx.data(), this->x_size);
-  std::cout << "Max value is " << max_value << std::endl;
+  // T max_value = Find_Absolute_Max<T>(this->rx.data(), this->x_size);
+  // std::cout << "Max value is " << max_value << std::endl;
 
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
 
   int nloop = this->repeats;
   double cudur = 0, dur = 0;
@@ -401,10 +396,10 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardVector) {
   for (int loop = 0; loop < nloop; loop++) {
 
     // RPUCuda forward
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->forward(
         this->x_cuvec->getData(), this->d_cuvec->getData(), false, 1, false, false, this->is_test);
-    CUDA_TIMING_STOP_NO_OUTPUT(*this->context);
+    CUDA_TIMING_STOP_NO_OUTPUT(this->context);
     if (loop > 0)
       cudur += milliseconds;
 
@@ -421,8 +416,8 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardVector) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->d_size; i++) {
-      cuavg[i] += this->d1[i] / nloop;
-      avg[i] += this->d2[i] / nloop;
+      cuavg[i] += this->d1[i] / (num_t)nloop;
+      avg[i] += this->d2[i] / (num_t)nloop;
 
       if (!this->noise_value) {
         EXPECT_FLOAT_EQ(this->d1[i], this->d2[i]);
@@ -430,14 +425,14 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardVector) {
     }
   }
 
-  std::cout << BOLD_ON << "\nCUDA Forwards done in: " << cudur / (nloop - 1) << " msec. "
+  std::cout << BOLD_ON << "\tCUDA Forward done in: " << (float)cudur / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
-  std::cout << BOLD_ON << "RPU Forwards done in: " << (T)dur / (nloop - 1) / 1000. << " msec.\n "
+  std::cout << BOLD_ON << "\tCPU Forward done in: " << (float)dur / (nloop - 1) / 1000. << " msec"
             << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->d_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -452,9 +447,9 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, ForwardMatrixBiasNoNoise) {
 
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
-  this->layer->printWeights(3, 3);
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
+  // this->layer->printWeights(3, 3);
 
   bool bias = false;
 
@@ -478,10 +473,16 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, ForwardMatrixBiasNoNoise) {
 
   for (int i = 0; i < this->d_size * this->m_batch; i++) {
     // std::cout << i << ": d1 " << this->d1[i] << " vs d2 " << this->d2[i] << std::endl;
-    ASSERT_NEAR(this->d1[i], this->d2[i], TOLERANCE);
-    ASSERT_NEAR(
-        this->d2[i], this->d3[i],
-        TOLERANCE); // because of noise/bound management: in/out bound should not matter
+    ASSERT_NEAR((float)this->d1[i], (float)this->d2[i], TOLERANCE);
+
+    if (!this->non_linearities) {
+      ASSERT_NEAR((float)this->d2[i], (float)this->d3[i], TOLERANCE);
+      ASSERT_NEAR((float)this->d1[i], (float)this->d3[i], TOLERANCE);
+
+    } else {
+      ASSERT_NE((float)this->d2[i], (float)this->d3[i]);
+      ASSERT_NE((float)this->d1[i], (float)this->d3[i]);
+    }
   }
 }
 
@@ -493,9 +494,9 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, ForwardIndexedNoNoise) {
 
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
-  this->layer->printWeights(3, 3);
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
+  // this->layer->printWeights(3, 3);
 
   int input_size = MIN(10, this->x_size * this->m);
   int output_size = this->x_size * this->m;
@@ -534,29 +535,29 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, ForwardIndexedNoNoise) {
         this->is_test);
     this->layer_pulsed->forwardTensor(
         indexed_input, this->d2.data(), false, this->m, this->dim3, trans, this->is_test);
-    std::cout << "\nCPU Indexed (" << trans << "):";
+    // std::cout << "\nCPU Indexed (" << trans << "):";
     for (int i = 0; i < d_cuvec_batch2.getSize(); i++) {
       ASSERT_FLOAT_EQ(this->d1[i], this->d2[i]);
     }
-    std::cout << "  success!\n";
+    // std::cout << "  success!\n";
 
     this->context->synchronizeDevice();
     this->culayer_pulsed->setMatrixIndices(cu_index.getData());
 
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->forwardIndexed(
         cu_orig_input.getDataConst(), d_cuvec_batch2.getData(), input_size * this->dim3, this->m,
         this->dim3, trans, this->is_test);
-    CUDA_TIMING_STOP(*this->context, "Forward Indexed " << trans);
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_STOP(this->context, "Forward Indexed " << trans);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->forwardTensor(
         cu_indexed_input.getDataConst(), this->d_cuvec_batch->getData(), false, this->m, this->dim3,
         trans, this->is_test);
-    CUDA_TIMING_STOP(*this->context, "Forward Tensor " << trans);
+    CUDA_TIMING_STOP(this->context, "Forward Tensor " << trans);
     this->context->synchronizeDevice();
 
     this->d_cuvec_batch->copyTo(this->d1.data());
-    d_cuvec_batch2.copyTo(this->d2.data());
+    d_cuvec_batch2.copyTo(this->d2.data()); // indexed version
 
     for (int i = 0; i < d_cuvec_batch2.getSize(); i++) {
       ASSERT_FLOAT_EQ(this->d1[i], this->d2[i]);
@@ -577,9 +578,9 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardIndexedNoNoise) {
 
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
-  this->layer->printWeights(3, 3);
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
+  // this->layer->printWeights(3, 3);
 
   int input_size = this->x_size * this->m;
   int output_size = MIN(10, this->x_size * this->m);
@@ -622,25 +623,25 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardIndexedNoNoise) {
       }
     }
 
-    std::cout << "\nCPU Indexed (" << trans << "):";
+    // std::cout << "\nCPU Indexed (" << trans << "):";
     for (int i = 0; i < output_size * this->dim3; i++) {
-      ASSERT_NEAR(this->x1[i], indexed_output[i], 1e-6);
+      ASSERT_NEAR((float)this->x1[i], (float)indexed_output[i], 1e-6);
     }
-    std::cout << "  success!\n";
+    // std::cout << "  success!\n";
 
     this->context->synchronizeDevice();
     this->culayer_pulsed->setMatrixIndices(cu_index.getData());
 
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->backwardIndexed(
         this->d_cuvec_batch->getData(), this->x_cuvec_batch->getData(), output_size * this->dim3,
         this->m, this->dim3, trans);
-    CUDA_TIMING_STOP(*this->context, "Backward Indexed " << trans);
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_STOP(this->context, "Backward Indexed " << trans);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->backwardTensor(
         this->d_cuvec_batch->getData(), x_cuvec_batch2.getData(), false, this->m, this->dim3,
         trans);
-    CUDA_TIMING_STOP(*this->context, "Backward Tensor " << trans);
+    CUDA_TIMING_STOP(this->context, "Backward Tensor " << trans);
 
     this->context->synchronizeDevice();
 
@@ -660,7 +661,7 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardIndexedNoNoise) {
     }
 
     for (int i = 0; i < output_size * this->dim3; i++) {
-      ASSERT_FLOAT_EQ(this->x1[i], indexed_output[i]);
+      ASSERT_FLOAT_EQ((float)this->x1[i], (float)indexed_output[i]);
     }
 
     delete[] indexed_output;
@@ -677,10 +678,10 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardMatrixBiasNoNoise) {
 
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
-  this->layer->printWeights(3, 3);
-  this->culayer_pulsed->dispParameter();
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
+  // this->layer->printWeights(3, 3);
+  // this->culayer_pulsed->dispParameter();
 
   // RPUCuda backward
   this->culayer_pulsed->backward(
@@ -700,8 +701,17 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, BackwardMatrixBiasNoNoise) {
   this->x3 = this->x_vec_batch;
 
   for (int i = 0; i < (this->x_size - 1) * this->m_batch; i++) {
-    ASSERT_NEAR(this->x1[i], this->x2[i], TOLERANCE);
-    ASSERT_NEAR(this->x2[i], this->x3[i], TOLERANCE);
+    ASSERT_NEAR((float)this->x1[i], (float)this->x2[i], TOLERANCE);
+
+    if (!this->non_linearities) {
+      ASSERT_NEAR((float)this->x1[i], (float)this->x3[i], TOLERANCE);
+
+      ASSERT_NEAR((float)this->x2[i], (float)this->x3[i], TOLERANCE);
+
+    } else {
+      ASSERT_NE((float)this->x2[i], (float)this->x3[i]);
+      ASSERT_NE((float)this->x1[i], (float)this->x3[i]);
+    }
   }
 }
 
@@ -740,8 +750,8 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, GetWeightsReal) {
 
   for (int i = 0; i < this->d_size * this->x_size; i++) {
 
-    avg_dev1 += fabs(w1[i] - w1_ref[i]);
-    avg_dev2 += fabs(w2[i] - w2_ref[i]);
+    avg_dev1 += fabsf(w1[i] - w1_ref[i]);
+    avg_dev2 += fabsf(w2[i] - w2_ref[i]);
   }
   avg_dev1 /= this->d_size * this->x_size;
   avg_dev2 /= this->d_size * this->x_size;
@@ -781,31 +791,31 @@ TYPED_TEST(RPUCudaPulsedTestFixtureNoNoise, SetWeightsReal) {
   this->culayer_pulsed->getWeights(w2);
 
   T avg_dev1 = 0.0, avg_dev2 = 0.0;
-  T max_dev1 = 0.0, max_dev2 = 0.0;
-  int max_dev1_i = 0;
-  int max_dev2_i = 0;
+  // T max_dev1 = 0.0, max_dev2 = 0.0;
+  // int max_dev1_i = 0;
+  // int max_dev2_i = 0;
 
   for (int i = 0; i < this->d_size * this->x_size; i++) {
-    avg_dev1 += fabs(w1[i] - w1_ref[i]);
-    avg_dev2 += fabs(w2[i] - w2_ref[i]);
+    avg_dev1 += fabsf(w1[i] - w1_ref[i]);
+    avg_dev2 += fabsf(w2[i] - w2_ref[i]);
 
-    if (max_dev1 < fabs(w1[i] - w1_ref[i])) {
-      max_dev1 = fabs(w1[i] - w1_ref[i]);
-      max_dev1_i = i;
-    }
+    // if (max_dev1 < fabsf(w1[i] - w1_ref[i])) {
+    //   max_dev1 = fabsf(w1[i] - w1_ref[i]);
+    //   max_dev1_i = i;
+    // }
 
-    if (max_dev2 < fabs(w2[i] - w2_ref[i])) {
-      max_dev2 = fabs(w2[i] - w2_ref[i]);
-      max_dev2_i = i;
-    }
+    // if (max_dev2 < fabsf(w2[i] - w2_ref[i])) {
+    //   max_dev2 = fabsf(w2[i] - w2_ref[i]);
+    //   max_dev2_i = i;
+    // }
 
     // std::cout << i << ": " << w1[i] << " vs [ref] " << w1_ref[i] << "\n";
     // std::cout << i << ": " << w2[i] << " vs [ref] " << w2_ref[i] << "\n";
   }
   avg_dev1 /= this->d_size * this->x_size;
   avg_dev2 /= this->d_size * this->x_size;
-  std::cout << "max_dev1 is " << max_dev1 << " idx is " << max_dev1_i << "\n";
-  std::cout << "max_dev2 is " << max_dev2 << " idx is " << max_dev2_i << "\n";
+  // std::cout << "max_dev1 is " << max_dev1 << " idx is " << max_dev1_i << "\n";
+  // std::cout << "max_dev2 is " << max_dev2 << " idx is " << max_dev2_i << "\n";
 
   EXPECT_NEAR(avg_dev1, avg_dev2, avg_dev1);
   EXPECT_NEAR(avg_dev1, 0.001, 0.002);
@@ -824,8 +834,8 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardMatrix) {
 
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
 
   int nloop = 2;
   double cudur = 0, dur = 0;
@@ -845,11 +855,11 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardMatrix) {
 
     // RPUCuda forward
     start_time = std::chrono::high_resolution_clock::now();
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->forward(
         this->x_cuvec_batch->getData(), this->d_cuvec_batch->getData(), false, this->m_batch, false,
         false, this->is_test);
-    CUDA_TIMING_STOP_NO_OUTPUT(*this->context);
+    CUDA_TIMING_STOP_NO_OUTPUT(this->context);
     if (loop > 0)
       cudur += milliseconds;
 
@@ -867,8 +877,8 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardMatrix) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->d_size * this->m_batch; i++) {
-      cuavg[i % this->m_batch] += this->d1[i] / nloop / this->m_batch;
-      avg[i % this->m_batch] += this->d2[i] / nloop / this->m_batch;
+      cuavg[i % this->m_batch] += this->d1[i] / (num_t)nloop / (num_t)this->m_batch;
+      avg[i % this->m_batch] += this->d2[i] / (num_t)nloop / (num_t)this->m_batch;
 
       if (!this->noise_value) {
         EXPECT_FLOAT_EQ(this->d1[i], this->d2[i]);
@@ -876,14 +886,14 @@ TYPED_TEST(RPUCudaPulsedTestFixture, ForwardMatrix) {
     }
   }
 
-  std::cout << BOLD_ON << "\nCUDA Forward Matrix done in: " << cudur / (nloop - 1) << " msec. "
+  std::cout << BOLD_ON << "\tCUDA Forward Matrix done in: " << (float)cudur / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
-  std::cout << BOLD_ON << "RPU Forward Matrix done in: " << (T)dur / 1000. / (nloop - 1)
-            << " msec.\n " << BOLD_OFF << std::endl;
+  std::cout << BOLD_ON << "\tCPU Forward Matrix done in: " << (float)dur / 1000. / (nloop - 1)
+            << " msec" << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->d_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -897,14 +907,14 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardVector) {
 
   this->d_cuvec->assign(this->rd.data());
   this->d_vec = this->rd;
-  T max_value = Find_Absolute_Max<T>(this->rd.data(), this->d_size);
-  std::cout << "Max value Reference: " << max_value << std::endl;
+  // T max_value = Find_Absolute_Max<T>(this->rd.data(), this->d_size);
+  // std::cout << "Max value Reference: " << max_value << std::endl;
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
 
-  this->culayer_pulsed->dispParameter();
+  // this->culayer_pulsed->dispParameter();
 
   T *cuavg = new T[this->x_size];
   T *avg = new T[this->x_size];
@@ -923,9 +933,9 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardVector) {
   for (int loop = 0; loop < nloop; loop++) {
 
     // RPUCuda backward
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->backward(this->d_cuvec->getData(), this->x_cuvec->getData(), false, 1);
-    CUDA_TIMING_STOP_NO_OUTPUT(*this->context);
+    CUDA_TIMING_STOP_NO_OUTPUT(this->context);
     if (loop > 0)
       cudur += milliseconds;
 
@@ -942,22 +952,22 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardVector) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->x_size; i++) {
-      cuavg[i] += this->x1[i] / nloop;
-      avg[i] += this->x2[i] / nloop;
+      cuavg[i] += this->x1[i] / (num_t)nloop;
+      avg[i] += this->x2[i] / (num_t)nloop;
 
       if (!this->noise_value) {
         EXPECT_FLOAT_EQ(this->x1[i], this->x2[i]);
       }
     }
   }
-  std::cout << BOLD_ON << "\nCUDA Backwards done in: " << cudur / (nloop - 1) << " msec. "
+  std::cout << BOLD_ON << "\tCUDA Backwards done in: " << (float)cudur / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
-  std::cout << BOLD_ON << "RPU Backwards done in: " << (T)dur / 1000. / (nloop - 1) << " msec.\n "
+  std::cout << BOLD_ON << "\tCPU Backwards done in: " << (float)dur / 1000. / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->x_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -972,8 +982,8 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
   this->d_vec_batch = this->rd;
   this->context->synchronizeDevice();
 
-  this->culayer_pulsed->printWeights(3, 3);
-  this->layer_pulsed->printWeights(3, 3);
+  // this->culayer_pulsed->printWeights(3, 3);
+  // this->layer_pulsed->printWeights(3, 3);
 
   T *cuavg = new T[this->x_size];
   T *avg = new T[this->x_size];
@@ -992,10 +1002,10 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
   for (int loop = 0; loop < nloop; loop++) {
 
     // RPUCuda backward
-    CUDA_TIMING_START(*this->context);
+    CUDA_TIMING_START(this->context);
     this->culayer_pulsed->backward(
         this->d_cuvec_batch->getData(), this->x_cuvec_batch->getData(), false, this->m_batch);
-    CUDA_TIMING_STOP_NO_OUTPUT(*this->context);
+    CUDA_TIMING_STOP_NO_OUTPUT(this->context);
     if (loop > 0)
       cudur += milliseconds;
 
@@ -1014,27 +1024,26 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
     this->context->synchronizeDevice();
 
     for (int i = 0; i < this->x_size * this->m_batch; i++) {
-      cuavg[i % this->m_batch] += this->x1[i] / nloop / this->m_batch;
-      avg[i % this->m_batch] += this->x2[i] / nloop / this->m_batch;
+      cuavg[i % this->m_batch] += this->x1[i] / (num_t)nloop / (num_t)this->m_batch;
+      avg[i % this->m_batch] += this->x2[i] / (num_t)nloop / (num_t)this->m_batch;
 
       if (!this->noise_value) {
-        if ((fabs(this->x2[i] - this->x1[i])) > 1e-6)
-          std::cout << "i " << i << " x_size " << this->x_size << " batch: " << this->m_batch
-                    << std::endl;
-
+        // if ((fabsf(this->x2[i] - this->x1[i])) > 1e-6)
+        // std::cout << "i " << i << " x_size " << this->x_size << " batch: " << this->m_batch
+        //          << std::endl;
         EXPECT_FLOAT_EQ(this->x1[i], this->x2[i]);
-        //!! note: could be an occaisional rounding difference!
+        //!! note: could have a rounding difference!
       }
     }
   }
-  std::cout << BOLD_ON << "\nCUDA Backward Mat done in: " << cudur / (nloop - 1) << " msec. "
+  std::cout << BOLD_ON << "\tCUDA Backward Mat done in: " << (float)cudur / (nloop - 1) << " msec"
             << BOLD_OFF << std::endl;
-  std::cout << BOLD_ON << "RPU Backward Mat done in: " << (T)dur / 1000. / (nloop - 1)
-            << " msec.\n " << BOLD_OFF << std::endl;
+  std::cout << BOLD_ON << "\tCPU Backward Mat done in: " << (float)dur / 1000. / (nloop - 1)
+            << " msec" << BOLD_OFF << std::endl;
 
   for (int i = 0; i < this->x_size; i++) {
     // std::cout  << "ref:" << avg[i] << ", cu out: " << cuavg[i] << std::endl;
-    ASSERT_NEAR(cuavg[i], avg[i], 1. / sqrtf(nloop));
+    ASSERT_NEAR((float)cuavg[i], (float)avg[i], 1. / sqrtf(nloop));
   }
 
   delete[] avg;
@@ -1044,13 +1053,6 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
 
 #define RPU_TEST_UPDATE(CUFUN, FUN, NLOOP)                                                         \
   this->context->synchronizeDevice();                                                              \
-  std::cout << "Cuda weights:\n";                                                                  \
-  this->culayer_pulsed->printWeights(5, 2);                                                        \
-  std::cout << "Weights:\n";                                                                       \
-  this->layer_pulsed->printWeights(5, 2);                                                          \
-                                                                                                   \
-  this->culayer_pulsed->printRPUParameter(1, 3);                                                   \
-  this->layer_pulsed->printRPUParameter(1, 3);                                                     \
   bool no_noise = !this->layer_pulsed->getRPUDevice().isPulsedDevice();                            \
   int n = this->x_size * this->d_size;                                                             \
   T **refweights = Array_2D_Get<T>(this->d_size, this->x_size);                                    \
@@ -1080,9 +1082,9 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
   for (int loop = 0; loop < nloop; loop++) {                                                       \
                                                                                                    \
     start_time = std::chrono::high_resolution_clock::now();                                        \
-    CUDA_TIMING_START(*this->context);                                                             \
+    CUDA_TIMING_START(this->context);                                                              \
     this->culayer_pulsed->CUFUN;                                                                   \
-    CUDA_TIMING_STOP_NO_OUTPUT(*this->context);                                                    \
+    CUDA_TIMING_STOP_NO_OUTPUT(this->context);                                                     \
     if (loop > 0)                                                                                  \
       cudur += milliseconds;                                                                       \
                                                                                                    \
@@ -1098,13 +1100,13 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
     for (int i = 0; i < this->d_size; i++) {                                                       \
       for (int j = 0; j < this->x_size; j++) {                                                     \
         int k = j + i * this->x_size;                                                              \
-        cuavg[k] += cuweights[i][j] / nloop;                                                       \
-        avg[k] += weights[i][j] / nloop;                                                           \
+        cuavg[k] += cuweights[i][j] / (num_t)nloop;                                                \
+        avg[k] += weights[i][j] / (num_t)nloop;                                                    \
         if (no_noise) {                                                                            \
-          ASSERT_NEAR(cuweights[i][j], weights[i][j], TOLERANCE);                                  \
+          ASSERT_NEAR((float)cuweights[i][j], (float)weights[i][j], TOLERANCE);                    \
         }                                                                                          \
-        cusig[k] += cuweights[i][j] * cuweights[i][j] / nloop;                                     \
-        sig[k] += weights[i][j] * weights[i][j] / nloop;                                           \
+        cusig[k] += cuweights[i][j] * cuweights[i][j] / (num_t)nloop;                              \
+        sig[k] += weights[i][j] * weights[i][j] / (num_t)nloop;                                    \
                                                                                                    \
         /*weights[i][j] = refweights[i][j];*/                                                      \
       }                                                                                            \
@@ -1115,21 +1117,16 @@ TYPED_TEST(RPUCudaPulsedTestFixture, BackwardMatrix) {
       this->layer_pulsed->setWeights(refweights[0]);                                               \
     }                                                                                              \
   }                                                                                                \
-  std::cout << "\nLast cuda weights:\n";                                                           \
-  this->culayer_pulsed->printWeights(5, 2);                                                        \
-  std::cout << "\nLast weights:\n";                                                                \
-  this->layer_pulsed->printWeights(5, 2);                                                          \
-                                                                                                   \
-  std::cout << BOLD_ON << "\nCUDA done in: " << cudur / (nloop - 1) << " msec. " << BOLD_OFF       \
+  std::cout << BOLD_ON << "\tCUDA done in: " << (float)cudur / (nloop - 1) << " msec " << BOLD_OFF \
             << std::endl;                                                                          \
-  std::cout << BOLD_ON << "RPU done in: " << (T)dur / 1000. / (nloop - 1) << " msec.\n "           \
+  std::cout << BOLD_ON << "\tCPU done in: " << (float)dur / 1000. / (nloop - 1) << " msec"         \
             << BOLD_OFF << std::endl;                                                              \
   for (int k = 0; k < n; k++) {                                                                    \
-    T sigi = sqrt(fabs(sig[k] - avg[k] * avg[k]));                                                 \
-    T cusigi = sqrt(fabs(cusig[k] - cuavg[k] * cuavg[k]));                                         \
+    T sigi = sqrt(fabsf(sig[k] - avg[k] * avg[k]));                                                \
+    T cusigi = sqrt(fabsf(cusig[k] - cuavg[k] * cuavg[k]));                                        \
                                                                                                    \
-    EXPECT_NEAR(avg[k], cuavg[k], 2. / sqrtf(nloop));                                              \
-    EXPECT_NEAR(sigi, cusigi, 2. / sqrtf(nloop));                                                  \
+    ASSERT_NEAR((float)avg[k], (float)cuavg[k], 2. / sqrtf(nloop));                                \
+    ASSERT_NEAR((float)sigi, (float)cusigi, 2. / sqrtf(nloop));                                    \
   }                                                                                                \
   delete[] cuavg;                                                                                  \
   delete[] avg;                                                                                    \
@@ -1218,9 +1215,9 @@ TYPED_TEST(RPUCudaPulsedTestFixture, PreAllReduce) {
 
   this->context->synchronizeDevice();
   CUDA_TIMING_INIT;
-  CUDA_TIMING_START(*this->context);
+  CUDA_TIMING_START(this->context);
   this->culayer_pulsed->getAndResetWeightUpdate(this->w_cuother->getData());
-  CUDA_TIMING_STOP(*this->context, "Get_And_Reset");
+  CUDA_TIMING_STOP(this->context, "Get_And_Reset");
   this->layer_pulsed->getAndResetWeightUpdate(this->w_other);
   this->context->synchronizeDevice();
 
@@ -1279,9 +1276,9 @@ TYPED_TEST(RPUCudaPulsedTestFixture, PostAllReduce) {
 
   this->context->synchronizeDevice();
   CUDA_TIMING_INIT;
-  CUDA_TIMING_START(*this->context);
+  CUDA_TIMING_START(this->context);
   this->culayer_pulsed->applyWeightUpdate(this->w_cuother->getData());
-  CUDA_TIMING_STOP(*this->context, "Apply_Weight_Update");
+  CUDA_TIMING_STOP(this->context, "Apply_Weight_Update");
   this->layer_pulsed->applyWeightUpdate(this->w_other);
   this->context->synchronizeDevice();
 

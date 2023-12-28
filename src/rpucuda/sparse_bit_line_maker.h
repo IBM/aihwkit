@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -49,8 +49,10 @@ public:
   virtual int makeCounts(
       const T *x_in,
       const int x_inc,
+      int &x_noz,
       const T *d_in,
       const int d_inc,
+      int &d_noz,
       RNG<T> *rng,
       const T lr,
       const T dw_min,
@@ -67,6 +69,10 @@ public:
 
   void printCounts(int BL) const;
   bool supports(RPU::PulseType pulse_type) const;
+
+  /* Ignore the buffer / indices, as they will be generated anew each sample.*/
+  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
 
 private:
   void freeContainers();

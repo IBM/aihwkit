@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,13 +21,16 @@ namespace RPU {
 template <typename T> class WeightClipperCuda {
 
 public:
-  explicit WeightClipperCuda(CudaContext *context, int x_size, int d_size);
+  explicit WeightClipperCuda(CudaContextPtr context, int x_size, int d_size);
   WeightClipperCuda(){};
 
   void apply(T *weights, const WeightClipParameter &wclpar);
 
+  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+
 private:
-  CudaContext *context_ = nullptr;
+  CudaContextPtr context_ = nullptr;
   int x_size_ = 0;
   int d_size_ = 0;
   int size_ = 0;

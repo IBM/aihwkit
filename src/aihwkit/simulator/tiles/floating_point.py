@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -12,21 +12,22 @@
 
 """High level analog tiles (floating point)."""
 
-from copy import deepcopy
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, Tuple, TYPE_CHECKING
 
-from torch import device as torch_device
-from torch.cuda import device as cuda_device
+from torch import Tensor
 
-from aihwkit.exceptions import CudaError
-from aihwkit.simulator.rpu_base import cuda, tiles
-from aihwkit.simulator.tiles.base import BaseTile
+from aihwkit.simulator.rpu_base import tiles
+from aihwkit.simulator.tiles.rpucuda import RPUCudaSimulatorTileWrapper
+from aihwkit.simulator.tiles.module import TileModule
+from aihwkit.simulator.tiles.periphery import TileWithPeriphery
+from aihwkit.simulator.tiles.functions import AnalogFunction
+from aihwkit.simulator.parameters.base import RPUConfigGeneric
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs import FloatingPointRPUConfig
 
 
-class FloatingPointTile(BaseTile):
+class FloatingPointTile(TileModule, TileWithPeriphery, RPUCudaSimulatorTileWrapper):
     r"""Floating point tile.
 
     Implements a floating point or ideal analog tile.
@@ -102,79 +103,25 @@ class FloatingPointTile(BaseTile):
     """
 
     def __init__(
-            self,
-            out_size: int,
-            in_size: int,
-            rpu_config: Optional['FloatingPointRPUConfig'] = None,
-            bias: bool = False,
-            in_trans: bool = False,
-            out_trans: bool = False,
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: "FloatingPointRPUConfig",
+        bias: bool = False,
+        in_trans: bool = False,
+        out_trans: bool = False,
     ):
-        if not rpu_config:
-            # Import `FloatingPointRPUConfig` dynamically to avoid import cycles.
-            # pylint: disable=import-outside-toplevel
-            from aihwkit.simulator.configs import FloatingPointRPUConfig
-            rpu_config = FloatingPointRPUConfig()
-        super().__init__(out_size, in_size, rpu_config, bias, in_trans, out_trans)
-
-    def cpu(self) -> 'BaseTile':
-        """Return a copy of this tile in CPU memory.
-
-        Note:
-            CUDA tiles weight can be accessed by `get_weights` etc
-            methods, there is no need to move them to CPU and it is
-            currently not supported.
-
-        Returns:
-            self in case of CPU
-
-        Raises:
-            CudaError: if a CUDA tile is moved to CPU
-        """
-        if self.is_cuda:
-            raise CudaError('Currently it is not possible to move CUDA tile to cpu.')
-
-        return self
-
-    def cuda(
-            self,
-            device: Optional[Union[torch_device, str, int]] = None
-    ) -> 'BaseTile':
-        """Return a copy of this tile in CUDA memory.
-
-        Args:
-            device: CUDA device
-
-        Returns:
-            Self with the underlying C++ tile moved to CUDA memory.
-
-        Raises:
-            CudaError: if the library has not been compiled with CUDA.
-        """
-        if not cuda.is_compiled():
-            raise CudaError('aihwkit has not been compiled with CUDA support')
-
-        device = torch_device('cuda', cuda_device(device).idx)
-
-        if self.is_cuda and device != self.device:
-            raise CudaError('Cannot switch CUDA devices of existing Cuda tiles')
-
-        if isinstance(self.tile, tiles.FloatingPointTile):
-            with cuda_device(device):
-                self.tile = tiles.CudaFloatingPointTile(self.tile)
-                self.is_cuda = True
-                self.device = device
-                self.analog_ctx.cuda(device)
-
-        return self
+        TileModule.__init__(self)
+        RPUCudaSimulatorTileWrapper.__init__(
+            self, out_size, in_size, rpu_config, bias, in_trans, out_trans  # type: ignore
+        )
+        TileWithPeriphery.__init__(self)
 
     def _create_simulator_tile(
-            self,
-            x_size: int,
-            d_size: int,
-            rpu_config: 'FloatingPointRPUConfig'
+        self, x_size: int, d_size: int, rpu_config: RPUConfigGeneric
     ) -> tiles.FloatingPointTile:
         """Create a simulator tile.
+
 
         Args:
             x_size: input size
@@ -184,35 +131,23 @@ class FloatingPointTile(BaseTile):
         Returns:
             a simulator tile based on the specified configuration.
         """
-        meta_parameter = rpu_config.device.as_bindings()
-
+        meta_parameter = rpu_config.device.as_bindings(self.get_data_type())
         return meta_parameter.create_array(x_size, d_size)
 
+    def forward(
+        self, x_input: Tensor, tensor_view: Optional[Tuple] = None  # type: ignore
+    ) -> Tensor:
+        """Torch forward function that calls the analog forward"""
+        # pylint: disable=arguments-differ
 
-class CudaFloatingPointTile(FloatingPointTile):
-    """Floating point tile (CUDA).
+        out = AnalogFunction.apply(
+            self.get_analog_ctx(), self, x_input, self.shared_weights, not self.training
+        )
 
-    Floating point tile that uses GPU for its operation. The instantiation is
-    based on an existing non-cuda tile: all the source attributes are copied
-    except for the simulator tile, which is recreated using a GPU tile.
+        if tensor_view is None:
+            tensor_view = self.get_tensor_view(out.dim())
+        out = self.apply_out_scaling(out, tensor_view)
 
-    Caution:
-        Deprecated. Use ``FloatingPointTile(..).cuda()`` instead.
-
-    Args:
-        source_tile: tile to be used as the source of this tile
-    """
-
-    is_cuda = True
-
-    def __init__(self, source_tile: FloatingPointTile):
-        if not cuda.is_compiled():
-            raise CudaError('aihwkit has not been compiled with CUDA support')
-
-        # Create a new instance of the rpu config.
-        new_rpu_config = deepcopy(source_tile.rpu_config)
-
-        # Create the tile, replacing the simulator tile.
-        super().__init__(source_tile.out_size, source_tile.in_size, new_rpu_config,
-                         source_tile.bias, source_tile.in_trans, source_tile.out_trans)
-        self.cuda(self.device)
+        if self.digital_bias:
+            return out + self.bias.view(*tensor_view)
+        return out

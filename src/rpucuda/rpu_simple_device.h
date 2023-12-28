@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -30,20 +30,26 @@ template <typename T> class AbstractRPUDevice;
 template <typename T> class SimpleRPUDevice;
 
 // register all available devices [better to use registry at some point]
-enum DeviceUpdateType {
+enum class DeviceUpdateType {
   Undefined,
   FloatingPoint,
   ConstantStep,
   LinearStep,
   SoftBounds,
+  HiddenStep,
   ExpStep,
   Vector,
   OneSided,
   Transfer,
-  MixedPrec,
-  PowStep,
   BufferedTransfer,
+  MixedPrec,
+  MixedPrecInt,
+  PowStep,
   PiecewiseStep,
+  ChoppedTransfer,
+  DynamicTransfer,
+  SoftBoundsReference,
+  PowStepReference,
   JARTv1b
 };
 
@@ -87,6 +93,8 @@ template <typename T> struct AbstractRPUDeviceMetaParameter : SimpleMetaParamete
 // Simple Device parameter
 template <typename T> struct SimpleRPUDeviceMetaParameter : AbstractRPUDeviceMetaParameter<T> {
 
+  T reset_std = 0.0;
+
   std::string getName() const override { return "SimpleRPUDevice"; };
   SimpleRPUDevice<T> *createDevice(int x_size, int d_size, RealWorldRNG<T> *rng) override {
     return new SimpleRPUDevice<T>(x_size, d_size, *this, rng);
@@ -97,6 +105,9 @@ template <typename T> struct SimpleRPUDeviceMetaParameter : AbstractRPUDeviceMet
   using SimpleMetaParameter<T>::print;
   void printToStream(std::stringstream &ss) const override {
     SimpleMetaParameter<T>::printToStream(ss);
+    if (reset_std > (T)0.0) {
+      ss << "\t reset_std: " << reset_std << std::endl;
+    }
   }
   DeviceUpdateType implements() const override { return DeviceUpdateType::FloatingPoint; };
 
@@ -121,12 +132,14 @@ public:
     return std::unique_ptr<AbstractRPUDevice<T>>(clone());
   };
   virtual void getDPNames(std::vector<std::string> &names) const = 0;
-  virtual void getDeviceParameter(std::vector<T *> &data_ptrs) const = 0;
+  virtual void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) = 0;
   virtual void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) = 0;
   virtual int getHiddenWeightsCount() const = 0;
   virtual void setHiddenWeights(const std::vector<T> &data) = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
   virtual void setHiddenUpdateIdx(int idx){};
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) = 0;
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) = 0;
 
   virtual void printDP(int x_count, int d_count) const = 0;
   void dispMetaParameter() const {
@@ -165,6 +178,7 @@ public:
   virtual bool onSetWeights(T **weights) = 0;
   virtual DeviceUpdateType implements() const = 0;
   virtual bool hasDirectUpdate() const { return false; };
+  virtual bool usesUpdateParameter() const { return !hasDirectUpdate(); };
   virtual void doDirectVectorUpdate(
       T **weights,
       const T *x_input,
@@ -207,7 +221,7 @@ public:
   SimpleRPUDevice<T> *clone() const override { return new SimpleRPUDevice<T>(*this); }
 
   void getDPNames(std::vector<std::string> &names) const override { names.clear(); };
-  void getDeviceParameter(std::vector<T *> &data_ptrs) const override{};
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override{};
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override{};
   int getHiddenWeightsCount() const override { return 0; };
   void setHiddenWeights(const std::vector<T> &data) override{};
@@ -232,9 +246,7 @@ public:
   void clipWeights(T **weights, T clip) override;
   bool onSetWeights(T **weights) override { return false; };
   void
-  resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override {
-    RPU_FATAL("Not supported for Simple devices");
-  }; // maybe support ?
+  resetCols(T **weights, int start_col, int n_cols, T reset_prob, RealWorldRNG<T> &rng) override;
 
   DeviceUpdateType implements() const override { return this->getPar().implements(); };
 
@@ -246,6 +258,8 @@ public:
     }
   };
   inline bool hasWDrifter() const { return wdrifter_ != nullptr; };
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
   void populate(const SimpleRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng);

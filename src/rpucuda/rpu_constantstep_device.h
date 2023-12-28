@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -26,7 +26,6 @@ BUILD_PULSED_DEVICE_META_PARAMETER(ConstantStep,
                                    /*parameter def*/
                                    ,
                                    /*print body*/
-                                   ss << "\t None additional." << std::endl;
                                    ,
                                    /* calc weight granularity body */
                                    return this->dw_min;

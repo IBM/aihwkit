@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -46,7 +46,7 @@ template <typename T> SimpleRPUDevice<T>::SimpleRPUDevice(const SimpleRPUDevice<
   }
 
   if (other.wdrifter_) {
-    wdrifter_ = make_unique<WeightDrifter<T>>(*other.wdrifter_);
+    wdrifter_ = RPU::make_unique<WeightDrifter<T>>(*other.wdrifter_);
   }
 }
 
@@ -74,6 +74,24 @@ SimpleRPUDevice<T> &SimpleRPUDevice<T>::operator=(SimpleRPUDevice<T> &&other) {
   return *this;
 }
 
+template <typename T>
+void SimpleRPUDevice<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+  if (hasWDrifter()) {
+    wdrifter_->dumpExtra(state, "wdrifter");
+    RPU::insertWithPrefix(extra, state, prefix);
+  }
+}
+
+template <typename T>
+void SimpleRPUDevice<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+  if (hasWDrifter()) {
+    auto state = RPU::selectWithPrefix(extra, prefix);
+    wdrifter_->loadExtra(state, "wdrifter", strict);
+  }
+};
+
 /********************************************************************************/
 /* compute functions  */
 
@@ -84,10 +102,10 @@ template <typename T> void SimpleRPUDevice<T>::decayWeights(T **weights, bool bi
 template <typename T>
 void SimpleRPUDevice<T>::decayWeights(T **weights, T alpha, bool bias_no_decay) {
   T lifetime = getPar().lifetime;
-  T decay_rate = (lifetime > 1) ? ((T)1.0 / lifetime) : (T)0.0;
+  T decay_rate = (lifetime > (T)1.0) ? ((T)1.0 / lifetime) : (T)0.0;
   T decay_scale = (T)1.0 - alpha * decay_rate;
 
-  if (decay_scale > 0 && decay_scale < 1.0) {
+  if (decay_scale > (T)0.0 && decay_scale < (T)1.0) {
     if (!bias_no_decay) {
       RPU::math::scal<T>(this->size_, decay_scale, weights[0], 1);
     } else {
@@ -112,7 +130,7 @@ void SimpleRPUDevice<T>::driftWeights(T **weights, T time_since_last_call, RNG<T
 template <typename T> void SimpleRPUDevice<T>::diffuseWeights(T **weights, RNG<T> &rng) {
 
   T diffusion = getPar().diffusion;
-  if (diffusion > 0.0) {
+  if (diffusion > (T)0.0) {
     T *w = weights[0];
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
@@ -124,11 +142,34 @@ template <typename T> void SimpleRPUDevice<T>::diffuseWeights(T **weights, RNG<T
 template <typename T> void SimpleRPUDevice<T>::clipWeights(T **weights, T clip) {
   // apply hard bounds
 
-  if (clip >= 0) {
+  if (clip >= (T)0.0) {
     T *w = weights[0];
     PRAGMA_SIMD
     for (int i = 0; i < this->size_; ++i) {
       w[i] = MIN(MAX(w[i], -clip), clip);
+    }
+  }
+}
+
+template <typename T>
+void SimpleRPUDevice<T>::resetCols(
+    T **weights, int start_col, int n_col_in, T reset_prob, RealWorldRNG<T> &rng) {
+
+  T *w = weights[0];
+  int n_col = (n_col_in >= 0) ? n_col_in : this->x_size_;
+
+  T reset_std = getPar().reset_std;
+  for (int j = 0; j < this->x_size_; ++j) {
+    if ((start_col + n_col <= this->x_size_ && j >= start_col && j < start_col + n_col) ||
+        (start_col + n_col > this->x_size_ &&
+         ((j >= start_col) || (j < n_col - (this->x_size_ - start_col))))) {
+      PRAGMA_SIMD
+      for (int i = 0; i < this->d_size_; ++i) {
+        if (reset_prob == (T)1.0 || rng.sampleUniform() < reset_prob) {
+          int k = i * this->x_size_ + j;
+          w[k] = (reset_std > (T)0.0 ? reset_std * rng.sampleGauss() : (T)0.0);
+        }
+      }
     }
   }
 }
@@ -139,8 +180,8 @@ void SimpleRPUDevice<T>::populate(const SimpleRPUDeviceMetaParameter<T> &p, Real
   par_storage_ = p.cloneUnique();
   par_storage_->initialize();
 
-  if (p.drift.nu > 0) {
-    wdrifter_ = make_unique<WeightDrifter<T>>(this->size_, p.drift, rng);
+  if (p.drift.nu > (T)0.0) {
+    wdrifter_ = RPU::make_unique<WeightDrifter<T>>(this->size_, p.drift, rng);
   } else {
     wdrifter_ = nullptr;
   }
@@ -153,6 +194,11 @@ template class SimpleRPUDevice<float>;
 template class AbstractRPUDevice<double>;
 template class SimpleRPUDevice<double>;
 template struct SimpleRPUDeviceMetaParameter<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class AbstractRPUDevice<half_t>;
+template class SimpleRPUDevice<half_t>;
+template struct SimpleRPUDeviceMetaParameter<half_t>;
 #endif
 
 } // namespace RPU

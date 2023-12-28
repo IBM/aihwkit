@@ -17,27 +17,41 @@
 from dataclasses import dataclass, field
 
 from aihwkit.simulator.configs.configs import (
-    SingleRPUConfig, UnitCellRPUConfig, DigitalRankUpdateRPUConfig
+    SingleRPUConfig,
+    UnitCellRPUConfig,
+    DigitalRankUpdateRPUConfig,
 )
-from aihwkit.simulator.configs.devices import (
-    PulsedDevice, TransferCompound, UnitCell, VectorUnitCell,
-    DigitalRankUpdateCell, MixedPrecisionCompound,
-    BufferedTransferCompound
+from aihwkit.simulator.configs.devices import PulsedDevice
+from aihwkit.simulator.configs.compounds import (
+    TransferCompound,
+    UnitCell,
+    VectorUnitCell,
+    DynamicTransferCompound,
+    DigitalRankUpdateCell,
+    MixedPrecisionCompound,
+    ChoppedTransferCompound,
 )
-from aihwkit.simulator.configs.utils import (
-    IOParameters, UpdateParameters, VectorUnitCellUpdatePolicy
+from aihwkit.simulator.parameters.enums import (
+    VectorUnitCellUpdatePolicy,
+    NoiseManagementType,
+    BoundManagementType,
 )
+from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
 from aihwkit.simulator.presets.devices import (
-    CapacitorPresetDevice, EcRamPresetDevice, EcRamMOPresetDevice, IdealizedPresetDevice,
-    ReRamESPresetDevice, ReRamSBPresetDevice, GokmenVlasovPresetDevice,
-    PCMPresetUnitCell
+    CapacitorPresetDevice,
+    EcRamPresetDevice,
+    EcRamMOPresetDevice,
+    IdealizedPresetDevice,
+    ReRamESPresetDevice,
+    ReRamSBPresetDevice,
+    GokmenVlasovPresetDevice,
 )
-from aihwkit.simulator.presets.utils import (
-    PresetIOParameters, PresetUpdateParameters
-)
+from aihwkit.simulator.presets.compounds import PCMPresetUnitCell
+from aihwkit.simulator.presets.utils import PresetIOParameters, PresetUpdateParameters
 
 
 # Single device configs.
+
 
 @dataclass
 class ReRamESPreset(SingleRPUConfig):
@@ -211,6 +225,7 @@ class PCMPreset(UnitCellRPUConfig):
 
 # 2-device configs.
 
+
 @dataclass
 class ReRamES2Preset(UnitCellRPUConfig):
     """Preset configuration using two ReRam devices per cross-point
@@ -227,10 +242,12 @@ class ReRamES2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -252,10 +269,12 @@ class ReRamSB2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -277,10 +296,12 @@ class Capacitor2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -302,10 +323,12 @@ class EcRam2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -327,10 +350,12 @@ class EcRamMO2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -352,16 +377,19 @@ class Idealized2Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
 
 
 # 4-device configs.
+
 
 @dataclass
 class ReRamES4Preset(UnitCellRPUConfig):
@@ -379,11 +407,17 @@ class ReRamES4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice(),
-                           ReRamESPresetDevice(), ReRamESPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                ReRamESPresetDevice(),
+                ReRamESPresetDevice(),
+                ReRamESPresetDevice(),
+                ReRamESPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -405,11 +439,17 @@ class ReRamSB4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice(),
-                           ReRamSBPresetDevice(), ReRamSBPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                ReRamSBPresetDevice(),
+                ReRamSBPresetDevice(),
+                ReRamSBPresetDevice(),
+                ReRamSBPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -431,11 +471,17 @@ class Capacitor4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice(),
-                           CapacitorPresetDevice(), CapacitorPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                CapacitorPresetDevice(),
+                CapacitorPresetDevice(),
+                CapacitorPresetDevice(),
+                CapacitorPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -457,11 +503,17 @@ class EcRam4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice(),
-                           EcRamPresetDevice(), EcRamPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                EcRamPresetDevice(),
+                EcRamPresetDevice(),
+                EcRamPresetDevice(),
+                EcRamPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -483,11 +535,17 @@ class EcRamMO4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice(),
-                           EcRamMOPresetDevice(), EcRamMOPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                EcRamMOPresetDevice(),
+                EcRamMOPresetDevice(),
+                EcRamMOPresetDevice(),
+                EcRamMOPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -509,17 +567,24 @@ class Idealized4Preset(UnitCellRPUConfig):
     configuration is used otherwise.
     """
 
-    device: UnitCell = field(default_factory=lambda: VectorUnitCell(
-        unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice(),
-                           IdealizedPresetDevice(), IdealizedPresetDevice()],
-        update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM
-    ))
+    device: UnitCell = field(
+        default_factory=lambda: VectorUnitCell(
+            unit_cell_devices=[
+                IdealizedPresetDevice(),
+                IdealizedPresetDevice(),
+                IdealizedPresetDevice(),
+                IdealizedPresetDevice(),
+            ],
+            update_policy=VectorUnitCellUpdatePolicy.SINGLE_RANDOM,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
 
 
 # Tiki-taka configs.
+
 
 @dataclass
 class TikiTakaReRamESPreset(UnitCellRPUConfig):
@@ -539,11 +604,13 @@ class TikiTakaReRamESPreset(UnitCellRPUConfig):
     device: UnitCell = field(
         default_factory=lambda: TransferCompound(
             unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
-            transfer_forward=PresetIOParameters(),
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
             transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -566,12 +633,18 @@ class TikiTakaReRamSBPreset(UnitCellRPUConfig):
 
     device: UnitCell = field(
         default_factory=lambda: TransferCompound(
-            unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice()],
-            transfer_forward=PresetIOParameters(),
+            unit_cell_devices=[
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+            ],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
             transfer_update=PresetUpdateParameters(),
             transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -595,11 +668,13 @@ class TikiTakaCapacitorPreset(UnitCellRPUConfig):
     device: UnitCell = field(
         default_factory=lambda: TransferCompound(
             unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
-            transfer_forward=PresetIOParameters(),
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
             transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -623,11 +698,13 @@ class TikiTakaEcRamPreset(UnitCellRPUConfig):
     device: UnitCell = field(
         default_factory=lambda: TransferCompound(
             unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
-            transfer_forward=PresetIOParameters(),
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
             transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -651,11 +728,13 @@ class TikiTakaEcRamMOPreset(UnitCellRPUConfig):
     device: UnitCell = field(
         default_factory=lambda: TransferCompound(
             unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
-            transfer_forward=PresetIOParameters(),
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
             transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -679,14 +758,17 @@ class TikiTakaIdealizedPreset(UnitCellRPUConfig):
     device: UnitCell = field(
         default_factory=lambda: TransferCompound(
             unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
-            transfer_forward=PresetIOParameters(),
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
             transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
             units_in_mbatch=True,
-            ))
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+
 
 # TTv2 configs.
 
@@ -696,7 +778,7 @@ class TTv2ReRamESPreset(UnitCellRPUConfig):
     """Configuration using TTv2 with
     :class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`.
 
-    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
     for details on TTv2-like optimizers.
 
     The default peripheral hardware
@@ -707,16 +789,24 @@ class TTv2ReRamESPreset(UnitCellRPUConfig):
     """
 
     device: UnitCell = field(
-        default_factory=lambda: BufferedTransferCompound(
+        default_factory=lambda: ChoppedTransferCompound(
             unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
-            transfer_forward=PresetIOParameters(),
-            transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
-            units_in_mbatch=True,
-            ))
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.0,
+            fast_lr=0.5,
+            auto_scale=True,
+            auto_granularity=1000,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
-    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
 
 
 @dataclass
@@ -724,7 +814,7 @@ class TTv2ReRamSBPreset(UnitCellRPUConfig):
     """Configuration using TTv2 with
     :class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`.
 
-    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
     for details on TTv2-like optimizers.
 
     The default peripheral hardware
@@ -735,16 +825,27 @@ class TTv2ReRamSBPreset(UnitCellRPUConfig):
     """
 
     device: UnitCell = field(
-        default_factory=lambda: BufferedTransferCompound(
-            unit_cell_devices=[ReRamSBPresetDevice(), ReRamSBPresetDevice()],
-            transfer_forward=PresetIOParameters(),
-            transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
-            units_in_mbatch=True,
-            ))
+        default_factory=lambda: ChoppedTransferCompound(
+            unit_cell_devices=[
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+            ],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.0,
+            fast_lr=0.5,
+            auto_scale=True,
+            auto_granularity=1000,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
-    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
 
 
 @dataclass
@@ -752,7 +853,7 @@ class TTv2CapacitorPreset(UnitCellRPUConfig):
     """Configuration using TTv2 with
     :class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`.
 
-    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
     for details on TTv2-like optimizers.
 
     The default peripheral hardware
@@ -763,16 +864,24 @@ class TTv2CapacitorPreset(UnitCellRPUConfig):
     """
 
     device: UnitCell = field(
-        default_factory=lambda: BufferedTransferCompound(
+        default_factory=lambda: ChoppedTransferCompound(
             unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
-            transfer_forward=PresetIOParameters(),
-            transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
-            units_in_mbatch=True,
-            ))
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.0,
+            fast_lr=0.1,
+            auto_scale=True,
+            auto_granularity=1000,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
-    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
 
 
 @dataclass
@@ -780,7 +889,7 @@ class TTv2EcRamPreset(UnitCellRPUConfig):
     """Configuration using TTv2 with
     :class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
 
-    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
     for details on TTv2-like optimizers.
 
     The default peripheral hardware
@@ -791,16 +900,24 @@ class TTv2EcRamPreset(UnitCellRPUConfig):
     """
 
     device: UnitCell = field(
-        default_factory=lambda: BufferedTransferCompound(
+        default_factory=lambda: ChoppedTransferCompound(
             unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
-            transfer_forward=PresetIOParameters(),
-            transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
-            units_in_mbatch=True,
-            ))
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.0,
+            fast_lr=0.1,
+            auto_scale=True,
+            auto_granularity=500,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
-    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
 
 
 @dataclass
@@ -808,7 +925,7 @@ class TTv2EcRamMOPreset(UnitCellRPUConfig):
     """Configuration using TTv2 with
     :class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`.
 
-    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
     for details on TTv2-like optimizers.
 
     The default peripheral hardware
@@ -819,16 +936,24 @@ class TTv2EcRamMOPreset(UnitCellRPUConfig):
     """
 
     device: UnitCell = field(
-        default_factory=lambda: BufferedTransferCompound(
+        default_factory=lambda: ChoppedTransferCompound(
             unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
-            transfer_forward=PresetIOParameters(),
-            transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
-            units_in_mbatch=True,
-            ))
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.0,
+            fast_lr=0.1,
+            auto_scale=True,
+            auto_granularity=500,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
-    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
 
 
 @dataclass
@@ -836,7 +961,7 @@ class TTv2IdealizedPreset(UnitCellRPUConfig):
     """Configuration using TTv2 with
     :class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
 
-    See :class:`~aihwkit.simulator.configs.devices.BufferedTransferCompound`
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
     for details on TTv2-like optimizers.
 
     The default peripheral hardware
@@ -847,16 +972,472 @@ class TTv2IdealizedPreset(UnitCellRPUConfig):
     """
 
     device: UnitCell = field(
-        default_factory=lambda: BufferedTransferCompound(
+        default_factory=lambda: ChoppedTransferCompound(
             unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
-            transfer_forward=PresetIOParameters(),
-            transfer_update=PresetUpdateParameters(),
-            transfer_every=1.0,
-            units_in_mbatch=True,
-            ))
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.0,
+            fast_lr=0.1,
+            auto_scale=True,
+            auto_granularity=500,
+        )
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
-    update: UpdateParameters = field(default_factory=PresetUpdateParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
+
+
+# Chopped-TTv2 configs.
+
+
+@dataclass
+class ChoppedTTv2ReRamESPreset(UnitCellRPUConfig):
+    """Configuration using ChoppedTTv2 with
+    :class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: ChoppedTransferCompound(
+            unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.01,
+            fast_lr=0.5,
+            auto_scale=True,
+            auto_granularity=1000,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+
+
+@dataclass
+class ChoppedTTv2ReRamSBPreset(UnitCellRPUConfig):
+    """Configuration using ChoppedTTv2 with
+    :class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
+    for details on ChoppedTTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: ChoppedTransferCompound(
+            unit_cell_devices=[
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+            ],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.01,
+            fast_lr=0.5,
+            auto_scale=True,
+            auto_granularity=1000,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+
+
+@dataclass
+class ChoppedTTv2CapacitorPreset(UnitCellRPUConfig):
+    """Configuration using ChoppedTTv2 with
+    :class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
+    for details on ChoppedTTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: ChoppedTransferCompound(
+            unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.01,
+            fast_lr=0.1,
+            auto_scale=True,
+            auto_granularity=1000,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+
+
+@dataclass
+class ChoppedTTv2EcRamPreset(UnitCellRPUConfig):
+    """Configuration using ChoppedTTv2 with
+    :class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: ChoppedTransferCompound(
+            unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            auto_granularity=500,
+            in_chop_prob=0.01,
+            units_in_mbatch=False,
+            auto_scale=True,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
+
+
+@dataclass
+class ChoppedTTv2EcRamMOPreset(UnitCellRPUConfig):
+    """Configuration using ChoppedTTv2 with
+    :class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: ChoppedTransferCompound(
+            unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.001,
+            fast_lr=0.1,
+            auto_scale=True,
+            auto_granularity=500,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
+
+
+@dataclass
+class ChoppedTTv2IdealizedPreset(UnitCellRPUConfig):
+    """Configuration using ChoppedTTv2 with
+    :class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.ChoppedTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: ChoppedTransferCompound(
+            unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            in_chop_prob=0.001,
+            fast_lr=0.1,
+            auto_scale=True,
+            auto_granularity=500,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
+
+
+# AGAD configs.
+
+
+@dataclass
+class AGADReRamESPreset(UnitCellRPUConfig):
+    """Configuration using AGAD with
+    :class:`~aihwkit.simulator.presets.devices.ReRamESPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.DynamicTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: DynamicTransferCompound(
+            unit_cell_devices=[ReRamESPresetDevice(), ReRamESPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            fast_lr=0.5,
+            auto_granularity=1000,
+            tail_weightening=5.0,
+            in_chop_prob=0.02,
+            auto_scale=True,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+
+
+@dataclass
+class AGADReRamSBPreset(UnitCellRPUConfig):
+    """Configuration using AGAD with
+    :class:`~aihwkit.simulator.presets.devices.ReRamSBPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.DynamicTransferCompound`
+    for details on AGAD-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: DynamicTransferCompound(
+            unit_cell_devices=[
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+                ReRamSBPresetDevice(subtract_symmetry_point=True),
+            ],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            fast_lr=0.5,
+            auto_granularity=1000,
+            tail_weightening=5.0,
+            in_chop_prob=0.02,
+            auto_scale=True,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+
+
+@dataclass
+class AGADCapacitorPreset(UnitCellRPUConfig):
+    """Configuration using AGAD with
+    :class:`~aihwkit.simulator.presets.devices.CapacitorPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.DynamicTransferCompound`
+    for details on AGAD-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: DynamicTransferCompound(
+            unit_cell_devices=[CapacitorPresetDevice(), CapacitorPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            units_in_mbatch=False,
+            fast_lr=0.1,
+            auto_granularity=1000,
+            tail_weightening=20.0,
+            in_chop_prob=0.01,
+            auto_scale=True,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+
+
+@dataclass
+class AGADEcRamPreset(UnitCellRPUConfig):
+    """Configuration using AGAD with
+    :class:`~aihwkit.simulator.presets.devices.EcRamPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.DynamicTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: DynamicTransferCompound(
+            unit_cell_devices=[EcRamPresetDevice(), EcRamPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            fast_lr=0.1,
+            auto_granularity=750,
+            tail_weightening=50.0,
+            in_chop_prob=0.005,
+            units_in_mbatch=False,
+            auto_scale=True,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=31))
+
+
+@dataclass
+class AGADEcRamMOPreset(UnitCellRPUConfig):
+    """Configuration using AGAD with
+    :class:`~aihwkit.simulator.presets.devices.EcRamMOPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.DynamicTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: DynamicTransferCompound(
+            unit_cell_devices=[EcRamMOPresetDevice(), EcRamMOPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            fast_lr=0.1,
+            auto_granularity=500,
+            tail_weightening=50.0,
+            in_chop_prob=0.005,
+            units_in_mbatch=False,
+            auto_scale=True,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
+
+
+@dataclass
+class AGADIdealizedPreset(UnitCellRPUConfig):
+    """Configuration using AGAD with
+    :class:`~aihwkit.simulator.presets.devices.IdealizedPresetDevice`.
+
+    See :class:`~aihwkit.simulator.configs.devices.DynamicTransferCompound`
+    for details on TTv2-like optimizers.
+
+    The default peripheral hardware
+    (:class:`~aihwkit.simulator.presets.utils.PresetIOParameters`) and
+    analog update
+    (:class:`~aihwkit.simulator.presets.utils.PresetUpdateParameters`)
+    configuration is used otherwise.
+    """
+
+    device: UnitCell = field(
+        default_factory=lambda: DynamicTransferCompound(
+            unit_cell_devices=[IdealizedPresetDevice(), IdealizedPresetDevice()],
+            transfer_forward=PresetIOParameters(
+                noise_management=NoiseManagementType.NONE, bound_management=BoundManagementType.NONE
+            ),
+            transfer_update=PresetUpdateParameters(
+                desired_bl=1, update_bl_management=False, update_management=False
+            ),
+            fast_lr=0.1,
+            auto_granularity=500,
+            tail_weightening=50.0,
+            in_chop_prob=0.005,
+            units_in_mbatch=False,
+            auto_scale=True,
+        )
+    )
+    forward: IOParameters = field(default_factory=PresetIOParameters)
+    backward: IOParameters = field(default_factory=PresetIOParameters)
+    update: UpdateParameters = field(default_factory=lambda: PresetUpdateParameters(desired_bl=100))
+
 
 # Mixed precision presets
 
@@ -878,9 +1459,8 @@ class MixedPrecisionReRamESPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=ReRamESPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=ReRamESPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -902,9 +1482,8 @@ class MixedPrecisionReRamSBPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=ReRamSBPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=ReRamSBPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -926,9 +1505,8 @@ class MixedPrecisionCapacitorPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=CapacitorPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=CapacitorPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -950,9 +1528,8 @@ class MixedPrecisionEcRamPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=EcRamPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=EcRamPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -974,9 +1551,8 @@ class MixedPrecisionEcRamMOPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=EcRamMOPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=EcRamMOPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -998,9 +1574,8 @@ class MixedPrecisionIdealizedPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=IdealizedPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=IdealizedPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -1022,9 +1597,8 @@ class MixedPrecisionGokmenVlasovPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=GokmenVlasovPresetDevice(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=GokmenVlasovPresetDevice())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)
@@ -1046,9 +1620,8 @@ class MixedPrecisionPCMPreset(DigitalRankUpdateRPUConfig):
     """
 
     device: DigitalRankUpdateCell = field(
-        default_factory=lambda: MixedPrecisionCompound(
-            device=PCMPresetUnitCell(),
-        ))
+        default_factory=lambda: MixedPrecisionCompound(device=PCMPresetUnitCell())
+    )
     forward: IOParameters = field(default_factory=PresetIOParameters)
     backward: IOParameters = field(default_factory=PresetIOParameters)
     update: UpdateParameters = field(default_factory=PresetUpdateParameters)

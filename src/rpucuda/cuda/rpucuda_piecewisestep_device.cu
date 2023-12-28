@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -28,10 +28,10 @@ __device__ __forceinline__ T get_interpolated_scale(
     const T &w_range,
     const T &wmin) {
 
-  if (n_sections <= 0 || (w_range <= 0)) {
+  if (n_sections <= 0 || (w_range <= (T)0.0)) {
     return n_sections == 0 ? piecewise_vec[0] * scale : scale;
   } else {
-    T w_scaled = MAX((w - wmin) / w_range * n_sections, (T)0.0);
+    T w_scaled = MAX((w - wmin) / w_range * (T)n_sections, (T)0.0);
     int w_index = MIN((int)floor(w_scaled), n_sections - 1);
     T t = MIN(w_scaled - (T)w_index, (T)1.0); // convex fraction
     T t1 = (T)1.0 - t;
@@ -45,8 +45,8 @@ template <typename T> struct UpdateFunctorPiecewiseStep {
       T &apparent_weight,
       uint32_t n,
       uint32_t negative,
-      const float4 par_4,
-      const float2 par_2,
+      const param4_t par_4,
+      const param2_t par_2,
       T &persistent_weight,
       const T *global_pars,
       const int global_params_count,
@@ -64,34 +64,34 @@ template <typename T> struct UpdateFunctorPiecewiseStep {
     const int n_sections = n_points - 1;
     const T uw_std = global_pars[global_params_count - 1]; // always last
 
-    const T scale = (negative > 0) ? (par_4.w) : (-par_4.y); // [3], [1]
-    const T wmax = par_4.z;                                  // [2]
-    const T wmin = par_4.x;                                  // [0]
+    const T scale = (negative > 0) ? ((T)par_4.w) : (-(T)par_4.y); // [3], [1]
+    const T wmax = par_4.z;                                        // [2]
+    const T wmin = par_4.x;                                        // [0]
     const T w_range = wmax - wmin;
 
-    T &w = uw_std > 0 ? persistent_weight : apparent_weight;
+    T &w = uw_std > (T)0.0 ? persistent_weight : apparent_weight;
 
     // n is larger 0 in any case
     if (n == 1) {
       T interpolated_scale =
           get_interpolated_scale(w, piecewise_vec, scale, n_sections, w_range, wmin);
-      if (noise_std_dw > 0) {
+      if (noise_std_dw > (T)0.0) {
         T stoch_value = curand_normal(&local_state);
         stoch_value *= noise_std_dw;
-        w += interpolated_scale * (1.0 + stoch_value);
+        w += interpolated_scale * ((T)1.0 + stoch_value);
       } else {
         w += interpolated_scale;
       }
       w = (w > wmax) ? wmax : w;
       w = (w < wmin) ? wmin : w;
     } else {
-      if (noise_std_dw > 0) {
+      if (noise_std_dw > (T)0.0) {
         for (int i_updates = 0; i_updates < n; i_updates++) {
           T stoch_value = curand_normal(&local_state);
           stoch_value *= noise_std_dw;
           T interpolated_scale =
               get_interpolated_scale(w, piecewise_vec, scale, n_sections, w_range, wmin);
-          w += interpolated_scale * (1.0 + stoch_value);
+          w += interpolated_scale * ((T)1.0 + stoch_value);
 
           // better always check both bounds
           w = (w > wmax) ? wmax : w;
@@ -164,6 +164,9 @@ pwukpvec_t<T> PiecewiseStepRPUDeviceCuda<T>::getUpdateKernels(
 template class PiecewiseStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class PiecewiseStepRPUDeviceCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class PiecewiseStepRPUDeviceCuda<half_t>;
 #endif
 
 } // namespace RPU

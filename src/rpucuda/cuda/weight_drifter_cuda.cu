@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -10,6 +10,7 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_fp16_util.h"
 #include "cuda_math_util.h"
 #include "weight_drifter_cuda.h"
 
@@ -49,7 +50,7 @@ __global__ void kernelDriftWeights(
   const bool is_simple_drift = nu_values == nullptr;
   const T w_read_std = w_read_std_in;
   const T a = a_in;
-  const bool stoch_if = w_read_std > 0 || nu_std > 0;
+  const bool stoch_if = w_read_std > (T)0.0 || nu_std > (T)0.0;
 
   curandState local_state;
   if (stoch_if && tid < size) {
@@ -74,16 +75,16 @@ __global__ void kernelDriftWeights(
         T nu = is_simple_drift ? simple_nu : nu_values[i];
         T t = t_values[i];
 
-        nu = (nu_std <= 0) ? nu : nu + nu_std * nu * curand_normal(&local_state);
-        nu = (nu_k == 0)
+        nu = (nu_std <= (T)0.0) ? nu : nu + nu_std * nu * (T)curand_normal(&local_state);
+        nu = (nu_k == (T)0.0)
                  ? nu
-                 : nu - nu_k * __log10f((w - w_offset) / wg_ratio + g_offset) + nu_k * logG0;
+                 : nu - nu_k * (T)__log10f((w - w_offset) / wg_ratio + g_offset) + nu_k * logG0;
         T delta_t = MAX(current_t - t, (T)1.0); // at least t0
-        T nu_scale = pow(delta_t, -nu);
+        T nu_scale = (T)powf(delta_t, -nu);
         w = w0 * nu_scale; // overwrites w
-        w = (a == 0) ? w : w + a * (nu_scale - (T)1.0);
+        w = (a == (T)0.0) ? w : w + a * (nu_scale - (T)1.0);
       }
-      w += (w_read_std > 0) ? w_read_std * curand_normal(&local_state) : (T)0.0;
+      w += (w_read_std > (T)0.0) ? w_read_std * (T)curand_normal(&local_state) : (T)0.0;
 
       previous_weights[i] = w;
       weights[i] = w;
@@ -98,12 +99,12 @@ __global__ void kernelDriftWeights(
 
 // ctor
 template <typename T>
-WeightDrifterCuda<T>::WeightDrifterCuda(CudaContext *context, int size)
+WeightDrifterCuda<T>::WeightDrifterCuda(CudaContextPtr context, int size)
     : context_(context), size_(size), max_size_(size), active_(false), current_t_(0.0) {}
 
 template <typename T>
 WeightDrifterCuda<T>::WeightDrifterCuda(
-    CudaContext *context, const WeightDrifter<T> &wd, int x_size, int d_size)
+    CudaContextPtr context, const WeightDrifter<T> &wd, int x_size, int d_size)
     : WeightDrifterCuda(context, x_size * d_size) {
   populateFrom(wd, x_size, d_size);
 }
@@ -131,6 +132,34 @@ template <typename T> WeightDrifterCuda<T>::WeightDrifterCuda(const WeightDrifte
 }
 
 template <typename T>
+void WeightDrifterCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
+  RPU::state_t state;
+
+  RPU::insert(state, "active", active_);
+  RPU::insert(state, "current_t", current_t_);
+  RPU::insert(state, "dev_previous_weights", dev_previous_weights_);
+  RPU::insert(state, "dev_w0", dev_w0_);
+  RPU::insert(state, "dev_t", dev_t_);
+  RPU::insert(state, "dev_nu", dev_nu_);
+
+  RPU::insertWithPrefix(extra, state, prefix);
+}
+
+template <typename T>
+void WeightDrifterCuda<T>::loadExtra(
+    const RPU::state_t &extra, const std::string prefix, bool strict) {
+
+  auto state = RPU::selectWithPrefix(extra, prefix);
+
+  RPU::load(context_, state, "dev_previous_weights", dev_previous_weights_, strict);
+  RPU::load(context_, state, "dev_w0", dev_w0_, strict);
+  RPU::load(context_, state, "dev_t", dev_t_, strict);
+  RPU::load(context_, state, "dev_nu", dev_nu_, strict);
+  RPU::load(state, "current_t", current_t_, strict);
+  RPU::load(state, "active", active_, strict);
+}
+
+template <typename T>
 void WeightDrifterCuda<T>::populateFrom(const WeightDrifter<T> &wd, int x_size, int d_size) {
   // only copies the parameter from nu. Other parameters are set when set to active.
 
@@ -149,7 +178,7 @@ void WeightDrifterCuda<T>::populateFrom(const WeightDrifter<T> &wd, int x_size, 
   context_->synchronize();
 }
 
-template <typename T> void WeightDrifterCuda<T>::saturate(T *weights, float *dev_4params) {
+template <typename T> void WeightDrifterCuda<T>::saturate(T *weights, param_t *dev_4params) {
   if (!active_) {
     RPU_FATAL("Apply should be called first!");
   }
@@ -198,7 +227,7 @@ template <typename T> void WeightDrifterCuda<T>::apply(T *weights, T time_since_
 
   current_t_ += time_since_last_call / par_.t0;
   T a = par_.g_offset * par_.wg_ratio + par_.w_offset;
-  if (fabs(a) < par_.reset_tol) {
+  if ((T)fabsf(a) < par_.reset_tol) {
     a = (T)0.0;
   }
 
@@ -213,6 +242,9 @@ template <typename T> void WeightDrifterCuda<T>::apply(T *weights, T time_since_
 template class WeightDrifterCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class WeightDrifterCuda<double>;
+#endif
+#ifdef RPU_USE_FP16
+template class WeightDrifterCuda<half_t>;
 #endif
 
 } // namespace RPU

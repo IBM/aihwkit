@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,9 +20,13 @@ import matplotlib.pyplot as plt
 
 from aihwkit.utils.visualization import plot_device
 
-from aihwkit.simulator.presets.devices import (
-    ReRamSBPresetDevice, ReRamESPresetDevice, CapacitorPresetDevice,
-    EcRamPresetDevice, IdealizedPresetDevice, EcRamMOPresetDevice,
+from aihwkit.simulator.presets import (
+    ReRamSBPresetDevice,
+    ReRamESPresetDevice,
+    CapacitorPresetDevice,
+    EcRamPresetDevice,
+    IdealizedPresetDevice,
+    EcRamMOPresetDevice,
     PCMPresetUnitCell,
 )
 

@@ -1,6 +1,6 @@
 
 /**
- * (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -11,10 +11,11 @@
  * that they have been altered from the originals.
  */
 
+#include "cuda_fp16_util.h"
+#include "cuda_math_util.h"
 #include "io_iterator.h"
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_mixedprec_device.h"
-#include <cub/cub.cuh>
 #include <memory>
 
 namespace RPU {
@@ -26,12 +27,12 @@ namespace RPU {
 
 */
 template <typename T>
-MixedPrecRPUDeviceCuda<T>::MixedPrecRPUDeviceCuda(CudaContext *c, int x_size, int d_size)
+MixedPrecRPUDeviceCuda<T>::MixedPrecRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size)
     : MixedPrecRPUDeviceBaseCuda<T>(c, x_size, d_size){};
 
 template <typename T>
 MixedPrecRPUDeviceCuda<T>::MixedPrecRPUDeviceCuda(
-    CudaContext *c, const MixedPrecRPUDevice<T> &rpu_device)
+    CudaContextPtr c, const MixedPrecRPUDevice<T> &rpu_device)
     : MixedPrecRPUDeviceCuda<T>(c, rpu_device.getXSize(), rpu_device.getDSize()) {
   populateFrom(rpu_device);
 };
@@ -56,6 +57,7 @@ MixedPrecRPUDeviceCuda<T> &
 MixedPrecRPUDeviceCuda<T>::operator=(const MixedPrecRPUDeviceCuda<T> &other) {
   MixedPrecRPUDeviceCuda<T> tmp(other);
   swap(*this, tmp);
+  this->context_->synchronize();
   return *this;
 };
 
@@ -116,7 +118,7 @@ __global__ void kernelQuantizeBatch(
 
     int sidx = trans ? (idx % m_batch) : (idx / size);
     T amax = nm_values[sidx]; // amax from noise management
-    value = amax > 0.0 ? value / amax : value;
+    value = amax > (T)0.0 ? value / amax : value;
     value = RPU_ROUNDFUN(value / res);
     value = MIN(MAX(value, -half_bins), half_bins) * amax * res;
 
@@ -151,8 +153,8 @@ __global__ void kernelQuantizeBatchStochasticRounding(
 
     int sidx = trans ? (idx % m_batch) : (idx / size);
     T amax = nm_values[sidx]; // amax from noise management
-    value = amax > 0.0 ? value / amax : value;
-    value = RPU_ROUNDFUN(value / res + stoch_value - 0.5);
+    value = amax > (T)0.0 ? value / amax : value;
+    value = RPU_ROUNDFUN(value / res + stoch_value - (T)0.5);
     value = MIN(MAX(value, -half_bins), half_bins) * amax * res;
 
     quantized_values[idx] = value;
@@ -208,7 +210,7 @@ void MixedPrecRPUDeviceCuda<T>::doDirectUpdate(
     T *x_buffer,
     T *d_buffer) {
 
-  if (beta != 1.0f) {
+  if (beta != (T)1.0) {
     RPU_FATAL("beta not equal 1 is not supported.")
   }
 
@@ -249,7 +251,7 @@ kernelMixedPrecTransfer(T *transfer_out, T *chi, const int size, const T granula
 
   if (tid < size) {
     T value = chi[tid];
-    T dw = truncf(value / granularity);
+    T dw = trunc(value / granularity);
     transfer_out[tid] = dw;
 
     chi[tid] = value - granularity * dw;
@@ -268,7 +270,7 @@ void MixedPrecRPUDeviceCuda<T>::forwardUpdate(
   if (!lr) {
     return;
   }
-  T t_size = n_vec * this->x_size_;
+  int t_size = n_vec * this->x_size_;
   if ((this->dev_transfer_tmp_ == nullptr) || this->dev_transfer_tmp_->getSize() < t_size) {
     this->dev_transfer_tmp_ = RPU::make_unique<CudaArray<T>>(this->context_, t_size);
   }
@@ -304,4 +306,8 @@ template class MixedPrecRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class MixedPrecRPUDeviceCuda<double>;
 #endif
+#ifdef RPU_USE_FP16
+template class MixedPrecRPUDeviceCuda<half_t>;
+#endif
+
 } // namespace RPU

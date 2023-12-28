@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -52,7 +52,8 @@ from aihwkit.simulator.rpu_base import cuda
 # optimizer used (e.g. mixed precision or full analog update)
 
 # As an example we use a mixed precision preset using an ECRAM device model
-from aihwkit.simulator.configs.utils import MappingParameter
+from aihwkit.simulator.configs import MappingParameter
+
 mapping = MappingParameter(weight_scaling_omega=0.8)
 RPU_CONFIG = MixedPrecisionEcRamMOPreset(mapping=mapping)
 
@@ -68,13 +69,13 @@ LR = 2e-2
 USE_CUDA = 0
 if cuda.is_compiled():
     USE_CUDA = 1
-DEVICE = torch.device('cuda' if USE_CUDA else 'cpu')
+DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
 
 # Path where the datasets will be stored.
-PATH_DATASET = os.path.join('data', 'DATASET')
+PATH_DATASET = os.path.join("data", "DATASET")
 
 # Path to store results
-RESULTS = os.path.join(os.getcwd(), 'results', 'GAN')
+RESULTS = os.path.join(os.getcwd(), "results", "GAN")
 
 
 def store_tensor_images(image_tensor, label, current_step, num_images=25, size=(1, 28, 28)):
@@ -92,7 +93,7 @@ def store_tensor_images(image_tensor, label, current_step, num_images=25, size=(
     """
     image_unflat = image_tensor.detach().cpu().view(-1, *size)
     image_grid = make_grid(image_unflat[:num_images], nrow=5)
-    save_image(image_grid, os.path.join(RESULTS, f'{label}_step_{current_step}.png'))
+    save_image(image_grid, os.path.join(RESULTS, f"{label}_step_{current_step}.png"))
 
 
 def show_animation_fake_images():
@@ -102,14 +103,15 @@ def show_animation_fake_images():
     results/GAN folder using a matplotlib animation.
     """
     fig = plt.figure(figsize=(8, 8))
-    plt.axis('off')
-    sorted_available_images = sorted(glob.glob(f'{RESULTS}/fake_*.png'),
-                                     key=lambda s: int(s.split('_')[-1].split('.png')[0]))
+    plt.axis("off")
+    sorted_available_images = sorted(
+        glob.glob(f"{RESULTS}/fake_*.png"), key=lambda s: int(s.split("_")[-1].split(".png")[0])
+    )
     ims = [[plt.imshow(plt_image.imread(i))] for i in sorted_available_images]
     ani = animation.ArtistAnimation(fig, ims, interval=500, repeat_delay=1000, blit=True)
     animation_writer = animation.PillowWriter()
 
-    ani.save(os.path.join(RESULTS, 'replay_fake_images_gan.gif'), writer=animation_writer)
+    ani.save(os.path.join(RESULTS, "replay_fake_images_gan.gif"), writer=animation_writer)
     plt.show()
 
 
@@ -126,12 +128,7 @@ def get_generator_block(input_dim, output_dim):
             followed by a batch normalization and then a relu activation
     """
     return AnalogSequential(
-        AnalogLinear(
-            input_dim,
-            output_dim,
-            bias=True,
-            rpu_config=RPU_CONFIG
-        ),
+        AnalogLinear(input_dim, output_dim, bias=True, rpu_config=RPU_CONFIG),
         nn.BatchNorm1d(output_dim),
         nn.ReLU(inplace=True),
     )
@@ -155,12 +152,7 @@ class Generator(nn.Module):
             get_generator_block(hidden_dim, hidden_dim * 2),
             get_generator_block(hidden_dim * 2, hidden_dim * 4),
             get_generator_block(hidden_dim * 4, hidden_dim * 8),
-            AnalogLinear(
-                hidden_dim * 8,
-                im_dim,
-                bias=True,
-                rpu_config=RPU_CONFIG
-            ),
+            AnalogLinear(hidden_dim * 8, im_dim, bias=True, rpu_config=RPU_CONFIG),
             nn.Sigmoid(),
         )
 
@@ -178,7 +170,7 @@ class Generator(nn.Module):
         return self.gen(noise)
 
 
-def get_noise(n_samples, z_dim, device='cpu'):
+def get_noise(n_samples, z_dim, device="cpu"):
     """Create noise vectors.
 
     Given the dimensions (n_samples, z_dim), creates a tensor of that shape
@@ -212,9 +204,7 @@ def get_discriminator_block(input_dim, output_dim):
             followed by an nn.LeakyReLU activation with negative slope of 0.2
             (https://pytorch.org/docs/master/generated/torch.nn.LeakyReLU.html)
     """
-    return nn.Sequential(
-        nn.Linear(input_dim, output_dim), nn.LeakyReLU(2e-1, inplace=True)
-    )
+    return nn.Sequential(nn.Linear(input_dim, output_dim), nn.LeakyReLU(2e-1, inplace=True))
 
 
 class Discriminator(nn.Module):
@@ -312,9 +302,7 @@ def get_gen_loss(gen, disc, criterion, num_images, z_dim, device):
     return gen_loss
 
 
-def training_loop(
-    gen, disc, gen_opt, disc_opt, criterion, dataloader, n_epochs, display_step
-):
+def training_loop(gen, disc, gen_opt, disc_opt, criterion, dataloader, n_epochs, display_step):
     """Training loop.
 
     Args:
@@ -345,9 +333,7 @@ def training_loop(
             disc_opt.zero_grad()
 
             # Calculate discriminator loss.
-            disc_loss = get_disc_loss(
-                gen, disc, criterion, real, cur_batch_size, Z_DIM, DEVICE
-            )
+            disc_loss = get_disc_loss(gen, disc, criterion, real, cur_batch_size, Z_DIM, DEVICE)
 
             # Update gradients.
             disc_loss.backward()
@@ -372,15 +358,15 @@ def training_loop(
             # Visualization code.
             if cur_step % display_step == 0 and cur_step > 0:
                 print(
-                    f'{datetime.now().time().replace(microsecond=0)} --- '
-                    f'Step {cur_step}: '
-                    f'Generator loss: {mean_generator_loss}, '
-                    f'discriminator loss: {mean_discriminator_loss}'
+                    f"{datetime.now().time().replace(microsecond=0)} --- "
+                    f"Step {cur_step}: "
+                    f"Generator loss: {mean_generator_loss}, "
+                    f"discriminator loss: {mean_discriminator_loss}"
                 )
                 fake_noise = get_noise(cur_batch_size, Z_DIM, device=DEVICE)
                 fake = gen(fake_noise)
 
-                store_tensor_images(fake, 'fake_images', cur_step)
+                store_tensor_images(fake, "fake_images", cur_step)
                 # For the example we will store only the fake images generated
                 # store_tensor_images(real, 'real_images', cur_step).
 
@@ -403,7 +389,7 @@ def main():
         shuffle=True,
     )
 
-    print(f'\n{datetime.now().time().replace(microsecond=0)} --- ' f'Started GAN Example')
+    print(f"\n{datetime.now().time().replace(microsecond=0)} --- " f"Started GAN Example")
 
     gen = Generator(Z_DIM).to(DEVICE)
     gen_opt = AnalogSGD(gen.parameters(), lr=LR)
@@ -422,9 +408,9 @@ def main():
     training_loop(gen, disc, gen_opt, disc_opt, criterion, dataloader, N_EPOCHS, DISPLAY_STEP)
     show_animation_fake_images()
 
-    print(f'{datetime.now().time().replace(microsecond=0)} --- ' f'Completed GAN Example')
+    print(f"{datetime.now().time().replace(microsecond=0)} --- " f"Completed GAN Example")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Execute only if run as the entry point into the program.
     main()
