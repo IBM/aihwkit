@@ -24,4 +24,5 @@ Submodules
    aihwkit.simulator.tiles.periphery
    aihwkit.simulator.tiles.rpucuda
    aihwkit.simulator.tiles.torch_tile
+   aihwkit.simulator.tiles.transfer
    aihwkit.simulator.tiles.utils
