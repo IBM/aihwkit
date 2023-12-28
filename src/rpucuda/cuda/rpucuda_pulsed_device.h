@@ -222,9 +222,6 @@ private:
   std::unique_ptr<CudaArray<T>> dev_diffusion_rate_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_decay_scale_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_reset_bias_ = nullptr;
-
-private:
-  void initialize();
 };
 
 #define BUILD_PULSED_DEVICE_CONSTRUCTORS_CUDA(                                                     \

@@ -263,7 +263,8 @@ TEST_P(RPUCudaJARTv1bTestFixture, UpdateMatrixBatch) {
 
   RPU_TEST_UPDATE(
       update(this->x_cuvec_batch->getData(), this->d_cuvec_batch->getData(), false, this->m_batch),
-      update(this->x_vec_batch.data(), this->d_vec_batch.data(), false, this->m_batch), this->repeats);
+      update(this->x_vec_batch.data(), this->d_vec_batch.data(), false, this->m_batch),
+      this->repeats);
 }
 
 } // namespace

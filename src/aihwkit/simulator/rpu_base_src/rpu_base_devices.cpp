@@ -11,6 +11,7 @@
  */
 
 #include "rpu.h"
+#include "rpu_JART_v1b_device.h"
 #include "rpu_base.h"
 #include "rpu_buffered_transfer_device.h"
 #include "rpu_chopped_transfer_device.h"
@@ -29,7 +30,6 @@
 #include "rpu_softbounds_reference_device.h"
 #include "rpu_transfer_device.h"
 #include "rpu_vector_device.h"
-#include "rpu_JART_v1b_device.h"
 
 #define NAME(S) (S + type_name_add).c_str()
 
@@ -55,7 +55,6 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
   using ChoppedTransferParam = RPU::ChoppedTransferRPUDeviceMetaParameter<T>;
   using DynamicTransferParam = RPU::DynamicTransferRPUDeviceMetaParameter<T>;
   using SoftBoundsReferenceParam = RPU::SoftBoundsReferenceRPUDeviceMetaParameter<T>;
-
 
   /*
    * Trampoline classes for allowing inheritance.
@@ -373,7 +372,6 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
     }
   };
 
-
   class PyJARTv1bParam : public JARTv1bParam {
   public:
     std::string getName() const override {
@@ -392,8 +390,9 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
     }
     T calcWeightGranularity() const override {
       PYBIND11_OVERLOAD(T, JARTv1bParam, calcWeightGranularity, );
+    }
+  };
 
-      
   class PyChoppedTransferParam : public ChoppedTransferParam {
   public:
     std::string getName() const override {
@@ -713,7 +712,6 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
            float: weight granularity
         )pbdoc");
 
-
   py::class_<JARTv1bParam, PyJARTv1bParam, PulsedParam>(m, NAME("JARTv1bResistiveDeviceParameter"))
       .def(py::init<>())
       .def_readwrite("write_noise_std", &JARTv1bParam::real_write_noise_std)
@@ -821,7 +819,6 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
         Returns:
            float: weight granularity
         )pbdoc");
-
 
   py::class_<VectorParam, PyVectorParam, PulsedBaseParam>(m, NAME("VectorResistiveDeviceParameter"))
       .def(py::init<>())
@@ -1015,7 +1012,6 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
         Returns:
            float: weight granularity
         )pbdoc");
-
 
   py::class_<BufferedTransferParam, PyBufferedTransferParam, TransferParam>(
       m, NAME("BufferedTransferResistiveDeviceParameter"))

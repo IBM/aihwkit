@@ -15,6 +15,7 @@
 #include "rpucuda_pulsed_device.h"
 #include <memory>
 
+#include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_buffered_transfer_device.h"
 #include "rpucuda_chopped_transfer_device.h"
 #include "rpucuda_constantstep_device.h"
@@ -26,7 +27,6 @@
 #include "rpucuda_mixedprec_int_device.h"
 #include "rpucuda_onesided_device.h"
 #include "rpucuda_piecewisestep_device.h"
-#include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_powstep_device.h"
 #include "rpucuda_powstep_reference_device.h"
 #include "rpucuda_softbounds_reference_device.h"

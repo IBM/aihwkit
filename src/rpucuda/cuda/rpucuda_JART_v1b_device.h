@@ -28,29 +28,30 @@ public:
       JARTv1bRPUDeviceCuda,
       JARTv1bRPUDevice,
       /*ctor body*/
-      dev_ldisc_A = RPU::make_unique<CudaArray<float>>(this->context_, 2 * this->size_);
-      dev_device_parameters = RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT);
+      dev_ldisc_A_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 2 * this->size_);
+      dev_device_parameters_ =
+          RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT);
       ,
       /*dtor body*/
       ,
       /*copy body*/
-      dev_ldisc_A->assign(*other.dev_ldisc_A);
-      dev_device_parameters->assign(*other.dev_device_parameters);
+      dev_ldisc_A_->assign(*other.dev_ldisc_A_);
+      dev_device_parameters_->assign(*other.dev_device_parameters_);
       ,
       /*move assigment body*/
-      dev_ldisc_A = std::move(other.dev_ldisc_A);
-      dev_device_parameters = std::move(other.dev_device_parameters);
+      dev_ldisc_A_ = std::move(other.dev_ldisc_A_);
+      dev_device_parameters_ = std::move(other.dev_device_parameters_);
       ,
       /*swap body*/
-      swap(a.dev_ldisc_A, b.dev_ldisc_A);
-      swap(a.dev_device_parameters, b.dev_device_parameters);
+      swap(a.dev_ldisc_A_, b.dev_ldisc_A_);
+      swap(a.dev_device_parameters_, b.dev_device_parameters_);
       ,
       /*host copy from cpu (rpu_device). Parent device params are copyied automatically*/
       int d_size = this->d_size_;
       int x_size = this->x_size_;
       T **device_specific_ldisc_cuda = rpu_device.getldisc();
       T **device_specific_A_cuda = rpu_device.getA();
-      float *tmp_ldisc_A = new float[2 * this->size_];
+      param_t *tmp_ldisc_A = new param_t[2 * this->size_];
 
       for (int i = 0; i < d_size; ++i) {
         for (int j = 0; j < x_size; ++j) {
@@ -60,12 +61,11 @@ public:
           tmp_ldisc_A[kk] = device_specific_ldisc_cuda[i][j];
           tmp_ldisc_A[kk + 1] = device_specific_A_cuda[i][j];
         }
-      }
-      dev_ldisc_A->assign(tmp_ldisc_A);
+      } dev_ldisc_A_->assign(tmp_ldisc_A);
 
       const auto &par = getPar();
       T *tmp_global_pars = new T[DEVICE_PARAMETER_COUNT]();
-      
+
       tmp_global_pars[0] = par.pulse_voltage_SET;
       tmp_global_pars[1] = par.pulse_voltage_RESET;
       tmp_global_pars[2] = par.pulse_length;
@@ -98,7 +98,8 @@ public:
       tmp_global_pars[29] = par.current_to_weight_ratio;
       tmp_global_pars[30] = par.weight_to_current_ratio;
       tmp_global_pars[31] = par.w_min;
-      // TODO: BUG: Use device variable bounds will result in PyTorch not receving the updated weights.
+      // TODO: BUG: Use device variable bounds will result in PyTorch not receving the updated
+      // weights.
       tmp_global_pars[32] = par.Ndisc_max_bound;
       tmp_global_pars[33] = par.Ndisc_min_bound;
       tmp_global_pars[34] = par.Ndiscmax_std;
@@ -116,17 +117,18 @@ public:
       tmp_global_pars[46] = par.rdisc_ctoc_upper_bound_old;
       tmp_global_pars[47] = par.rdisc_ctoc_lower_bound_old;
 
-      dev_device_parameters = nullptr;
-      dev_device_parameters = RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT, tmp_global_pars);
+      dev_device_parameters_ = nullptr;
+      dev_device_parameters_ =
+          RPU::make_unique<CudaArray<T>>(this->context_, DEVICE_PARAMETER_COUNT, tmp_global_pars);
 
       this->context_->synchronize();
       delete[] tmp_ldisc_A;
       delete[] tmp_global_pars;
-      
 
-    // TODO: BUG: Segmentation fault (core dumped) appear if we don't overwrite PersistentWeights again.
-    // We shouldn't need to do this since the PersistentWeights are already writed as Ndisc from the CPU side.
-      int size = x_size * d_size;
+      // TODO: BUG: Segmentation fault (core dumped) appear if we don't overwrite PersistentWeights
+      // again. We shouldn't need to do this since the PersistentWeights are already writed as Ndisc
+      // from the CPU side.
+      int size = x_size *d_size;
       T *tmp_Ndisc = new T[size];
 
       T *Ndiscs = rpu_device.getPersistentWeights()[0];
@@ -146,8 +148,7 @@ public:
 
       this->context_->synchronize();
 
-      delete[] tmp_Ndisc;
-      );
+      delete[] tmp_Ndisc;);
 
   pwukpvec_t<T> getUpdateKernels(
       int m_batch,
@@ -155,29 +156,29 @@ public:
       int use_bo64,
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
-  T *getGlobalParamsData() override { return dev_device_parameters->getData(); };
-  float *get2ParamsData() override { return dev_ldisc_A->getData(); };
-  T *get1ParamsData() override {
-    return this->dev_persistent_weights_->getData();
-  };
+  T *getGlobalParamsData() override { return dev_device_parameters_->getData(); };
+  param_t *get2ParamsData() override { return dev_ldisc_A_->getData(); };
+  T *get1ParamsData() override { return this->dev_persistent_weights_->getData(); };
   T getWeightGranularityNoise() const override {
     return PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
   // implement abstract functions
-  void decayWeights(T *dev_weights, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
-  void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override{RPU_NOT_IMPLEMENTED;};
-  void driftWeights(T *dev_weights, T time_since_epoch) override{RPU_NOT_IMPLEMENTED;};
-  void diffuseWeights(T *dev_weights) override{RPU_NOT_IMPLEMENTED;};
+  void decayWeights(T *dev_weights, bool bias_no_decay) override { RPU_NOT_IMPLEMENTED; };
+  void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) override { RPU_NOT_IMPLEMENTED; };
+  void driftWeights(T *dev_weights, T time_since_epoch) override { RPU_NOT_IMPLEMENTED; };
+  void diffuseWeights(T *dev_weights) override { RPU_NOT_IMPLEMENTED; };
   void clipWeights(T *dev_weights, T clip) override;
   // RRAM does not have the function to reset to a 0 weight value
-  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override{RPU_NOT_IMPLEMENTED;};
-  void resetAt(T *dev_weights, const char *dev_non_zero_msk) override{RPU_NOT_IMPLEMENTED;};
+  void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override {
+    RPU_NOT_IMPLEMENTED;
+  };
+  void resetAt(T *dev_weights, const char *dev_non_zero_msk) override { RPU_NOT_IMPLEMENTED; };
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override;
   // void setWeights(const T *weightsptr) override;
 
 private:
-  std::unique_ptr<CudaArray<float>> dev_ldisc_A = nullptr;
-  std::unique_ptr<CudaArray<T>> dev_device_parameters = nullptr;
+  std::unique_ptr<CudaArray<param_t>> dev_ldisc_A_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_device_parameters_ = nullptr;
 };
 
 } // namespace RPU
