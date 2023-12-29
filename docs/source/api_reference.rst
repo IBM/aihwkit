@@ -48,6 +48,7 @@ API Reference
    aihwkit.simulator
    aihwkit.simulator.configs
    aihwkit.simulator.presets
+   aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
    aihwkit.nn
    aihwkit.nn.conversion
@@ -73,11 +74,3 @@ API Reference
    aihwkit.utils.visualization_web
    aihwkit.utils.export
    aihwkit.version
-
-
-.. only:: env_local
-
-   .. autosummary::
-        :recursive:
-
-        aihwkit.simulator.rpu_base
