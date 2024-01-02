@@ -74,4 +74,3 @@ html_static_path = [""]
 # -- Options specific to this project ----------------------------------------
 
 autodoc_typehints = "description"
-autodoc_mock_imports = ["aihwkit.simulator.rpu_base"]
