@@ -12,4 +12,4 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   aihwkit.simulators.rpu_base.tiles
+   aihwkit.simulator.rpu_base.tiles
