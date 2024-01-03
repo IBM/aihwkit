@@ -13,7 +13,15 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath("../../src"))
+# -- Options specific to readthedocs -----------------------------------------
+
+on_readthedocs = os.environ.get("READTHEDOCS") == "True"
+if not on_readthedocs:
+    # If not invoked from the `readthedocs` build environment, use the source
+    # files instead of assuming the package is installed, and mock `rpu_base`.
+    import sys
+    sys.path.insert(0, os.path.abspath("../../src"))
+    autodoc_mock_imports = ["aihwkit.simulator.rpu_base"]
 
 
 # -- Project information -----------------------------------------------------
@@ -74,12 +82,3 @@ html_static_path = [""]
 # -- Options specific to this project ----------------------------------------
 
 autodoc_typehints = "description"
-autodoc_mock_imports = ["aihwkit.simulator.rpu_base"]
-
-# -- Options specific to readthedocs -----------------------------------------
-
-on_readthedocs = os.environ.get("READTHEDOCS") == "True"
-if on_readthedocs:
-    tags.add("env_readthedocs")
-else:
-    tags.add("env_local")
