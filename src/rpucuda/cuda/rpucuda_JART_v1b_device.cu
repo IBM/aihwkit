@@ -176,7 +176,6 @@ template <typename T> struct UpdateFunctorJARTv1b {
     pulse_count *= n;
     double Ndisc_double = Ndisc;
 
-
     if (negative > 0) {
       for (int i_updates = 0; i_updates < pulse_count; i_updates++) {
         T ratio = Ndisc_double;
@@ -190,8 +189,8 @@ template <typename T> struct UpdateFunctorJARTv1b {
             Ndiscmin_ctoc_lower_bound, ldisc_ctoc_upper_bound, ldisc_ctoc_lower_bound,
             rdisc_ctoc_upper_bound, rdisc_ctoc_lower_bound);
 
-	T max_bound = MIN(Ndisc_max_bound, device_specific_Ndiscmax_cuda);
-	T min_bound = MAX(Ndisc_min_bound, device_specific_Ndiscmin_cuda);
+        T max_bound = MIN(Ndisc_max_bound, device_specific_Ndiscmax_cuda);
+        T min_bound = MAX(Ndisc_min_bound, device_specific_Ndiscmin_cuda);
 
         Ndisc_double = MAX(MIN(Ndisc_double, max_bound), min_bound);
 
@@ -236,10 +235,10 @@ template <typename T> struct UpdateFunctorJARTv1b {
             Ndiscmin_ctoc_lower_bound, ldisc_ctoc_upper_bound, ldisc_ctoc_lower_bound,
             rdisc_ctoc_upper_bound, rdisc_ctoc_lower_bound);
 
-	T max_bound = MIN(Ndisc_max_bound, device_specific_Ndiscmax_cuda);
-	T min_bound = MAX(Ndisc_min_bound, device_specific_Ndiscmin_cuda);
+        T max_bound = MIN(Ndisc_max_bound, device_specific_Ndiscmax_cuda);
+        T min_bound = MAX(Ndisc_min_bound, device_specific_Ndiscmin_cuda);
         Ndisc_double = MAX(MIN(Ndisc_double, max_bound), min_bound);
-	
+
         T gamma_V_disk_coefficient_l = gamma_coefficient / lcell;
         T Rth_positive_coefficient_A = Rth_positive_coefficient / device_specific_A_cuda;
         T I_mem =
