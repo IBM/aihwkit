@@ -17,7 +17,8 @@ from typing import List
 from dataclasses import dataclass, field
 
 from aihwkit.simulator.configs.compounds import OneSidedUnitCell
-from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.presets.devices import PCMPresetDevice
 from aihwkit.simulator.presets.utils import PresetIOParameters, PresetUpdateParameters
 

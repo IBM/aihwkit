@@ -310,6 +310,9 @@ class AnalogMVType(Enum):
     inputs separately. The output of the two passes are added in
     analog and then passed once through ADC stage (which also applies
     the output noise, range clipping, output non-linearity etc.).
+
+    Caution:
+        Only supported for RPUCuda tiles (based on C++ not pure torch)
     """
 
     POS_NEG_SEPARATE_DIGITAL_SUM = "PosNegSeparateDigitalSum"
@@ -317,6 +320,25 @@ class AnalogMVType(Enum):
     inputs separately. The ADC output stage is applied to each pass
     separately and the results are summed in full precision (i.e. in
     digital).
+
+    Caution:
+        Only supported for RPUCuda tiles (based on C++ not pure torch)
+    """
+
+    SPLIT_MODE = "SplitMode"
+    """Split PWM bits into two phases to speedup MAC and increase energy
+    efficiency (may sacrifice some accuracy).
+
+    Caution:
+        Only supported for ``TorchInferenceRPUConfigIRDropT``
+    """
+
+    BIT_WISE = "BitWise"
+    """Bit-wise PWM input to speedup MAC and increase energy
+    efficiency (may sacrifice some accuracy).
+
+    Caution:
+        Only supported for ``TorchInferenceRPUConfigIRDropT``
     """
 
 

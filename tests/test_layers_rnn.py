@@ -30,12 +30,12 @@ from .helpers.layers import (
     LSTMCombinedWeightCuda,
 )
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, Inference, TorchInference, Custom
+from .helpers.tiles import FloatingPoint, Inference, TorchInference, TorchInferenceIRDropT, Custom
 
 
 @parametrize_over_layers(
     layers=[LSTM, VanillaRNN, GRU, LSTMCuda, GRUCuda, VanillaRNNCuda],
-    tiles=[FloatingPoint, Inference, TorchInference, Custom],
+    tiles=[FloatingPoint, Inference, TorchInference, TorchInferenceIRDropT, Custom],
     biases=["analog", "digital", None],
 )
 class RNNLayerTest(ParametrizedTestCase):

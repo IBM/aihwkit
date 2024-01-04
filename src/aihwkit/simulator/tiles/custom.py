@@ -29,7 +29,7 @@ from aihwkit.simulator.tiles.array import TileModuleArray
 from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
 from aihwkit.simulator.parameters.mapping import MappableRPU
 from aihwkit.simulator.parameters.helpers import _PrintableMixin
-from aihwkit.simulator.parameters.training import IOParameters
+from aihwkit.simulator.parameters.io import IOParameters
 
 
 class CustomSimulatorTile(SimulatorTile, Module):

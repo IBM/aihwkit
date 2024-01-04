@@ -36,7 +36,8 @@ from aihwkit.simulator.parameters.enums import (
     NoiseManagementType,
     BoundManagementType,
 )
-from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.presets.devices import (
     CapacitorPresetDevice,
     EcRamPresetDevice,

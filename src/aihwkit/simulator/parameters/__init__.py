@@ -28,7 +28,9 @@ from .enums import (
     AnalogMVType,
 )
 
-from .training import IOParameters, UpdateParameters
+from .training import UpdateParameters
+
+from .io import IOParameters, IOParametersIRDropT
 
 from .mapping import MappingParameter
 

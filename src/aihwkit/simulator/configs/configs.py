@@ -30,6 +30,7 @@ from aihwkit.simulator.configs.devices import (
 from aihwkit.simulator.configs.compounds import DigitalRankUpdateCell, UnitCell, TransferCompound
 from aihwkit.simulator.parameters import (
     IOParameters,
+    IOParametersIRDropT,
     PulseType,
     UpdateParameters,
     WeightClipParameter,
@@ -44,7 +45,9 @@ from aihwkit.inference import (
 )
 
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile, TorchInferenceTile
+
 from aihwkit.simulator.tiles.torch_tile import TorchSimulatorTile
+from aihwkit.simulator.tiles.torch_tile_irdrop_t import TorchSimulatorTileIRDropT
 from aihwkit.simulator.tiles.array import TileModuleArray
 
 
@@ -274,3 +277,39 @@ class TorchInferenceRPUConfig(InferenceRPUConfig):
 
     tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
+
+
+@dataclass
+class TorchInferenceRPUConfigIRDropT(TorchInferenceRPUConfig):
+    """Inference configuration using time-dependent IR drop.
+
+    This configuration defaults to a tile module implementation that
+    supported a subset of functions of the ``InferenceRPUConfig`` but
+    uses native torch instead of the RPUCuda library for simulating
+    the analog MVM.
+
+    The advantage is that autograd is more fully supported and
+    hardware aware training is more flexible to be modified. However,
+    some nonidealities are not supported.
+
+    Note:
+
+        For features that are not supported a ``NotImplementedError`` or a
+        ``TorchTileConfigError`` is raised.
+    """
+
+    simulator_tile_class: Type = TorchSimulatorTileIRDropT
+
+    forward: IOParametersIRDropT = field(default_factory=IOParametersIRDropT)
+    """Input-output parameter setting for the forward direction.
+
+    This parameters govern the hardware definitions specifying analog
+    MVM non-idealities.
+
+    Note:
+
+        This forward pass is applied equally in training and
+        inference. In addition, materials effects such as drift and
+        programming noise can be enabled during inference by
+        specifying the ``noise_model``
+    """

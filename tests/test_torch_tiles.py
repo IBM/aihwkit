@@ -17,7 +17,6 @@ from pytest import mark
 from torch import allclose, randn, tensor, manual_seed, device, clip, ones
 from torch.nn import Linear
 
-from aihwkit.simulator.rpu_base import cuda
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
@@ -28,10 +27,20 @@ from aihwkit.simulator.configs import (
     NoiseManagementType,
     BoundManagementType,
 )
-from .helpers.testcases import AihwkitTestCase
+from .helpers.decorators import parametrize_over_tiles
+from .helpers.testcases import ParametrizedTestCase, SkipTest
+from .helpers.tiles import (
+    TorchInference,
+    TorchInferenceCuda,
+    TorchInferenceIRDropT,
+    TorchInferenceIRDropTCuda,
+)
 
 
-class TorchInferenceTest(AihwkitTestCase):
+@parametrize_over_tiles(
+    [TorchInference, TorchInferenceCuda, TorchInferenceIRDropT, TorchInferenceIRDropTCuda]
+)
+class TorchInferenceTest(ParametrizedTestCase):
     """Tests the basic functionality of FloatingPoint and Analog tiles."""
 
     def test_storing_and_loading(self):
@@ -40,10 +49,14 @@ class TorchInferenceTest(AihwkitTestCase):
         """
         # - Create simple rpu_config
         n_in = 20
-        rpu_config = TorchInferenceRPUConfig()
+        rpu_config = self.get_rpu_config()
         rpu_config.forward.is_perfect = True
         linear = AnalogSequential(AnalogLinear(n_in, 10, bias=True, rpu_config=rpu_config))
         inp = randn((10, n_in))
+        if self.use_cuda:
+            linear = linear.cuda()
+            inp = inp.cuda()
+
         out_pre = linear(inp)
         linear.load_state_dict(linear.state_dict())
         out_post = linear(inp)
@@ -53,7 +66,10 @@ class TorchInferenceTest(AihwkitTestCase):
         rpu_config = InferenceRPUConfig()
         rpu_config.forward.is_perfect = True
         linear_ref = AnalogSequential(AnalogLinear(n_in, 10, bias=True, rpu_config=rpu_config))
-        linear_ref.load_state_dict(linear.state_dict())
+        if self.use_cuda:
+            linear_ref = linear_ref.cuda()
+
+        linear_ref.load_state_dict(linear.state_dict(), load_rpu_config=True)
         self.assertTensorAlmostEqual(linear_ref(inp), out_post)
 
     def test_to_device(self):
@@ -61,13 +77,13 @@ class TorchInferenceTest(AihwkitTestCase):
         Test moving the new torch based models to and from GPU.
         """
         # - Per default on CPU
-        rpu_config = TorchInferenceRPUConfig()
+        rpu_config = self.get_rpu_config()
         rpu_config.forward.is_perfect = True
         linear = AnalogSequential(AnalogLinear(10, 10, bias=True, rpu_config=rpu_config))
         for param in linear.parameters():
             self.assertEqual(param.device, device("cpu"))
         # - Move to GPU
-        if cuda.is_compiled():
+        if self.use_cuda:
             linear = linear.cuda()
             for param in linear.parameters():
                 self.assertTrue("cuda" in str(param.device))
@@ -80,8 +96,10 @@ class TorchInferenceTest(AihwkitTestCase):
         """
         Test integrity of weights after set and get.
         """
-        rpu_config = TorchInferenceRPUConfig()
+        rpu_config = self.get_rpu_config()
         linear = AnalogLinear(10, 10, bias=True, rpu_config=rpu_config)
+        if self.use_cuda:
+            linear = linear.cuda()
         weights = randn(10, 10)
         linear.set_weights(weights)
         weights_read, _ = linear.get_weights()
@@ -89,6 +107,8 @@ class TorchInferenceTest(AihwkitTestCase):
         # - Compare to cpp-based tile
         linear_ref = AnalogLinear(10, 10, rpu_config=InferenceRPUConfig())
         linear_ref.set_weights(weights)
+        if self.use_cuda:
+            linear_ref = linear_ref.cuda()
         weights_read, _ = linear_ref.get_weights()
         self.assertTensorAlmostEqual(weights, weights_read)
 
@@ -97,15 +117,18 @@ class TorchInferenceTest(AihwkitTestCase):
         Test correct grad and scale of grad compared to cpp-based tile under clipping.
         """
 
-        def set_discretize(rpu: TorchInferenceRPUConfig):
-            rpu.forward.out_noise = 0.0
-            rpu.forward.inp_bound = 1.0
-            rpu.forward.out_bound = 1e6
-            rpu.forward.inp_res = -1
-            rpu.forward.out_res = -1
-            rpu.forward.noise_management = NoiseManagementType.NONE
-            rpu.forward.bound_management = BoundManagementType.NONE
-            return rpu
+        def set_discretize(rpu_config: TorchInferenceRPUConfig):
+            rpu_config.forward.is_perfect = False
+            if rpu_config.forward.ir_drop > 0:
+                raise SkipTest("Inp res < 0 not supported")
+            rpu_config.forward.out_noise = 0.0
+            rpu_config.forward.inp_bound = 1.0
+            rpu_config.forward.out_bound = 1e6
+            rpu_config.forward.inp_res = -1
+            rpu_config.forward.out_res = -1
+            rpu_config.forward.noise_management = NoiseManagementType.NONE
+            rpu_config.forward.bound_management = BoundManagementType.NONE
+            return rpu_config
 
         class ClippedLinear(Linear):
             """
@@ -119,13 +142,18 @@ class TorchInferenceTest(AihwkitTestCase):
                 x = clip(input, -1.0, 1.0)
                 return super().forward(x)
 
-        rpu_config = set_discretize(TorchInferenceRPUConfig())
+        rpu_config = set_discretize(self.get_rpu_config())
 
         linear = AnalogLinear(10, 10, bias=False, rpu_config=rpu_config)
         linear_ref = ClippedLinear(10, 10, bias=False)
-
         linear_ref.weight.data = linear.get_weights()[0]
         inp = randn(50, 10)
+
+        if self.use_cuda:
+            linear = linear.cuda()
+            linear_ref = linear_ref.cuda()
+            inp = inp.cuda()
+
         out = linear(inp).mean()
         out_ref = linear_ref(inp).mean()
         out.backward()
@@ -153,15 +181,24 @@ class TorchInferenceTest(AihwkitTestCase):
             rpu.pre_post.input_range.init_from_data = False
             return rpu
 
-        rpu_config = set_discretize(TorchInferenceRPUConfig())
+        rpu_config = set_discretize(self.get_rpu_config())
         rpu_config_ref = set_discretize(InferenceRPUConfig())
         linear = AnalogLinear(in_features=256, out_features=256, bias=False, rpu_config=rpu_config)
         linear_ref = AnalogLinear(
             in_features=256, out_features=256, bias=False, rpu_config=rpu_config_ref
         )
         linear_ref.load_state_dict(linear.state_dict(), load_rpu_config=False)
+
+        if self.use_cuda:
+            linear = linear.cuda()
+            linear_ref = linear_ref.cuda()
+
         for _ in range(10):
             inp = randn((3, 20, 256))
+
+            if self.use_cuda:
+                inp = inp.cuda()
+
             out = linear(inp).mean()
             out.backward()
             out_ref = linear_ref(inp).mean()

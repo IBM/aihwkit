@@ -44,7 +44,14 @@ enum class PulseType {
   DeterministicImplicit
 };
 
-enum class AnalogMVType { Ideal, OnePass, PosNegSeparate, PosNegSeparateDigitalSum };
+enum class AnalogMVType {
+  Ideal,
+  OnePass,
+  PosNegSeparate,
+  PosNegSeparateDigitalSum,
+  SplitMode,
+  BitWise
+};
 
 template <typename T> struct IOMetaParameter {
   bool _par_initialized = false;

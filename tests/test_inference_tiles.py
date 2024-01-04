@@ -38,10 +38,26 @@ from aihwkit.exceptions import TorchTileConfigError
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import Inference, InferenceCuda, TorchInference, TorchInferenceCuda
+from .helpers.tiles import (
+    Inference,
+    InferenceCuda,
+    TorchInference,
+    TorchInferenceCuda,
+    TorchInferenceIRDropT,
+    TorchInferenceIRDropTCuda,
+)
 
 
-@parametrize_over_tiles([Inference, InferenceCuda, TorchInference, TorchInferenceCuda])
+@parametrize_over_tiles(
+    [
+        Inference,
+        InferenceCuda,
+        TorchInference,
+        TorchInferenceCuda,
+        TorchInferenceIRDropT,
+        TorchInferenceIRDropTCuda,
+    ]
+)
 class InferenceTileTest(ParametrizedTestCase):
     """Inference model tests."""
 
