@@ -23,7 +23,6 @@ on_readthedocs = os.environ.get("READTHEDOCS") == "True"
 if not on_readthedocs:
     # If not invoked from the `readthedocs` build environment, use the source
     # files instead of assuming the package is installed, and mock `rpu_base`.
-    import sys
     sys.path.insert(0, os.path.abspath("../../src"))
     autodoc_mock_imports = ["aihwkit.simulator.rpu_base"]
 

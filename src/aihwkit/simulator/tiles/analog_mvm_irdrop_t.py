@@ -32,7 +32,7 @@ from torch import (
 from torch.autograd import no_grad
 from torch.nn.functional import pad
 
-from aihwkit.extension import extension_ops
+from aihwkit.extension import extension_ops  # type: ignore
 from aihwkit.inference.converter.conductance import SinglePairConductanceConverter
 
 from aihwkit.exceptions import ConfigError
