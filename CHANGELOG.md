@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Custom tile bugfixes (\#563)
 * Bug-fixes for specialized learning algorithms (\#563)
 * Bug-fix for data-parallel hardware-aware training for inference (\#569)
+* Fix docker build stubgen (\#581)
 
 ### Changed
 

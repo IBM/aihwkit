@@ -20,7 +20,7 @@ RUN apt-get update && \
 
 # Install Python build dependencies
 RUN pip install --no-cache-dir --upgrade --no-warn-script-location pip && \
-    pip install --no-cache-dir --no-warn-script-location pybind11 scikit-build protobuf
+    pip install --no-cache-dir --no-warn-script-location pybind11 scikit-build protobuf mypy
 
 ARG USERNAME=coder
 ARG USERID=1000
