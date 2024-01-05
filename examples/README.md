@@ -578,7 +578,6 @@ example shows what RPU Configuration has to be used and plots a number
 of comparisons of the advanced IR drop in comparison to simplified IR
 drop implementation.
 
-
 ## Example 29: [`29_linalg_krylov.py`]
 
 Example of how to use the linaer algebra module. It uses an flexible
