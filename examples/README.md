@@ -571,6 +571,14 @@ standard deviaiton as the input range.
 
 For each method, the performance (under quantization) is printed.
 
+## Example 28: [`28_advanced_irdrop.py`]
+
+Example of how to use the time-dependent IR drop for inference. The
+example shows what RPU Configuration has to be used and plots a number
+of comparisons of the advanced IR drop in comparison to simplified IR
+drop implementation.
+
+
 ## Example 29: [`29_linalg_krylov.py`]
 
 Example of how to use the linaer algebra module. It uses an flexible
@@ -628,4 +636,5 @@ offset-corrected in-memeory training. ArXiv preprint]: https://arxiv.org/abs/230
 [`25_torch_tile_lenet5_hardware_aware.py`]: 25_torch_tile_lenet5_hardware_aware.py
 [`26_correlation_detection.py`]: 26_correlation_detection.py
 [`27_input_range_calibration`]: 27_input_range_calibration.py
+[`28_advanced_irdrop.py`]: 28_advanced_irdrop.py
 [`29_linalg_krylov.py`]: 29_linalg_krylov.py
