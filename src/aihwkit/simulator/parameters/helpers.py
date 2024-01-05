@@ -87,8 +87,8 @@ def parameters_to_bindings(params: Any, data_type: RPUDataType, check_fields: bo
     result = result()
 
     field_dict = {field.name: (field, getattr(params, field.name)) for field in fields(params)}
+    ignore_fields = getattr(params, "bindings_ignore", [])
     if check_fields:
-        ignore_fields = getattr(params, "bindings_ignore", [])
         for key in params.__dict__.keys():
             if key not in field_dict and key not in ignore_fields:
                 raise ConfigError(
@@ -99,7 +99,7 @@ def parameters_to_bindings(params: Any, data_type: RPUDataType, check_fields: bo
 
     for field, (dataclass_field, value) in field_dict.items():
         # Convert enums to the bindings enums.
-        if field in ("unit_cell_devices", "device"):
+        if field in ("unit_cell_devices", "device") or field in ignore_fields:
             # Exclude special fields that are not present in the bindings.
             continue
 

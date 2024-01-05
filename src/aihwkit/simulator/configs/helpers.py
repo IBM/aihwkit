@@ -29,7 +29,8 @@ from aihwkit.simulator.configs.compounds import (
     MixedPrecisionCompound,
     VectorUnitCell,
 )
-from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.parameters.enums import (
     VectorUnitCellUpdatePolicy,
     NoiseManagementType,

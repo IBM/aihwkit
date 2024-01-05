@@ -52,7 +52,7 @@ pycodestyle:
 	pycodestyle src/ tests/ examples/
 
 pylint:
-	PYTHONPATH=src/ pylint -rn src/ tests/ examples/
+	PYTHONPATH=src/ git ls-files | grep -E ".*\.py$$" | grep -v "pb2\.py$$" | xargs  pylint -rn
 
 pytest:
 	PYTHONPATH=src/ pytest -v -s tests/

@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Transfer compounds using torch implementation (`TorchTransferTile`) (\#567)
 * Weight programming error plotting utility (\#572)
 * Add optimizer checkpoint in example 20 (\#573) 
+* Inference tile with time-dependent IR-drop (\#587)
 
 ### Fixed
 
