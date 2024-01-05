@@ -571,6 +571,13 @@ standard deviaiton as the input range.
 
 For each method, the performance (under quantization) is printed.
 
+## Example 29: [`29_linalg_krylov.py`]
+
+Example of how to use the linaer algebra module. It uses an flexible
+GMRES algorithm with analog preconditioner. Note that the example
+needs additional python packages which can be installed with `pip
+install -r requirements-examples.txt`.
+
 
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
@@ -621,3 +628,4 @@ offset-corrected in-memeory training. ArXiv preprint]: https://arxiv.org/abs/230
 [`25_torch_tile_lenet5_hardware_aware.py`]: 25_torch_tile_lenet5_hardware_aware.py
 [`26_correlation_detection.py`]: 26_correlation_detection.py
 [`27_input_range_calibration`]: 27_input_range_calibration.py
+[`29_linalg_krylov.py`]: 29_linalg_krylov.py

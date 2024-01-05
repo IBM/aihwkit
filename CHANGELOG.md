@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Weight programming error plotting utility (\#572)
 * Add optimizer checkpoint in example 20 (\#573) 
 * Inference tile with time-dependent IR-drop (\#587)
+* Linear algebra module (\#588) 
 
 ### Fixed
 
