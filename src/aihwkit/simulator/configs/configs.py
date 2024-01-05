@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,6 +20,7 @@ from typing import ClassVar, Type, Optional, Union, Any
 from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
 from aihwkit.simulator.parameters.mapping import MappableRPU
 from aihwkit.simulator.parameters.helpers import tile_parameters_to_bindings
+from aihwkit.simulator.parameters.runtime import RuntimeParameter
 
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
@@ -89,6 +90,9 @@ class IOManagedRPUConfig(MappableRPU, PrePostProcessingRPU):
 
     def as_bindings(self) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
+        if not hasattr(self, "runtime"):
+            # legacy
+            self.runtime = RuntimeParameter()
         return tile_parameters_to_bindings(self, self.runtime.data_type)
 
 
