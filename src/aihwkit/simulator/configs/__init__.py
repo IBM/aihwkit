@@ -14,6 +14,7 @@
 
 from aihwkit.simulator.parameters import (
     IOParameters,
+    IOParametersIRDropT,
     UpdateParameters,
     WeightModifierParameter,
     WeightClipParameter,
@@ -68,6 +69,7 @@ from .configs import (
     UnitCellRPUConfig,
     DigitalRankUpdateRPUConfig,
     TorchInferenceRPUConfig,
+    TorchInferenceRPUConfigIRDropT,
 )
 
 from .helpers import build_config

@@ -10,16 +10,6 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-# pylint: disable=import-error, no-name-in-module, invalid-name
+"""Linear Algebra functionality."""
 
-"""AIHWKIT extension """
-
-from importlib.util import find_spec
-
-EXTENSION_COMPILED = find_spec(".aihwkit_extension", package="aihwkit.extension") is not None
-
-if EXTENSION_COMPILED:
-    from .functions import FloatPrecisionCast
-    from aihwkit.extension.aihwkit_extension import ops as extension_ops
-else:
-    extension_ops = None
+from .matrix import AnalogMatrix

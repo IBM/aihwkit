@@ -21,7 +21,8 @@ from warnings import warn
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.parameters.helpers import _PrintableMixin, parameters_to_bindings
-from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.parameters.enums import VectorUnitCellUpdatePolicy, RPUDataType
 
 if TYPE_CHECKING:

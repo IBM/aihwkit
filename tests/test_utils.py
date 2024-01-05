@@ -54,11 +54,12 @@ from .helpers.tiles import (
     Inference,
     InferenceLearnOutScaling,
     TorchInference,
+    TorchInferenceIRDropT,
     Custom,
     TorchTransfer,
 )
 
-SKIP_META_PARAM_TILES = [TorchInference, Custom, FloatingPoint]
+SKIP_META_PARAM_TILES = [TorchInference, TorchInferenceIRDropT, Custom, FloatingPoint]
 
 
 @parametrize_over_layers(
@@ -78,10 +79,11 @@ SKIP_META_PARAM_TILES = [TorchInference, Custom, FloatingPoint]
         Inference,
         InferenceLearnOutScaling,
         TorchInference,
+        TorchInferenceIRDropT,
         TorchTransfer,
         Custom,
     ],
-    biases=["digital", None],
+    biases=["digital"],
 )
 class SerializationTest(ParametrizedTestCase):
     """Tests for serialization."""

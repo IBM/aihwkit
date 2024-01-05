@@ -48,7 +48,8 @@ from aihwkit.simulator.parameters.enums import (
     PulseType,
     WeightNoiseType,
 )
-from aihwkit.simulator.parameters.training import UpdateParameters, IOParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.presets import PresetIOParameters
 from aihwkit.simulator.tiles import AnalogTile, InferenceTile
 from aihwkit.simulator.tiles.module import TileModule

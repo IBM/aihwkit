@@ -104,10 +104,6 @@ def get_rpu_config(
         # Common parameters in ttv4.
         rpu_config.device.tail_weightening = 5
 
-    if isinstance(rpu_config.device, DynamicTransferCompound):
-        # Common parameters in ttv4.
-        rpu_config.device.tail_weightening = np.inf
-
     return rpu_config
 
 
