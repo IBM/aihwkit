@@ -30,7 +30,7 @@ if not on_readthedocs:
 # -- Project information -----------------------------------------------------
 
 project = "IBM Analog Hardware Acceleration Kit"
-copyright = "2020, 2021, 2022, 2023 IBM Research"
+copyright = "2020, 2021, 2022, 2023, 2024 IBM Research"
 author = "IBM Research"
 
 

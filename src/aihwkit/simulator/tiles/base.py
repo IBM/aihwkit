@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -331,9 +331,9 @@ class SimulatorTileWrapper:
 
     def get_runtime(self) -> RuntimeParameter:
         """Returns the runtime parameter."""
-        if hasattr(self.rpu_config, "runtime"):
-            return self.rpu_config.runtime
-        return RuntimeParameter()
+        if not hasattr(self.rpu_config, "runtime"):
+            self.rpu_config.runtime = RuntimeParameter()
+        return self.rpu_config.runtime
 
     def get_data_type(self) -> RPUDataType:
         """Return data_type setting of the RPUConfig"""
