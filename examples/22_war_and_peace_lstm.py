@@ -43,7 +43,6 @@ from aihwkit.simulator.configs import (
     SoftBoundsReferenceDevice,
     ConstantStepDevice,
     MappingParameter,
-    IOParameters,
     UpdateParameters,
 )
 from aihwkit.simulator.rpu_base import cuda
@@ -62,7 +61,7 @@ TEST_FREQ = 1
 WP_TRAIN_FNAME = "wp.train.txt"
 WP_TEST_FNAME = "wp.test.txt"
 WP_VALID_FNAME = "wp.valid.txt"
-DATASET_PATH = os.path.join(os.getenv("RPUSIM"), "data", "lstm")
+DATASET_PATH = os.path.join(os.getenv("RPUSIM", ""), "data", "lstm")
 
 
 def parse_args():

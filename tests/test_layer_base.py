@@ -22,12 +22,12 @@ from aihwkit.simulator.tiles.module import TileModule
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearMapped, Conv2dMapped
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import Inference, TorchInference, Custom
+from .helpers.tiles import Inference, TorchInference, TorchInferenceIRDropT, Custom
 
 
 @parametrize_over_layers(
     layers=[Linear, LinearMapped, Conv2dMapped],
-    tiles=[Inference, TorchInference, Custom],
+    tiles=[Inference, TorchInference, TorchInferenceIRDropT, Custom],
     biases=["analog", "digital", None],
 )
 class LayerModuleBaseTest(ParametrizedTestCase):

@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from .helpers import _PrintableMixin
-from .training import IOParameters
+from .io import IOParameters
 from .base import RPUConfigBase
 from .enums import BoundManagementType, NoiseManagementType
 

@@ -10,6 +10,10 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+# pylint: disable=invalid-name, undefined-variable redefined-builtin
+
+"""Documentation configuration"""
+
 import os
 import sys
 
@@ -19,8 +23,6 @@ on_readthedocs = os.environ.get("READTHEDOCS") == "True"
 if not on_readthedocs:
     # If not invoked from the `readthedocs` build environment, use the source
     # files instead of assuming the package is installed, and mock `rpu_base`.
-    import sys
-
     sys.path.insert(0, os.path.abspath("../../src"))
     autodoc_mock_imports = ["aihwkit.simulator.rpu_base"]
 
@@ -38,7 +40,7 @@ def get_version() -> str:
     version_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "src", "aihwkit", "VERSION.txt"
     )
-    with open(version_path) as version_file:
+    with open(version_path, "r", encoding="UTF-8") as version_file:
         return version_file.read().strip()
 
 

@@ -896,7 +896,7 @@ inline bool ForwardBackwardPassIOManaged<T>::computeAnalogMV(
     return bound_success;
   }
   default:
-    RPU_FATAL("AnalogMVType Unknown.");
+    RPU_FATAL("AnalogMVType not implemented.");
   }
 }
 
