@@ -23,7 +23,7 @@ API Reference
    aihwkit.experiments.experiments.inferencing
    aihwkit.experiments.experiments.training
    aihwkit.experiments.runners.base
-   aihwkit.experiments.runners.cloud   
+   aihwkit.experiments.runners.cloud
    aihwkit.experiments.runners.i_cloud
    aihwkit.experiments.runners.i_local
    aihwkit.experiments.runners.local
