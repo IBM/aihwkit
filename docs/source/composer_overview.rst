@@ -1,8 +1,8 @@
 Analog AI Cloud Composer Overview
 ===================================
 
-In the following, we describe the Analog AI Cloud Composer (AAICC) platform, a cloud offering that provides the benefits of using the AIHWKit simulation platform in a fully managed cloud setting. 
-The Analog Composer is introducing for the first time Analog AI as a service or, in short, AAaaS. 
+In the following, we describe the Analog AI Cloud Composer (AAICC) platform, a cloud offering that provides the benefits of using the AIHWKit simulation platform in a fully managed cloud setting.
+The Analog Composer is introducing for the first time Analog AI as a service or, in short, AAaaS.
 The cloud composer can be freely accessed at `Analog AI Cloud Composer`
 
 
@@ -10,16 +10,16 @@ Composer Design and Architecture.
 ---------------------------------
 
 The AAICC is a novel approach to AIMC that leverages the AIHWKit simulation platform to allow a seamless,
-no-code interactive cloud experience. With access to the open-source AIHWKit libraries and an easy-to-use 
-interface, it provides a platform for researchers, hardware-engineers, developers, and enthusiasts to explore, 
-experiment, simulate, and create Analog AI neural networks and tune various analog devices to create 
+no-code interactive cloud experience. With access to the open-source AIHWKit libraries and an easy-to-use
+interface, it provides a platform for researchers, hardware-engineers, developers, and enthusiasts to explore,
+experiment, simulate, and create Analog AI neural networks and tune various analog devices to create
 accurate and sustainable AI models. This platform also serves as an educational tool to democratize IMC and introduce
 its key concepts.
 
-The AAICC adopts a modern distributed architecture based on IBM Cloud services and guidelines. 
-The user input is limited to data (not code) with strong control and validations during the lifecycle of 
+The AAICC adopts a modern distributed architecture based on IBM Cloud services and guidelines.
+The user input is limited to data (not code) with strong control and validations during the lifecycle of
 the application and the input data. The design maintains a separation of concerns and responsibilities between
-the various components. Tracking, monitoring, and auditing services are enforced to ensure security and 
+the various components. Tracking, monitoring, and auditing services are enforced to ensure security and
 compliance according to IBM Cloud security standards.
 
 The architecture of the AAICC can be divided into five main components, as illustrated in  below figure
@@ -38,4 +38,3 @@ The architecture of the AAICC can be divided into five main components, as illus
     :alt: Analog AI Composer Architecture
 
 .. _`Analog AI Cloud Composer`_: https://aihw-composer.draco.res.ibm.com
- 
