@@ -51,7 +51,6 @@ benefits in regards to serialization and separating concerns overall.
 Relevant modules:
 
 * :py:mod:`aihwkit.simulator.tiles`
-* :py:mod:`aihwkit.simulator.devices`
 * :py:mod:`aihwkit.simulator.configs`
 * :py:mod:`aihwkit.simulator.presets`
 

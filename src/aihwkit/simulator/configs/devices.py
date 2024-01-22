@@ -417,8 +417,8 @@ class LinearStepDevice(PulsedDevice):
         :nowrap:
 
         \begin{eqnarray*}
-        \gamma_{ij}^+ &=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}_{ij}\\
-        \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}_{ij}
+        \gamma_{ij}^+ &\=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}_{ij}\\
+        \gamma_{ij}^- &\=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}_{ij}
         \end{eqnarray*}
 
     where the :math:`\xi` are standard Gaussian random variables and
@@ -478,9 +478,9 @@ class LinearStepDevice(PulsedDevice):
 
     .. math::
 
-        \gamma_{ij}^+ &=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}
+        \gamma_{ij}^+ &\=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}
 
-        \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}
+        \gamma_{ij}^- &\=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}
 
     where :math:`b^\text{max}` and :math:`b^\text{max}` are the values given by
     ``w_max`` and ``w_min``, see :class:`~PulsedDevice`.
@@ -695,16 +695,16 @@ class SoftBoundsReferenceDevice(PulsedDevice):
     In particular, the update behavior is
 
     .. math::
-        \delta W_+ &=& \alpha_{+}(1 - \frac{w}{\bmax}) (1 + \sigma \xi)
-        \delta W_- &=& \alpha_{-}(1 - \frac{w}{\bmin}) (1 + \sigma \xi)
+        \delta W_+ = \alpha_{+}(1 - \frac{w}{\beta_{max}}) (1 + \sigma \xi)
+
+        \delta W_- = \alpha_{-}(1 - \frac{w}{\beta_{min}}) (1 + \sigma \xi)
 
     Where the same device-to-device varition can be given as for the
     ``PulsedDevice``. In addition, a device-to-device variation can be
     directly given on the slope.
 
     Moreover, a fixed reference conductance can be subtracted from the
-    resulting weight, which implemented a differential read of $W -
-    R$.
+    resulting weight, which implemented a differential read of :math:`w - r`.
 
     """
 
@@ -767,21 +767,21 @@ class SoftBoundsReferenceDevice(PulsedDevice):
     """
 
     reference_mean: float = 0.0
-    """Added to all devices of the reference $R$.
+    """Added to all devices of the reference :math:`r`.
     """
 
     reference_std: float = 0.0
-    """Normal distributed device-to-device variation added to the reference $R$.
+    """Normal distributed device-to-device variation added to the reference :math:`r`.
     """
 
     subtract_symmetry_point: bool = False
     r"""Whether to add the computed symmetry point of the devices onto the
-    reference $R$.
+    reference :math:`r`.
 
     The symmetry point is given by:
 
     .. math::
-        w_* = \frac{alpha_{+} - \alpha_{-}}{\frac{\alpha_{+}}{b_\text{max}}
+        w_* = \frac{\alpha_{+} - \alpha_{-}}{\frac{\alpha_{+}}{b_\text{max}}
                     - \frac{\alpha_{-}}{b_\text{min}}}
     """
 
