@@ -699,9 +699,11 @@ class SoftBoundsReferenceDevice(PulsedDevice):
 
         \delta W_- = \alpha_{-}(1 - \frac{w}{\beta_{min}}) (1 + \sigma \xi)
 
-    Where the same device-to-device varition can be given as for the
+    Where the same device-to-device variation can be given as for the
     ``PulsedDevice``. In addition, a device-to-device variation can be
-    directly given on the slope.
+    directly given on the slope.  The :math:`\alpha_{+}` and :math:`\alpha_{-}` are
+    the scaling factors that determine the magnitude of positive and negative
+    weight updates.
 
     Moreover, a fixed reference conductance can be subtracted from the
     resulting weight, which implemented a differential read of :math:`w - r`.
