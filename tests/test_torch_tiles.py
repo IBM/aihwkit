@@ -14,7 +14,19 @@
 
 from typing import Union
 from pytest import mark
-from torch import allclose, randn, tensor, manual_seed, device, clip, ones
+from torch import (
+    Tensor,
+    allclose,
+    randn,
+    tensor,
+    manual_seed,
+    device,
+    clip,
+    ones,
+    zeros_like,
+    clamp,
+    cat,
+)
 from torch.nn import Linear
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
@@ -251,6 +263,71 @@ def test_discretization_behavior(inp_bound, out_bound, inp_res, out_res, bm_type
     out = linear(inp)
     out_ref = linear_ref(inp)
     assert allclose(out, out_ref, atol=1e-5)
+
+
+# @mark.parametrize("is_training", [True, False])
+def test_iterative_linear(is_training: bool = False):
+    """
+    Test that checks the gradient of the input range when
+    we pass through different inputs without calling
+    .backward(), i.e. until we compute the gradients.
+
+    Args:
+        is_training: Whether the model is in training mode.
+    """
+
+    def populate_rpu(rpu_config: InferenceRPUConfig):
+        rpu_config.forward.bound_management = BoundManagementType.NONE
+        rpu_config.forward.noise_management = NoiseManagementType.NONE
+        rpu_config.forward.out_noise = 0.0
+        rpu_config.pre_post.input_range.enable = True
+        rpu_config.pre_post.input_range.init_value = 1.0
+        rpu_config.forward.is_perfect = True
+        rpu_config.pre_post.input_range.init_from_data = 0
+        rpu_config.pre_post.input_range.decay = 0.0
+        return rpu_config
+
+    cuda_linear = AnalogLinear(256, 256, bias=False, rpu_config=populate_rpu(InferenceRPUConfig()))
+    torch_linear = AnalogLinear(
+        256, 256, bias=False, rpu_config=populate_rpu(TorchInferenceRPUConfig())
+    )
+    normal_linear = Linear(256, 256, bias=False)
+    if is_training:
+        cuda_linear = cuda_linear.train()
+        torch_linear = torch_linear.train()
+    else:
+        cuda_linear = cuda_linear.eval()
+        torch_linear = torch_linear.eval()
+    torch_linear.set_weights(cuda_linear.get_weights()[0])
+    normal_linear.weight.data = torch_linear.get_weights()[0]
+    inp = randn((3, 256))
+    cuda_out = cuda_linear(inp).mean()
+    cuda_out.backward()
+    torch_out = torch_linear(inp).mean()
+    torch_out.backward()
+    inp.requires_grad = True
+    inp.retain_grad()
+    normal_out = normal_linear(inp).mean()
+    normal_out.backward()
+    normal_grad = zeros_like(torch_linear.analog_module.input_range)
+    normal_grad += clamp((inp >= 1.0) * inp.grad.clone(), min=None, max=0.0).sum()
+    normal_grad -= clamp((inp <= -1.0) * inp.grad.clone(), min=0.0, max=None).sum()
+    torch_ir_grad = torch_linear.analog_module.input_range.grad.clone()
+    cuda_ir_grad = cuda_linear.analog_module.input_range.grad.clone()
+    assert allclose(normal_grad, torch_ir_grad, atol=1e-5)
+    assert allclose(normal_grad, cuda_ir_grad, atol=1e-5)
+    # zero out the ir grads
+    for param in torch_linear.parameters():
+        param.grad = None
+    for param in cuda_linear.parameters():
+        param.grad = None
+    iter_cuda_out = cat([cuda_linear(inp[i]) for i in range(3)]).mean()
+    iter_torch_out = cat([torch_linear(inp[i]) for i in range(3)]).mean()
+    assert allclose(iter_torch_out, iter_cuda_out, atol=1e-5)
+    iter_cuda_out.backward()
+    iter_torch_out.backward()
+    assert allclose(normal_grad, cuda_linear.analog_module.input_range.grad, atol=1e-5)
+    assert allclose(normal_grad, torch_linear.analog_module.input_range.grad, atol=1e-5)
 
 
 @mark.parametrize(
