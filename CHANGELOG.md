@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Bug-fix for data-parallel hardware-aware training for inference (\#569)
 * Fix docker build stubgen (\#581)
 * Fix readthedoc builds (\#586)
+* Fix the backward of the input ranges in the torch tile (\#606)
 
 ### Changed
 
