@@ -37,6 +37,7 @@ void declare_utils(py::module &m_devices, py::module &m_tiles) {
   py::enum_<RPU::WeightModifierType>(m_tiles, "WeightModifierType")
       .value("Copy", RPU::WeightModifierType::Copy)
       .value("Discretize", RPU::WeightModifierType::Discretize)
+      .value("DiscretizePerChannel", RPU::WeightModifierType::DiscretizePerChannel)
       .value("MultNormal", RPU::WeightModifierType::MultNormal)
       .value("AddNormal", RPU::WeightModifierType::AddNormal)
       .value("DiscretizeAddNormal", RPU::WeightModifierType::DiscretizeAddNormal)

@@ -58,17 +58,31 @@ void WeightModifier<T>::apply(
   enable_during_test_ = wmpar.enable_during_test;
 
   T amax = (T)wmpar.assumed_wmax; // assumed max
+  std::vector<T> amax_per_column(d_size_, amax);
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
-    amax = 0.0;
-    PRAGMA_SIMD
-    for (int i = 0; i < size_; i++) {
-      if (wmpar.copy_last_column && (i % x_size_) == x_size_ - 1) {
-        continue;
+    if (wmpar.type == WeightModifierType::DiscretizePerChannel) {
+      PRAGMA_SIMD
+      for (int col = 0; col < d_size_; col++) {
+        T amax_col = 0.0;
+        PRAGMA_SIMD
+        for (int row = 0; row < x_size_; row++) {
+          T a = (T)fabsf(weights[col * x_size_ + row]);
+          amax_col = a > amax_col ? a : amax_col;
+        }
+        amax_per_column[col] = amax_col;
       }
-      T a = (T)fabsf(new_weights[i]);
-      amax = a > amax ? a : amax;
+    } else {
+      amax = 0.0;
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        if (wmpar.copy_last_column && (i % x_size_) == x_size_ - 1) {
+          continue;
+        }
+        T a = (T)fabsf(new_weights[i]);
+        amax = a > amax ? a : amax;
+      }
+      amax = amax > (T)0.0 ? amax : (T)1.0;
     }
-    amax = amax > (T)0.0 ? amax : (T)1.0;
   }
 
   switch (wmpar.type) {
@@ -89,6 +103,20 @@ void WeightModifier<T>::apply(
       for (int i = 0; i < size_; i++) {
         T w = new_weights[i];
         new_weights[i] = amax * getDiscretizedValueRound(w / amax, res, sto_round, rw_rng_);
+      }
+    }
+    break;
+  }
+  case WeightModifierType::DiscretizePerChannel: {
+
+    const T res = (T)wmpar.res;
+    if (res > (T)0.0) {
+      const bool sto_round = wmpar.sto_round;
+      PRAGMA_SIMD
+      for (int i = 0; i < size_; i++) {
+        int col = i / x_size_;
+        T w = new_weights[i];
+        new_weights[i] = amax_per_column[col] * getDiscretizedValueRound(w / amax_per_column[col], res, sto_round, rw_rng_);
       }
     }
     break;

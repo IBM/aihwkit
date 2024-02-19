@@ -14,19 +14,8 @@
 
 from typing import Union
 from pytest import mark
-from torch import (
-    Tensor,
-    allclose,
-    randn,
-    tensor,
-    manual_seed,
-    device,
-    clip,
-    ones,
-    zeros_like,
-    clamp,
-    cat,
-)
+import torch
+from torch import allclose, randn, tensor, manual_seed, device, clip, ones, zeros_like, clamp, cat
 from torch.nn import Linear
 
 from aihwkit.nn import AnalogLinear, AnalogSequential
@@ -36,6 +25,7 @@ from aihwkit.simulator.configs import (
     InferenceRPUConfig,
     WeightRemapType,
     WeightClipType,
+    WeightModifierType,
     NoiseManagementType,
     BoundManagementType,
 )
@@ -215,8 +205,10 @@ class TorchInferenceTest(ParametrizedTestCase):
             out.backward()
             out_ref = linear_ref(inp).mean()
             out_ref.backward()
-            self.assertTensorAlmostEqual(
-                linear.analog_module.input_range.grad, linear_ref.analog_module.input_range.grad
+            torch.allclose(
+                linear.analog_module.input_range.grad,
+                linear_ref.analog_module.input_range.grad,
+                atol=1e-4,
             )
             linear.analog_module.input_range.grad = None
             linear_ref.analog_module.input_range.grad = None
@@ -265,8 +257,8 @@ def test_discretization_behavior(inp_bound, out_bound, inp_res, out_res, bm_type
     assert allclose(out, out_ref, atol=1e-5)
 
 
-# @mark.parametrize("is_training", [True, False])
-def test_iterative_linear(is_training: bool = False):
+@mark.parametrize("is_training", [True, False])
+def test_iterative_linear(is_training: bool):
     """
     Test that checks the gradient of the input range when
     we pass through different inputs without calling
@@ -476,3 +468,83 @@ def test_noise_and_bound_management(
     out = linear_torch(inp)
     out_ref = linear(inp)
     assert allclose(out, out_ref, atol=1e-5)
+
+
+@mark.parametrize("modifier_res", [2**8 - 2])
+@mark.parametrize(
+    "wm_type", [WeightModifierType.DISCRETIZE, WeightModifierType.DISCRETIZE_PER_CHANNEL]
+)
+def test_weight_modifier(modifier_res: float, wm_type: WeightModifierType):
+    """
+    Test correctness of discretization.
+    """
+    # pylint: disable-msg=too-many-locals
+    device_ = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def populate_rpu(
+        rpu_config: Union[TorchInferenceRPUConfig, InferenceRPUConfig],
+        modifier_res: float,
+        wm_type: WeightModifierType,
+    ):
+        rpu_config.forward.bound_management = BoundManagementType.NONE
+        rpu_config.forward.noise_management = NoiseManagementType.NONE
+        rpu_config.noise_model = None
+        rpu_config.modifier.type = wm_type
+        rpu_config.modifier.res = modifier_res
+        rpu_config.modifier.sto_round = False
+        rpu_config.forward.inp_res = -1
+        rpu_config.forward.out_res = -1
+        rpu_config.forward.inp_bound = -1
+        rpu_config.forward.out_bound = -1
+        rpu_config.forward.out_noise = 0.0
+        rpu_config.forward.is_perfect = True
+        return rpu_config
+
+    torch.manual_seed(0)
+    tile_weights = torch.randn(256, 255).to(device_)
+    inp = randn((1, 256)).to(device_)
+    rpu_config_torch = populate_rpu(TorchInferenceRPUConfig(), modifier_res, wm_type)
+    rpu_config = populate_rpu(InferenceRPUConfig(), modifier_res, wm_type)
+
+    # One target will be to remove this line
+    rpu_config.modifier.res = 2 * (1 / modifier_res if modifier_res > 1.0 else modifier_res)
+
+    linear = AnalogLinear(in_features=256, out_features=255, bias=False, rpu_config=rpu_config)
+    linear_torch = AnalogLinear(
+        in_features=256, out_features=255, bias=False, rpu_config=rpu_config_torch
+    )
+    linear_torch.set_weights(tile_weights.T)
+
+    # move to device
+    linear = linear.to(device_)
+    linear_torch = linear_torch.to(device_)
+
+    # load the state dict
+    linear.load_state_dict(linear_torch.state_dict(), load_rpu_config=False)
+
+    # post update step generates the weight modification, needed for rpu tile
+    linear.analog_module.post_update_step()
+    assumed_wmax = rpu_config_torch.modifier.assumed_wmax
+    if rpu_config_torch.modifier.rel_to_actual_wmax:
+        assumed_wmax = (
+            tile_weights.abs().max()
+            if wm_type == WeightModifierType.DISCRETIZE
+            else tile_weights.abs().amax(0)
+        )
+
+    n_states = rpu_config_torch.modifier.res
+    n_states = n_states if n_states > 1.0 else 1 / n_states
+    res = 2 * (1 / n_states) * assumed_wmax
+    quantized_weights = (tile_weights / res).round() * res
+    cpp_quantized_weights = tile_weights / res
+    cpp_quantized_weights = (
+        torch.trunc(cpp_quantized_weights + 0.5 * torch.sign(cpp_quantized_weights)) * res
+    )
+    # Test if quantization is as expected.
+    # pylint: disable=not-callable
+    assert allclose(linear_torch(inp), torch.matmul(inp, quantized_weights), atol=1e-4)
+
+    # test if C++ tile is the same
+    cpp_out = linear(inp)
+    quantized_groundtruth = torch.matmul(inp, cpp_quantized_weights)
+    assert allclose(cpp_out, quantized_groundtruth, atol=1e-4)

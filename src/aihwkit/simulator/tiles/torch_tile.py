@@ -238,9 +238,20 @@ class TorchSimulatorTile(SimulatorTile, Module):
 
         assumed_wmax = modifier.assumed_wmax
         if modifier.rel_to_actual_wmax:
-            assumed_wmax = inp_weight.abs().max()
+            if modifier.type in [WeightModifierType.DISCRETIZE, WeightModifierType.ADD_NORMAL]:
+                assumed_wmax = inp_weight.abs().max()
+            elif modifier.type == WeightModifierType.DISCRETIZE_PER_CHANNEL:
+                assumed_wmax = inp_weight.abs().amax(1).unsqueeze(-1)  # -> [n_cols, 1]
+            else:
+                raise TorchTileConfigError(f"Weight modifier {modifier} not supported")
 
         if modifier.type == WeightModifierType.DISCRETIZE:
+            # - Discretize the weights on the fly and backprob through them
+            out_weight = inp_weight.clone().view(target_shape)
+            out_weight = UniformQuantize.apply(
+                out_weight, modifier.res, assumed_wmax, modifier.sto_round
+            )
+        elif modifier.type == WeightModifierType.DISCRETIZE_PER_CHANNEL:
             # - Discretize the weights on the fly and backprob through them
             out_weight = inp_weight.clone().view(target_shape)
             out_weight = UniformQuantize.apply(

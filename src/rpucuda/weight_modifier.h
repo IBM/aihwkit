@@ -20,6 +20,7 @@ namespace RPU {
 enum class WeightModifierType {
   Copy, // does nothing, just copy (e.g. for delayed weight update), however, could also drop
   Discretize,
+  DiscretizePerChannel,
   MultNormal,
   AddNormal,
   DiscretizeAddNormal,
@@ -62,6 +63,8 @@ template <typename T> struct WeightModifierParameter {
       return "MultNormal";
     case WeightModifierType::Discretize:
       return "Discretize";
+    case WeightModifierType::DiscretizePerChannel:
+      return "DiscretizePerChannel";
     case WeightModifierType::AddNormal:
       return "AddNormal";
     case WeightModifierType::DoReFa:

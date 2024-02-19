@@ -197,7 +197,10 @@ class WeightModifierType(Enum):
     """No weight modifier. Nothing happens to the weight. """
 
     DISCRETIZE = "Discretize"
-    """Quantize the weights."""
+    """Quantize the weights per tensor."""
+
+    DISCRETIZE_PER_CHANNEL = "DiscretizePerChannel"
+    """Quantize the weights per channel."""
 
     MULT_NORMAL = "MultNormal"
     """Multiplicative Gaussian noise."""
