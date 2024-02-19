@@ -64,7 +64,6 @@ void WeightModifier<T>::apply(
       PRAGMA_SIMD
       for (int col = 0; col < d_size_; col++) {
         T amax_col = 0.0;
-        PRAGMA_SIMD
         for (int row = 0; row < x_size_; row++) {
           T a = (T)fabsf(weights[col * x_size_ + row]);
           amax_col = a > amax_col ? a : amax_col;
