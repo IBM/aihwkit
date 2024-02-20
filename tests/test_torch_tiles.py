@@ -501,17 +501,20 @@ def test_weight_modifier(modifier_res: float, wm_type: WeightModifierType):
         return rpu_config
 
     torch.manual_seed(0)
-    tile_weights = torch.randn(256, 255).to(device_)
-    inp = randn((1, 256)).to(device_)
+    inp_dim = 256
+    out_dim = 255
+
+    tile_weights = torch.randn(inp_dim, out_dim).to(device_)
+    inp = randn((1, inp_dim)).to(device_)
     rpu_config_torch = populate_rpu(TorchInferenceRPUConfig(), modifier_res, wm_type)
     rpu_config = populate_rpu(InferenceRPUConfig(), modifier_res, wm_type)
 
     # One target will be to remove this line
     rpu_config.modifier.res = 2 * (1 / modifier_res if modifier_res > 1.0 else modifier_res)
 
-    linear = AnalogLinear(in_features=256, out_features=255, bias=False, rpu_config=rpu_config)
+    linear = AnalogLinear(in_features=inp_dim, out_features=out_dim, bias=False, rpu_config=rpu_config)
     linear_torch = AnalogLinear(
-        in_features=256, out_features=255, bias=False, rpu_config=rpu_config_torch
+        in_features=inp_dim, out_features=out_dim, bias=False, rpu_config=rpu_config_torch
     )
     linear_torch.set_weights(tile_weights.T)
 

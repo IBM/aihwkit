@@ -14,6 +14,19 @@
 #include "cuda_math_util.h"
 #include "weight_modifier_cuda.h"
 
+#define cudaSafeCall(call)                                                     \
+  do {                                                                         \
+    cudaError_t err = call;                                                    \
+    if (cudaSuccess != err) {                                                  \
+      std::cerr << "CUDA error in " << __FILE__ << "(" << __LINE__             \
+                << "): " << cudaGetErrorString(err);                           \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
+template <class T> __host__ __device__ T min_(T a, T b) {
+  return !(b < a) ? a : b;
+};
+
 namespace RPU {
 
 #define RPU_WM_KERNEL_LOOP(STOCH_IF, BODY)                                                         \
@@ -43,6 +56,45 @@ namespace RPU {
     random_states[tid] = local_state;                                                              \
   }
 
+__device__ static float atomicMax(float* address, float val)
+{
+    int* address_as_i = (int*) address;
+    int old = *address_as_i, assumed;
+    do {
+        assumed = old;
+        old = ::atomicCAS(address_as_i, assumed,
+            __float_as_int(::fmaxf(val, __int_as_float(assumed))));
+    } while (assumed != old);
+    return __int_as_float(old);
+}
+
+__device__ static double atomicMax(double* address, double val)
+{
+    unsigned long long* address_as_i = (unsigned long long*) address;
+    unsigned long long old = *address_as_i, assumed;
+    do {
+        assumed = old;
+        old = ::atomicCAS(address_as_i, assumed,
+            __double_as_longlong(::fmaxf(val, __longlong_as_double(assumed))));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+
+template<typename T>
+__global__ void maxAbsAlongDimension(const T *X, int rows, int cols, T *result, int dimension) {
+    int tid = threadIdx.x;
+    int blockId = blockIdx.x;
+    int blockSize = blockDim.x;
+
+    int index = blockId * blockSize + tid;
+
+    if (index < rows * cols){
+        // int target_idx = (dimension == 0 ? index / rows : index % rows); // column major order
+        int target_idx = (dimension == 0 ? index % cols : index / cols); // row major order
+        atomicMax(&result[target_idx], fabs(X[index]));
+    }
+}
+
 template <typename T>
 __global__ void kernelModifyWeightsDiscretize(
     int size_in,
@@ -71,6 +123,37 @@ __global__ void kernelModifyWeightsDiscretize(
       }
 
       new_weights[i] = amax * res * round(value););
+}
+
+template <typename T>
+__global__ void kernelModifyWeightsDiscretizePerChannel(
+    int size_in,
+    int d_size,
+    const bool copy_last_column,
+    T *new_weights,
+    const T *weights,
+    const T res_in, // need to larger than zero!!
+    const bool sto_round,
+    const T assumed_wmax,
+    T *wmax,
+    curandState_t *random_states) {
+  const T res = res_in;
+  const int x_size = size_in / d_size;
+  
+  RPU_WM_KERNEL_LOOP(
+      sto_round,
+
+      T f_amax = (wmax) ? wmax[i % d_size] : assumed_wmax;
+
+      T value = weights[i] / f_amax;
+      value /= res;
+
+      if (stoch_if) {
+        T stoch_value = curand_uniform(&local_state);
+        value += stoch_value - (T)0.5;
+      }
+
+      new_weights[i] = f_amax * res * round(value););
 }
 
 template <typename T>
@@ -425,12 +508,19 @@ void WeightModifierCuda<T>::apply(
 
   T *amax = nullptr;
   if (wmpar.rel_to_actual_wmax && wmpar.type != WeightModifierType::Copy) {
-    if (!amaximizer_) {
-      amaximizer_ = RPU::make_unique<Maximizer<T>>(
-          context_, wmpar.copy_last_column ? (size_ - d_size_) : size_, true);
+    if (wmpar.type == WeightModifierType::DiscretizePerChannel) {
+      cudaMalloc((void**)&amax, d_size_ * sizeof(T));
+      int threadsPerBlock = 256; // what is better for this?
+      int blocksPerGrid = (x_size_ * d_size_ + threadsPerBlock - 1) / threadsPerBlock;
+      maxAbsAlongDimension<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(T)>>>(weights, x_size_, d_size_, amax, 0);
+    } else {
+      if (!amaximizer_) {
+        amaximizer_ = RPU::make_unique<Maximizer<T>>(
+            context_, wmpar.copy_last_column ? (size_ - d_size_) : size_, true);
+      }
+      amaximizer_->compute(weights, 1, false);
+      amax = amaximizer_->getMaxValues();
     }
-    amaximizer_->compute(weights, 1, false);
-    amax = amaximizer_->getMaxValues();
   }
 
   if (wmpar.type != WeightModifierType::Copy) {
@@ -458,6 +548,17 @@ void WeightModifierCuda<T>::apply(
           size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
           wmpar.assumed_wmax, amax,
           wmpar.sto_round ? context_->getRandomStates(nblocks * nthreads) : nullptr);
+      done = true;
+    }
+    break;
+  }
+  case WeightModifierType::DiscretizePerChannel: {
+    if (wmpar.res > (T)0.0) {
+      kernelModifyWeightsDiscretizePerChannel<T><<<nblocks, nthreads, 0, s>>>(
+          size_, d_size_, wmpar.copy_last_column, new_weights, weights, wmpar.res, wmpar.sto_round,
+          wmpar.assumed_wmax, amax,
+          wmpar.sto_round ? context_->getRandomStates(nblocks * nthreads) : nullptr);
+      cudaFree(amax);
       done = true;
     }
     break;
