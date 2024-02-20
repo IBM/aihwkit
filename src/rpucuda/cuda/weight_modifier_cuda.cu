@@ -14,19 +14,6 @@
 #include "cuda_math_util.h"
 #include "weight_modifier_cuda.h"
 
-#define cudaSafeCall(call)                                                     \
-  do {                                                                         \
-    cudaError_t err = call;                                                    \
-    if (cudaSuccess != err) {                                                  \
-      std::cerr << "CUDA error in " << __FILE__ << "(" << __LINE__             \
-                << "): " << cudaGetErrorString(err);                           \
-      exit(EXIT_FAILURE);                                                      \
-    }                                                                          \
-  } while (0)
-template <class T> __host__ __device__ T min_(T a, T b) {
-  return !(b < a) ? a : b;
-};
-
 namespace RPU {
 
 #define RPU_WM_KERNEL_LOOP(STOCH_IF, BODY)                                                         \
