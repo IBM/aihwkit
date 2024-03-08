@@ -114,7 +114,6 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
             raise AnalogBiasConfigError("Analog bias is not supported for the torch tile")
 
         # Hooks for input range grad computation. Will not be saved in state_dict
-        self._input_range_hook = None
         self._tile_input_grad_hook = None
         self._tile_input = None  # type: Tensor
         self._x_input_grad = None  # type: Tensor
