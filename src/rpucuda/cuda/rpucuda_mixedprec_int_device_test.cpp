@@ -34,7 +34,7 @@ public:
     dp.setDevicePar(dp_cs);
   };
 
-  void TearDown(){};
+  void TearDown() {};
 
   int x_size, d_size;
   MixedPrecIntRPUDeviceMetaParameter<num_t> dp;

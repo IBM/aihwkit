@@ -138,9 +138,9 @@ public:
 
   T getLearningRate() const { return learning_rate_; };
 
-  virtual void finishUpdateCalculations(){};
-  virtual void finishAllCalculations(){};
-  virtual void makeUpdateAsync(){};
+  virtual void finishUpdateCalculations() {};
+  virtual void finishAllCalculations() {};
+  virtual void makeUpdateAsync() {};
 
 protected:
   int x_size_ = 0;
@@ -324,8 +324,8 @@ public:
      which usually are drawn during instantiation of the RPU object
      based on parameters defining their probabilty distributions. */
   virtual void getDeviceParameterNames(std::vector<std::string> &names) const { names.clear(); };
-  virtual void getDeviceParameter(std::vector<T *> &data_ptrs){};
-  virtual void setDeviceParameter(const std::vector<T *> &data_ptrs){};
+  virtual void getDeviceParameter(std::vector<T *> &data_ptrs) {};
+  virtual void setDeviceParameter(const std::vector<T *> &data_ptrs) {};
 
   /* These dumps extra state vectors that are not returned by
      getDeviuceParameters or getWeights*/
@@ -333,7 +333,7 @@ public:
   virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);
 
   virtual int getHiddenUpdateIdx() const { return 0; };
-  virtual void setHiddenUpdateIdx(int idx){};
+  virtual void setHiddenUpdateIdx(int idx) {};
 
   /* Decaying the weights once. Alpha can be a factor additionally
      applied to the current decay rate*/
@@ -416,7 +416,7 @@ public:
   virtual void setDeltaWeights(T *dw_extern);
   virtual T *getDeltaWeights() const { return delta_weights_extern_[0]; };
 
-  virtual void setVerbosityLevel(int verbose){};
+  virtual void setVerbosityLevel(int verbose) {};
 
   /* public interfaces for forward/backward/update. Format is
      expected in x-major order. However, the batch dimension comes
@@ -553,7 +553,7 @@ protected:
   virtual T *copyToMatrixBiasBuffer(const T *X_input_without_bias, int m_batch, bool x_trans);
   virtual void
   copyFromMatrixBiasBuffer(T *X_input_without_bias, int m_batch, bool x_trans, T *bias_buffer);
-  virtual void releaseMatrixBiasBuffer(){};
+  virtual void releaseMatrixBiasBuffer() {};
   virtual T *getMatrixBiasBuffer(int m_batch);
   void forwardMatrixBias(
       const T *X_input_without_bias,
