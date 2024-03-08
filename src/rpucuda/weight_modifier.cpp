@@ -200,6 +200,11 @@ void WeightModifier<T>::apply(
     break;
   }
 
+  case WeightModifierType::DropConnect: {
+    // will be done below
+    break;
+  }
+
   default:
     RPU_FATAL("Requested WeightModifierType not implemented in CPU version.");
   }

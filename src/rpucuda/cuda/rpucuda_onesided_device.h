@@ -53,7 +53,7 @@ public:
   };
   OneSidedRPUDeviceCuda<T> *clone() const override { return new OneSidedRPUDeviceCuda<T>(*this); };
 
-  void setHiddenUpdateIdx(int idx) override{};
+  void setHiddenUpdateIdx(int idx) override {};
 
   void runUpdateKernel(
       pwukp_t<T> kpars,

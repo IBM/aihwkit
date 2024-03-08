@@ -41,8 +41,8 @@ public:
       const int d_inc,
       const T learning_rate);
 
-  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix){};
-  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) {};
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {};
 
 protected:
   int x_size_ = 0;

@@ -118,8 +118,8 @@ public:
       T *scales = nullptr,
       T *biases = nullptr);
 
-  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
-  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) {};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {};
 
 private:
   std::vector<T> max_values_;

@@ -589,6 +589,11 @@ void WeightModifierCuda<T>::apply(
     break;
   }
 
+  case WeightModifierType::DropConnect: {
+    // to not get into the default branch. Drop connect is handled below
+    break;
+  }
+
   default:
     RPU_FATAL("Requested WeightModifierType not implemented.");
   }
