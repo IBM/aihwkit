@@ -1,3 +1,17 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+"""Tests for continuing to train."""
+
 from torch import manual_seed, rand, mean, tensor, allclose
 from torch.nn import Linear
 
@@ -14,17 +28,16 @@ def train_linear_regression(reload: bool):
     """Train a linear regression model and return the losses."""
     def generate_toy_data(num_samples=100):
         manual_seed(0)
-        X = 2 * rand(num_samples, 1)
-        y = 4 + 3 * X + rand(num_samples, 1)
-        return X, y
+        x = 2 * rand(num_samples, 1)
+        y = 4 + 3 * x + rand(num_samples, 1)
+        return x, y
 
     def mean_squared_error(y_true, y_pred):
         return mean((y_true - y_pred) ** 2)
 
     manual_seed(0)
-    num_epochs = 1000
     learning_rate = 0.001
-    X, y = generate_toy_data()
+    x, y = generate_toy_data()
     model = Linear(1, 1)
 
     rpu_config = TorchInferenceRPUConfig()
@@ -43,21 +56,20 @@ def train_linear_regression(reload: bool):
     optimizer = AnalogSGD(params=model.parameters(), lr=learning_rate)
 
     losses = []
-    for epoch in range(num_epochs):
-        predictions = model.forward(X)
-        loss = mean_squared_error(y, predictions)
+    for epoch in range(1000):
+        loss = mean_squared_error(y, model.forward(x))
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         losses.append(loss.item())
 
         if epoch == 500 and reload:
-            sd = model.state_dict()
+            state_dict = model.state_dict()
             optimizer_sd = optimizer.state_dict()
             model = Linear(1, 1)
             model = convert_to_analog(model, rpu_config)
             optimizer = AnalogSGD(params=model.parameters(), lr=learning_rate)
-            model.load_state_dict(sd)
+            model.load_state_dict(state_dict)
             optimizer.load_state_dict(optimizer_sd)
     return tensor(losses)
 
