@@ -504,7 +504,7 @@ class SimulatorTileWrapper:
             # see https://github.com/IBM/aihwkit/issues/609
             need_to_recreate = not hasattr(
                 self, "rpu_config"
-            ) or not "TorchInferenceRPUConfig" in str(self.rpu_config.__class__)
+            ) or "TorchInferenceRPUConfig" not in str(self.rpu_config.__class__)
 
             # Check for tile mismatch
             rpu_config = current_dict.pop("rpu_config")
