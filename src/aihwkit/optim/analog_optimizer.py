@@ -116,12 +116,16 @@ class AnalogOptimizerMixin:
                             analog_ctx.analog_input, analog_ctx.analog_grad_output
                         ):
                             analog_tile.update_indexed(
-                                x_input.to(analog_tile.device)
-                                if runtime.offload_input
-                                else x_input,
-                                d_input.to(analog_tile.device)
-                                if runtime.offload_gradient
-                                else d_input,
+                                (
+                                    x_input.to(analog_tile.device)
+                                    if runtime.offload_input
+                                    else x_input
+                                ),
+                                (
+                                    d_input.to(analog_tile.device)
+                                    if runtime.offload_gradient
+                                    else d_input
+                                ),
                             )
                     else:
                         x_input = cat(
