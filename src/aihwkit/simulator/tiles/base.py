@@ -283,9 +283,8 @@ class SimulatorTileWrapper:
         bias: whether to add a bias column to the tile.
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
-        shared_weights: optional shared weights tensor memory that
-            should be used.
         handle_output_bound: whether the bound clamp gradient should be inserted
+        ignore_analog_state: whether to ignore the analog state when __getstate__ is called
     """
 
     def __init__(
@@ -501,6 +500,12 @@ class SimulatorTileWrapper:
             if "non_blocking" not in current_dict:
                 current_dict["non_blocking"] = False
 
+            # do we need to re-create the tile? fix for issue #609
+            # see https://github.com/IBM/aihwkit/issues/609
+            need_to_recreate = not hasattr(
+                self, "rpu_config"
+            ) or not "TorchInferenceRPUConfig" in str(self.rpu_config.__class__)
+
             # Check for tile mismatch
             rpu_config = current_dict.pop("rpu_config")
             if hasattr(self, "rpu_config"):
@@ -526,7 +531,11 @@ class SimulatorTileWrapper:
             d_size = self.out_size
 
             # Recreate the tile.
-            self.tile = self._create_simulator_tile(x_size, d_size, self.rpu_config)
+            self.tile = (
+                self._create_simulator_tile(x_size, d_size, self.rpu_config)
+                if need_to_recreate
+                else self.tile
+            )
             names = self.tile.get_hidden_parameter_names()
             if len(hidden_parameters_names) > 0 and names != hidden_parameters_names:
                 # Check whether names match
