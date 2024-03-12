@@ -224,8 +224,8 @@ class TileModule(Module, TileModuleBase):
         if rpu_config is not None:
             self.replace_with(rpu_config)
 
-        device = kwargs.get("device")
-        dtype = kwargs.get("dtype")
+        device = kwargs.pop("device", None)
+        dtype = kwargs.pop("dtype", None)
         for arg in args:
             if isinstance(arg, bool):
                 continue
@@ -244,7 +244,6 @@ class TileModule(Module, TileModuleBase):
             self._apply_without_context(lambda t: t.to(*new_args, **kwargs))
 
         if dtype is not None:
-            # for the torch tile. This renews the hook with the correct dtype
             scales = self.get_scales()
             if scales is not None:
                 self.set_scales(scales)

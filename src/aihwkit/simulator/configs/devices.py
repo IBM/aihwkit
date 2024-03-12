@@ -710,9 +710,9 @@ class SoftBoundsReferenceDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Optional[Union[Type, str]]] = (
-        "SoftBoundsReferenceResistiveDeviceParameter"
-    )
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "SoftBoundsReferenceResistiveDeviceParameter"
 
     mult_noise: bool = False
     """Whether to use multiplicative noise instead of additive cycle-to-cycle
@@ -1090,9 +1090,9 @@ class PowStepReferenceDevice(PulsedDevice):
 
     """
 
-    bindings_class: ClassVar[Optional[Union[Type, str]]] = (
-        "PowStepReferenceResistiveDeviceParameter"
-    )
+    bindings_class: ClassVar[
+        Optional[Union[Type, str]]
+    ] = "PowStepReferenceResistiveDeviceParameter"
 
     pow_gamma: float = 1.0
     r"""The value of :math:`\gamma` as explained above.
