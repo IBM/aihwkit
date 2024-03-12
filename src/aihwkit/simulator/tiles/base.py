@@ -283,6 +283,8 @@ class SimulatorTileWrapper:
         bias: whether to add a bias column to the tile.
         in_trans: Whether to assume an transposed input (batch first)
         out_trans: Whether to assume an transposed output (batch first)
+        shared_weights: optional shared weights tensor memory that
+            should be used.
         handle_output_bound: whether the bound clamp gradient should be inserted
         ignore_analog_state: whether to ignore the analog state when __getstate__ is called
     """
@@ -356,6 +358,21 @@ class SimulatorTileWrapper:
             a simulator tile based on the specified configuration.
         """
         raise NotImplementedError
+
+    def _recreate_simulator_tile(
+        self, x_size: int, d_size: int, rpu_config: "RPUConfigGeneric"
+    ) -> Any:  # just use Any instead of Union["SimulatorTile", tiles.AnalogTile, ..]
+        """Re-create a simulator tile in __setstate__.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+        return self._create_simulator_tile(x_size, d_size, rpu_config)
 
     def get_tensor_view(self, ndim: int, dim: Optional[int] = None) -> tuple:
         """Return the tensor view for ndim vector at dim.
@@ -500,12 +517,6 @@ class SimulatorTileWrapper:
             if "non_blocking" not in current_dict:
                 current_dict["non_blocking"] = False
 
-            # do we need to re-create the tile? fix for issue #609
-            # see https://github.com/IBM/aihwkit/issues/609
-            need_to_recreate = not hasattr(
-                self, "rpu_config"
-            ) or "TorchInferenceRPUConfig" not in str(self.rpu_config.__class__)
-
             # Check for tile mismatch
             rpu_config = current_dict.pop("rpu_config")
             if hasattr(self, "rpu_config"):
@@ -531,11 +542,8 @@ class SimulatorTileWrapper:
             d_size = self.out_size
 
             # Recreate the tile.
-            self.tile = (
-                self._create_simulator_tile(x_size, d_size, self.rpu_config)
-                if need_to_recreate
-                else self.tile
-            )
+            self.tile = self._recreate_simulator_tile(x_size, d_size, self.rpu_config)
+
             names = self.tile.get_hidden_parameter_names()
             if len(hidden_parameters_names) > 0 and names != hidden_parameters_names:
                 # Check whether names match

@@ -17,15 +17,13 @@ from torch.nn import Linear
 
 from aihwkit.optim.analog_optimizer import AnalogSGD
 from aihwkit.simulator.configs import TorchInferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    BoundManagementType,
-    NoiseManagementType,
-)
+from aihwkit.simulator.configs.utils import BoundManagementType, NoiseManagementType
 from aihwkit.nn.conversion import convert_to_analog
 
 
 def train_linear_regression(reload: bool):
     """Train a linear regression model and return the losses."""
+
     def generate_toy_data(num_samples=100):
         manual_seed(0)
         x = 2 * rand(num_samples, 1)
