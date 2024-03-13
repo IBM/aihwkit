@@ -49,7 +49,7 @@ public:
       T *d_buffer) = 0;
   virtual bool hasDirectUpdate() const = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
-  virtual void setHiddenUpdateIdx(int idx){};
+  virtual void setHiddenUpdateIdx(int idx) {};
   virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) = 0;
   virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) = 0;
   virtual void populateFrom(const AbstractRPUDevice<T> &rpu_device) = 0;

@@ -76,8 +76,8 @@ public:
   /* in-place clipping of weights */
   void apply(T *weights, const WeightClipParameter &wclpar);
 
-  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
-  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) {};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {};
 
 private:
   void clip(T *weights, T clip_value);

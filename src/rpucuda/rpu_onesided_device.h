@@ -109,7 +109,7 @@ public:
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
 
-  void setHiddenUpdateIdx(int idx) override{};
+  void setHiddenUpdateIdx(int idx) override {};
 
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
