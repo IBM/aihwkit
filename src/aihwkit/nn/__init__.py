@@ -17,7 +17,7 @@
 from aihwkit.nn.modules.container import AnalogSequential, AnalogWrapper
 from aihwkit.nn.modules.conv import AnalogConv1d, AnalogConv2d, AnalogConv3d
 from aihwkit.nn.modules.linear import AnalogLinear
-from aihwkit.nn.modules.linear import AnalogLinearBitSlicing
+from aihwkit.nn.modules.linear_sliced import AnalogLinearBitSlicing
 from aihwkit.nn.modules.rnn.rnn import AnalogRNN
 from aihwkit.nn.modules.rnn.cells import (
     AnalogGRUCell,
