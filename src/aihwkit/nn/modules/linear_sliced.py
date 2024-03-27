@@ -11,7 +11,7 @@
 # that they have been altered from the originals.
 
 """Analog layers."""
-from typing import Optional, Type, List
+from typing import Any, Optional, Type, List
 
 from torch import Tensor
 from torch.nn import Linear, ParameterList
@@ -20,6 +20,7 @@ from aihwkit.exceptions import ModuleError
 from aihwkit.nn.modules.base import AnalogLayerBase
 from aihwkit.simulator.parameters.base import RPUConfigBase
 from aihwkit.nn import AnalogLinear
+
 
 class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
     """Linear layer that implements bit-slicing in an analog tile.
@@ -62,7 +63,7 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
         evenly_sliced: bool = True,
         rpu_config: Optional[RPUConfigBase] = None,
         tile_module_class: Optional[Type] = None,
-        significance_factors: Optional[List[float]] = None,
+        significance_factors: Optional[List[int]] = None,
     ):
         # Call super()
         Linear.__init__(self, in_features, out_features, bias=bias)
@@ -84,17 +85,15 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
             if evenly_sliced is True:
                 self.significance_factors = [1] * number_slices
             else:
-                #we increase the significance by 2 for every slice
+                # We increase the significance by 2 for every slice
                 self.significance_factors = [1]
                 for _ in range(1, number_slices):
                     self.significance_factors.append(self.significance_factors[-1]*2)
         else:
             if len(significance_factors) != number_slices:
-                raise ModuleError(f"Length of factors must equal number of slices exactly")
+                raise ModuleError("Length of factors must equal number of slices exactly")
             self.significance_factors = significance_factors
-        
 
-        #self.analog_module = tile_module_class(out_features, in_features, rpu_config, bias)
         self.analog_slices = ParameterList(AnalogLinear(in_features, out_features, bias, rpu_config, tile_module_class) for i in range(number_slices))
         # Unregister weight/bias as a parameter.
         self.unregister_parameter("weight")
@@ -145,7 +144,8 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
                 :class:`~aihwkit.simulator.tiles.array.TileModuleArray`
 
         Returns:
-            an AnalogLinearBitSlicing layer based on the digital Linear ``module``. Defaults to evenly sliced weights, with 8 slices.
+            an AnalogLinearBitSlicing layer based on the digital Linear ``module``. 
+            Defaults to evenly sliced weights, with 8 slices.
         """
         analog_layer = cls(
             module.in_features,
@@ -157,9 +157,9 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
             tile_module_class,
         )
 
-        #slice total weight over number of slices and distribute over each slice part of the weight evenly
+        # slice total weight over number of slices and distribute over each slice part of the weight evenly
         for weight_slice in analog_layer.analog_slices:
-            weight_slice.set_weights(module.weight/len(analog_layer.analog_slices), module.bias/len(analog_layer.analog_slices))
+            weight_slice.set_weights(module.weight / len(analog_layer.analog_slices), module.bias / len(analog_layer.analog_slices))
 
         return analog_layer.to(module.weight.device)
 
@@ -177,14 +177,14 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
             an torch Linear layer with the same dimension and weights
             as the analog linear layer.
         """
-        #to get the correct tensor shapes
-        weight, bias = module.analog_slices.get_weights()[0], module.analog_slices.get_weights()[1] 
+        # to get the correct tensor shapes
+        weight, bias = module.analog_slices.get_weights()[0], module.analog_slices.get_weights()[1]
 
-        #loop over slices, multiply factors with weights, add and give as weight/bias
+        # loop over slices, multiply factors with weights, add and give as weight/bias
         for idx, weight_slice in enumerate(module.analog_slices):
             slice_weight, slice_bias = weight_slice.get_weights(realistic=realistic)
-            weight += slice_weight*module.significance_factors[idx]
-            bias += slice_bias*module.significance_factors[idx]
+            weight += slice_weight * module.significance_factors[idx]
+            bias += slice_bias * module.significance_factors[idx]
 
         digital_layer = Linear(module.in_features, module.out_features, bias is not None)
         digital_layer.weight.data = weight
