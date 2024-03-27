@@ -94,7 +94,9 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
                 raise ModuleError("Length of factors must equal number of slices exactly")
             self.significance_factors = significance_factors
 
-        self.analog_slices = ParameterList(AnalogLinear(in_features, out_features, bias, rpu_config, tile_module_class) for i in range(number_slices))
+        self.analog_slices = ParameterList(AnalogLinear(in_features, out_features, 
+                                                        bias, rpu_config, 
+                                                        tile_module_class) for i in range(number_slices))
         # Unregister weight/bias as a parameter.
         self.unregister_parameter("weight")
         if bias:
@@ -157,9 +159,10 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
             tile_module_class,
         )
 
-        # slice total weight over number of slices and distribute over each slice part of the weight evenly
+        # slice total weight over number of slices, then distribute evenly
         for weight_slice in analog_layer.analog_slices:
-            weight_slice.set_weights(module.weight / len(analog_layer.analog_slices), module.bias / len(analog_layer.analog_slices))
+            weight_slice.set_weights(module.weight / len(analog_layer.analog_slices), 
+                                    module.bias / len(analog_layer.analog_slices))
 
         return analog_layer.to(module.weight.device)
 
