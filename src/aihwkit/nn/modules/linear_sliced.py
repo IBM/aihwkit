@@ -83,13 +83,11 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
         if significance_factors is None:
             if evenly_sliced is True:
                 self.significance_factors = [1] * number_slices
-                print(self.significance_factors)
             else:
                 #we increase the significance by 2 for every slice
                 self.significance_factors = [1]
                 for _ in range(1, number_slices):
                     self.significance_factors.append(self.significance_factors[-1]*2)
-                    print(self.significance_factors)
         else:
             if len(significance_factors) != number_slices:
                 raise ModuleError(f"Length of factors must equal number of slices exactly")
@@ -113,20 +111,21 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
     def reset_parameters(self) -> None:
         """Reset the parameters (weight and bias)."""
         if hasattr(self, "analog_module"):
-            bias = self.bias
-            self.weight, self.bias = self.get_weights()  # type: ignore
-            super().reset_parameters()
-            self.set_weights(self.weight, self.bias)  # type: ignore
-            self.weight, self.bias = None, bias
+            for weight_slice in self.analog_slices:
+                bias = weight_slice.bias
+                weight_slice.weight, weight_slice.bias = weight_slice.get_weights()  # type: ignore
+                weight_slice.super().reset_parameters()
+                weight_slice.set_weights(weight_slice.weight, weight_slice.bias)  # type: ignore
+                weight_slice.weight, weight_slice.bias = None, bias
 
     def forward(self, x_input: Tensor) -> Tensor:
         """Compute the forward pass."""
         # pylint: disable=arguments-differ, arguments-renamed
-        self.forward_output = 0 #to initialize the forward_output for the loop
+        forward_output = 0 #to initialize the forward_output for the loop
         for idx, weight_slice in enumerate(self.analog_slices):
-            self.forward_output += (weight_slice(x_input) * self.significance_factors[idx]) 
+            forward_output += (weight_slice(x_input) * self.significance_factors[idx]) 
 
-        return self.forward_output  # type: ignore
+        return forward_output  # type: ignore
 
     @classmethod
     def from_digital(
@@ -159,8 +158,8 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
         )
 
         #slice total weight over number of slices and distribute over each slice part of the weight evenly
-        for idx, weight_slice in enumerate(analog_layer.analog_slices):
-            analog_layer.analog_slices[idx].set_weights(module.weight/len(analog_layer.analog_slices), module.bias/len(analog_layer.analog_slices))
+        for weight_slice in analog_layer.analog_slices:
+            weight_slice.set_weights(module.weight/len(analog_layer.analog_slices), module.bias/len(analog_layer.analog_slices))
 
         return analog_layer.to(module.weight.device)
 
@@ -178,16 +177,18 @@ class AnalogLinearBitSlicing(AnalogLayerBase, Linear):
             an torch Linear layer with the same dimension and weights
             as the analog linear layer.
         """
-        weight, bias = 0, 0
+        #to get the correct tensor shapes
+        weight, bias = module.analog_slices.get_weights()[0], module.analog_slices.get_weights()[1] 
 
-        #loop over slices, multiply factors with weights, add and give as weight/bias -- recombining back to original weight
-        for idx, weight_slice in enumerate(self.analog_slices):
+        #loop over slices, multiply factors with weights, add and give as weight/bias
+        for idx, weight_slice in enumerate(module.analog_slices):
             slice_weight, slice_bias = weight_slice.get_weights(realistic=realistic)
-            weight += slice_weight*self.significance_factors[idx]
+            weight += slice_weight*module.significance_factors[idx]
+            bias += slice_bias*module.significance_factors[idx]
 
         digital_layer = Linear(module.in_features, module.out_features, bias is not None)
-        digital_layer.weight.data = weight.data
+        digital_layer.weight.data = weight
         if bias is not None:
-            digital_layer.bias.data = bias.data
+            digital_layer.bias.data = bias
         analog_tile = next(module.analog_tiles())
         return digital_layer.to(device=analog_tile.device, dtype=analog_tile.get_dtype())
