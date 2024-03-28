@@ -36,7 +36,8 @@ job_compile_common: &job_compile_common
   install:
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-    - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
+    - $PYTHON_EXECUTABLE -m pip install travis-wait-improved
+    - travis-wait-improved --timeout 60m $PYTHON_EXECUTABLE -m pip install -r requirements.txt
     - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
     - $PYTHON_EXECUTABLE -m pip install -r requirements-examples.txt
     # Install the package in editable mode.
