@@ -42,7 +42,7 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
 
         To account for short-term read noise (about 1\%) one should
         additional set the ``forward.w_noise`` parameter to about 0.01
-        (with w_noise_type=WeightNoiseType.ADD_NORMAL)
+        (with w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
 
     Args:
 
