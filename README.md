@@ -221,9 +221,7 @@ at the ``aihwkit@us.ibm.com`` email address.
 
 ## License
 
-This project is licensed under [Apache License 2.0].
 
-[Apache License 2.0]: LICENSE.txt
 [Python package index]: https://pypi.org/project/aihwkit
 [`PyTorch`]: https://pytorch.org/
 
