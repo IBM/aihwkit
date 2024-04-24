@@ -134,6 +134,21 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
         """
         return rpu_config.simulator_tile_class(x_size=x_size, d_size=d_size, rpu_config=rpu_config)
 
+    def _recreate_simulator_tile(  # type: ignore[override]
+        self, x_size: int, d_size: int, rpu_config: "TorchInferenceRPUConfig"
+    ) -> Any:  # just use Any instead of Union["SimulatorTile", tiles.AnalogTile, ..]
+        """Re-create a simulator tile in __setstate__.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+        return self.tile
+
     def init_input_processing(self) -> bool:
         """Helper function to initialize the input processing.
 
