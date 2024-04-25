@@ -198,7 +198,7 @@ class TorchSimulatorTile(SimulatorTile, Module):
         else:
             noisy_weights = self.weight
 
-        return AnalogMVM.matmul(
+        return self._analog_mvm.matmul(
             noisy_weights,
             x_input,
             self._f_io,
