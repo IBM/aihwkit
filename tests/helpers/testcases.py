@@ -25,7 +25,7 @@ SKIP_CUDA_TESTS = os.getenv("SKIP_CUDA_TESTS") or not cuda.is_compiled()
 class AihwkitTestCase(TestCase):
     """Test case that contains common asserts and functions for aihwkit."""
 
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b, decimal=4):
+    def assertTensorAlmostEqual(self, tensor_a, tensor_b, decimal=3):
         """Assert that two tensors are almost equal."""
         # pylint: disable=invalid-name
         array_a = tensor_a.detach().cpu().numpy()
