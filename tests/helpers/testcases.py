@@ -32,7 +32,7 @@ class AihwkitTestCase(TestCase):
         array_b = tensor_b.detach().cpu().numpy()
         assert_array_almost_equal(array_a, array_b, decimal=decimal)
 
-    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b, decimal=4):
+    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b, decimal=3):
         """Assert that two tensors are not equal."""
         # pylint: disable=invalid-name
         assert_raises(
