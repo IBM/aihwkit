@@ -1,7 +1,5 @@
 # type: ignore
-# pylint: disable=missing-module-docstring
-# pylint: disable=missing-class-docstring
-# pylint: disable=missing-function-docstring
+# pylint: disable-all
 # -*- coding: utf-8 -*-
 
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
