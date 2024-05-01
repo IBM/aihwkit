@@ -25,26 +25,17 @@ Input and output bounds, in addition to output scales are not defined.
 """
 # pylint: disable=invalid-name
 
+import os
 import torch
 import torch.nn.functional as F
+import torchvision
+from torchvision.datasets.utils import download_url
 from aihwkit.nn.conversion import convert_to_analog
-from aihwkit.simulator.presets.utils import IOParameters
 from aihwkit.simulator.presets import StandardHWATrainingPreset
-from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
-from aihwkit.inference.compensation.drift import GlobalDriftCompensation
-from aihwkit.simulator.configs import InferenceRPUConfig
-from aihwkit.simulator.configs.utils import (
-    WeightModifierType,
-    BoundManagementType,
-    WeightClipType,
-    NoiseManagementType,
-    WeightRemapType,
-)
 from aihwkit.inference.calibration import (
     calibrate_input_ranges,
     InputRangeCalibrationType,
 )
-import torchvision
 
 
 class LambdaLayer(torch.nn.Module):
@@ -198,7 +189,7 @@ def get_test_loader(batch_size=128):
         ]
     )
     testset = torchvision.datasets.CIFAR10(
-        root="~/data/cifar10", train=False, download=True, transform=transform_test
+        root="data/cifar10", train=False, download=True, transform=transform_test
     )
     test_loader = torch.utils.data.DataLoader(
         testset,
@@ -208,42 +199,6 @@ def get_test_loader(batch_size=128):
         pin_memory=True,
     )
     return test_loader
-
-
-def gen_rpu_config():
-    rpu_config = InferenceRPUConfig()
-    rpu_config.modifier.std_dev = 0.06
-    rpu_config.modifier.type = WeightModifierType.ADD_NORMAL
-
-    rpu_config.mapping.digital_bias = True
-    rpu_config.mapping.weight_scaling_omega = 1.0
-    rpu_config.mapping.weight_scaling_columnwise = False
-    rpu_config.mapping.out_scaling_columnwise = False
-    rpu_config.remap.type = WeightRemapType.LAYERWISE_SYMMETRIC
-
-    rpu_config.clip.type = WeightClipType.LAYER_GAUSSIAN
-    rpu_config.clip.sigma = 2.0
-
-    rpu_config.forward = IOParameters()
-    rpu_config.forward.is_perfect = False
-    rpu_config.forward.out_noise = 0.0
-    rpu_config.forward.inp_bound = 1.0
-    rpu_config.forward.inp_res = 1 / (2**8 - 2)
-    rpu_config.forward.out_bound = 12
-    rpu_config.forward.out_res = 1 / (2**8 - 2)
-    rpu_config.forward.bound_management = BoundManagementType.NONE
-    rpu_config.forward.noise_management = NoiseManagementType.NONE
-
-    rpu_config.pre_post.input_range.enable = True
-    rpu_config.pre_post.input_range.decay = 0.01
-    rpu_config.pre_post.input_range.init_from_data = 50
-    rpu_config.pre_post.input_range.init_std_alpha = 3.0
-    rpu_config.pre_post.input_range.input_min_percentage = 0.995
-    rpu_config.pre_post.input_range.manage_output_clipping = False
-
-    rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
-    rpu_config.drift_compensation = GlobalDriftCompensation()
-    return rpu_config
 
 
 class Sampler:
@@ -284,14 +239,18 @@ def evaluate_model(model, test_loader, device):
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = resnet9s().to(device)
-    state_dict = torch.load("resnet9s.th", device)  # TODO: Get this from the cloud.
+    download_url(
+        "https://aihwkit-tutorial.s3.us-east.cloud-object-storage.appdomain.cloud/resnet9s.th",
+        os.getcwd(),
+    )
+    state_dict = torch.load("resnet9s.th", device)
     # The state dict of the model with hardware-aware trained weights is stored in the
     # model_state_dict key of the external checkpoint.
     model.load_state_dict(state_dict["model_state_dict"], strict=True)
-    model = convert_to_analog(model, gen_rpu_config())
+    model = convert_to_analog(model, StandardHWATrainingPreset())
     model.eval()
     test_loader = get_test_loader()
-    t_inferences = [0.0, 3600.0, 86400.0]  # Infernece times to perform infernece.
+    t_inferences = [0.0, 3600.0, 86400.0]  # Times to perform infernece.
     n_reps = 5  # Number of inference repetitions.
     # Calibrate input ranges
     print("Performing input range calibration")
