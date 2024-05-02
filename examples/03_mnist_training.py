@@ -51,7 +51,7 @@ HIDDEN_SIZES = [256, 128]
 OUTPUT_SIZE = 10
 
 # Training parameters.
-EPOCHS = 30
+EPOCHS = 50
 BATCH_SIZE = 64
 
 
@@ -118,7 +118,7 @@ def create_sgd_optimizer(model):
     Returns:
         nn.Module: optimizer
     """
-    optimizer = AnalogSGD(model.parameters(), lr=0.05)
+    optimizer = AnalogSGD(model.parameters(), lr=0.2)
     optimizer.regroup_param_groups(model)
 
     return optimizer
