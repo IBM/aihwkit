@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -565,7 +565,9 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
 
         ir_params = self.rpu_config.pre_post.input_range  # type: InputRangeParameter
         if ir_params.enable:
-            self.input_range_update_idx = 0
+            self.input_range_update_idx = Parameter(
+                full((1,), 0.0, device=self.device, requires_grad=False)
+            )
             if ir_params.learn_input_range:
                 self.input_range = Parameter(
                     full(
@@ -754,7 +756,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
                     self.input_range.data = (
                         self.input_range.data * idx + ir_params.init_std_alpha * std
                     ) / (idx + 1)
-                    self.input_range_update_idx += 1
+                    self.input_range_update_idx.data += 1
 
                 self.input_range.data = self.input_range.data.abs()
 

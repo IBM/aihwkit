@@ -1,6 +1,6 @@
 
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -197,6 +197,11 @@ void WeightModifier<T>::apply(
       }
     }
 
+    break;
+  }
+
+  case WeightModifierType::DropConnect: {
+    // will be done below
     break;
   }
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -17,7 +17,8 @@ from typing import List
 from dataclasses import dataclass, field
 
 from aihwkit.simulator.configs.compounds import OneSidedUnitCell
-from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.presets.devices import PCMPresetDevice
 from aihwkit.simulator.presets.utils import PresetIOParameters, PresetUpdateParameters
 

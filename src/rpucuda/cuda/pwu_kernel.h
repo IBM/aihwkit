@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -103,7 +103,7 @@ getIdxToLoad<false>(int batch_index, int count_index, int sz, int m_batch, int c
                                                                                                    \
     uint32_t x_and_d = x & d;                                                                      \
     n = __popc(x_and_d);                                                                           \
-    n -= ((x_and_d)&1);                                                                            \
+    n -= ((x_and_d) & 1);                                                                          \
                                                                                                    \
     if (nK32 > 1) {                                                                                \
       int i_d = 0;                                                                                 \
@@ -451,8 +451,8 @@ __global__ void kernelUpdateWFunctor(
       } sum_n = 0;                                                                                 \
       last_negative = 0;                                                                           \
                                                                                                    \
-      int pos_n = __popc((~negative) & n); int neg_n = __popc((negative)&n); T dw_pos = (T)pos_n;  \
-      T dw_neg = (T)neg_n;                                                                         \
+      int pos_n = __popc((~negative) & n); int neg_n = __popc((negative) & n);                     \
+      T dw_pos = (T)pos_n; T dw_neg = (T)neg_n;                                                    \
                                                                                                    \
       if (noise_std_dw > (T)0.0) {                                                                 \
         if (pos_n > 0) {                                                                           \
@@ -937,7 +937,7 @@ __global__ void kernelUpdateWBatchSharedSum(
       }
 
     } // within range
-  }   // batch strides
+  } // batch strides
   if (within_range) {
     weights[idx] = w;
   }
@@ -1010,7 +1010,7 @@ __global__ void kernelUpdateWBatchSharedSumBoundCheck(
       }
 
     } // within range
-  }   // batch strides
+  } // batch strides
 
   if (within_range) {
     weights[idx] = w;
@@ -1111,7 +1111,7 @@ __global__ void kernelUpdateWBatchSharedFunctor(
       } // batch
 
     } // within range
-  }   // batch strides
+  } // batch strides
 
   if (within_range) {
     weights[idx] = w;
@@ -1505,7 +1505,7 @@ __global__ void kernelUpdateWBatchSharedWeightOutputFunctor(
       } // batch
 
     } // within range
-  }   // batch strides
+  } // batch strides
 
   if (within_range) {
     weights[idx] = w;

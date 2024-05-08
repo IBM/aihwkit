@@ -23,12 +23,14 @@ API Reference
    aihwkit.experiments.experiments.inferencing
    aihwkit.experiments.experiments.training
    aihwkit.experiments.runners.base
-   aihwkit.experiments.runners.cloud   
+   aihwkit.experiments.runners.cloud
    aihwkit.experiments.runners.i_cloud
    aihwkit.experiments.runners.i_local
    aihwkit.experiments.runners.local
    aihwkit.experiments.runners.i_metrics
    aihwkit.experiments.runners.metrics
+   aihwkit.extension
+   aihwkit.extension.functions
    aihwkit.inference
    aihwkit.inference.calibration
    aihwkit.inference.calibration.calibration
@@ -45,10 +47,17 @@ API Reference
    aihwkit.inference.noise.fusion
    aihwkit.inference.noise.pcm
    aihwkit.inference.noise.reram
+   aihwkit.linalg
+   aihwkit.linalg.matrix
    aihwkit.simulator
    aihwkit.simulator.configs
    aihwkit.simulator.presets
+   aihwkit.simulator.rpu_base
    aihwkit.simulator.tiles
+   aihwkit.simulator.parameters.io
+   aihwkit.simulator.tiles.analog_mvm
+   aihwkit.simulator.tiles.analog_mvm_irdrop_t
+   aihwkit.simulator.tiles.torch_tile_irdrop_t
    aihwkit.nn
    aihwkit.nn.conversion
    aihwkit.nn.modules
@@ -74,10 +83,3 @@ API Reference
    aihwkit.utils.export
    aihwkit.version
 
-
-.. only:: env_local
-
-   .. autosummary::
-        :recursive:
-
-        aihwkit.simulator.rpu_base

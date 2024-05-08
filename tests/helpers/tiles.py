@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -42,6 +42,7 @@ from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
     InferenceRPUConfig,
     TorchInferenceRPUConfig,
+    TorchInferenceRPUConfigIRDropT,
     SingleRPUConfig,
     UnitCellRPUConfig,
     DigitalRankUpdateRPUConfig,
@@ -471,6 +472,23 @@ class TorchInference:
 
     def get_rpu_config(self):
         rpu_config = TorchInferenceRPUConfig()
+        rpu_config.forward.is_perfect = True
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
+
+
+class TorchInferenceIRDropT:
+    """Inference torch tile with time-varying IR Drop."""
+
+    simulator_tile_class = TorchInferenceRPUConfigIRDropT.simulator_tile_class
+    first_hidden_field = None
+    use_cuda = False
+
+    def get_rpu_config(self):
+        rpu_config = TorchInferenceRPUConfigIRDropT()
         rpu_config.forward.is_perfect = True
         return rpu_config
 
@@ -913,6 +931,23 @@ class TorchInferenceCuda:
 
     def get_rpu_config(self):
         return TorchInferenceRPUConfig()
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs).cuda()
+
+
+class TorchInferenceIRDropTCuda:
+    """Inference torch tile with time-varying IR Drop with CUDA."""
+
+    simulator_tile_class = TorchInferenceRPUConfigIRDropT.simulator_tile_class
+    first_hidden_field = None
+    use_cuda = True
+
+    def get_rpu_config(self):
+        rpu_config = TorchInferenceRPUConfigIRDropT()
+        rpu_config.forward.is_perfect = True
+        return rpu_config
 
     def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
         rpu_config = rpu_config or self.get_rpu_config()

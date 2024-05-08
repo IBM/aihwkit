@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -49,7 +49,7 @@ public:
       T *d_buffer) = 0;
   virtual bool hasDirectUpdate() const = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
-  virtual void setHiddenUpdateIdx(int idx){};
+  virtual void setHiddenUpdateIdx(int idx) {};
   virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) = 0;
   virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) = 0;
   virtual void populateFrom(const AbstractRPUDevice<T> &rpu_device) = 0;

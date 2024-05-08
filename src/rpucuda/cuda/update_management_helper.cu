@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -363,7 +363,7 @@ int debugKernelTranslateTransFormatToBatchOrder64Format(
       for (int i = 0; i < k; i++) { // k is smaller than 32 because nK32==1
         kagg_t current_cK = Kc + i;
         kagg_t iB = (current_cK) >> 5;
-        int ibit = (current_cK)&0x1f;
+        int ibit = (current_cK) & 0x1f;
         if ((c & (one << i)) > 0) {
           counts_out_ref[iB + idx * nBref] |= ((uint64_t)1) << ibit;
         }

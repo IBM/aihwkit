@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from .helpers import _PrintableMixin
-from .training import IOParameters
+from .io import IOParameters
 from .base import RPUConfigBase
 from .enums import BoundManagementType, NoiseManagementType
 

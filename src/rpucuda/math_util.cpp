@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -73,14 +73,14 @@ void gemm<half_t>(
     const int ldb,
     const half_t beta,
     half_t *C,
-    const int ldc){
-    // TODO: DOES HGEMM JUST NOT work for some reasons? MKL FP16 different from half_t ?
-    // RPU_INFO("A: " << (float)A[0] << ", B[0] " << B[0] << ", C[0] " << C[0]);
-    // cblas_hgemm(
-    //     Order, TransA, TransB, M, N, K, alpha, (const unsigned short *) A, lda,
-    //     (const unsigned short *) B, ldb, beta, (unsigned short *) C, ldc);
+    const int ldc) {
+  // TODO: DOES HGEMM JUST NOT work for some reasons? MKL FP16 different from half_t ?
+  // RPU_INFO("A: " << (float)A[0] << ", B[0] " << B[0] << ", C[0] " << C[0]);
+  // cblas_hgemm(
+  //     Order, TransA, TransB, M, N, K, alpha, (const unsigned short *) A, lda,
+  //     (const unsigned short *) B, ldb, beta, (unsigned short *) C, ldc);
 
-    // just use sgemm for now (quite slow to copy)
+  // just use sgemm for now (quite slow to copy)
 };
 #endif
 

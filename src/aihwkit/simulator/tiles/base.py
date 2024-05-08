@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -286,6 +286,7 @@ class SimulatorTileWrapper:
         shared_weights: optional shared weights tensor memory that
             should be used.
         handle_output_bound: whether the bound clamp gradient should be inserted
+        ignore_analog_state: whether to ignore the analog state when __getstate__ is called
     """
 
     def __init__(
@@ -331,9 +332,9 @@ class SimulatorTileWrapper:
 
     def get_runtime(self) -> RuntimeParameter:
         """Returns the runtime parameter."""
-        if hasattr(self.rpu_config, "runtime"):
-            return self.rpu_config.runtime
-        return RuntimeParameter()
+        if not hasattr(self.rpu_config, "runtime"):
+            self.rpu_config.runtime = RuntimeParameter()
+        return self.rpu_config.runtime
 
     def get_data_type(self) -> RPUDataType:
         """Return data_type setting of the RPUConfig"""
@@ -357,6 +358,21 @@ class SimulatorTileWrapper:
             a simulator tile based on the specified configuration.
         """
         raise NotImplementedError
+
+    def _recreate_simulator_tile(
+        self, x_size: int, d_size: int, rpu_config: "RPUConfigGeneric"
+    ) -> Any:  # just use Any instead of Union["SimulatorTile", tiles.AnalogTile, ..]
+        """Re-create a simulator tile in __setstate__.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+        return self._create_simulator_tile(x_size, d_size, rpu_config)
 
     def get_tensor_view(self, ndim: int, dim: Optional[int] = None) -> tuple:
         """Return the tensor view for ndim vector at dim.
@@ -526,7 +542,8 @@ class SimulatorTileWrapper:
             d_size = self.out_size
 
             # Recreate the tile.
-            self.tile = self._create_simulator_tile(x_size, d_size, self.rpu_config)
+            self.tile = self._recreate_simulator_tile(x_size, d_size, self.rpu_config)
+
             names = self.tile.get_hidden_parameter_names()
             if len(hidden_parameters_names) > 0 and names != hidden_parameters_names:
                 # Check whether names match

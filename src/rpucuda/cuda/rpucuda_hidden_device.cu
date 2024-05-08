@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -25,9 +25,9 @@ namespace RPU {
   } else {                                                                                         \
     hw += hs_dw;                                                                                   \
   }                                                                                                \
-  if (hw > (T)1.0 || hw < (T)-1.0) {                                                               \
+  if (hw > (T)1.0 || hw < (T) - 1.0) {                                                             \
                                                                                                    \
-    T dw = (hw > (T)1) ? ((T)par_4.w) : ((T)-par_4.y);                                             \
+    T dw = (hw > (T)1) ? ((T)par_4.w) : ((T) - par_4.y);                                           \
     hw = (T)0.0;                                                                                   \
     if (noise_std_dw > (T)0.0) {                                                                   \
       T stoch_value = curand_normal(&local_state);                                                 \

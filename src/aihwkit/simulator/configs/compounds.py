@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -21,7 +21,8 @@ from warnings import warn
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.parameters.helpers import _PrintableMixin, parameters_to_bindings
-from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.parameters.enums import VectorUnitCellUpdatePolicy, RPUDataType
 
 if TYPE_CHECKING:

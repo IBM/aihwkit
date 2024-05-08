@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,7 +20,7 @@ from torch import randn
 from torch import device as torch_device
 
 # Imports from aihwkit.
-from aihwkit.simulator.tiles import AnalogTile
+from aihwkit.linalg.matrix import AnalogMatrix
 from aihwkit.simulator.presets import ReRamSBPreset
 from aihwkit.simulator.rpu_base import cuda
 
@@ -41,23 +41,17 @@ x_values = randn(t, m)
 d_values = randn(t, n)
 
 # create analog tile (a single crossbar array)
-analog_tile = AnalogTile(matrix.shape[0], matrix.shape[1], rpu_config)
-analog_tile.set_weights(matrix)  # set weights
-# analog_tile.program_weights()  # set realistically, slow
+analog_matrix = AnalogMatrix(matrix, rpu_config, device=DEVICE)
 
 if DEVICE.type == "cuda":
-    analog_tile = analog_tile.cuda(DEVICE)
     x_values = x_values.cuda(DEVICE)
     d_values = d_values.cuda(DEVICE)
 
 # compute matrix vector product (A * x)
-y1 = analog_tile.forward(x_values)
+y1 = analog_matrix @ x_values
 
 # compute transposed matrix vector product (A' * d)
-y2 = analog_tile.backward(d_values)
+y2 = d_values @ analog_matrix
 
 # compute rank update  A += - lr * x * d'
-analog_tile.set_learning_rate(0.01)
-analog_tile.update(x_values, -d_values)
-current_analog_matrix = analog_tile.get_weights()  # perfect read
-current_matrix = analog_tile.read_weights()  # actual read
+analog_matrix.ger(x_values, d_values, 0.01)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -38,10 +38,26 @@ from aihwkit.exceptions import TorchTileConfigError
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import Inference, InferenceCuda, TorchInference, TorchInferenceCuda
+from .helpers.tiles import (
+    Inference,
+    InferenceCuda,
+    TorchInference,
+    TorchInferenceCuda,
+    TorchInferenceIRDropT,
+    TorchInferenceIRDropTCuda,
+)
 
 
-@parametrize_over_tiles([Inference, InferenceCuda, TorchInference, TorchInferenceCuda])
+@parametrize_over_tiles(
+    [
+        Inference,
+        InferenceCuda,
+        TorchInference,
+        TorchInferenceCuda,
+        TorchInferenceIRDropT,
+        TorchInferenceIRDropTCuda,
+    ]
+)
 class InferenceTileTest(ParametrizedTestCase):
     """Inference model tests."""
 

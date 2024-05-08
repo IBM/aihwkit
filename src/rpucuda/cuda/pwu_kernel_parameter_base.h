@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -127,7 +127,7 @@ public:
     if (this->use_bo64 == 1) {
       this->use_bo64 = 2;
     }
-  };                                                        // debug hack
+  }; // debug hack
   inline void forceNonTrans() { this->out_trans = false; }; // debug hack
   inline void force32() { this->use_bo64 = 0; };            // debug hack
 

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,7 +20,7 @@
 
 #define DISABLE_SHARED_MUTEX 1
 
-#define IDX2F(i, j, ld) ((((j)-1) * (ld)) + ((i)-1))
+#define IDX2F(i, j, ld) ((((j) - 1) * (ld)) + ((i) - 1))
 
 // this should be not necesary, because device id is set individually
 // per thread. However, if one would want to use 2 GPUs within one

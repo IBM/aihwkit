@@ -14,6 +14,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## Unreleased
 
+### Fixed
+
+* Use `ADDITIVE_CONSTANT instead of `ADD_NORMAL` in WeightNoiseType (\#630)
+* Fix continuing training based on checkpoint using torch tile (\#626)
+* Fix the support of different dtypes for the torch model (\#625)
+* Fixes the fall-through to the default error message when using drop connect (\#624)
+* Update `analog_fusion` notebook (\#611)
+
+## [0.9.0] - 2024/01/25
+
 ### Added
 
 * On-the-fly change of some `RPUConfig` fields (\# 539)
@@ -25,7 +35,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * New `PCM_NOISE` type for hardware-aware training for inference (\#563)
 * Transfer compounds using torch implementation (`TorchTransferTile`) (\#567)
 * Weight programming error plotting utility (\#572)
-* Add optimizer checkpoint in example 20 (\#573) 
+* Add optimizer checkpoint in example 20 (\#573)
+* Inference tile with time-dependent IR-drop (\#587)
+* Linear algebra module (\#588)
+* New Jupyter notebook for Fusion chip access (\#601)
 
 ### Fixed
 
@@ -33,6 +46,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Custom tile bugfixes (\#563)
 * Bug-fixes for specialized learning algorithms (\#563)
 * Bug-fix for data-parallel hardware-aware training for inference (\#569)
+* Fix docker build stubgen (\#581)
+* Fix readthedoc builds (\#586)
+* Fix the backward of the input ranges in the torch tile (\#606)
 
 ### Changed
 
@@ -44,6 +60,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Parameters for specialized learning algorithms changed somwhat (\#563)
 * RNN modules inherit from `Module` or `AnalogContainerBase` instead of `AnalogSequential` (\#563)
 * Adjustment of parameter to bindings for various number formats (\#563)
+* Documentation updates and fixes (\#562, \#564, \#570, \#575, \#576, #\580, #\585, \#586)
+* Updated installation instructions in Readthedoc (\#594)
 
 ### Removed
 
@@ -569,7 +587,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.8.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/IBM/aihwkit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/IBM/aihwkit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBM/aihwkit/compare/v0.7.0..v0.7.1
 [0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0

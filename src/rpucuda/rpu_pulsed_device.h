@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -167,10 +167,10 @@ public:
       const T *x_input = nullptr,
       const int x_inc = 1,
       const T *d_input = nullptr,
-      const int d_inc = 1){};
+      const int d_inc = 1) {};
   // called when update completed
   virtual void finishUpdateCycle(
-      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info){};
+      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {};
 
   inline T getWeightGranularity() const { return weight_granularity_; };
   inline T getNumStates() const { return num_states_; };
@@ -185,7 +185,7 @@ public:
      initUpdateCycle. Can be used to do some additional computation on
      the input */
   virtual void
-  initWithUpdateInput(const T *x_input, const int x_inc, const T *d_input, const int d_inc){};
+  initWithUpdateInput(const T *x_input, const int x_inc, const T *d_input, const int d_inc) {};
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix) override {
     SimpleRPUDevice<T>::dumpExtra(extra, prefix);
@@ -440,7 +440,7 @@ public:                                                                         
       return new DEVICENAME##RPUDeviceMetaParameter<T>(*this);                                     \
     };                                                                                             \
                                                                                                    \
-    T calcWeightGranularity() const override{GRANULARITY_BODY};                                    \
+    T calcWeightGranularity() const override { GRANULARITY_BODY };                                 \
     T calcNumStates() const override {                                                             \
       return (this->w_max - this->w_min) / calcWeightGranularity();                                \
     };                                                                                             \

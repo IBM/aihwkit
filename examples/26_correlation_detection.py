@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -103,10 +103,6 @@ def get_rpu_config(
     if isinstance(rpu_config.device, DynamicTransferCompound):
         # Common parameters in ttv4.
         rpu_config.device.tail_weightening = 5
-
-    if isinstance(rpu_config.device, DynamicTransferCompound):
-        # Common parameters in ttv4.
-        rpu_config.device.tail_weightening = np.inf
 
     return rpu_config
 

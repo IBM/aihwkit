@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -41,8 +41,8 @@ public:
       const int d_inc,
       const T learning_rate);
 
-  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix){};
-  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) {};
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {};
 
 protected:
   int x_size_ = 0;

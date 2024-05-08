@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -20,6 +20,7 @@ from typing import ClassVar, Type, Optional, Union, Any
 from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
 from aihwkit.simulator.parameters.mapping import MappableRPU
 from aihwkit.simulator.parameters.helpers import tile_parameters_to_bindings
+from aihwkit.simulator.parameters.runtime import RuntimeParameter
 
 from aihwkit.simulator.configs.devices import (
     ConstantStepDevice,
@@ -30,6 +31,7 @@ from aihwkit.simulator.configs.devices import (
 from aihwkit.simulator.configs.compounds import DigitalRankUpdateCell, UnitCell, TransferCompound
 from aihwkit.simulator.parameters import (
     IOParameters,
+    IOParametersIRDropT,
     PulseType,
     UpdateParameters,
     WeightClipParameter,
@@ -44,7 +46,9 @@ from aihwkit.inference import (
 )
 
 from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile, TorchInferenceTile
+
 from aihwkit.simulator.tiles.torch_tile import TorchSimulatorTile
+from aihwkit.simulator.tiles.torch_tile_irdrop_t import TorchSimulatorTileIRDropT
 from aihwkit.simulator.tiles.array import TileModuleArray
 
 
@@ -86,6 +90,9 @@ class IOManagedRPUConfig(MappableRPU, PrePostProcessingRPU):
 
     def as_bindings(self) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
+        if not hasattr(self, "runtime"):
+            # legacy
+            self.runtime = RuntimeParameter()
         return tile_parameters_to_bindings(self, self.runtime.data_type)
 
 
@@ -274,3 +281,39 @@ class TorchInferenceRPUConfig(InferenceRPUConfig):
 
     tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
+
+
+@dataclass
+class TorchInferenceRPUConfigIRDropT(TorchInferenceRPUConfig):
+    """Inference configuration using time-dependent IR drop.
+
+    This configuration defaults to a tile module implementation that
+    supported a subset of functions of the ``InferenceRPUConfig`` but
+    uses native torch instead of the RPUCuda library for simulating
+    the analog MVM.
+
+    The advantage is that autograd is more fully supported and
+    hardware aware training is more flexible to be modified. However,
+    some nonidealities are not supported.
+
+    Note:
+
+        For features that are not supported a ``NotImplementedError`` or a
+        ``TorchTileConfigError`` is raised.
+    """
+
+    simulator_tile_class: Type = TorchSimulatorTileIRDropT
+
+    forward: IOParametersIRDropT = field(default_factory=IOParametersIRDropT)
+    """Input-output parameter setting for the forward direction.
+
+    This parameters govern the hardware definitions specifying analog
+    MVM non-idealities.
+
+    Note:
+
+        This forward pass is applied equally in training and
+        inference. In addition, materials effects such as drift and
+        programming noise can be enabled during inference by
+        specifying the ``noise_model``
+    """

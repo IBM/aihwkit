@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -586,6 +586,11 @@ void WeightModifierCuda<T>::apply(
           wmpar.std_dev, wmpar.assumed_wmax, amax, context_->getRandomStates(nblocks * nthreads));
       done = true;
     }
+    break;
+  }
+
+  case WeightModifierType::DropConnect: {
+    // to not get into the default branch. Drop connect is handled below
     break;
   }
 

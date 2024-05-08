@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -89,7 +89,7 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
       int n_total_devices);
 
   virtual void initializeWithSize(int x_size, int d_size);
-  void initialize() override{/* do nothing */};
+  void initialize() override { /* do nothing */ };
 
   inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == (T)1.0); };
 
@@ -181,7 +181,7 @@ public:
 
   void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
-  void setHiddenUpdateIdx(int idx) override{};
+  void setHiddenUpdateIdx(int idx) override {};
 
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;

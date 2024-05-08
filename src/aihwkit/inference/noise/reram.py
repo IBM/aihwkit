@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -42,7 +42,7 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
 
         To account for short-term read noise (about 1\%) one should
         additional set the ``forward.w_noise`` parameter to about 0.01
-        (with w_noise_type=WeightNoiseType.ADD_NORMAL)
+        (with w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
 
     Args:
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
 # This code is licensed under the Apache License, Version 2.0. You may
 # obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -116,12 +116,16 @@ class AnalogOptimizerMixin:
                             analog_ctx.analog_input, analog_ctx.analog_grad_output
                         ):
                             analog_tile.update_indexed(
-                                x_input.to(analog_tile.device)
-                                if runtime.offload_input
-                                else x_input,
-                                d_input.to(analog_tile.device)
-                                if runtime.offload_gradient
-                                else d_input,
+                                (
+                                    x_input.to(analog_tile.device)
+                                    if runtime.offload_input
+                                    else x_input
+                                ),
+                                (
+                                    d_input.to(analog_tile.device)
+                                    if runtime.offload_gradient
+                                    else d_input
+                                ),
                             )
                     else:
                         x_input = cat(

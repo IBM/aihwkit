@@ -1,5 +1,5 @@
 /**
- * (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+ * (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
  *
  * This code is licensed under the Apache License, Version 2.0. You may
  * obtain a copy of this license in the LICENSE.txt file in the root directory
@@ -38,7 +38,7 @@ namespace {
 
 using namespace RPU;
 
-template <typename DeviceParT> void specific_settings(DeviceParT &par){};
+template <typename DeviceParT> void specific_settings(DeviceParT &par) {};
 
 template <> void specific_settings(PiecewiseStepRPUDeviceMetaParameter<num_t> &par) {
   par.piecewise_up_vec = std::vector<num_t>{0.1, 0.5, 1.0, 0.3, 0.1};
