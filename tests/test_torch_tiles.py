@@ -12,9 +12,17 @@
 
 """Tests for torch-based inference tiles."""
 
+import os
 from typing import Union
 from pytest import mark
 from torch import (
+    float32,
+    float16,
+    bfloat16,
+    int64,
+    autocast,
+    flatten,
+    cuda,
     Tensor,
     allclose,
     randn,
@@ -27,8 +35,11 @@ from torch import (
     clamp,
     cat,
 )
-from torch.nn import Linear
+from torch import dtype as torch_dtype
+from torch.nn.functional import log_softmax
+from torch.nn import Linear, Conv2d, Module, NLLLoss, MaxPool2d
 
+from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
@@ -47,6 +58,8 @@ from .helpers.tiles import (
     TorchInferenceIRDropT,
     TorchInferenceIRDropTCuda,
 )
+
+SKIP_CUDA_TESTS = os.getenv("SKIP_CUDA_TESTS")
 
 
 @parametrize_over_tiles(
@@ -265,8 +278,8 @@ def test_discretization_behavior(inp_bound, out_bound, inp_res, out_res, bm_type
     assert allclose(out, out_ref, atol=1e-5)
 
 
-# @mark.parametrize("is_training", [True, False])
-def test_iterative_linear(is_training: bool = False):
+@mark.parametrize("is_training", [True, False])
+def test_iterative_linear(is_training: bool):
     """
     Test that checks the gradient of the input range when
     we pass through different inputs without calling
@@ -476,3 +489,109 @@ def test_noise_and_bound_management(
     out = linear_torch(inp)
     out_ref = linear(inp)
     assert allclose(out, out_ref, atol=1e-5)
+
+
+@mark.parametrize("dtype", [float32, float16, bfloat16])
+@mark.parametrize("device_type", [device("cpu"), device("cuda")])
+def test_dtype(dtype: torch_dtype, device_type: device):
+    """
+    Test whether there is some implicit casting of the inputs.
+
+    Args:
+        dtype: Torch dtype
+        device_type: Torch device
+
+    Raises:
+        SkipTest: If cuda not found or disabled
+    """
+    if SKIP_CUDA_TESTS or not cuda.is_available():
+        raise SkipTest("CUDA not available")
+
+    rpu_config_torch = TorchInferenceRPUConfig()
+    rpu_config_torch.forward.is_perfect = True
+
+    linear_torch = AnalogLinear(
+        in_features=256, out_features=256, bias=False, rpu_config=rpu_config_torch
+    )
+    linear_torch = linear_torch.to(device=device_type, dtype=dtype)
+    inp = randn((10, 256)).to(device=device_type, dtype=dtype)
+    out: Tensor
+    out = linear_torch(inp)  # pylint: disable=not-callable
+    assert out.dtype == dtype
+
+
+@mark.parametrize("dtype", [float32, float16, bfloat16])
+@mark.parametrize("device_type", [device("cpu"), device("cuda")])
+@mark.parametrize("use_autocast", [True, False])
+def test_low_prec_training(dtype: torch_dtype, device_type: device, use_autocast: bool):
+    """
+    Test training with and without autocast.
+
+    Args:
+        dtype: Torch dtype
+        device_type: Torch device
+        use_autocast: Whether to use autocast
+
+    Raises:
+        SkipTest: If cuda not found or disabled
+    """
+    if SKIP_CUDA_TESTS or not cuda.is_available():
+        raise SkipTest("CUDA not available")
+
+    class Net(Module):
+        """Test network."""
+
+        def __init__(self):
+            super().__init__()
+            self.conv1 = Conv2d(1, 32, 3, 1)
+            self.conv2 = Conv2d(32, 64, 3, 1)
+            self.pool = MaxPool2d(2, 2)
+            self.fc1 = Linear(9216, 128)
+            self.fc2 = Linear(128, 10)
+
+        def forward(self, x):
+            """Test forward."""
+            x = self.conv1(x)
+            x = self.pool(self.conv2(x))
+            x = flatten(x, 1)
+            x = self.fc1(x)
+            x = self.fc2(x)
+            output = log_softmax(x, dim=1)
+            return output
+
+    def get_data_and_labels():
+        """Get data and labels."""
+        return randn(10, 1, 28, 28), tensor([1, 2, 3, 4, 5, 6, 7, 8, 9, 0], dtype=int64)
+
+    model = Net()
+    rpu_config = TorchInferenceRPUConfig()
+    rpu_config.forward.is_perfect = True
+    rpu_config.mapping.max_input_size = 0
+    rpu_config.mapping.max_output_size = 0
+    model = convert_to_analog(model, rpu_config)
+    nll_loss = NLLLoss()
+
+    model = model.to(device=device_type, dtype=dtype)
+    optimizer = AnalogSGD(model.parameters(), lr=0.1)
+    model = model.train()
+
+    data, target = get_data_and_labels()
+    data = data.to(device=device_type, dtype=dtype)
+    target = target.to(device=device_type)
+    if use_autocast:
+        # Runs the forward pass with autocasting.
+        with autocast(device_type=str(device_type), dtype=dtype):
+            output: Tensor
+            output = model(data)
+            loss: Tensor
+            loss = nll_loss(output, target)
+        loss.backward()
+        optimizer.step()
+    else:
+        optimizer.zero_grad()
+        output: Tensor
+        output = model(data)
+        loss: Tensor
+        loss = nll_loss(output.float(), target)
+        loss.backward()
+        optimizer.step()

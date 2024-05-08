@@ -131,7 +131,10 @@ As an alternative, you can use ``make`` to compile the ``aihwkit`` shared librar
 
       $ make build_inplace_cuda
 
+.. note::
+   If you are using ``mkl`` in the conda environment then you also need to ``export CMAKE_PREFIX_PATH=$CONDA_PREFIX``
 
+  
 Via cmake command
 """""""""""""""""
 

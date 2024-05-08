@@ -262,7 +262,7 @@ class _PrintableMixin:
         # special case for global skip:
         all_skip = hasattr(self, ALL_SKIP_FIELD) and getattr(self, ALL_SKIP_FIELD)
 
-        for field in fields(self):
+        for field in fields(self):  # type: ignore[arg-type]
             value = getattr(self, field.name)
 
             # Exclude fields.

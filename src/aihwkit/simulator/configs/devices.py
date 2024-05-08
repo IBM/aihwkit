@@ -835,6 +835,7 @@ class ExpStepDevice(PulsedDevice):
         :math:`\sigma_\text{add}` is given by ``dw_min_std_add``, and
         :math:`\sigma_\text{slope}` is given by ``dw_min_std_slope``.
     """
+
     # pylint: disable=invalid-name
 
     bindings_class: ClassVar[Optional[Union[Type, str]]] = "ExpStepResistiveDeviceParameter"

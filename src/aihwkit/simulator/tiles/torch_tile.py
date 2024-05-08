@@ -198,7 +198,7 @@ class TorchSimulatorTile(SimulatorTile, Module):
         else:
             noisy_weights = self.weight
 
-        return AnalogMVM.matmul(
+        return self._analog_mvm.matmul(
             noisy_weights,
             x_input,
             self._f_io,
@@ -231,7 +231,7 @@ class TorchSimulatorTile(SimulatorTile, Module):
 
         if modifier.type == WeightModifierType.MULT_NORMAL:
             with no_grad():
-                gauss = randn(size=target_shape, device=inp_weight.device)
+                gauss = randn(size=target_shape, device=inp_weight.device, dtype=inp_weight.dtype)
                 noise = inp_weight * modifier.std_dev * gauss
             out_weight = inp_weight.clone() + noise
             return out_weight
@@ -249,7 +249,9 @@ class TorchSimulatorTile(SimulatorTile, Module):
         elif modifier.type == WeightModifierType.ADD_NORMAL:
             with no_grad():
                 noise = (
-                    modifier.std_dev * assumed_wmax * randn(target_shape, device=inp_weight.device)
+                    modifier.std_dev
+                    * assumed_wmax
+                    * randn(target_shape, device=inp_weight.device, dtype=inp_weight.dtype)
                 )
             out_weight = inp_weight.clone() + noise
         else:

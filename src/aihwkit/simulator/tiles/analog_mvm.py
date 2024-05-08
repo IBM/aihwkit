@@ -91,7 +91,7 @@ class AnalogMVM:
             and (nm_scale_values == 0.0).all()
         ):
             # - Shortcut, output would be all zeros
-            return zeros(size=out_size, device=input_.device, dtype=input_.dtype())
+            return zeros(size=out_size, device=input_.device, dtype=input_.dtype)
 
         if isinstance(nm_scale_values, Tensor):
             # set zeros to 1 to avoid divide-by-zero errors

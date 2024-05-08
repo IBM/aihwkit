@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ## Unreleased
 
+### Fixed
+
+* Use `ADDITIVE_CONSTANT instead of `ADD_NORMAL` in WeightNoiseType (\#630)
+* Fix continuing training based on checkpoint using torch tile (\#626)
+* Fix the support of different dtypes for the torch model (\#625)
+* Fixes the fall-through to the default error message when using drop connect (\#624)
+* Update `analog_fusion` notebook (\#611)
+
 ## [0.9.0] - 2024/01/25
 
 ### Added
