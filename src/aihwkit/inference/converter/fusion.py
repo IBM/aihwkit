@@ -14,7 +14,6 @@
 
 from typing import Dict, List, Tuple
 
-from torch import abs as torch_abs
 from torch import Tensor, sign
 from torch.autograd import no_grad
 
