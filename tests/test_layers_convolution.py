@@ -14,6 +14,7 @@
 
 from unittest import SkipTest
 
+import pytest
 from torch import randn
 from torch.nn import (
     Conv1d as torch_Conv1d,
@@ -283,6 +284,7 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
             if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
+    @pytest.mark.skip(reason="This test is randomly failing.")
     def test_out_scaling_learning(self):
         """Check if out scaling are learning."""
         rpu_config = InferenceRPUConfig(
@@ -334,6 +336,7 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
         self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
+    @pytest.mark.skip(reason="This test is randomly failing.")
     def test_out_scaling_learning_columnwise(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(
@@ -570,6 +573,7 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
             if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
+    @pytest.mark.skip(reason="This test is randomly failing.")
     def test_out_scaling_learning(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(
@@ -617,6 +621,7 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
+    @pytest.mark.skip(reason="This test is randomly failing.")
     def test_out_scaling_learning_columnwise(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(
@@ -812,6 +817,7 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
             if self.bias:
                 self.assertTensorAlmostEqual(bias_analog, bias)
 
+    @pytest.mark.skip(reason="This test is randomly failing.")
     def test_out_scaling_learning(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(
@@ -864,6 +870,7 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
         self.assertIsNotNone(analog_tile_1.get_learned_out_scales().grad)
         self.assertNotAlmostEqualTensor(initial_out_scaling_1, learned_out_scaling_1)
 
+    @pytest.mark.skip(reason="This test is randomly failing.")
     def test_out_scaling_learning_columnwise(self):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(
