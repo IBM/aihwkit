@@ -216,12 +216,12 @@ def fusion_import(
         layer_params = params[layer_name]
         last_value = 0
         tile_id = 0
+        programmed_conductances = []
         for analog_tile in module.analog_tiles():
             if not isinstance(analog_tile, InferenceTile):
                 raise TileError("Expected an InferenceTile.")
 
             weight_shape = tensor([analog_tile.out_size, analog_tile.in_size])
-            programmed_conductances = []
             num_values = prod(weight_shape)
             g_mat = Tensor(layer_data[last_value : last_value + num_values]).reshape(
                 weight_shape.tolist()
