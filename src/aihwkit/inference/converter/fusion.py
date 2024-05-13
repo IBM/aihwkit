@@ -71,7 +71,7 @@ class FusionConductanceConverter(BaseConductanceConverter):
         if len(conductances) != 1:
             raise ValueError("conductances must contain exactly 1 element")
         if "scale_ratio_per_col" not in params:
-            raise ValueError("params do not contain scale_ratio")
+            raise ValueError("params do not contain scale_ratio_per_col")
         if "sign_weights" not in params:
             raise ValueError("params do not contain sign_weights")
 

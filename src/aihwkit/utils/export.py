@@ -111,7 +111,7 @@ def fusion_export(
     analog_model: Module,
     g_converter: Optional[BaseConductanceConverter] = None,
     file_name: Optional[str] = None,
-) -> Tuple[Dict, Dict]:
+) -> Tuple[Dict, Dict, Dict]:
     """Exports an analog module for inference on the Fusion chip.
 
     Args:
@@ -175,15 +175,10 @@ def fusion_import(
 
         analog_model: The analog model used for export. It will be changed in place.
 
+        params: Dictionary containing additional parameters required for conversion.
+
         state_dict: the state_dict of the model to initialize the same
             weights as when using :func:`fusion_export`
-
-            Caution:
-
-                If not given the weights of the model are simply
-                overwritte, however, it is assumed that the weights
-                are the very same as during the :func:`fusion_export`
-                call and not check is done to ensure it.
 
         g_converter: The same g-converter used for :func:`fusion_export`
 
