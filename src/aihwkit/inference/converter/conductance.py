@@ -14,7 +14,7 @@
 
 from typing import Dict, List, Optional, Tuple
 
-from torch import abs as torch_abs # pylint: disable=unused-import
+from torch import abs as torch_abs  # pylint: disable=unused-import
 from torch import Tensor
 from torch.autograd import no_grad
 
