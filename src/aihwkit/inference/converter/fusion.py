@@ -20,7 +20,7 @@ from torch.autograd import no_grad
 from aihwkit.exceptions import ArgumentError
 from aihwkit.inference.converter.base import BaseConductanceConverter
 
-_ZERO_CLIP = 1e-9
+_ZERO_CLIP = 1e-10
 
 
 class FusionConductanceConverter(BaseConductanceConverter):
