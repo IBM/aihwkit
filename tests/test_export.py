@@ -71,13 +71,13 @@ class FusionExportTest(ParametrizedTestCase):
         if not isinstance(rpu_config, InferenceRPUConfig):
             assert_raises(TileError(), fusion_export(model))
 
-        data, _, state_dict = fusion_export(model)
+        data, params, state_dict = fusion_export(model)
 
         model.reset_parameters()
         new_weights, _ = model.get_weights()
         assert_raises(AssertionError, assert_array_almost_equal, weights, new_weights)
 
-        new_model = fusion_import(data, model, state_dict)
+        new_model = fusion_import(data, model, params, state_dict)
 
         new_weights, _ = new_model.get_weights()
         assert_array_almost_equal(weights, new_weights)
@@ -88,9 +88,9 @@ class FusionExportTest(ParametrizedTestCase):
         weights, _ = model.get_weights()
 
         with NamedTemporaryFile() as file:
-            _, _, state_dict = fusion_export(model, file_name=file.name)
+            _, params, state_dict = fusion_export(model, file_name=file.name)
             model.reset_parameters()
-            new_model = fusion_import(file.name, model, state_dict)
+            new_model = fusion_import(file.name, model, params, state_dict)
 
         new_weights, _ = new_model.get_weights()
         assert_array_almost_equal(weights, new_weights)
