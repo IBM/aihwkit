@@ -162,7 +162,7 @@ namespace RPU {
                                                                                                    \
   int batch_idx = m_batch - 1;                                                                     \
   for (int j = 0; j < size * nK32; j++) {                                                          \
-    counts[j] = tmp32[(batch_idx) * size * nK32 + j];                                              \
+    counts[j] = tmp32[(batch_idx)*size * nK32 + j];                                                \
   }                                                                                                \
                                                                                                    \
   CUDA_CALL(cudaDeviceSynchronize());                                                              \

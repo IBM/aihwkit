@@ -49,7 +49,9 @@ class FusionConductanceConverter(BaseConductanceConverter):
 
     def __init__(self, g_max: int = 40) -> None:
         if g_max < 10 or g_max > 40:
-            raise ArgumentError("Specified fusion g_max value must be between 10 and 40.")
+            raise ArgumentError(
+                "Specified fusion g_max value must be between 10 and 40."
+            )
         self.g_max = g_max
         self.scale_ratio = None
 
@@ -63,11 +65,16 @@ class FusionConductanceConverter(BaseConductanceConverter):
         scaled_weights = weights * scale_ratio_per_col.unsqueeze(1)
         sign_weights = sign(scaled_weights)
         conductances = [abs(scaled_weights).clamp(min=0.0, max=self.g_max)]
-        params = {"scale_ratio_per_col": scale_ratio_per_col, "sign_weights": sign_weights}
+        params = {
+            "scale_ratio_per_col": scale_ratio_per_col,
+            "sign_weights": sign_weights,
+        }
         return conductances, params
 
     @no_grad()
-    def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
+    def convert_back_to_weights(
+        self, conductances: List[Tensor], params: Dict
+    ) -> Tensor:
         if len(conductances) != 1:
             raise ValueError("conductances must contain exactly 1 element")
         if "scale_ratio_per_col" not in params:
@@ -75,6 +82,8 @@ class FusionConductanceConverter(BaseConductanceConverter):
         if "sign_weights" not in params:
             raise ValueError("params do not contain sign_weights")
 
-        weights = (params["sign_weights"] * conductances[0]) / params["scale_ratio_per_col"].unsqueeze(1)
+        weights = (params["sign_weights"] * conductances[0]) / params[
+            "scale_ratio_per_col"
+        ].unsqueeze(1)
 
         return weights

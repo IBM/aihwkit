@@ -71,7 +71,7 @@ class FusionExportTest(ParametrizedTestCase):
         if not isinstance(rpu_config, InferenceRPUConfig):
             assert_raises(TileError(), fusion_export(model))
 
-        data, state_dict = fusion_export(model)
+        data, _, state_dict = fusion_export(model)
 
         model.reset_parameters()
         new_weights, _ = model.get_weights()
@@ -88,7 +88,7 @@ class FusionExportTest(ParametrizedTestCase):
         weights, _ = model.get_weights()
 
         with NamedTemporaryFile() as file:
-            _, state_dict = fusion_export(model, file_name=file.name)
+            _, _, state_dict = fusion_export(model, file_name=file.name)
             model.reset_parameters()
             new_model = fusion_import(file.name, model, state_dict)
 

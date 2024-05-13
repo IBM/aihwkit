@@ -32,7 +32,9 @@ from aihwkit.nn.modules.base import AnalogLayerBase
 from aihwkit.simulator.tiles.base import TileModuleBase, SimulatorTile
 
 
-def _fusion_save_csv(file_name: str, conductance_data: OrderedDict, header: str) -> None:
+def _fusion_save_csv(
+    file_name: str, conductance_data: OrderedDict, header: str
+) -> None:
     """Saves the conductance data to a csv file."""
 
     layer_names = list(conductance_data.keys())
@@ -61,7 +63,9 @@ def _fusion_load_csv(file_name: str, header: str) -> OrderedDict:
             tmp = next(csv_reader)
             actual_header_line = ",".join(tmp)
             if actual_header_line != header_line:
-                raise FusionExportError("Header line mismatch: ", header_line, actual_header_line)
+                raise FusionExportError(
+                    "Header line mismatch: ", header_line, actual_header_line
+                )
         layer_names = next(csv_reader)
         for layer_name in layer_names:
             tmp = next(csv_reader)
@@ -73,7 +77,9 @@ def _fusion_get_csv_header(analog_model: Module) -> str:
     """Generates and returns the fusion CSV header."""
 
     def add_to_header(current_header: str, field: str) -> str:
-        current_header += ",".join([str(info[field]) for info in layer_infos.values()]) + "\n"
+        current_header += (
+            ",".join([str(info[field]) for info in layer_infos.values()]) + "\n"
+        )
         return current_header
 
     layer_infos = ordered_dict()  # type: OrderedDict
@@ -143,8 +149,13 @@ def fusion_export(
             if not isinstance(analog_tile, InferenceTile):
                 raise TileError("Expected an InferenceTile.")
 
-            weights = analog_tile.get_weights(apply_weight_scaling=False, realistic=False)[0]
-            target_conductances, analog_tile_params = g_converter.convert_to_conductances(weights)
+            weights = analog_tile.get_weights(
+                apply_weight_scaling=False, realistic=False
+            )[0]
+            (
+                target_conductances,
+                analog_tile_params,
+            ) = g_converter.convert_to_conductances(weights)
             layer_params.append(analog_tile_params)
             for conductance_matrix in target_conductances:
                 layer_data.extend(conductance_matrix.flatten().numpy().tolist())
@@ -219,9 +230,15 @@ def fusion_import(
             programmed_conductances.append(g_mat)
 
             noisy_weights = g_converter.convert_back_to_weights(
-                [programmed_conductances[tile_id]], layer_params[tile_id],
+                [programmed_conductances[tile_id]],
+                layer_params[tile_id],
             )
-            analog_tile.set_weights(noisy_weights, analog_tile.get_weights()[1], apply_weight_scaling=False, realistic=False)
+            analog_tile.set_weights(
+                noisy_weights,
+                analog_tile.get_weights()[1],
+                apply_weight_scaling=False,
+                realistic=False,
+            )
             tile_id += 1
 
     return analog_model

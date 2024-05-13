@@ -34,8 +34,9 @@ void DynamicTransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &
      << std::endl;
 
   if (experimental_fast_lr_feedback) {
-    ss << "\t Fast LR Feedback" << ", target: " << experimental_feedback_target
-       << ", mod: " << experimental_feedback_mod << "]" << std::endl;
+    ss << "\t Fast LR Feedback"
+       << ", target: " << experimental_feedback_target << ", mod: " << experimental_feedback_mod
+       << "]" << std::endl;
   }
 
   ChoppedTransferRPUDeviceMetaParameter<T>::printToStream(ss);
