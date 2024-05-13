@@ -19,7 +19,7 @@ from copy import deepcopy
 from collections import OrderedDict as ordered_dict
 from csv import writer, reader
 
-from torch import Tensor
+from torch import Tensor, tensor, save, prod, sum
 from torch.nn import Module, ModuleList
 
 from numpy import array
@@ -28,7 +28,6 @@ from aihwkit.exceptions import TileError, FusionExportError
 from aihwkit.simulator.tiles.inference import InferenceTile
 from aihwkit.inference.converter.base import BaseConductanceConverter
 from aihwkit.inference.converter.fusion import FusionConductanceConverter
-from aihwkit.inference.noise.fusion import FusionImportNoiseModel
 from aihwkit.nn.modules.base import AnalogLayerBase
 from aihwkit.simulator.tiles.base import TileModuleBase, SimulatorTile
 
@@ -135,37 +134,35 @@ def fusion_export(
     """
     g_converter = deepcopy(g_converter) or FusionConductanceConverter()
     state_dict = analog_model.state_dict()
-
     conductance_data = ordered_dict()
+    params = ordered_dict()
     for layer_name, module in analog_model.named_analog_layers():
         layer_data = []
+        layer_params = []
         for analog_tile in module.analog_tiles():
             if not isinstance(analog_tile, InferenceTile):
                 raise TileError("Expected an InferenceTile.")
 
-            weights = analog_tile.tile.get_weights()
-            target_conductances, _ = g_converter.convert_to_conductances(weights)
-
-            # we do not store params but recreate later. Note that for
-            # that the model for import and export has to be exactly
-            # the same. Better save the model checkpoint and load it
-            # later? or just save the parmater in an extra file ?
-
+            weights = analog_tile.get_weights(apply_weight_scaling=False, realistic=False)[0]
+            target_conductances, analog_tile_params = g_converter.convert_to_conductances(weights)
+            layer_params.append(analog_tile_params)
             for conductance_matrix in target_conductances:
                 layer_data.extend(conductance_matrix.flatten().numpy().tolist())
 
         conductance_data[layer_name] = layer_data
+        params[layer_name] = layer_params
 
     if file_name is not None:
         header = _fusion_get_csv_header(analog_model)
         _fusion_save_csv(file_name, conductance_data, header)
 
-    return conductance_data, state_dict
+    return conductance_data, params, state_dict
 
 
 def fusion_import(
     conductance_data: Union[OrderedDict, str],
     analog_model: Module,
+    params: Dict,
     state_dict: Optional[Dict] = None,
     g_converter: Optional[BaseConductanceConverter] = None,
 ) -> Module:
@@ -208,35 +205,28 @@ def fusion_import(
         conductance_data = _fusion_load_csv(conductance_data, header)
 
     analog_model.eval()
-
     for layer_name, module in analog_model.named_analog_layers():
         layer_data = conductance_data[layer_name]
+        layer_params = params[layer_name]
         last_value = 0
+        tile_id = 0
         for analog_tile in module.analog_tiles():
             if not isinstance(analog_tile, InferenceTile):
                 raise TileError("Expected an InferenceTile.")
 
-            weights = analog_tile.tile.get_weights()
-            target_conductances, params = g_converter.convert_to_conductances(weights)
-
-            # we do not store params but recreate later. Note that for
-            # that the model for import and export has to be exactly
-            # the same. Better save the model checkpoint and load it
-            # later? or just save the parmater in an extra file ?
+            weight_shape = tensor([analog_tile.out_size, analog_tile.in_size])
             programmed_conductances = []
-            for conductance_matrix in target_conductances:
-                num_values = conductance_matrix.numel()
-                g_mat = Tensor(layer_data[last_value : last_value + num_values]).reshape(
-                    *conductance_matrix.size()
-                )
-                last_value += num_values
-                programmed_conductances.append(g_mat)
-
-            fusion_noise = FusionImportNoiseModel(
-                g_converter=g_converter, programmed_conductances=programmed_conductances, **params
+            num_values = prod(weight_shape)
+            g_mat = Tensor(layer_data[last_value : last_value + num_values]).reshape(
+                weight_shape.tolist()
             )
-            analog_tile.program_weights(from_reference=False, noise_model=fusion_noise)
+            last_value += num_values
+            programmed_conductances.append(g_mat)
 
-    analog_model.drift_analog_weights()
+            noisy_weights = g_converter.convert_back_to_weights(
+                [programmed_conductances[tile_id]], layer_params[tile_id],
+            )
+            analog_tile.set_weights(noisy_weights, analog_tile.get_weights()[1], apply_weight_scaling=False, realistic=False)
+            tile_id += 1
 
     return analog_model

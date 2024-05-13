@@ -21,7 +21,7 @@ from torch.autograd import no_grad
 from aihwkit.exceptions import ArgumentError
 from aihwkit.inference.converter.base import BaseConductanceConverter
 
-_ZERO_CLIP = 1e-7
+_ZERO_CLIP = 1e-9
 
 
 class FusionConductanceConverter(BaseConductanceConverter):
@@ -58,23 +58,23 @@ class FusionConductanceConverter(BaseConductanceConverter):
 
     @no_grad()
     def convert_to_conductances(self, weights: Tensor) -> Tuple[List[Tensor], Dict]:
-        abs_max = torch_abs(weights).max()
-        scale_ratio = self.g_max / abs_max.clamp(min=_ZERO_CLIP)
-        scaled_weights = weights * scale_ratio
+        abs_max_per_col = weights.abs().max(dim=1).values
+        scale_ratio_per_col = self.g_max / abs_max_per_col.clamp(min=_ZERO_CLIP)
+        scaled_weights = weights * scale_ratio_per_col.unsqueeze(1)
         sign_weights = sign(scaled_weights)
         conductances = [abs(scaled_weights).clamp(min=0.0, max=self.g_max)]
-        params = {"scale_ratio": scale_ratio, "sign_weights": sign_weights}
-
+        params = {"scale_ratio_per_col": scale_ratio_per_col, "sign_weights": sign_weights}
         return conductances, params
 
     @no_grad()
     def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
         if len(conductances) != 1:
             raise ValueError("conductances must contain exactly 1 element")
-        if "scale_ratio" not in params:
+        if "scale_ratio_per_col" not in params:
             raise ValueError("params do not contain scale_ratio")
         if "sign_weights" not in params:
             raise ValueError("params do not contain sign_weights")
 
-        weights = (params["sign_weights"] * conductances[0]) / params["scale_ratio"]
+        weights = (params["sign_weights"] * conductances[0]) / params["scale_ratio_per_col"].unsqueeze(1)
+
         return weights
