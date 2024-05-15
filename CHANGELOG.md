@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## Unreleased
+## [0.9.1] - 2024/05/15
 
 ### Fixed
 
@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Fix the support of different dtypes for the torch model (\#625)
 * Fixes the fall-through to the default error message when using drop connect (\#624)
 * Update `analog_fusion` notebook (\#611)
+* Fix sub-optimal mapping of conductances to weights for fusion by regressing weights per column (\#653)
 
 ## [0.9.0] - 2024/01/25
 

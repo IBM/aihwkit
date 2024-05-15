@@ -16,6 +16,7 @@ from typing import Dict, List, Tuple
 
 from torch import Tensor, sign
 from torch.autograd import no_grad
+from sklearn.linear_model import LinearRegression
 
 from aihwkit.exceptions import ArgumentError
 from aihwkit.inference.converter.base import BaseConductanceConverter
@@ -62,11 +63,9 @@ class FusionConductanceConverter(BaseConductanceConverter):
         abs_max_per_col = weights.abs().max(dim=1).values
         scale_ratio_per_col = self.g_max / abs_max_per_col.clamp(min=_ZERO_CLIP)
         scaled_weights = weights * scale_ratio_per_col.unsqueeze(1)
-        sign_weights = sign(scaled_weights)
         conductances = [abs(scaled_weights).clamp(min=0.0, max=self.g_max)]
         params = {
-            "scale_ratio_per_col": scale_ratio_per_col,
-            "sign_weights": sign_weights,
+            "original_weights": weights,
         }
         return conductances, params
 
@@ -76,13 +75,13 @@ class FusionConductanceConverter(BaseConductanceConverter):
     ) -> Tensor:
         if len(conductances) != 1:
             raise ValueError("conductances must contain exactly 1 element")
-        if "scale_ratio_per_col" not in params:
-            raise ValueError("params do not contain scale_ratio_per_col")
-        if "sign_weights" not in params:
-            raise ValueError("params do not contain sign_weights")
+        if "original_weights" not in params:
+            raise ValueError("params do not contain original_weights")
 
-        weights = (params["sign_weights"] * conductances[0]) / params[
-            "scale_ratio_per_col"
-        ].unsqueeze(1)
+        weights = conductances[0] * sign(params['original_weights'])
+        for col in range(weights.shape[0]):
+            reg = LinearRegression().fit(weights[col].flatten().numpy().reshape(-1, 1), params[
+                'original_weights'][col].flatten().numpy().reshape(-1, 1))
+            weights[col] *= reg.coef_[0][0]
 
         return weights
