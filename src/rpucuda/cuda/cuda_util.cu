@@ -20,7 +20,7 @@
 
 #define DISABLE_SHARED_MUTEX 1
 
-#define IDX2F(i, j, ld) ((((j) - 1) * (ld)) + ((i) - 1))
+#define IDX2F(i, j, ld) ((((j)-1) * (ld)) + ((i)-1))
 
 // this should be not necesary, because device id is set individually
 // per thread. However, if one would want to use 2 GPUs within one
