@@ -110,9 +110,9 @@ jobs:
 
   - name: "Build wheel for Python 3.8, 3.9 on OS X"
     os: osx
-    osx_image: xcode12.4
+    osx_image: xcode13.2.1
     stage: Build wheels
-    if: branch =~ /^release\/.*$/
+    if: branch =~ /^release\/osx.*$/
     addons:
       homebrew:
         packages:
