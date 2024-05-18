@@ -1,6 +1,5 @@
 ## Interactive Task
 Deployment of a HWA Trained Network to Fusion:
-
 1. Go to https://aihw-composer.draco.res.ibm.com and create an account.
 2. Create a New experiment -> Inference experiment -> Real Chip with Program your own Neural Network Weights.
 3. Download the ResNet-9 pretrained network checkpoint: https://aihwkit-tutorial.s3.us-east.cloud-object-storage.appdomain.cloud/resnet9s.th.
