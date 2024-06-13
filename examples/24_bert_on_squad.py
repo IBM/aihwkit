@@ -431,7 +431,7 @@ def postprocess_predictions(
 
 def create_datasets():
     """Load the SQuAD dataset, the tokenized version, and the validation set"""
-    squad = load_dataset("squad")
+    squad = load_dataset("squad", name="plain_text")
 
     # Preprocessing changes number of samples, so we need to remove some columns so
     # the data updates properly
