@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example: Example using convert_to_analog to run GPT-2 transformer
+"""aihwkit example 31: Example using convert_to_analog to run GPT-2 transformer
 **Source**:
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
@@ -56,8 +56,9 @@ from aihwkit.optim import AnalogSGD
 
 
 # GPT-2 model from Hugging Face model hub
-MODEL_NAME = "gpt2"
+MODEL_NAME = "distilgpt2"
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
+TOKENIZER.pad_token = TOKENIZER.eos_token  # Set the padding token
 
 # Parse some arguments
 PARSER = ArgumentParser("Analog GPT-2 example")
@@ -174,6 +175,8 @@ def create_model(rpu_config):
     print(model)
     return model
 
+# Setting a padding token
+TOKENIZER.pad_token = TOKENIZER.eos_token
 
 def preprocess_data(dataset):
     """Preprocess the dataset for GPT-2"""
@@ -185,7 +188,6 @@ def preprocess_data(dataset):
         return_tensors="pt",
     )
     return tokenized_dataset
-
 
 def create_datasets():
     """Load the dataset"""
@@ -206,11 +208,11 @@ def make_trainer(model, optimizer, tokenized_data):
     training_args = TrainingArguments(
         output_dir="./",
         save_strategy="no",
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
+        per_device_train_batch_size=2,
+        per_device_eval_batch_size=2,
         num_train_epochs=3,
         weight_decay=0.001,
-        no_cuda=False,
+        no_cuda=True,
     )
 
     collator = DefaultDataCollator()
@@ -260,11 +262,12 @@ def do_inference(model, trainer, dataset, writer, max_inference_time=1e6, n_time
         predictions = predict()
         write_metrics(predictions, t_inference)
 
+# Add this before moving the model to GPU
+import torch
+torch.cuda.empty_cache()
 
+# Main function
 def main():
-    """Provide the lambda function for WandB sweep. If WandB is not used, then this
-    is what is executed in the job
-    """
     if ARGS.wandb:
         wandb.init()
 
@@ -275,6 +278,7 @@ def main():
         rpu_config = create_rpu_config(modifier_noise=ARGS.noise)
 
     model = create_model(rpu_config)
+    model.to('cpu')  # Move model to CPU
 
     dataset, tokenized_data = create_datasets()
     optimizer = create_optimizer(model)
@@ -282,7 +286,7 @@ def main():
 
     if ARGS.load:
         print(f"Load model from '{ARGS.checkpoint}'.")
-        model.load_state_dict(torch_load(ARGS.checkpoint))
+        model.load_state_dict(torch_load(ARGS.checkpoint, map_location=torch.device('cpu')))
 
     # Do hw-aware training if in analog domain and the model isn't loaded from
     # an existing checkpoint
@@ -290,7 +294,6 @@ def main():
         trainer.train()
         torch_save(model.state_dict(), ARGS.checkpoint)
     do_inference(model, trainer, dataset, writer)
-
 
 if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
