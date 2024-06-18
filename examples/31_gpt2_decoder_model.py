@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example 31: Example using convert_to_analog to run GPT-2 transformer
+"""aihwkit example: Example using convert_to_analog to run GPT-2 transformer
 **Source**:
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
@@ -22,6 +22,7 @@ from argparse import ArgumentParser
 from collections import OrderedDict, defaultdict
 from numpy import log10, logspace, argsort
 from transformers.integrations import TensorBoardCallback
+from transformers import DataCollatorForLanguageModeling
 
 from transformers import (
     AutoTokenizer,
@@ -56,9 +57,12 @@ from aihwkit.optim import AnalogSGD
 
 
 # GPT-2 model from Hugging Face model hub
-MODEL_NAME = "distilgpt2"
+MODEL_NAME = "distilbert/distilgpt2" # smallest model
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
-TOKENIZER.pad_token = TOKENIZER.eos_token  # Set the padding token
+
+# Add padding token if it doesn't exist
+if TOKENIZER.pad_token is None:
+    TOKENIZER.add_special_tokens({'pad_token': TOKENIZER.eos_token})
 
 # Parse some arguments
 PARSER = ArgumentParser("Analog GPT-2 example")
@@ -175,26 +179,18 @@ def create_model(rpu_config):
     print(model)
     return model
 
-# Setting a padding token
-TOKENIZER.pad_token = TOKENIZER.eos_token
+# Preprocess the dataset for GPT-2
+def preprocess_data(examples):
+    return TOKENIZER(examples["text"], truncation=True, max_length=512, padding="max_length")
 
-def preprocess_data(dataset):
-    """Preprocess the dataset for GPT-2"""
-    tokenized_dataset = TOKENIZER(
-        dataset["text"],
-        truncation=True,
-        max_length=512,
-        padding="max_length",
-        return_tensors="pt",
-    )
-    return tokenized_dataset
-
+# Create datasets
 def create_datasets():
-    """Load the dataset"""
     dataset = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
-    tokenized_data = preprocess_data(dataset)
-    return dataset, tokenized_data
+    tokenized_dataset = dataset.map(preprocess_data, batched=True, remove_columns=["text"])
+    # Set the format for PyTorch
+    tokenized_dataset.set_format(type="torch", columns=["input_ids", "attention_mask"])
 
+    return tokenized_dataset
 
 def create_optimizer(model):
     """Create the analog-aware optimizer"""
@@ -208,11 +204,11 @@ def make_trainer(model, optimizer, tokenized_data):
     training_args = TrainingArguments(
         output_dir="./",
         save_strategy="no",
-        per_device_train_batch_size=2,
-        per_device_eval_batch_size=2,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
         num_train_epochs=3,
         weight_decay=0.001,
-        no_cuda=True,
+        no_cuda=False,
     )
 
     collator = DefaultDataCollator()
@@ -262,12 +258,11 @@ def do_inference(model, trainer, dataset, writer, max_inference_time=1e6, n_time
         predictions = predict()
         write_metrics(predictions, t_inference)
 
-# Add this before moving the model to GPU
-import torch
-torch.cuda.empty_cache()
-
 # Main function
 def main():
+    """Provide the lambda function for WandB sweep. If WandB is not used, then this
+    is what is executed in the job
+    """
     if ARGS.wandb:
         wandb.init()
 
@@ -278,23 +273,51 @@ def main():
         rpu_config = create_rpu_config(modifier_noise=ARGS.noise)
 
     model = create_model(rpu_config)
-    model.to('cpu')  # Move model to CPU
 
-    dataset, tokenized_data = create_datasets()
+    tokenized_data = create_datasets()
     optimizer = create_optimizer(model)
-    trainer, writer = make_trainer(model, optimizer, tokenized_data)
+
+    # Create a data collator for language modeling
+    data_collator = DataCollatorForLanguageModeling(tokenizer=TOKENIZER, mlm=False)
+
+    # Define training arguments
+    training_args = TrainingArguments(
+        output_dir="./",
+        save_strategy="no",
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        num_train_epochs=3,
+        weight_decay=0.001,
+        no_cuda=False,
+    )
+
+    log_dir = "logs/fit/" + ARGS.run_name
+    writer = SummaryWriter(log_dir=log_dir)
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=tokenized_data,
+        eval_dataset=tokenized_data,
+        tokenizer=TOKENIZER,
+        optimizers=(optimizer, None),
+        callbacks=[TensorBoardCallback(writer)],
+    )
 
     if ARGS.load:
         print(f"Load model from '{ARGS.checkpoint}'.")
-        model.load_state_dict(torch_load(ARGS.checkpoint, map_location=torch.device('cpu')))
+        model.load_state_dict(torch_load(ARGS.checkpoint))
 
     # Do hw-aware training if in analog domain and the model isn't loaded from
     # an existing checkpoint
     if ARGS.train_hwa and not ARGS.digital and not ARGS.load:
         trainer.train()
         torch_save(model.state_dict(), ARGS.checkpoint)
-    do_inference(model, trainer, dataset, writer)
 
+    do_inference(model, trainer, tokenized_data, writer)
+
+# Check if ARGS.wandb is used
 if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
 else:
