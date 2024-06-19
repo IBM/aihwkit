@@ -115,7 +115,7 @@ DOC_STRIDE = 128
 
 def create_ideal_rpu_config(tile_size=512):
     """Create RPU Config with ideal conditions"""
-    rpu_config = InferenceRPUConfig(
+    rpu_config = torchInferenceRPUConfig(
         mapping=MappingParameter(
             digital_bias=True,
             learn_out_scaling=True,
