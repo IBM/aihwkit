@@ -49,7 +49,8 @@ enum class DeviceUpdateType {
   ChoppedTransfer,
   DynamicTransfer,
   SoftBoundsReference,
-  PowStepReference
+  PowStepReference,
+  JARTv1b
 };
 
 // inherit from Simple

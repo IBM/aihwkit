@@ -15,6 +15,7 @@
 #include "rpucuda_pulsed_device.h"
 #include <memory>
 
+#include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_buffered_transfer_device.h"
 #include "rpucuda_chopped_transfer_device.h"
 #include "rpucuda_constantstep_device.h"
@@ -78,6 +79,8 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
   case DeviceUpdateType::PiecewiseStep:
     return new PiecewiseStepRPUDeviceCuda<T>(
         c, static_cast<const PiecewiseStepRPUDevice<T> &>(rpu_device));
+  case DeviceUpdateType::JARTv1b:
+    return new JARTv1bRPUDeviceCuda<T>(c, static_cast<const JARTv1bRPUDevice<T> &>(rpu_device));
   case DeviceUpdateType::ChoppedTransfer:
     return new ChoppedTransferRPUDeviceCuda<T>(
         c, static_cast<const ChoppedTransferRPUDevice<T> &>(rpu_device));
