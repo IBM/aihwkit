@@ -27,6 +27,7 @@ from transformers import DataCollatorForLanguageModeling
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
+    AutoModelForQuestionAnswering,
     Trainer,
     TrainingArguments,
     DefaultDataCollator,
@@ -39,6 +40,7 @@ from evaluate import load
 from datasets import load_dataset
 
 from aihwkit.simulator.configs import (
+    TorchInferenceRPUConfig,
     InferenceRPUConfig,
     WeightModifierType,
     WeightClipType,
@@ -115,7 +117,7 @@ if ARGS.wandb:
 
 def create_ideal_rpu_config(tile_size=512):
     """Create RPU Config with ideal conditions"""
-    rpu_config = InferenceRPUConfig(
+    rpu_config = TorchInferenceRPUConfig(
         mapping=MappingParameter(
             digital_bias=True,
             learn_out_scaling=True,
