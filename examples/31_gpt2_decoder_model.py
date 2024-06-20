@@ -27,7 +27,6 @@ from transformers import DataCollatorForLanguageModeling
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
-    AutoModelForQuestionAnswering,
     Trainer,
     TrainingArguments,
     DefaultDataCollator,
