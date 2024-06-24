@@ -38,7 +38,6 @@ from evaluate import load
 from datasets import load_dataset
 
 from aihwkit.simulator.configs import (
-    TorchInferenceRPUConfig,
     InferenceRPUConfig,
     WeightModifierType,
     WeightClipType,
@@ -138,7 +137,7 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     if ARGS.wandb:
         modifier_noise = wandb.config.modifier_noise
 
-    rpu_config = TorchInferenceRPUConfig(
+    rpu_config = InferenceRPUConfig(
         clip=WeightClipParameter(type=WeightClipType.FIXED_VALUE, fixed_value=1.0),
         modifier=WeightModifierParameter(
             rel_to_actual_wmax=True, type=WeightModifierType.ADD_NORMAL, std_dev=modifier_noise
@@ -167,19 +166,16 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     )
     return rpu_config
 
+
 def create_model(rpu_config):
     """Return Question Answering model and whether or not it was loaded from a checkpoint"""
+
     model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
+
     if not ARGS.digital:
         model = convert_to_analog(model, rpu_config)
         model.remap_analog_weights()
-        
-        # Add logging for noise statistics per layer
-        for name, layer in model.named_modules():
-            if hasattr(layer, 'analog_tile'):
-                print(f"Layer {name}: Noise stats: {layer.analog_tile.tile_config}")
-                # Log noise levels or other relevant statistics
-                
+
     print(model)
     return model
 
@@ -435,7 +431,7 @@ def postprocess_predictions(
 
 def create_datasets():
     """Load the SQuAD dataset, the tokenized version, and the validation set"""
-    squad = load_dataset("squad", name="plain_text")
+    squad = load_dataset("squad")
 
     # Preprocessing changes number of samples, so we need to remove some columns so
     # the data updates properly
@@ -488,44 +484,54 @@ def make_trainer(model, optimizer, tokenized_data):
 
     return trainer, writer
 
+
 def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9):
     """Perform inference experiment at weight noise level specified at runtime.
     SQuAD exact match and f1 metrics are captured in Tensorboard
     """
-    
+
+    # Helper functions
     def predict():
+        # Perform inference + evaluate metric here
         raw_predictions = trainer.predict(eval_data)
         predictions = postprocess_predictions(
             squad["validation"], eval_data, raw_predictions.predictions
         )
+
+        # Format to list of dicts instead of a large dict
         formatted_preds = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
+
         out_metric = metric.compute(predictions=formatted_preds, references=ground_truth)
+
         return out_metric["f1"], out_metric["exact_match"]
 
     def write_metrics(f1, exact_match, t_inference):
+        # Add information to tensorboard
         writer.add_scalar("val/f1", f1, t_inference)
         writer.add_scalar("val/exact_match", exact_match, t_inference)
+
         if ARGS.wandb:
             wandb.log({"t_inference": t_inference, "f1": f1, "exact_match": exact_match})
+
         print(f"Exact match: {exact_match: .2f}\t" f"F1: {f1: .2f}\t" f"Drift: {t_inference: .2e}")
 
     model.eval()
+
     metric = load("squad")
+
     ground_truth = [{"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]]
+
     t_inference_list = logspace(0, log10(float(max_inference_time)), n_times).tolist()
+
+    # Get the initial metrics
     f1, exact_match = predict()
     write_metrics(f1, exact_match, 0.0)
-    
+
     for t_inference in t_inference_list:
         model.drift_analog_weights(t_inference)
         f1, exact_match = predict()
         write_metrics(f1, exact_match, t_inference)
-        
-        # Log layer-wise noise impact
-        for name, layer in model.named_modules():
-            if hasattr(layer, 'analog_tile'):
-                noise_level = layer.analog_tile.tile_config
-                writer.add_scalar(f"noise/{name}", noise_level, t_inference)
+
 
 def main():
     """Provide the lambda function for WandB sweep. If WandB is not used, then this
