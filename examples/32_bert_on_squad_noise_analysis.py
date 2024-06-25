@@ -524,7 +524,8 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
         # Log layer-wise noise impact
         for name, layer in model.named_modules():
             if hasattr(layer, 'analog_tile'):
-                noise_level = layer.analog_tile.tile_config
+                # Assuming noise_level is an attribute of the analog_tile or can be calculated
+                noise_level = layer.analog_tile.tile_config.modifier.std_dev
                 writer.add_scalar(f"noise/{name}", noise_level, t_inference)
 
 def main():
