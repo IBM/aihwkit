@@ -38,6 +38,7 @@ from evaluate import load
 from datasets import load_dataset
 
 from aihwkit.simulator.configs import (
+    TorchInferenceRPUConfig,
     InferenceRPUConfig,
     WeightModifierType,
     WeightClipType,
@@ -115,7 +116,7 @@ DOC_STRIDE = 128
 
 def create_ideal_rpu_config(tile_size=512):
     """Create RPU Config with ideal conditions"""
-    rpu_config = InferenceRPUConfig(
+    rpu_config = TorchInferenceRPUConfig(
         mapping=MappingParameter(
             digital_bias=True,
             learn_out_scaling=True,
@@ -137,7 +138,7 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     if ARGS.wandb:
         modifier_noise = wandb.config.modifier_noise
 
-    rpu_config = InferenceRPUConfig(
+    rpu_config = TorchInferenceRPUConfig(
         clip=WeightClipParameter(type=WeightClipType.FIXED_VALUE, fixed_value=1.0),
         modifier=WeightModifierParameter(
             rel_to_actual_wmax=True, type=WeightModifierType.ADD_NORMAL, std_dev=modifier_noise
