@@ -35,7 +35,7 @@ from torch.utils.tensorboard import SummaryWriter
 from datasets import load_dataset
 
 from aihwkit.simulator.configs import (
-    TorchInferenceRPUConfig
+    TorchInferenceRPUConfig,
     InferenceRPUConfig,
     WeightModifierType,
     WeightClipType,
@@ -54,7 +54,7 @@ from aihwkit.optim import AnalogSGD
 
 
 # GPT-2 model from Hugging Face model hub
-MODEL_NAME = "distilgpt2"
+MODEL_NAME = "distilbert/distilgpt2"
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 # Parse some arguments
@@ -279,4 +279,12 @@ def main():
     # Do hw-aware training if in analog domain and the model isn't loaded from
     # an existing checkpoint
     if ARGS.train_hwa and not ARGS.digital and not ARGS.load:
-        trainer.trai
+        trainer.train()
+        torch_save(model.state_dict(), ARGS.checkpoint)
+    do_inference(model, trainer, eval_dataset, writer)
+
+
+if ARGS.wandb:
+    wandb.agent(SWEEP_ID, function=main, count=4)
+else:
+    main()
