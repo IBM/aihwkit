@@ -180,7 +180,7 @@ def preprocess_function(examples):
 
 def create_datasets():
     """Load the openwebtext dataset"""
-    dataset = load_dataset("openwebtext", split="train[:1%]").train_test_split(test_size=0.1)
+    dataset = load_dataset("openwebtext", split="train[:1%]", trust_remote_code=True).train_test_split(test_size=0.1)
     tokenized_datasets = dataset.map(preprocess_function, batched=True, remove_columns=["text"])
     return tokenized_datasets["train"], tokenized_datasets["test"]
 
