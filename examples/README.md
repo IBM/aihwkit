@@ -17,7 +17,7 @@ For example:
 to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training
 
-## Example 31: [31_gpt2_on_openwebtext.py]
+## Example 31: ['31_gpt2_on_openwebtext.py']
 This example is adapted from
 https://github.com/huggingface/notebooks/blob/main/examples/language_modeling.ipynb
 
@@ -33,7 +33,7 @@ to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training.
 
 ## Example 32: 
-Example 32: [32_bert_noise_analysis.py]
+Example 32: ['32_bert_noise_analysis.py']
 This example is adapted from
 https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 
