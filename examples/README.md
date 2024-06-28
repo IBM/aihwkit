@@ -32,8 +32,7 @@ python /path/to/aihwkit/examples/31_gpt2_on_openwebtext.py -n 0.1 -r "run 1" -l 
 to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training.
 
-## Example 32: 
-Example 32: ['32_bert_on_squad_noise_analysis.py']
+## Example 32: ['32_bert_on_squad_noise_analysis.py']
 This example is adapted from
 https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 
@@ -50,6 +49,15 @@ Additionally, the script allows for the loading of a pre-trained analog model fr
 - Train and save the analog model: python 32_bert_on_squad_noise_analysis.py --noise 0.1 --train_hwa --checkpoint ./saved_chkpt_noise_analysis.pth
 - Load and evaluate the analog model: python 32_bert_on_squad_noise_analysis.py --noise 0.1 --checkpoint ./saved_chkpt_noise_analysis.pth --load
 
+#Major Changes
+1. Identify the Layers: Extract the names or indices of each layer in the model.
+2. Modify the Noise Configuration: Implement a mechanism to apply noise only to one layer at a time while keeping other layers noise-free.
+3. Evaluate the Impact: Evaluate the impact of noise on each layer by measuring the F1 score drop for each noisy layer configuration.
+
+apply_noise_to_layer: This function applies noise to a specific layer in the model.
+get_all_layers: This function returns the names of all layers in the model.
+evaluate_noise_sensitivity: This function evaluates the noise sensitivity for each layer by applying noise to one layer at a time, performing inference, and measuring the F1 score and exact match metrics.
+main: Updated to perform noise sensitivity analysis by calling the new functions.
 
 [`01_simple_layer.py`]: 01_simple_layer.py
 [`02_multiple_layer.py`]: 02_multiple_layer.py
