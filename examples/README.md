@@ -33,7 +33,7 @@ to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training.
 
 ## Example 32: 
-Example 32: ['32_bert_noise_analysis.py']
+Example 32: ['32_bert_on_squad_noise_analysis.py']
 This example is adapted from
 https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 
@@ -47,8 +47,8 @@ to set the weight noise to 0.1, name the run in Tensorboard "run 1", set the lea
 
 Additionally, the script allows for the loading of a pre-trained analog model from a checkpoint to evaluate the noise sensitivity of different layers, providing insights into which layers are most vulnerable to noise and thus require more robust analog hardware implementations.
 
-- Train and save the analog model: python 32_bert_on_squad_noise_analysis.py --noise 0.1 --train_hwa --checkpoint ./saved_chkpt.pth
-- Load and evaluate the analog model: python 324_bert_on_squad_noise_analysis.py --noise 0.1 --checkpoint ./saved_chkpt.pth --load
+- Train and save the analog model: python 32_bert_on_squad_noise_analysis.py --noise 0.1 --train_hwa --checkpoint ./saved_chkpt_noise_analysis.pth
+- Load and evaluate the analog model: python 32_bert_on_squad_noise_analysis.py --noise 0.1 --checkpoint ./saved_chkpt_noise_analysis.pth --load
 
 
 [`01_simple_layer.py`]: 01_simple_layer.py
