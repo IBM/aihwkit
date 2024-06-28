@@ -17,6 +17,7 @@
 """
 # pylint: disable=invalid-name, too-many-locals, import-error
 
+import torch
 from datetime import datetime
 from argparse import ArgumentParser
 from collections import OrderedDict, defaultdict
@@ -87,7 +88,7 @@ PARSER.add_argument(
     "-c",
     "--checkpoint",
     help="File name specifying where to load/save a checkpoint",
-    default="./saved_chkpt.pth",
+    default="./saved_chkpt_bert_noise_analysis.pth",
     type=str,
 )
 PARSER.add_argument(
