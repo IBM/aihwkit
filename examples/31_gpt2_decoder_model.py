@@ -54,8 +54,11 @@ from aihwkit.optim import AnalogSGD
 
 
 # GPT-2 model from Hugging Face model hub
-MODEL_NAME = "distilbert/distilgpt2"
+MODEL_NAME = "distilbert/distilgpt2" # Smallest GPT-2 model
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
+
+# Set the padding token to eos_token
+TOKENIZER.pad_token = TOKENIZER.eos_token
 
 # Parse some arguments
 PARSER = ArgumentParser("Analog GPT-2 on openwebtext example")
@@ -124,7 +127,6 @@ def create_ideal_rpu_config(tile_size=512):
     )
     return rpu_config
 
-
 def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     """Create RPU Config emulated typical PCM Device"""
     if ARGS.wandb:
@@ -145,8 +147,6 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
             max_output_size=0,
         ),
         forward=PresetIOParameters(
-            w_noise_type=WeightNoiseType.PCM_READ,
-            w_noise=0.0175,
             inp_res=dac_res,
             out_res=adc_res,
             out_bound=10.0,
@@ -165,6 +165,9 @@ def create_model(rpu_config):
 
     model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
 
+    # Update model config to use the new pad_token_id
+    model.config.pad_token_id = TOKENIZER.pad_token_id
+
     if not ARGS.digital:
         model = convert_to_analog(model, rpu_config)
         model.remap_analog_weights()
@@ -180,7 +183,12 @@ def preprocess_function(examples):
 
 def create_datasets():
     """Load the openwebtext dataset"""
-    dataset = load_dataset("openwebtext", split="train[:1%]", trust_remote_code=True).train_test_split(test_size=0.1)
+    try:
+        dataset = load_dataset("openwebtext", split="train[:0.1%]", trust_remote_code=True).train_test_split(test_size=0.1)
+    except Exception as e:
+        print(f"Error loading dataset: {e}")
+        return None, None
+    
     tokenized_datasets = dataset.map(preprocess_function, batched=True, remove_columns=["text"])
     return tokenized_datasets["train"], tokenized_datasets["test"]
 
@@ -191,6 +199,9 @@ def create_optimizer(model):
     optimizer.regroup_param_groups(model)
     return optimizer
 
+# Alleviate CUDA memory access issue
+import os
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 def make_trainer(model, optimizer, train_dataset, eval_dataset):
     """Create the Huggingface Trainer"""
@@ -288,3 +299,4 @@ if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
 else:
     main()
+
