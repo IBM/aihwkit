@@ -1,0 +1,777 @@
+(myenv) [BMHRjngg@npl41 examples]$ python 32_noisy_bert.py --noise 0.1 --checkpoint ./saved_chkpt_noise_analysis.pth --load
+/gpfs/u/home/BMHR/BMHRjngg/barn-shared/miniconda3/envs/myenv/lib/python3.11/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Some weights of the model checkpoint at csarron/bert-base-uncased-squad-v1 were not used when initializing BertForQuestionAnswering: ['bert.pooler.dense.bias', 'bert.pooler.dense.weight']
+- This IS expected if you are initializing BertForQuestionAnswering from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
+- This IS NOT expected if you are initializing BertForQuestionAnswering from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).
+AnalogWrapperBertForQuestionAnswering(
+  (bert): BertModel(
+    (embeddings): BertEmbeddings(
+      (word_embeddings): Embedding(30522, 768, padding_idx=0)
+      (position_embeddings): Embedding(512, 768)
+      (token_type_embeddings): Embedding(2, 768)
+      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): BertEncoder(
+      (layer): ModuleList(
+        (0-11): 12 x BertLayer(
+          (attention): BertAttention(
+            (self): BertSdpaSelfAttention(
+              (query): AnalogLinear(
+                in_features=768, out_features=768, bias=True, TorchInferenceRPUConfig
+                (analog_module): TileModuleArray(
+                  (array): ModuleList(
+                    (0-1): 2 x ModuleList(
+                      (0): TorchInferenceTile(
+                        (tile): TorchSimulatorTile(768, 384, cpu)
+                      )
+                    )
+                  )
+                )
+              )
+              (key): AnalogLinear(
+                in_features=768, out_features=768, bias=True, TorchInferenceRPUConfig
+                (analog_module): TileModuleArray(
+                  (array): ModuleList(
+                    (0-1): 2 x ModuleList(
+                      (0): TorchInferenceTile(
+                        (tile): TorchSimulatorTile(768, 384, cpu)
+                      )
+                    )
+                  )
+                )
+              )
+              (value): AnalogLinear(
+                in_features=768, out_features=768, bias=True, TorchInferenceRPUConfig
+                (analog_module): TileModuleArray(
+                  (array): ModuleList(
+                    (0-1): 2 x ModuleList(
+                      (0): TorchInferenceTile(
+                        (tile): TorchSimulatorTile(768, 384, cpu)
+                      )
+                    )
+                  )
+                )
+              )
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+            (output): BertSelfOutput(
+              (dense): AnalogLinear(
+                in_features=768, out_features=768, bias=True, TorchInferenceRPUConfig
+                (analog_module): TileModuleArray(
+                  (array): ModuleList(
+                    (0-1): 2 x ModuleList(
+                      (0): TorchInferenceTile(
+                        (tile): TorchSimulatorTile(768, 384, cpu)
+                      )
+                    )
+                  )
+                )
+              )
+              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+              (dropout): Dropout(p=0.1, inplace=False)
+            )
+          )
+          (intermediate): BertIntermediate(
+            (dense): AnalogLinear(
+              in_features=768, out_features=3072, bias=True, TorchInferenceRPUConfig
+              (analog_module): TileModuleArray(
+                (array): ModuleList(
+                  (0-1): 2 x ModuleList(
+                    (0): TorchInferenceTile(
+                      (tile): TorchSimulatorTile(3072, 384, cpu)
+                    )
+                  )
+                )
+              )
+            )
+            (intermediate_act_fn): GELUActivation()
+          )
+          (output): BertOutput(
+            (dense): AnalogLinear(
+              in_features=3072, out_features=768, bias=True, TorchInferenceRPUConfig
+              (analog_module): TileModuleArray(
+                (array): ModuleList(
+                  (0-5): 6 x ModuleList(
+                    (0): TorchInferenceTile(
+                      (tile): TorchSimulatorTile(768, 512, cpu)
+                    )
+                  )
+                )
+              )
+            )
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+      )
+    )
+  )
+  (qa_outputs): AnalogLinear(
+    in_features=768, out_features=2, bias=True, TorchInferenceRPUConfig
+    (analog_module): TileModuleArray(
+      (array): ModuleList(
+        (0-1): 2 x ModuleList(
+          (0): TorchInferenceTile(
+            (tile): TorchSimulatorTile(2, 384, cpu)
+          )
+        )
+      )
+    )
+  )
+)
+Detected kernel version 3.10.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+You are adding a <class 'transformers.integrations.integration_utils.TensorBoardCallback'> to the callbacks of this Trainer, but there is already one. The currentlist of callbacks is
+:DefaultFlowCallback
+TensorBoardCallback
+Load model from './saved_chkpt_noise_analysis.pth'.
+Test valid
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:54<00:00,  3.46s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.embeddings.word_embeddings.weight, F1 Score: 4.06, Exact Match: 0.55
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:38<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.embeddings.position_embeddings.weight, F1 Score: 4.19, Exact Match: 0.46
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:53<00:00,  3.46s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.embeddings.token_type_embeddings.weight, F1 Score: 0.59, Exact Match: 0.08
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:07<00:00,  3.50s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.embeddings.LayerNorm.weight, F1 Score: 87.11, Exact Match: 79.04
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:32<00:00,  3.40s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.embeddings.LayerNorm.bias, F1 Score: 86.89, Exact Match: 78.85
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [17:03<00:00,  2.97s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.query.analog_module.bias, F1 Score: 87.29, Exact Match: 79.23
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:27<00:00,  3.56s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.query.analog_module.array.0.0.analog_ctx, F1 Score: 86.89, Exact Match: 78.81
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:29<00:00,  3.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.query.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.04, Exact Match: 79.00
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:06<00:00,  3.50s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.query.analog_module.array.0.0.tile.weight, F1 Score: 86.99, Exact Match: 79.12
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:40<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.query.analog_module.array.1.0.analog_ctx, F1 Score: 86.95, Exact Match: 79.04
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:34<00:00,  3.58s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.query.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.10, Exact Match: 78.94
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:49<00:00,  3.62s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.query.analog_module.array.1.0.tile.weight, F1 Score: 86.98, Exact Match: 79.04
+ 90%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▌               | 309/345 [18:42<01:58,  3.28s/i 90%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏              | 310/345 [18:46<01:58,  3.38s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:54<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.key.analog_module.bias, F1 Score: 87.23, Exact Match: 79.29
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:07<00:00,  3.67s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.key.analog_module.array.0.0.analog_ctx, F1 Score: 87.16, Exact Match: 79.55
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:45<00:00,  3.61s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.key.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.20, Exact Match: 79.38
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:44<00:00,  3.26s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.key.analog_module.array.0.0.tile.weight, F1 Score: 87.07, Exact Match: 79.15
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:02<00:00,  3.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.key.analog_module.array.1.0.analog_ctx, F1 Score: 86.99, Exact Match: 79.02
+ 30%|████████████████████████████████████████████▍                                                                                                     | 105/345 [05:49<12:48,  3.20s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:50<00:00,  3.45s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.key.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.06, Exact Match: 79.03
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:54<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.key.analog_module.array.1.0.tile.weight, F1 Score: 87.00, Exact Match: 79.10
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:03<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.value.analog_module.bias, F1 Score: 86.75, Exact Match: 78.67
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:37<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.value.analog_module.array.0.0.analog_ctx, F1 Score: 87.23, Exact Match: 79.42
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:52<00:00,  3.63s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.value.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.76, Exact Match: 78.93
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:08<00:00,  3.68s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.value.analog_module.array.0.0.tile.weight, F1 Score: 87.35, Exact Match: 79.39
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:40<00:00,  3.60s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.value.analog_module.array.1.0.analog_ctx, F1 Score: 87.47, Exact Match: 79.67
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:05<00:00,  3.67s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.value.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.00, Exact Match: 79.25
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:14<00:00,  3.70s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.self.value.analog_module.array.1.0.tile.weight, F1 Score: 87.17, Exact Match: 79.25
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:11<00:00,  3.68s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.dense.analog_module.bias, F1 Score: 86.88, Exact Match: 78.76
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:47<00:00,  3.27s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.16, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:19<00:00,  3.53s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.20, Exact Match: 79.28
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:56<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.dense.analog_module.array.0.0.tile.weight, F1 Score: 86.83, Exact Match: 78.94
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:01<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.02, Exact Match: 79.05
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:24<00:00,  3.55s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.21, Exact Match: 79.47
+ 66%|█████████████████████████████████████████████████████████████████████████████████████████████████▊                                                  | 228/345 [13:42<07:05,  3.64s/i 66%|██████████████████████████████████████████████████████████████████████████████████████████████████▏                                                 | 229/345 [13:46<07:10,  3.71s/i 67%|█████████████████████████████████████████████████████████████████████████████████████████████████▎                                                | 230/345 [13:48<06:25,  3.36s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:37<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.dense.analog_module.array.1.0.tile.weight, F1 Score: 87.13, Exact Match: 79.37
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:32<00:00,  3.40s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.LayerNorm.weight, F1 Score: 87.18, Exact Match: 79.26
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:46<00:00,  3.61s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.attention.output.LayerNorm.bias, F1 Score: 87.32, Exact Match: 79.53
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:50<00:00,  3.63s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.intermediate.dense.analog_module.bias, F1 Score: 87.18, Exact Match: 79.32
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:14<00:00,  3.17s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.intermediate.dense.analog_module.array.0.0.analog_ctx, F1 Score: 86.93, Exact Match: 79.00
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:57<00:00,  3.65s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.intermediate.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.08, Exact Match: 79.10
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:25<00:00,  3.73s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.intermediate.dense.analog_module.array.0.0.tile.weight, F1 Score: 86.89, Exact Match: 78.91
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:37<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.intermediate.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.03, Exact Match: 79.12
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:02<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.intermediate.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.13, Exact Match: 79.23
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:28<00:00,  3.56s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.intermediate.dense.analog_module.array.1.0.tile.weight, F1 Score: 87.00, Exact Match: 79.09
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:11<00:00,  3.68s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.bias, F1 Score: 87.00, Exact Match: 78.95
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:10<00:00,  3.68s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.19, Exact Match: 79.37
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:04<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.99, Exact Match: 79.06
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:02<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.0.0.tile.weight, F1 Score: 87.28, Exact Match: 79.26
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:06<00:00,  3.67s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.1.0.analog_ctx, F1 Score: 86.84, Exact Match: 78.83
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:56<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.20, Exact Match: 79.21
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:57<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.1.0.tile.weight, F1 Score: 87.20, Exact Match: 79.41
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:49<00:00,  3.62s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.2.0.analog_ctx, F1 Score: 86.93, Exact Match: 79.02
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:13<00:00,  3.52s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.2.0.out_scaling_alpha, F1 Score: 86.88, Exact Match: 78.86
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:47<00:00,  3.62s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.2.0.tile.weight, F1 Score: 86.94, Exact Match: 78.80
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:33<00:00,  3.58s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.3.0.analog_ctx, F1 Score: 87.20, Exact Match: 79.16
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:01<00:00,  3.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.3.0.out_scaling_alpha, F1 Score: 87.19, Exact Match: 79.45
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:57<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.3.0.tile.weight, F1 Score: 87.23, Exact Match: 79.08
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:55<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.4.0.analog_ctx, F1 Score: 87.07, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:03<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.4.0.out_scaling_alpha, F1 Score: 87.22, Exact Match: 79.19
+ 97%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏   | 336/345 [20:33<00:34,  3.82s/i 98%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▌   | 337/345 [20:37<00:31,  3.90s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:06<00:00,  3.67s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.4.0.tile.weight, F1 Score: 86.95, Exact Match: 78.91
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:26<00:00,  3.56s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.5.0.analog_ctx, F1 Score: 86.99, Exact Match: 79.09
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:45<00:00,  3.61s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.5.0.out_scaling_alpha, F1 Score: 87.13, Exact Match: 79.09
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:15<00:00,  3.52s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.dense.analog_module.array.5.0.tile.weight, F1 Score: 87.06, Exact Match: 79.13
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:12<00:00,  3.52s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.LayerNorm.weight, F1 Score: 87.05, Exact Match: 79.07
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:00<00:00,  3.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.0.output.LayerNorm.bias, F1 Score: 86.93, Exact Match: 79.01
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:02<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.query.analog_module.bias, F1 Score: 87.19, Exact Match: 79.20
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:30<00:00,  3.57s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.query.analog_module.array.0.0.analog_ctx, F1 Score: 87.24, Exact Match: 79.27
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:24<00:00,  3.55s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.query.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.11, Exact Match: 79.34
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:32<00:00,  3.57s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.query.analog_module.array.0.0.tile.weight, F1 Score: 87.10, Exact Match: 79.25
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:30<00:00,  3.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.query.analog_module.array.1.0.analog_ctx, F1 Score: 87.03, Exact Match: 79.04
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:14<00:00,  3.52s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.query.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.09, Exact Match: 79.21
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:44<00:00,  3.61s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.query.analog_module.array.1.0.tile.weight, F1 Score: 87.10, Exact Match: 79.00
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:41<00:00,  3.60s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.key.analog_module.bias, F1 Score: 87.14, Exact Match: 79.15
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:59<00:00,  3.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.key.analog_module.array.0.0.analog_ctx, F1 Score: 86.76, Exact Match: 78.84
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:36<00:00,  3.58s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.key.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.00, Exact Match: 79.01
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:27<00:00,  3.56s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.key.analog_module.array.0.0.tile.weight, F1 Score: 87.01, Exact Match: 78.98
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:49<00:00,  3.62s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.key.analog_module.array.1.0.analog_ctx, F1 Score: 87.01, Exact Match: 79.18
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:55<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.key.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.14, Exact Match: 79.21
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:38<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.key.analog_module.array.1.0.tile.weight, F1 Score: 87.04, Exact Match: 79.23
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:17<00:00,  3.53s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.value.analog_module.bias, F1 Score: 87.16, Exact Match: 79.30
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:55<00:00,  3.64s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.value.analog_module.array.0.0.analog_ctx, F1 Score: 87.25, Exact Match: 79.46
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:47<00:00,  3.62s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.value.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.96, Exact Match: 79.03
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:58<00:00,  3.65s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.value.analog_module.array.0.0.tile.weight, F1 Score: 86.89, Exact Match: 78.81
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:37<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.value.analog_module.array.1.0.analog_ctx, F1 Score: 87.20, Exact Match: 79.38
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:49<00:00,  3.62s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.value.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.13, Exact Match: 79.11
+100%|██████████████████████████████████████████████████████████████████ ██████████████████████████████████████████████████████████████████████████████████| 345/345 [20:47<00:00,  3.61s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.self.value.analog_module.array.1.0.tile.weight, F1 Score: 86.93, Exact Match: 78.94
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:03<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.output.dense.analog_module.bias, F1 Score: 87.27, Exact Match: 79.51
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:03<00:00,  3.66s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.output.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.09, Exact Match: 79.04
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:27<00:00,  3.56s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.output.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.95, Exact Match: 78.75
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:30<00:00,  3.57s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.attention.output.dense.analog_module.array.0.0.tile.weight, F1 Score: 87.14, Exact Match: 79.46
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [21:04<00:00,  3.67s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.03, Exact Match: 79.05
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:29<00:00,  2.52s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 86.99, Exact Match: 79.07
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:46<00:00,  2.57s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.1.0.tile.weight, F1 Score: 87.31, Exact Match: 79.74
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:03<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.2.0.analog_ctx, F1 Score: 87.15, Exact Match: 79.39
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:26<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.2.0.out_scaling_alpha, F1 Score: 87.23, Exact Match: 79.34
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:50<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.2.0.tile.weight, F1 Score: 87.06, Exact Match: 79.16
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:29<00:00,  2.35s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.3.0.analog_ctx, F1 Score: 86.87, Exact Match: 78.90
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:02<00:00,  2.27s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.3.0.out_scaling_alpha, F1 Score: 86.96, Exact Match: 78.85
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:35<00:00,  2.36s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.3.0.tile.weight, F1 Score: 87.29, Exact Match: 79.56
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:45<00:00,  2.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.4.0.analog_ctx, F1 Score: 86.88, Exact Match: 78.89
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:45<00:00,  2.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.4.0.out_scaling_alpha, F1 Score: 87.25, Exact Match: 79.26
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:38<00:00,  2.37s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.4.0.tile.weight, F1 Score: 87.07, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:37<00:00,  2.37s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.5.0.analog_ctx, F1 Score: 87.16, Exact Match: 79.21
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:44<00:00,  2.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.5.0.out_scaling_alpha, F1 Score: 87.08, Exact Match: 79.16
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:57<00:00,  2.43s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.dense.analog_module.array.5.0.tile.weight, F1 Score: 86.97, Exact Match: 79.13
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:56<00:00,  2.42s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.LayerNorm.weight, F1 Score: 86.93, Exact Match: 79.10
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:17<00:00,  2.49s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.1.output.LayerNorm.bias, F1 Score: 87.20, Exact Match: 79.25
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:04<00:00,  2.45s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.query.analog_module.bias, F1 Score: 87.19, Exact Match: 79.28
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:40<00:00,  2.38s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.query.analog_module.array.0.0.analog_ctx, F1 Score: 87.16, Exact Match: 79.36
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:58<00:00,  2.43s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.query.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.02, Exact Match: 79.22
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:14<00:00,  2.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.query.analog_module.array.0.0.tile.weight, F1 Score: 86.90, Exact Match: 79.04
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:11<00:00,  2.47s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.query.analog_module.array.1.0.analog_ctx, F1 Score: 87.07, Exact Match: 78.92
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:00<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.query.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.12, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:41<00:00,  2.38s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.query.analog_module.array.1.0.tile.weight, F1 Score: 87.10, Exact Match: 79.26
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:37<00:00,  2.37s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.key.analog_module.bias, F1 Score: 86.99, Exact Match: 78.92
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:03<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.key.analog_module.array.0.0.analog_ctx, F1 Score: 87.00, Exact Match: 79.10
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:18<00:00,  2.49s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.key.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.97, Exact Match: 79.17
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:40<00:00,  2.38s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.key.analog_module.array.0.0.tile.weight, F1 Score: 87.34, Exact Match: 79.39
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:47<00:00,  2.40s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.key.analog_module.array.1.0.analog_ctx, F1 Score: 87.18, Exact Match: 79.43
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:49<00:00,  2.40s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.key.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.03, Exact Match: 79.16
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:02<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.key.analog_module.array.1.0.tile.weight, F1 Score: 86.92, Exact Match: 78.96
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:00<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.value.analog_module.bias, F1 Score: 87.02, Exact Match: 78.80
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:11<00:00,  2.47s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.value.analog_module.array.0.0.analog_ctx, F1 Score: 86.96, Exact Match: 78.81
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:02<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.value.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.90, Exact Match: 78.78
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:59<00:00,  2.43s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.value.analog_module.array.0.0.tile.weight, F1 Score: 87.23, Exact Match: 79.28
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:48<00:00,  2.40s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.value.analog_module.array.1.0.analog_ctx, F1 Score: 87.08, Exact Match: 79.08
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:28<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.value.analog_module.array.1.0.out_scaling_alpha, F1 Score: 86.96, Exact Match: 78.93
+ 22%|████████████████████████████████▍                                                                                                                    | 75/345 [02:54<12:12,  2.71s/it] 26%|██████████████████████████████████████                                                                                                               | 88/345 [03:27<10:15,  2.39s 26%|█████████████████████████████████████▉                                                                                                             | 89/345 [03:29<10:33,  2.47s/it] 27%|█100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:51<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.self.value.analog_module.array.1.0.tile.weight, F1 Score: 87.19, Exact Match: 79.34
+ 65%|███████████████████████████████████████████████████████████████████████████████████████████████▋                                                    | 223/345 [08:48<04:32,  2.24s/i 6 66%|█████████████████████████████████████████████████████████████████████████████████████████████████▊                                                  | 228/345 [09:00<04:32,  2.33s/it]100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:44<00:00,  2.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.dense.analog_module.bias, F1 Score: 86.99, Exact Match: 79.15
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:52<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.01, Exact Match: 79.28
+ 51%|███████████████████████████████████████████████████████████████████████████▉                                                                        | 177/345 [06:52<06:37,  2.37s/it]100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:26<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.04, Exact Match: 79.16
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:31<00:00,  2.35s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.dense.analog_module.array.0.0.tile.weight, F1 Score: 86.86, Exact Match: 78.89
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:02<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.20, Exact Match: 79.33
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:35<00:00,  2.36s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.03, Exact Match: 79.10
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:44<00:00,  2.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.dense.analog_module.array.1.0.tile.weight, F1 Score: 87.14, Exact Match: 79.24
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:31<00:00,  2.35s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.LayerNorm.weight, F1 Score: 86.82, Exact Match: 78.87
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:46<00:00,  2.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.attention.output.LayerNorm.bias, F1 Score: 87.18, Exact Match: 79.02
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:54<00:00,  2.42s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.intermediate.dense.analog_module.bias, F1 Score: 86.95, Exact Match: 79.00
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:06<00:00,  2.28s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.intermediate.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.13, Exact Match: 79.56
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:35<00:00,  2.36s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.intermediate.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.72, Exact Match: 78.71
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:18<00:00,  2.49s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.intermediate.dense.analog_module.array.0.0.tile.weight, F1 Score: 86.76, Exact Match: 78.72
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:30<00:00,  2.35s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.intermediate.dense.analog_module.array.1.0.analog_ctx, F1 Score: 86.98, Exact Match: 78.92
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:26<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.intermediate.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.02, Exact Match: 78.98
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:25<00:00,  2.33s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.intermediate.dense.analog_module.array.1.0.tile.weight, F1 Score: 87.20, Exact Match: 79.38
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:21<00:00,  2.32s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.bias, F1 Score: 87.07, Exact Match: 79.02
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [12:51<00:00,  2.24s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.0.0.analog_ctx, F1 Score: 86.98, Exact Match: 79.15
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:25<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.16, Exact Match: 79.33
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:10<00:00,  2.29s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.0.0.tile.weight, F1 Score: 87.14, Exact Match: 79.15
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:23<00:00,  2.33s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.04, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:36<00:00,  2.37s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.02, Exact Match: 79.23
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:57<00:00,  2.43s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.1.0.tile.weight, F1 Score: 86.87, Exact Match: 78.59
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:30<00:00,  2.35s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.2.0.analog_ctx, F1 Score: 86.91, Exact Match: 78.97
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:25<00:00,  2.33s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.2.0.out_scaling_alpha, F1 Score: 87.22, Exact Match: 79.38
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:22<00:00,  2.50s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.2.0.tile.weight, F1 Score: 85.45, Exact Match: 76.73
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:14<00:00,  2.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.3.0.analog_ctx, F1 Score: 87.07, Exact Match: 78.92
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:50<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.3.0.out_scaling_alpha, F1 Score: 87.01, Exact Match: 79.14
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:15<00:00,  2.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.3.0.tile.weight, F1 Score: 85.66, Exact Match: 76.86
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:08<00:00,  2.46s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.4.0.analog_ctx, F1 Score: 87.12, Exact Match: 79.16
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:49<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.4.0.out_scaling_alpha, F1 Score: 87.11, Exact Match: 79.28
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:39<00:00,  2.37s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.4.0.tile.weight, F1 Score: 87.02, Exact Match: 79.07
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:51<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.5.0.analog_ctx, F1 Score: 86.92, Exact Match: 79.21
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:25<00:00,  2.51s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.5.0.out_scaling_alpha, F1 Score: 87.23, Exact Match: 79.30
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:48<00:00,  2.40s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.dense.analog_module.array.5.0.tile.weight, F1 Score: 87.10, Exact Match: 79.25
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:36<00:00,  2.37s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.LayerNorm.weight, F1 Score: 86.73, Exact Match: 78.65
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:56<00:00,  2.42s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.2.output.LayerNorm.bias, F1 Score: 87.02, Exact Match: 78.76
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:14<00:00,  2.48s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.query.analog_module.bias, F1 Score: 87.07, Exact Match: 78.99
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:08<00:00,  2.46s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.query.analog_module.array.0.0.analog_ctx, F1 Score: 86.99, Exact Match: 79.12
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:42<00:00,  2.38s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.query.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.15, Exact Match: 79.08
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:11<00:00,  2.47s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.query.analog_module.array.0.0.tile.weight, F1 Score: 87.13, Exact Match: 79.40
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:52<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.query.analog_module.array.1.0.analog_ctx, F1 Score: 86.85, Exact Match: 78.75
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:02<00:00,  2.27s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.query.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.04, Exact Match: 79.01
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:43<00:00,  2.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.query.analog_module.array.1.0.tile.weight, F1 Score: 87.03, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:17<00:00,  2.31s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.key.analog_module.bias, F1 Score: 87.21, Exact Match: 79.23
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:41<00:00,  2.38s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.key.analog_module.array.0.0.analog_ctx, F1 Score: 86.98, Exact Match: 79.07
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:02<00:00,  2.44s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.key.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.10, Exact Match: 79.15
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:34<00:00,  2.53s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.key.analog_module.array.0.0.tile.weight, F1 Score: 87.08, Exact Match: 79.05
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:10<00:00,  2.47s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.key.analog_module.array.1.0.analog_ctx, F1 Score: 87.14, Exact Match: 79.21
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:53<00:00,  2.42s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.key.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.22, Exact Match: 79.36
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:23<00:00,  2.33s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.key.analog_module.array.1.0.tile.weight, F1 Score: 87.03, Exact Match: 78.94
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:28<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.value.analog_module.bias, F1 Score: 87.11, Exact Match: 79.21
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:03<00:00,  2.45s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.value.analog_module.array.0.0.analog_ctx, F1 Score: 87.27, Exact Match: 79.28
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:50<00:00,  2.41s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.value.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.12, Exact Match: 79.25
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:42<00:00,  2.38s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.value.analog_module.array.0.0.tile.weight, F1 Score: 86.90, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:28<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.value.analog_module.array.1.0.analog_ctx, F1 Score: 87.02, Exact Match: 79.06
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [15:07<00:00,  2.63s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.value.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.06, Exact Match: 79.13
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:04<00:00,  2.45s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.self.value.analog_module.array.1.0.tile.weight, F1 Score: 86.96, Exact Match: 78.97
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:26<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.dense.analog_module.bias, F1 Score: 86.98, Exact Match: 78.94
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [13:27<00:00,  2.34s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.12, Exact Match: 79.24
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:19<00:00,  3.36s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.21, Exact Match: 79.32
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:58<00:00,  3.47s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.dense.analog_module.array.0.0.tile.weight, F1 Score: 87.21, Exact Match: 79.34
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:18<00:00,  3.53s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.02, Exact Match: 79.11
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:28<00:00,  3.39s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 86.94, Exact Match: 78.93
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:51<00:00,  3.28s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.dense.analog_module.array.1.0.tile.weight, F1 Score: 86.89, Exact Match: 79.06
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:38<00:00,  3.42s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.LayerNorm.weight, F1 Score: 87.03, Exact Match: 79.17
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:08<00:00,  3.16s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.attention.output.LayerNorm.bias, F1 Score: 86.95, Exact Match: 79.17
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [17:57<00:00,  3.12s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.intermediate.dense.analog_module.bias, F1 Score: 87.18, Exact Match: 79.37
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [16:21<00:00,  2.84s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.intermediate.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.24, Exact Match: 79.31
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [16:08<00:00,  2.81s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.intermediate.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 86.95, Exact Match: 79.03
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [17:23<00:00,  3.02s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.intermediate.dense.analog_module.array.0.0.tile.weight, F1 Score: 86.74, Exact Match: 78.52
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:35<00:00,  3.23s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.intermediate.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.24, Exact Match: 79.36
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:09<00:00,  3.33s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.intermediate.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.21, Exact Match: 79.19
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:06<00:00,  3.50s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.intermediate.dense.analog_module.array.1.0.tile.weight, F1 Score: 86.88, Exact Match: 78.87
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:58<00:00,  3.47s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.bias, F1 Score: 87.19, Exact Match: 79.24
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [16:47<00:00,  2.92s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.0.0.analog_ctx, F1 Score: 87.20, Exact Match: 79.19
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:52<00:00,  3.28s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.0.0.out_scaling_alpha, F1 Score: 87.25, Exact Match: 79.28
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [17:48<00:00,  3.10s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.0.0.tile.weight, F1 Score: 87.12, Exact Match: 78.98
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [16:41<00:00,  2.90s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.1.0.analog_ctx, F1 Score: 87.25, Exact Match: 79.39
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [14:49<00:00,  2.58s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.1.0.out_scaling_alpha, F1 Score: 87.30, Exact Match: 79.46
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [16:30<00:00,  2.87s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.1.0.tile.weight, F1 Score: 83.88, Exact Match: 73.85
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [17:42<00:00,  3.08s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.2.0.analog_ctx, F1 Score: 86.99, Exact Match: 78.88
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:37<00:00,  3.24s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.2.0.out_scaling_alpha, F1 Score: 86.90, Exact Match: 78.90
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:20<00:00,  3.36s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.2.0.tile.weight, F1 Score: 86.75, Exact Match: 78.68
+ 72%|██████████████████████████████████████████████████████████████████████████████████████████████████████████▍                                         | 248/345 [14:11<05:40,  3.51s/i 72%|█████████████████████████████████████████████████████████████████████████████████████████████████████████▎                                        | 249/345 [14:15<05:48,  3.63s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:53<00:00,  3.46s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.3.0.analog_ctx, F1 Score: 86.95, Exact Match: 78.93
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [20:36<00:00,  3.59s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.3.0.out_scaling_alpha, F1 Score: 87.00, Exact Match: 79.12
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [18:55<00:00,  3.29s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: bert.encoder.layer.3.output.dense.analog_module.array.3.0.tile.weight, F1 Score: 77.13, Exact Match: 63.69
+
+(Omit)
+
+Post-processing 10570 example predictions split into 11033 features.
+Layer: qa_outputs.analog_module.bias, F1 Score: 87.51, Exact Match: 79.60
+ 79%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋                          79%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████                               | 272/345 [15:22<04:12,  3.46s/it]100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 345/345 [19:39<00:00,  3.42s/it]
+Post-processing 10570 example predictions split into 11033 features.
+Layer: qa_outputs.analog_module.array.0.0.analog_ctx, F1 Score: 87.04, Exact Match: 79.17
+ 44%|███████████████████████████████████████████████████████████████▉                                                                                  | 151/345 [08:09<12:06,  3.74s/it]
