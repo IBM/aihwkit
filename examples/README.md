@@ -22,13 +22,13 @@ This example is adapted from
 https://github.com/huggingface/notebooks/blob/main/examples/language_modeling.ipynb
 
 The example loads a pre-trained GPT-2 model trained on
-the openwebtext dataset. It then applies convert_to_analog()
-to examine the effects of drift_analog_weights() on inference performance at
+the openwebtext dataset. It then applies `convert_to_analog()`
+to examine the effects of `drift_analog_weights()` on inference performance at
 different weight noise levels. Tensorboard is used to display the perplexity
 metrics evaluated using the model at various times after training completed.
 
 Commandline arguments can be used to control certain options. For example:
-python /path/to/aihwkit/examples/31_gpt2_on_openwebtext.py -n 0.1 -r "run 1" -l 0.0005 -t
+`python /path/to/aihwkit/examples/31_gpt2_on_openwebtext.py -n 0.1 -r "run 1" -l 0.0005 -t`
 to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training.
 
@@ -41,13 +41,13 @@ the SQuAD dataset. It then applies convert_to_analog()
 to examine the effects of noise on different layers of the model. Specifically, it evaluates the sensitivity of each layer to noise by injecting noise into individual layers and measuring the resulting drop in F1 score and exact match metrics on the SQuAD task.
 
 The script uses Tensorboard to display the SQuAD metrics evaluated at various times after training completed, and command-line arguments can be used to control various options. For example:
-python /path/to/aihwkit/examples/32_bert_noise_analysis.py -n 0.1 -r "run 1" -l 0.0005 -t
+`python /path/to/aihwkit/examples/32_bert_noise_analysis.py -n 0.1 -r "run 1" -l 0.0005 -t`
 to set the weight noise to 0.1, name the run in Tensorboard "run 1", set the learning rate to 0.0005, and enable hardware-aware training.
 
 Additionally, the script allows for the loading of a pre-trained analog model from a checkpoint to evaluate the noise sensitivity of different layers, providing insights into which layers are most vulnerable to noise and thus require more robust analog hardware implementations.
 
-- Train and save the analog model: python 32_bert_on_squad_noise_analysis.py --noise 0.1 --train_hwa --checkpoint ./saved_chkpt_noise_analysis.pth
-- Load and evaluate the analog model: python 32_bert_on_squad_noise_analysis.py --noise 0.1 --checkpoint ./saved_chkpt_noise_analysis.pth --load
+- Train and save the analog model: `python 32_bert_on_squad_noise_analysis.py --noise 0.1 --train_hwa --checkpoint ./saved_chkpt_noise_analysis.pth`
+- Load and evaluate the analog model: `python 32_bert_on_squad_noise_analysis.py --noise 0.1 --checkpoint ./saved_chkpt_noise_analysis.pth --load`
 
 <b>Major Changes</b>
 1. Identify the Layers: Extract the names or indices of each layer in the model.
@@ -89,3 +89,5 @@ Additionally, the script allows for the loading of a pre-trained analog model fr
 [`28_advanced_irdrop.py`]: 28_advanced_irdrop.py
 [`29_linalg_krylov.py`]: 29_linalg_krylov.py
 [`30_external_hardware_aware_model.py`]: 30_external_hardware_aware_model.py
+['31_gpt2_on_openwebtext.py']: 31_gpt2_on_openwebtext.py
+['32_bert_on_squad_noise_analysis.py']: 32_bert_on_squad_noise_analysis.py
