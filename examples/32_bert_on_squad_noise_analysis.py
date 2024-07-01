@@ -1,29 +1,7 @@
-# -*- coding: utf-8 -*-
-
-# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
-#
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
-
-"""aihwkit example 24: Example using convert_to_analog to run BERT transformer on SQuAD task
-**Source**:
-    The example is adapted from code in
-    https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
-"""
-# pylint: disable=invalid-name, too-many-locals, import-error
-
-import torch
+import argparse
 from datetime import datetime
-from argparse import ArgumentParser
 from collections import OrderedDict, defaultdict
 from numpy import log10, logspace, argsort
-from transformers.integrations import TensorBoardCallback
-
 from transformers import (
     AutoTokenizer,
     AutoModelForQuestionAnswering,
@@ -31,13 +9,12 @@ from transformers import (
     TrainingArguments,
     DefaultDataCollator,
 )
-
+import torch
 from torch import save as torch_save, load as torch_load
+from transformers.integrations import TensorBoardCallback
 from torch.utils.tensorboard import SummaryWriter
-
 from evaluate import load
 from datasets import load_dataset
-
 from aihwkit.simulator.configs import (
     TorchInferenceRPUConfig,
     InferenceRPUConfig,
@@ -50,70 +27,29 @@ from aihwkit.simulator.configs import (
     WeightModifierParameter,
     MappingParameter,
 )
-
 from aihwkit.simulator.presets import PresetIOParameters
 from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.optim import AnalogSGD
 
+# Argument parsing
+parser = argparse.ArgumentParser("Analog BERT on SQuAD example")
+parser.add_argument("-d", "--digital", help="Add to use digital inference", action="store_true")
+parser.add_argument("-i", "--ideal", help="Add to use ideal config instead of default noisy one", action="store_true")
+parser.add_argument("-w", "--wandb", help="Add to use wandb", action="store_true")
+parser.add_argument("-n", "--noise", help="Modifier noise", default=0.1, type=float)
+parser.add_argument("-r", "--run_name", help="Tensorboard run name", default=datetime.now().strftime("%Y%m%d-%H%M%S"), type=str)
+parser.add_argument("-t", "--train_hwa", help="Use Hardware-Aware training", action="store_true")
+parser.add_argument("-L", "--load", help="Use when loading from training checkpoint", action="store_true")
+parser.add_argument("-c", "--checkpoint", help="File name specifying where to load/save a checkpoint", default="./saved_chkpt.pth", type=str)
+parser.add_argument("-l", "--learning_rate", help="Learning rate for training", default=2e-4, type=float)
+ARGS = parser.parse_args()
 
 # BERT model from Hugging Face model hub fine-tuned on SQuAD v1
 MODEL_NAME = "csarron/bert-base-uncased-squad-v1"
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
-
-# Parse some arguments
-PARSER = ArgumentParser("Analog BERT on SQuAD example")
-PARSER.add_argument("-d", "--digital", help="Add to use digital inference", action="store_true")
-PARSER.add_argument(
-    "-i",
-    "--ideal",
-    help="Add to use ideal config instead of default noisy one",
-    action="store_true",
-)
-PARSER.add_argument("-w", "--wandb", help="Add to use wandb", action="store_true")
-PARSER.add_argument("-n", "--noise", help="Modifier noise", default=0.1, type=float)
-PARSER.add_argument(
-    "-r",
-    "--run_name",
-    help="Tensorboard run name",
-    default=datetime.now().strftime("%Y%m%d-%H%M%S"),
-    type=str,
-)
-PARSER.add_argument("-t", "--train_hwa", help="Use Hardware-Aware training", action="store_true")
-PARSER.add_argument(
-    "-L", "--load", help="Use when loading from training checkpoint", action="store_true"
-)
-
-PARSER.add_argument(
-    "-c",
-    "--checkpoint",
-    help="File name specifying where to load/save a checkpoint",
-    default="./saved_chkpt_bert_noise_analysis.pth",
-    type=str,
-)
-PARSER.add_argument(
-    "-l", "--learning_rate", help="Learning rate for training", default=2e-4, type=float
-)
-
-ARGS = PARSER.parse_args()
-
-if ARGS.wandb:
-    import wandb
-
-    # Define weights noise sweep configuration
-    SWEEP_CONFIG = {
-        "method": "random",
-        "name": "modifier noise sweep",
-        "metric": {"goal": "maximize", "name": "exact_match"},
-        "parameters": {"modifier_noise": {"values": [0, 0.05, 0.1, 0.2]}},
-    }
-
-    SWEEP_ID = wandb.sweep(sweep=SWEEP_CONFIG, project="bert-weight-noise-experiment")
-
-# max length and stride specific to pretrained model
 MAX_LENGTH = 320
 DOC_STRIDE = 128
-
 
 def create_ideal_rpu_config(tile_size=512):
     """Create RPU Config with ideal conditions"""
@@ -132,7 +68,6 @@ def create_ideal_rpu_config(tile_size=512):
         drift_compensation=None,
     )
     return rpu_config
-
 
 def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     """Create RPU Config emulated typical PCM Device"""
@@ -154,8 +89,6 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
             max_output_size=0,
         ),
         forward=PresetIOParameters(
-            w_noise_type=WeightNoiseType.PCM_READ,
-            w_noise=0.0175,
             inp_res=dac_res,
             out_res=adc_res,
             out_bound=10.0,
@@ -167,25 +100,17 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
         drift_compensation=GlobalDriftCompensation(),
     )
     return rpu_config
-
-
+    
 def create_model(rpu_config):
     """Return Question Answering model and whether or not it was loaded from a checkpoint"""
-
     model = AutoModelForQuestionAnswering.from_pretrained(MODEL_NAME)
 
     if not ARGS.digital:
         model = convert_to_analog(model, rpu_config)
         model.remap_analog_weights()
 
-        # Add logging for noise statistics per layer
-        for name, layer in model.named_modules():
-            if hasattr(layer, 'analog_tile'):
-                print(f"Layer {name}: Noise stats: {layer.analog_tile.tile_config}")
-                
     print(model)
     return model
-
 
 # Some examples in the dataset may have contexts that exceed the maximum input length
 # We can truncate the context using truncation="only_second"
@@ -284,7 +209,6 @@ def preprocess_train(dataset):
 
     return tokenized_dataset
 
-
 def preprocess_validation(dataset):
     """Preprocess the validation set"""
     # Some of the questions have lots of whitespace on the left,
@@ -339,7 +263,6 @@ def preprocess_validation(dataset):
 
     return tokenized_dataset
 
-
 def postprocess_predictions(
     examples, features, raw_predictions, n_best_size=20, max_answer_length=30
 ):
@@ -385,7 +308,7 @@ def postprocess_predictions(
             # context.
             offset_mapping = features[feature_index]["offset_mapping"]
 
-            # Go through all possibilities for the `n_best_size` greater start and end logits.
+            # Go through all possibilities for the n_best_size greater start and end logits.
             start_indexes = argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
             end_indexes = argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
             for start_index in start_indexes:
@@ -435,7 +358,6 @@ def postprocess_predictions(
 
     return predictions
 
-
 def create_datasets():
     """Load the SQuAD dataset, the tokenized version, and the validation set"""
     squad = load_dataset("squad")
@@ -451,7 +373,6 @@ def create_datasets():
 
     return squad, tokenized_data, eval_data
 
-
 def create_optimizer(model):
     """Create the analog-aware optimizer"""
     optimizer = AnalogSGD(model.parameters(), lr=ARGS.learning_rate)
@@ -459,7 +380,6 @@ def create_optimizer(model):
     optimizer.regroup_param_groups(model)
 
     return optimizer
-
 
 def make_trainer(model, optimizer, tokenized_data):
     """Create the Huggingface Trainer"""
@@ -490,7 +410,6 @@ def make_trainer(model, optimizer, tokenized_data):
     )
 
     return trainer, writer
-
 
 def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e6, n_times=9):
     """Perform inference experiment at weight noise level specified at runtime.
@@ -539,17 +458,47 @@ def do_inference(model, trainer, squad, eval_data, writer, max_inference_time=1e
         f1, exact_match = predict()
         write_metrics(f1, exact_match, t_inference)
 
-        # Log layer-wise noise impact
-        for name, layer in model.named_modules():
-            if hasattr(layer, 'analog_tile'):
-                noise_level = layer.analog_tile.tile_config.modifier.std_dev
-                writer.add_scalar(f"noise/{name}", noise_level, t_inference)
+import torch.nn as nn
 
+def apply_noise_to_layer(model, layer_name, noise_std):
+    """Apply noise to a specific layer in the model."""
+    for name, param in model.named_parameters():
+        if layer_name in name:
+            noise = torch.normal(mean=0, std=noise_std, size=param.size()).to(param.device)
+            param.data.add_(noise)
+
+def get_all_layers(model):
+    """Get the names of all layers in the model."""
+    print("Test valid")
+    return [name for name, _ in model.named_parameters()]
+
+def evaluate_noise_sensitivity(model, trainer, eval_data, ground_truth, layers, noise_std, squad, metric):
+    """Evaluate the noise sensitivity for each layer."""
+    noise_results = []
+
+    for layer in layers:
+        # Reload the original model weights
+        model.load_state_dict(torch_load(ARGS.checkpoint))
+
+        # Apply noise to the specified layer
+        apply_noise_to_layer(model, layer, noise_std)
+
+        # Perform inference and calculate metrics
+        raw_predictions = trainer.predict(eval_data)
+        predictions = postprocess_predictions(squad["validation"], eval_data, raw_predictions.predictions)
+        formatted_preds = [{"id": k, "prediction_text": v} for k, v in predictions.items()]
+        out_metric = metric.compute(predictions=formatted_preds, references=ground_truth)
+
+        f1 = out_metric["f1"]
+        exact_match = out_metric["exact_match"]
+        noise_results.append((layer, f1, exact_match))
+
+        print(f"Layer: {layer}, F1 Score: {f1:.2f}, Exact Match: {exact_match:.2f}")
+
+    return noise_results
 
 def main():
-    """Provide the lambda function for WandB sweep. If WandB is not used, then this
-    is what is executed in the job
-    """
+    """Main function to execute the noise analysis."""
     if ARGS.wandb:
         wandb.init()
 
@@ -574,8 +523,25 @@ def main():
     if ARGS.train_hwa and not ARGS.digital and not ARGS.load:
         trainer.train()
         torch_save(model.state_dict(), ARGS.checkpoint)
-    do_inference(model, trainer, squad, eval_data, writer)
 
+    # Get the ground truth for evaluation
+    ground_truth = [{"id": ex["id"], "answers": ex["answers"]} for ex in squad["validation"]]
+
+    # Get all layers in the model
+    layers = get_all_layers(model)
+
+    # Initialize the metric for evaluation
+    metric = load("squad")
+   
+
+    # Evaluate noise sensitivity for each layer
+    noise_std = ARGS.noise  # Set the noise standard deviation
+    noise_results = evaluate_noise_sensitivity(model, trainer, eval_data, ground_truth, layers, noise_std, squad, metric)
+
+    # Print the results
+    print("Noise Sensitivity Analysis:")
+    for layer, f1, exact_match in noise_results:
+        print(f"Layer: {layer}, F1 Score: {f1:.2f}, Exact Match: {exact_match:.2f}")
 
 if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
