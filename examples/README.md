@@ -17,18 +17,18 @@ For example:
 to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training
 
-## Example 31: ['31_gpt2_on_openwebtext.py']
+## Example 31: ['31_gpt2_on_wikitext.py']
 This example is adapted from
 https://github.com/huggingface/notebooks/blob/main/examples/language_modeling.ipynb
 
 The example loads a pre-trained GPT-2 model trained on
-the openwebtext dataset. It then applies `convert_to_analog()`
+the wikitext dataset. It then applies `convert_to_analog()`
 to examine the effects of `drift_analog_weights()` on inference performance at
 different weight noise levels. Tensorboard is used to display the perplexity
 metrics evaluated using the model at various times after training completed.
 
 Commandline arguments can be used to control certain options. For example:
-`python /path/to/aihwkit/examples/31_gpt2_on_openwebtext.py -n 0.1 -r "run 1" -l 0.0005 -t`
+`python /path/to/aihwkit/examples/31_gpt2_on_wikitext.py -n 0.1 -r "run 1" -l 0.0005 -t`
 to set the weight noise to 0.1, name the run in Tensorboard "run 1",
 set the learning rate to 0.0005, and do hardware-aware training.
 
