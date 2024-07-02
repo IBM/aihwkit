@@ -89,5 +89,5 @@ Additionally, the script allows for the loading of a pre-trained analog model fr
 [`28_advanced_irdrop.py`]: 28_advanced_irdrop.py
 [`29_linalg_krylov.py`]: 29_linalg_krylov.py
 [`30_external_hardware_aware_model.py`]: 30_external_hardware_aware_model.py
-['31_gpt2_on_openwebtext.py']: 31_gpt2_on_openwebtext.py
+['31_gpt2_on_wikitext.py']: 31_gpt2_on_wikitext.py
 ['32_bert_on_squad_noise_analysis.py']: 32_bert_on_squad_noise_analysis.py
