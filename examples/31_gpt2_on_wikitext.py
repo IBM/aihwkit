@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example: Example using convert_to_analog to run GPT-2 transformer on openwebtext
+"""aihwkit example: Example using convert_to_analog to run GPT-2 transformer on wikitext-2-raw-v1
 **Source**:
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/language_modeling.ipynb
@@ -36,7 +36,6 @@ from datasets import load_dataset
 
 from aihwkit.simulator.configs import (
     TorchInferenceRPUConfig,
-    InferenceRPUConfig,
     WeightModifierType,
     WeightClipType,
     WeightNoiseType,
@@ -52,16 +51,17 @@ from aihwkit.inference import PCMLikeNoiseModel, GlobalDriftCompensation
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.optim import AnalogSGD
 
+import numpy as np
 
 # GPT-2 model from Hugging Face model hub
-MODEL_NAME = "distilbert/distilgpt2" # Smallest GPT-2 model
+MODEL_NAME = "distilgpt2"  # Smallest GPT-2 model
 TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 # Set the padding token to eos_token
 TOKENIZER.pad_token = TOKENIZER.eos_token
 
 # Parse some arguments
-PARSER = ArgumentParser("Analog GPT-2 on openwebtext example")
+PARSER = ArgumentParser("Analog GPT-2 on wikitext-2-raw-v1 example")
 PARSER.add_argument("-d", "--digital", help="Add to use digital inference", action="store_true")
 PARSER.add_argument(
     "-i",
@@ -80,7 +80,7 @@ PARSER.add_argument(
 )
 PARSER.add_argument("-t", "--train_hwa", help="Use Hardware-Aware training", action="store_true")
 PARSER.add_argument(
-    "-L", "--load", help="Use when loadiung from training checkpoint", action="store_true"
+    "-L", "--load", help="Use when loading from training checkpoint", action="store_true"
 )
 
 PARSER.add_argument(
@@ -109,6 +109,7 @@ if ARGS.wandb:
 
     SWEEP_ID = wandb.sweep(sweep=SWEEP_CONFIG, project="gpt2-weight-noise-experiment")
 
+
 def create_ideal_rpu_config(tile_size=512):
     """Create RPU Config with ideal conditions"""
     rpu_config = TorchInferenceRPUConfig(
@@ -126,6 +127,7 @@ def create_ideal_rpu_config(tile_size=512):
         drift_compensation=None,
     )
     return rpu_config
+
 
 def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
     """Create RPU Config emulated typical PCM Device"""
@@ -162,7 +164,6 @@ def create_rpu_config(modifier_noise, tile_size=512, dac_res=256, adc_res=256):
 
 def create_model(rpu_config):
     """Return Causal Language Model and whether or not it was loaded from a checkpoint"""
-
     model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
 
     # Update model config to use the new pad_token_id
@@ -182,15 +183,22 @@ def preprocess_function(examples):
 
 
 def create_datasets():
-    """Load the openwebtext dataset"""
+    """Load the wikitext-2-raw-v1 dataset"""
     try:
-        dataset = load_dataset("openwebtext", split="train[:0.1%]", trust_remote_code=True).train_test_split(test_size=0.1)
+        dataset = load_dataset("wikitext", "wikitext-2-raw-v1")
+        print("Dataset loaded successfully.")
     except Exception as e:
         print(f"Error loading dataset: {e}")
         return None, None
     
-    tokenized_datasets = dataset.map(preprocess_function, batched=True, remove_columns=["text"])
-    return tokenized_datasets["train"], tokenized_datasets["test"]
+    try:
+        tokenized_datasets = dataset.map(preprocess_function, batched=True, remove_columns=["text"], num_proc=4)
+        print("Dataset tokenized successfully.")
+    except Exception as e:
+        print(f"Error tokenizing dataset: {e}")
+        return None, None
+
+    return tokenized_datasets["train"], tokenized_datasets["validation"]
 
 
 def create_optimizer(model):
@@ -199,9 +207,6 @@ def create_optimizer(model):
     optimizer.regroup_param_groups(model)
     return optimizer
 
-# Alleviate CUDA memory access issue
-import os
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 def make_trainer(model, optimizer, train_dataset, eval_dataset):
     """Create the Huggingface Trainer"""
@@ -252,7 +257,7 @@ def do_inference(model, trainer, eval_dataset, writer, max_inference_time=1e6, n
 
     model.eval()
 
-    t_inference_list = logspace(0, log10(float(max_inference_time)), n_times).tolist()
+    t_inference_list = np.logspace(0, np.log10(float(max_inference_time)), n_times).tolist()
 
     # Get the initial metrics
     eval_loss = predict()
@@ -280,6 +285,10 @@ def main():
     model = create_model(rpu_config)
 
     train_dataset, eval_dataset = create_datasets()
+    if train_dataset is None or eval_dataset is None:
+        print("Error: train_dataset or eval_dataset is None.")
+        return
+
     optimizer = create_optimizer(model)
     trainer, writer = make_trainer(model, optimizer, train_dataset, eval_dataset)
 
@@ -299,4 +308,3 @@ if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
 else:
     main()
-
