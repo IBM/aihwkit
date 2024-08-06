@@ -127,7 +127,7 @@ public:
     if (this->use_bo64 == 1) {
       this->use_bo64 = 2;
     }
-  }; // debug hack
+  };                                                        // debug hack
   inline void forceNonTrans() { this->out_trans = false; }; // debug hack
   inline void force32() { this->use_bo64 = 0; };            // debug hack
 

@@ -14,14 +14,14 @@
 
 from typing import Dict, List, Tuple
 
-from torch import abs as torch_abs
 from torch import Tensor, sign
 from torch.autograd import no_grad
+from sklearn.linear_model import LinearRegression
 
 from aihwkit.exceptions import ArgumentError
 from aihwkit.inference.converter.base import BaseConductanceConverter
 
-_ZERO_CLIP = 1e-7
+_ZERO_CLIP = 1e-10
 
 
 class FusionConductanceConverter(BaseConductanceConverter):
@@ -49,7 +49,9 @@ class FusionConductanceConverter(BaseConductanceConverter):
 
     def __init__(self, g_max: int = 40) -> None:
         if g_max < 10 or g_max > 40:
-            raise ArgumentError("Specified fusion g_max value must be between 10 and 40.")
+            raise ArgumentError(
+                "Specified fusion g_max value must be between 10 and 40."
+            )
         self.g_max = g_max
         self.scale_ratio = None
 
@@ -58,23 +60,28 @@ class FusionConductanceConverter(BaseConductanceConverter):
 
     @no_grad()
     def convert_to_conductances(self, weights: Tensor) -> Tuple[List[Tensor], Dict]:
-        abs_max = torch_abs(weights).max()
-        scale_ratio = self.g_max / abs_max.clamp(min=_ZERO_CLIP)
-        scaled_weights = weights * scale_ratio
-        sign_weights = sign(scaled_weights)
+        abs_max_per_col = weights.abs().max(dim=1).values
+        scale_ratio_per_col = self.g_max / abs_max_per_col.clamp(min=_ZERO_CLIP)
+        scaled_weights = weights * scale_ratio_per_col.unsqueeze(1)
         conductances = [abs(scaled_weights).clamp(min=0.0, max=self.g_max)]
-        params = {"scale_ratio": scale_ratio, "sign_weights": sign_weights}
-
+        params = {
+            "original_weights": weights,
+        }
         return conductances, params
 
     @no_grad()
-    def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
+    def convert_back_to_weights(
+        self, conductances: List[Tensor], params: Dict
+    ) -> Tensor:
         if len(conductances) != 1:
             raise ValueError("conductances must contain exactly 1 element")
-        if "scale_ratio" not in params:
-            raise ValueError("params do not contain scale_ratio")
-        if "sign_weights" not in params:
-            raise ValueError("params do not contain sign_weights")
+        if "original_weights" not in params:
+            raise ValueError("params do not contain original_weights")
 
-        weights = (params["sign_weights"] * conductances[0]) / params["scale_ratio"]
+        weights = conductances[0] * sign(params['original_weights'])
+        for col in range(weights.shape[0]):
+            reg = LinearRegression().fit(weights[col].flatten().numpy().reshape(-1, 1), params[
+                'original_weights'][col].flatten().numpy().reshape(-1, 1))
+            weights[col] *= reg.coef_[0][0]
+
         return weights

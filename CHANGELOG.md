@@ -12,15 +12,23 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## Unreleased
+## [0.9.1] - 2024/05/16
+
+### Added
+
+* Added column wise scaling logic to fusion import/export to improve accuracy (\#652)
+*  Added a new example that demonstrates how to import and perform inference using a model which has been trained in a hardware-aware fashion using an external library (\#648)
+* Added a wew WeightModifierType.DISCRETIZE_PER_CHANNEL type and a test case to validate the correctness against manual quantization in PyTorch (\#618)
 
 ### Fixed
 
-* Use `ADDITIVE_CONSTANT instead of `ADD_NORMAL` in WeightNoiseType (\#630)
+* Fix sub-optimal mapping of conductances to weights for fusion by regressing weights per column (\#653)
+* Documentation correction: Use `ADDITIVE_CONSTANT instead of `ADD_NORMAL` in WeightNoiseType (\#630)
 * Fix continuing training based on checkpoint using torch tile (\#626)
 * Fix the support of different dtypes for the torch model (\#625)
 * Fixes the fall-through to the default error message when using drop connect (\#624)
 * Update `analog_fusion` notebook (\#611)
+
 
 ## [0.9.0] - 2024/01/25
 
