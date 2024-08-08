@@ -114,7 +114,6 @@ void JARTv1bRPUDevice<T>::populate(
       T device_specific_rdisc = MAX(par.rdisc * (1 + par.rdisc_dtod * rng->sampleGauss()), (T) 0.0);
       device_specific_A[i][j] = (T)M_PI * pow(device_specific_rdisc, 2.0);
 
-      // just set to same value ?
       device_specific_Ndisc[i][j] = par._Ninit;
     }
   }

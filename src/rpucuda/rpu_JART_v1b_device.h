@@ -292,6 +292,14 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
     swap(a.device_specific_Ndiscmin, b.device_specific_Ndiscmin);
     swap(a.device_specific_ldisc, b.device_specific_ldisc);
     swap(a.device_specific_A, b.device_specific_A);
+    swap(a.device_specific_Ndiscmax_ctoc_upper_bound, b.device_specific_Ndiscmax_ctoc_upper_bound);
+    swap(a.device_specific_Ndiscmin_ctoc_upper_bound, b.device_specific_Ndiscmin_ctoc_upper_bound);
+    swap(a.device_specific_ldisc_ctoc_upper_bound, b.device_specific_ldisc_ctoc_upper_bound);
+    swap(a.device_specific_A_ctoc_upper_bound, b.device_specific_A_ctoc_upper_bound);
+    swap(a.device_specific_Ndiscmax_ctoc_lower_bound, b.device_specific_Ndiscmax_ctoc_lower_bound);
+    swap(a.device_specific_Ndiscmin_ctoc_lower_bound, b.device_specific_Ndiscmin_ctoc_lower_bound);
+    swap(a.device_specific_ldisc_ctoc_lower_bound, b.device_specific_ldisc_ctoc_lower_bound);
+    swap(a.device_specific_A_ctoc_lower_bound, b.device_specific_A_ctoc_lower_bound);
   };								
                                                                                                 
   void copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> *rpu_device) override {         
@@ -301,13 +309,13 @@ template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
       RPU_FATAL("Wrong device class");                                                        
     };                                                                                        
 
-    for (int j = 0; j < this->x_size_; ++j) {
-      for (int i = 0; i < this->d_size_; ++i) {
-	std::swap(device_specific_Ndisc_max_bound[i][j], device_specific_Ndisc_min_bound[i][j]);
-	std::swap(device_specific_Ndiscmax[i][j], device_specific_Ndiscmin[i][j]);
-      }
-    }
-    
+    // for (int j = 0; j < this->x_size_; ++j) {
+    //   for (int i = 0; i < this->d_size_; ++i) {
+    //     std::swap(device_specific_Ndisc_max_bound[i][j], device_specific_Ndisc_min_bound[i][j]);
+    //     std::swap(device_specific_Ndiscmax[i][j], device_specific_Ndiscmin[i][j]);
+    //   }
+    // }
+    RPU_FATAL("This device does not support this function.");   
     
   };                                                                                           
                                                                                                
@@ -372,7 +380,20 @@ public:                                                                         
                                                                                                    \
   void getDPNames(std::vector<std::string> &names) const override {                                \
     PulsedRPUDevice<T>::getDPNames(names);                                                         \
-    {DPNAMES_BODY};                                                                                \
+    names.push_back(std::string("device_specific_Ndisc_max_bound"));
+    names.push_back(std::string("device_specific_Ndisc_min_bound"));
+    names.push_back(std::string("device_specific_Ndiscmax"));
+    names.push_back(std::string("device_specific_Ndiscmin"));
+    names.push_back(std::string("device_specific_ldisc"));
+    names.push_back(std::string("device_specific_A"));
+    names.push_back(std::string("device_specific_Ndiscmax_ctoc_upper_bound"));
+    names.push_back(std::string("device_specific_Ndiscmin_ctoc_upper_bound"));
+    names.push_back(std::string("device_specific_ldisc_ctoc_upper_bound"));
+    names.push_back(std::string("device_specific_A_ctoc_upper_bound"));
+    names.push_back(std::string("device_specific_Ndiscmax_ctoc_lower_bound"));
+    names.push_back(std::string("device_specific_Ndiscmin_ctoc_lower_bound"));
+    names.push_back(std::string("device_specific_ldisc_ctoc_lower_bound"));
+    names.push_back(std::string("device_specific_A_ctoc_lower_bound"));                                                                         \
   };                                                                                               \
                                                                                                    \
   void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override {                     \
@@ -386,7 +407,25 @@ public:                                                                         
       RPU_FATAL("Wrong number of arguments.");                                                     \
     }                                                                                              \
     PulsedRPUDevice<T>::getDPNames(names);                                                         \
-    {DP2V_BODY};                                                                                   \
+    int n_prev = (int)names.size();
+    int size = this->x_size_ * this->d_size_;
+
+    for (int i = 0; i < size; ++i) {
+      data_ptrs[n_prev][i] = device_specific_Ndisc_max_bound[0][i];
+      data_ptrs[n_prev + 1][i] = device_specific_Ndisc_min_bound[0][i];
+      data_ptrs[n_prev + 2][i] = device_specific_Ndiscmax[0][i];
+      data_ptrs[n_prev + 3][i] = device_specific_Ndiscmin[0][i];
+      data_ptrs[n_prev + 4][i] = device_specific_ldisc[0][i];
+      data_ptrs[n_prev + 5][i] = device_specific_A[0][i];
+      data_ptrs[n_prev + 6][i] = device_specific_Ndiscmax_ctoc_upper_bound[0][i];
+      data_ptrs[n_prev + 7][i] = device_specific_Ndiscmin_ctoc_upper_bound[0][i];
+      data_ptrs[n_prev + 8][i] = device_specific_ldisc_ctoc_upper_bound[0][i];
+      data_ptrs[n_prev + 9][i] = device_specific_A_ctoc_upper_bound[0][i];
+      data_ptrs[n_prev + 10][i] = device_specific_Ndiscmax_ctoc_lower_bound[0][i];
+      data_ptrs[n_prev + 11][i] = device_specific_Ndiscmin_ctoc_lower_bound[0][i];
+      data_ptrs[n_prev + 12][i] = device_specific_ldisc_ctoc_lower_bound[0][i];
+      data_ptrs[n_prev + 13][i] = device_specific_A_ctoc_lower_bound[0][i];
+    }                                                                                   \
   };                                                                                               \
                                                                                                    \
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override {           \
@@ -394,96 +433,209 @@ public:                                                                         
                                                                                                    \
     std::vector<std::string> names;                                                                \
     PulsedRPUDevice<T>::getDPNames(names);                                                         \
-    {V2DP_BODY};                                                                                   \
+    int n_prev = (int)names.size();
+    int size = this->x_size_ * this->d_size_;
+
+    for (int i = 0; i < size; ++i) {
+      device_specific_Ndisc_max_bound[0][i] = data_ptrs[n_prev][i];
+      device_specific_Ndisc_min_bound[0][i] = data_ptrs[n_prev + 1][i];
+      device_specific_Ndiscmax[0][i] = data_ptrs[n_prev + 2][i];
+      device_specific_Ndiscmin[0][i] = data_ptrs[n_prev + 3][i];
+      device_specific_ldisc[0][i] = data_ptrs[n_prev + 4][i];
+      device_specific_A[0][i] = data_ptrs[n_prev + 5][i];
+      device_specific_Ndiscmax_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 6][i];
+      device_specific_Ndiscmin_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 7][i];
+      device_specific_ldisc_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 8][i];
+      device_specific_A_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 9][i];
+      device_specific_Ndiscmax_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 10][i];
+      device_specific_Ndiscmin_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 11][i];
+      device_specific_ldisc_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 12][i];
+      device_specific_A_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 13][i];
+    }                                                                            \
     this->onSetWeights(out_weights);                                                               \
   }
 
-  BUILD_PULSED_DEVICE_CONSTRUCTORS(
-      JARTv1bRPUDevice,
-      /* ctor*/
-      /* dtor*/
-      Array_2D_Free<T>(device_specific_Ndisc_max_bound);
-      Array_2D_Free<T>(device_specific_Ndisc_min_bound);
-      Array_2D_Free<T>(device_specific_Ndiscmax);
-      Array_2D_Free<T>(device_specific_Ndiscmin);
-      Array_2D_Free<T>(device_specific_ldisc);
-      Array_2D_Free<T>(device_specific_A);
-      Array_2D_Free<T>(device_specific_Ndiscmax_ctoc_upper_bound);
-      Array_2D_Free<T>(device_specific_Ndiscmin_ctoc_upper_bound);
-      Array_2D_Free<T>(device_specific_ldisc_ctoc_upper_bound);
-      Array_2D_Free<T>(device_specific_A_ctoc_upper_bound);
-      Array_2D_Free<T>(device_specific_Ndiscmax_ctoc_lower_bound);
-      Array_2D_Free<T>(device_specific_Ndiscmin_ctoc_lower_bound);
-      Array_2D_Free<T>(device_specific_ldisc_ctoc_lower_bound);
-      Array_2D_Free<T>(device_specific_A_ctoc_lower_bound);
-      ,
-      /* copy */
-      /* move assignment */
-      ,
-      /* swap*/
-      ,
-      /* dp names*/
-      names.push_back(std::string("device_specific_Ndisc_max_bound"));
-      names.push_back(std::string("device_specific_Ndisc_min_bound"));
-      names.push_back(std::string("device_specific_Ndiscmax"));
-      names.push_back(std::string("device_specific_Ndiscmin"));
-      names.push_back(std::string("device_specific_ldisc"));
-      names.push_back(std::string("device_specific_A"));
-      names.push_back(std::string("device_specific_Ndiscmax_ctoc_upper_bound"));
-      names.push_back(std::string("device_specific_Ndiscmin_ctoc_upper_bound"));
-      names.push_back(std::string("device_specific_ldisc_ctoc_upper_bound"));
-      names.push_back(std::string("device_specific_A_ctoc_upper_bound"));
-      names.push_back(std::string("device_specific_Ndiscmax_ctoc_lower_bound"));
-      names.push_back(std::string("device_specific_Ndiscmin_ctoc_lower_bound"));
-      names.push_back(std::string("device_specific_ldisc_ctoc_lower_bound"));
-      names.push_back(std::string("device_specific_A_ctoc_lower_bound"));
-      ,
-      /* dp2vec body*/
-      int n_prev = (int)names.size();
-      int size = this->x_size_ * this->d_size_;
+  // BUILD_PULSED_DEVICE_CONSTRUCTORS(
+  //     JARTv1bRPUDevice,
+  //     /* ctor*/
+  //     int x_sz = this->x_size_;
+  //     int d_sz = this->d_size_;
 
-      for (int i = 0; i < size; ++i) {
-        data_ptrs[n_prev][i] = device_specific_Ndisc_max_bound[0][i];
-        data_ptrs[n_prev + 1][i] = device_specific_Ndisc_min_bound[0][i];
-        data_ptrs[n_prev + 2][i] = device_specific_Ndiscmax[0][i];
-        data_ptrs[n_prev + 3][i] = device_specific_Ndiscmin[0][i];
-        data_ptrs[n_prev + 4][i] = device_specific_ldisc[0][i];
-        data_ptrs[n_prev + 5][i] = device_specific_A[0][i];
-        data_ptrs[n_prev + 6][i] = device_specific_Ndiscmax_ctoc_upper_bound[0][i];
-        data_ptrs[n_prev + 7][i] = device_specific_Ndiscmin_ctoc_upper_bound[0][i];
-        data_ptrs[n_prev + 8][i] = device_specific_ldisc_ctoc_upper_bound[0][i];
-        data_ptrs[n_prev + 9][i] = device_specific_A_ctoc_upper_bound[0][i];
-        data_ptrs[n_prev + 10][i] = device_specific_Ndiscmax_ctoc_lower_bound[0][i];
-        data_ptrs[n_prev + 11][i] = device_specific_Ndiscmin_ctoc_lower_bound[0][i];
-        data_ptrs[n_prev + 12][i] = device_specific_ldisc_ctoc_lower_bound[0][i];
-        data_ptrs[n_prev + 13][i] = device_specific_A_ctoc_lower_bound[0][i];
-      },
-      /* vec2dp body*/
-      int n_prev = (int)names.size();
-      int size = this->x_size_ * this->d_size_;
+  //     device_specific_Ndisc_max_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_Ndisc_min_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_Ndiscmax = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_Ndiscmin = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_ldisc = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_A = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_Ndiscmax_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_Ndiscmin_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_ldisc_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_A_ctoc_upper_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_Ndiscmax_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_Ndiscmin_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_ldisc_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
+  //     device_specific_A_ctoc_lower_bound = Array_2D_Get<T>(d_sz, x_sz);
 
-      for (int i = 0; i < size; ++i) {
-        device_specific_Ndisc_max_bound[0][i] = data_ptrs[n_prev][i];
-        device_specific_Ndisc_min_bound[0][i] = data_ptrs[n_prev + 1][i];
-        device_specific_Ndiscmax[0][i] = data_ptrs[n_prev + 2][i];
-        device_specific_Ndiscmin[0][i] = data_ptrs[n_prev + 3][i];
-        device_specific_ldisc[0][i] = data_ptrs[n_prev + 4][i];
-        device_specific_A[0][i] = data_ptrs[n_prev + 5][i];
-        device_specific_Ndiscmax_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 6][i];
-        device_specific_Ndiscmin_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 7][i];
-        device_specific_ldisc_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 8][i];
-        device_specific_A_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 9][i];
-        device_specific_Ndiscmax_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 10][i];
-        device_specific_Ndiscmin_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 11][i];
-        device_specific_ldisc_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 12][i];
-        device_specific_A_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 13][i];
-      }
+  //     for (int j = 0; j < x_sz; ++j) {
+  //       for (int i = 0; i < d_sz; ++i) {
+  //         device_specific_Ndisc_max_bound[i][j] = (T)0.0;
+  //         device_specific_Ndisc_min_bound[i][j] = (T)0.0;
+  //         device_specific_Ndiscmax[i][j] = (T)0.0;
+  //         device_specific_Ndiscmin[i][j] = (T)0.0;
+  //         device_specific_ldisc[i][j] = (T)0.0;
+  //         device_specific_A[i][j] = (T)0.0;
+  //         device_specific_Ndiscmax_ctoc_upper_bound[i][j] = (T)0.0;
+  //         device_specific_Ndiscmin_ctoc_upper_bound[i][j] = (T)0.0;
+  //         device_specific_ldisc_ctoc_upper_bound[i][j] = (T)0.0;
+  //         device_specific_A_ctoc_upper_bound[i][j] = (T)0.0;
+  //         device_specific_Ndiscmax_ctoc_lower_bound[i][j] = (T)0.0;
+  //         device_specific_Ndiscmin_ctoc_lower_bound[i][j] = (T)0.0;
+  //         device_specific_ldisc_ctoc_lower_bound[i][j] = (T)0.0;
+  //         device_specific_A_ctoc_lower_bound[i][j] = (T)0.0;
+  //       }
+  //     },
+  //     /* dtor*/
+  //     Array_2D_Free<T>(device_specific_Ndisc_max_bound);
+  //     Array_2D_Free<T>(device_specific_Ndisc_min_bound);
+  //     Array_2D_Free<T>(device_specific_Ndiscmax);
+  //     Array_2D_Free<T>(device_specific_Ndiscmin);
+  //     Array_2D_Free<T>(device_specific_ldisc);
+  //     Array_2D_Free<T>(device_specific_A);
+  //     Array_2D_Free<T>(device_specific_Ndiscmax_ctoc_upper_bound);
+  //     Array_2D_Free<T>(device_specific_Ndiscmin_ctoc_upper_bound);
+  //     Array_2D_Free<T>(device_specific_ldisc_ctoc_upper_bound);
+  //     Array_2D_Free<T>(device_specific_A_ctoc_upper_bound);
+  //     Array_2D_Free<T>(device_specific_Ndiscmax_ctoc_lower_bound);
+  //     Array_2D_Free<T>(device_specific_Ndiscmin_ctoc_lower_bound);
+  //     Array_2D_Free<T>(device_specific_ldisc_ctoc_lower_bound);
+  //     Array_2D_Free<T>(device_specific_A_ctoc_lower_bound);
+  //     ,
+  //     /* copy */
+  //     for (int j = 0; j < other.x_size_; ++j) {
+  //       for (int i = 0; i < other.d_size_; ++i) {
+  //         device_specific_Ndisc_max_bound[i][j] = other.device_specific_Ndisc_max_bound[i][j];
+  //         device_specific_Ndisc_min_bound[i][j] = other.device_specific_Ndisc_min_bound[i][j];
+  //         device_specific_Ndiscmax[i][j] = other.device_specific_Ndiscmax[i][j];
+  //         device_specific_Ndiscmin[i][j] = other.device_specific_Ndiscmin[i][j];
+  //         device_specific_ldisc[i][j] = other.device_specific_ldisc[i][j];
+  //         device_specific_A[i][j] = other.device_specific_A[i][j];
+  //         device_specific_Ndiscmax_ctoc_upper_bound[i][j] = other.device_specific_Ndiscmax_ctoc_upper_bound[i][j];
+  //         device_specific_Ndiscmin_ctoc_upper_bound[i][j] = other.device_specific_Ndiscmin_ctoc_upper_bound[i][j];
+  //         device_specific_ldisc_ctoc_upper_bound[i][j] = other.device_specific_ldisc_ctoc_upper_bound[i][j];
+  //         device_specific_A_ctoc_upper_bound[i][j] = other.device_specific_A_ctoc_upper_bound[i][j];
+  //         device_specific_Ndiscmax_ctoc_lower_bound[i][j] = other.device_specific_Ndiscmax_ctoc_lower_bound[i][j];
+  //         device_specific_Ndiscmin_ctoc_lower_bound[i][j] = other.device_specific_Ndiscmin_ctoc_lower_bound[i][j];
+  //         device_specific_ldisc_ctoc_lower_bound[i][j] = other.device_specific_ldisc_ctoc_lower_bound[i][j];
+  //         device_specific_A_ctoc_lower_bound[i][j] = other.device_specific_A_ctoc_lower_bound[i][j];
+  //       }
+  //     },
+  //     /* move assignment */
+  //     device_specific_Ndisc_max_bound = other.device_specific_Ndisc_max_bound;
+  //     device_specific_Ndisc_min_bound = other.device_specific_Ndisc_min_bound;
+  //     device_specific_Ndiscmax = other.device_specific_Ndiscmax;
+  //     device_specific_Ndiscmin = other.device_specific_Ndiscmin;
+  //     device_specific_ldisc = other.device_specific_ldisc;
+  //     device_specific_A = other.device_specific_A;
+  //     device_specific_Ndiscmax_ctoc_upper_bound = other.device_specific_Ndiscmax_ctoc_upper_bound;
+  //     device_specific_Ndiscmin_ctoc_upper_bound = other.device_specific_Ndiscmin_ctoc_upper_bound;
+  //     device_specific_ldisc_ctoc_upper_bound = other.device_specific_ldisc_ctoc_upper_bound;
+  //     device_specific_A_ctoc_upper_bound = other.device_specific_A_ctoc_upper_bound;
+  //     device_specific_Ndiscmax_ctoc_lower_bound = other.device_specific_Ndiscmax_ctoc_lower_bound;
+  //     device_specific_Ndiscmin_ctoc_lower_bound = other.device_specific_Ndiscmin_ctoc_lower_bound;
+  //     device_specific_ldisc_ctoc_lower_bound = other.device_specific_ldisc_ctoc_lower_bound;
+  //     device_specific_A_ctoc_lower_bound = other.device_specific_A_ctoc_lower_bound;
 
-      ,
-      /*invert copy DP */
-      // Todo: if device specific Ndisc bounds: Remap wmax&wmin to Ndisc max_bound&min_bound
+  //     other.device_specific_Ndisc_max_bound = nullptr;
+  //     other.device_specific_Ndisc_min_bound = nullptr;
+  //     other.device_specific_Ndiscmax = nullptr;
+  //     other.device_specific_Ndiscmin = nullptr;
+  //     other.device_specific_ldisc = nullptr;
+  //     other.device_specific_A = nullptr;
+  //     other.device_specific_Ndiscmax_ctoc_upper_bound = nullptr;
+  //     other.device_specific_Ndiscmin_ctoc_upper_bound = nullptr;
+  //     other.device_specific_ldisc_ctoc_upper_bound = nullptr;
+  //     other.device_specific_A_ctoc_upper_bound = nullptr;
+  //     other.device_specific_Ndiscmax_ctoc_lower_bound = nullptr;
+  //     other.device_specific_Ndiscmin_ctoc_lower_bound = nullptr;
+  //     other.device_specific_ldisc_ctoc_lower_bound = nullptr;
+  //     other.device_specific_A_ctoc_lower_bound = nullptr;
+  //     ,
+  //     /* swap*/
+  //     swap(a.device_specific_Ndisc_max_bound, b.device_specific_Ndisc_max_bound);
+  //     swap(a.device_specific_Ndisc_min_bound, b.device_specific_Ndisc_min_bound);
+  //     swap(a.device_specific_Ndiscmax, b.device_specific_Ndiscmax);
+  //     swap(a.device_specific_Ndiscmin, b.device_specific_Ndiscmin);
+  //     swap(a.device_specific_ldisc, b.device_specific_ldisc);
+  //     swap(a.device_specific_A, b.device_specific_A);
+  //     swap(a.device_specific_Ndiscmax_ctoc_upper_bound, b.device_specific_Ndiscmax_ctoc_upper_bound);
+  //     swap(a.device_specific_Ndiscmin_ctoc_upper_bound, b.device_specific_Ndiscmin_ctoc_upper_bound);
+  //     swap(a.device_specific_ldisc_ctoc_upper_bound, b.device_specific_ldisc_ctoc_upper_bound);
+  //     swap(a.device_specific_A_ctoc_upper_bound, b.device_specific_A_ctoc_upper_bound);
+  //     swap(a.device_specific_Ndiscmax_ctoc_lower_bound, b.device_specific_Ndiscmax_ctoc_lower_bound);
+  //     swap(a.device_specific_Ndiscmin_ctoc_lower_bound, b.device_specific_Ndiscmin_ctoc_lower_bound);
+  //     swap(a.device_specific_ldisc_ctoc_lower_bound, b.device_specific_ldisc_ctoc_lower_bound);
+  //     swap(a.device_specific_A_ctoc_lower_bound, b.device_specific_A_ctoc_lower_bound);
+  //     ,
+  //     /* dp names*/
+  //     names.push_back(std::string("device_specific_Ndisc_max_bound"));
+  //     names.push_back(std::string("device_specific_Ndisc_min_bound"));
+  //     names.push_back(std::string("device_specific_Ndiscmax"));
+  //     names.push_back(std::string("device_specific_Ndiscmin"));
+  //     names.push_back(std::string("device_specific_ldisc"));
+  //     names.push_back(std::string("device_specific_A"));
+  //     names.push_back(std::string("device_specific_Ndiscmax_ctoc_upper_bound"));
+  //     names.push_back(std::string("device_specific_Ndiscmin_ctoc_upper_bound"));
+  //     names.push_back(std::string("device_specific_ldisc_ctoc_upper_bound"));
+  //     names.push_back(std::string("device_specific_A_ctoc_upper_bound"));
+  //     names.push_back(std::string("device_specific_Ndiscmax_ctoc_lower_bound"));
+  //     names.push_back(std::string("device_specific_Ndiscmin_ctoc_lower_bound"));
+  //     names.push_back(std::string("device_specific_ldisc_ctoc_lower_bound"));
+  //     names.push_back(std::string("device_specific_A_ctoc_lower_bound"));
+  //     ,
+  //     /* dp2vec body*/
+  //     int n_prev = (int)names.size();
+  //     int size = this->x_size_ * this->d_size_;
 
-  );
+  //     for (int i = 0; i < size; ++i) {
+  //       data_ptrs[n_prev][i] = device_specific_Ndisc_max_bound[0][i];
+  //       data_ptrs[n_prev + 1][i] = device_specific_Ndisc_min_bound[0][i];
+  //       data_ptrs[n_prev + 2][i] = device_specific_Ndiscmax[0][i];
+  //       data_ptrs[n_prev + 3][i] = device_specific_Ndiscmin[0][i];
+  //       data_ptrs[n_prev + 4][i] = device_specific_ldisc[0][i];
+  //       data_ptrs[n_prev + 5][i] = device_specific_A[0][i];
+  //       data_ptrs[n_prev + 6][i] = device_specific_Ndiscmax_ctoc_upper_bound[0][i];
+  //       data_ptrs[n_prev + 7][i] = device_specific_Ndiscmin_ctoc_upper_bound[0][i];
+  //       data_ptrs[n_prev + 8][i] = device_specific_ldisc_ctoc_upper_bound[0][i];
+  //       data_ptrs[n_prev + 9][i] = device_specific_A_ctoc_upper_bound[0][i];
+  //       data_ptrs[n_prev + 10][i] = device_specific_Ndiscmax_ctoc_lower_bound[0][i];
+  //       data_ptrs[n_prev + 11][i] = device_specific_Ndiscmin_ctoc_lower_bound[0][i];
+  //       data_ptrs[n_prev + 12][i] = device_specific_ldisc_ctoc_lower_bound[0][i];
+  //       data_ptrs[n_prev + 13][i] = device_specific_A_ctoc_lower_bound[0][i];
+  //     },
+  //     /* vec2dp body*/
+  //     int n_prev = (int)names.size();
+  //     int size = this->x_size_ * this->d_size_;
+
+  //     for (int i = 0; i < size; ++i) {
+  //       device_specific_Ndisc_max_bound[0][i] = data_ptrs[n_prev][i];
+  //       device_specific_Ndisc_min_bound[0][i] = data_ptrs[n_prev + 1][i];
+  //       device_specific_Ndiscmax[0][i] = data_ptrs[n_prev + 2][i];
+  //       device_specific_Ndiscmin[0][i] = data_ptrs[n_prev + 3][i];
+  //       device_specific_ldisc[0][i] = data_ptrs[n_prev + 4][i];
+  //       device_specific_A[0][i] = data_ptrs[n_prev + 5][i];
+  //       device_specific_Ndiscmax_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 6][i];
+  //       device_specific_Ndiscmin_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 7][i];
+  //       device_specific_ldisc_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 8][i];
+  //       device_specific_A_ctoc_upper_bound[0][i] = data_ptrs[n_prev + 9][i];
+  //       device_specific_Ndiscmax_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 10][i];
+  //       device_specific_Ndiscmin_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 11][i];
+  //       device_specific_ldisc_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 12][i];
+  //       device_specific_A_ctoc_lower_bound[0][i] = data_ptrs[n_prev + 13][i];
+  //     }
+  //     ,
+  //     /*invert copy DP */
+  //     RPU_FATAL("This device does not support this function.");   
+  // );
 
   void printDP(int x_count, int d_count) const override;
 
