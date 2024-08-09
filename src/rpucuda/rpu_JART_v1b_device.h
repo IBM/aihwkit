@@ -31,84 +31,112 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     JARTv1b,
     /*implements*/
     DeviceUpdateType::JARTv1b,
-    /*parameter def*/
-    T real_write_noise_std = (T)0.0;
-    T alpha0 = (T)4.81951e-5;
+    /*parameter def*/ 
+    T real_write_noise_std = (T) 0.0;
+    T alpha0 = (T) 4.81951e-5;
     // T alpha1 = (T) 2.4006e-6;
-    T alpha2 = (T)1.03685;
-    T alpha3 = (T)0.34567;
-    T beta0 = (T)7.0526e-4;
-    T beta1 = (T)4.2383e-5;
-    T c0 = (T)4.004;
-    T c1 = (T)2.8646;
-    T c2 = (T)4.2125;
-    T c3 = (T)1.4134;
-    T d0 = (T)6.6103;
-    T d1 = (T)1.4524;
-    T d2 = (T)7.4235;
-    T d3 = (T)4.0585;
-    T f0 = (T)6.326e-4;
-    T f1 = (T)1.4711;
-    T f2 = (T)0.5199;
-    T f3 = (T)1.561;
-    T g0 = (T)4.84e-3;
-    T g1 = (T)0.1353;
-    T h0 = (T)5.548;
-    T h1 = (T)6.8648;
-    T h2 = (T)51.586;
-    T h3 = (T)0.36;
-    T j_0 = (T)1.054;
-    T k0 = (T)1.0526;
+    T alpha2 = (T) 1.03685;
+    T alpha3 = (T) 0.34567;
+    T beta0 = (T) 7.0526e-4;
+    T beta1 = (T) 4.2383e-5;
+    T c0 = (T) 4.004;
+    T c1 = (T) 2.8646;
+    T c2 = (T) 4.2125;
+    T c3 = (T) 1.4134;
+    T d0 = (T) 6.6103;
+    T d1 = (T) 1.4524;
+    T d2 = (T) 7.4235;
+    T d3 = (T) 4.0585;
+    T f0 = (T) 6.326e-4;
+    T f1 = (T) 1.4711;
+    T f2 = (T) 0.5199;
+    T f3 = (T) 1.561;
+    T g0 = (T) 4.84e-3;
+    T g1 = (T) 0.1353;
+    T h0 = (T) 5.548;
+    T h1 = (T) 6.8648;
+    T h2 = (T) 51.586;
+    T h3 = (T) 0.36;
+    T j_0 = (T) 1.054;
+    T k0 = (T) 1.0526;
     // Fitting Parameters for original model
-    T T0 = (T)293; // ambient temperature [K]
-    T un =
-        (T)4e-6;           // from [1e-6:1e-5];				// electron mobility [m^2/Vs]
-    T Ndiscmax = (T)20;    // from [0.001:1100];				// maximum oxygen vacancy
-                           // concentration in the disc[10^26/m^3]
-    T Ndiscmin = (T)0.008; // from [0.0001:100];			// minimum oxygen vacancy concentration
-                           // in the disc [10^26/m^3]
-    T Nplug = (T)20;  // from [0.001:100];					// oxygen vacancy
-                      // concentration in the plug [10^26/m^3]
-    T a = (T)0.25e-9; // from [0.1e-9:1e-9];					// ion hopping
-                      // distance [m]
-    T ny0 =  (T)2e13;         // from [1e10:1e14];	// attemp frequenzy [Hz]
-    T dWa = (T)1.35;     // from [0.8:1.5];		// activation energy [eV]
-    T Rth0 = (T)15.72e6; // from [1e6:20e6];		// thermal resistance of the Hafnium Oxide [K/W]
-    T rdisc = (T)45e-9;    // from [5e-9:100e-9];	// radius of the filament
-                           // area [m]
-    T rdisc_dtod = (T) 0.0;
-    T lcell = (T)3 * 1e-9; // from [2:5];		// length of disc and
-                           // plug region [m]
-    T ldisc = (T)0.4 * 1e-9; // from [0.1:5]; 		// length of the disc region [m]
-    T ldisc_dtod = (T) 0.0;
-    
-    T Rtheff_scaling =
-        (T)0.27; // from [0.1:1];			// scaling factor for gradual RESET
-    T RseriesTiOx =
-        (T)650;               // from [100:200000];	// series resistance of the TiOx layer [Ohm]
-    T R0 = (T)719.2437;       // line resistance for a current of 0 A [Ohm]
-    T Rthline = (T)90471.47;  // thermal resistance of the lines [W/K]
-    T alphaline = (T)3.92e-3; // temperature coefficient of the lines [1/K]
-    T read_voltage = (T)0.2;
-    T pulse_voltage_SET = (T)-0.342;
-    T pulse_voltage_RESET = (T)0.7065;
-    T pulse_length = (T)1e-6;
-    T base_time_step = (T)1e-8;
-    T Ndisc_min_bound = (T)0.06;
-    T Ndisc_max_bound = (T)1.9897452127440086504;
+    T T0 = (T) 293;								 	// ambient temperature [K] 
+    T un = (T) 4e-6; // from [1e-6:1e-5];				// electron mobility [m^2/Vs]
+    T Ndiscmax = (T) 20; // from [0.001:1100];				// maximum oxygen vacancy concentration in the disc[10^26/m^3]
+    T Ndiscmin = (T) 0.008; // from [0.0001:100];			// minimum oxygen vacancy concentration in the disc [10^26/m^3]
+    T Nplug = (T) 20; // from [0.001:100];					// oxygen vacancy concentration in the plug [10^26/m^3]
+    T a = (T) 0.25e-9; // from [0.1e-9:1e-9];					// ion hopping distance [m]
+    T ny0 = (T) 2e13; // from [1e10:1e14];					// attemp frequenzy [Hz]
+    T dWa = (T) 1.35; // from [0.8:1.5];					// activation energy [eV]
+    T Rth0 = (T) 15.72e6; // from [1e6:20e6];					// thermal resistance of the Hafnium Oxide [K/W]
+    T rdisc = (T) 45e-9; // from [5e-9:100e-9];				// radius of the filament area [m]
+    T lcell = (T) 3*1e-9; // from [2:5];							// length of disc and plug region [m]
+    T ldisc = (T) 0.4*1e-9; // from [0.1:5]; 					// length of the disc region [m]
+    T Rtheff_scaling = (T) 0.27; // from [0.1:1];				// scaling factor for gradual RESET 
+    T RseriesTiOx = (T) 650; // from [100:200000];			// series resistance of the TiOx layer [Ohm]
+    T R0 = (T) 719.2437;									// line resistance for a current of 0 A [Ohm]
+    T Rthline = (T) 90471.47;							// thermal resistance of the lines [W/K]
+    T alphaline = (T) 3.92e-3;							// temperature coefficient of the lines [1/K]
+    T read_voltage = (T) 0.2;
+    T pulse_voltage_SET = (T) -0.342;
+    T pulse_voltage_RESET = (T) 0.7065;
+    T pulse_length = (T) 1e-6;
+    T base_time_step = (T) 1e-8;
+    T Ndisc_min_bound = (T) 0.06;
+    T Ndisc_max_bound = (T) 1.9897452127440086504;
     T w_min = (T)-0.6;
     T w_min_dtod = (T)0.3;
     T w_max = (T)0.6;
     T w_max_dtod = (T)0.3;
-    T Ndisc_std = (T)0.0;                                           //
-    T dNdt_std = (T)0.0;                                           //
+    T Ndiscmax_dtod = (T) 0.0;							// 
+    T Ndiscmax_dtod_upper_bound = (T) 0.0;							// 
+    T Ndiscmax_dtod_lower_bound = (T) 0.0;							// 
+    T Ndiscmin_dtod = (T) 0.0;							//
+    T Ndiscmin_dtod_upper_bound = (T) 0.0;							// 
+    T Ndiscmin_dtod_lower_bound = (T) 0.0;							// 
+    T ldisc_dtod = (T) 0.0;							//
+    T ldisc_dtod_upper_bound = (T) 0.0;							// 
+    T ldisc_dtod_lower_bound = (T) 0.0;							// 
+    T rdisc_dtod = (T) 0.0;							//
+    T rdisc_dtod_upper_bound = (T) 0.0;							// 
+    T rdisc_dtod_lower_bound = (T) 0.0;							// 
+    T Ndiscmax_std = (T) 0.0;							// 
+    T Ndiscmax_ctoc_upper_bound_old = (T) 0.0;							// 
+    T Ndiscmax_ctoc_lower_bound_old = (T) 0.0;							// 
+    T Ndiscmax_ctoc_upper_bound = (T) 0.0;							// 
+    T Ndiscmax_ctoc_lower_bound = (T) 0.0;							// 
+    T Ndiscmin_std = (T) 0.0;							//
+    T Ndiscmin_ctoc_upper_bound_old = (T) 0.0;							// 
+    T Ndiscmin_ctoc_lower_bound_old = (T) 0.0;							// 
+    T Ndiscmin_ctoc_upper_bound = (T) 0.0;							// 
+    T Ndiscmin_ctoc_lower_bound = (T) 0.0;							// 
+    T ldisc_std = (T) 0.0;							//
+    T ldisc_std_slope = (T) 0.0;							//
+    T ldisc_ctoc_upper_bound_old = (T) 0.0;							// 
+    T ldisc_ctoc_lower_bound_old = (T) 0.0;							// 
+    T ldisc_ctoc_upper_bound = (T) 0.0;							// 
+    T ldisc_ctoc_lower_bound = (T) 0.0;							// 
+    T rdisc_std = (T) 0.0;							//
+    T rdisc_std_slope = (T) 0.0;							//
+    T rdisc_ctoc_upper_bound_old = (T) 0.0;							// 
+    T rdisc_ctoc_lower_bound_old = (T) 0.0;							// 
+    T rdisc_ctoc_upper_bound = (T) 0.0;							// 
+    T rdisc_ctoc_lower_bound = (T) 0.0;							// 
+    bool enable_w_max_w_min_bounds = false;					// 
+    T w_max_dtod_upper_bound = (T) 0.0;							// 
+    T w_max_dtod_lower_bound = (T) 0.0;							// 
+    T w_min_dtod_upper_bound = (T) 0.0;							// 
+    T w_min_dtod_lower_bound = (T) 0.0;							// 
 
-    T write_noise_std = (T)1.0; T dw_min_dtod = (T)0.0; T dw_min_std = (T)0.0; // ctoc of pulse
+    T write_noise_std = (T)1.0;
+    T dw_min_dtod = (T)0.0;
+    T dw_min_std = (T)0.0; // ctoc of pulse
 
     // these compound parameters derive from the above and will be calculated in initialize
     T _current_min = (T) 0.0;
     T _current_max = (T) 0.0;
     T _Ninit = (T) 0.0;
+
     T _alpha_SET = (T) 0.0;
     T _beta_SET = (T) 0.0;
     T _c_SET = (T) 0.0;
@@ -130,35 +158,50 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     T _V_disk_coefficient = (T) 0.0;
 
     T _gamma_coefficient = (T) 0.0;
-
-    T _current_to_weight_ratio = (T) 0.0;
-    T _weight_to_current_ratio = (T) 0.0;
     T _a_ny0 = (T) 0.0;
     ,
     /*print body*/
     ss << "\t write noise std:\t" << real_write_noise_std << std::endl;
     ss << "\t alpha0:\t\t" << alpha0 << std::endl;
-    ss << "\t alpha2:\t\t" << alpha2 << std::endl; ss << "\t alpha3:\t\t" << alpha3 << std::endl;
-    ss << "\t beta0:\t\t\t" << beta0 << std::endl; ss << "\t beta1:\t\t\t" << beta1 << std::endl;
-    ss << "\t c0:\t\t\t" << c0 << std::endl; ss << "\t c1:\t\t\t" << c1 << std::endl;
-    ss << "\t c2:\t\t\t" << c2 << std::endl; ss << "\t c3:\t\t\t" << c3 << std::endl;
-    ss << "\t d0:\t\t\t" << d0 << std::endl; ss << "\t d1:\t\t\t" << d1 << std::endl;
-    ss << "\t d2:\t\t\t" << d2 << std::endl; ss << "\t d3:\t\t\t" << d3 << std::endl;
-    ss << "\t f0:\t\t\t" << f0 << std::endl; ss << "\t f1:\t\t\t" << f1 << std::endl;
-    ss << "\t f2:\t\t\t" << f2 << std::endl; ss << "\t f3:\t\t\t" << f3 << std::endl;
-    ss << "\t g0:\t\t\t" << g0 << std::endl; ss << "\t g1:\t\t\t" << g1 << std::endl;
-    ss << "\t h0:\t\t\t" << h0 << std::endl; ss << "\t h1:\t\t\t" << h1 << std::endl;
-    ss << "\t h2:\t\t\t" << h2 << std::endl; ss << "\t h3:\t\t\t" << h3 << std::endl;
-    ss << "\t j0:\t\t\t" << j_0 << std::endl; ss << "\t k0:\t\t\t" << k0 << std::endl;
-
-    ss << "\t T0:\t\t\t" << T0 << std::endl; ss << "\t un:\t\t\t" << un << std::endl;
-    ss << "\t Nplug:\t\t\t" << Nplug << std::endl; ss << "\t a:\t\t\t" << a << std::endl;
-    ss << "\t ny0:\t\t\t" << ny0 << std::endl; ss << "\t dWa:\t\t\t" << dWa << std::endl;
-    ss << "\t Rth0:\t\t\t" << Rth0 << std::endl; ss << "\t rdisc:\t\t\t" << rdisc << std::endl;
-    ss << "\t lcell:\t\t\t" << lcell << std::endl; ss << "\t ldisc:\t\t\t" << ldisc << std::endl;
+    ss << "\t alpha2:\t\t" << alpha2 << std::endl;
+    ss << "\t alpha3:\t\t" << alpha3 << std::endl;
+    ss << "\t beta0:\t\t\t" << beta0 << std::endl;
+    ss << "\t beta1:\t\t\t" << beta1 << std::endl;
+    ss << "\t c0:\t\t\t" << c0 << std::endl;
+    ss << "\t c1:\t\t\t" << c1 << std::endl;
+    ss << "\t c2:\t\t\t" << c2 << std::endl;
+    ss << "\t c3:\t\t\t" << c3 << std::endl;
+    ss << "\t d0:\t\t\t" << d0 << std::endl;
+    ss << "\t d1:\t\t\t" << d1 << std::endl;
+    ss << "\t d2:\t\t\t" << d2 << std::endl;
+    ss << "\t d3:\t\t\t" << d3 << std::endl;
+    ss << "\t f0:\t\t\t" << f0 << std::endl;
+    ss << "\t f1:\t\t\t" << f1 << std::endl;
+    ss << "\t f2:\t\t\t" << f2 << std::endl;
+    ss << "\t f3:\t\t\t" << f3 << std::endl;
+    ss << "\t g0:\t\t\t" << g0 << std::endl;
+    ss << "\t g1:\t\t\t" << g1 << std::endl;
+    ss << "\t h0:\t\t\t" << h0 << std::endl;
+    ss << "\t h1:\t\t\t" << h1 << std::endl;
+    ss << "\t h2:\t\t\t" << h2 << std::endl;
+    ss << "\t h3:\t\t\t" << h3 << std::endl;
+    ss << "\t j0:\t\t\t" << j_0 << std::endl;
+    ss << "\t k0:\t\t\t" << k0 << std::endl;
+    
+    ss << "\t T0:\t\t\t" << T0 << std::endl;
+    ss << "\t un:\t\t\t" << un << std::endl;
+    ss << "\t Nplug:\t\t\t" << Nplug << std::endl;
+    ss << "\t a:\t\t\t" << a << std::endl;
+    ss << "\t ny0:\t\t\t" << ny0 << std::endl;
+    ss << "\t dWa:\t\t\t" << dWa << std::endl;
+    ss << "\t Rth0:\t\t\t" << Rth0 << std::endl;
+    ss << "\t rdisc:\t\t\t" << rdisc << std::endl;
+    ss << "\t lcell:\t\t\t" << lcell << std::endl;
+    ss << "\t ldisc:\t\t\t" << ldisc << std::endl;
     ss << "\t Rtheff_scaling:\t" << Rtheff_scaling << std::endl;
     ss << "\t RseriesTiOx:\t\t" << RseriesTiOx << std::endl;
-    ss << "\t R0:\t\t\t" << R0 << std::endl; ss << "\t Rthline:\t\t" << Rthline << std::endl;
+    ss << "\t R0:\t\t\t" << R0 << std::endl;
+    ss << "\t Rthline:\t\t" << Rthline << std::endl;
     ss << "\t alphaline:\t\t" << alphaline << std::endl;
     ss << "\t read_voltage:\t\t" << read_voltage << std::endl;
     ss << "\t pulse_voltage_SET:\t" << pulse_voltage_SET << std::endl;
@@ -167,6 +210,45 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     ss << "\t base_time_step:\t" << base_time_step << std::endl;
     ss << "\t Ndisc_min_bound:\t" << Ndisc_min_bound << std::endl;
     ss << "\t Ndisc_max_bound:\t" << Ndisc_max_bound << std::endl;
+    ss << "\t Ndiscmax_dtod:\t\t" << Ndiscmax_dtod << std::endl;
+    ss << "\t Ndiscmax_dtod_upper_bound:\t\t" << Ndiscmax_dtod_upper_bound << std::endl;
+    ss << "\t Ndiscmax_dtod_lower_bound:\t\t" << Ndiscmax_dtod_lower_bound << std::endl;
+    ss << "\t Ndiscmin_dtod:\t\t" << Ndiscmin_dtod << std::endl;
+    ss << "\t Ndiscmin_dtod_upper_bound:\t\t" << Ndiscmin_dtod_upper_bound << std::endl;
+    ss << "\t Ndiscmin_dtod_lower_bound:\t\t" << Ndiscmin_dtod_lower_bound << std::endl;
+    ss << "\t ldisc_dtod:\t\t" << ldisc_dtod << std::endl;
+    ss << "\t ldisc_dtod_upper_bound:\t\t" << ldisc_dtod_upper_bound << std::endl;
+    ss << "\t ldisc_dtod_lower_bound:\t\t" << ldisc_dtod_lower_bound << std::endl;
+    ss << "\t rdisc_dtod:\t\t" << rdisc_dtod << std::endl;
+    ss << "\t rdisc_dtod_upper_bound:\t\t" << rdisc_dtod_upper_bound << std::endl;
+    ss << "\t rdisc_dtod_lower_bound:\t\t" << rdisc_dtod_lower_bound << std::endl;
+    ss << "\t Ndiscmax_std:\t\t" << Ndiscmax_std << std::endl;
+    ss << "\t Ndiscmax_ctoc_upper_bound_old:\t\t" << Ndiscmax_ctoc_upper_bound_old << std::endl;
+    ss << "\t Ndiscmax_ctoc_lower_bound_old:\t\t" << Ndiscmax_ctoc_lower_bound_old << std::endl;
+    ss << "\t Ndiscmax_ctoc_upper_bound:\t\t" << Ndiscmax_ctoc_upper_bound << std::endl;
+    ss << "\t Ndiscmax_ctoc_lower_bound:\t\t" << Ndiscmax_ctoc_lower_bound << std::endl;
+    ss << "\t Ndiscmin_std:\t\t" << Ndiscmin_std << std::endl;
+    ss << "\t Ndiscmin_ctoc_upper_bound_old:\t\t" << Ndiscmin_ctoc_upper_bound_old << std::endl;
+    ss << "\t Ndiscmin_ctoc_lower_bound_old:\t\t" << Ndiscmin_ctoc_lower_bound_old << std::endl;
+    ss << "\t Ndiscmin_ctoc_upper_bound:\t\t" << Ndiscmin_ctoc_upper_bound << std::endl;
+    ss << "\t Ndiscmin_ctoc_lower_bound:\t\t" << Ndiscmin_ctoc_lower_bound << std::endl;
+    ss << "\t ldisc_std:\t\t" << ldisc_std << std::endl;
+    ss << "\t ldisc_std_slope:\t\t" << ldisc_std_slope << std::endl;
+    ss << "\t ldisc_ctoc_upper_bound_old:\t\t" << ldisc_ctoc_upper_bound_old << std::endl;
+    ss << "\t ldisc_ctoc_lower_bound_old:\t\t" << ldisc_ctoc_lower_bound_old << std::endl;
+    ss << "\t ldisc_ctoc_upper_bound:\t\t" << ldisc_ctoc_upper_bound << std::endl;
+    ss << "\t ldisc_ctoc_lower_bound:\t\t" << ldisc_ctoc_lower_bound << std::endl;
+    ss << "\t rdisc_std:\t\t" << rdisc_std << std::endl;
+    ss << "\t rdisc_std_slope:\t\t" << rdisc_std_slope << std::endl;
+    ss << "\t rdisc_ctoc_upper_bound_old:\t\t" << rdisc_ctoc_upper_bound_old << std::endl;
+    ss << "\t rdisc_ctoc_lower_bound_old:\t\t" << rdisc_ctoc_lower_bound_old << std::endl;
+    ss << "\t rdisc_ctoc_upper_bound:\t\t" << rdisc_ctoc_upper_bound << std::endl;
+    ss << "\t rdisc_ctoc_lower_bound:\t\t" << rdisc_ctoc_lower_bound << std::endl;
+    ss << "\t enable_w_max_w_min_bounds:\t\t" << enable_w_max_w_min_bounds << std::endl;
+    ss << "\t w_max_dtod_upper_bound:\t\t" << w_max_dtod_upper_bound << std::endl;
+    ss << "\t w_max_dtod_lower_bound:\t\t" << w_max_dtod_lower_bound << std::endl;
+    ss << "\t w_min_dtod_upper_bound:\t\t" << w_min_dtod_upper_bound << std::endl;
+    ss << "\t w_min_dtod_lower_bound:\t\t" << w_min_dtod_lower_bound << std::endl;
     ,
     /* calc weight granularity body */
     return this->dw_min;
