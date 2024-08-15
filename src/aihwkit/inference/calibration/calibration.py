@@ -240,7 +240,7 @@ def calibrate_input_ranges(
 
     # Pass through the samples
     progress_bar = tqdm if verbose else lambda x: x
-    for args, kwargs in progress_bar(dataloader):
+    for args, kwargs in progress_bar(dataloader):  # type: ignore
         model(*args, **kwargs)
 
     # Remove hooks
