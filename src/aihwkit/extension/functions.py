@@ -27,14 +27,14 @@ class FloatPrecisionCastFunction(Function):
 
     @staticmethod
     def forward(
-        ctx: Any, input_: Tensor, exponent: int = 8, mantissa: int = 7, saturate_to_inf: bool = True
+        _: Any, input_: Tensor, exponent: int = 8, mantissa: int = 7, saturate_to_inf: bool = True
     ) -> Tensor:
-        # pylint: disable=arguments-differ
+        # pylint: disable=unused-argument, arguments-differ
         return ops.float_precision_cast(input_, exponent, mantissa, saturate_to_inf)
 
     @staticmethod
     def backward(ctx: Any, grad_in: Tensor) -> Tensor:
-        # pylint: disable=arguments-differ
+        # pylint: disable=unused-argument, arguments-differ
         return grad_in
 
 
