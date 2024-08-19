@@ -31,6 +31,7 @@ from aihwkit.simulator.parameters.enums import RPUDataType
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -55,26 +56,28 @@ class Net(nn.Module):
         x = self.fc2(x)
         output = F.log_softmax(x, dim=1)
         return output
-    
+
+
 if __name__ == "__main__":
     model = Net()
     rpu_config = TorchInferenceRPUConfig()
-    model = convert_to_analog(model, rpu_config) 
+    model = convert_to_analog(model, rpu_config)
     nll_loss = torch.nn.NLLLoss()
-    transform=transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
-    ])
-    dataset = datasets.MNIST('data', train=True, download=True, transform=transform)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
+    dataset = datasets.MNIST("data", train=True, download=True, transform=transform)
     train_loader = torch.utils.data.DataLoader(dataset, batch_size=32)
-    
+
     model = model.to(device=device, dtype=torch.bfloat16)
     optimizer = AnalogSGD(model.parameters(), lr=0.1)
     model = model.train()
-    
+
     pbar = tqdm.tqdm(enumerate(train_loader))
     for batch_idx, (data, target) in pbar:
-        data, target = data.to(device=device, dtype=torch.bfloat16), target.to(device=device)
+        data, target = data.to(device=device, dtype=torch.bfloat16), target.to(
+            device=device
+        )
         optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output.float(), target)
