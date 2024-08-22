@@ -180,12 +180,14 @@ class _AnalogConvNd(AnalogLayerBase, _ConvNd):
             dilation=self.dilation,
             padding=self.padding,
             stride=self.stride,
-        ).transpose(1, 2)
+        ).transpose(-1, -2)
 
-        out = self.analog_module(x_input_).transpose(1, 2)
+        out = self.analog_module(x_input_).transpose(-1, -2)
         out_size = (
-            im_shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1
+            im_shape[-2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1
         ) // self.stride[0] + 1
+        if len(im_shape) == 3:
+            return out.view(self.out_channels, out_size, -1)
         return out.view(im_shape[0], self.out_channels, out_size, -1)
 
 

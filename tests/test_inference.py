@@ -46,6 +46,24 @@ class NoiseModelTest(AihwkitTestCase):
 
         self.assertNotAlmostEqualTensor(noisy_weights, weights)
 
+    def test_apply_custom_drift(self):
+        """Test custom drift model with g_converter"""
+        weights = randn(10, 35)
+
+        g_min, g_max = 0., 25.
+        custom_drift_model = dict(g_lst=[g_min, 10., g_max],
+                                  nu_mean_lst=[0.08, 0.05, 0.03],
+                                  nu_std_lst=[0.03, 0.02, 0.01])
+
+        noise_model = PCMLikeNoiseModel(
+            g_converter=SinglePairConductanceConverter(g_min=g_min, g_max=g_max),
+            custom_drift_model=custom_drift_model
+        )
+        t_inference = 100.0
+        noisy_weights = noise_model.apply_noise(weights, t_inference)
+
+        self.assertNotAlmostEqualTensor(noisy_weights, weights)
+
 
 class ConductanceConverterTest(AihwkitTestCase):
     """Conductance converter test."""
