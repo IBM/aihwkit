@@ -39,7 +39,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
     r"""Noise model that was fitted and characterized on real PCM devices.
 
     Expected weight noise at assumed time of inference with expected
-/dccstor/transformer/charles/aihwkit/src/aihwkit/utils    programming noise at 0.
+    programming noise at 0.
 
     The statistical noise model is based on measured PCM devices. See
     also `Nandakumar et al. ICECS (2019)`_
