@@ -12,6 +12,20 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## [0.9.2] - 2024/08/26
+
+### Added
+
+* Added new Hermes noise model and related notebooks
+* Added new conductance converters
+* Make Conv layers also compatible with non-batched inputs
+* Added per column drift compensation
+* Added custom drifts
+
+### Changed
+
+* Update requirements-examples.txt
+
 ## [0.9.1] - 2024/05/16
 
 ### Added
