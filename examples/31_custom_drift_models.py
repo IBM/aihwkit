@@ -61,12 +61,12 @@ BATCH_SIZE = 1
 
 # define rpu_config
 io_params = IOParameters(
-    bound_management = BoundManagementType.NONE,
-    nm_thres = 1.0,
-    inp_res = 2 ** 8 - 2,
-    out_bound = -1,
-    out_res = -1,
-    out_noise = 0.0)
+    bound_management=BoundManagementType.NONE,
+    nm_thres=1.0,
+    inp_res=2 ** 8 - 2,
+    out_bound=-1,
+    out_res=-1,
+    out_noise=0.0)
 
 noise_model = PCMLikeNoiseModel(
     prog_noise_scale=0.0,   # turn off to show drift only
