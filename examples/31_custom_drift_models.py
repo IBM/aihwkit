@@ -38,6 +38,7 @@ from aihwkit.simulator.rpu_base import cuda
 from aihwkit.inference.converter.conductance import SinglePairConductanceConverter
 from aihwkit.inference import PCMLikeNoiseModel
 from aihwkit.simulator.parameters.enums import BoundManagementType
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.configs import TorchInferenceRPUConfig
 
 g_min, g_max = 0.0, 25.
@@ -59,19 +60,22 @@ OUT_FEATURES = 512
 BATCH_SIZE = 1
 
 # define rpu_config
-rpu_config = TorchInferenceRPUConfig()
-rpu_config.noise_model = PCMLikeNoiseModel(
+io_params = IOParameters(
+    bound_management = BoundManagementType.NONE,
+    nm_thres = 1.0,
+    inp_res = 2 ** 8 - 2,
+    out_bound = -1,
+    out_res = -1,
+    out_noise = 0.0)
+
+noise_model = PCMLikeNoiseModel(
     prog_noise_scale=0.0,   # turn off to show drift only
     read_noise_scale=0.0,   # turn off to show drift only
     drift_scale=1.0,
     g_converter=SinglePairConductanceConverter(g_min=g_min, g_max=g_max),
     custom_drift_model=custom_drift_model)
-rpu_config.forward.bound_management = BoundManagementType.NONE
-rpu_config.forward.nm_thres = 1.0
-rpu_config.forward.inp_res = 2 ** 8 - 2
-rpu_config.forward.out_bound = -1   # no out bound
-rpu_config.forward.out_res = -1     # infinite out res
-rpu_config.forward.out_noise = 0.0  # turn off output noise
+
+rpu_config = TorchInferenceRPUConfig(noise_model=noise_model, forward=io_params)
 
 # define simple model, weights, and activations
 model = AnalogLinear(IN_FEATURES, OUT_FEATURES, bias=False, rpu_config=rpu_config)
