@@ -34,6 +34,18 @@ from aihwkit.inference.converter.conductance import SinglePairConductanceConvert
 
 _ZERO_CLIP = 1e-7
 
+class CustomDriftModel:
+    r"""Custom drift model for conductance drift.
+    """
+    def __init__(self, g_lst: List[float], nu_mean_lst: List[float], nu_std_lst: List[float]):
+        self.g_lst = g_lst
+        self.nu_mean_lst = nu_mean_lst
+        self.nu_std_lst = nu_std_lst
+
+    def is_valid(self):
+        for attr, val in vars(self).items():
+            assert len(val) >= 2, f"Attribute {attr} must have at least 2 elements"
+
 
 class PCMLikeNoiseModel(BaseNoiseModel):
     r"""Noise model that was fitted and characterized on real PCM devices.
@@ -83,7 +95,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         read_noise_scale: float = 1.0,
         drift_scale: float = 1.0,
         prog_coeff_g_max_reference: Optional[float] = None,
-        **kwargs: Any,
+        custom_drift_model: Optional[CustomDriftModel] = None,
     ):
         g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
@@ -108,16 +120,11 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         self.prog_noise_scale = prog_noise_scale
         self.read_noise_scale = read_noise_scale
         self.drift_scale = drift_scale
-        self.valid_kwargs = ['custom_drift_model']
-
-        if not all(key in self.valid_kwargs for key in kwargs):
-            ValueError("PCMLikeNoiseModel only supports kwargs = %s" % self.valid_kwargs)
-
-        self.custom_drift_model = kwargs.get('custom_drift_model')
+        self.custom_drift_model = custom_drift_model
 
         if self.custom_drift_model is not None:
-            drift_model_g_min = min(self.custom_drift_model['g_lst'])
-            drift_model_g_max = max(self.custom_drift_model['g_lst'])
+            drift_model_g_min = min(self.custom_drift_model.g_lst)
+            drift_model_g_max = max(self.custom_drift_model.g_lst)
             # using Single/Dual/NPairConductanceConverter
             if hasattr(g_converter, 'g_min') and hasattr(g_converter, 'g_max'):
                 g_converter_g_min = g_converter.g_min
@@ -167,23 +174,10 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         the g_lst values. Nu coeffiecients will be interpolated using this
         model information."""
 
-        if self.custom_drift_model is not None:
-            assert isinstance(self.custom_drift_model,
-                              dict), "custom_drift_model must be specified as dictionary"
-            required_keys = ['g_lst', 'nu_mean_lst', 'nu_std_lst']
-            assert all(key in required_keys for key in
-                       self.custom_drift_model), ("Missing required key in custom_drift_model: "
-                                                  "g_lst, nu_mean_lst, nu_std_lst")
-            assert all(isinstance(val, List) for _, val in
-                       self.custom_drift_model.items()), ("Value corresponding to each key in "
-                                                          "custom_drift_model must be a list")
-            assert all(len(val) >= 2 for _, val in
-                       self.custom_drift_model.items()), ("Each key in custom_drift_model must"
-                                                          "have at least 2 elements")
-
-            g_lst = Tensor(self.custom_drift_model.get('g_lst'))
-            nu_mean_lst = Tensor(self.custom_drift_model.get('nu_mean_lst'))
-            nu_std_lst = Tensor(self.custom_drift_model.get('nu_std_lst'))
+        if self.custom_drift_model is not None and self.custom_drift_model.is_valid():
+            g_lst = Tensor(self.custom_drift_model.g_lst)
+            nu_mean_lst = Tensor(self.custom_drift_model.nu_mean_lst)
+            nu_std_lst = Tensor(self.custom_drift_model.nu_std_lst)
 
             g_min = torch_min(g_lst)
             g_max = torch_max(g_lst)
