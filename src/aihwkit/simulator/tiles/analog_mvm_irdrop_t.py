@@ -19,6 +19,7 @@ from math import log2
 
 from torch import (
     Tensor,
+    empty,
     zeros,
     sum as torch_sum,
     flip,
@@ -28,6 +29,7 @@ from torch import (
     fmod,
     allclose,
     linspace,
+    Size,
 )
 from torch.autograd import no_grad
 from torch.nn.functional import pad
@@ -69,21 +71,23 @@ class AnalogMVMIRDropT(AnalogMVM):
         return res
 
     @classmethod
-    def _interleave_cols_2d(cls, mvm1: Tensor, mvm2: Tensor) -> Tensor:
-        """Returns 2D matrix with columns interleaved, starting with mvm1
+    def _interleave_cols_nd(cls, mvm1: Tensor, mvm2: Tensor) -> Tensor:
+        """Interleaves two matrices along final dimension to mimic North-South ADcs,
+        starting with mvm1. Can now handle n-dimensional matrices, not just 2D.
 
         Args:
-            mvm1: ``[batch_size, out_size/2]`` output activations (to south ADCs)
-            mvm2: ``[batch_size, out_size/2]`` output activations (to north ADCs)
+            mvm1: ``[*, batch_size, out_size/2]`` output activations (to south ADCs)
+            mvm2: ``[*, batch_size, out_size/2]`` output activations (to north ADCs)
 
         Returns:
-            Column-wise interleaved 2D matrix of output activations that captures
+            Column-wise interleaved matrix of output activations that captures
             IR drop in both directions (to north and south ADCs) in a
             symmetric tile design.
         """
-        mvm = zeros((mvm1.shape[0], mvm1.shape[1] + mvm2.shape[1])).to(mvm1.device)
-        mvm[:, 0::2] = mvm1
-        mvm[:, 1::2] = mvm2
+        shape = Size(mvm1.shape[0:-1]) + Size([mvm1.shape[-1] + mvm2.shape[-1]])
+        mvm = empty(*shape).to(mvm1.device)
+        mvm[..., 0::2] = mvm1
+        mvm[..., 1::2] = mvm2
         return mvm
 
     @classmethod
@@ -92,9 +96,10 @@ class AnalogMVMIRDropT(AnalogMVM):
     ) -> Tuple[Tensor, Tensor]:
         """Return input_ (activations) and weights symmetrically padded
         with zeros to mimic symmetric ADCs (north and south).
+        Can now handle n-dimensional input_, not just 2D.
 
         Args:
-            input_: ``[batch_size, in_size]`` input_ (activations).
+            input_: ``[*, batch_size, in_size]`` input_ (activations).
             weight: ``[in_size, out_size]`` weight matrix.
             phys_input_size: number of hardware tile rows
 
@@ -105,7 +110,8 @@ class AnalogMVMIRDropT(AnalogMVM):
         if pad1 == 0:
             return input_, weight
         pad2 = phys_input_size - weight.shape[0] - pad1
-        input_ = pad(input_, (pad1, pad2, 0, 0), "constant", 0)
+        input_pad_tuple = (pad1, pad2) + (0, 0) * (input_.dim() - 1)
+        input_ = pad(input_, input_pad_tuple, "constant", 0)
         weight = pad(weight, (0, 0, pad1, pad2), "constant", 0)
         return input_, weight
 
@@ -129,10 +135,11 @@ class AnalogMVMIRDropT(AnalogMVM):
         will return a list of activations for each bit, which
         depends on the inp_res.  SPLIT_MODE and BIT_WISE will
         appropriately bit-shift the output results to perform
-        the MVM operation correctly.
+        the MVM operation correctly. Can handle n-dimensional
+        input activations, not just 2D.
 
         Args:
-            input_: ``[N, in_size]`` input activations.
+            input_: ``[*, batch_size, in_size]`` input activations.
             scale: scale for rescaling input activations.
             scaling: whether to rescale input activations.
             with_asymmetry:
@@ -155,16 +162,17 @@ class AnalogMVMIRDropT(AnalogMVM):
         if io_pars.mv_type == AnalogMVType.ONE_PASS:
             prepared_input = [prepared_input]
         elif io_pars.mv_type == AnalogMVType.SPLIT_MODE:
-            n_bits = int(log2(1.0 / res))
-            if not log2(1.0 / res) % 1 == 0:
+            n_bits = int(log2(1.0 / res + 2))
+            if not log2(1.0 / res + 2) % 1 == 0:
                 raise ConfigError(
-                    f"inp_res={1. / res} must be power of 2 (or 1/2**n_bits) "
+                    f"inp_res={1. / res} must be of form (2**n_bits - 2) "
                     "for AnalogMVType.SPLIT_MODE"
                 )
 
             if not io_pars.split_mode_bit_shift % 1 == 0:
                 raise ConfigError(
-                    f"split_mode_bit_shift={io_pars.split_mode_bit_shift}" " must be integer"
+                    f"split_mode_bit_shift={io_pars.split_mode_bit_shift}"
+                    " must be integer"
                 )
 
             if not io_pars.split_mode_bit_shift < n_bits:
@@ -185,7 +193,8 @@ class AnalogMVMIRDropT(AnalogMVM):
             prepared_input_lsb = lower_bits * (2 * res)
 
             if not allclose(
-                (2**io_pars.split_mode_bit_shift) * prepared_input_msb + prepared_input_lsb,
+                (2**io_pars.split_mode_bit_shift) * prepared_input_msb
+                + prepared_input_lsb,
                 prepared_input,
             ):
                 raise ConfigError("Split mode pwm conversion error")
@@ -193,8 +202,8 @@ class AnalogMVMIRDropT(AnalogMVM):
             prepared_input = [prepared_input_lsb, prepared_input_msb]
 
         elif io_pars.mv_type == AnalogMVType.BIT_WISE:
-            int_input = prepared_input / (2 * res)
-            n_bits = int(log2(1.0 / res))
+            int_input = prepared_input / (2.0 * res)
+            n_bits = int(log2(1.0 / res + 2)) - 1
             prepared_input = []
             for _ in range(n_bits):
                 # fmod for +/- remainders
@@ -216,8 +225,7 @@ class AnalogMVMIRDropT(AnalogMVM):
     def _thev_equiv(
         cls,
         input_: Tensor,
-        weight: Tensor,
-        g_converter: Optional[SinglePairConductanceConverter] = None,
+        g_lst: List[Tensor],
         time_steps: int = 128,
         t_max: float = 1.0,
         segments: int = 8,
@@ -234,19 +242,12 @@ class AnalogMVMIRDropT(AnalogMVM):
         equivalents into one time-varying Thevenin equivalent circuit per MVM
         tile column (i.e. each element of out_size). This part is represented by
         the for loop at the end of the method. Largest indices are closest to
-        the ADC.
+        the ADC. Can now handle n-dimensional input activations, not just 2D.
 
         Args:
-            input_: ``[N, in_size]`` MVM tile input activations
+            input_: ``[*, batch_size, in_size]`` MVM tile input activations
 
-            weight: ``[in_size, out_size]`` MVM tile weights
-                time_steps: discrete time steps for time-varying Thevenin equivalent
-                (approximation). High value is more accurate whereas lower value
-                results in faster computation with more IR drop inaccuracy. SPLIT_MODE
-                and BIT_WISE will automatically set this parameter to an appropriate value.
-
-            g_converter: specifies weight programming scheme which determines conductances
-                for Thevenin equivlanet circuit.
+            g_lst: list of conductances in MVM tile
 
             t_max: max sim time, beyond which activations all zero. Can cease computation
 
@@ -268,29 +269,38 @@ class AnalogMVMIRDropT(AnalogMVM):
 
         Returns:
             Tuple[Tensor] containing thevenin voltages vth_3d and rth_3d where both
-            have dimensions ``[batch_size, out_size/2, time_steps]``. Tensor vth_3d
-            is given volts and rth_3d is in units of MOhms.
-
+            have dimensions ``[*, batch_size, out_size/2, time_steps]``.
+            Tensor vth_nd is given volts and rth_nd is in units of MOhms.
         """
-        seg_rows = int(phys_input_size / segments)
-        assert seg_rows * segments == phys_input_size, (
+        syn_rows_per_seg = int(phys_input_size / segments)
+        assert syn_rows_per_seg * segments == phys_input_size, (
             "Error: phys_input_size "
             "(%s) must be evenly divisible by number "
             "of segments (%s)" % (str(phys_input_size), str(segments))
         )
 
-        input_, weight = cls._pad_symmetric(input_, weight, phys_input_size=phys_input_size)
-        if g_converter is None:
-            g_converter = SinglePairConductanceConverter()
-        [gp_2d, gm_2d], _ = g_converter.convert_to_conductances(weight)
+        gp_2d, gm_2d = g_lst
+
+        out_sh = Size(input_.shape[0:-1]) + Size([gp_2d.shape[1]]) + Size([time_steps])
+
+        input_ = input_.view(-1, input_.shape[-1])  # make 2d
 
         if use_extension and extension_ops is not None:
             # use C++ code for speedup if available
             output = extension_ops.thevenin_equiv(
-                input_, gp_2d.T.contiguous(), gm_2d.T.contiguous(), r_s, t_max, time_steps
+                input_,
+                gp_2d.T.contiguous(),
+                gm_2d.T.contiguous(),
+                r_s,
+                t_max,
+                time_steps,
             )
             vth_3d = output[0, :, :, :]
             rth_3d = output[1, :, :, :]
+
+            vth_nd = vth_3d.view(*out_sh)  # reshape back to appropriate dimensions
+            rth_nd = rth_3d.view(*out_sh)
+
             return vth_3d, rth_3d
 
         gp_4d = gp_2d[None, :, :, None]
@@ -299,11 +309,17 @@ class AnalogMVMIRDropT(AnalogMVM):
         x_4d = input_[:, :, None, None]
 
         def sum_segs(g_values: Tensor) -> Tensor:
-            if seg_rows == 1:
+            if syn_rows_per_seg == 1:
                 return g_values
             shape = g_values.shape
             return g_values.view(
-                (shape[0], shape[1] // seg_rows, seg_rows, shape[2], shape[3])
+                (
+                    shape[0],
+                    shape[1] // syn_rows_per_seg,
+                    syn_rows_per_seg,
+                    shape[2],
+                    shape[3],
+                )
             ).sum(dim=2)
 
         # pp
@@ -331,7 +347,7 @@ class AnalogMVMIRDropT(AnalogMVM):
         g_4d = None
 
         # wire resistance depends on segmentation
-        rw_segs = 1e-6 * r_s * seg_rows
+        rw_segs = 1e-6 * r_s * syn_rows_per_seg
 
         vth_3d = vth_4d_segs[:, 0, :, :]
         rth_3d = 1.0 / gth_4d_segs[:, 0, :, :]
@@ -342,7 +358,10 @@ class AnalogMVMIRDropT(AnalogMVM):
             vth_3d = (vth_3d / r_1 + vth_4d_segs[:, seg, :, :] / r_2) * rth_3d
         rth_3d += 0.5 * rw_segs
 
-        return vth_3d, rth_3d  # rth_3d in MOhm
+        vth_nd = vth_3d.view(*out_sh)  # reshape back to appropriate dimensions
+        rth_nd = rth_3d.view(*out_sh)
+
+        return vth_nd, rth_nd  # rth_nd in MOhm
 
     @classmethod
     def _matmul_irdrop(
@@ -362,7 +381,7 @@ class AnalogMVMIRDropT(AnalogMVM):
 
         Args:
             weight: ``[in_size, out_size]`` MVM tile weights
-            input_: ``[N, in_size]`` MVM tile input activations
+            input_: ``[*, batch_size, in_size]`` MVM tile input activations
             trans: whether to transpose the weight
             io_pars: Parameter defining the mat-mul nonlinearities and time-dependent IR drop
             ir_drop: scale of the IR-drop wire resistance
@@ -373,9 +392,11 @@ class AnalogMVMIRDropT(AnalogMVM):
             info: info string.
 
         Returns:
-            Tensor with 2D matmul result
+            Tensor with n-dimensional matmul result
         """
         ir_drop_rs = ir_drop * io_pars.ir_drop_rs
+        res = cls._get_res(io_pars.inp_res)
+        bit_res = io_pars.inp_bound / res
 
         if ir_drop == 0.0:
             return super(AnalogMVMIRDropT, cls)._matmul(weight, input_, trans)
@@ -388,35 +409,55 @@ class AnalogMVMIRDropT(AnalogMVM):
         else:
             new_weight = weight
 
-        vth_3d, rth_3d = cls._thev_equiv(
-            input_,
-            new_weight[:, 0::2],  # even cols
-            g_converter,
-            time_steps=time_steps,
-            t_max=t_max,
-            segments=io_pars.ir_drop_segments,
-            r_s=ir_drop_rs,
-            phys_input_size=phys_input_size,
+        syn_rows_per_seg = int(phys_input_size / io_pars.ir_drop_segments)
+        assert syn_rows_per_seg * io_pars.ir_drop_segments == phys_input_size, (
+            "Error: phys_input_size "
+            "(%s) must be evenly divisible by number "
+            "of segments (%s)" % (str(phys_input_size), str(io_pars.ir_drop_segments))
         )
-        i_out_3d = (vth_3d - io_pars.ir_drop_v_read) / rth_3d  # uA
-        mvm_even_col_down_adc = torch_sum(i_out_3d, dim=2)  # batch_size x n_cols/2
 
-        vth_3d, rth_3d = cls._thev_equiv(
-            flip(input_, (1,)),  # flip input
-            flip(new_weight[:, 1::2], (0,)),  # odd cols
-            g_converter,
-            time_steps=time_steps,
-            t_max=t_max,
-            segments=io_pars.ir_drop_segments,
-            r_s=ir_drop_rs,
-            phys_input_size=phys_input_size,
+        input_, new_weight = cls._pad_symmetric(
+            input_, new_weight, phys_input_size=phys_input_size
         )
-        i_out_3d = (vth_3d - io_pars.ir_drop_v_read) / rth_3d  # uA
-        mvm_odd_col_up_adc = torch_sum(i_out_3d, dim=2)  # batch_size x n_cols/2
+        if g_converter is None:
+            g_converter = SinglePairConductanceConverter()  # type: ignore
+        g_lst, params = g_converter.convert_to_conductances(new_weight)
 
-        mvm = cls._interleave_cols_2d(mvm_even_col_down_adc, mvm_odd_col_up_adc)  # symmetric ADCs
-        mvm /= g_converter.g_max - g_converter.g_min  # conductance normalization
+        mvm = zeros((input_.shape[0], g_lst[0].shape[1])).to(input_.device)
+        # (f1, (gp1, gm1)), (f2, (gp2, gm2), ... , (fn, (gpn, gmn)) # low to highest significance
+        for f_factor, g_lst_pair in zip(params.get('f_lst', [1.]),
+                                        zip(g_lst[::2], g_lst[1::2])):
+            vth_nd, rth_nd = cls._thev_equiv(
+                input_,
+                [g[:, 0::2] for g in g_lst_pair],  # even cols
+                time_steps=time_steps,
+                t_max=t_max,
+                segments=io_pars.ir_drop_segments,
+                r_s=ir_drop_rs,
+                phys_input_size=phys_input_size,
+            )
+            i_out_nd = (vth_nd - io_pars.ir_drop_v_read) / rth_nd  # uA
+            mvm_even_col_down_adc = torch_sum(i_out_nd, dim=-1)  # * x batch_size x n_cols/2
+
+            vth_nd, rth_nd = cls._thev_equiv(
+                flip(input_, (-1,)),  # flip input
+                [flip(g[:, 1::2], (0,)) for g in g_lst_pair],  # odd cols
+                time_steps=time_steps,
+                t_max=t_max,
+                segments=io_pars.ir_drop_segments,
+                r_s=ir_drop_rs,
+                phys_input_size=phys_input_size,
+            )
+            i_out_nd = (vth_nd - io_pars.ir_drop_v_read) / rth_nd  # uA
+            mvm_odd_col_up_adc = torch_sum(i_out_nd, dim=-1)  # * x batch_size x n_cols/2
+
+            mvm += f_factor * cls._interleave_cols_nd(
+                mvm_even_col_down_adc, mvm_odd_col_up_adc
+            )  # symmetric ADCs
+
+        mvm /= params['scale_ratio']  # conductance normalization
         mvm /= 0.2  # hardware normalization
+        mvm /= bit_res / 2.0  # normalize
         return mvm
 
     @classmethod
@@ -439,7 +480,7 @@ class AnalogMVMIRDropT(AnalogMVM):
 
         Args:
             weight: Weight tensor.
-            input_: Input tensor in format [N, in_size].
+            input_: Input tensor in format [*, batch_size, in_size].
             trans: whether to transpose the weight
             scale: Scale for scaling the input.
             scaling: Whether to scale.
@@ -467,7 +508,7 @@ class AnalogMVMIRDropT(AnalogMVM):
             io_pars=io_pars,
         )
         res = cls._get_res(io_pars.inp_res)
-        bit_res = io_pars.inp_bound / res
+        bit_res = io_pars.inp_bound / res + 2
 
         if io_pars.mv_type == AnalogMVType.ONE_PASS:
             # - Perform the noisy MVM
@@ -478,11 +519,12 @@ class AnalogMVMIRDropT(AnalogMVM):
                 io_pars,
                 ir_drop=ir_drop,
                 t_max=1.0,
-                time_steps=int((bit_res / 2) * io_pars.ir_drop_time_step_resolution_scale),
+                time_steps=int(
+                    (bit_res / 2) * io_pars.ir_drop_time_step_resolution_scale
+                ),
                 phys_input_size=phys_input_size,
                 g_converter=g_converter,
             )
-            out_values /= bit_res / 2.0
             bound_test_passed, finalized_outputs = cls._finalize_output(
                 out_values=out_values, io_pars=io_pars, **fwd_pars
             )
@@ -504,15 +546,14 @@ class AnalogMVMIRDropT(AnalogMVM):
                 g_converter=g_converter,
                 info="LSB",
             )
-            out_values_lsb /= bit_res / 2.0  # normalize
             bound_test_passed_lsb, finalized_outputs_lsb = cls._finalize_output(
                 out_values=out_values_lsb, io_pars=io_pars, **fwd_pars
             )
 
             time_steps = 2 ** int(
-                log2(bit_res + 1) - io_pars.split_mode_bit_shift - 1
+                log2(bit_res) - io_pars.split_mode_bit_shift - 1
             )  # minus 1 for sign bit
-            t_max = io_pars.inp_bound / (2**io_pars.split_mode_bit_shift)
+            t_max = (2 * res) * (time_steps - 1)
             out_values_msb = cls._matmul_irdrop(
                 weight,
                 prepared_input_msb,
@@ -525,13 +566,13 @@ class AnalogMVMIRDropT(AnalogMVM):
                 g_converter=g_converter,
                 info="MSB",
             )
-            out_values_msb /= bit_res / 2.0  # normalize
             bound_test_passed_msb, finalized_outputs_msb = cls._finalize_output(
                 out_values=out_values_msb, io_pars=io_pars, **fwd_pars
             )
 
             finalized_outputs = (
-                finalized_outputs_lsb + (2**io_pars.split_mode_bit_shift) * finalized_outputs_msb
+                finalized_outputs_lsb
+                + (2**io_pars.split_mode_bit_shift) * finalized_outputs_msb
             )
             bound_test_passed = bound_test_passed_lsb * bound_test_passed_msb
 
@@ -550,7 +591,6 @@ class AnalogMVMIRDropT(AnalogMVM):
                     g_converter=g_converter,
                     info=str(bit_pos),
                 )
-                out_values_1b /= bit_res / 2.0  # normalize
                 bound_test_passed_1b, finalized_outputs_1b = cls._finalize_output(
                     out_values=out_values_1b, io_pars=io_pars, **fwd_pars
                 )
@@ -610,8 +650,14 @@ class AnalogMVMIRDropT(AnalogMVM):
         if io_pars.slope_calibration > 0.0:
             raise ConfigError("Slope calibration not supported in torch tile")
 
-        if io_pars.v_offset_std > 0.0 or io_pars.v_offset_w_min > 0.0 or io_pars.r_series > 0.0:
+        if (
+            io_pars.v_offset_std > 0.0
+            or io_pars.v_offset_w_min > 0.0
+            or io_pars.r_series > 0.0
+        ):
             raise ConfigError("Voltage offset or R-series not supported in torch tile")
 
         if io_pars.w_read_asymmetry_dtod > 0.0:
-            raise ConfigError("Device polarity read dependence is not supported in torch tile")
+            raise ConfigError(
+                "Device polarity read dependence is not supported in torch tile"
+            )
