@@ -16,6 +16,7 @@ from torch import randn
 
 from aihwkit.inference import (
     PCMLikeNoiseModel,
+    CustomDriftPCMLikeNoiseModel,
     StateIndependentNoiseModel,
     SinglePairConductanceConverter,
     DualPairConductanceConverter,
@@ -58,9 +59,9 @@ class NoiseModelTest(AihwkitTestCase):
                                   nu_mean_lst=[0.08, 0.05, 0.03],
                                   nu_std_lst=[0.03, 0.02, 0.01])
 
-        noise_model = PCMLikeNoiseModel(
+        noise_model = CustomDriftPCMLikeNoiseModel(
+            custom_drift_model,
             g_converter=SinglePairConductanceConverter(g_min=g_min, g_max=g_max),
-            custom_drift_model=custom_drift_model
         )
         t_inference = 100.0
         noisy_weights = noise_model.apply_noise(weights, t_inference)
