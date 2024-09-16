@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 from aihwkit.nn import AnalogLinear
 from aihwkit.simulator.rpu_base import cuda
 from aihwkit.inference.converter.conductance import SinglePairConductanceConverter
-from aihwkit.inference import PCMLikeNoiseModel
+from aihwkit.inference.noise.pcm import CustomDriftPCMLikeNoiseModel
 from aihwkit.simulator.parameters.enums import BoundManagementType
 from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.configs import TorchInferenceRPUConfig
@@ -68,12 +68,13 @@ io_params = IOParameters(
     out_res=-1,
     out_noise=0.0)
 
-noise_model = PCMLikeNoiseModel(
-    prog_noise_scale=0.0,   # turn off to show drift only
-    read_noise_scale=0.0,   # turn off to show drift only
-    drift_scale=1.0,
-    g_converter=SinglePairConductanceConverter(g_min=g_min, g_max=g_max),
-    custom_drift_model=custom_drift_model)
+noise_model = CustomDriftPCMLikeNoiseModel(custom_drift_model,
+                                           prog_noise_scale=0.0,   # turn off to show drift only
+                                           read_noise_scale=0.0,   # turn off to show drift only
+                                           drift_scale=1.0,
+                                           g_converter=SinglePairConductanceConverter(g_min=g_min,
+                                                                                      g_max=g_max),
+                                           )
 
 rpu_config = TorchInferenceRPUConfig(noise_model=noise_model, forward=io_params)
 
