@@ -42,19 +42,25 @@ class HermesNoiseModel(BaseNoiseModel):
     See also `Nandakumar et al. ICECS (2019)`_ for details about the
     statistical modelling methodology that was used.
 
-    NOTE: The programming noise model used when the number of devices is two
-    stems from the work `Vasilopoulos et al. TED (2023)`_. For the drift characterization
-    of the two devices, though, it is considered that the cell has both devices in the same
-    state. This simplification yields worse drift behavior than the one disclosed in the
-    aforementioned work.
-
+    NOTE: The argument `num_devices` changes the programming method and the drift behavior of 
+    the model. When `num_devices` is 1, a conventional single device programming method is 
+    used. When `num_devices` is 2, the method from the work `Vasilopoulos et al. TED (2023)`_
+    is employed (MSF), which is optimal and yields higher programming accuracy. 
+    For the drift characterization, though, when `num_devices` is 2 the model is applied as 
+    if the two devices host the same conductance and not as described in the aforementioned 
+    reference, due to it using a dynamic conductance mapping step which requires feedback from
+    the chip in question. This simplification yields worse drift behavior in the current model 
+    than the one measured on-chip in the aforementioned work.
+    
     Args:
         prog_coeff: Programming polynomial coeffs in
             :math:`\sum_i c_i \left(\frac{g_t}{g_\max}\right)^i`
         g_converter: instantiated class of the conductance converter
             (defaults to single pair)
         num_devices: The number of devices that are used to map a weight.
-            Hermes supports either 1 or 2 devices per weight. Defaults to 2.
+            Hermes supports either 1 or 2 devices per weight. When `num_devices`
+            is 2, higher programming accuracy and less drift variability is measured.
+            Defaults to 2.
         g_max: In :math:`\mu S`, the maximal conductance, ie the value
             the absolute max of the weights will be mapped to.
             When `num_devices = 2`, the maximum characterized conductance
