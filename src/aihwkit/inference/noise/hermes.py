@@ -42,16 +42,16 @@ class HermesNoiseModel(BaseNoiseModel):
     See also `Nandakumar et al. ICECS (2019)`_ for details about the
     statistical modelling methodology that was used.
 
-    NOTE: The argument `num_devices` changes the programming method and the drift behavior of 
-    the model. When `num_devices` is 1, a conventional single device programming method is 
+    NOTE: The argument `num_devices` changes the programming method and the drift behavior of
+    the model. When `num_devices` is 1, a conventional single device programming method is
     used. When `num_devices` is 2, the method from the work `Vasilopoulos et al. TED (2023)`_
-    is employed (MSF), which is optimal and yields higher programming accuracy. 
-    For the drift characterization, though, when `num_devices` is 2 the model is applied as 
-    if the two devices host the same conductance and not as described in the aforementioned 
+    is employed (MSF), which is optimal and yields higher programming accuracy.
+    For the drift characterization, though, when `num_devices` is 2 the model is applied as
+    if the two devices host the same conductance and not as described in the aforementioned
     reference, due to it using a dynamic conductance mapping step which requires feedback from
-    the chip in question. This simplification yields worse drift behavior in the current model 
+    the chip in question. This simplification yields worse drift behavior in the current model
     than the one measured on-chip in the aforementioned work.
-    
+
     Args:
         prog_coeff: Programming polynomial coeffs in
             :math:`\sum_i c_i \left(\frac{g_t}{g_\max}\right)^i`
