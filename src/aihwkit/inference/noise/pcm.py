@@ -353,6 +353,9 @@ class CustomDriftPCMLikeNoiseModel(PCMLikeNoiseModel):
         """Returns drift coefficients ``nu`` based on custom drift model.
         Nu coeffiecients will be interpolated using this model information."""
 
+        if self.custom_drift_model is None:
+            raise ValueError("custom_drift_model is not set.")
+
         g_lst = Tensor(self.custom_drift_model.get('g_lst'))
         nu_mean_lst = Tensor(self.custom_drift_model.get('nu_mean_lst'))
         nu_std_lst = Tensor(self.custom_drift_model.get('nu_std_lst'))
