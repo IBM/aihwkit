@@ -40,3 +40,24 @@ class GlobalDriftCompensation(BaseDriftCompensation):
 
     def __str__(self) -> str:
         return "{}()".format(self.__class__.__name__)
+
+
+class PerColumnDriftCompensation(BaseDriftCompensation):
+    """Per column drift compensation.
+    Uses a vector for compensating the drift.
+    """
+
+    @no_grad()
+    def readout(self, out_tensor: Tensor) -> Tensor:
+        """Read outs the per-column mean abs."""
+        return clamp(torch_abs(out_tensor).mean(dim=0), min=0.0001)
+
+    @no_grad()
+    def get_readout_tensor(self, in_size: int) -> Tensor:
+        """Return the read-out tensor.
+        Uses the set of one-hot vectors (eye).
+        """
+        return eye(in_size)
+
+    def __str__(self) -> str:
+        return "{}()".format(self.__class__.__name__)
