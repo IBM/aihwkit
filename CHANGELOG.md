@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Changed
 
-* Update requirements-examples.txt
+* Update requirements-examples.txt (\#685)
 
 ## [0.9.1] - 2024/05/16
 
