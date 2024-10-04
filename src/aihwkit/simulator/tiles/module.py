@@ -244,6 +244,7 @@ class TileModule(Module, TileModuleBase):
             self._apply_without_context(lambda t: t.to(*new_args, **kwargs))
 
         if dtype is not None:
+            self.analog_ctx.to(dtype=dtype)
             scales = self.get_scales()
             if scales is not None:
                 self.set_scales(scales)
