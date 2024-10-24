@@ -2,13 +2,7 @@
 
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Setup.py for `aihwkit`."""
 
@@ -50,13 +44,13 @@ setup(
     url="https://github.com/IBM/aihwkit",
     author="IBM Research",
     author_email="aihwkit@us.ibm.com",
-    license="Apache 2.0",
+    license="MIT",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Environment :: GPU :: NVIDIA CUDA",
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: Apache Software License",
+        "License :: OSI Approved :: MIT License",
         "Operating System :: MacOS",
         "Operating System :: Microsoft :: Windows",
         "Operating System :: POSIX :: Linux",
