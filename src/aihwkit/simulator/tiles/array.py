@@ -148,7 +148,7 @@ class TileModuleArray(Module, TileModuleBase):
         # pylint: disable=arguments-differ,arguments-renamed
 
         if self.analog_tile_count == 1:
-            analog_tile = self.array[0][0] # pylint: disable=unsubscriptable-object
+            analog_tile = self.array[0][0]  # pylint: disable=unsubscriptable-object
             result = analog_tile(x_input)
         else:
             # mapped version
