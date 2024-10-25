@@ -10,7 +10,7 @@ the project maintainers.
 
 ## Open Development & Community Driven
 
-`aihwkit` is open-source under the [Apache License 2.0]. All the work
+`aihwkit` is open-source under the [MIT License]. All the work
 done is available on GitHub, and the resulting Python packages are available
 in PyPI.
 
@@ -75,6 +75,6 @@ bugs - and we aim to keep a close eye on them. Before filling a new bug, please
 try to browse through the list in case the bug is already reported.
 
 [`issues`]: ../../../issues
-[Apache License 2.0]: LICENSE.txt
+[MIT License]: LICENSE.txt
 [Code of Conduct]: CODE_OF_CONDUCT.md
 [GitHub documentation]: https://docs.github.com/en/github/getting-started-with-github/fork-a-repo
