@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Tile module base."""
 
@@ -18,8 +12,9 @@ from typing import Dict, List, Optional, Union, Any, Callable, Tuple, NamedTuple
 from collections import OrderedDict
 from copy import deepcopy
 
-from torch import Tensor, dtype
+from torch import Tensor
 from torch.nn import Module
+from torch import dtype as torch_dtype
 from torch import device as torch_device
 
 from aihwkit.exceptions import TileModuleError
@@ -210,13 +205,9 @@ class TileModule(Module, TileModuleBase):
             Please be aware that moving analog tiles from GPU to CPU is
             currently not supported.
 
-        Caution:
-            Other tensor conversions than moving the device to CUDA,
-            such as changing the data type are not supported for analog
-            tiles and will be simply ignored.
-
         Returns:
-            This module in the specified device.
+            This module in the specified device and converted to the
+            specified data type.
         """
 
         rpu_config = kwargs.pop("rpu_config", None)
@@ -227,16 +218,17 @@ class TileModule(Module, TileModuleBase):
         if rpu_config is not None:
             self.replace_with(rpu_config)
 
-        device = None
-        if "device" in kwargs:
-            device = kwargs["device"]
-        elif len(new_args) > 0 and not isinstance(new_args[0], (Tensor, dtype)):
-            if new_args[0] is None:
-                return self
-            device = torch_device(args[0])
+        device = kwargs.pop("device", None)
+        dtype = kwargs.pop("dtype", None)
+        for arg in args:
+            if isinstance(arg, bool):
+                continue
+            if isinstance(arg, torch_dtype):
+                dtype = arg
+            if isinstance(arg, (str, torch_device)):
+                device = torch_device(arg) if isinstance(arg, str) else arg
 
         if device is not None:
-            device = torch_device(device)
             if device.type == "cuda":
                 self.cuda(device)
             else:
@@ -244,6 +236,13 @@ class TileModule(Module, TileModuleBase):
 
         if len(new_args) > 0 or len(kwargs) > 0:
             self._apply_without_context(lambda t: t.to(*new_args, **kwargs))
+
+        if dtype is not None:
+            self.analog_ctx.to(dtype=dtype)
+            scales = self.get_scales()
+            if scales is not None:
+                self.set_scales(scales)
+
         return self
 
     @staticmethod

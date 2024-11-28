@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Configuration for NVM devices for Analog (Resistive Device) tiles."""
 
@@ -417,8 +411,8 @@ class LinearStepDevice(PulsedDevice):
         :nowrap:
 
         \begin{eqnarray*}
-        \gamma_{ij}^+ &=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}_{ij}\\
-        \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}_{ij}
+        \gamma_{ij}^+ &\=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}_{ij}\\
+        \gamma_{ij}^- &\=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}_{ij}
         \end{eqnarray*}
 
     where the :math:`\xi` are standard Gaussian random variables and
@@ -478,9 +472,9 @@ class LinearStepDevice(PulsedDevice):
 
     .. math::
 
-        \gamma_{ij}^+ &=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}
+        \gamma_{ij}^+ &\=& - |\gamma^+ + \gamma_\text{d-to-d}^+ \xi|/b^\text{max}
 
-        \gamma_{ij}^- &=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}
+        \gamma_{ij}^- &\=& - |\gamma^- + \gamma_\text{d-to-d}^- \xi|/b^\text{min}
 
     where :math:`b^\text{max}` and :math:`b^\text{max}` are the values given by
     ``w_max`` and ``w_min``, see :class:`~PulsedDevice`.
@@ -695,16 +689,18 @@ class SoftBoundsReferenceDevice(PulsedDevice):
     In particular, the update behavior is
 
     .. math::
-        \delta W_+ &=& \alpha_{+}(1 - \frac{w}{\bmax}) (1 + \sigma \xi)
-        \delta W_- &=& \alpha_{-}(1 - \frac{w}{\bmin}) (1 + \sigma \xi)
+        \delta W_+ = \alpha_{+}(1 - \frac{w}{\beta_{max}}) (1 + \sigma \xi)
 
-    Where the same device-to-device varition can be given as for the
+        \delta W_- = \alpha_{-}(1 - \frac{w}{\beta_{min}}) (1 + \sigma \xi)
+
+    Where the same device-to-device variation can be given as for the
     ``PulsedDevice``. In addition, a device-to-device variation can be
-    directly given on the slope.
+    directly given on the slope.  The :math:`\alpha_{+}` and :math:`\alpha_{-}` are
+    the scaling factors that determine the magnitude of positive and negative
+    weight updates.
 
     Moreover, a fixed reference conductance can be subtracted from the
-    resulting weight, which implemented a differential read of $W -
-    R$.
+    resulting weight, which implemented a differential read of :math:`w - r`.
 
     """
 
@@ -767,21 +763,21 @@ class SoftBoundsReferenceDevice(PulsedDevice):
     """
 
     reference_mean: float = 0.0
-    """Added to all devices of the reference $R$.
+    """Added to all devices of the reference :math:`r`.
     """
 
     reference_std: float = 0.0
-    """Normal distributed device-to-device variation added to the reference $R$.
+    """Normal distributed device-to-device variation added to the reference :math:`r`.
     """
 
     subtract_symmetry_point: bool = False
     r"""Whether to add the computed symmetry point of the devices onto the
-    reference $R$.
+    reference :math:`r`.
 
     The symmetry point is given by:
 
     .. math::
-        w_* = \frac{alpha_{+} - \alpha_{-}}{\frac{\alpha_{+}}{b_\text{max}}
+        w_* = \frac{\alpha_{+} - \alpha_{-}}{\frac{\alpha_{+}}{b_\text{max}}
                     - \frac{\alpha_{-}}{b_\text{min}}}
     """
 
@@ -833,6 +829,7 @@ class ExpStepDevice(PulsedDevice):
         :math:`\sigma_\text{add}` is given by ``dw_min_std_add``, and
         :math:`\sigma_\text{slope}` is given by ``dw_min_std_slope``.
     """
+
     # pylint: disable=invalid-name
 
     bindings_class: ClassVar[Optional[Union[Type, str]]] = "ExpStepResistiveDeviceParameter"

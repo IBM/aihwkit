@@ -2,13 +2,7 @@
 
 # (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 # pylint: disable=too-many-lines
 
@@ -36,7 +30,8 @@ from aihwkit.simulator.parameters.enums import (
     NoiseManagementType,
     BoundManagementType,
 )
-from aihwkit.simulator.parameters.training import IOParameters, UpdateParameters
+from aihwkit.simulator.parameters.training import UpdateParameters
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.presets.devices import (
     CapacitorPresetDevice,
     EcRamPresetDevice,

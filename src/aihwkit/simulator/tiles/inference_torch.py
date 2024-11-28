@@ -1,21 +1,15 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """High level analog tiles (inference)."""
 
 from typing import Optional, Any, Dict, Tuple, TYPE_CHECKING
 
 from torch import Tensor, zeros_like, clamp
-from torch.autograd import no_grad
+from torch.autograd import no_grad, Function
 
 from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
 from aihwkit.simulator.tiles.torch_tile import TorchSimulatorTile
@@ -29,6 +23,52 @@ if TYPE_CHECKING:
     from torch.nn import BackwardHook
     from aihwkit.simulator.configs import TorchInferenceRPUConfig
     from aihwkit.simulator.parameters import InputRangeParameter
+
+
+class InputRangeForward(Function):
+    """
+    Enable custom input range gradient computation using torch's autograd.
+    """
+
+    # pylint: disable=abstract-method, redefined-builtin, arguments-differ
+
+    @staticmethod
+    def forward(
+        ctx: Any, x_input: Tensor, input_range: Tensor, ir_params: "InputRangeParameter"
+    ) -> Tensor:
+        ctx.save_for_backward(x_input, input_range)
+        ctx.ir_params = ir_params
+        return x_input
+
+    @staticmethod
+    def backward(ctx: Any, d_output: Tensor) -> Tuple[Tensor, Tensor, None]:
+        x_input, input_range = ctx.saved_tensors
+        ir_grad = None
+
+        if input_range is not None:
+            ir_params = ctx.ir_params
+
+            upper_thres = x_input >= input_range  # pylint: disable=invalid-unary-operand-type
+            lower_thres = x_input <= -input_range  # pylint: disable=invalid-unary-operand-type
+            ir_grad = zeros_like(input_range)
+            ir_grad += clamp(upper_thres * d_output, min=None, max=0.0).sum()
+            ir_grad -= clamp(lower_thres * d_output, min=0.0, max=None).sum()
+
+            if ir_params.gradient_relative:
+                ir_grad *= input_range
+                ir_grad *= ir_params.gradient_scale
+
+            if ir_params.manage_output_clipping:
+                raise NotImplementedError
+            if ir_params.decay > 0:
+                # - We shrink the input range if less than X% of the inputs are clipping.
+                # where X is 1-ir_params.input_min_percentage
+                percentage = (x_input.abs() < input_range).float().mean()
+                ir_grad += (
+                    ir_params.decay * input_range * (percentage > ir_params.input_min_percentage)
+                )
+
+        return d_output, ir_grad, None
 
 
 class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWrapper):
@@ -68,7 +108,6 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
             raise AnalogBiasConfigError("Analog bias is not supported for the torch tile")
 
         # Hooks for input range grad computation. Will not be saved in state_dict
-        self._input_range_hook = None
         self._tile_input_grad_hook = None
         self._tile_input = None  # type: Tensor
         self._x_input_grad = None  # type: Tensor
@@ -88,6 +127,21 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
         """
         return rpu_config.simulator_tile_class(x_size=x_size, d_size=d_size, rpu_config=rpu_config)
 
+    def _recreate_simulator_tile(  # type: ignore[override]
+        self, x_size: int, d_size: int, rpu_config: "TorchInferenceRPUConfig"
+    ) -> Any:  # just use Any instead of Union["SimulatorTile", tiles.AnalogTile, ..]
+        """Re-create a simulator tile in __setstate__.
+
+        Args:
+            x_size: input size
+            d_size: output size
+            rpu_config: resistive processing unit configuration
+
+        Returns:
+            a simulator tile based on the specified configuration.
+        """
+        return self.tile
+
     def init_input_processing(self) -> bool:
         """Helper function to initialize the input processing.
 
@@ -104,37 +158,6 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
 
         if not enable:
             return False
-
-        ir_params = self.rpu_config.pre_post.input_range  # type: InputRangeParameter
-
-        def grad_input_range(grad: Tensor) -> Tensor:
-            x_input = self._tile_input
-            d_output = self._x_input_grad
-            upper_thres = x_input >= self.input_range  # pylint: disable=invalid-unary-operand-type
-            lower_thres = x_input <= -self.input_range  # pylint: disable=invalid-unary-operand-type
-            grad = zeros_like(self.input_range)
-            grad += clamp(upper_thres * d_output, min=None, max=0.0).sum()
-            grad -= clamp(lower_thres * d_output, min=0.0, max=None).sum()
-            if not ir_params.gradient_relative:
-                grad /= self.input_range
-            grad *= ir_params.gradient_scale
-            if ir_params.manage_output_clipping:
-                raise NotImplementedError
-            if ir_params.decay > 0:
-                # - We shrink the input range if less than X% of the inputs are clipping.
-                # where X is 1-ir_params.input_min_percentage
-                percentage = (x_input.abs() < self.input_range).float().mean()
-                grad += (
-                    ir_params.decay
-                    * self.input_range
-                    * (percentage > ir_params.input_min_percentage)
-                )
-            return grad
-
-        # - Register the hook
-        if self.input_range.requires_grad:
-            self._input_range_hook = self.input_range.register_hook(grad_input_range)
-
         return True
 
     def set_scales(self, scales: Tensor) -> None:
@@ -175,17 +198,17 @@ class TorchInferenceTile(TileModule, InferenceTileWithPeriphery, SimulatorTileWr
         Returns:
             Output tensor of the same shape
         """
-        self._tile_input = x_input
 
         # pylint: disable=unused-argument
         if self.input_range is not None:
-            x_input = self.apply_input_range(x_input, not is_test) / self.input_range
+            x_input = self.apply_input_range(x_input, not is_test)
 
-        def save_tile_input_grad(grad: Tensor) -> None:
-            self._x_input_grad = grad
+        x_input = InputRangeForward.apply(
+            x_input, self.input_range, self.rpu_config.pre_post.input_range
+        )
 
-        if x_input.requires_grad:
-            self._tile_input_grad_hook = x_input.register_hook(save_tile_input_grad)
+        if self.input_range is not None:
+            x_input = x_input / self.input_range
 
         return x_input
 

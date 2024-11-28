@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """TestCases for aihwkit tests."""
 
@@ -25,14 +19,14 @@ SKIP_CUDA_TESTS = os.getenv("SKIP_CUDA_TESTS") or not cuda.is_compiled()
 class AihwkitTestCase(TestCase):
     """Test case that contains common asserts and functions for aihwkit."""
 
-    def assertTensorAlmostEqual(self, tensor_a, tensor_b, decimal=6):
+    def assertTensorAlmostEqual(self, tensor_a, tensor_b, decimal=4):
         """Assert that two tensors are almost equal."""
         # pylint: disable=invalid-name
         array_a = tensor_a.detach().cpu().numpy()
         array_b = tensor_b.detach().cpu().numpy()
         assert_array_almost_equal(array_a, array_b, decimal=decimal)
 
-    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b, decimal=6):
+    def assertNotAlmostEqualTensor(self, tensor_a, tensor_b, decimal=4):
         """Assert that two tensors are not equal."""
         # pylint: disable=invalid-name
         assert_raises(

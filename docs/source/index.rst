@@ -5,7 +5,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
     :maxdepth: 3
     :caption: Get started
     :hidden:
-    
+
 
     install
     advanced_install
@@ -20,7 +20,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
     analog_ai
     analog_ai_hw
     pros_cons
-     
+
 
 .. toctree::
     :maxdepth: 3
@@ -28,7 +28,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
     :hidden:
 
 
-    composer_overview  
+    composer_overview
     using_experiments
 
 .. toctree::
@@ -37,9 +37,9 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
     :hidden:
 
     using_simulator
-    
 
-     
+
+
 .. toctree::
    :maxdepth: 3
    :caption: Analog DNN Training
@@ -47,7 +47,7 @@ Welcome to IBM Analog Hardware Acceleration Kit's documentation!
 
    analog_update.rst
    analog_training_presets.rst
-  
+
 
 .. toctree::
    :maxdepth: 3

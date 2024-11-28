@@ -10,16 +10,27 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+# pylint: disable=invalid-name, undefined-variable redefined-builtin
+
+"""Documentation configuration"""
+
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath("../../src"))
+# -- Options specific to readthedocs -----------------------------------------
+
+on_readthedocs = os.environ.get("READTHEDOCS") == "True"
+if not on_readthedocs:
+    # If not invoked from the `readthedocs` build environment, use the source
+    # files instead of assuming the package is installed, and mock `rpu_base`.
+    sys.path.insert(0, os.path.abspath("../../src"))
+    autodoc_mock_imports = ["aihwkit.simulator.rpu_base"]
 
 
 # -- Project information -----------------------------------------------------
 
 project = "IBM Analog Hardware Acceleration Kit"
-copyright = "2020, 2021, 2022, 2023 IBM Research"
+copyright = "2020, 2021, 2022, 2023, 2024 IBM Research"
 author = "IBM Research"
 
 
@@ -29,7 +40,7 @@ def get_version() -> str:
     version_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "src", "aihwkit", "VERSION.txt"
     )
-    with open(version_path) as version_file:
+    with open(version_path, "r", encoding="UTF-8") as version_file:
         return version_file.read().strip()
 
 
@@ -74,12 +85,3 @@ html_static_path = [""]
 # -- Options specific to this project ----------------------------------------
 
 autodoc_typehints = "description"
-autodoc_mock_imports = ["aihwkit.simulator.rpu_base"]
-
-# -- Options specific to readthedocs -----------------------------------------
-
-on_readthedocs = os.environ.get("READTHEDOCS") == "True"
-if on_readthedocs:
-    tags.add("env_readthedocs")
-else:
-    tags.add("env_local")

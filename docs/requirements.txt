@@ -5,3 +5,5 @@ myst-parser==2.0.0
 # Dependencies for extras in `setup.py` needed for documentation.
 matplotlib>=3.0
 lmfit
+# Dependencies needed for building the package
+mypy==0.991

@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Utilities for resistive processing units configurations."""
 from sys import version_info
@@ -87,8 +81,8 @@ def parameters_to_bindings(params: Any, data_type: RPUDataType, check_fields: bo
     result = result()
 
     field_dict = {field.name: (field, getattr(params, field.name)) for field in fields(params)}
+    ignore_fields = getattr(params, "bindings_ignore", [])
     if check_fields:
-        ignore_fields = getattr(params, "bindings_ignore", [])
         for key in params.__dict__.keys():
             if key not in field_dict and key not in ignore_fields:
                 raise ConfigError(
@@ -99,7 +93,7 @@ def parameters_to_bindings(params: Any, data_type: RPUDataType, check_fields: bo
 
     for field, (dataclass_field, value) in field_dict.items():
         # Convert enums to the bindings enums.
-        if field in ("unit_cell_devices", "device"):
+        if field in ("unit_cell_devices", "device") or field in ignore_fields:
             # Exclude special fields that are not present in the bindings.
             continue
 
@@ -262,7 +256,7 @@ class _PrintableMixin:
         # special case for global skip:
         all_skip = hasattr(self, ALL_SKIP_FIELD) and getattr(self, ALL_SKIP_FIELD)
 
-        for field in fields(self):
+        for field in fields(self):  # type: ignore[arg-type]
             value = getattr(self, field.name)
 
             # Exclude fields.

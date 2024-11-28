@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Tests for linear layer."""
 
@@ -22,12 +16,12 @@ from aihwkit.simulator.tiles.module import TileModule
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearMapped, Conv2dMapped
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import Inference, TorchInference, Custom
+from .helpers.tiles import Inference, TorchInference, TorchInferenceIRDropT, Custom
 
 
 @parametrize_over_layers(
     layers=[Linear, LinearMapped, Conv2dMapped],
-    tiles=[Inference, TorchInference, Custom],
+    tiles=[Inference, TorchInference, TorchInferenceIRDropT, Custom],
     biases=["analog", "digital", None],
 )
 class LayerModuleBaseTest(ParametrizedTestCase):

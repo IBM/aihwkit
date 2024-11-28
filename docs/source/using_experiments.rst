@@ -42,7 +42,7 @@ A :class:`~aihwkit.experiments.experiments.training.BasicTraining`  Experiment c
             AnalogLinear(128, 10, bias=True),
             LogSoftmax(dim=1)
         )
-    
+
 Similarly a :class:`~aihwkit.experiments.experiments.training.BasicInferencing`  Experiment can also be created by creating an instance of the class ::
 
     from torch.nn import (
@@ -76,7 +76,7 @@ For example, the ``BasicTraining`` Experiment allows setting attributes that
 define the characteristics of the training (``dataset``, ``model``,
 ``batch_size``, ``loss_function``, ``epochs``, ``learning_rate``).
 
-Similarly the ``BasicInferencing`` Experiment allows setting attributes 
+Similarly the ``BasicInferencing`` Experiment allows setting attributes
 that define the characteristics of the Inferencing experiment (``dataset``,
 ``model``, ``batch_size`` , ``inference_repeats`` , ``inference_time``)
 
@@ -166,7 +166,7 @@ epoch::
     ]
 
 The ``LocalRunner`` for ``Training`` experiment and ``InferenceLocalRunner`` for ``Inferencing`` experiment
-will also print information by default while the experiment is being executed (for example, if running 
+will also print information by default while the experiment is being executed (for example, if running
 the experiment in an interactive session, as a way of tracking progress). This can be turned off by the
 ``stdout`` argument to the ``run()`` function::
 
@@ -208,7 +208,7 @@ run experiments in the cloud:
     api_token = YOUR_API_TOKEN
 
 3. You may need to download the SSL certificates and add them to the certificate store.
-   
+
    - https://cacerts.digicert.com/DigiCertGlobalRootCA.crt.pem
    - https://cacerts.digicert.com/DigiCertTLSRSASHA2562020CA1-1.crt.pem
    - Append the certificates to the cacert.pem file
@@ -231,7 +231,7 @@ experiments locally::
     my_cloud_runner = CloudRunner()
     cloud_experiment = my_cloud_runner.run(my_experiment)
 
-Similarly ``Inferencing`` experiment can also be performed in the cloud by using 
+Similarly ``Inferencing`` experiment can also be performed in the cloud by using
 the ``InferenceCloudRunner`` , in an analogous way as running experiments locally ::
 
     from aihwkit.experiments.runners import InferenceCloudRunner

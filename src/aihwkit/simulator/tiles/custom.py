@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """High level analog tiles (floating point)."""
 
@@ -29,7 +23,7 @@ from aihwkit.simulator.tiles.array import TileModuleArray
 from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
 from aihwkit.simulator.parameters.mapping import MappableRPU
 from aihwkit.simulator.parameters.helpers import _PrintableMixin
-from aihwkit.simulator.parameters.training import IOParameters
+from aihwkit.simulator.parameters.io import IOParameters
 
 
 class CustomSimulatorTile(SimulatorTile, Module):

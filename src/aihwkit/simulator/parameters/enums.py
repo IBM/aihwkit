@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 # pylint: disable=too-many-instance-attributes
 
@@ -310,6 +304,9 @@ class AnalogMVType(Enum):
     inputs separately. The output of the two passes are added in
     analog and then passed once through ADC stage (which also applies
     the output noise, range clipping, output non-linearity etc.).
+
+    Caution:
+        Only supported for RPUCuda tiles (based on C++ not pure torch)
     """
 
     POS_NEG_SEPARATE_DIGITAL_SUM = "PosNegSeparateDigitalSum"
@@ -317,6 +314,25 @@ class AnalogMVType(Enum):
     inputs separately. The ADC output stage is applied to each pass
     separately and the results are summed in full precision (i.e. in
     digital).
+
+    Caution:
+        Only supported for RPUCuda tiles (based on C++ not pure torch)
+    """
+
+    SPLIT_MODE = "SplitMode"
+    """Split PWM bits into two phases to speedup MAC and increase energy
+    efficiency (may sacrifice some accuracy).
+
+    Caution:
+        Only supported for ``TorchInferenceRPUConfigIRDropT``
+    """
+
+    BIT_WISE = "BitWise"
+    """Bit-wise PWM input to speedup MAC and increase energy
+    efficiency (may sacrifice some accuracy).
+
+    Caution:
+        Only supported for ``TorchInferenceRPUConfigIRDropT``
     """
 
 
