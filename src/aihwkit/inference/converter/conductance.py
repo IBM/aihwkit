@@ -351,7 +351,7 @@ class CustomPairConductanceConverter(BaseConductanceConverter):
         return weights_us / params['scale_ratio']   # back to unitless
 
 class SingleDeviceConductanceConverter(BaseConductanceConverter):
-    r"""Single devices to represent a weight
+    r"""Single devices to represent weights
 
     Assuming a single bidirectional device per cross-point
     Args:
@@ -386,15 +386,8 @@ class SingleDeviceConductanceConverter(BaseConductanceConverter):
         scale_ratio = (self.g_max - self.g_min) / (w_max - w_min)
         scaled_weights = (weights - w_min) * scale_ratio
         conductance = scaled_weights + self.g_min 
-        #conductance = Tensor(conductance)
-        #conductances = [
-            #scaled_weights.clamp(min=0.0, max=self.g_max) + self.g_min,
-            #(-scaled_weights).clamp(min=0.0, max=self.g_max) + self.g_min,
-        #]
-        #print("TO CONDUCTANCE")
         params = {"scale_ratio": scale_ratio,
                   "min": w_min}
-
         return conductance, params
 
     @no_grad()
@@ -403,16 +396,10 @@ class SingleDeviceConductanceConverter(BaseConductanceConverter):
             raise ValueError("params do not contain scale_ratio")
         if "min" not in params:
             raise ValueError("params do not contain min")
-        #weights = (conductances[0] - self.g_min) / params["scale_ratio"] - 1
+
         if type(conductance) == list:
             conductance = stack(conductance)
-        print(type(conductance))
-        print(type(params["min"]))
-        print(type(params["scale_ratio"]))
 
         weights =  params["min"] +((conductance - self.g_min) / params["scale_ratio"])
-        #weights = ((conductances[0] - self.g_min) - (conductances[1] - self.g_min)) / params[
-            #"scale_ratio"
-        #]
 
         return weights
