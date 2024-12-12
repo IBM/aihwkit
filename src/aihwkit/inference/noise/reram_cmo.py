@@ -26,17 +26,23 @@ from aihwkit.inference.converter.base import BaseConductanceConverter
 from aihwkit.inference.converter.conductance import SinglePairConductanceConverter, SingleDeviceConductanceConverter
 import numpy
 import torch
-#torch.random.manual_seed(0)
+
 class ReRamCMONoiseModel(BaseNoiseModel):
     r"""Noise model that was inferred from ReRam publication data.
 
-    This noise model is estimated from experimental data of the MO/HfOx devices from Falcone et al.
-    Conductance dependence of the deviations from the target (the mean of the conductance is considered as the target)
-    the response is described by a 1st-order polynomial for 1s after programming
-    Data for de day of the mean and std of the target is also available
+    This noise model is estimated from statistical characterization of (Conductive Metal Oxide) CMO/HfO<sub>x</sub> devices from Falcone et al. (In Review)
+
+    Programming noise:
+        Described by a linear function with respect to the G target.
+        Coefficients are considered for two acceptance ranges, 0.2% and 2% of target conductance
+      
+    Conductance Decay:
+        Drift in CMO/HfO<sub>x</sub> devices showed independence of the target conductance value. 
+        Mean and STD of the conductance distribution were fitted with 1st-order polynomial
+        as a function of the log(t_inf)
 
     TODO:
-    Read noise (1/f) characterization available but not implemented.
+    Read noise (1/f) characterization of CMO/HfO<sub>x</sub> available at Lombardo et al. DRC (2024) but not implemented.
 
     Note:
 
@@ -46,7 +52,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
     Args:
 
-        coeff_dic: the two coefficients at t=0,1 of the programming noise
+        coeff_dic: 
         g_max: In :math:`\mu S`, the maximal conductance, i.e. the value
             the absolute max of the weights will be mapped to.
         noise_scale: Additional scale for the noise.
@@ -73,8 +79,6 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         if coeff_g_max_reference is None:
             self.coeff_g_max_reference = self.g_max
         if coeff_dic is None:
-            # standard g_max are defined in respect to 40.0 uS. Need to
-            # adjust for that in case g_max is not equal to 40.0 uS
             coeff_dic = {
                 0.2: [0.00106879, 0.00081107][::-1],
                 2: [0.01129027418 ,0.0112185391][::-1]
