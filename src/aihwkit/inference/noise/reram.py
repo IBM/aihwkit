@@ -176,7 +176,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
     Conductance Decay:
         Drift in CMO/HfO<sub>x</sub> devices showed independence of the target conductance value. 
         Mean and STD of the conductance distribution were fitted with 1st-order polynomial
-        as a function of the log(t_inf)
+        as a function of the log(t) where t is the time of inference
 
     TODO:
     Read noise (1/f) characterization of CMO/HfO<sub>x</sub> available at Lombardo et al. DRC (2024) but not implemented.
