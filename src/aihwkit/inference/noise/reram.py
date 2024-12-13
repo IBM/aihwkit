@@ -165,16 +165,17 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
 
 
 class ReRamCMONoiseModel(BaseNoiseModel):
-    r"""Noise model that was inferred from ReRam Conductive-Metal-Oxide (CMO)/HfO<sub>x</sub> devices from IBM Research - Zurich.
+    r"""Noise model inferred from Analog Filamentary Conductive-Metal-Oxide
+    (CMO)/HfOx ReRAM devices from IBM Research Europe - Zurich.
 
-    This noise model is estimated from statistical characterization of CMO/HfO<sub>x</sub> devices from Falcone et al. (In Review)
+    This noise model is estimated from statistical characterization of CMO/HfOx devices from Falcone et al. (In Review)
 
     Programming noise:
         Described by a linear function with respect to the G target.
         Coefficients are considered for two acceptance ranges, 0.2% and 2% of target conductance
       
     Conductance Decay:
-        Drift in CMO/HfO<sub>x</sub> devices showed independence of the target conductance value. 
+        Drift in CMO/HfOx devices showed independence of the target conductance value. 
         Mean and STD of the conductance distribution were fitted with 1st-order polynomial
         as a function of the log(t) where t is the time of inference
 
