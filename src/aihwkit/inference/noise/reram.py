@@ -204,12 +204,12 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         self,
         coeff_dic: Optional[Dict[float, List]] = None,
         g_converter: Optional[BaseConductanceConverter] = None,
-        g_max: Optional[float] = 88.19,
+        g_max: Optional[float] = 88.19997,
         g_min: Optional[float] = 9.0,
         noise_scale: float = 1.0,
-        coeff_g_max_reference: Optional[float] = None,
-        decay_dict: Optional[Dict[float, List]] = None,
-        reference_drift: Optional[float] = None,
+        coeff_g_max_reference: Optional[float] = 88.19997,
+        decay_dict: Optional[Dict[str, List]] = None,
+        reference_drift: Optional[float] = 50.0, #conductance level for relaxation assessment
         acceptance_range : float = 2e-2
     ):
         g_converter = SingleDeviceConductanceConverter(g_max=g_max)
@@ -218,6 +218,8 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         self.g_min = getattr(self.g_converter, "g_min", g_min)
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
+        if self.g_min is None:
+            raise ValueError("g_min cannot be established from g_converter")
         if coeff_g_max_reference is None:
             self.coeff_g_max_reference = self.g_max
         if coeff_dic is None:
@@ -232,8 +234,6 @@ class ReRamCMONoiseModel(BaseNoiseModel):
             }
         if reference_drift is None:
             self.reference_drift = 50.0
-            self.prog_coeff_g_max_reference = 88.199997
-
         self.coeff_dic = coeff_dic
         self.noise_scale = noise_scale
         self.decay_dict = decay_dict
@@ -246,7 +246,10 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         for value in coeff[1:]:
             mat *= g_target #/ self.g_max
             sig_prog += mat * value
-
+        print("-"*15)
+        print(self.g_max)
+        print(self.coeff_g_max_reference)
+        print("-"*15)
         sig_prog *= self.g_max / self.coeff_g_max_reference 
         g_prog = g_target + sig_prog * randn_like(g_target)
         return g_prog

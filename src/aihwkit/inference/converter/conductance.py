@@ -391,7 +391,7 @@ class SingleDeviceConductanceConverter(BaseConductanceConverter):
         return conductance, params
 
     @no_grad()
-    def convert_back_to_weights(self, conductance: List[Tensor], params: Dict) -> Tensor:
+    def convert_back_to_weights(self, conductance: Tensor, params: Dict) -> Tensor:
         if "scale_ratio" not in params:
             raise ValueError("params do not contain scale_ratio")
         if "min" not in params:
