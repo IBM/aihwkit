@@ -324,5 +324,5 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         )
         g_drift = g_mean + randn_like(g_prog) * sigma_relaxation
         # TODO:
-        #Read Noise implementation on g_final
+        # Read Noise implementation on g_final
         return g_drift.clamp(min=self.g_min)
