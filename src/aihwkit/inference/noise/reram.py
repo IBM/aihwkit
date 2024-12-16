@@ -250,10 +250,6 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         for value in coeff[1:]:
             mat *= g_target #/ self.g_max
             sig_prog += mat * value
-        print("-"*15)
-        print(self.g_max)
-        print(self.coeff_g_max_reference)
-        print("-"*15)
         sig_prog *= self.g_max / self.coeff_g_max_reference 
         g_prog = g_target + sig_prog * randn_like(g_target)
         return g_prog
