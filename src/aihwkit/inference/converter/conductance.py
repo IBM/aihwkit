@@ -391,15 +391,15 @@ class SingleDeviceConductanceConverter(BaseConductanceConverter):
         return conductance, params
 
     @no_grad()
-    def convert_back_to_weights(self, conductance: Tensor, params: Dict) -> Tensor:
+    def convert_back_to_weights(self, conductances: Tensor, params: Dict) -> Tensor:
         if "scale_ratio" not in params:
             raise ValueError("params do not contain scale_ratio")
         if "min" not in params:
             raise ValueError("params do not contain min")
 
-        if type(conductance) == list:
-            conductance = stack(conductance)
+        if type(conductances) == list:
+            conductances = stack(conductances)
 
-        weights =  params["min"] +((conductance - self.g_min) / params["scale_ratio"])
+        weights =  params["min"] +((conductances - self.g_min) / params["scale_ratio"])
 
         return weights
