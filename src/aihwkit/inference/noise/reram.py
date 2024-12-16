@@ -215,7 +215,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
     def __init__(
         self,
-        coeff_dic: Optional[Dict[float, List]] = None,
+        coeff_dict: Optional[Dict[float, List]] = None,
         g_converter: Optional[BaseConductanceConverter] = None,
         g_max: Optional[float] = None,
         g_min: Optional[float] = None,
@@ -241,8 +241,8 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         self.g_min = g_min
         if coeff_g_max_reference is None:
             self.coeff_g_max_reference = self.g_max
-        if coeff_dic is None:
-            coeff_dic = {
+        if coeff_dict is None:
+            coeff_dict = {
                 0.2: [0.00106879, 0.00081107][::-1],
                 2: [0.01129027418, 0.0112185391][::-1],
             }
@@ -255,7 +255,9 @@ class ReRamCMONoiseModel(BaseNoiseModel):
             }
         if reference_drift is None:
             self.reference_drift = 50.0
-        self.coeff_dic = coeff_dic
+        if acceptance_range not in coeff_dict.keys():
+            acceptance_range = min(coeff_dict.keys())
+        self.coeff_dict = coeff_dict
         self.noise_scale = noise_scale
         self.decay_dict = decay_dict
         self.acceptance_range = acceptance_range
@@ -283,10 +285,10 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
         min_key = (
             self.acceptance_range
-            if self.acceptance_range in self.coeff_dic.keys()
-            else min(list(self.coeff_dic.keys()))
+            if self.acceptance_range in self.coeff_dict.keys()
+            else min(list(self.coeff_dict.keys()))
         )
-        return self._apply_poly(g_target, self.coeff_dic[min_key], self.noise_scale)
+        return self._apply_poly(g_target, self.coeff_dict[min_key], self.noise_scale)
 
     @no_grad()
     def generate_drift_coefficients(self, g_target: Tensor) -> Tensor:
@@ -312,12 +314,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
         """
         if t_inference == 0:
-            g_final = self._apply_poly(
-                g_prog,
-                self.coeff_dic[self.acceptance_range],
-                self.noise_scale,
-            )
-            return g_final.clamp(min=self.g_min)
+            return g_prog
 
         g_mean = self.decay_dict["mean"][0] * log(t_inference) + (
             self.decay_dict["mean"][1] * g_prog / self.reference_drift
@@ -325,5 +322,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         sigma_relaxation = (
             self.decay_dict["std"][0] * log(t_inference) + self.decay_dict["std"][1]
         )
-        g_final = g_mean + randn_like(g_prog) * sigma_relaxation
-        return g_final.clamp(min=self.g_min)
+        g_drift = g_mean + randn_like(g_prog) * sigma_relaxation
+        # TODO:
+        #Read Noise implementation on g_final
+        return g_drift.clamp(min=self.g_min)
