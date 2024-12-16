@@ -38,7 +38,7 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
 
         To account for short-term read noise (about 1\%) one should
         additional set the ``forward.w_noise`` parameter to about 0.01
-        (with w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
+            (with w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
 
     Args:
 
@@ -243,7 +243,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         self.decay_dict = decay_dict
         self.acceptance_range = acceptance_range
 
-    def _apply_poly(self, g_target: Tensor, coeff: List, scale: float = 1.0, sigma_relaxation : float = 0.0) -> Tensor:
+    def _apply_poly(self, g_target: Tensor, coeff: List, scale: float = 1.0) -> Tensor:
         """Applied polynomial noise"""
         mat = 1
         sig_prog = coeff[0]
@@ -251,7 +251,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
             mat *= g_target #/ self.g_max
             sig_prog += mat * value
         sig_prog *= self.g_max / self.coeff_g_max_reference 
-        g_prog = g_target + sig_prog * randn_like(g_target)
+        g_prog = g_target + sig_prog * randn_like(g_target)*scale
         return g_prog
 
     @no_grad()
@@ -275,7 +275,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-            self, g_target: Tensor, drift_noise_param: Tensor, t_inference: float
+            self, g_prog: Tensor, drift_noise_param: Tensor, t_inference: float
     ) -> Tensor:
         """Apply the accumulated noise according to the time of inference.
 
@@ -283,8 +283,8 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         and standard deviation shift from the ReRAM
 
         Args:
-            g_prog: will be ignored
-            g_target: target conductance values that will be used to add noise
+            g_prog: target conductance values that will be used to add noise
+            drift_noise_param: ccoefficients of the mean and std drift
             t_inference: time of inference. Times in seconds
 
         Returns:
@@ -292,10 +292,10 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
         """
         if t_inference == 0:
-            g_final = self._apply_poly(g_target, self.coeff_dic[self.acceptance_range], self.noise_scale, sigma_relaxation=0.0)
+            g_final = self._apply_poly(g_prog, self.coeff_dic[self.acceptance_range], self.noise_scale, sigma_relaxation=0.0)
             return g_final.clamp(min=self.g_min)
 
-        g_mean = self.decay_dict['mean'][0]*log(t_inference) + (self.decay_dict['mean'][1]*g_target/self.reference_drift)
+        g_mean = self.decay_dict['mean'][0]*log(t_inference) + (self.decay_dict['mean'][1]*g_prog/self.reference_drift)
         sigma_relaxation = self.decay_dict['std'][0]*log(t_inference) + self.decay_dict['std'][1]
-        g_final = g_mean + randn_like(g_target) * sigma_relaxation
+        g_final = g_mean + randn_like(g_prog) * sigma_relaxation
         return g_final.clamp(min=self.g_min)
