@@ -12,9 +12,8 @@ from copy import deepcopy
 from typing import List, Optional, Dict
 
 from torch import randn_like, Tensor
-from numpy import log
 from torch.autograd import no_grad
-
+from numpy import log
 from aihwkit.exceptions import ArgumentError
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.converter.base import BaseConductanceConverter
