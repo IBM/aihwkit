@@ -204,22 +204,24 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         self,
         coeff_dic: Optional[Dict[float, List]] = None,
         g_converter: Optional[BaseConductanceConverter] = None,
-        g_max: Optional[float] = 88.19997,
-        g_min: Optional[float] = 9.0,
+        g_max: Optional[float] = None,
+        g_min: Optional[float] = None,
         noise_scale: float = 1.0,
-        coeff_g_max_reference: Optional[float] = 88.19997,
+        coeff_g_max_reference: Optional[float] = None,
         decay_dict: Optional[Dict[str, List]] = None,
-        reference_drift: Optional[float] = 50.0, #conductance level for relaxation assessment
+        reference_drift: Optional[float] = None, #conductance level for relaxation assessment
         acceptance_range : float = 2e-2
     ):
-        g_converter = SingleDeviceConductanceConverter(g_max=g_max)
+        g_converter = deepcopy(g_converter) or SingleDeviceConductanceConverter(g_max=g_max, g_min=g_min)
         super().__init__(g_converter)
-        self.g_max = getattr(self.g_converter, "g_max", g_max)
-        self.g_min = getattr(self.g_converter, "g_min", g_min)
-        if self.g_max is None:
+        g_max = getattr(self.g_converter, "g_max", g_max)
+        g_min = getattr(self.g_converter, "g_min", g_min)
+        if g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
-        if self.g_min is None:
+        if g_min is None:
             raise ValueError("g_min cannot be established from g_converter")
+        self.g_max = g_max
+        self.g_min = g_min
         if coeff_g_max_reference is None:
             self.coeff_g_max_reference = self.g_max
         if coeff_dic is None:
@@ -227,6 +229,8 @@ class ReRamCMONoiseModel(BaseNoiseModel):
                 0.2: [0.00106879, 0.00081107][::-1],
                 2: [0.01129027418 ,0.0112185391][::-1]
             }
+            
+            self.coeff_g_max_reference = 88.19998
         if decay_dict is None:
             decay_dict = {
                 'mean' : [-0.08900206, 49.92383444],
@@ -275,7 +279,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-        self, g_target: Tensor, drift_noise_param, t_inference: float
+            self, g_target: Tensor, drift_noise_param: Tensor, t_inference: float
     ) -> Tensor:
         """Apply the accumulated noise according to the time of inference.
 
