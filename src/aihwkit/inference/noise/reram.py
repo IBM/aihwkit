@@ -317,7 +317,6 @@ class ReRamCMONoiseModel(BaseNoiseModel):
                 g_prog,
                 self.coeff_dic[self.acceptance_range],
                 self.noise_scale,
-                sigma_relaxation=0.0,
             )
             return g_final.clamp(min=self.g_min)
 
