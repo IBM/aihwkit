@@ -14,8 +14,7 @@
 
 from typing import Dict, List, Optional, Tuple
 
-from torch import abs as torch_abs
-from torch import Tensor, zeros_like, from_numpy, linspace, allclose, stack
+from torch import Tensor, zeros_like, from_numpy, linspace, allclose, stack, abs as torch_abs
 from torch.autograd import no_grad
 from numpy import interp
 from aihwkit.inference.converter.base import BaseConductanceConverter
@@ -422,7 +421,7 @@ class SingleDeviceConductanceConverter(BaseConductanceConverter):
         if "min" not in params:
             raise ValueError("params do not contain min")
 
-        if type(conductances) == list:
+        if isinstance(conductances, list):
             conductances = stack(conductances)
 
         weights = params["min"] + ((conductances - self.g_min) / params["scale_ratio"])
