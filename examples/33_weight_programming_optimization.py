@@ -91,11 +91,11 @@ TOKENIZER = AutoTokenizer.from_pretrained(MODEL_NAME)
 # Parse some arguments
 parser = ArgumentParser("bert example")
 parser.add_argument('--result_dir', default='33_results', type=str)
-parser.add_argument('--sub_dir', default='m0.1_r0.3_kw0_lm0.2', type=str)
+parser.add_argument('--sub_dir', default='m0.1_r0.3_kw1_lm0.2', type=str)
 parser.add_argument('--mutation', default=0.1, type=float)
 parser.add_argument('--recombination', default=0.3, type=float)
 parser.add_argument('--use_max_kw', default=1, type=int)
-parser.add_argument('--loss_margin', default=0.15, type=float)
+parser.add_argument('--loss_margin', default=0.2, type=float)
 parser.add_argument('--test_out_features', default=20, type=int)
 parser.add_argument('--optimize', default=1, type=int)
 parser.add_argument('--inference', default=1, type=int)
@@ -760,7 +760,7 @@ def make_trainer(model, eval_data):
         args=training_args,
         data_collator=collator,
         eval_dataset=eval_data,
-        processing_class=TOKENIZER,
+        tokenizer=TOKENIZER,
     )
 
     return trainer
