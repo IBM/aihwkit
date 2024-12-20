@@ -121,6 +121,12 @@ The fits between these equations and the hardware measurements are shown below:
 .. image:: ../img/pcm_drift_plot.png
    :alt:
 
+Users can also provide custom drift characteristics to override the default drift model, 
+which can be used to evaluate the performance and trade-offs of different devices 
+:ref:`[6] <references_pcm>`. See 
+`example 31 <https://github.com/IBM/aihwkit/blob/master/examples/31_custom_drift_models.py>`_ 
+for an example on how to customize drift models.
+
 Read noise
 ----------
 
@@ -225,4 +231,6 @@ References
 
 * [5] Le Gallo, M., Krebs, D., Zipoli, F., Salinga, M., & Sebastian, A. `Collective Structural Relaxation in Phase‐Change Memory Devices <https://onlinelibrary.wiley.com/doi/full/10.1002/aelm.201700627>`_. Advanced Electronic Materials, 4(9), 1700627. 2018
 
-* [6] Le Gallo, M., Sebastian, A., Cherubini, G., Giefers, H., & Eleftheriou, E. `Compressed sensing with approximate message passing using in-memory computing <https://ieeexplore.ieee.org/abstract/document/8450603>`_. IEEE Transactions on Electron Devices, 65(10), 4304-4312. 2018
+* [6] N. Li, C. Mackin, A. Chen, K. Brew, T. Philip, A. Simon, I. Saraf, J.-P. Han, S. G. Sarwat, G. W. Burr, M. Rasch, A. Sebastian, V. Narayanan, N. Saulnier. `Optimization of Projected Phase Change Memory for Analog In-Memory Computing Inference <https://doi.org/10.1002/aelm.202201190>`_. Advanced Electronic Materials, 9, 2201190. 2023
+
+* [7] Le Gallo, M., Sebastian, A., Cherubini, G., Giefers, H., & Eleftheriou, E. `Compressed sensing with approximate message passing using in-memory computing <https://ieeexplore.ieee.org/abstract/document/8450603>`_. IEEE Transactions on Electron Devices, 65(10), 4304-4312. 2018

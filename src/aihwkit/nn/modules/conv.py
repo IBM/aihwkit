@@ -2,13 +2,7 @@
 
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Convolution layers."""
 
@@ -180,12 +174,14 @@ class _AnalogConvNd(AnalogLayerBase, _ConvNd):
             dilation=self.dilation,
             padding=self.padding,
             stride=self.stride,
-        ).transpose(1, 2)
+        ).transpose(-1, -2)
 
-        out = self.analog_module(x_input_).transpose(1, 2)
+        out = self.analog_module(x_input_).transpose(-1, -2)
         out_size = (
-            im_shape[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1
+            im_shape[-2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1
         ) // self.stride[0] + 1
+        if len(im_shape) == 3:
+            return out.view(self.out_channels, out_size, -1)
         return out.view(im_shape[0], self.out_channels, out_size, -1)
 
 
