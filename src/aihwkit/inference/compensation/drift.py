@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Global drift compensation for inference."""
 
@@ -34,6 +28,27 @@ class GlobalDriftCompensation(BaseDriftCompensation):
     def get_readout_tensor(self, in_size: int) -> Tensor:
         """Return the read-out tensor.
 
+        Uses the set of one-hot vectors (eye).
+        """
+        return eye(in_size)
+
+    def __str__(self) -> str:
+        return "{}()".format(self.__class__.__name__)
+
+
+class PerColumnDriftCompensation(BaseDriftCompensation):
+    """Per column drift compensation.
+    Uses a vector for compensating the drift.
+    """
+
+    @no_grad()
+    def readout(self, out_tensor: Tensor) -> Tensor:
+        """Read outs the per-column mean abs."""
+        return clamp(torch_abs(out_tensor).mean(dim=0), min=0.0001)
+
+    @no_grad()
+    def get_readout_tensor(self, in_size: int) -> Tensor:
+        """Return the read-out tensor.
         Uses the set of one-hot vectors (eye).
         """
         return eye(in_size)

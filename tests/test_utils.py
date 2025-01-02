@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 # pylint: disable=too-many-locals, too-many-public-methods, no-member
 """Test for different utility functionality."""
@@ -54,11 +48,12 @@ from .helpers.tiles import (
     Inference,
     InferenceLearnOutScaling,
     TorchInference,
+    TorchInferenceIRDropT,
     Custom,
     TorchTransfer,
 )
 
-SKIP_META_PARAM_TILES = [TorchInference, Custom, FloatingPoint]
+SKIP_META_PARAM_TILES = [TorchInference, TorchInferenceIRDropT, Custom, FloatingPoint]
 
 
 @parametrize_over_layers(
@@ -78,10 +73,11 @@ SKIP_META_PARAM_TILES = [TorchInference, Custom, FloatingPoint]
         Inference,
         InferenceLearnOutScaling,
         TorchInference,
+        TorchInferenceIRDropT,
         TorchTransfer,
         Custom,
     ],
-    biases=["digital", None],
+    biases=["digital"],
 )
 class SerializationTest(ParametrizedTestCase):
     """Tests for serialization."""

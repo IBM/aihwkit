@@ -1,2 +1,7 @@
-torchvision==0.7.0
+torchvision>=0.7.0
 matplotlib>=3.0
+pyamg
+jupyter
+transformers
+evaluate
+accelerate

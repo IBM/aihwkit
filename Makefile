@@ -2,13 +2,7 @@
 
 # (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 .PHONY: build_inplace clean clean-doc clang-format mypy pycodestyle pylint pytest build_inplace_mkl build_inplace_cuda build_cuda
 
@@ -52,7 +46,7 @@ pycodestyle:
 	pycodestyle src/ tests/ examples/
 
 pylint:
-	PYTHONPATH=src/ pylint -rn src/ tests/ examples/
+	PYTHONPATH=src/ git ls-files | grep -E ".*\.py$$" | grep -v "pb2\.py$$" | xargs  pylint -rn
 
 pytest:
 	PYTHONPATH=src/ pytest -v -s tests/

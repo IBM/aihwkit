@@ -1,23 +1,39 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Tests for torch-based inference tiles."""
 
+import os
 from typing import Union
 from pytest import mark
-from torch import allclose, randn, tensor, manual_seed, device, clip, ones
-from torch.nn import Linear
+from torch import (
+    float32,
+    float16,
+    bfloat16,
+    int64,
+    autocast,
+    flatten,
+    cuda,
+    Tensor,
+    allclose,
+    randn,
+    tensor,
+    manual_seed,
+    device,
+    clip,
+    ones,
+    zeros_like,
+    clamp,
+    cat,
+)
+from torch import dtype as torch_dtype
+from torch.nn.functional import log_softmax
+from torch.nn import Linear, Conv2d, Module, NLLLoss, MaxPool2d
 
-from aihwkit.simulator.rpu_base import cuda
+from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
@@ -28,10 +44,22 @@ from aihwkit.simulator.configs import (
     NoiseManagementType,
     BoundManagementType,
 )
-from .helpers.testcases import AihwkitTestCase
+from .helpers.decorators import parametrize_over_tiles
+from .helpers.testcases import ParametrizedTestCase, SkipTest
+from .helpers.tiles import (
+    TorchInference,
+    TorchInferenceCuda,
+    TorchInferenceIRDropT,
+    TorchInferenceIRDropTCuda,
+)
+
+SKIP_CUDA_TESTS = os.getenv("SKIP_CUDA_TESTS")
 
 
-class TorchInferenceTest(AihwkitTestCase):
+@parametrize_over_tiles(
+    [TorchInference, TorchInferenceCuda, TorchInferenceIRDropT, TorchInferenceIRDropTCuda]
+)
+class TorchInferenceTest(ParametrizedTestCase):
     """Tests the basic functionality of FloatingPoint and Analog tiles."""
 
     def test_storing_and_loading(self):
@@ -40,10 +68,14 @@ class TorchInferenceTest(AihwkitTestCase):
         """
         # - Create simple rpu_config
         n_in = 20
-        rpu_config = TorchInferenceRPUConfig()
+        rpu_config = self.get_rpu_config()
         rpu_config.forward.is_perfect = True
         linear = AnalogSequential(AnalogLinear(n_in, 10, bias=True, rpu_config=rpu_config))
         inp = randn((10, n_in))
+        if self.use_cuda:
+            linear = linear.cuda()
+            inp = inp.cuda()
+
         out_pre = linear(inp)
         linear.load_state_dict(linear.state_dict())
         out_post = linear(inp)
@@ -53,7 +85,10 @@ class TorchInferenceTest(AihwkitTestCase):
         rpu_config = InferenceRPUConfig()
         rpu_config.forward.is_perfect = True
         linear_ref = AnalogSequential(AnalogLinear(n_in, 10, bias=True, rpu_config=rpu_config))
-        linear_ref.load_state_dict(linear.state_dict())
+        if self.use_cuda:
+            linear_ref = linear_ref.cuda()
+
+        linear_ref.load_state_dict(linear.state_dict(), load_rpu_config=True)
         self.assertTensorAlmostEqual(linear_ref(inp), out_post)
 
     def test_to_device(self):
@@ -61,13 +96,13 @@ class TorchInferenceTest(AihwkitTestCase):
         Test moving the new torch based models to and from GPU.
         """
         # - Per default on CPU
-        rpu_config = TorchInferenceRPUConfig()
+        rpu_config = self.get_rpu_config()
         rpu_config.forward.is_perfect = True
         linear = AnalogSequential(AnalogLinear(10, 10, bias=True, rpu_config=rpu_config))
         for param in linear.parameters():
             self.assertEqual(param.device, device("cpu"))
         # - Move to GPU
-        if cuda.is_compiled():
+        if self.use_cuda:
             linear = linear.cuda()
             for param in linear.parameters():
                 self.assertTrue("cuda" in str(param.device))
@@ -80,8 +115,10 @@ class TorchInferenceTest(AihwkitTestCase):
         """
         Test integrity of weights after set and get.
         """
-        rpu_config = TorchInferenceRPUConfig()
+        rpu_config = self.get_rpu_config()
         linear = AnalogLinear(10, 10, bias=True, rpu_config=rpu_config)
+        if self.use_cuda:
+            linear = linear.cuda()
         weights = randn(10, 10)
         linear.set_weights(weights)
         weights_read, _ = linear.get_weights()
@@ -89,6 +126,8 @@ class TorchInferenceTest(AihwkitTestCase):
         # - Compare to cpp-based tile
         linear_ref = AnalogLinear(10, 10, rpu_config=InferenceRPUConfig())
         linear_ref.set_weights(weights)
+        if self.use_cuda:
+            linear_ref = linear_ref.cuda()
         weights_read, _ = linear_ref.get_weights()
         self.assertTensorAlmostEqual(weights, weights_read)
 
@@ -97,15 +136,18 @@ class TorchInferenceTest(AihwkitTestCase):
         Test correct grad and scale of grad compared to cpp-based tile under clipping.
         """
 
-        def set_discretize(rpu: TorchInferenceRPUConfig):
-            rpu.forward.out_noise = 0.0
-            rpu.forward.inp_bound = 1.0
-            rpu.forward.out_bound = 1e6
-            rpu.forward.inp_res = -1
-            rpu.forward.out_res = -1
-            rpu.forward.noise_management = NoiseManagementType.NONE
-            rpu.forward.bound_management = BoundManagementType.NONE
-            return rpu
+        def set_discretize(rpu_config: TorchInferenceRPUConfig):
+            rpu_config.forward.is_perfect = False
+            if rpu_config.forward.ir_drop > 0:
+                raise SkipTest("Inp res < 0 not supported")
+            rpu_config.forward.out_noise = 0.0
+            rpu_config.forward.inp_bound = 1.0
+            rpu_config.forward.out_bound = 1e6
+            rpu_config.forward.inp_res = -1
+            rpu_config.forward.out_res = -1
+            rpu_config.forward.noise_management = NoiseManagementType.NONE
+            rpu_config.forward.bound_management = BoundManagementType.NONE
+            return rpu_config
 
         class ClippedLinear(Linear):
             """
@@ -119,13 +161,18 @@ class TorchInferenceTest(AihwkitTestCase):
                 x = clip(input, -1.0, 1.0)
                 return super().forward(x)
 
-        rpu_config = set_discretize(TorchInferenceRPUConfig())
+        rpu_config = set_discretize(self.get_rpu_config())
 
         linear = AnalogLinear(10, 10, bias=False, rpu_config=rpu_config)
         linear_ref = ClippedLinear(10, 10, bias=False)
-
         linear_ref.weight.data = linear.get_weights()[0]
         inp = randn(50, 10)
+
+        if self.use_cuda:
+            linear = linear.cuda()
+            linear_ref = linear_ref.cuda()
+            inp = inp.cuda()
+
         out = linear(inp).mean()
         out_ref = linear_ref(inp).mean()
         out.backward()
@@ -153,15 +200,24 @@ class TorchInferenceTest(AihwkitTestCase):
             rpu.pre_post.input_range.init_from_data = False
             return rpu
 
-        rpu_config = set_discretize(TorchInferenceRPUConfig())
+        rpu_config = set_discretize(self.get_rpu_config())
         rpu_config_ref = set_discretize(InferenceRPUConfig())
         linear = AnalogLinear(in_features=256, out_features=256, bias=False, rpu_config=rpu_config)
         linear_ref = AnalogLinear(
             in_features=256, out_features=256, bias=False, rpu_config=rpu_config_ref
         )
         linear_ref.load_state_dict(linear.state_dict(), load_rpu_config=False)
+
+        if self.use_cuda:
+            linear = linear.cuda()
+            linear_ref = linear_ref.cuda()
+
         for _ in range(10):
             inp = randn((3, 20, 256))
+
+            if self.use_cuda:
+                inp = inp.cuda()
+
             out = linear(inp).mean()
             out.backward()
             out_ref = linear_ref(inp).mean()
@@ -214,6 +270,71 @@ def test_discretization_behavior(inp_bound, out_bound, inp_res, out_res, bm_type
     out = linear(inp)
     out_ref = linear_ref(inp)
     assert allclose(out, out_ref, atol=1e-5)
+
+
+@mark.parametrize("is_training", [True, False])
+def test_iterative_linear(is_training: bool):
+    """
+    Test that checks the gradient of the input range when
+    we pass through different inputs without calling
+    .backward(), i.e. until we compute the gradients.
+
+    Args:
+        is_training: Whether the model is in training mode.
+    """
+
+    def populate_rpu(rpu_config: InferenceRPUConfig):
+        rpu_config.forward.bound_management = BoundManagementType.NONE
+        rpu_config.forward.noise_management = NoiseManagementType.NONE
+        rpu_config.forward.out_noise = 0.0
+        rpu_config.pre_post.input_range.enable = True
+        rpu_config.pre_post.input_range.init_value = 1.0
+        rpu_config.forward.is_perfect = True
+        rpu_config.pre_post.input_range.init_from_data = 0
+        rpu_config.pre_post.input_range.decay = 0.0
+        return rpu_config
+
+    cuda_linear = AnalogLinear(256, 256, bias=False, rpu_config=populate_rpu(InferenceRPUConfig()))
+    torch_linear = AnalogLinear(
+        256, 256, bias=False, rpu_config=populate_rpu(TorchInferenceRPUConfig())
+    )
+    normal_linear = Linear(256, 256, bias=False)
+    if is_training:
+        cuda_linear = cuda_linear.train()
+        torch_linear = torch_linear.train()
+    else:
+        cuda_linear = cuda_linear.eval()
+        torch_linear = torch_linear.eval()
+    torch_linear.set_weights(cuda_linear.get_weights()[0])
+    normal_linear.weight.data = torch_linear.get_weights()[0]
+    inp = randn((3, 256))
+    cuda_out = cuda_linear(inp).mean()
+    cuda_out.backward()
+    torch_out = torch_linear(inp).mean()
+    torch_out.backward()
+    inp.requires_grad = True
+    inp.retain_grad()
+    normal_out = normal_linear(inp).mean()
+    normal_out.backward()
+    normal_grad = zeros_like(torch_linear.analog_module.input_range)
+    normal_grad += clamp((inp >= 1.0) * inp.grad.clone(), min=None, max=0.0).sum()
+    normal_grad -= clamp((inp <= -1.0) * inp.grad.clone(), min=0.0, max=None).sum()
+    torch_ir_grad = torch_linear.analog_module.input_range.grad.clone()
+    cuda_ir_grad = cuda_linear.analog_module.input_range.grad.clone()
+    assert allclose(normal_grad, torch_ir_grad, atol=1e-5)
+    assert allclose(normal_grad, cuda_ir_grad, atol=1e-5)
+    # zero out the ir grads
+    for param in torch_linear.parameters():
+        param.grad = None
+    for param in cuda_linear.parameters():
+        param.grad = None
+    iter_cuda_out = cat([cuda_linear(inp[i]) for i in range(3)]).mean()
+    iter_torch_out = cat([torch_linear(inp[i]) for i in range(3)]).mean()
+    assert allclose(iter_torch_out, iter_cuda_out, atol=1e-5)
+    iter_cuda_out.backward()
+    iter_torch_out.backward()
+    assert allclose(normal_grad, cuda_linear.analog_module.input_range.grad, atol=1e-5)
+    assert allclose(normal_grad, torch_linear.analog_module.input_range.grad, atol=1e-5)
 
 
 @mark.parametrize(
@@ -362,3 +483,109 @@ def test_noise_and_bound_management(
     out = linear_torch(inp)
     out_ref = linear(inp)
     assert allclose(out, out_ref, atol=1e-5)
+
+
+@mark.parametrize("dtype", [float32, float16, bfloat16])
+@mark.parametrize("device_type", [device("cpu"), device("cuda")])
+def test_dtype(dtype: torch_dtype, device_type: device):
+    """
+    Test whether there is some implicit casting of the inputs.
+
+    Args:
+        dtype: Torch dtype
+        device_type: Torch device
+
+    Raises:
+        SkipTest: If cuda not found or disabled
+    """
+    if SKIP_CUDA_TESTS or not cuda.is_available():
+        raise SkipTest("CUDA not available")
+
+    rpu_config_torch = TorchInferenceRPUConfig()
+    rpu_config_torch.forward.is_perfect = True
+
+    linear_torch = AnalogLinear(
+        in_features=256, out_features=256, bias=False, rpu_config=rpu_config_torch
+    )
+    linear_torch = linear_torch.to(device=device_type, dtype=dtype)
+    inp = randn((10, 256)).to(device=device_type, dtype=dtype)
+    out: Tensor
+    out = linear_torch(inp)  # pylint: disable=not-callable
+    assert out.dtype == dtype
+
+
+@mark.parametrize("dtype", [float32, float16, bfloat16])
+@mark.parametrize("device_type", [device("cpu"), device("cuda")])
+@mark.parametrize("use_autocast", [True, False])
+def test_low_prec_training(dtype: torch_dtype, device_type: device, use_autocast: bool):
+    """
+    Test training with and without autocast.
+
+    Args:
+        dtype: Torch dtype
+        device_type: Torch device
+        use_autocast: Whether to use autocast
+
+    Raises:
+        SkipTest: If cuda not found or disabled
+    """
+    if SKIP_CUDA_TESTS or not cuda.is_available():
+        raise SkipTest("CUDA not available")
+
+    class Net(Module):
+        """Test network."""
+
+        def __init__(self):
+            super().__init__()
+            self.conv1 = Conv2d(1, 32, 3, 1)
+            self.conv2 = Conv2d(32, 64, 3, 1)
+            self.pool = MaxPool2d(2, 2)
+            self.fc1 = Linear(9216, 128)
+            self.fc2 = Linear(128, 10)
+
+        def forward(self, x):
+            """Test forward."""
+            x = self.conv1(x)
+            x = self.pool(self.conv2(x))
+            x = flatten(x, 1)
+            x = self.fc1(x)
+            x = self.fc2(x)
+            output = log_softmax(x, dim=1)
+            return output
+
+    def get_data_and_labels():
+        """Get data and labels."""
+        return randn(10, 1, 28, 28), tensor([1, 2, 3, 4, 5, 6, 7, 8, 9, 0], dtype=int64)
+
+    model = Net()
+    rpu_config = TorchInferenceRPUConfig()
+    rpu_config.forward.is_perfect = True
+    rpu_config.mapping.max_input_size = 0
+    rpu_config.mapping.max_output_size = 0
+    model = convert_to_analog(model, rpu_config)
+    nll_loss = NLLLoss()
+
+    model = model.to(device=device_type, dtype=dtype)
+    optimizer = AnalogSGD(model.parameters(), lr=0.1)
+    model = model.train()
+
+    data, target = get_data_and_labels()
+    data = data.to(device=device_type, dtype=dtype)
+    target = target.to(device=device_type)
+    if use_autocast:
+        # Runs the forward pass with autocasting.
+        with autocast(device_type=str(device_type), dtype=dtype):
+            output: Tensor
+            output = model(data)
+            loss: Tensor
+            loss = nll_loss(output, target)
+        loss.backward()
+        optimizer.step()
+    else:
+        optimizer.zero_grad()
+        output: Tensor
+        output = model(data)
+        loss: Tensor
+        loss = nll_loss(output.float(), target)
+        loss.backward()
+        optimizer.step()

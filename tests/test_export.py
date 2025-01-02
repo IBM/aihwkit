@@ -2,13 +2,7 @@
 
 # (C) Copyright 2020, 2021, 2022 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 # pylint: disable=too-many-locals, too-many-public-methods, no-member
 """Test for different utility functionality."""
@@ -71,13 +65,13 @@ class FusionExportTest(ParametrizedTestCase):
         if not isinstance(rpu_config, InferenceRPUConfig):
             assert_raises(TileError(), fusion_export(model))
 
-        data, state_dict = fusion_export(model)
+        data, params, state_dict = fusion_export(model)
 
         model.reset_parameters()
         new_weights, _ = model.get_weights()
         assert_raises(AssertionError, assert_array_almost_equal, weights, new_weights)
 
-        new_model = fusion_import(data, model, state_dict)
+        new_model = fusion_import(data, model, params, state_dict)
 
         new_weights, _ = new_model.get_weights()
         assert_array_almost_equal(weights, new_weights)
@@ -88,9 +82,9 @@ class FusionExportTest(ParametrizedTestCase):
         weights, _ = model.get_weights()
 
         with NamedTemporaryFile() as file:
-            _, state_dict = fusion_export(model, file_name=file.name)
+            _, params, state_dict = fusion_export(model, file_name=file.name)
             model.reset_parameters()
-            new_model = fusion_import(file.name, model, state_dict)
+            new_model = fusion_import(file.name, model, params, state_dict)
 
         new_weights, _ = new_model.get_weights()
         assert_array_almost_equal(weights, new_weights)
@@ -130,7 +124,7 @@ class FusionExactTest(AihwkitTestCase):
     def test_fusion_load_csv(self) -> None:
         """Test export and loading via dict."""
         weights = [Tensor([[1.0, 0.2], [0.3, -0.4]]), Tensor([[-0.5, 0.6], [0.7, -1.0]])]
-        conductances = [[40.0, 8.0, 12.0, 16.0], [20.0, 24.0, 28.0, 40.0]]
+        conductances = [[40.0, 8.0, 30.0, 40.0], [33.33333, 40.0, 28.0, 40.0]]
 
         rpu_config = InferenceRPUConfig()
         rpu_config.mapping.weight_scaling_columnwise = 0.0
@@ -139,8 +133,8 @@ class FusionExactTest(AihwkitTestCase):
             AnalogLinear(2, 2, False, rpu_config), AnalogLinear(2, 2, False, rpu_config)
         )
 
-        model[0].set_weights(weights[0])
-        model[1].set_weights(weights[1])
+        model[0].set_weights(weights[0], apply_weight_scaling=False)
+        model[1].set_weights(weights[1], apply_weight_scaling=False)
         header = _fusion_get_csv_header(model)
         with NamedTemporaryFile() as file:
             fusion_export(model, file_name=file.name)
@@ -148,4 +142,5 @@ class FusionExactTest(AihwkitTestCase):
 
         for idx, (name, _) in enumerate(model.named_analog_layers()):
             self.assertTrue(name in conductance_data)
+            print(conductance_data[name])
             assert_array_almost_equal(conductance_data[name], conductances[idx], 5)

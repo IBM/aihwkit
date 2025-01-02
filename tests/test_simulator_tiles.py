@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 # pylint: disable=too-many-locals
 
@@ -673,12 +667,14 @@ class TileForwardBackwardTest(ParametrizedTestCase):
         inputs = Tensor([[-0.1, 0.4], [-0.5, 0.1]])
         if analog_tile.is_cuda:
             inputs = inputs.cuda()
+        y_1_lst = []
         for _ in range(10):
-            y_1 = analog_tile(inputs)
+            y_1_lst.append(analog_tile(inputs))
+        y_2_lst = []
         for _ in range(10):
-            y_2 = analog_tile(inputs)
-        self.assertTensorAlmostEqual(y_1[:, 1], y_2[:, 1])
-        self.assertNotAlmostEqualTensor(y_1[:, 0], y_2[:, 0])
+            y_2_lst.append(analog_tile(inputs))
+        self.assertTensorAlmostEqual(y_1_lst[-1][:, 1], y_2_lst[-1][:, 1])
+        self.assertNotAlmostEqualTensor(y_1_lst[-1][:, 0], y_2_lst[-1][:, 0])
 
         with self.assertRaises(ArgumentError):
             forward_parameters["_not_existent"] = Tensor([1.0])

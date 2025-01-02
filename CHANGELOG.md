@@ -12,7 +12,39 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## Unreleased
+## [0.9.2] - 2024/09/18
+
+### Added
+
+* Added new Hermes noise model and related notebooks (\#685)
+* Added new conductance converters (\#685)
+* Make Conv layers also compatible with non-batched inputs (\#685)
+* Added per column drift compensation (\#685)
+* Added custom drifts (\#685)
+
+### Changed
+
+* Update requirements-examples.txt (\#685)
+
+## [0.9.1] - 2024/05/16
+
+### Added
+
+* Added column wise scaling logic to fusion import/export to improve accuracy (\#652)
+*  Added a new example that demonstrates how to import and perform inference using a model which has been trained in a hardware-aware fashion using an external library (\#648)
+* Added a wew WeightModifierType.DISCRETIZE_PER_CHANNEL type and a test case to validate the correctness against manual quantization in PyTorch (\#618)
+
+### Fixed
+
+* Fix sub-optimal mapping of conductances to weights for fusion by regressing weights per column (\#653)
+* Documentation correction: Use `ADDITIVE_CONSTANT instead of `ADD_NORMAL` in WeightNoiseType (\#630)
+* Fix continuing training based on checkpoint using torch tile (\#626)
+* Fix the support of different dtypes for the torch model (\#625)
+* Fixes the fall-through to the default error message when using drop connect (\#624)
+* Update `analog_fusion` notebook (\#611)
+
+
+## [0.9.0] - 2024/01/25
 
 ### Added
 
@@ -25,7 +57,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 * New `PCM_NOISE` type for hardware-aware training for inference (\#563)
 * Transfer compounds using torch implementation (`TorchTransferTile`) (\#567)
 * Weight programming error plotting utility (\#572)
-* Add optimizer checkpoint in example 20 (\#573) 
+* Add optimizer checkpoint in example 20 (\#573)
+* Inference tile with time-dependent IR-drop (\#587)
+* Linear algebra module (\#588)
+* New Jupyter notebook for Fusion chip access (\#601)
 
 ### Fixed
 
@@ -33,6 +68,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Custom tile bugfixes (\#563)
 * Bug-fixes for specialized learning algorithms (\#563)
 * Bug-fix for data-parallel hardware-aware training for inference (\#569)
+* Fix docker build stubgen (\#581)
+* Fix readthedoc builds (\#586)
+* Fix the backward of the input ranges in the torch tile (\#606)
 
 ### Changed
 
@@ -44,6 +82,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Parameters for specialized learning algorithms changed somwhat (\#563)
 * RNN modules inherit from `Module` or `AnalogContainerBase` instead of `AnalogSequential` (\#563)
 * Adjustment of parameter to bindings for various number formats (\#563)
+* Documentation updates and fixes (\#562, \#564, \#570, \#575, \#576, #\580, #\585, \#586)
+* Updated installation instructions in Readthedoc (\#594)
 
 ### Removed
 
@@ -569,7 +609,8 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Added a PyTorch `AnalogConv2d` neural network model.
 
 
-[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.8.0...HEAD
+[UNRELEASED]: https://github.com/IBM/aihwkit/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/IBM/aihwkit/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/IBM/aihwkit/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/IBM/aihwkit/compare/v0.7.0..v0.7.1
 [0.7.0]: https://github.com/IBM/aihwkit/compare/0.6.0..v0.7.0

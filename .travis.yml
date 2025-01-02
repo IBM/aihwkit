@@ -1,12 +1,6 @@
-# (C) Copyright 2020, 2021, 2022, 2023 IBM. All Rights Reserved.
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 notifications:
   email: false
@@ -31,13 +25,15 @@ job_compile_common: &job_compile_common
     - sudo apt-get -qq install -y ca-certificates
     - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
     - sudo apt-get update
-    - sudo apt-get install -y libopenblas-dev gcc-8 g++-8
-    - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 60 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+    - sudo apt-get install -y libopenblas-dev gcc-9 g++-9
+    - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
   install:
     # Set the python executable, to force cmake picking the right one.
     - PYTHON_EXECUTABLE=~/virtualenv/python$TRAVIS_PYTHON_VERSION/bin/python$TRAVIS_PYTHON_VERSION
-    - $PYTHON_EXECUTABLE -m pip install -r requirements.txt
-    - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt	
+    - $PYTHON_EXECUTABLE -m pip install travis-wait-improved
+    - travis-wait-improved --timeout 60m $PYTHON_EXECUTABLE -m pip install -r requirements.txt
+    - $PYTHON_EXECUTABLE -m pip install -r requirements-dev.txt
+    - $PYTHON_EXECUTABLE -m pip install -r requirements-examples.txt
     # Install the package in editable mode.
     - VERBOSE=1 $PYTHON_EXECUTABLE -m pip install -v -e ".[visualization, fitting]"
   script:
@@ -82,7 +78,7 @@ jobs:
     <<: *job_compile_common
     stage: Test multiple python versions
     python: "3.9"
-    
+
   - name: "Build wheel for Python 3.8, 3.9, 3.10 on Linux x86_64"
     os: linux
     dist: focal
@@ -92,11 +88,11 @@ jobs:
     if: branch =~ /^release\/.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.0.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==2.0.1 torchvision && pip install -r requirements.txt"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.4.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==2.4.1 torchvision && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_REPAIR_WHEEL_COMMAND="auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
-      - CIBW_BUILD="cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
+      - CIBW_BUILD="cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64"
     before_install:
       - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
@@ -137,9 +133,9 @@ jobs:
     if: branch =~ /^release\/win.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.0.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==2.0.1 && pip install -r requirements.txt"
-      - CIBW_BUILD="cp37-win_amd64 cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.4.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==2.4.1 && pip install -r requirements.txt"
+      - CIBW_BUILD="cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
       # Use unzipped OpenBLAS.
       - OPENBLAS_ROOT=C:\\BLAS
       - OPENBLAS_ROOT_DIR=C:\\BLAS
