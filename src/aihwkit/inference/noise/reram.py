@@ -39,7 +39,7 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
 
         To account for short-term read noise (about 1\%) one should
         additional set the ``forward.w_noise`` parameter to about 0.01
-            (with w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
+        (with w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
 
     Args:
 
@@ -72,9 +72,7 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
         noise_scale: float = 1.0,
         coeff_g_max_reference: Optional[float] = None,
     ):
-        g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(
-            g_max=g_max
-        )
+        g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
 
         self.g_max = getattr(self.g_converter, "g_max", g_max)
@@ -160,13 +158,9 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
         # pylint: disable=arguments-renamed
 
         if t_inference not in self.coeff_dic:
-            raise ArgumentError(
-                f"t_inference should be one of `{list(self.coeff_dic.keys())}`"
-            )
+            raise ArgumentError(f"t_inference should be one of `{list(self.coeff_dic.keys())}`")
 
-        g_final = self._apply_poly(
-            g_target, self.coeff_dic[t_inference], self.noise_scale
-        )
+        g_final = self._apply_poly(g_target, self.coeff_dic[t_inference], self.noise_scale)
 
         return g_final.clamp(min=0.0)
 
