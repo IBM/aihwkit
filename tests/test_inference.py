@@ -60,12 +60,10 @@ class NoiseModelTest(AihwkitTestCase):
         """Test custom drift model with g_converter"""
         weights = randn(10, 35)
 
-        g_min, g_max = 0.0, 25.0
-        custom_drift_model = dict(
-            g_lst=[g_min, 10.0, g_max],
-            nu_mean_lst=[0.08, 0.05, 0.03],
-            nu_std_lst=[0.03, 0.02, 0.01],
-        )
+        g_min, g_max = 0., 25.
+        custom_drift_model = dict(g_lst=[g_min, 10., g_max],
+                                  nu_mean_lst=[0.08, 0.05, 0.03],
+                                  nu_std_lst=[0.03, 0.02, 0.01])
 
         noise_model = CustomDriftPCMLikeNoiseModel(
             custom_drift_model,
@@ -100,12 +98,10 @@ class ConductanceConverterTest(AihwkitTestCase):
             (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum() > 0
         )
         self.assertTrue(
-            (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum()
-            == 0
+            (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum() == 0
         )
         self.assertTrue(
-            (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum()
-            == 0
+            (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum() == 0
         )
 
         converted_weights = g_converter.convert_back_to_weights(g_lst, params)
@@ -119,9 +115,10 @@ class ConductanceConverterTest(AihwkitTestCase):
 
         weights = randn(10, 35)
 
-        g_converter = DualPairConductanceConverter(
-            f_lst=[1.0, 3.0], g_max=g_max, g_min=g_min
-        )
+        g_converter = DualPairConductanceConverter(f_lst=[1.0, 3.0],
+                                                   g_max=g_max,
+                                                   g_min=g_min)
+
 
         g_lst, params = g_converter.convert_to_conductances(weights)
 
@@ -132,16 +129,13 @@ class ConductanceConverterTest(AihwkitTestCase):
             g_minus = g_lst[1].detach().cpu().numpy()
 
             self.assertTrue(
-                (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum()
-                > 0
+                (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum() > 0
             )
             self.assertTrue(
-                (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum()
-                == 0
+                (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum() == 0
             )
             self.assertTrue(
-                (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum()
-                == 0
+                (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum() == 0
             )
 
         converted_weights = g_converter.convert_back_to_weights(g_lst, params)
@@ -155,9 +149,9 @@ class ConductanceConverterTest(AihwkitTestCase):
 
         weights = randn(10, 35)
 
-        g_converter = NPairConductanceConverter(
-            f_lst=[1.0, 2.0, 3.0], g_max=g_max, g_min=g_min
-        )
+        g_converter = NPairConductanceConverter(f_lst=[1.0, 2.0, 3.0],
+                                                g_max=g_max,
+                                                g_min=g_min)
 
         g_lst, params = g_converter.convert_to_conductances(weights)
 
@@ -168,16 +162,13 @@ class ConductanceConverterTest(AihwkitTestCase):
             g_minus = g_lst[1].detach().cpu().numpy()
 
             self.assertTrue(
-                (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum()
-                > 0
+                (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum() > 0
             )
             self.assertTrue(
-                (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum()
-                == 0
+                (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum() == 0
             )
             self.assertTrue(
-                (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum()
-                == 0
+                (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum() == 0
             )
 
         converted_weights = g_converter.convert_back_to_weights(g_lst, params)
@@ -191,16 +182,23 @@ class ConductanceConverterTest(AihwkitTestCase):
 
         weights = randn(10, 35)
 
-        g_converter = CustomPairConductanceConverter(
-            f_lst=[1.0],
-            g_lst=[
-                [g_min, g_min, g_min, (g_max - g_min) / 2 + g_min, g_max],
-                [g_max, (g_max - g_min) / 2 + g_min, g_min, g_min, g_min],
-            ],
-            g_min=g_min,
-            g_max=g_max,
-            invertibility_test=False,
-        )
+        g_converter = CustomPairConductanceConverter(f_lst=[1.0],
+                                                     g_lst=[[g_min,
+                                                             g_min,
+                                                             g_min,
+                                                             (g_max - g_min) / 2 + g_min,
+                                                             g_max],
+                                                            [g_max,
+                                                             (g_max - g_min) / 2 + g_min,
+                                                             g_min,
+                                                             g_min,
+                                                             g_min],
+                                                            ],
+                                                     g_min=g_min,
+                                                     g_max=g_max,
+                                                     invertibility_test=False,
+                                                     )
+
 
         g_lst, params = g_converter.convert_to_conductances(weights)
 
@@ -210,16 +208,13 @@ class ConductanceConverterTest(AihwkitTestCase):
             g_minus = g_lst[1].detach().cpu().numpy()
 
             self.assertTrue(
-                (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum()
-                > 0
+                (g_plus > g_max - tolerance).sum() + (g_minus > g_max - tolerance).sum() > 0
             )
             self.assertTrue(
-                (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum()
-                == 0
+                (g_plus < g_min - tolerance).sum() + (g_minus < g_min - tolerance).sum() == 0
             )
             self.assertTrue(
-                (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum()
-                == 0
+                (g_plus > g_max + tolerance).sum() + (g_minus > g_max + tolerance).sum() == 0
             )
 
         converted_weights = g_converter.convert_back_to_weights(g_lst, params)
@@ -239,4 +234,5 @@ class ConductanceConverterTest(AihwkitTestCase):
         self.assertTrue((g_lst < g_min - tolerance).sum() == 0)
 
         converted_weights = g_converter.convert_back_to_weights(g_lst, params)
+
         self.assertTensorAlmostEqual(weights, converted_weights)
