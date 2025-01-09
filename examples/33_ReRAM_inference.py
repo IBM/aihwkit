@@ -54,7 +54,15 @@ drifted_MVM = zeros((len(t_inferences), crossbar_size, batches))
 wire = 0.35
 
 
-def gen_rpu_config():
+def def_rpu_config():
+    """Configures the RPU for inferencing with ReRAM CMO Noise model
+
+    Args:
+        None
+
+    Returns:
+        InferecneRPUConfig
+    """
     rpu_config = InferenceRPUConfig()
     rpu_config.modifier.type = None
 
@@ -88,7 +96,7 @@ def gen_rpu_config():
 #  Initialize a squared matrix
 model = nn.Linear(crossbar_size, crossbar_size, bias=False)
 model.weight.data = matrix
-rpu_config = gen_rpu_config()
+rpu_config = def_rpu_config()
 
 # Convert the FP layer to an analog tile
 analog_model = convert_to_analog(model, rpu_config)
