@@ -191,7 +191,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         additional set the ``forward.w_noise`` parameter to about 0.01
         (with w_noise_type=WeightNoiseType.ADDITIVE_CONSTANT)
 
-    Args: TODO
+    Args:
         coeff_dict:  acceptance range with coefficients for the programming noise in :math:`\mu S`,
         g_converter: Instantiated class of the conductance converter for a single device per
         cross-point.
@@ -286,7 +286,8 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
     @no_grad()
     def generate_drift_coefficients(self, g_target: Tensor) -> Tensor:
-        """Return target values as coefficients."""
+        """Conductance relaxation is independent of the conductance level
+        """
         return g_target
 
     @no_grad()
