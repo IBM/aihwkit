@@ -30,35 +30,33 @@ from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery, Infere
 from aihwkit.simulator.parameters.io import IOParametersIRDropT
 
 # Input/Output quantization
-precision_i = 32
-precision_o =  32
+precision_i = 6
+precision_o = 8
 
 # Crossbar array size
 crossbar_size = 64
 
-# Program-verify acceptance range
-acceptance_range= 0.2 # either 2% or 0.2%
+# Program-verify acceptance range, either 2% or 0.2%
+acceptance_range = 0.2
 
-# Amount of vectors 
+# Amount of vectors
 batches = 100
 
-# Set random seed
-#random.seed(0)
- 
 # initial weights
-matrix = rand(crossbar_size, crossbar_size)*2-1
+matrix = rand(crossbar_size, crossbar_size) * 2 - 1
 
 # probe vectors
-input_probe = rand(crossbar_size, batches)*2-1
+input_probe = rand(crossbar_size, batches) * 2 - 1
 real_MVM = matmul(input_probe.T, matrix.T)
-#rmse_base = sqrt(mean((analog_MVM - real_MVM)**2))
 
 # time of infernence ir 0s, 1s, 1h, 1d and 10y
-t_inferences = [0, 1, 3600, 3600*24, 3600*24*365*10] 
+t_inferences = [0, 1, 3600, 3600 * 24, 3600 * 24 * 365 * 10]
 drifted_MVM = zeros((len(t_inferences), crossbar_size, batches))
 
 # Wire resistance in Ohms
 wire = 0.35
+
+
 def gen_rpu_config():
     rpu_config = InferenceRPUConfig()
     rpu_config.modifier.type = None
@@ -84,24 +82,27 @@ def gen_rpu_config():
     rpu_config.forward.bound_management = BoundManagementType.NONE
     rpu_config.forward.noise_management = NoiseManagementType.NONE
 
-    rpu_config.noise_model = ReRamCMONoiseModel(g_max = 88.19, g_min = 9.0, acceptance_range=acceptance_range)
+    rpu_config.noise_model = ReRamCMONoiseModel(g_max=88.19, g_min=9.0,
+                                                acceptance_range=acceptance_range)
     rpu_config.drift_compensation = None
     return rpu_config
-#  Initialize a squared matrix 
-model = nn.Linear(crossbar_size,crossbar_size, bias=False)
+
+
+#  Initialize a squared matrix
+model = nn.Linear(crossbar_size, crossbar_size, bias=False)
 model.weight.data = matrix
 rpu_config = gen_rpu_config()
 
 # Convert the FP layer to an analog tile
-analog_model = convert_to_analog(model,rpu_config)
+analog_model = convert_to_analog(model, rpu_config)
 analog_model = analog_model.eval()
 
 # Program the weights for the configured noise model (i.e. programming noise)
-analog_model.program_analog_weights(noise_model =rpu_config.noise_model)
+analog_model.program_analog_weights(noise_model=rpu_config.noise_model)
 
 # Get the MVM accuracy at t=0s. Only considers programming noise
-baseline = analog_model(input_probe[:,0])
-baseline_FP = matmul(input_probe[:,0], matrix.T)
+baseline = analog_model(input_probe[:, 0])
+baseline_FP = matmul(input_probe[:, 0], matrix.T)
 analog_MVM = zeros((crossbar_size, batches))
 
 # compute the MVM for each time of inference considering conductance relaxation
@@ -109,4 +110,4 @@ for i, t_inference in enumerate(t_inferences):
     # drift the weights for each time of inference and compute the MVM
     analog_model.drift_analog_weights(t_inference)
     for j in range(batches):
-        drifted_MVM[i,:, j] = analog_model(input_probe[:, j])
+        drifted_MVM[i, :, j] = analog_model(input_probe[:, j])
