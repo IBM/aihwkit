@@ -12,21 +12,18 @@ MVM accuracy is assessed for different times after programming.
 # pylint: disable=invalid-name
 
 # Imports from PyTorch
-from torch import Tensor, nn, zeros, matmul, sqrt, mean, random, rand
+from torch import nn, zeros, matmul, rand
 
 # Imports from aihwkit
 from aihwkit.nn.conversion import convert_to_analog
-from aihwkit.inference.noise.reram import ReRamCMONoiseModel, ReRamWan2022NoiseModel
-from aihwkit.inference.noise.pcm import PCMLikeNoiseModel
+from aihwkit.inference.noise.reram import ReRamCMONoiseModel
 from aihwkit.simulator.configs import InferenceRPUConfig
 from aihwkit.simulator.configs.utils import (
-    WeightModifierType,
     BoundManagementType,
     WeightClipType,
     NoiseManagementType,
     WeightRemapType,
 )
-from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery, InferenceTile
 from aihwkit.simulator.parameters.io import IOParametersIRDropT
 
 # Input/Output quantization
