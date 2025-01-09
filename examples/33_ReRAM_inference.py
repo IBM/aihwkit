@@ -85,7 +85,6 @@ def gen_rpu_config():
     rpu_config.forward.noise_management = NoiseManagementType.NONE
 
     rpu_config.noise_model = ReRamCMONoiseModel(g_max = 88.19, g_min = 9.0, acceptance_range=acceptance_range)
-    #rpu_config.noise_model = PCMLikeNoiseModel(g_max=25.0)
     rpu_config.drift_compensation = None
     return rpu_config
 
