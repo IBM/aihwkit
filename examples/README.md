@@ -590,6 +590,29 @@ Example of how to import and perform inference using a model which
 has been trained in a hardware-aware fashion using an external 
 library (i.e., not the AIHWKIT).
 
+## Example 31: [`31_custom_drift_models.py`]
+Example of how to modify analog device time-dependent drift 
+characteristics.
+
+## Example 32: [`32_weight_programming_options.py`]
+Example of how to implement different unit cells for 
+weight programming. These include the default 
+SinglePairConductanceConverter along with a DualPairConductanceConverter, 
+which uses two conductance pairs per unit cell. An
+NPairConductanceConverter is also available for studying the effects of
+additional conductance pairs along with a CustomPairConductanceConverter,
+which enables highly customizable weight programming strategies where
+allowing the user to define how to split weights across multiple conductances
+as a function of the weight being implemented.
+
+## Example 33: [`33_weight_programming_optimization.py`]
+Example of how to improve inference accuracy--including as a function
+of time–-via more optimized weight programming strategies based on 
+specific analog device characterstics such as programming errors, 
+conductance drift, and read noise. This example is based on the 
+paper: [C. Mackin, et al., "Optimised weight programming for analogue
+memory-based deep neural networks," <em>Nature Communications</em>, 2022.]
+
 [Resistive Processing Units]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#resistive-processing-units
 [Inference and PCM statistical model]: https://aihwkit.readthedocs.io/en/latest/pcm_inference.html
 [Unit Cell Device]: https://aihwkit.readthedocs.io/en/latest/using_simulator.html#unit-cell-device
@@ -611,6 +634,8 @@ Front. Neurosci.]: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103
 [ImageNet]: https://www.image-net.org/
 [Rasch MJ, Carta F, Fagbohungbe O and Gokmen T (2023) Fast
 offset-corrected in-memeory training. ArXiv preprint]: https://arxiv.org/abs/2303.04721
+[C. Mackin, et al., "Optimised weight programming for analogue memory-based deep neural
+networks," <em>Nature Communications</em>, 2022.]: https://www.nature.com/articles/s41467-022-31405-1
 
 [`01_simple_layer.py`]: 01_simple_layer.py
 [`02_multiple_layer.py`]: 02_multiple_layer.py
@@ -642,3 +667,6 @@ offset-corrected in-memeory training. ArXiv preprint]: https://arxiv.org/abs/230
 [`28_advanced_irdrop.py`]: 28_advanced_irdrop.py
 [`29_linalg_krylov.py`]: 29_linalg_krylov.py
 [`30_external_hardware_aware_model.py`]: 30_external_hardware_aware_model.py
+[`31_custom_drift_models.py`]: 31_custom_drift_models.py
+[`32_weight_programming_options.py`]: 32_weight_programming_options.py
+[`33_weight_programming_optimization.py`]: 33_weight_programming_optimization.py
