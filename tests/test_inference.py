@@ -119,7 +119,6 @@ class ConductanceConverterTest(AihwkitTestCase):
                                                    g_max=g_max,
                                                    g_min=g_min)
 
-
         g_lst, params = g_converter.convert_to_conductances(weights)
 
         tolerance = 1e-6
@@ -198,7 +197,6 @@ class ConductanceConverterTest(AihwkitTestCase):
                                                      g_max=g_max,
                                                      invertibility_test=False,
                                                      )
-
 
         g_lst, params = g_converter.convert_to_conductances(weights)
 
