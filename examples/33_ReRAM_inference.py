@@ -87,41 +87,26 @@ def gen_rpu_config():
     rpu_config.noise_model = ReRamCMONoiseModel(g_max = 88.19, g_min = 9.0, acceptance_range=acceptance_range)
     rpu_config.drift_compensation = None
     return rpu_config
-
+#  Initialize a squared matrix 
 model = nn.Linear(crossbar_size,crossbar_size, bias=False)
 model.weight.data = matrix
 rpu_config = gen_rpu_config()
+
+# Convert the FP layer to an analog tile
 analog_model = convert_to_analog(model,rpu_config)
-
-#for analog_tile in analog_model.analog_tiles():
-    ##if isinstance(analog_tile, InferenceTileWithPeriphery):
-        #analog_tile.programmed_weights = matrix
-
 analog_model = analog_model.eval()
+
+# Program the weights for the configured noise model (i.e. programming noise)
 analog_model.program_analog_weights(noise_model =rpu_config.noise_model)
+
+# Get the MVM accuracy at t=0s. Only considers programming noise
 baseline = analog_model(input_probe[:,0])
 baseline_FP = matmul(input_probe[:,0], matrix.T)
 analog_MVM = zeros((crossbar_size, batches))
+
 # compute the MVM for each time of inference considering conductance relaxation
 for i, t_inference in enumerate(t_inferences):
+    # drift the weights for each time of inference and compute the MVM
     analog_model.drift_analog_weights(t_inference)
     for j in range(batches):
         drifted_MVM[i,:, j] = analog_model(input_probe[:, j])
-
-drifted_MVM = drifted_MVM.detach()
-print(drifted_MVM.shape)
-print(real_MVM.shape)
-rmse_t0 = sqrt(mean((drifted_MVM[0] - real_MVM.T)**2))
-rmse_t1 = sqrt(mean((drifted_MVM[1] - real_MVM.T)**2))
-rmse_t2 = sqrt(mean((drifted_MVM[2] - real_MVM.T)**2))
-rmse_t3 = sqrt(mean((drifted_MVM[3] - real_MVM.T)**2))
-rmse_t4 = sqrt(mean((drifted_MVM[4] - real_MVM.T)**2))
-print(f"RMSE t0: {rmse_t0}")
-print(f"RMSE t = 1s: {rmse_t1}")
-print(f"RMSE t = 1h: {rmse_t2}")
-print(f"RMSE t = 24h: {rmse_t3}")
-print(f"RMSE t = 10y: {rmse_t4}")
-#if SAVE_FILES == True:
-    #for i in range(drifted_MVM.shape[0]):
-        #np.save(f"/Users/mvc/Library/CloudStorage/Box-Box/unicos/Donato_MVM_tol02/t_{t_inferences[i]}_sec_prec_{precision_i}-{precision_o}bit_{runs}runs.npy", drifted_MVM[i])
-    #np.save(f"/Users/mvc/Library/CloudStorage/Box-Box/unicos/Donato_MVM_tol02/baseline_MVM.npy", real_MVM)
