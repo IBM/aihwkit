@@ -8,7 +8,7 @@
 
 from typing import Dict, List, Optional, Tuple
 
-from torch import abs as torch_abs
+from torch import abs as torch_abs, stack
 from torch import Tensor, zeros_like, from_numpy, linspace, allclose
 from torch.autograd import no_grad
 
@@ -345,6 +345,7 @@ class CustomPairConductanceConverter(BaseConductanceConverter):
             weights_us += f_factor * (g_plus - g_minus)
 
         return weights_us / params['scale_ratio']   # back to unitless
+
 
 class SingleDeviceConductanceConverter(BaseConductanceConverter):
     r"""Single devices to represent weights
