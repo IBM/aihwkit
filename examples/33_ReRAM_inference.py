@@ -54,7 +54,7 @@ drifted_MVM = zeros((len(t_inferences), crossbar_size, batches))
 wire = 0.35
 
 
-def def_rpu_config():
+def inference_rpu_config():
     """Configures the RPU for inferencing with ReRAM CMO Noise model
 
     Args:
@@ -96,14 +96,14 @@ def def_rpu_config():
 #  Initialize a squared matrix
 model = nn.Linear(crossbar_size, crossbar_size, bias=False)
 model.weight.data = matrix
-rpu_config = def_rpu_config()
+rpu_conf = inference_rpu_config()
 
 # Convert the FP layer to an analog tile
-analog_model = convert_to_analog(model, rpu_config)
+analog_model = convert_to_analog(model, rpu_conf)
 analog_model = analog_model.eval()
 
 # Program the weights for the configured noise model (i.e. programming noise)
-analog_model.program_analog_weights(noise_model=rpu_config.noise_model)
+analog_model.program_analog_weights(noise_model=rpu_conf.noise_model)
 
 # Get the MVM accuracy at t=0s. Only considers programming noise
 baseline = analog_model(input_probe[:, 0])
