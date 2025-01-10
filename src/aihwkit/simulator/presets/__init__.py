@@ -68,8 +68,7 @@ from .configs import (
     MixedPrecisionGokmenVlasovPreset,
     MixedPrecisionPCMPreset,
 )
-from .inference import StandardHWATrainingPreset
-
+from .inference import StandardHWATrainingPreset, FloatingPointPreset
 from .devices import (
     ReRamESPresetDevice,
     ReRamSBPresetDevice,
