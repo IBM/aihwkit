@@ -6,7 +6,7 @@
 
 """Tests for analog presets."""
 
-from torch import Tensor
+from torch import Tensor, randn
 
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.presets import (
@@ -50,6 +50,7 @@ from aihwkit.simulator.presets import (
     TTv2EcRamPreset,
     TTv2EcRamMOPreset,
     TTv2IdealizedPreset,
+    FloatingPointPreset,
 )
 from .helpers.decorators import parametrize_over_presets
 from .helpers.testcases import AihwkitTestCase
@@ -131,3 +132,21 @@ class PresetTest(AihwkitTestCase):
         self.assertEqual(tile_biases, None)
         # TODO: disabled as the comparison needs to take into account noise
         # self.assertTensorAlmostEqual(tile_weights, weights)
+
+
+class PresetTestFP(AihwkitTestCase):
+    """Test for FP preset."""
+
+    def test_tile_preset(self):
+        """Test fwd behavior of FP preset."""
+        out_size = 2
+        in_size = 3
+        weights = randn(out_size, in_size)
+        inp = randn(in_size)
+        fp_out = inp @ weights.T
+
+        rpu_config = FloatingPointPreset()
+        analog_tile = AnalogTile(out_size, in_size, rpu_config, bias=False)
+        analog_tile.set_weights(weights)
+        tile_out = analog_tile(inp)
+        self.assertTensorAlmostEqual(fp_out, tile_out)
