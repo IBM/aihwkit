@@ -1,12 +1,6 @@
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 notifications:
   email: false
@@ -94,11 +88,11 @@ jobs:
     if: branch =~ /^release\/.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.0.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==2.0.1 torchvision && pip install -r requirements.txt"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.4.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==2.4.1 torchvision && pip install -r requirements.txt"
       - CIBW_MANYLINUX_X86_64_IMAGE="aihwkit/manylinux2014_x86_64_aihwkit"
       - CIBW_REPAIR_WHEEL_COMMAND="auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
-      - CIBW_BUILD="cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
+      - CIBW_BUILD="cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64"
     before_install:
       - docker pull aihwkit/manylinux2014_x86_64_aihwkit
     install:
@@ -139,9 +133,9 @@ jobs:
     if: branch =~ /^release\/win.*$/
     env:
       # Use a specific torch version.
-      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.0.1'"
-      - CIBW_BEFORE_BUILD="pip install torch==2.0.1 && pip install -r requirements.txt"
-      - CIBW_BUILD="cp37-win_amd64 cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
+      - CIBW_ENVIRONMENT="TORCH_VERSION_SPECIFIER='==2.4.1'"
+      - CIBW_BEFORE_BUILD="pip install torch==2.4.1 && pip install -r requirements.txt"
+      - CIBW_BUILD="cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
       # Use unzipped OpenBLAS.
       - OPENBLAS_ROOT=C:\\BLAS
       - OPENBLAS_ROOT_DIR=C:\\BLAS
