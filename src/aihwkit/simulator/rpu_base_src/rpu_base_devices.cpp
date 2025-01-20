@@ -716,7 +716,6 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
       .def(py::init<>())
       .def_readwrite("write_noise_std", &JARTv1bParam::real_write_noise_std)
       .def_readwrite("alpha0", &JARTv1bParam::alpha0)
-      .def_readwrite("alpha1", &JARTv1bParam::alpha1)
       .def_readwrite("alpha2", &JARTv1bParam::alpha2)
       .def_readwrite("alpha3", &JARTv1bParam::alpha3)
       .def_readwrite("beta0", &JARTv1bParam::beta0)

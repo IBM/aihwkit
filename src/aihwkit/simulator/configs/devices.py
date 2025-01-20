@@ -1372,13 +1372,13 @@ class JARTv1bDevice(PulsedDevice):
     alpha3: float = 0.34567
     """See ``alpha0``."""
 
-    alpha1 = alpha0*exp(-alpha2/alpha3)
-    r"""See ``alpha0``.
-    This parameter should not be specified, and will be calculated as:
+    # alpha1 = alpha0*exp(-alpha2/alpha3)
+    # r"""See ``alpha0``.
+    # This parameter should not be specified, and will be calculated as:
     
-    .. math::
-        \alpha_{1} = \alpha_{0} * e^{left(-\frac{\alpha{2}}{\alpha{3}}\right)
-    """
+    # .. math::
+    #     \alpha_{1} = \alpha_{0} * e^{left(-\frac{\alpha{2}}{\alpha{3}}\right)
+    # """
 
     beta0: float = 7.0526e-4
     """See ``alpha0``."""
