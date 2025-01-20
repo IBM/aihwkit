@@ -4,13 +4,7 @@
 
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """aihwkit example 31: Using half precision training.
 
@@ -24,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import datasets, transforms
-from aihwkit.simulator.configs import InferenceRPUConfig, TorchInferenceRPUConfig
+from aihwkit.simulator.configs import TorchInferenceRPUConfig
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.parameters.enums import RPUDataType
@@ -61,6 +55,7 @@ class Net(nn.Module):
 if __name__ == "__main__":
     model = Net()
     rpu_config = TorchInferenceRPUConfig()
+    rpu_config.runtime.data_type = RPUDataType.HALF
     model = convert_to_analog(model, rpu_config)
     nll_loss = torch.nn.NLLLoss()
     transform = transforms.Compose(
