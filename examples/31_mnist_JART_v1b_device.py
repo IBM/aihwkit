@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example 3: MNIST training.
+"""aihwkit example 31: MNIST training with JART v1b device.
 
 MNIST training example based on the paper:
 https://www.frontiersin.org/articles/10.3389/fnins.2016.00333/full
@@ -28,47 +28,68 @@ from torch import nn
 from torch.optim.lr_scheduler import StepLR
 from torchvision import datasets, transforms
 
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--config", help="YAML Configuration File")
-args = parser.parse_args()
+# Imports from aihwkit.
+from aihwkit.nn import AnalogLinear, AnalogSequential
+from aihwkit.optim import AnalogSGD
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.devices import JARTv1bDevice
 
-if args.config:
-    config_file = args.config
-else:
-    config_file = "noise_free.yml"
+USE_0_initialization = True
+USE_bias = True
+Repeat_Times = 1
+epochs = 30
+batch_size = 32
+learning_rate = 0.05
 
-split = config_file.split(".")
-if len(split) == 2:
-    job_type = split[0]
-else:
-    job_type = config_file
+scheduler_step_size = 10
+scheduler_gamma: 0.5
 
-import yaml
-stream = open(config_file, "r")
-config_dictionary = yaml.safe_load(stream)
+JART_rpu_config = SingleRPUConfig(device=JARTv1bDevice(w_max=1.5,
+                                                    w_min=-1.5,
 
-project_name = config_dictionary["project_name"]
-CUDA_Enabled = config_dictionary["USE_CUDA"]
-USE_wandb = config_dictionary["USE_wandb"]
-USE_0_initialization= config_dictionary["USE_0_initialization"]
-USE_bias= config_dictionary["USE_bias"]
-del config_dictionary["USE_0_initialization"]
-del config_dictionary["project_name"]
-del config_dictionary["USE_wandb"]
-del config_dictionary["pulse_related"]
-del config_dictionary["noise"]
-del config_dictionary["w_max"]
-del config_dictionary["w_min"]
+                                                    read_voltage=0.2,  # V
+                                                    pulse_voltage_SET=-0.342,  # V
+                                                    pulse_voltage_RESET=0.7065,  # V
+                                                    pulse_length=1.0e-6,  # s
+                                                    base_time_step=1.0e-8,  # s
 
-if USE_wandb:
-    import wandb
+                                                    enable_w_max_w_min_bounds=True,
+                                                    w_max_dtod=1.0,
+                                                    w_max_dtod_upper_bound=1.65,
+                                                    w_max_dtod_lower_bound=1.35,
+                                                    w_min_dtod=0.1,
+                                                    w_min_dtod_upper_bound=-1.35,
+                                                    w_min_dtod_lower_bound=-1.65,
 
-if "Repeat_Times" in config_dictionary:
-    Repeat_Times = config_dictionary["Repeat_Times"]
-    del config_dictionary["Repeat_Times"]
-else:
-    Repeat_Times = 1
+                                                    Ndiscmax_dtod=1.0,
+                                                    Ndiscmax_dtod_upper_bound=22,
+                                                    Ndiscmax_dtod_lower_bound=18,
+                                                    Ndiscmax_std=0.1,
+                                                    Ndiscmax_ctoc_upper_bound=0.1,
+                                                    Ndiscmax_ctoc_lower_bound=-0.1,
+
+                                                    Ndiscmin_dtod=1.0,
+                                                    Ndiscmin_dtod_upper_bound=0.016,
+                                                    Ndiscmin_dtod_lower_bound=0.004,
+                                                    Ndiscmin_std=0.9,
+                                                    Ndiscmin_ctoc_upper_bound=0.9,
+                                                    Ndiscmin_ctoc_lower_bound=-0.9,
+
+                                                    ldisc_dtod=1.0,
+                                                    ldisc_dtod_upper_bound=0.44e-9,
+                                                    ldisc_dtod_lower_bound=0.36e-9,
+                                                    ldisc_std=0.01,
+                                                    ldisc_std_slope=0.1,
+                                                    ldisc_ctoc_upper_bound=0.1,
+                                                    ldisc_ctoc_lower_bound=-0.1,
+
+                                                    rdisc_dtod=1.0,
+                                                    rdisc_dtod_upper_bound=49.5e-9,
+                                                    rdisc_dtod_lower_bound=40.5e-9,
+                                                    rdisc_std=0.01,
+                                                    rdisc_std_slope=0.1,
+                                                    rdisc_ctoc_upper_bound=0.1,
+                                                    rdisc_ctoc_lower_bound=-0.1))
 
 # Network definition.
 INPUT_SIZE = 784
@@ -76,11 +97,11 @@ HIDDEN_SIZES = [256, 128]
 OUTPUT_SIZE = 10
 
 # Check device
-USE_CUDA = 0
-DEVICE = torch.device('cuda:3' if USE_CUDA else 'cpu')
+DEVICE = torch.device('cpu')
 
 # Path where the datasets will be stored.
 PATH_DATASET = os.path.join('data', 'DATASET')
+
 def load_images():
     """Load images for train from the torchvision datasets."""
     transform = transforms.Compose([transforms.ToTensor()])
@@ -91,9 +112,9 @@ def load_images():
     val_set = datasets.MNIST(PATH_DATASET,
                              download=True, train=False, transform=transform)
     train_data = torch.utils.data.DataLoader(
-        train_set, batch_size=config_dictionary["batch_size"], shuffle=True)
+        train_set, batch_size=batch_size, shuffle=True)
     validation_data = torch.utils.data.DataLoader(
-        val_set, batch_size=config_dictionary["batch_size"], shuffle=True)
+        val_set, batch_size=batch_size, shuffle=True)
 
     return train_data, validation_data
 
@@ -109,12 +130,14 @@ def create_analog_network(input_size, hidden_sizes, output_size):
     Returns:
         nn.Module: created analog model
     """
-    model = nn.Sequential(
-        nn.Linear(input_size, hidden_sizes[0], USE_bias),
+    
+    rpu_config = JART_rpu_config
+    model = AnalogSequential(
+        AnalogLinear(input_size, hidden_sizes[0], USE_bias, rpu_config),
         nn.Sigmoid(),
-        nn.Linear(hidden_sizes[0], hidden_sizes[1], USE_bias),
+        AnalogLinear(hidden_sizes[0], hidden_sizes[1], USE_bias, rpu_config),
         nn.Sigmoid(),
-        nn.Linear(hidden_sizes[1], output_size, USE_bias),
+        AnalogLinear(hidden_sizes[1], output_size, USE_bias, rpu_config),
         nn.LogSoftmax(dim=1)
     )
 
@@ -126,9 +149,6 @@ def create_analog_network(input_size, hidden_sizes, output_size):
                     layer.set_weights(torch.zeros_like(weights), torch.zeros_like(bias))
                 else:
                     layer.set_weights(torch.zeros_like(weights))
-                
-    if USE_CUDA:
-        model.cuda()
 
     print(model)
     return model
@@ -142,7 +162,8 @@ def create_sgd_optimizer(model):
     Returns:
         nn.Module: optimizer
     """
-    optimizer = torch.optim.SGD(model.parameters(), lr=config_dictionary["learning_rate"])
+    optimizer = AnalogSGD(model.parameters(), lr=learning_rate)
+    optimizer.regroup_param_groups(model)
 
     return optimizer
 
@@ -156,9 +177,9 @@ def train(model, train_set):
     """
     classifier = nn.NLLLoss()
     optimizer = create_sgd_optimizer(model)
-    scheduler = StepLR(optimizer, step_size=config_dictionary["scheduler"]["step_size"], gamma=config_dictionary["scheduler"]["gamma"])
+    scheduler = StepLR(optimizer, step_size=scheduler_step_size, gamma=scheduler_gamma)
 
-    for epoch_number in range(config_dictionary["epochs"]):
+    for epoch_number in range(epochs):
         total_loss = 0
         for images, labels in train_set:
             images = images.to(DEVICE)
@@ -180,8 +201,6 @@ def train(model, train_set):
             total_loss += loss.item()
 
         training_loss = total_loss / len(train_set)
-        if USE_wandb:
-            wandb.log({"loss": training_loss, "epoch": epoch_number})
         print('Epoch {} - Training loss: {:.16f}'.format(epoch_number, training_loss))
 
         # Decay learning rate if needed.
@@ -214,8 +233,6 @@ def test_evaluation(model, val_set):
         predicted_ok += (predicted == labels).sum().item()
 
     Accuracy = predicted_ok/total_images
-    if USE_wandb:
-        wandb.log({"Model Accuracy": Accuracy})
     print('\nNumber Of Images Tested = {}'.format(total_images))
     print('Model Accuracy = {}'.format(Accuracy))
 
@@ -225,9 +242,6 @@ def main():
     # Load datasets.
 
     for repeat in range(Repeat_Times):
-        if USE_wandb:
-            wandb.init(project=project_name, group="Fully Connected MNIST", job_type="Floating Point Baseline")
-            wandb.config.update(config_dictionary)
         train_dataset, validation_dataset = load_images()
 
         # Prepare the model.
@@ -238,9 +252,6 @@ def main():
 
         # Evaluate the trained model.
         test_evaluation(model, validation_dataset)
-
-        if USE_wandb:
-            wandb.finish()
 
 
 if __name__ == '__main__':
