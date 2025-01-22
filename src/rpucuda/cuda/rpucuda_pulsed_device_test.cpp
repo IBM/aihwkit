@@ -9,6 +9,7 @@
 #include "io_manager.h"
 #include "rng.h"
 #include "rpu_pulsed.h"
+#include "rpucuda_JART_v1b_device.h"
 #include "rpucuda_constantstep_device.h"
 #include "rpucuda_expstep_device.h"
 #include "rpucuda_hidden_device.h"
@@ -243,6 +244,7 @@ typedef ::testing::Types<
     PowStepRPUDeviceMetaParameter<num_t>,
     ConstantStepRPUDeviceMetaParameter<num_t>,
     PiecewiseStepRPUDeviceMetaParameter<num_t>,
+    JARTv1bRPUDeviceMetaParameter<num_t>,
     SoftBoundsReferenceRPUDeviceMetaParameter<num_t>>
 
     MetaPar;
