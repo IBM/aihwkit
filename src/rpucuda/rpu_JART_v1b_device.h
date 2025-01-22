@@ -263,7 +263,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
 
 
 template <typename T> class JARTv1bRPUDevice : public PulsedRPUDevice<T> {
-
+public:
   explicit JARTv1bRPUDevice(){};				
   explicit JARTv1bRPUDevice(int x_size, int d_size) : PulsedRPUDevice<T>(x_size, d_size) {
     initialize();                                                                         
