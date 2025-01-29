@@ -19,6 +19,7 @@ from torch.autograd import no_grad
 
 from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
 
+
 class BaseDriftCompensation:
     """Base class for drift compensations."""
 
