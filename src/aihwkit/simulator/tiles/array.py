@@ -2,13 +2,7 @@
 
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Implements analog tile module array ."""
 from typing import Any, Optional, Tuple, List, TYPE_CHECKING
@@ -154,7 +148,7 @@ class TileModuleArray(Module, TileModuleBase):
         # pylint: disable=arguments-differ,arguments-renamed
 
         if self.analog_tile_count == 1:
-            analog_tile = self.array[0][0]
+            analog_tile = self.array[0][0]  # pylint: disable=unsubscriptable-object
             result = analog_tile(x_input)
         else:
             # mapped version
