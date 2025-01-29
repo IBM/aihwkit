@@ -57,7 +57,7 @@ class GlobalDriftCompensationWithExactReference(GlobalDriftCompensation):
         Returns:
             reference tensor readout
         """
-        forward_output = tile._forward_drift_readout_tensor(True, is_perfect=True)
+        forward_output = tile._forward_drift_readout_tensor(True, exact_reference=True)
         ref_value = self.readout(forward_output)
 
         return ref_value

@@ -32,7 +32,7 @@ class BaseDriftCompensation:
         Returns:
             reference tensor readout
         """
-        forward_output = tile._forward_drift_readout_tensor(True, is_perfect=False)
+        forward_output = tile._forward_drift_readout_tensor(True, exact_reference=False)
         ref_value = self.readout(forward_output)
 
         return ref_value

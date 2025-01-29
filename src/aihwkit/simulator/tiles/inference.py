@@ -103,12 +103,13 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
     @no_grad()
     def _forward_drift_readout_tensor(
-        self, reset_if: bool = False, is_perfect: bool = False
+        self, reset_if: bool = False, exact_reference: bool = False
     ) -> Optional[Tensor]:
         """Perform a forward pass using the drift read-out tensor.
 
         Args:
             reset_if: Will reset the readout tensor, otherwise use the stored one
+            exact_reference: Whether or not to compute the reference using an "ideal" forward pass.
 
         Returns:
             Readout tensor if drift compensation is on
@@ -136,24 +137,24 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
         # We need to take the bias as a common column here, also we do
         # not want to use indexed.
-        if is_perfect:
-            is_perfect_state = self.rpu_config.forward.is_perfect
-            tile_rpu_config = self.rpu_config
-            tile_rpu_config.forward.is_perfect = True
-            self.tile.set_config(tile_rpu_config)
+        if ideal_reference:
+            input_ = self.drift_readout_tensor
+            if self.in_trans:
+                input_ = input_.T
 
-        output = self.tile.forward(
-            self.drift_readout_tensor,
-            False,
-            self.in_trans,
-            self.out_trans,
-            True,
-            self.non_blocking,
-        )
+            output = (input_ @ self.reference_combined_weights.T)
+            if self.out_trans:
+                output = output.T
 
-        if is_perfect:
-            tile_rpu_config.forward.is_perfect = is_perfect_state
-            self.tile.set_config(tile_rpu_config)
+        else:
+            output = self.tile.forward(
+                self.drift_readout_tensor,
+                False,
+                self.in_trans,
+                self.out_trans,
+                True,
+                self.non_blocking,
+            )
 
         return output
 
