@@ -109,7 +109,7 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
     @no_grad()
     def _forward_drift_readout_tensor(
-        self, reset_if: bool = False, is_perfect=False
+        self, reset_if: bool = False, is_perfect: bool = False
     ) -> Optional[Tensor]:
         """Perform a forward pass using the drift read-out tensor.
 

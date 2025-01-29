@@ -12,6 +12,8 @@
 
 """Global drift compensation for inference."""
 
+from typing import Tuple
+
 from torch.autograd import no_grad
 from torch import abs as torch_abs
 from torch import clamp, Tensor, eye
