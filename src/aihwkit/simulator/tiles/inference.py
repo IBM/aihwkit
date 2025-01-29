@@ -137,7 +137,7 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
         # We need to take the bias as a common column here, also we do
         # not want to use indexed.
-        if ideal_reference:
+        if exact_reference:
             input_ = self.drift_readout_tensor
             if self.in_trans:
                 input_ = input_.T
