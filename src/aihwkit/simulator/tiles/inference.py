@@ -126,15 +126,20 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
         # We need to take the bias as a common column here, also we do
         # not want to use indexed.
-        is_perfect_state = self.rpu_config.forward.is_perfect
-        tile_rpu_config = self.rpu_config
-        tile_rpu_config.forward.is_perfect = True
-        self.tile.set_config(tile_rpu_config)
+        if is_perfect:
+            is_perfect_state = self.rpu_config.forward.is_perfect
+            tile_rpu_config = self.rpu_config
+            tile_rpu_config.forward.is_perfect = True
+            self.tile.set_config(tile_rpu_config)
+
         output = self.tile.forward(
             self.drift_readout_tensor, False, self.in_trans, self.out_trans, True, self.non_blocking
         )
-        tile_rpu_config.forward.is_perfect = is_perfect_state
-        self.tile.set_config(tile_rpu_config)
+
+        if is_perfect:
+            tile_rpu_config.forward.is_perfect = is_perfect_state
+            self.tile.set_config(tile_rpu_config)
+
         return output
 
     @no_grad()
@@ -191,8 +196,7 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             hasattr(self.rpu_config, "drift_compensation")
             and self.rpu_config.drift_compensation is not None
         ):
-            forward_output = self._forward_drift_readout_tensor(True, is_perfect=True)
-            self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(forward_output)
+            self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(self)
 
     @no_grad()
     def drift_weights(self, t_inference: float = 0.0) -> None:
