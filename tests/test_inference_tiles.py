@@ -2,23 +2,17 @@
 
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# This code is licensed under the Apache License, Version 2.0. You may
-# obtain a copy of this license in the LICENSE.txt file in the root directory
-# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
-#
-# Any modifications or derivative works of this code must retain this
-# copyright notice, and modified files need to carry a notice indicating
-# that they have been altered from the originals.
+# Licensed under the MIT license. See LICENSE file in the project root for details.
 
 # pylint: disable=raise-missing-from
 
 """Tests for inference tiles."""
 
-from typing import Optional, List
+from typing import Optional, List, Type
 from unittest import SkipTest
 
 from parameterized import parameterized
-from torch import ones
+from torch import ones, randn
 from torch import Tensor
 from torch.nn.functional import mse_loss
 from torch.optim import SGD
@@ -36,6 +30,17 @@ from aihwkit.simulator.parameters import (
 from aihwkit.inference import PCMLikeNoiseModel
 from aihwkit.exceptions import TorchTileConfigError
 
+
+from aihwkit.inference import (
+    BaseConductanceConverter,
+    SinglePairConductanceConverter,
+    DualPairConductanceConverter,
+    NPairConductanceConverter,
+    CustomPairConductanceConverter,
+)
+
+from aihwkit.inference.converter.wpo import WeightProgrammingOptimizer
+
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
 from .helpers.tiles import (
@@ -46,6 +51,8 @@ from .helpers.tiles import (
     TorchInferenceIRDropT,
     TorchInferenceIRDropTCuda,
 )
+
+g_min, g_max = 0., 25.
 
 
 @parametrize_over_tiles(
@@ -261,6 +268,73 @@ class InferenceTileTest(ParametrizedTestCase):
             self.assertTensorAlmostEqual(tile_biases, biases)
         scales = analog_tile.get_mapping_scales()
         self.assertTensorAlmostEqual(scales, expected_scales)
+
+    @parameterized.expand(
+        [
+            ("single_pair", SinglePairConductanceConverter(g_min=g_min,
+                                                           g_max=g_max),),
+            ("dual_pair", DualPairConductanceConverter(f_lst=[1.0, 1.0],
+                                                       g_min=g_min,
+                                                       g_max=g_max),),
+            ("n_pair", NPairConductanceConverter(f_lst=[1.0, 1.0, 1.0],
+                                                 g_min=g_min,
+                                                 g_max=g_max),),
+            ("custom_pair", CustomPairConductanceConverter(f_lst=[1.0],
+                                                           g_lst=[[g_min,
+                                                                   g_min,
+                                                                   g_min,
+                                                                   (g_max - g_min) / 2 + g_min,
+                                                                   g_max],
+                                                                  [g_max,
+                                                                   (g_max - g_min) / 2 + g_min,
+                                                                   g_min,
+                                                                   g_min,
+                                                                   g_min]],
+                                                           g_min=g_min,
+                                                           g_max=g_max,
+                                                           invertibility_test=False),)
+        ]
+    )
+    def test_weight_programming_optimization(self, _, g_converter: Type[BaseConductanceConverter]):
+        """Tests weight programming optimization using each inference tile"""
+
+        # optimization time steps
+        time_steps = [1.0]
+
+        # dummy weights
+        weights = randn(16, 16)
+
+        # get f_lst from g_converter if exists
+        f_lst = g_converter.f_lst if hasattr(g_converter, 'f_lst') else [1.0]
+
+        # whether to optimize f_lst
+        optimize_f_lst = True
+
+        # keep or optimize f_lst params
+        f_lst = [1.0] + [None] * (len(f_lst) - 1) if optimize_f_lst else f_lst
+
+        wpo = WeightProgrammingOptimizer(weights,
+                                         f_lst,
+                                         self.get_rpu_config(),
+                                         time_steps,
+                                         g_converter,
+                                         nbins=2,                       # speed up test
+                                         popsize=1,                     # speed up test
+                                         maxiter=1,                     # speed up test
+                                         baseline_iterations=1,         # speed up test
+                                         loss_margin=-1e9,              # speed up test
+                                         polish=False,                  # speed up test
+                                         disp=False,                    # suppress updates
+                                         callback=None,                 # suppress updates
+                                         )
+        g_converter_optimized, success = wpo.run_optimizer()
+
+        self.assertTrue(success)
+        self.assertIsInstance(g_converter_optimized, CustomPairConductanceConverter)
+        self.assertEqual(len(f_lst), len(g_converter_optimized.f_lst))
+        self.assertEqual(g_min, g_converter_optimized.g_min)
+        self.assertEqual(g_max, g_converter_optimized.g_max)
+        self.assertEqual(len(g_converter_optimized.g_lst), 2 * len(f_lst))
 
     @parameterized.expand(
         [
