@@ -296,8 +296,8 @@ class InferenceTileTest(ParametrizedTestCase):
         ]
     )
     def test_weight_programming_optimization(self, _, g_converter: Type[BaseConductanceConverter]):
-        self.skipTest("Skipping test: test_weight_programming_optimization")
         """Tests weight programming optimization using each inference tile"""
+        self.skipTest("Skipping test: test_weight_programming_optimization")
 
         # optimization time steps
         time_steps = [1.0]
