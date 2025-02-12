@@ -196,7 +196,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
             save(model.state_dict(), file)
             # Create a new model and load its state dict.
             file.seek(0)
-            checkpoint = load(file)
+            checkpoint = load(file, weights_only=False)
         model.load_state_dict(checkpoint)
 
         expected_device = device("cuda", current_device())

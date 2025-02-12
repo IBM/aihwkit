@@ -572,7 +572,9 @@ def test_low_prec_training(dtype: torch_dtype, device_type: device, use_autocast
     data, target = get_data_and_labels()
     data = data.to(device=device_type, dtype=dtype)
     target = target.to(device=device_type)
-    if use_autocast:
+    
+    # Modify: For CPU with unsupported dtype (e.g. torch.float32), skip autocast to avoid warning.
+    if use_autocast and not (device_type.type == "cpu" and dtype == float32):
         # Runs the forward pass with autocasting.
         with autocast(device_type=str(device_type), dtype=dtype):
             output: Tensor
