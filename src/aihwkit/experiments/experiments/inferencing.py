@@ -187,7 +187,7 @@ class BasicInferencing(Experiment):
 
             # print('template_path: ', template_path)
             if path.exists(template_path):
-                state_dict = load(template_path, map_location=device)
+                state_dict = load(template_path, map_location=device, weights_only=False)
                 state_dict, _ = convert_legacy_checkpoint(state_dict, model)
                 model.load_state_dict(state_dict, load_rpu_config=False)
             else:
