@@ -206,7 +206,7 @@ class MappedLayerLinearTest(ParametrizedTestCase):
             new_model = self.get_mapped_model(model, rpu_config)
             if self.use_cuda:
                 new_model = new_model.cuda()
-            new_model.load_state_dict(load(file))
+            new_model.load_state_dict(load(file, weights_only=False))
 
         new_weight, new_bias = new_model.get_weights()
 
