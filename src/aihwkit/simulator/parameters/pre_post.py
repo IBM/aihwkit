@@ -130,12 +130,54 @@ class InputRangeParameter(_PrintableMixin):
 
 
 @dataclass
+class PeripheryQuantizationParameter(_PrintableMixin):
+    """
+    Defines parameters used for the quantization of the periphery operations
+    in the `QuantizedTorchInferenceTile`. These parameters will be applied both
+    to the affine scales (e.g., per-column weight scaling) but also on the
+    bias that is added, whether that happens at the tile level or at the
+    array level (see `QuantizedTileModuleArray`).
+    """
+
+    n_bits: int = 0
+    """The number of bits for the quantization of the periphery operations.
+    If <= 0 is selected, no quantization will be applied. By default 0 (no quantization).
+    """
+
+    symmetric: bool = True
+    """If True, the quantization in the periphery will be symmetrical.
+    If False, asymmetric quantization will be used. This option is valid
+    only if `n_bits` > 0."""
+
+    learn_quant_params: bool = False
+    """If True, the quantization scale (and offset if asymmetrical) will be 
+    learned during training (or was learned, if loading a checkpoint). If False, 
+    the scales will be estimated during training or used as trained. By default False."""
+
+    init_learning_after: int = 100
+    """If `learn_quant_params` is True, the quantization parameters will
+    be estimated (minmax) up to `init_learning_after` batches before switching
+    to being learnt. Has to be atleast 1 to initialize the params, by default 100."""
+
+
+@dataclass
 class PrePostProcessingParameter(_PrintableMixin):
     """Parameter related to digital input and output processing, such as input clip
     learning.
     """
 
     input_range: InputRangeParameter = field(default_factory=InputRangeParameter)
+
+
+@dataclass
+class PrePostProcessingParameterQuant(PrePostProcessingParameter):
+    """Parameter related to digital input and output processing, such as input clip
+    learning and periphery quantization.
+    """
+
+    periph_quant: PeripheryQuantizationParameter = field(
+        default_factory=PeripheryQuantizationParameter
+    )
 
 
 @dataclass

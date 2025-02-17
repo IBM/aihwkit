@@ -36,6 +36,7 @@ from aihwkit.simulator.configs import (
     InferenceRPUConfig,
     TorchInferenceRPUConfig,
     TorchInferenceRPUConfigIRDropT,
+    QuantizedTorchInferenceRPUConfig,
     SingleRPUConfig,
     UnitCellRPUConfig,
     DigitalRankUpdateRPUConfig,
@@ -450,6 +451,23 @@ class TorchInference:
 
     def get_rpu_config(self):
         rpu_config = TorchInferenceRPUConfig()
+        rpu_config.forward.is_perfect = True
+        return rpu_config
+
+    def get_tile(self, out_size, in_size, rpu_config=None, **kwargs):
+        rpu_config = rpu_config or self.get_rpu_config()
+        return rpu_config.tile_class(out_size, in_size, rpu_config, **kwargs)
+
+
+class QuantizedTorchInference:
+    """QuantizedTorchInference tile (perfect forward)."""
+
+    simulator_tile_class = TorchSimulatorTile
+    first_hidden_field = None
+    use_cuda = False
+
+    def get_rpu_config(self):
+        rpu_config = QuantizedTorchInferenceRPUConfig()
         rpu_config.forward.is_perfect = True
         return rpu_config
 

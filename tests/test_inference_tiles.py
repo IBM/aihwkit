@@ -50,9 +50,10 @@ from .helpers.tiles import (
     TorchInferenceCuda,
     TorchInferenceIRDropT,
     TorchInferenceIRDropTCuda,
+    QuantizedTorchInference,
 )
 
-g_min, g_max = 0., 25.
+g_min, g_max = 0.0, 25.0
 
 
 @parametrize_over_tiles(
@@ -60,6 +61,7 @@ g_min, g_max = 0., 25.
         Inference,
         InferenceCuda,
         TorchInference,
+        QuantizedTorchInference,
         TorchInferenceCuda,
         TorchInferenceIRDropT,
         TorchInferenceIRDropTCuda,

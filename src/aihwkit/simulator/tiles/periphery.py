@@ -38,6 +38,9 @@ from aihwkit.simulator.tiles.base import BaseTile, SimulatorTileWrapper, Simulat
 
 from aihwkit.simulator.parameters.mapping import MappingParameter
 from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU, InputRangeParameter
+from aihwkit.simulator.digital_low_precision.base_quantized_classes import QuantizationManager
+from aihwkit.simulator.digital_low_precision.quantizers import QMethods
+from aihwkit.simulator.digital_low_precision.range_estimators import RangeEstimators
 
 
 class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
@@ -75,6 +78,9 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         self.mapping_scales = None  # type: Tensor
         self.mapping_lr_scale = 1.0
         self.input_range = None  # type: Parameter
+        # Quantizers if the tile module is of type `QuantizedTorchInferenceTile`
+        self.scale_quantizer = None  # type: Optional[QuantizationManager]
+        self.bias_quantizer = None  # type: Optional[QuantizationManager]
 
         self.image_sizes = []  # type: List[int]
 
@@ -94,6 +100,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         self.init_learned_out_scales()
         self.init_mapping_scales()
         self.init_input_processing()
+        self.init_periph_quant_processing()
 
         if isinstance(self, Module):
             mapping_scales = self.__dict__.pop("mapping_scales")
@@ -591,6 +598,56 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             return True
         return False
 
+    def init_periph_quant_processing(self) -> None:
+        """Initializes the quantizers and parameters for the affine scale and bias
+        quantization for the `QuantizedTorchInferenceTile`, as defined in the
+        `PeripheryQuantizationParameter` field in the `QuantizedTorchInferenceRPUConfig`.
+        """
+        if not hasattr(self.rpu_config.pre_post, "periph_quant"):
+            # Exit for all tiles that don't have the PeripheryQuantizationParameter
+            return
+        periph_quant = self.rpu_config.pre_post.periph_quant
+        assert isinstance(periph_quant.n_bits, int), "Number of bits must be an integer number"
+        if periph_quant.n_bits <= 0:
+            # Don't define quantizers if quantization is not to be applied
+            self.scale_quantizer = None
+            self.bias_quantizer = None
+            return
+
+        if periph_quant.learn_quant_params:
+            assert (
+                isinstance(periph_quant.init_learning_after, int)
+                and periph_quant.init_learning_after >= 1
+            ), "The `init_learning_after` parameter has to be an integer larger or equal to 1."
+
+        # Initialize the quantizer to quantize the affine scales
+        quant_method = (
+            QMethods.symmetric_uniform if periph_quant.symmetric else QMethods.asymmetric_uniform
+        )
+        self.scale_quantizer = QuantizationManager(
+            qmethod=quant_method,
+            qparams={"n_bits": periph_quant.n_bits},
+            init=RangeEstimators.current_minmax,
+        )
+        if periph_quant.learn_quant_params:
+            self.scale_quant_update_idx = Parameter(
+                full((1,), 0.0, device=self.device), requires_grad=False
+            )
+
+        if self.digital_bias:
+            # Initialize the quantizer to quantize the bias
+            self.bias_quantizer = QuantizationManager(
+                qmethod=quant_method,
+                qparams={"n_bits": periph_quant.n_bits},
+                init=RangeEstimators.current_minmax,
+            )
+            if periph_quant.learn_quant_params:
+                self.bias_quant_update_idx = Parameter(
+                    full((1,), 0.0, device=self.device), requires_grad=False
+                )
+        else:
+            self.bias_quantizer = None
+
     @no_grad()
     def set_input_range(self, value: Union[Tensor, float]) -> None:
         """Sets the input range.
@@ -806,6 +863,12 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             grad_zero_msk = logical_or(x_output >= bound, x_output <= -bound)
             ctx.saved_analog_tensors.append(grad_zero_msk)
 
+        # Only applies to QuantizedTorchInferenceTile, as it applies the
+        # scales differently than the rest of the tiles.
+        if hasattr(self.rpu_config.pre_post, "periph_quant"):
+            x_output = self.apply_quant_periphery_scales(x_output, dim, is_test=is_test)
+            return x_output
+
         scale = None
         if self.input_range is not None:
             scale = self.input_range
@@ -820,6 +883,134 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         if scale is not None:
             return x_output * scale
         return x_output
+
+    def apply_quant_periphery_scales(
+        self, x_output: Tensor, dim: int, is_test: bool = False
+    ) -> Tensor:
+        """An extension of the post_forward call to apply the periphery scales for a
+        tile with quantized periphery. The scales are all merged, quantized, and then
+        applied to the output of the tile. Additionally, the trainable output scales
+        are moved in this context.
+
+        Parameters
+        ----------
+        x_output : Tensor
+            tensor that is the output from the forward pass of the tile
+        dim : int
+            output channel dimension, ie the d_size dimension
+        is_test : bool, optional
+            whether in eval mode, by default False
+
+        Returns
+        -------
+        Tensor
+            The scaled version of x_output
+        """
+        tensor_view = self.get_tensor_view(x_output.dim(), dim)
+
+        scale = None
+        if self.input_range is not None:
+            scale = self.input_range
+
+        if self.mapping_scales is not None:
+            if scale is not None:
+                scale = scale * self.get_mapping_scales().view(tensor_view)
+            else:
+                scale = self.get_mapping_scales().view(tensor_view)
+
+        if self.out_scaling_alpha is not None:
+            if scale is not None:
+                scale = scale * self.out_scaling_alpha.view(tensor_view)
+            else:
+                scale = self.out_scaling_alpha.view(tensor_view)
+
+        if scale is None:
+            return x_output
+
+        if self.scale_quantizer is None:
+            # If there's no quantization apply the scale in FP and exit
+            return x_output * scale
+        else:
+            if not is_test:
+                # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
+                # selected. In the learn mode, the ranges are also estimated up to batch number
+                # `init_learning_after` and then switch to learned ranges.
+                if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
+                    self.scale_quantizer.estimate_ranges_train()  # estimate if no learned
+                elif (
+                    self.rpu_config.pre_post.periph_quant.learn_quant_params
+                    and not self.scale_quantizer.is_learning()
+                ):  # If it's to be learned but it's not learning yet
+                    self.scale_quant_update_idx.data += 1  # count up to the desired batch
+                    if (
+                        self.scale_quant_update_idx
+                        > self.rpu_config.pre_post.periph_quant.init_learning_after
+                    ):
+                        self.scale_quantizer.learn_ranges()  # Switch to learned
+                    else:
+                        self.scale_quantizer.estimate_ranges_train()  # Remain/switch to estimate ranges
+            elif is_test and not self.scale_quantizer.quantizer.is_initialized:
+                # In eval mode, if the ranges are NOT initialized, meaning they were not loaded
+                # from a checkpoint or trained/estimated before, they are estimated for a single
+                # batch and then get fixed.
+                self.scale_quantizer.estimate_ranges()
+                q_scale = self.scale_quantizer(scale)
+                self.scale_quantizer.fix_ranges()
+                return x_output * q_scale
+
+            return x_output * self.scale_quantizer(scale)
+
+    def add_quant_periphery_bias(
+        self, output: Tensor, tensor_view: Optional[Tuple], is_test: bool = False
+    ) -> Tensor:
+        """Adds the bias after quantizing it as defined in the PeripheryQuantizationParameter.
+
+        Parameters
+        ----------
+        output : Tensor
+            tensor that is the output from the forward pass of the tile
+        tensor_view : Optional[Tuple]
+            The tensor view of the output tensor (see `get_tensor_view` method)
+        is_test : bool, optional
+            whether in eval mode, by default False
+
+        Returns
+        -------
+        Tensor
+            The output of the tile added with the bias
+        """
+        if self.bias_quantizer is None:
+            return output + self.bias.view(*tensor_view)
+        else:
+            if not is_test:
+                # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
+                # selected. In the learn mode, the ranges are also estimated up to batch number
+                # `init_learning_after` and then switch to learned ranges.
+                if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
+                    self.bias_quantizer.estimate_ranges_train()  # estimate if no learned
+                elif (
+                    self.rpu_config.pre_post.periph_quant.learn_quant_params
+                    and not self.bias_quantizer.is_learning()
+                ):  # If it's to be learned but it's not learning yet
+                    self.bias_quant_update_idx.data += 1  # count up to the desired batch
+                    if (
+                        self.bias_quant_update_idx
+                        > self.rpu_config.pre_post.periph_quant.init_learning_after
+                    ):
+                        self.bias_quantizer.learn_ranges()  # Switch to learned
+                    else:
+                        self.bias_quantizer.estimate_ranges_train()  # Remain/switch to estimate ranges
+
+            elif is_test and not self.bias_quantizer.quantizer.is_initialized:
+                # In eval mode, if the ranges are NOT initialized, meaning they were not loaded
+                # from a checkpoint or trained/estimated before, they are estimated for a single
+                # batch and then get fixed.
+                self.bias_quantizer.estimate_ranges()
+                q_bias = self.bias_quantizer(self.bias)
+                self.bias_quantizer.fix_ranges()
+                return output + q_bias.view(*tensor_view)
+
+            return output + self.bias_quantizer(self.bias).view(*tensor_view)
 
     def joint_forward(self, x_input: Tensor, is_test: bool = False, ctx: Any = None) -> Tensor:
         """Perform the forward pass.

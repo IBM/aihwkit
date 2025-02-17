@@ -51,9 +51,16 @@ from .helpers.tiles import (
     TorchInferenceIRDropT,
     Custom,
     TorchTransfer,
+    QuantizedTorchInference,
 )
 
-SKIP_META_PARAM_TILES = [TorchInference, TorchInferenceIRDropT, Custom, FloatingPoint]
+SKIP_META_PARAM_TILES = [
+    TorchInference,
+    TorchInferenceIRDropT,
+    Custom,
+    FloatingPoint,
+    QuantizedTorchInference,
+]
 
 
 @parametrize_over_layers(
@@ -76,6 +83,7 @@ SKIP_META_PARAM_TILES = [TorchInference, TorchInferenceIRDropT, Custom, Floating
         TorchInferenceIRDropT,
         TorchTransfer,
         Custom,
+        QuantizedTorchInference,
     ],
     biases=["digital"],
 )
@@ -857,7 +865,7 @@ class SerializationTest(ParametrizedTestCase):
 
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
-    tiles=[FloatingPoint, Inference, TorchInference],
+    tiles=[FloatingPoint, Inference, TorchInference, QuantizedTorchInference],
     biases=["digital"],
 )
 class SerializationTestExtended(ParametrizedTestCase):
