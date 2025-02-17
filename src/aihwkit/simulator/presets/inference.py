@@ -10,7 +10,7 @@
 from typing import Optional
 from dataclasses import dataclass, field
 
-from aihwkit.simulator.configs.configs import InferenceRPUConfig
+from aihwkit.simulator.configs.configs import InferenceRPUConfig, TorchInferenceRPUConfig
 from aihwkit.simulator.parameters import (
     MappingParameter,
     IOParameters,
@@ -34,6 +34,28 @@ from aihwkit.simulator.presets.utils import PresetIOParameters
 
 
 # Inference
+@dataclass
+class FloatingPointPreset(TorchInferenceRPUConfig):
+    """Preset configuration for FP-like AIMC (Analog In-Mememory Compute)
+    accuracy evaluation/training.
+
+    This preset configuration does not inject any noise in any form (weight noise
+    quantization etc.) and is equivalent to the FP model.
+    """
+
+    mapping: MappingParameter = field(
+        default_factory=lambda: MappingParameter(max_input_size=0, max_output_size=0)
+    )
+
+    forward: IOParameters = field(default_factory=lambda: IOParameters(is_perfect=True))
+
+    pre_post: PrePostProcessingParameter = field(
+        default_factory=lambda: PrePostProcessingParameter(
+            input_range=InputRangeParameter(enable=False)
+        )
+    )
+
+
 @dataclass
 class StandardHWATrainingPreset(InferenceRPUConfig):
     """Preset configuration for AIMC (Analog In-Mememory Compute)

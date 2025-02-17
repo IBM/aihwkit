@@ -182,7 +182,7 @@ class SerializationTest(ParametrizedTestCase):
             # Create a new model and load its state dict.
             file.seek(0)
             new_model = self.get_layer()
-            new_model.load_state_dict(load(file))
+            new_model.load_state_dict(load(file, weights_only=False))
 
         # Compare the new model weights and biases. they should now be in sync
         (
@@ -227,7 +227,7 @@ class SerializationTest(ParametrizedTestCase):
             # Create a new model and load its state dict.
             file.seek(0)
             new_model = self.get_layer()
-            loaded = load(file)
+            loaded = load(file, weights_only=False)
             new_model.load_state_dict(loaded)
 
         # Compare the new model weights and biases. they should now be in sync
@@ -278,7 +278,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model.state_dict(), file)
             # Create a new model and load its state dict.
             file.seek(0)
-            model.load_state_dict(load(file))
+            model.load_state_dict(load(file, weights_only=False))
 
         # Compare the new model weights and biases. they should now be in sync
         (
@@ -322,7 +322,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Create a new model and load its state dict.
             file.seek(0)
-            new_model = load(file)
+            new_model = load(file, weights_only=False)
 
         # Compare the new model weights and biases. they should now be in sync
         (
@@ -365,7 +365,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Load the model.
             file.seek(0)
-            new_model = load(file)
+            new_model = load(file, weights_only=False)
 
         # Compare the new model weights and biases.
         (
@@ -419,7 +419,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Load the model.
             file.seek(0)
-            new_model = load(file, map_location=device(map_location))
+            new_model = load(file, map_location=device(map_location), weights_only=False)
 
         # Compare the new model weights and biases.
         (
@@ -469,7 +469,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Load the model.
             file.seek(0)
-            new_model = load(file)
+            new_model = load(file, weights_only=False)
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
@@ -493,7 +493,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Load the model.
             file.seek(0)
-            new_model = load(file)
+            new_model = load(file, weights_only=False)
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
@@ -516,7 +516,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Load the model.
             file.seek(0)
-            new_model = load(file)
+            new_model = load(file, weights_only=False)
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
@@ -541,7 +541,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Load the model.
             file.seek(0)
-            new_model = load(file)
+            new_model = load(file, weights_only=False)
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
@@ -563,7 +563,7 @@ class SerializationTest(ParametrizedTestCase):
             save(model, file)
             # Load the model.
             file.seek(0)
-            new_model = load(file)
+            new_model = load(file, weights_only=False)
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
@@ -618,7 +618,7 @@ class SerializationTest(ParametrizedTestCase):
             # Load the model.
             file.seek(0)
             new_model = self.get_layer()
-            new_model.load_state_dict(load(file))
+            new_model.load_state_dict(load(file, weights_only=False))
 
         # Assert over the new model tile parameters.
         new_analog_tile = self.get_analog_tile(new_model)
@@ -921,7 +921,7 @@ class SerializationTestExtended(ParametrizedTestCase):
             file.seek(0)
             model = self.get_torch_model(self.use_cuda)
             new_analog_model = convert_to_analog(model, self.get_rpu_config())
-            state_dict = load(file)
+            state_dict = load(file, weights_only=False)
             new_analog_model.load_state_dict(state_dict, load_rpu_config=True)
 
         new_state_dict = new_analog_model.state_dict()
