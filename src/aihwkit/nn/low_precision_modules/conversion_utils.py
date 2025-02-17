@@ -7,6 +7,7 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
+""" Utility funcitons for converting a module to its quantized counterpart """
 
 from copy import deepcopy
 from typing import Optional
@@ -50,8 +51,7 @@ def append_default_conversions(quantization_map: QuantizationMap) -> None:
         if module in quantization_map.module_qconfig_map:
             continue
         quantization_map.module_qconfig_map[module] = QuantizedModuleConfig(
-            quantized_module=q_module,
-            module_qconfig=deepcopy(quantization_map.default_qconfig),
+            quantized_module=q_module, module_qconfig=deepcopy(quantization_map.default_qconfig)
         )
 
 
@@ -70,6 +70,12 @@ def get_module_args(module: Module, activation: Optional[Module] = None) -> dict
     activation : Optional[Module], optional
         The activation function for the `QuantizationHijacker` if applicable,
         by default None
+
+    Raises
+    ------
+    ValueError
+        If the function has not been tought how to handle
+        a given module.
     """
 
     def get_linear_args(module):

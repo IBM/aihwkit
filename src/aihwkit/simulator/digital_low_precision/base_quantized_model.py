@@ -1,6 +1,8 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
+# pylint: skip-file
+
 from torch import nn
 
 from aihwkit.simulator.digital_low_precision.base_quantized_classes import (
@@ -18,6 +20,7 @@ class QuantizedModel(nn.Module):
     whole model into quantization or full precision or to freeze BN. Otherwise it does not add any
     further functionality, so it is not a necessity that a quantized model uses this class.
     """
+
     def quantized_weights(self):
         def _fn(layer):
             if isinstance(layer, QuantizedModule):
@@ -69,14 +72,14 @@ class QuantizedModel(nn.Module):
 
     def fix_act_ranges(self):
         def _fn(module):
-            if isinstance(module, QuantizedModule) and hasattr(module, 'activation_quantizer'):
+            if isinstance(module, QuantizedModule) and hasattr(module, "activation_quantizer"):
                 _set_layer_fix_ranges(module.activation_quantizer)
 
         self.apply(_fn)
 
     def fix_weight_ranges(self):
         def _fn(module):
-            if isinstance(module, QuantizedModule) and hasattr(module, 'weight_quantizer'):
+            if isinstance(module, QuantizedModule) and hasattr(module, "weight_quantizer"):
                 _set_layer_fix_ranges(module.weight_quantizer)
 
         self.apply(_fn)
@@ -86,7 +89,7 @@ class QuantizedModel(nn.Module):
 
     def estimate_act_ranges(self):
         def _fn(module):
-            if isinstance(module, QuantizedModule) and hasattr(module, 'activation_quantizer'):
+            if isinstance(module, QuantizedModule) and hasattr(module, "activation_quantizer"):
                 _set_layer_estimate_ranges(module.activation_quantizer)
 
         self.apply(_fn)
@@ -96,7 +99,7 @@ class QuantizedModel(nn.Module):
 
     def reset_act_ranges(self):
         def _fn(module):
-            if isinstance(module, QuantizedModule) and hasattr(module, 'activation_quantizer'):
+            if isinstance(module, QuantizedModule) and hasattr(module, "activation_quantizer"):
                 module.activation_quantizer.reset_ranges()
 
         self.apply(_fn)

@@ -7,6 +7,8 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
+""" Functions to manipulate the quantization state of a module """
+
 from torch.nn import Module
 
 from aihwkit.simulator.digital_low_precision.base_quantized_classes import (

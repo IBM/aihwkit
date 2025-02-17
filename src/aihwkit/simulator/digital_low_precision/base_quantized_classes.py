@@ -1,6 +1,8 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
+# pylint: skip-file
+
 from torch import nn
 
 from aihwkit.simulator.digital_low_precision.quantization_manager import QuantizationManager
@@ -54,7 +56,7 @@ class QuantizedModule(nn.Module):
         act_range_method=RangeEstimators.running_minmax,
         act_range_options=None,
         scale_domain="linear",
-        **kwargs
+        **kwargs,
     ):
         kwargs.pop("quant_dict", None)
         kwargs.pop("module_map", None)
@@ -136,13 +138,9 @@ class QuantizedModule(nn.Module):
         return super(QuantizedModule, self)._apply(*args, **kwargs)
 
     def extra_repr(self):
-        quant_state = "weight_quant={}, act_quant={}".format(
-            self._quant_w, self._quant_a
-        )
+        quant_state = "weight_quant={}, act_quant={}".format(self._quant_w, self._quant_a)
         parent_repr = super().extra_repr()
-        return (
-            "{},\n{}".format(parent_repr, quant_state) if parent_repr else quant_state
-        )
+        return "{},\n{}".format(parent_repr, quant_state) if parent_repr else quant_state
 
 
 class QuantizedActivation(QuantizedModule):

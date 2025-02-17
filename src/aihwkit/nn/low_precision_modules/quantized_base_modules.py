@@ -1,3 +1,14 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
+#
+# Licensed under the MIT license. See LICENSE file in the project root for details.
+
+# Copyright (c) 2021 Qualcomm Technologies, Inc.
+# All Rights Reserved.
+
+""" Basic quantized modules """
+
 from torch import nn
 from torch.nn import functional as F
 
@@ -7,7 +18,6 @@ from aihwkit.simulator.digital_low_precision.base_quantized_classes import (
 )
 from aihwkit.simulator.digital_low_precision.base_quantized_model import QuantizedModel
 from aihwkit.simulator.digital_low_precision.hijacker import QuantizationHijacker
-from aihwkit.simulator.digital_low_precision.quantization_manager import QuantizationManager
 
 
 class QuantLinear(QuantizationHijacker, nn.Linear):
@@ -38,49 +48,8 @@ class QuantConv2d(QuantizationHijacker, nn.Conv2d):
         )
 
 
-class QuantizedActivationWrapper(QuantizedActivation):
-    """
-    Wraps over a layer and quantized the activation.
-    It also allow for tying the input and output quantizer which is helpful
-    for layers such Average Pooling.
-    """
-
-    def __init__(
-        self,
-        layer,
-        tie_activation_quantizers=False,
-        input_quantizer: QuantizationManager = None,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.tie_activation_quantizers = tie_activation_quantizers
-        if input_quantizer:
-            assert isinstance(input_quantizer, QuantizationManager)
-            self.activation_quantizer = input_quantizer
-        self.layer = layer
-
-    def quantize_activations_no_range_update(self, x):
-        if self._quant_a:
-            return self.activation_quantizer.quantizer(x)
-        else:
-            return x
-
-    def forward(self, x):
-        x = self.layer(x)
-        if self.tie_activation_quantizers:
-            # The input activation quantizer is used to quantize the activation
-            # but without updating the quantization range
-            return self.quantize_activations_no_range_update(x)
-        else:
-            return self.quantize_activations(x)
-
-
 class QuantLayerNorm(QuantizationHijacker, nn.LayerNorm):
     """Quantized layer of torch.nn.LayerNorm with input and weight quantization"""
-
-    def __init__(self, *args, activation=None, **kwargs):
-        super().__init__(*args, activation=activation, **kwargs)
 
     def run_forward(self, x, weight, bias, offsets=None):
         return F.layer_norm(
@@ -126,6 +95,7 @@ class QuantBatchNorm2d(QuantizedModel):
         self.act_bn_quantizer = QuantizedActivation(**quant_params)
 
     def forward(self, x):
+        """Execute BatchNorm2d and then quantize its output"""
         y = self.module(x)
         y_quant = self.act_bn_quantizer(y)
         return y_quant

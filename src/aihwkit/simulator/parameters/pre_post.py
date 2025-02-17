@@ -150,8 +150,8 @@ class PeripheryQuantizationParameter(_PrintableMixin):
     only if `n_bits` > 0."""
 
     learn_quant_params: bool = False
-    """If True, the quantization scale (and offset if asymmetrical) will be 
-    learned during training (or was learned, if loading a checkpoint). If False, 
+    """If True, the quantization scale (and offset if asymmetrical) will be
+    learned during training (or was learned, if loading a checkpoint). If False,
     the scales will be estimated during training or used as trained. By default False."""
 
     init_learning_after: int = 100

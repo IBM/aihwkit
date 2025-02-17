@@ -7,6 +7,8 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
+# pylint: skip-file
+
 
 from collections import namedtuple
 from enum import Enum

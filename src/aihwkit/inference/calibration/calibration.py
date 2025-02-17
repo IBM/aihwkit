@@ -342,14 +342,16 @@ def calibrate_quantization_ranges(
             The maximum number of batches to use for estimation, by default 20
         dataloader_inp_idx : Optional[int], optional
             Only applicable when the dataloader returns a list or tuple. Signifies which
-            position of the list or tuple are the input data to be provided to the model, by default 0
+            position of the list or tuple are the input data to be provided to the model,
+            by default 0
         """
 
         model.eval()
         device = next(model.parameters()).device
         for i, data in enumerate(loader):
             if isinstance(data, (tuple, list)):
-                # The case that the dataloader returns a list/tuple of (data, targets) (e.g., CIFAR dataloaders)
+                # The case that the dataloader returns a list/tuple of (data, targets)
+                # (e.g., CIFAR dataloaders)
                 x = data[dataloader_inp_idx].to(device=device)
                 model(x)
             else:
@@ -364,11 +366,7 @@ def calibrate_quantization_ranges(
     estimate_ranges(model)
 
     # Pass batches of data for estimation
-    pass_data_for_range_estimation(
-        loader=loader,
-        model=model,
-        max_num_batches=max_num_batches,
-    )
+    pass_data_for_range_estimation(loader=loader, model=model, max_num_batches=max_num_batches)
 
     # Fix all the quantizer ranges after they've been estimated
     fix_ranges(model)

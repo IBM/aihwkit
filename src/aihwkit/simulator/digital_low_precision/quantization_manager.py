@@ -7,6 +7,8 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
+# pylint: skip-file
+
 
 from enum import Enum
 
@@ -83,10 +85,12 @@ class QuantizationManager(nn.Module):
             # set up the collector function to set the ranges
             self.range_estimator = self.init.cls(
                 per_channel=self.per_channel,
-                quantizer=self.quantizer if self.init.value.value > 2 else None,  # For MSE and the crossentropy range estimators
+                quantizer=(
+                    self.quantizer if self.init.value.value > 2 else None
+                ),  # For MSE and the crossentropy range estimators
                 axis=self.axis,
                 n_groups=self.n_groups,
-                **self.init_params
+                **self.init_params,
             )
 
     @property

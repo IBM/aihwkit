@@ -213,7 +213,7 @@ class QuantizedTileModuleArray(TileModuleArray):
         # requantized because they were produced by accumulation
         # of partial results, and as such are no longer quantized in the
         # same bit-precision. The wide layers need to be quantized to equalize
-        # the range across the different tiles and keep the precision down 
+        # the range across the different tiles and keep the precision down
         # in case of bias addition.
         if self.analog_tile_count > 1:
             if rpu_config.act_quant_config is not None and rpu_config.act_quant_config.n_bits > 0:
@@ -247,7 +247,7 @@ class QuantizedTileModuleArray(TileModuleArray):
 
     def forward(self, x_input: Tensor, tensor_view: Optional[Tuple] = None) -> Tensor:
         """Compute the forward pass, quantizing the final result as appropriate"""
-        # pylint: disable=arguments-differ,arguments-renamed
+        # pylint: disable=arguments-differ,arguments-renamed,too-many-branches
 
         # Create the final result. In tall splits, perform the intermediate accumulation
         if self.analog_tile_count == 1:
@@ -290,7 +290,8 @@ class QuantizedTileModuleArray(TileModuleArray):
                         and self.periph_quant.learn_quant_params
                         and not self.bias_quantizer.is_learning()
                     ):
-                        # If learning is enabled, estimate till `init_learning_after` before switching
+                        # If learning is enabled, estimate till `init_learning_after`
+                        # before switching to learned
                         self.bias_quant_update_idx.data += 1  # count up to the desired batch
                         if self.bias_quant_update_idx > self.periph_quant.init_learning_after:
                             self.bias_quantizer.learn_ranges()  # Switch to learned

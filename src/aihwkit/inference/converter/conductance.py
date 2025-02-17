@@ -103,16 +103,14 @@ class NPairConductanceConverter(BaseConductanceConverter):
             the logical zero of the weights will be mapped to.
     """
 
-    def __init__(self,
-                 f_lst: List[float],
-                 g_max: Optional[float] = None,
-                 g_min: Optional[float] = None,
-                 ):
+    def __init__(
+        self, f_lst: List[float], g_max: Optional[float] = None, g_min: Optional[float] = None
+    ):
 
         if not isinstance(f_lst, list):
             raise ValueError("f_lst parameter must be a list of F factors")
 
-        if max(f_lst) < 0.:
+        if max(f_lst) < 0.0:
             raise ValueError("f_lst parameter contains negative value")
 
         self.g_max = 25.0 if g_max is None else g_max
@@ -139,35 +137,41 @@ class NPairConductanceConverter(BaseConductanceConverter):
         scale_ratio = max_weight_us / max_weight_unitless
         weights_us = scale_ratio * weights
 
-        lower_bound_us = 0.  # lower bound in uS
+        lower_bound_us = 0.0  # lower bound in uS
         conductances = []
         for f_factor in self.f_lst:
-            conductances.append(((weights_us.clamp(min=0.0) - lower_bound_us) / f_factor
-                                 + self.g_min).clamp(min=self.g_min, max=self.g_max))      # g_plus
-            conductances.append((((-weights_us).clamp(min=0.0) - lower_bound_us) / f_factor
-                                 + self.g_min).clamp(min=self.g_min, max=self.g_max))      # g_minus
+            conductances.append(
+                ((weights_us.clamp(min=0.0) - lower_bound_us) / f_factor + self.g_min).clamp(
+                    min=self.g_min, max=self.g_max
+                )
+            )  # g_plus
+            conductances.append(
+                (((-weights_us).clamp(min=0.0) - lower_bound_us) / f_factor + self.g_min).clamp(
+                    min=self.g_min, max=self.g_max
+                )
+            )  # g_minus
             lower_bound_us += f_factor * (self.g_max - self.g_min)
 
-        params = {'scale_ratio': scale_ratio,
-                  'f_lst': self.f_lst}
+        params = {"scale_ratio": scale_ratio, "f_lst": self.f_lst}
 
         return conductances, params
 
     @no_grad()
     def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
-        if 'f_lst' not in params:
+        if "f_lst" not in params:
             raise ValueError("params does not contain f_lst")
         if len(conductances) % 2 != 0:
             raise ValueError("unit cell must have an even number of conductances")
-        if 'scale_ratio' not in params:
+        if "scale_ratio" not in params:
             raise ValueError("params does not contain scale_ratio")
 
         weights = zeros_like(conductances[0])
-        for f_factor, (g_plus, g_minus) in zip(self.f_lst,
-                                               zip(conductances[::2], conductances[1::2])):
+        for f_factor, (g_plus, g_minus) in zip(
+            self.f_lst, zip(conductances[::2], conductances[1::2])
+        ):
             weights += f_factor * (g_plus - g_minus)
 
-        return weights / params['scale_ratio']
+        return weights / params["scale_ratio"]
 
 
 class DualPairConductanceConverter(NPairConductanceConverter):
@@ -195,18 +199,14 @@ class DualPairConductanceConverter(NPairConductanceConverter):
             the logical zero of the weights will be mapped to.
     """
 
-    def __init__(self,
-                 f_lst: List[float],
-                 g_max: Optional[float] = None,
-                 g_min: Optional[float] = None,
-                 ):
+    def __init__(
+        self, f_lst: List[float], g_max: Optional[float] = None, g_min: Optional[float] = None
+    ):
 
         if len(f_lst) != 2:
             raise ValueError("f_lst parameter does not contain two values")
 
-        super().__init__(f_lst=f_lst,
-                         g_max=g_max,
-                         g_min=g_min)
+        super().__init__(f_lst=f_lst, g_max=g_max, g_min=g_min)
 
 
 class CustomPairConductanceConverter(BaseConductanceConverter):
@@ -235,13 +235,14 @@ class CustomPairConductanceConverter(BaseConductanceConverter):
             the logical zero of the weights will be mapped to.
     """
 
-    def __init__(self,
-                 f_lst: List[float],
-                 g_lst: List[List[float]],
-                 g_max: Optional[float] = None,
-                 g_min: Optional[float] = None,
-                 invertibility_test: Optional[bool] = True,
-                 ):
+    def __init__(
+        self,
+        f_lst: List[float],
+        g_lst: List[List[float]],
+        g_max: Optional[float] = None,
+        g_min: Optional[float] = None,
+        invertibility_test: Optional[bool] = True,
+    ):
         self.g_max = 25.0 if g_max is None else g_max
         self.g_min = 0.0 if g_min is None else g_min
 
@@ -300,48 +301,44 @@ class CustomPairConductanceConverter(BaseConductanceConverter):
     def convert_to_conductances(self, weights: Tensor) -> Tuple[List[Tensor], Dict]:
 
         weights_us = zeros_like(Tensor(self.g_lst[0])).type_as(weights)
-        for f_factor, (gp_lst, gm_lst) in zip(self.f_lst,
-                                              zip(self.g_lst[::2], self.g_lst[1::2])):
+        for f_factor, (gp_lst, gm_lst) in zip(self.f_lst, zip(self.g_lst[::2], self.g_lst[1::2])):
             weights_us += f_factor * (Tensor(gp_lst) - Tensor(gm_lst)).type_as(weights)
 
         max_weight = torch_abs(weights).max()
         max_weight_us = torch_abs(weights_us).max()
         scale_ratio = max_weight_us / max_weight.clamp(min=_ZERO_CLIP)
 
-        w_lst = (linspace(-max_weight_us,
-                          max_weight_us,
-                          len(self.g_lst[0])) / scale_ratio).tolist()
+        w_lst = (linspace(-max_weight_us, max_weight_us, len(self.g_lst[0])) / scale_ratio).tolist()
 
         conductances = []
-        for f_factor, (gp_lst, gm_lst) in zip(self.f_lst,
-                                              zip(self.g_lst[::2], self.g_lst[1::2])):
-            conductances.append(from_numpy(interp(weights.cpu().numpy(),
-                                                  w_lst,
-                                                  gp_lst)).type_as(weights))
-            conductances.append(from_numpy(interp(weights.cpu().numpy(),
-                                                  w_lst,
-                                                  gm_lst)).type_as(weights))
+        for f_factor, (gp_lst, gm_lst) in zip(self.f_lst, zip(self.g_lst[::2], self.g_lst[1::2])):
+            conductances.append(
+                from_numpy(interp(weights.cpu().numpy(), w_lst, gp_lst)).type_as(weights)
+            )
+            conductances.append(
+                from_numpy(interp(weights.cpu().numpy(), w_lst, gm_lst)).type_as(weights)
+            )
 
-        params = {'scale_ratio': scale_ratio,
-                  'f_lst': self.f_lst}
+        params = {"scale_ratio": scale_ratio, "f_lst": self.f_lst}
 
         return conductances, params
 
     @no_grad()
     def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
 
-        if 'f_lst' not in params:
+        if "f_lst" not in params:
             raise ValueError("params does not contain f_lst")
 
-        if not isinstance(params['f_lst'], list):
+        if not isinstance(params["f_lst"], list):
             raise TypeError("f_lst parameter must be a list of f factors")
 
-        if 2 * len(params['f_lst']) != len(conductances):
+        if 2 * len(params["f_lst"]) != len(conductances):
             raise ValueError("must have one value in f_lst for every pair of conductances")
 
         weights_us = zeros_like(conductances[0])
-        for f_factor, (g_plus, g_minus) in zip(params['f_lst'],
-                                               zip(conductances[::2], conductances[1::2])):
+        for f_factor, (g_plus, g_minus) in zip(
+            params["f_lst"], zip(conductances[::2], conductances[1::2])
+        ):
             weights_us += f_factor * (g_plus - g_minus)
 
-        return weights_us / params['scale_ratio']   # back to unitless
+        return weights_us / params["scale_ratio"]  # back to unitless

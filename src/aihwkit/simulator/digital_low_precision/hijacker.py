@@ -1,6 +1,8 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
+# pylint: skip-file
+
 import copy
 
 import torch
@@ -32,6 +34,7 @@ class QuantizationHijacker(QuantizedModule):
     NB: this implementation (for now) assumes that there will always be some training involved,
     e.g. to estimate the activation ranges.
     """
+
     def __init__(self, *args, activation: nn.Module = None, **kwargs):
         super().__init__(*args, **kwargs)
         if activation:
@@ -109,7 +112,7 @@ class QuantizationHijacker(QuantizedModule):
             activations = self.activation_quantizer(activations)
 
             if self.activation_save_target is not None:
-                self.activation_save_target[self.activation_save_name + '_Q'] = (
+                self.activation_save_target[self.activation_save_name + "_Q"] = (
                     activations.data.cpu().numpy()
                 )
 

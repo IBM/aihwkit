@@ -31,22 +31,9 @@ from aihwkit.inference.noise.custom import StateIndependentNoiseModel
 from aihwkit.nn.conversion import convert_to_analog
 
 from .helpers.decorators import parametrize_over_layers
-from .helpers.layers import (
-    Conv1d,
-    Conv1dCuda,
-    Conv2d,
-    Conv2dCuda,
-    Conv3d,
-    Conv3dCuda,
-)
+from .helpers.layers import Conv1d, Conv1dCuda, Conv2d, Conv2dCuda, Conv3d, Conv3dCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import (
-    FloatingPoint,
-    Inference,
-    TorchInference,
-    Custom,
-    QuantizedTorchInference,
-)
+from .helpers.tiles import FloatingPoint, Inference, TorchInference, Custom, QuantizedTorchInference
 
 
 class ConvolutionLayerTest(ParametrizedTestCase):
@@ -111,9 +98,7 @@ class ConvolutionLayerTest(ParametrizedTestCase):
 
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
-                weight_scaling_omega=0.0,
-                learn_out_scaling=False,
-                weight_scaling_columnwise=False,
+                weight_scaling_omega=0.0, learn_out_scaling=False, weight_scaling_columnwise=False
             ),
             modifier=WeightModifierParameter(type=WeightModifierType.ADD_NORMAL, std_dev=1.0),
             forward=IOParameters(is_perfect=True),
@@ -145,17 +130,12 @@ class ConvolutionLayerTest(ParametrizedTestCase):
 
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
-                weight_scaling_omega=0.0,
-                learn_out_scaling=False,
-                weight_scaling_columnwise=False,
+                weight_scaling_omega=0.0, learn_out_scaling=False, weight_scaling_columnwise=False
             ),
             forward=IOParameters(is_perfect=True),
             drift_compensation=GlobalDriftCompensation(),
             noise_model=StateIndependentNoiseModel(
-                prog_noise_scale=0.0,
-                read_noise_scale=0.0,
-                drift_nu_std=0.0,
-                drift_nu_mean=0.1,
+                prog_noise_scale=0.0, read_noise_scale=0.0, drift_nu_std=0.0, drift_nu_mean=0.1
             ),
         )
 
@@ -280,18 +260,10 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
 
         analog_model = Sequential(
             self.get_layer(
-                in_channels=2,
-                out_channels=2,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=2, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
             self.get_layer(
-                in_channels=2,
-                out_channels=3,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=3, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
         )
 
@@ -326,26 +298,16 @@ class Convolution1dLayerTest(ConvolutionLayerTest):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
-                weight_scaling_omega=0.6,
-                learn_out_scaling=True,
-                weight_scaling_columnwise=True,
+                weight_scaling_omega=0.6, learn_out_scaling=True, weight_scaling_columnwise=True
             )
         )
 
         analog_model = Sequential(
             self.get_layer(
-                in_channels=2,
-                out_channels=2,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=2, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
             self.get_layer(
-                in_channels=2,
-                out_channels=3,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=3, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
         )
 
@@ -411,13 +373,7 @@ class Convolution1dLayerTestInference(ConvolutionLayerTest):
 
 @parametrize_over_layers(
     layers=[Conv2d, Conv2dCuda],
-    tiles=[
-        FloatingPoint,
-        Inference,
-        TorchInference,
-        Custom,
-        QuantizedTorchInference,
-    ],
+    tiles=[FloatingPoint, Inference, TorchInference, Custom, QuantizedTorchInference],
     biases=["analog", "digital", None],
 )
 class Convolution2dLayerTest(ConvolutionLayerTest):
@@ -549,18 +505,10 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
 
         analog_model = Sequential(
             self.get_layer(
-                in_channels=2,
-                out_channels=2,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=2, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
             self.get_layer(
-                in_channels=2,
-                out_channels=3,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=3, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
         )
 
@@ -593,26 +541,16 @@ class Convolution2dLayerTest(ConvolutionLayerTest):
         """Check if out scaling alpha are learning."""
         rpu_config = InferenceRPUConfig(
             mapping=MappingParameter(
-                weight_scaling_omega=0.6,
-                learn_out_scaling=True,
-                weight_scaling_columnwise=True,
+                weight_scaling_omega=0.6, learn_out_scaling=True, weight_scaling_columnwise=True
             )
         )
 
         analog_model = Sequential(
             self.get_layer(
-                in_channels=2,
-                out_channels=2,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=2, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
             self.get_layer(
-                in_channels=2,
-                out_channels=3,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=3, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
         )
 
@@ -781,18 +719,10 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
 
         analog_model = Sequential(
             self.get_layer(
-                in_channels=2,
-                out_channels=2,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=2, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
             self.get_layer(
-                in_channels=2,
-                out_channels=3,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=3, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
         )
 
@@ -832,18 +762,10 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
 
         analog_model = Sequential(
             self.get_layer(
-                in_channels=2,
-                out_channels=2,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=2, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
             self.get_layer(
-                in_channels=2,
-                out_channels=3,
-                kernel_size=4,
-                padding=2,
-                rpu_config=rpu_config,
+                in_channels=2, out_channels=3, kernel_size=4, padding=2, rpu_config=rpu_config
             ),
         )
 

@@ -1,8 +1,9 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
+""" Util conversion function for the quant library """
+
 import numpy as np
-import torch
 
 
 def to_numpy(tensor):
@@ -19,12 +20,12 @@ def to_numpy(tensor):
     """
     if isinstance(tensor, np.ndarray):
         return tensor
-    if hasattr(tensor, 'is_cuda'):
+    if hasattr(tensor, "is_cuda"):
         if tensor.is_cuda:
             return tensor.cpu().detach().numpy()
-    if hasattr(tensor, 'detach'):
+    if hasattr(tensor, "detach"):
         return tensor.detach().numpy()
-    if hasattr(tensor, 'numpy'):
+    if hasattr(tensor, "numpy"):
         return tensor.numpy()
 
     return np.array(tensor)

@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
+#
+# Licensed under the MIT license. See LICENSE file in the project root for details.
+
+"""Tests for quantized tile functionality."""
+
 from typing import Union
 
 from pytest import mark
@@ -14,6 +22,8 @@ from .helpers.tiles import QuantizedTorchInferenceRPUConfig, TorchInferenceRPUCo
 @mark.parametrize("symmetric", [True, False])
 @mark.parametrize("range_estimator", list(RangeEstimators))
 def test_output_quantization(n_bits, symmetric, range_estimator):
+    """Test that output quantization works, returning the appropriate number of states"""
+
     def set_perfect_rpuconfig(
         rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
     ):
@@ -54,7 +64,11 @@ def test_output_quantization(n_bits, symmetric, range_estimator):
 @mark.parametrize("n_bits", [0, 4, 8])
 @mark.parametrize("symmetric", [True, False])
 @mark.parametrize("range_estimator", list(RangeEstimators))
-def test_array_module_output_quantization(n_bits, symmetric, range_estimator, arr_rows, arr_columns):
+def test_array_module_output_quantization(
+    n_bits, symmetric, range_estimator, arr_rows, arr_columns
+):
+    """Test that when an array is used, output quantization is properly applied"""
+
     def set_perfect_rpuconfig(
         rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
     ):
@@ -84,11 +98,14 @@ def test_array_module_output_quantization(n_bits, symmetric, range_estimator, ar
         assert not torch.allclose(out, out_ref, atol=1e-5)
         assert out.unique().numel() <= 2**n_bits
 
+
 @mark.parametrize("arr_rows", [512, 1024])
 @mark.parametrize("arr_columns", [512, 1024])
 @mark.parametrize("n_bits", [0, 4, 8])
 @mark.parametrize("symmetric", [True, False])
 def test_quantized_periphery(n_bits, symmetric, arr_rows, arr_columns):
+    """Test that quantized periphery is properly applied"""
+
     def set_perfect_rpuconfig_with_periphery(
         rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
     ):

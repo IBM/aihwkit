@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
+#
+# Licensed under the MIT license. See LICENSE file in the project root for details.
+
+"""Tile with quantized periphery and outputs."""
+
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from torch import Tensor
@@ -53,7 +61,7 @@ class QuantizedTorchInferenceTile(TorchInferenceTile):
         than the TorchInferenceTile in the way it handles the bias addition, affine
         scaling application and the output quantization. See the methods
         `post_forward`, `apply_quant_periphery_scales` and `add_quant_periphery_bias`
-        in `TileWithPeriphery` for details """
+        in `TileWithPeriphery` for details"""
         # pylint: disable=arguments-differ
 
         # Note: this is now called with autograd enabled and thus will

@@ -1,6 +1,8 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
+# pylint: skip-file
+
 import copy
 from collections import namedtuple
 from enum import Enum

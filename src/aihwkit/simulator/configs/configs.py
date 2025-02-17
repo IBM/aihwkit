@@ -289,9 +289,12 @@ class TorchInferenceRPUConfig(InferenceRPUConfig):
 
 @dataclass
 class QuantizedTorchInferenceRPUConfig(TorchInferenceRPUConfig):
+    """Extends the TorchInference configuration with quantized functionality
+    in the periphery of the tile and the final output"""
+
     tile_class: Type = QuantizedTorchInferenceTile
     tile_array_class: Type = QuantizedTileModuleArray
-    """Tile and tile array classes used to simulate quantization 
+    """Tile and tile array classes used to simulate quantization
     on the output and the periphery of the tiles"""
 
     act_quant_config: ActivationQuantConfig = None

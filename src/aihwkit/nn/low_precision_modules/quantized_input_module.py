@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
+#
+# Licensed under the MIT license. See LICENSE file in the project root for details.
+
+""" Module wrapper to quantize its input """
+
 from torch import Tensor
 from torch.nn import Module
 
@@ -26,8 +34,9 @@ class QuantizedInputModule(Module):
             **convert_act_config_to_kwargs_dict(act_quant_config)
         )
 
-    def forward(self, input: Tensor, *args, **kwargs):
+    def forward(self, inp: Tensor, *args, **kwargs):
+        """Perform the forward of the original module after quantizing its input"""
         # Quantize inputs
-        input_q = self.input_quantizer(input)
+        input_q = self.input_quantizer(inp)
         # Feed the quantized inputs to the original module
         return self.module(input_q, *args, **kwargs)

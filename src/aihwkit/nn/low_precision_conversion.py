@@ -4,6 +4,8 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
+""" Functions to convert a given model to a quantized counterpart """
+
 import copy
 
 from torch.nn import Module, Linear, Conv2d
@@ -49,17 +51,19 @@ def convert_to_quantized(model: Module, quantization_map: QuantizationMap) -> Mo
 
 
 def quantize_model(
-    model: Module,
-    quantization_map: QuantizationMap,
-    model_name: str = "",
+    model: Module, quantization_map: QuantizationMap, model_name: str = ""
 ) -> Module:
     """Traverses a model recursively and replaces a module with a quantized counterpart,
     if such a conversion is defined in the quantization map. It realizes all the capabilities
     of the QuantizationMap, namely:
-    - Excluding specific modules from the quantization, identified by exact state_dict string (`quantization_map.excluded_modules`)
-    - Instance specific quantization, identified by exact state_dict string (`quantization_map.instance_qconfig_map`)
-    - Module specific quantization, identified by the type of a module (`quantization_map.module_qconfig_map`)
-    - Input quantization on specified modules, identified by the state_dict string (`quantization_map.input_activation_qconfig_map`)
+    - Excluding specific modules from the quantization, identified by exact state_dict
+        string (`quantization_map.excluded_modules`)
+    - Instance specific quantization, identified by exact state_dict string
+        (`quantization_map.instance_qconfig_map`)
+    - Module specific quantization, identified by the type of a module
+        (`quantization_map.module_qconfig_map`)
+    - Input quantization on specified modules, identified by the state_dict string
+        (`quantization_map.input_activation_qconfig_map`)
     (see `QuantizationMap` and the related examples for more details on how to define these fields)
 
     Parameters
@@ -67,7 +71,8 @@ def quantize_model(
     model : Module
         Model to recursively quantize
     quantization_map : QuantizationMap
-        The dataclass that defines the quantization conversions as well as the quantization parameters for each conversion
+        The dataclass that defines the quantization conversions as well as the
+        quantization parameters for each conversion
     model_name : str, optional
         The name of the current module in the state dict of the original model, by default ""
 
@@ -76,16 +81,18 @@ def quantize_model(
     Module
         Quantized model
     """
+    # pylint: disable=too-many-branches
+
     # Exclude modules based on state_dict string
     if model_name in quantization_map.excluded_modules:
-        return
+        return None
 
     # Early exit for quantizers and range estimators
-    elif isinstance(model, LEAF_MODULES):
-        return
+    if isinstance(model, LEAF_MODULES):
+        return None
 
     # Quantization code for instance- or module-specific conversions
-    elif (model_name in quantization_map.instance_qconfig_map) or (
+    if (model_name in quantization_map.instance_qconfig_map) or (
         type(model) in quantization_map.module_qconfig_map
     ):
         # Select the quantized module counterpart and the quantization parameters
@@ -118,10 +125,7 @@ def quantize_model(
             # merge the scales with the parameters and then quantize to the counterpart.
             # NOTE: Only Linear and Conv2d are supported at the moment.
             model = convert_to_digital(model)
-            assert type(model) in [
-                Linear,
-                Conv2d,
-            ], "Only Linear and Conv2d supported at the moment"
+            assert type(model) in [Linear, Conv2d], "Only Linear and Conv2d supported at the moment"
             kwargs = get_module_args(model, None)
             quant_model = q_model(**kwargs, **convert_configs_to_kwargs_dict(q_config))
 

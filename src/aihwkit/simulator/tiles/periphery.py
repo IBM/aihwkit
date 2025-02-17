@@ -906,6 +906,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         Tensor
             The scaled version of x_output
         """
+        # pylint: disable=too-many-branches
         tensor_view = self.get_tensor_view(x_output.dim(), dim)
 
         scale = None
@@ -930,35 +931,36 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         if self.scale_quantizer is None:
             # If there's no quantization apply the scale in FP and exit
             return x_output * scale
-        else:
-            if not is_test:
-                # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
-                # selected. In the learn mode, the ranges are also estimated up to batch number
-                # `init_learning_after` and then switch to learned ranges.
-                if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
-                    self.scale_quantizer.estimate_ranges_train()  # estimate if no learned
-                elif (
-                    self.rpu_config.pre_post.periph_quant.learn_quant_params
-                    and not self.scale_quantizer.is_learning()
-                ):  # If it's to be learned but it's not learning yet
-                    self.scale_quant_update_idx.data += 1  # count up to the desired batch
-                    if (
-                        self.scale_quant_update_idx
-                        > self.rpu_config.pre_post.periph_quant.init_learning_after
-                    ):
-                        self.scale_quantizer.learn_ranges()  # Switch to learned
-                    else:
-                        self.scale_quantizer.estimate_ranges_train()  # Remain/switch to estimate ranges
-            elif is_test and not self.scale_quantizer.quantizer.is_initialized:
-                # In eval mode, if the ranges are NOT initialized, meaning they were not loaded
-                # from a checkpoint or trained/estimated before, they are estimated for a single
-                # batch and then get fixed.
-                self.scale_quantizer.estimate_ranges()
-                q_scale = self.scale_quantizer(scale)
-                self.scale_quantizer.fix_ranges()
-                return x_output * q_scale
 
-            return x_output * self.scale_quantizer(scale)
+        if not is_test:
+            # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
+            # selected. In the learn mode, the ranges are also estimated up to batch number
+            # `init_learning_after` and then switch to learned ranges.
+            if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
+                self.scale_quantizer.estimate_ranges_train()  # estimate if no learned
+            elif (
+                self.rpu_config.pre_post.periph_quant.learn_quant_params
+                and not self.scale_quantizer.is_learning()
+            ):  # If it's to be learned but it's not learning yet
+                self.scale_quant_update_idx.data += 1  # count up to the desired batch
+                if (
+                    self.scale_quant_update_idx
+                    > self.rpu_config.pre_post.periph_quant.init_learning_after
+                ):
+                    self.scale_quantizer.learn_ranges()  # Switch to learned
+                else:
+                    # Remain/switch to estimate ranges
+                    self.scale_quantizer.estimate_ranges_train()
+        elif is_test and not self.scale_quantizer.quantizer.is_initialized:
+            # In eval mode, if the ranges are NOT initialized, meaning they were not loaded
+            # from a checkpoint or trained/estimated before, they are estimated for a single
+            # batch and then get fixed.
+            self.scale_quantizer.estimate_ranges()
+            q_scale = self.scale_quantizer(scale)
+            self.scale_quantizer.fix_ranges()
+            return x_output * q_scale
+
+        return x_output * self.scale_quantizer(scale)
 
     def add_quant_periphery_bias(
         self, output: Tensor, tensor_view: Optional[Tuple], is_test: bool = False
@@ -981,36 +983,37 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         """
         if self.bias_quantizer is None:
             return output + self.bias.view(*tensor_view)
-        else:
-            if not is_test:
-                # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
-                # selected. In the learn mode, the ranges are also estimated up to batch number
-                # `init_learning_after` and then switch to learned ranges.
-                if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
-                    self.bias_quantizer.estimate_ranges_train()  # estimate if no learned
-                elif (
-                    self.rpu_config.pre_post.periph_quant.learn_quant_params
-                    and not self.bias_quantizer.is_learning()
-                ):  # If it's to be learned but it's not learning yet
-                    self.bias_quant_update_idx.data += 1  # count up to the desired batch
-                    if (
-                        self.bias_quant_update_idx
-                        > self.rpu_config.pre_post.periph_quant.init_learning_after
-                    ):
-                        self.bias_quantizer.learn_ranges()  # Switch to learned
-                    else:
-                        self.bias_quantizer.estimate_ranges_train()  # Remain/switch to estimate ranges
 
-            elif is_test and not self.bias_quantizer.quantizer.is_initialized:
-                # In eval mode, if the ranges are NOT initialized, meaning they were not loaded
-                # from a checkpoint or trained/estimated before, they are estimated for a single
-                # batch and then get fixed.
-                self.bias_quantizer.estimate_ranges()
-                q_bias = self.bias_quantizer(self.bias)
-                self.bias_quantizer.fix_ranges()
-                return output + q_bias.view(*tensor_view)
+        if not is_test:
+            # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
+            # selected. In the learn mode, the ranges are also estimated up to batch number
+            # `init_learning_after` and then switch to learned ranges.
+            if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
+                self.bias_quantizer.estimate_ranges_train()  # estimate if no learned
+            elif (
+                self.rpu_config.pre_post.periph_quant.learn_quant_params
+                and not self.bias_quantizer.is_learning()
+            ):  # If it's to be learned but it's not learning yet
+                self.bias_quant_update_idx.data += 1  # count up to the desired batch
+                if (
+                    self.bias_quant_update_idx
+                    > self.rpu_config.pre_post.periph_quant.init_learning_after
+                ):
+                    self.bias_quantizer.learn_ranges()  # Switch to learned
+                else:
+                    # Remain/switch to estimate ranges
+                    self.bias_quantizer.estimate_ranges_train()
 
-            return output + self.bias_quantizer(self.bias).view(*tensor_view)
+        elif is_test and not self.bias_quantizer.quantizer.is_initialized:
+            # In eval mode, if the ranges are NOT initialized, meaning they were not loaded
+            # from a checkpoint or trained/estimated before, they are estimated for a single
+            # batch and then get fixed.
+            self.bias_quantizer.estimate_ranges()
+            q_bias = self.bias_quantizer(self.bias)
+            self.bias_quantizer.fix_ranges()
+            return output + q_bias.view(*tensor_view)
+
+        return output + self.bias_quantizer(self.bias).view(*tensor_view)
 
     def joint_forward(self, x_input: Tensor, is_test: bool = False, ctx: Any = None) -> Tensor:
         """Perform the forward pass.
