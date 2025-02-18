@@ -13,6 +13,7 @@ MVM accuracy is assessed for different times after programming.
 
 # Imports from PyTorch
 from torch import nn, zeros, matmul, rand
+import torch
 
 # Imports from aihwkit
 from aihwkit.nn.conversion import convert_to_analog
@@ -106,9 +107,7 @@ analog_model = analog_model.eval()
 analog_model.program_analog_weights(noise_model=rpu_conf.noise_model)
 
 # Get the MVM accuracy at t=0s. Only considers programming noise
-baseline = analog_model(input_probe[:, 0])
-baseline_FP = matmul(input_probe[:, 0], matrix.T)
-analog_MVM = zeros((crossbar_size, batches))
+baseline_FP = matmul(input_probe.T, matrix.T)
 
 # compute the MVM for each time of inference considering conductance relaxation
 for i, t_inference in enumerate(t_inferences):
@@ -116,3 +115,4 @@ for i, t_inference in enumerate(t_inferences):
     analog_model.drift_analog_weights(t_inference)
     for j in range(batches):
         drifted_MVM[i, :, j] = analog_model(input_probe[:, j])
+drifted_MVM = drifted_MVM.detach()

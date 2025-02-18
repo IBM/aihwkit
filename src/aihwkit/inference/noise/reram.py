@@ -324,7 +324,8 @@ class ReRamCMONoiseModel(BaseNoiseModel):
             self.decay_dict["std"][0] * log(t_inference) + self.decay_dict["std"][1]
         )
         g_drift = g_mean + (randn_like(g_prog) * sigma_relaxation * self.drift_scale)
-        sigma_read = self.read_parameter * log10(g_drift) *sqrt(log((t_inference + self.t_read) / (2 * self.t_read)))
+        sigma_read = self.read_parameter * log10(g_drift) * sqrt(
+            log((t_inference + self.t_read) / (2 * self.t_read)))
         g_final = g_drift + sigma_read * randn_like(g_prog) * self.read_noise_scale
 
         return g_final.clamp(min=self.g_min, max=self.g_max)
