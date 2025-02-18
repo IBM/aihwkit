@@ -9,11 +9,11 @@
 """Phenomenological noise models for ReRAM devices for inference."""
 
 from copy import deepcopy
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 from torch import randn_like, Tensor
 from torch.autograd import no_grad
-from numpy import log
+from numpy import log, log10, sqrt
 from aihwkit.exceptions import ArgumentError
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.converter.base import BaseConductanceConverter
@@ -199,11 +199,12 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         the weights will be mapped to.
         g_min: In :math:`\mu S`, the minimal conductance, i.e. the value the absolute min of
         the weights will be mapped to.
-        noise_scale: Additional scale for the noise.
+        prog_noise_scale: Scale for the programming noise.
+        read_noise_scale: Scale for the read and accumulated noise.
+        drift_scale: Scale for the  drift coefficient.
         coeff_g_max_reference: reference :math:`g_\max` value when fitting the coefficients,
         since the result of the polynomial fit is given in uS.
         decay_dict: mean and std coefficients for the drift noise in :math:`\mu S`,
-        reference_drift: reference conductance value of the drift characterization (G-independent)
 
     """
 
@@ -213,13 +214,15 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         g_converter: Optional[BaseConductanceConverter] = None,
         g_max: Optional[float] = None,
         g_min: Optional[float] = None,
-        noise_scale: float = 1.0,
+        t_read: float = 1.0e-9,
+        prog_noise_scale: float = 1.0,
+        read_noise_scale: float = 1.0,
+        drift_scale: float = 1.0,
         coeff_g_max_reference: Optional[float] = None,
         decay_dict: Optional[Dict[str, List]] = None,
-        reference_drift: Optional[
-            float
-        ] = None,  # conductance level for relaxation assessment
         acceptance_range: float = 2e-2,
+        read_parameter: Optional[float] = None,
+        **kwargs: Any,
     ):
         g_converter = deepcopy(g_converter) or SingleDeviceConductanceConverter(
             g_max=g_max, g_min=g_min
@@ -244,16 +247,20 @@ class ReRamCMONoiseModel(BaseNoiseModel):
             self.coeff_g_max_reference = 88.19998
         if decay_dict is None:
             decay_dict = {
-                "mean": [-0.08900206, 49.92383444],
+                "mean": [-0.08900206],
                 "std": [0.04201137, 0.41183342],
             }
-        if reference_drift is None:
-            self.reference_drift = 50.0
+        if read_parameter is None:
+            read_parameter = 0.0277316483
         if acceptance_range not in coeff_dict.keys():
             acceptance_range = min(coeff_dict.keys())
         self.coeff_dict = coeff_dict
-        self.noise_scale = noise_scale
+        self.prog_noise_scale = prog_noise_scale
+        self.read_noise_scale = read_noise_scale
+        self.drift_scale = drift_scale
+        self.t_read = t_read
         self.decay_dict = decay_dict
+        self.read_parameter = read_parameter
         self.acceptance_range = acceptance_range
 
     def _apply_poly(self, g_target: Tensor, coeff: List, scale: float = 1.0) -> Tensor:
@@ -282,7 +289,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
             if self.acceptance_range in self.coeff_dict.keys()
             else min(list(self.coeff_dict.keys()))
         )
-        return self._apply_poly(g_target, self.coeff_dict[min_key], self.noise_scale)
+        return self._apply_poly(g_target, self.coeff_dict[min_key], self.prog_noise_scale)
 
     @no_grad()
     def generate_drift_coefficients(self, g_target: Tensor) -> Tensor:
@@ -311,13 +318,13 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         if t_inference == 0:
             return g_prog
 
-        g_mean = self.decay_dict["mean"][0] * log(t_inference) + (
-            self.decay_dict["mean"][1] * g_prog / self.reference_drift
-        )
+        g_mean = g_prog + (self.decay_dict["mean"][0] * log(t_inference) * self.drift_scale)
+
         sigma_relaxation = (
             self.decay_dict["std"][0] * log(t_inference) + self.decay_dict["std"][1]
         )
-        g_drift = g_mean + randn_like(g_prog) * sigma_relaxation
-        # TODO:
-        # Read Noise implementation on g_final
-        return g_drift.clamp(min=self.g_min)
+        g_drift = g_mean + (randn_like(g_prog) * sigma_relaxation * self.drift_scale)
+        sigma_read = self.read_parameter * log10(g_drift) *sqrt(log((t_inference + self.t_read) / (2 * self.t_read)))
+        g_final = g_drift + sigma_read * randn_like(g_prog) * self.read_noise_scale
+
+        return g_final.clamp(min=self.g_min, max=self.g_max)
