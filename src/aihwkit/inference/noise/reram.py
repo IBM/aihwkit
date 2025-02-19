@@ -239,7 +239,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
             }
         if read_dict is None:
             read_dict = {
-                "K" :0.0277316483,
+                "K" : 0.0277316483,
                 "t_read" : 1e-6
             }
         if decay_dict is None:
