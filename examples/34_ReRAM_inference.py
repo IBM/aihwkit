@@ -4,7 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-"""aihwkit example 33: Matrix-Vector Multiplication (MVM) with ReRAM CMO.
+"""aihwkit example 34: Matrix-Vector Multiplication (MVM) with ReRAM CMO.
 
 Single matrix-vector multiplication of an analog matrix of size 64x64.
 MVM accuracy is assessed for different times after programming.
@@ -13,7 +13,6 @@ MVM accuracy is assessed for different times after programming.
 
 # Imports from PyTorch
 from torch import nn, zeros, matmul, rand
-import torch
 
 # Imports from aihwkit
 from aihwkit.nn.conversion import convert_to_analog
