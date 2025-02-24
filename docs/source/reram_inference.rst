@@ -11,7 +11,7 @@ Conventional ReRAM relies on the redox reactions within the conductive filament 
 In contrast, the analog filamentary CMO-ReRAM operates on a different principle, with the modulation of defect states within the sub-band of the CMO layer playing a crucial role in its switching :ref:`[3] <references_reram>` :ref:`[4] <references_reram>` :ref:`[5] <references_reram>`. In this case, the CF plays a minimal role after the initial electroforming. During the RESET (from low to high resistance) process in CMO-ReRAM, oxygen vacancies migrate radially away from the conductive filament, depleting a semi-spherical volume referred to as the dome. This leads to a reduction in defect state density in the CMO layer, resulting in a high-resistance state. Conversely, during the SET (from high to low resistance) process, a local enrichment of defects occurs within the dome in the CMO layer, thus restoring the low-resistance state. Notably, various intermediate resistance states (IRS) can be achieved depending on the number of voltage pulses applied in both directions :ref:`[3] <references_reram>` :ref:`[4] <references_reram>` :ref:`[6] <references_reram>`.
 
 
-.. image:: ../img/filamentary_ReRAM.png
+.. image:: ../img/filamentary_reram.png
    :alt:
 
 The model simulates three different sources of noise in the CMO-ReRAM array: programming noise, read noise, and temporal drift. The model is used only during inference, assuming that the network weights have been trained beforehand in software using dedicated training algorithm (e.g. SGD or Tiki-Taka) :ref:`[7] <references_reram>`.
@@ -54,7 +54,7 @@ In analog ReRAM devices, a significant conductance relaxation has been observed 
     g_\text{drift} = {\cal N}(\mu_\text{drift},\sigma_\text{drift})
 
 
-described by a Gaussian distribution with mean :math:`\mu_\text{drift}` and standard deviation :math:`\sigma_\text{drift}`. In contrast to other resistive memory devices, the characterization of conductance relaxation in CMO-ReRAM devices showed independence from the target conductance level :ref:`[1] <references_reram>`. Therefore, the time dependency of the drift was extracted for a reference conductance level of 50 :math:`\mu S` among devices. 
+Described by a Gaussian distribution with mean :math:`\mu_\text{drift}` and standard deviation :math:`\sigma_\text{drift}`. In contrast to other resistive memory devices, the characterization of conductance relaxation in CMO-ReRAM devices showed independence from the target conductance level :ref:`[1] <references_reram>`. Therefore, the time dependency of the drift was extracted for a reference conductance level of 50 :math:`\mu S` among devices. 
 The mean and standard deviation of the drift showed a decrease and increase with the logarithm of the time, respectively. The fitted equations to model the mean and the standard deviation are defined as:
 
 .. math::
