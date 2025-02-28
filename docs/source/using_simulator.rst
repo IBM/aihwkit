@@ -399,6 +399,21 @@ instead of manually specifying a ``RPU Configuration``::
     tile = AnalogTile(10, 20, rpu_config=TikiTakaEcRamPreset())
 
 
+Working with half-precision training
+------------------------------------
+
+The simulator supports half-precision training. This can be enabled by setting the
+``RPUDataType`` to ``HALF`` when creating the configuration::
+
+    from aihwkit.simulator.configs import InferenceRPUConfig
+    from aihwkit.simulator.parameters.enums import RPUDataType
+
+    rpu_config = InferenceRPUConfig() # or TorchInferenceRPUConfig().
+    rpu_config.runtime.data_type = RPUDataType.HALF
+
+For more info look into :py:mod:`aihwkit.simulator.parameters.enums.RPUDataType`.
+
+
 .. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
 .. _Example 7: https://github.com/IBM/aihwkit/blob/master/examples/07_simple_layer_with_other_devices.py
 .. _Example 8: https://github.com/IBM/aihwkit/blob/master/examples/08_simple_layer_with_tiki_taka.py
