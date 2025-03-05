@@ -8,7 +8,7 @@
 
 from typing import Dict, List, Optional, Tuple
 
-from torch import abs as torch_abs
+from torch import abs as torch_abs, stack
 from torch import Tensor, zeros_like, from_numpy, linspace, allclose
 from torch.autograd import no_grad
 
@@ -341,4 +341,57 @@ class CustomPairConductanceConverter(BaseConductanceConverter):
         ):
             weights_us += f_factor * (g_plus - g_minus)
 
-        return weights_us / params["scale_ratio"]  # back to unitless
+        return weights_us / params['scale_ratio']   # back to unitless
+
+
+class SingleDeviceConductanceConverter(BaseConductanceConverter):
+    r"""Single devices to represent weights
+
+    Assuming a single bidirectional device per cross-point
+    Args:
+        g_max: In :math:`\mu S`, the maximal conductance, ie the value
+            the absolute max of the weights will be mapped to.
+        g_min: In :math:`\mu S`, the minimal conductance, ie the value
+            the logical zero of the weights will be mapped to.
+    """
+
+    def __init__(self, g_max: Optional[float] = None, g_min: Optional[float] = None):
+        self.g_max = 88.199997 if g_max is None else g_max
+        self.g_min = 9.0 if g_min is None else g_min
+        self.scale_ratio = None
+
+        if self.g_max < 0.0:
+            raise ValueError("g_max should be a positive value")
+        if self.g_min < 0.0:
+            raise ValueError("g_min should be a positive value")
+        if self.g_min >= self.g_max:
+            raise ValueError("g_min should be smaller than g_max")
+
+    def __str__(self) -> str:
+        return "{}(g_max={:1.2f}, g_min={:1.2f})".format(
+            self.__class__.__name__, self.g_max, self.g_min
+        )
+
+    @no_grad()
+    def convert_to_conductances(self, weights: Tensor) -> Tuple[List[Tensor], Dict]:
+        w_min = weights.min()
+        w_max = weights.max()
+        scale_ratio = (self.g_max - self.g_min) / (w_max - w_min)
+        scaled_weights = (weights - w_min) * scale_ratio
+        conductance = scaled_weights + self.g_min
+        params = {"scale_ratio": scale_ratio, "min": w_min}
+        return conductance, params
+
+    @no_grad()
+    def convert_back_to_weights(self, conductances: Tensor, params: Dict) -> Tensor:
+        if "scale_ratio" not in params:
+            raise ValueError("params do not contain scale_ratio")
+        if "min" not in params:
+            raise ValueError("params do not contain min")
+
+        if isinstance(conductances, list):
+            conductances = stack(conductances)
+
+        weights = params["min"] + ((conductances - self.g_min) / params["scale_ratio"])
+
+        return weights

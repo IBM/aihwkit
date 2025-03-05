@@ -10,9 +10,11 @@ from torch import randn
 
 from aihwkit.inference import (
     PCMLikeNoiseModel,
+    ReRamCMONoiseModel,
     CustomDriftPCMLikeNoiseModel,
     StateIndependentNoiseModel,
     SinglePairConductanceConverter,
+    SingleDeviceConductanceConverter,
     DualPairConductanceConverter,
     NPairConductanceConverter,
     CustomPairConductanceConverter,
@@ -29,6 +31,16 @@ class NoiseModelTest(AihwkitTestCase):
         weights = randn(10, 35)
 
         noise_model = PCMLikeNoiseModel()
+        t_inference = 100.0
+        noisy_weights = noise_model.apply_noise(weights, t_inference)
+
+        self.assertNotAlmostEqualTensor(noisy_weights, weights)
+
+    def test_apply_noise_reram_cmo(self):
+        """Test using realistic weights (bias)."""
+        weights = randn(10, 35)
+
+        noise_model = ReRamCMONoiseModel()
         t_inference = 100.0
         noisy_weights = noise_model.apply_noise(weights, t_inference)
 
@@ -181,7 +193,6 @@ class ConductanceConverterTest(AihwkitTestCase):
 
         tolerance = 1e-6
         for g_plus, g_minus in zip(g_lst[::2], g_lst[1::2]):
-
             g_plus = g_lst[0].detach().cpu().numpy()
             g_minus = g_lst[1].detach().cpu().numpy()
 
@@ -198,3 +209,19 @@ class ConductanceConverterTest(AihwkitTestCase):
         converted_weights = g_converter.convert_back_to_weights(g_lst, params)
 
         self.assertTensorAlmostEqual(weights, converted_weights)  # invertibility test
+
+    def test_single_device_converter(self):
+        """Tests single bidirectional switching device converter"""
+        g_max = 88.19
+        g_min = 9.0
+
+        weights = randn(10, 35)
+        g_converter = SingleDeviceConductanceConverter(g_max=g_max, g_min=g_min)
+        g_lst, params = g_converter.convert_to_conductances(weights=weights)
+        tolerance = 1e-6
+        self.assertTrue((g_lst > g_max - tolerance).sum() == 0)
+        self.assertTrue((g_lst < g_min - tolerance).sum() == 0)
+
+        converted_weights = g_converter.convert_back_to_weights(g_lst, params)
+
+        self.assertTensorAlmostEqual(weights, converted_weights)

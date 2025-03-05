@@ -582,7 +582,7 @@ def plot_device_compact(
     axis_left.set_xlim(0.0, limit)
     axis_right.set_xlim(0.0, limit)
 
-    return figure
+    return w_trace
 
 
 def plot_device_symmetry(
