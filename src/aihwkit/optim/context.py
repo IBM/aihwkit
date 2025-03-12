@@ -31,6 +31,12 @@ class AnalogContext(Parameter):
         only for studying propuses. To simulate the real reading, call the `read_weights` method
         instead, i.e. given `analog_ctx: AnalogContext`,
         estimated_weights, estimated_bias = analog_ctx.analog_tile.read_weights()
+        
+    Similarly, even though this feature allows us to update the weights directly, always keep in mind
+        that the real RPU devices change their weights only by "pulse update" method. 
+        Therefore, use the following update methods instead of writing `data` directly in the analog optimizer:
+            analog_ctx.analog_tile.update(...)
+            analog_ctx.analog_tile.update_indexed(...)
     """
 
     def __new__(
