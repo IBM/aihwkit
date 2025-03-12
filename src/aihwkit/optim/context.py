@@ -19,7 +19,19 @@ if TYPE_CHECKING:
 
 
 class AnalogContext(Parameter):
-    """Context for analog optimizer."""
+    """Context for analog optimizer.
+    
+    Remark: `data` attribution, inherited from `torch.nn.Parameter`, is a tensor of training parameter
+    If `analog_bias` (which is provided by `analog_tile`) is False,
+        `data` has the same meaning as `torch.nn.Parameter`
+    If `analog_bias` (which is provided by `analog_tile`) is True,
+        The last column of `data` is the `bias` term
+        
+    Even though it allows us to access the weights directly, always keep in mind that it is used
+        only for studying propuses. To simulate the real reading, call the `read_weights` method
+        instead, i.e. given `analog_ctx: AnalogContext`,
+        estimated_weights, estimated_bias = analog_ctx.analog_tile.read_weights()
+    """
 
     def __new__(
         cls: Type["AnalogContext"],
@@ -46,6 +58,12 @@ class AnalogContext(Parameter):
         self.analog_input = []  # type: list
         self.analog_grad_output = []  # type: list
         self.reset(analog_tile)
+
+        # analog_tile.tile is the class from C++ code:
+        # aihwkit.silulator.rpu_base.devices.AnalogTile
+        # It stores the "weight" matrix; 
+        #   If analog_tile.analog_bias is True, it also stores the "bias" matrix
+        self.data = analog_tile.tile.get_weights()
 
     def set_indexed(self, value: bool = True) -> None:
         """Set the context to forward_indexed."""
