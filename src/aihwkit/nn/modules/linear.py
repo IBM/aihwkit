@@ -82,6 +82,10 @@ class AnalogLinear(AnalogLayerBase, Linear):
             self.weight, self.bias = self.get_weights()  # type: ignore
             super().reset_parameters()
             self.set_weights(self.weight, self.bias)  # type: ignore
+            # AnalogLinear doesn't support access weight and bias directly, so delete them
+            del self.weight, self.bias
+            # delete them manually is necessary since asigning `bias` (a bool) is forbidden
+            #   by torch if self.bias is already a tensor
             self.weight, self.bias = None, bias
 
     def forward(self, x_input: Tensor) -> Tensor:
