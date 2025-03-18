@@ -100,14 +100,18 @@ class SerializationTest(ParametrizedTestCase):
     @staticmethod
     def get_layer_and_tile_weights(model):
         """Return the weights and biases of the model and the tile and whether
-        it automatically syncs"""
+        it automatically syncs
+        
+        Note: All the weights and biases are detached and converted to numpy format."""
 
         if isinstance(model, AnalogLinearMapped):
             weight, bias = model.get_weights()
+            weight, bias = weight.detach().cpu().numpy(), bias.detach().cpu().numpy()
             return weight, bias, weight, bias, True
 
         if isinstance(model, AnalogConv2dMapped):
             weight, bias = model.get_weights()
+            weight, bias = weight.detach().cpu().numpy(), bias.detach().cpu().numpy()
             return weight, bias, weight, bias, True
 
         if model.weight is not None:
@@ -115,6 +119,7 @@ class SerializationTest(ParametrizedTestCase):
         else:
             # we do not sync anymore
             weight, bias = model.get_weights()
+            weight, bias = weight.detach().cpu().numpy(), bias.detach().cpu().numpy()
             return weight, bias, weight, bias, True
 
         if model.bias is not None:
@@ -436,6 +441,7 @@ class SerializationTest(ParametrizedTestCase):
         self.assertIsInstance(new_analog_tile.analog_ctx.analog_tile, analog_tile.__class__)
 
         self.assertTrue(new_analog_tile.is_cuda != analog_tile.is_cuda)
+        self.assertTrue(new_analog_tile.device.type == map_location)
 
         if analog_tile.shared_weights is not None:
             self.assertTrue(new_analog_tile.shared_weights.device.type == map_location)
@@ -923,7 +929,11 @@ class SerializationTestExtended(ParametrizedTestCase):
 
             state1 = new_state_dict[key]
             state2 = state_dict[key]
-            assert_array_almost_equal(state1["analog_tile_weights"], state2["analog_tile_weights"])
+            weights1 = state1["analog_tile_weights"]
+            weights2 = state2["analog_tile_weights"]
+            if self.use_cuda:
+                weights1, weights2 = weights1.cpu(), weights2.cpu()
+            assert_array_almost_equal(weights1, weights2)
             # assert_array_almost_equal(state1['analog_alpha_scale'],
             #                           state2['analog_alpha_scale'])
 

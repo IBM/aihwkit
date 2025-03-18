@@ -48,7 +48,7 @@ class AnalogContext(Parameter):
         if parameter is None:
             return Parameter.__new__(
                 cls,
-                data=ones((), device=analog_tile.device, dtype=analog_tile.get_dtype()),
+                data=None,
                 requires_grad=True,
             )
         parameter.__class__ = cls
@@ -65,8 +65,9 @@ class AnalogContext(Parameter):
         self.analog_grad_output = []  # type: list
         self.reset(analog_tile)
 
-        # analog_tile.tile is the class from C++ code:
-        # aihwkit.silulator.rpu_base.devices.AnalogTile
+        # analog_tile.tile can comes from different classes:
+        #   aihwkit.silulator.rpu_base.devices.AnalogTile (C++)
+        #   TorchInferenceTile (Python)
         # It stores the "weight" matrix; 
         #   If analog_tile.analog_bias is True, it also stores the "bias" matrix
         self.data = analog_tile.tile.get_weights()

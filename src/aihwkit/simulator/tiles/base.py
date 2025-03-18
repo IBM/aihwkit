@@ -281,6 +281,15 @@ class SimulatorTileWrapper:
             should be used.
         handle_output_bound: whether the bound clamp gradient should be inserted
         ignore_analog_state: whether to ignore the analog state when __getstate__ is called
+        
+    
+    Attributes:
+        tile: A simulator tile object that handles the computations for the given input/output sizes.
+              It is created by `self._create_simulator_tile` method, which is provided by the derived class.
+              E.g., `aihwkit.simulator.tiles.analog.AnalogTile` and 
+                    `aihwkit.simulator.tiles.inference_torch.TorchInferenceTile` implement this method.
+              The weight data is stored in the tile object.
+        analog_ctx: `AnalogContext`, which wraps the weight in tile into a `torch.nn.Parameter` object.
     """
 
     def __init__(
@@ -295,8 +304,6 @@ class SimulatorTileWrapper:
         handle_output_bound: bool = False,
         ignore_analog_state: bool = False,
     ):
-        self.is_cuda = False
-        self.device = torch_device("cpu")
         self.out_size = out_size
         self.in_size = in_size
         self.rpu_config = deepcopy(rpu_config)
@@ -323,6 +330,15 @@ class SimulatorTileWrapper:
 
         self.analog_ctx = AnalogContext(self)
         self.analog_ctx.use_torch_update = torch_update
+        
+    @property
+    def device(self) -> torch_device:
+        """Return the device of the tile."""
+        return self.analog_ctx.device
+    
+    @property
+    def is_cuda(self) -> bool:
+        return self.analog_ctx.is_cuda
 
     def get_runtime(self) -> RuntimeParameter:
         """Returns the runtime parameter."""
@@ -456,8 +472,6 @@ class SimulatorTileWrapper:
 
         # don't save device. Will be determined by loading object
         current_dict.pop("stream", None)
-        current_dict.pop("is_cuda", None)
-        current_dict.pop("device", None)
 
         # this is should not be saved.
         current_dict.pop("image_sizes", None)
@@ -527,9 +541,6 @@ class SimulatorTileWrapper:
             self.rpu_config = rpu_config
             self.__dict__.update(current_dict)
 
-            self.device = torch_device("cpu")
-            self.is_cuda = False
-
             # recreate attributes not saved
             # always first create on CPU
             x_size = self.in_size + 1 if self.analog_bias else self.in_size
@@ -568,8 +579,15 @@ class SimulatorTileWrapper:
         if analog_ctx is not None:
             # Keep the object ID and device
             to_device = analog_ctx.device
-            if self.device != to_device:
-                self.analog_ctx = self.analog_ctx.to(to_device)
+            if self.analog_ctx.device != to_device:
+                # aihwkit implements analog tiles in both CPU and CUDA versions, 
+                #   e.g. FloatingPointTile(RPUSimple<float>(4, 3))
+                #   v.s. FloatingPointTile(RPUCudaSimple<float>(4, 3))
+                # Here we need to manually convert the tile to the corresponding version
+                self.to(to_device)
+                # Note: `self.to(to_device)` will call `self.analog_ctx.data.to(to_device)`
+                #        so no need to recall
+                # self.analog_ctx = self.analog_ctx.to(to_device)
             self.analog_ctx.set_data(analog_ctx.data)
 
     @no_grad()
@@ -642,8 +660,6 @@ class SimulatorTileWrapper:
         if not self.is_cuda:
             return self
 
-        self.is_cuda = False
-        self.device = torch_device("cpu")
         self.analog_ctx.data = self.analog_ctx.data.cpu()
         self.analog_ctx.reset(self)
 
@@ -665,8 +681,6 @@ class SimulatorTileWrapper:
             CudaError: if the library has not been compiled with CUDA.
         """
         device = torch_device("cuda", cuda_device(device).idx)
-        self.is_cuda = True
-        self.device = device
         self.analog_ctx.data = self.analog_ctx.data.cuda(device)
         self.analog_ctx.reset(self)
         return self
