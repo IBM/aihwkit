@@ -101,7 +101,7 @@ class SerializationTest(ParametrizedTestCase):
     def get_layer_and_tile_weights(model):
         """Return the weights and biases of the model and the tile and whether
         it automatically syncs
-        
+
         Note: All the weights and biases are detached and converted to numpy format."""
 
         if isinstance(model, AnalogLinearMapped):
