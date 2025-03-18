@@ -77,7 +77,7 @@ class TorchSimulatorTile(SimulatorTile, Module):
         Args:
             weight: ``[out_size, in_size]`` weight matrix.
         """
-        self.weight.data = weight.clone().to(self.weight.device)
+        self.weight.data.copy_(weight)
 
     def get_weights(self) -> Tensor:
         """Get the tile weights.
@@ -87,7 +87,7 @@ class TorchSimulatorTile(SimulatorTile, Module):
             matrix; and the second item is either the ``[out_size]`` bias vector
             or ``None`` if the tile is set not to use bias.
         """
-        return self.weight.data.detach().cpu()
+        return self.weight.data
 
     def get_x_size(self) -> int:
         """Returns input size of tile"""
