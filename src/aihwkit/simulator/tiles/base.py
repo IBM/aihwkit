@@ -548,6 +548,7 @@ class SimulatorTileWrapper:
 
             # Recreate the tile.
             self.tile = self._recreate_simulator_tile(x_size, d_size, self.rpu_config)
+            self.analog_ctx.data = self.tile.get_weights()
 
             names = self.tile.get_hidden_parameter_names()
             if len(hidden_parameters_names) > 0 and names != hidden_parameters_names:
