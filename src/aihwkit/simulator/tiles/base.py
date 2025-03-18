@@ -651,6 +651,15 @@ class SimulatorTileWrapper:
 
         return combined_weights, None
 
+    def to(self, device: torch_device) -> "SimulatorTileWrapper":
+        """Move the tile to a device.
+        """
+        if device.type == "cuda":
+            self.cuda(device)
+        else:
+            self.cpu()
+        return self
+    
     @no_grad()
     def cpu(self) -> "SimulatorTileWrapper":
         """Return a copy of this tile in CPU memory.
