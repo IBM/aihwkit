@@ -20,21 +20,22 @@ if TYPE_CHECKING:
 
 class AnalogContext(Parameter):
     """Context for analog optimizer.
-    
+
     Note: `data` attribution, inherited from `torch.nn.Parameter`, is a tensor of training parameter
     If `analog_bias` (which is provided by `analog_tile`) is False,
         `data` has the same meaning as `torch.nn.Parameter`
     If `analog_bias` (which is provided by `analog_tile`) is True,
         The last column of `data` is the `bias` term
-        
+
     Even though it allows us to access the weights directly, always keep in mind that it is used
         only for studying propuses. To simulate the real reading, call the `read_weights` method
         instead, i.e. given `analog_ctx: AnalogContext`,
         estimated_weights, estimated_bias = analog_ctx.analog_tile.read_weights()
-        
-    Similarly, even though this feature allows us to update the weights directly, 
-        always keep in mind that the real RPU devices change their weights only 
-        by "pulse update" method. 
+
+    Similarly, even though this feature allows us to update the weights directly,
+        always keep in mind that the real RPU devices change their weights only
+        by "pulse update" method.
+
     Therefore, use the following update methods instead of
         writing `data` directly in the analog optimizer:
         ---
@@ -58,9 +59,9 @@ class AnalogContext(Parameter):
         # analog_tile.tile can comes from different classes:
         #   aihwkit.silulator.rpu_base.devices.AnalogTile (C++)
         #   TorchInferenceTile (Python)
-        # It stores the "weight" matrix; 
+        # It stores the "weight" matrix;
         #   If analog_tile.analog_bias is True, it also stores the "bias" matrix
-        
+
         parameter.__class__ = cls
         return parameter
 
