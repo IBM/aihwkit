@@ -264,6 +264,7 @@ class SimulatorTile:
         raise NotImplementedError
 
 
+# pylint: disable=too-many-public-methods
 class SimulatorTileWrapper:
     """Wrapper base class for defining the necessary tile
     functionality.
@@ -341,6 +342,7 @@ class SimulatorTileWrapper:
 
     @property
     def is_cuda(self) -> bool:
+        """Return the is_cuda state of the tile."""
         return self.analog_ctx.is_cuda
 
     def get_runtime(self) -> RuntimeParameter:
@@ -654,6 +656,7 @@ class SimulatorTileWrapper:
 
         return combined_weights, None
 
+    # pylint: disable=invalid-name
     def to(self, device: torch_device) -> "SimulatorTileWrapper":
         """Move the tile to a device.
         """

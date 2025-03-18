@@ -19,7 +19,6 @@ from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
 from aihwkit.simulator.tiles.base import AnalogTileStateNames
 from aihwkit.simulator.parameters.base import RPUConfigBase
-from aihwkit.optim.context import AnalogContext
 
 if TYPE_CHECKING:
     from aihwkit.inference.noise.base import BaseNoiseModel
