@@ -34,9 +34,9 @@ class IOParameters(_PrintableMixin):
     If ``True``, it assumes an ideal forward pass (e.g. no bound, ADC etc...).
     Will disregard all other IOParameters settings in this case.
 
-    Note that other noise sources set by 
-    :class:`aihwkit.simulator.parameters.inference.WeightModifierParameter` and 
-    :class:`aihwkit.inference.noise` will still be applied.
+    Note that other noise sources set by
+    :class:`aihwkit.simulator.parameters.inference.WeightModifierParameter`
+    and :class:`aihwkit.inference.noise` will still be applied.
     """
 
     mv_type: AnalogMVType = AnalogMVType.ONE_PASS
