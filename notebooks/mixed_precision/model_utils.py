@@ -1,4 +1,13 @@
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
+#
+# Licensed under the MIT license. See LICENSE file in the project root for details.
+
 # various utility functions
+# pylint: skip-file
+# type: ignore
+
 import os
 import random
 
@@ -61,20 +70,13 @@ class BasicBlock(torch.nn.Module):
                 """
                 self.shortcut = LambdaLayer(
                     lambda x: F.pad(
-                        x[:, :, ::2, ::2],
-                        (0, 0, 0, 0, planes // 4, planes // 4),
-                        "constant",
-                        0,
+                        x[:, :, ::2, ::2], (0, 0, 0, 0, planes // 4, planes // 4), "constant", 0
                     )
                 )
             elif option == "B":
                 self.shortcut = torch.nn.Sequential(
                     torch.nn.Conv2d(
-                        in_planes,
-                        self.expansion * planes,
-                        kernel_size=1,
-                        stride=stride,
-                        bias=False,
+                        in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False
                     ),
                     torch.nn.BatchNorm2d(self.expansion * planes),
                 )

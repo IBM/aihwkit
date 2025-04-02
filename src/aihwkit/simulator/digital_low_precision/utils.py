@@ -1,12 +1,14 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
-""" Util conversion function for the quant library """
+"""Util conversion function for the quant library"""
 
 import numpy as np
+from numpy.typing import NDArray
+from torch import Tensor
 
 
-def to_numpy(tensor):
+def to_numpy(tensor: Tensor) -> NDArray:
     """
     Helper function that turns the given tensor into a numpy array.
 

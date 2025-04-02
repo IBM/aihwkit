@@ -2,6 +2,7 @@
 # All Rights Reserved.
 
 # pylint: skip-file
+# type: ignore
 
 import copy
 

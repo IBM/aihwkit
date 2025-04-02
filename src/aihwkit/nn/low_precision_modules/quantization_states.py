@@ -7,7 +7,9 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
-""" Functions to manipulate the quantization state of a module """
+# mypy: disable-error-code=attr-defined
+
+"""Functions to manipulate the quantization state of a module"""
 
 from torch.nn import Module
 
@@ -30,7 +32,7 @@ def quantized_weights(model: Module) -> None:
         recursively on its modules.
     """
 
-    def _fn(layer):
+    def _fn(layer: Module) -> None:
         if isinstance(layer, QuantizedModule):
             layer.quantized_weights()
 
@@ -47,7 +49,7 @@ def full_precision_weights(model: Module) -> None:
         in full precision
     """
 
-    def _fn(layer):
+    def _fn(layer: Module) -> None:
         if isinstance(layer, QuantizedModule):
             layer.full_precision_weights()
 
@@ -64,7 +66,7 @@ def quantized_acts(model: Module) -> None:
         recursively on its modules.
     """
 
-    def _fn(layer):
+    def _fn(layer: Module) -> None:
         if isinstance(layer, QuantizedModule):
             layer.quantized_acts()
 
@@ -81,7 +83,7 @@ def full_precision_acts(model: Module) -> None:
         in full precision
     """
 
-    def _fn(layer):
+    def _fn(layer: Module) -> None:
         if isinstance(layer, QuantizedModule):
             layer.full_precision_acts()
 
@@ -98,7 +100,7 @@ def quantized(model: Module) -> None:
         recursively on its modules.
     """
 
-    def _fn(layer):
+    def _fn(layer: Module) -> None:
         if isinstance(layer, QuantizedModule):
             layer.quantized()
 
@@ -115,7 +117,7 @@ def full_precision(model: Module) -> None:
         in full precision
     """
 
-    def _fn(layer):
+    def _fn(layer: Module) -> None:
         if isinstance(layer, QuantizedModule):
             layer.full_precision()
 
@@ -157,7 +159,7 @@ def fix_act_ranges(model: Module) -> None:
         in `fix_ranges` mode
     """
 
-    def _fn(module):
+    def _fn(module: Module) -> None:
         if isinstance(module, QuantizedModule) and hasattr(module, "activation_quantizer"):
             _set_layer_fix_ranges(module.activation_quantizer)
 
@@ -174,7 +176,7 @@ def fix_weight_ranges(model: Module) -> None:
         in `fix_ranges` mode
     """
 
-    def _fn(module):
+    def _fn(module: Module) -> None:
         if isinstance(module, QuantizedModule) and hasattr(module, "weight_quantizer"):
             _set_layer_fix_ranges(module.weight_quantizer)
 
@@ -203,7 +205,7 @@ def estimate_act_ranges(model: Module) -> None:
         in `estimate_ranges` mode
     """
 
-    def _fn(module):
+    def _fn(module: Module) -> None:
         if isinstance(module, QuantizedModule) and hasattr(module, "activation_quantizer"):
             _set_layer_estimate_ranges(module.activation_quantizer)
 
@@ -231,7 +233,7 @@ def reset_act_ranges(model: Module) -> None:
         Model to reset the activation quantizers of its modules
     """
 
-    def _fn(module):
+    def _fn(module: Module) -> None:
         if isinstance(module, QuantizedModule) and hasattr(module, "activation_quantizer"):
             module.activation_quantizer.reset_ranges()
 
@@ -265,7 +267,7 @@ def set_quant_state(model: Module, weight_quant: bool, act_quant: bool) -> None:
         full_precision_weights(model)
 
 
-def enable_quant_states(model) -> None:
+def enable_quant_states(model: Module) -> None:
     """Function to enable the quantization states in all modules that inherit from the
     `QuantizedModule` class.
 
@@ -275,7 +277,7 @@ def enable_quant_states(model) -> None:
         Model to configure
     """
 
-    def _fn(layer):
+    def _fn(layer: Module) -> None:
         if isinstance(layer, QuantizedModule):
             if layer.n_bits > 0:
                 layer.quantized_weights()

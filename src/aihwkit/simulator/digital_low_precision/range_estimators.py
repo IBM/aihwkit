@@ -2,6 +2,7 @@
 # All Rights Reserved.
 
 # pylint: skip-file
+# type: ignore
 
 import copy
 from collections import namedtuple
@@ -111,8 +112,8 @@ class CurrentMinMaxEstimator(RangeEstimatorBase):
                 # permute
                 if self.ranges is not None:
                     i = torch.argsort(self.ranges)
-                    I = torch.eye(len(i), device=self.ranges.device)
-                    P = I[i]
+                    Iarr = torch.eye(len(i), device=self.ranges.device)
+                    P = Iarr[i]
                     x = P.mm(x)
 
                 x = x.view(ng, -1)

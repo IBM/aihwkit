@@ -4,9 +4,10 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-"""Base tile with added periphery and common utility methods."""
-
 # pylint: disable=too-many-lines
+# mypy: disable-error-code=attr-defined
+
+"""Base tile with added periphery and common utility methods."""
 
 from typing import Optional, Tuple, Union, Any, List
 from numpy import array
@@ -933,20 +934,17 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             return x_output * scale
 
         if not is_test:
+            periph_quant_params = self.rpu_config.pre_post.periph_quant  # type: ignore
             # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
             # selected. In the learn mode, the ranges are also estimated up to batch number
             # `init_learning_after` and then switch to learned ranges.
-            if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
+            if not periph_quant_params.learn_quant_params:
                 self.scale_quantizer.estimate_ranges_train()  # estimate if no learned
             elif (
-                self.rpu_config.pre_post.periph_quant.learn_quant_params
-                and not self.scale_quantizer.is_learning()
+                periph_quant_params.learn_quant_params and not self.scale_quantizer.is_learning()
             ):  # If it's to be learned but it's not learning yet
                 self.scale_quant_update_idx.data += 1  # count up to the desired batch
-                if (
-                    self.scale_quant_update_idx
-                    > self.rpu_config.pre_post.periph_quant.init_learning_after
-                ):
+                if self.scale_quant_update_idx > periph_quant_params.init_learning_after:
                     self.scale_quantizer.learn_ranges()  # Switch to learned
                 else:
                     # Remain/switch to estimate ranges
@@ -985,20 +983,17 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             return output + self.bias.view(*tensor_view)
 
         if not is_test:
+            periph_quant_params = self.rpu_config.pre_post.periph_quant  # type: ignore
             # In training mode, the ranges are estimated UNLESS the `learn_quant_params` flag is
             # selected. In the learn mode, the ranges are also estimated up to batch number
             # `init_learning_after` and then switch to learned ranges.
-            if not self.rpu_config.pre_post.periph_quant.learn_quant_params:
+            if not periph_quant_params.learn_quant_params:
                 self.bias_quantizer.estimate_ranges_train()  # estimate if no learned
             elif (
-                self.rpu_config.pre_post.periph_quant.learn_quant_params
-                and not self.bias_quantizer.is_learning()
+                periph_quant_params.learn_quant_params and not self.bias_quantizer.is_learning()
             ):  # If it's to be learned but it's not learning yet
                 self.bias_quant_update_idx.data += 1  # count up to the desired batch
-                if (
-                    self.bias_quant_update_idx
-                    > self.rpu_config.pre_post.periph_quant.init_learning_after
-                ):
+                if self.bias_quant_update_idx > periph_quant_params.init_learning_after:
                     self.bias_quantizer.learn_ranges()  # Switch to learned
                 else:
                     # Remain/switch to estimate ranges

@@ -4,14 +4,16 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Defines configuration parameters and conversions to dict
-structures for the quantized module base classes """
+# mypy: disable-error-code=attr-defined
 
-from typing import Any, Optional, TYPE_CHECKING
+"""Defines configuration parameters and conversions to dict
+structures for the quantized module base classes"""
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from aihwkit.simulator.digital_low_precision.quantizers import QMethods
-from aihwkit.simulator.digital_low_precision.range_estimators import RangeEstimators, OptMethod
+from aihwkit.simulator.digital_low_precision.range_estimators import OptMethod, RangeEstimators
 
 if TYPE_CHECKING:
     from aihwkit.simulator.parameters.quantization import (
@@ -50,7 +52,7 @@ class CrossEntropyEstimatorParams(MSEEstimatorParams):
     Alias of `MSEEstimatorParams`"""
 
 
-def convert_configs_to_kwargs_dict(quant_config: "QuantizationConfig") -> dict[str, Any]:
+def convert_configs_to_kwargs_dict(quant_config: "QuantizationConfig") -> Dict[str, Any]:
     """Converts the QuantizationConfig structure to a kwargs dict for the
     `QuantizedModule` base class"""
     return {
@@ -61,7 +63,7 @@ def convert_configs_to_kwargs_dict(quant_config: "QuantizationConfig") -> dict[s
 
 def convert_weight_config_to_kwargs_dict(
     weight_quant_config: "WeightQuantConfig",
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Converts the WeightQuantConfig structure to a kwargs dict for the
     `QuantizedModule` base class"""
     weight_range_options = {}
@@ -94,7 +96,7 @@ def convert_weight_config_to_kwargs_dict(
     }
 
 
-def convert_act_config_to_kwargs_dict(act_quant_config: "ActivationQuantConfig") -> dict[str, Any]:
+def convert_act_config_to_kwargs_dict(act_quant_config: "ActivationQuantConfig") -> Dict[str, Any]:
     """Converts the ActivationQuantConfig structure to a kwargs dict for the
     `QuantizedModule` base class"""
     act_range_options = {}

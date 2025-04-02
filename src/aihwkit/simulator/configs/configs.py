@@ -297,7 +297,7 @@ class QuantizedTorchInferenceRPUConfig(TorchInferenceRPUConfig):
     """Tile and tile array classes used to simulate quantization
     on the output and the periphery of the tiles"""
 
-    act_quant_config: ActivationQuantConfig = None
+    act_quant_config: Optional[ActivationQuantConfig] = None
     """Activation quantization configuration for the output of the tiles,
     including the output of the array, if multiple tiles are used"""
 

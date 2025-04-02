@@ -322,10 +322,7 @@ def calibrate_quantization_ranges(
     """
 
     def pass_data_for_range_estimation(
-        loader: DataLoader,
-        model: Module,
-        max_num_batches: int = 20,
-        dataloader_inp_idx: Optional[int] = 0,
+        loader: DataLoader, model: Module, max_num_batches: int = 20, dataloader_inp_idx: int = 0
     ) -> None:
         """
         Places the model in eval mode and passes a number of batches so that the
@@ -340,12 +337,11 @@ def calibrate_quantization_ranges(
             The model to be calibrated
         max_num_batches : int, optional
             The maximum number of batches to use for estimation, by default 20
-        dataloader_inp_idx : Optional[int], optional
+        dataloader_inp_idx : int, optional
             Only applicable when the dataloader returns a list or tuple. Signifies which
             position of the list or tuple are the input data to be provided to the model,
             by default 0
         """
-
         model.eval()
         device = next(model.parameters()).device
         for i, data in enumerate(loader):

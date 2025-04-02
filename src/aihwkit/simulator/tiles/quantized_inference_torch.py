@@ -4,6 +4,8 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
+# mypy: disable-error-code=attr-defined
+
 """Tile with quantized periphery and outputs."""
 
 from typing import TYPE_CHECKING, Optional, Tuple

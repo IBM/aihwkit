@@ -7,10 +7,12 @@
 # Copyright (c) 2021 Qualcomm Technologies, Inc.
 # All Rights Reserved.
 
-""" Utility funcitons for converting a module to its quantized counterpart """
+# mypy: disable-error-code=attr-defined
+
+"""Utility funcitons for converting a module to its quantized counterpart"""
 
 from copy import deepcopy
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from torch.nn import Conv2d, Embedding, LayerNorm, Linear, Module
 
@@ -78,7 +80,7 @@ def get_module_args(module: Module, activation: Optional[Module] = None) -> dict
         a given module.
     """
 
-    def get_linear_args(module):
+    def get_linear_args(module: Module) -> Dict[str, Any]:
         """Quantization arguments for `QuantLinear`"""
         args = dict(
             in_features=module.in_features,
@@ -87,12 +89,12 @@ def get_module_args(module: Module, activation: Optional[Module] = None) -> dict
         )
         return args
 
-    def get_layernorm_args(module):
+    def get_layernorm_args(module: Module) -> Dict[str, Any]:
         """Quantization arguments for `QuantLayerNorm`"""
         args = dict(normalized_shape=module.normalized_shape, eps=module.eps)
         return args
 
-    def get_embedding_args(module):
+    def get_embedding_args(module: Module) -> Dict[str, Any]:
         """Quantization arguments for `QuantEmbeddings`"""
         args = dict(
             num_embeddings=module.num_embeddings,
@@ -105,7 +107,7 @@ def get_module_args(module: Module, activation: Optional[Module] = None) -> dict
         )
         return args
 
-    def get_conv2d_args(module):
+    def get_conv2d_args(module: Module) -> Dict[str, Any]:
         """Quantization arguments for `QuantConv2d`"""
         args = dict(
             in_channels=module.in_channels,

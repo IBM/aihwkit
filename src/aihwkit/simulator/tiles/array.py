@@ -4,7 +4,10 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
+# mypy: disable-error-code=attr-defined
+
 """Implements analog tile module array ."""
+
 from typing import Any, Optional, Tuple, List, TYPE_CHECKING
 
 from torch import Tensor, cat, split, zeros, full
@@ -21,6 +24,7 @@ from aihwkit.simulator.digital_low_precision.range_estimators import RangeEstima
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs.configs import MappableRPU
+    from aihwkit.simulator.configs import QuantizedTorchInferenceRPUConfig
 
 
 class TileModuleArray(Module, TileModuleBase):
@@ -205,7 +209,14 @@ class QuantizedTileModuleArray(TileModuleArray):
     output and bias quantization.
     """
 
-    def __init__(self, out_size, in_size, rpu_config, bias=False, **kwargs):
+    def __init__(
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: "QuantizedTorchInferenceRPUConfig",
+        bias: bool = False,
+        **kwargs: Any,
+    ):
         super().__init__(out_size, in_size, rpu_config, bias, **kwargs)
         self.periph_quant = rpu_config.pre_post.periph_quant
 

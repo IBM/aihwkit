@@ -2,6 +2,7 @@
 # All Rights Reserved.
 
 # pylint: skip-file
+# type: ignore
 
 from torch import nn
 

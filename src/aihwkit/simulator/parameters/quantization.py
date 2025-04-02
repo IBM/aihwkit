@@ -4,7 +4,9 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Quantization configuration parameters """
+# mypy: disable-error-code=attr-defined
+
+"""Quantization configuration parameters"""
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -63,7 +65,7 @@ class BaseQuantConfig(_PrintableMixin):
     through the property `range_estimator_params`.
     """
 
-    _range_estimator_to_params: dict[RangeEstimators, Any] = field(
+    _range_estimator_to_params: Dict[RangeEstimators, Any] = field(
         default_factory=lambda: {
             RangeEstimators.allminmax: None,
             RangeEstimators.current_minmax: CurrentMinMaxEstimatorParams,
@@ -74,7 +76,7 @@ class BaseQuantConfig(_PrintableMixin):
         init=False,
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initializes the `_range_estimator_params` with the default values according to
         the type of the `range_estimator object.
         """
@@ -90,7 +92,7 @@ class BaseQuantConfig(_PrintableMixin):
         return self._range_estimator
 
     @range_estimator.setter
-    def range_estimator(self, new_range_estimator: RangeEstimators):
+    def range_estimator(self, new_range_estimator: RangeEstimators) -> None:
         """Change `range_estimator` but also reset `range_estimator_params` object to the default
         configuration for the corresponding type of estimator.
         """
@@ -103,12 +105,12 @@ class BaseQuantConfig(_PrintableMixin):
         )
 
     @property
-    def range_estimator_params(self):
+    def range_estimator_params(self) -> Any:
         """range_estimator_params property"""
         return self._range_estimator_params
 
     @range_estimator_params.setter
-    def range_estimator_params(self, new_params):
+    def range_estimator_params(self, new_params: Any) -> None:
         """Configure the `range_estimator_params` but make sure it's in accordance to the type
         of range_estimator selected, to avoid misconfiguration.
         """

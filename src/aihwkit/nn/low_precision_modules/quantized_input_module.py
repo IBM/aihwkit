@@ -4,7 +4,11 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Module wrapper to quantize its input """
+# mypy: disable-error-code=attr-defined
+
+"""Module wrapper to quantize its input"""
+
+from typing import Any
 
 from torch import Tensor
 from torch.nn import Module
@@ -34,7 +38,7 @@ class QuantizedInputModule(Module):
             **convert_act_config_to_kwargs_dict(act_quant_config)
         )
 
-    def forward(self, inp: Tensor, *args, **kwargs):
+    def forward(self, inp: Tensor, *args: Any, **kwargs: Any) -> Tensor:
         """Perform the forward of the original module after quantizing its input"""
         # Quantize inputs
         input_q = self.input_quantizer(inp)

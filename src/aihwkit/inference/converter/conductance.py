@@ -341,7 +341,7 @@ class CustomPairConductanceConverter(BaseConductanceConverter):
         ):
             weights_us += f_factor * (g_plus - g_minus)
 
-        return weights_us / params['scale_ratio']   # back to unitless
+        return weights_us / params["scale_ratio"]  # back to unitless
 
 
 class SingleDeviceConductanceConverter(BaseConductanceConverter):
