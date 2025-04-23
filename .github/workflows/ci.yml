@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   COS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
   COS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
@@ -150,14 +154,17 @@ jobs:
       - name: Build wheels
         run: python3 -m cibuildwheel --output-dir wheelhouse
 
-      - name: Upload wheels to COS
-        uses: jakejarvis/s3-sync-action@master
-        with:
-          args: --acl public-read --delete wheelhouse/ s3://${{ env.COS_BUCKET }}/
+      - name: Sync wheels to IBM COS
         env:
-          AWS_S3_ENDPOINT: ${{ env.COS_ENDPOINT }}
-          AWS_ACCESS_KEY_ID: ${{ env.COS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.COS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-south-1
+        run: |
+          which aws || pip install awscli --upgrade
+          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
+            --acl public-read \
+            --delete \
+            --endpoint-url https://${{ env.COS_ENDPOINT }}
 
   build-and-deploy-macos:
     name: Build & Deploy wheels (macOS)
@@ -184,14 +191,17 @@ jobs:
       - name: Build wheels
         run: python3 -m cibuildwheel --output-dir wheelhouse --platform macos
 
-      - name: Upload wheels to COS
-        uses: jakejarvis/s3-sync-action@master
-        with:
-          args: --acl public-read --delete wheelhouse/ s3://${{ env.COS_BUCKET }}/
+      - name: Sync wheels to IBM COS
         env:
-          AWS_S3_ENDPOINT: ${{ env.COS_ENDPOINT }}
-          AWS_ACCESS_KEY_ID: ${{ env.COS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.COS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-south-1
+        run: |
+          which aws || pip install awscli --upgrade
+          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
+            --acl public-read \
+            --delete \
+            --endpoint-url https://${{ env.COS_ENDPOINT }}
 
   build-and-deploy-windows:
     name: Build & Deploy wheels (Windows)
@@ -220,11 +230,14 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
 
-      - name: Upload wheels to COS
-        uses: jakejarvis/s3-sync-action@master
-        with:
-          args: --acl public-read --delete wheelhouse/ s3://${{ env.COS_BUCKET }}/
+      - name: Sync wheels to IBM COS
         env:
-          AWS_S3_ENDPOINT: ${{ env.COS_ENDPOINT }}
-          AWS_ACCESS_KEY_ID: ${{ env.COS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.COS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-south-1
+        run: |
+          which aws || pip install awscli --upgrade
+          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
+            --acl public-read \
+            --delete \
+            --endpoint-url https://${{ env.COS_ENDPOINT }}
