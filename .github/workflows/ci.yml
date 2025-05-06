@@ -30,7 +30,9 @@ jobs:
             --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
       - name: Build and install aihwkit wheel
-        run: make build_inplace
+        run: |
+          pip install -r requirements.txt
+          make build_inplace
 
       - name: Run pytest
         run: |
@@ -62,7 +64,9 @@ jobs:
             --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
       - name: Build and install aihwkit wheel
-        run: make build_inplace
+        run: |
+          pip install -r requirements.txt
+          make build_inplace
 
       - name: Run lint checks
         run: |
@@ -96,7 +100,9 @@ jobs:
                                    --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
       - name: Build and install aihwkit wheel
-        run: make build_inplace
+        run: |
+          pip install -r requirements.txt
+          make build_inplace
 
       - name: Run pytest
         run: |
