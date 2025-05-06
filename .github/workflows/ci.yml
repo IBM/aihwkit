@@ -44,9 +44,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install travis-wait-improved
           travis-wait-improved --timeout 60m pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-          pip install -r requirements-examples.txt
-          VERBOSE=1 pip install -v ".[visualization, fitting]"
+          VERBOSE=1 pip install -e .
 
       - name: Run pytest
         run: make pytest
