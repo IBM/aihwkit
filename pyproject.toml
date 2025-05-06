@@ -2,8 +2,18 @@
 requires = [
   "setuptools>=66.0.0",
   "wheel",
-  "scikit-build",
-  "cmake",
-  "ninja"
+  "ninja",
+  "cmake>=3.18",
+  "scikit-build>=0.11.1",
+  "scikit-learn",
+  "pybind11>=2.6.2",
+  "torch>=1.9",
+  "torchvision",
+  "scipy",
+  "requests>=2.25,<3",
+  "numpy>=1.22,<2",
+  "protobuf>=4.21.6",
+  "tqdm",
+  "mypy==0.991"
 ]
 build-backend = "setuptools.build_meta"

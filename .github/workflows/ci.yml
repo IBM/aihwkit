@@ -6,16 +6,6 @@ on:
   pull_request:
     branches: master
 
-permissions:
-  id-token: write
-  contents: read
-
-env:
-  COS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
-  COS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
-  COS_BUCKET:          ${{ secrets.COS_BUCKET }}
-  COS_ENDPOINT:        ${{ secrets.COS_ENDPOINT }}
-
 jobs:
   # ────────────────────────────
   # Test on Python 3.10
@@ -39,15 +29,13 @@ jobs:
             --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
             --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install travis-wait-improved
-          travis-wait-improved --timeout 60m pip install -r requirements.txt
-          VERBOSE=1 pip install -e .
+      - name: Build and install aihwkit wheel
+        run: make build_inplace
 
       - name: Run pytest
-        run: make pytest
+        run: |
+          pip install pytest
+          make pytest
         env:
           TEST_DATASET: true
 
@@ -73,17 +61,13 @@ jobs:
             --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
             --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install travis-wait-improved
-          travis-wait-improved --timeout 60m pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-          pip install -r requirements-examples.txt
-          VERBOSE=1 pip install -v ".[visualization, fitting]"
+      - name: Build and install aihwkit wheel
+        run: make build_inplace
 
       - name: Run lint checks
         run: |
+          pip install -r requirements-dev.txt
+          pip install -r requirements-examples.txt
           make pycodestyle
           make pylint
           make mypy
@@ -111,14 +95,10 @@ jobs:
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
                                    --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install travis-wait-improved
-          travis-wait-improved --timeout 60m pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-          pip install -r requirements-examples.txt
-          VERBOSE=1 pip install -v ".[visualization, fitting]"
+      - name: Build and install aihwkit wheel
+        run: make build_inplace
 
       - name: Run pytest
-        run: make pytest
+        run: |
+          pip install pytest
+          make pytest
