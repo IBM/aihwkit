@@ -36,7 +36,7 @@ jobs:
 
       - name: Run pytest
         run: |
-          pip install pytest
+          pip install -r requirements-dev.txt
           make pytest
         env:
           TEST_DATASET: true
@@ -106,5 +106,5 @@ jobs:
 
       - name: Run pytest
         run: |
-          pip install pytest
+          pip install -r requirements-dev.txt
           make pytest
