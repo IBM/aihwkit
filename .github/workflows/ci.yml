@@ -46,7 +46,7 @@ jobs:
           travis-wait-improved --timeout 60m pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install -r requirements-examples.txt
-          VERBOSE=1 pip install -v -e ".[visualization, fitting]"
+          VERBOSE=1 pip install -v ".[visualization, fitting]"
 
       - name: Run pytest
         run: make pytest
@@ -82,7 +82,7 @@ jobs:
           travis-wait-improved --timeout 60m pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install -r requirements-examples.txt
-          VERBOSE=1 pip install -v -e ".[visualization, fitting]"
+          VERBOSE=1 pip install -v ".[visualization, fitting]"
 
       - name: Run lint checks
         run: |
@@ -120,7 +120,7 @@ jobs:
           travis-wait-improved --timeout 60m pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install -r requirements-examples.txt
-          VERBOSE=1 pip install -v -e ".[visualization, fitting]"
+          VERBOSE=1 pip install -v ".[visualization, fitting]"
 
       - name: Run pytest
         run: make pytest
