@@ -64,6 +64,7 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   T transfer_lr = (T)1.0;
   std::vector<T> transfer_lr_vec;
   bool scale_transfer_lr = true;
+  bool scale_fast_lr = true;
   bool transfer_columns = true; // or rows
   int _in_size = 0;
   int _out_size = 0;

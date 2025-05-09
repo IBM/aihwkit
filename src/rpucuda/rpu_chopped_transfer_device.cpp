@@ -75,9 +75,9 @@ template <typename T> void ChoppedTransferRPUDeviceMetaParameter<T>::checkSuppor
     RPU_FATAL("Only same context supported");
   }
 
-  if (!this->fullyHidden()) {
-    RPU_FATAL("Expects a fully hidden fast device.");
-  }
+  // if (!this->fullyHidden()) {
+  //   RPU_FATAL("Expects a fully hidden fast device.");
+  // }
 
   if ((this->n_reads_per_transfer != 1) || (this->random_selection != false) ||
       (this->with_reset_prob > (T)0.0)) {
