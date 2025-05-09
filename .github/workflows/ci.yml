@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: master
+  pull_request:
+    branches: master
+
+jobs:
+  # ────────────────────────────
+  # Test on Python 3.10
+  # ────────────────────────────
+  test-py310:
+    name: Test (Python 3.10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10.17
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y ca-certificates libopenblas-dev gcc-9 g++-9
+          sudo update-alternatives \
+            --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
+            --slave /usr/bin/g++ g++ /usr/bin/g++-9
+
+      - name: Build and install aihwkit wheel
+        run: |
+          pip install -r requirements.txt
+          make build_inplace
+
+      - name: Run pytest
+        run: |
+          pip install -r requirements-dev.txt
+          make pytest
+        env:
+          TEST_DATASET: true
+
+  # ────────────────────────────
+  # Lint on Python 3.10
+  # ────────────────────────────
+  lint-py310:
+    name: Lint (Python 3.10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10.17
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y ca-certificates libopenblas-dev gcc-9 g++-9
+          sudo update-alternatives \
+            --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
+            --slave /usr/bin/g++ g++ /usr/bin/g++-9
+
+      - name: Build and install aihwkit wheel
+        run: |
+          pip install -r requirements.txt
+          make build_inplace
+
+      - name: Run lint checks
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r requirements-examples.txt
+          make pycodestyle
+          make pylint
+          make mypy
+  # ────────────────────────────────────────
+  # Stage: Test multiple Python versions
+  # ────────────────────────────────────────
+  test-matrix:
+    name: Tests (3.8 & 3.9)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y ca-certificates libopenblas-dev gcc-9 g++-9
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
+                                   --slave /usr/bin/g++ g++ /usr/bin/g++-9
+
+      - name: Build and install aihwkit wheel
+        run: |
+          pip install -r requirements.txt
+          make build_inplace
+
+      - name: Run pytest
+        run: |
+          pip install -r requirements-dev.txt
+          make pytest
