@@ -4,18 +4,27 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
+# mypy: disable-error-code=attr-defined
+
 """Implements analog tile module array ."""
+
 from typing import Any, Optional, Tuple, List, TYPE_CHECKING
 
-from torch import Tensor, cat, split, zeros
+from torch import Tensor, cat, split, zeros, full
 from torch.nn import ModuleList, Parameter, Module
 from torch.autograd import no_grad
 
 from aihwkit.simulator.tiles.base import TileModuleBase
 from aihwkit.exceptions import TileModuleError
+from aihwkit.simulator.digital_low_precision.base_quantized_classes import QuantizedActivation
+from aihwkit.simulator.digital_low_precision.config_utils import convert_act_config_to_kwargs_dict
+from aihwkit.simulator.digital_low_precision.base_quantized_classes import QuantizationManager
+from aihwkit.simulator.digital_low_precision.quantizers import QMethods
+from aihwkit.simulator.digital_low_precision.range_estimators import RangeEstimators
 
 if TYPE_CHECKING:
     from aihwkit.simulator.configs.configs import MappableRPU
+    from aihwkit.simulator.configs import QuantizedTorchInferenceRPUConfig
 
 
 class TileModuleArray(Module, TileModuleBase):
@@ -187,3 +196,122 @@ class TileModuleArray(Module, TileModuleBase):
                 out_values_row.append(getattr(analog_tile, method_name)(*args, **kwargs))
             out_values.append(out_values_row)
         return out_values
+
+
+class QuantizedTileModuleArray(TileModuleArray):
+    """Logical array of quantized torch inference tile modules. It extends
+    the functionality of `TileModuleArray`, by adding quantization capability
+    for the bias (which is applied here instead of the individual tiles) and
+    for the final result of the array, after all the partial results from the
+    tiles have been accumulated.
+
+    It only overwrites the forward function of the `TileModuleArray`, to add the
+    output and bias quantization.
+    """
+
+    def __init__(
+        self,
+        out_size: int,
+        in_size: int,
+        rpu_config: "QuantizedTorchInferenceRPUConfig",
+        bias: bool = False,
+        **kwargs: Any,
+    ):
+        super().__init__(out_size, in_size, rpu_config, bias, **kwargs)
+        self.periph_quant = rpu_config.pre_post.periph_quant
+
+        # Quantization in tall and wide layers. The tall layers need to be
+        # requantized because they were produced by accumulation
+        # of partial results, and as such are no longer quantized in the
+        # same bit-precision. The wide layers need to be quantized to equalize
+        # the range across the different tiles and keep the precision down
+        # in case of bias addition.
+        if self.analog_tile_count > 1:
+            if rpu_config.act_quant_config is not None and rpu_config.act_quant_config.n_bits > 0:
+                self.module_out_quantizer = QuantizedActivation(
+                    **convert_act_config_to_kwargs_dict(rpu_config.act_quant_config)
+                )
+                # Enable the quantization
+                self.module_out_quantizer.quantized_acts()
+            else:
+                self.module_out_quantizer = None
+
+        # Initialize the bias quantizer, if quantized periphery is defined
+        if self.bias is not None:
+            if rpu_config.pre_post.periph_quant.n_bits > 0:
+                periph_quant = rpu_config.pre_post.periph_quant
+                self.bias_quantizer = QuantizationManager(
+                    qmethod=(
+                        QMethods.symmetric_uniform
+                        if periph_quant.symmetric
+                        else QMethods.asymmetric_uniform
+                    ),
+                    qparams={"n_bits": periph_quant.n_bits},
+                    init=RangeEstimators.current_minmax,
+                )
+                if periph_quant.learn_quant_params:
+                    self.bias_quant_update_idx = Parameter(
+                        full((1,), 0.0, device=self.device), requires_grad=False
+                    )
+            else:
+                self.bias_quantizer = None
+
+    def forward(self, x_input: Tensor, tensor_view: Optional[Tuple] = None) -> Tensor:
+        """Compute the forward pass, quantizing the final result as appropriate"""
+        # pylint: disable=arguments-differ,arguments-renamed,too-many-branches
+
+        # Create the final result. In tall splits, perform the intermediate accumulation
+        if self.analog_tile_count == 1:
+            analog_tile = self.array[0][0]  # pylint: disable=unsubscriptable-object
+            result = analog_tile(x_input)
+        else:
+            # mapped version
+            last_dim = x_input.ndim - 1
+            splits = split(x_input, self.in_sizes, dim=last_dim)
+            result = None
+            for idx, (x, in_tiles) in enumerate(zip(splits, self.array)):
+                out_result = []
+
+                for analog_tile in in_tiles:
+                    out_result.append(analog_tile(x, tensor_view=tensor_view))
+
+                if idx == 0:
+                    result = cat(out_result, last_dim)
+                else:
+                    result.add_(cat(out_result, last_dim))
+
+        # Add the bias
+        if self.bias is not None:
+            if tensor_view is None:
+                tensor_view = analog_tile.get_tensor_view(result.dim())
+            if self.bias_quantizer is None:
+                result += self.bias.view(*tensor_view)
+            else:
+                # In the case of evaluation with uninitialized quantizer, take care of
+                # estimating the ranges first and then fixing them
+                if not self.training and not self.bias_quantizer.quantizer.is_initialized:
+                    self.bias_quantizer.estimate_ranges()
+                    q_bias = self.bias_quantizer(self.bias)
+                    self.bias_quantizer.fix_ranges()
+                    result += q_bias.view(*tensor_view)
+
+                else:
+                    if (
+                        self.training
+                        and self.periph_quant.learn_quant_params
+                        and not self.bias_quantizer.is_learning()
+                    ):
+                        # If learning is enabled, estimate till `init_learning_after`
+                        # before switching to learned
+                        self.bias_quant_update_idx.data += 1  # count up to the desired batch
+                        if self.bias_quant_update_idx > self.periph_quant.init_learning_after:
+                            self.bias_quantizer.learn_ranges()  # Switch to learned
+
+                    # Add to the result the quantized bias
+                    result += self.bias_quantizer(self.bias).view(*tensor_view)
+
+        # Quantize the final result post accumulation and bias addition
+        if self.module_out_quantizer is not None:
+            result = self.module_out_quantizer(result)
+
+        return result

@@ -64,6 +64,7 @@ from .configs import (
     DigitalRankUpdateRPUConfig,
     TorchInferenceRPUConfig,
     TorchInferenceRPUConfigIRDropT,
+    QuantizedTorchInferenceRPUConfig,
 )
 
 from .helpers import build_config

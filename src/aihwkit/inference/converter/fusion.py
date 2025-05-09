@@ -43,9 +43,7 @@ class FusionConductanceConverter(BaseConductanceConverter):
 
     def __init__(self, g_max: int = 40) -> None:
         if g_max < 10 or g_max > 40:
-            raise ArgumentError(
-                "Specified fusion g_max value must be between 10 and 40."
-            )
+            raise ArgumentError("Specified fusion g_max value must be between 10 and 40.")
         self.g_max = g_max
         self.scale_ratio = None
 
@@ -58,24 +56,22 @@ class FusionConductanceConverter(BaseConductanceConverter):
         scale_ratio_per_col = self.g_max / abs_max_per_col.clamp(min=_ZERO_CLIP)
         scaled_weights = weights * scale_ratio_per_col.unsqueeze(1)
         conductances = [abs(scaled_weights).clamp(min=0.0, max=self.g_max)]
-        params = {
-            "original_weights": weights,
-        }
+        params = {"original_weights": weights}
         return conductances, params
 
     @no_grad()
-    def convert_back_to_weights(
-        self, conductances: List[Tensor], params: Dict
-    ) -> Tensor:
+    def convert_back_to_weights(self, conductances: List[Tensor], params: Dict) -> Tensor:
         if len(conductances) != 1:
             raise ValueError("conductances must contain exactly 1 element")
         if "original_weights" not in params:
             raise ValueError("params do not contain original_weights")
 
-        weights = conductances[0] * sign(params['original_weights'])
+        weights = conductances[0] * sign(params["original_weights"])
         for col in range(weights.shape[0]):
-            reg = LinearRegression().fit(weights[col].flatten().numpy().reshape(-1, 1), params[
-                'original_weights'][col].flatten().numpy().reshape(-1, 1))
+            reg = LinearRegression().fit(
+                weights[col].flatten().numpy().reshape(-1, 1),
+                params["original_weights"][col].flatten().numpy().reshape(-1, 1),
+            )
             weights[col] *= reg.coef_[0][0]
 
         return weights

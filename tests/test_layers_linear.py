@@ -32,12 +32,26 @@ from aihwkit.nn import AnalogSequential, AnalogLinear
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearCuda
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import FloatingPoint, IdealizedConstantStep, Inference, TorchInference, Custom
+from .helpers.tiles import (
+    FloatingPoint,
+    IdealizedConstantStep,
+    Inference,
+    TorchInference,
+    Custom,
+    QuantizedTorchInference,
+)
 
 
 @parametrize_over_layers(
     layers=[Linear, LinearCuda],
-    tiles=[FloatingPoint, IdealizedConstantStep, Inference, TorchInference, Custom],
+    tiles=[
+        FloatingPoint,
+        IdealizedConstantStep,
+        Inference,
+        TorchInference,
+        Custom,
+        QuantizedTorchInference,
+    ],
     biases=["analog", "digital", None],
 )
 class LinearLayerTest(ParametrizedTestCase):
@@ -336,7 +350,9 @@ class LinearLayerTest(ParametrizedTestCase):
 
 
 @parametrize_over_layers(
-    layers=[Linear, LinearCuda], tiles=[Inference, TorchInference], biases=["digital"]
+    layers=[Linear, LinearCuda],
+    tiles=[Inference, TorchInference, QuantizedTorchInference],
+    biases=["digital"],
 )
 class LinearLayerInferenceTest(ParametrizedTestCase):
     """Linear layer abstractions tests for inference."""

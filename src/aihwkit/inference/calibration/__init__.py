@@ -7,4 +7,8 @@
 """High level inference tools."""
 
 # Convenience imports for easier access to the classes.
-from .calibration import calibrate_input_ranges, InputRangeCalibrationType
+from .calibration import (
+    InputRangeCalibrationType,
+    calibrate_input_ranges,
+    calibrate_quantization_ranges,
+)

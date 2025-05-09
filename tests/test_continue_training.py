@@ -6,16 +6,21 @@
 
 """Tests for continuing to train."""
 
-from torch import manual_seed, rand, mean, tensor, allclose
+from typing import Union
+
+from pytest import mark
+from torch import allclose, manual_seed, mean, rand, tensor
 from torch.nn import Linear
 
 from aihwkit.optim.analog_optimizer import AnalogSGD
-from aihwkit.simulator.configs import TorchInferenceRPUConfig
+from aihwkit.simulator.configs import QuantizedTorchInferenceRPUConfig, TorchInferenceRPUConfig
 from aihwkit.simulator.configs.utils import BoundManagementType, NoiseManagementType
 from aihwkit.nn.conversion import convert_to_analog
 
 
-def train_linear_regression(reload: bool):
+def train_linear_regression(
+    rpu_cls: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig], reload: bool
+):
     """Train a linear regression model and return the losses."""
 
     def generate_toy_data(num_samples=100):
@@ -32,7 +37,7 @@ def train_linear_regression(reload: bool):
     x, y = generate_toy_data()
     model = Linear(1, 1)
 
-    rpu_config = TorchInferenceRPUConfig()
+    rpu_config = rpu_cls()
     rpu_config.forward.bound_management = BoundManagementType.NONE
     rpu_config.forward.noise_management = NoiseManagementType.NONE
     rpu_config.forward.out_noise = 0.0
@@ -66,8 +71,9 @@ def train_linear_regression(reload: bool):
     return tensor(losses)
 
 
-def test_continue_training():
+@mark.parametrize("rpu_cls", [TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig])
+def test_continue_training(rpu_cls):
     """Test if continuing to train still works."""
-    losses_false = train_linear_regression(reload=False)
-    losses_true = train_linear_regression(reload=True)
+    losses_false = train_linear_regression(rpu_cls, reload=False)
+    losses_true = train_linear_regression(rpu_cls, reload=True)
     assert allclose(losses_false, losses_true, atol=1e-4)

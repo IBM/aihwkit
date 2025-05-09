@@ -226,10 +226,7 @@ class HermesNoiseModel(BaseNoiseModel):
 
     @no_grad()
     def apply_drift_noise_to_conductance(
-        self,
-        g_prog: Tensor,
-        drift_noise_param: Tensor,
-        t_inference: float,
+        self, g_prog: Tensor, drift_noise_param: Tensor, t_inference: float
     ) -> Tensor:
         """Apply the noise and drift up to the assumed inference time
         point based on PCM measurements."""

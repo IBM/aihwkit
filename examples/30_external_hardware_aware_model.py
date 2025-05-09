@@ -24,10 +24,7 @@ import torchvision
 from torchvision.datasets.utils import download_url
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.simulator.presets import StandardHWATrainingPreset
-from aihwkit.inference.calibration import (
-    calibrate_input_ranges,
-    InputRangeCalibrationType,
-)
+from aihwkit.inference.calibration import calibrate_input_ranges, InputRangeCalibrationType
 
 
 class LambdaLayer(torch.nn.Module):
@@ -48,9 +45,7 @@ class BasicBlock(torch.nn.Module):
             in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
         )
         self.bn1 = torch.nn.BatchNorm2d(planes)
-        self.conv2 = torch.nn.Conv2d(
-            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
-        )
+        self.conv2 = torch.nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = torch.nn.BatchNorm2d(planes)
 
         self.shortcut = torch.nn.Sequential()
@@ -61,20 +56,13 @@ class BasicBlock(torch.nn.Module):
                 """
                 self.shortcut = LambdaLayer(
                     lambda x: F.pad(
-                        x[:, :, ::2, ::2],
-                        (0, 0, 0, 0, planes // 4, planes // 4),
-                        "constant",
-                        0,
+                        x[:, :, ::2, ::2], (0, 0, 0, 0, planes // 4, planes // 4), "constant", 0
                     )
                 )
             elif option == "B":
                 self.shortcut = torch.nn.Sequential(
                     torch.nn.Conv2d(
-                        in_planes,
-                        self.expansion * planes,
-                        kernel_size=1,
-                        stride=stride,
-                        bias=False,
+                        in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False
                     ),
                     torch.nn.BatchNorm2d(self.expansion * planes),
                 )
@@ -175,20 +163,14 @@ def get_test_loader(batch_size=128):
     transform_test = torchvision.transforms.Compose(
         [
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(
-                (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-            ),
+            torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ]
     )
     testset = torchvision.datasets.CIFAR10(
         root="data/cifar10", train=False, download=True, transform=transform_test
     )
     test_loader = torch.utils.data.DataLoader(
-        testset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=0,
-        pin_memory=True,
+        testset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True
     )
     return test_loader
 
@@ -257,9 +239,7 @@ if __name__ == "__main__":
     for t_id, t in enumerate(t_inferences):
         for i in range(n_reps):
             model.drift_analog_weights(t)
-            inference_accuracy_values[t_id, i] = evaluate_model(
-                model, test_loader, device
-            )
+            inference_accuracy_values[t_id, i] = evaluate_model(model, test_loader, device)
 
         print(
             f"Test set accuracy (%) at t={t}s: mean: {inference_accuracy_values[t_id].mean()}, \

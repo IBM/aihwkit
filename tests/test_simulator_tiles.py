@@ -66,6 +66,7 @@ from .helpers.tiles import (
     SoftBoundsReferenceCuda,
     TorchInference,
     TorchInferenceCuda,
+    QuantizedTorchInference,
 )
 from .helpers.testcases import SKIP_CUDA_TESTS
 
@@ -625,7 +626,15 @@ class TileTest(ParametrizedTestCase):
 
 
 @parametrize_over_tiles(
-    [ConstantStep, ConstantStepCuda, Inference, InferenceCuda, TorchInference, TorchInferenceCuda]
+    [
+        ConstantStep,
+        ConstantStepCuda,
+        Inference,
+        InferenceCuda,
+        TorchInference,
+        TorchInferenceCuda,
+        QuantizedTorchInference,
+    ]
 )
 class TileForwardBackwardTest(ParametrizedTestCase):
     """Test some forward aspects."""
