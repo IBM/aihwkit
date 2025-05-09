@@ -32,6 +32,8 @@ struct ChoppedTransferRPUDeviceMetaParameter : BufferedTransferRPUDeviceMetaPara
   T auto_momentum = (T)0.99;   // momentum for auto_scale (in batch?)
   T auto_granularity = (T)0.0; // scales by the number of mat-vecs to reach thres
 
+  bool buffer_as_momentum = false;
+  
   T buffer_granularity =
       (T)1.0; // does REPLACE the thres_scale (and is NOT scaled with weight_granularity)
   bool no_buffer = false; // turn off buffer (TTv1)

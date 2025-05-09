@@ -756,6 +756,7 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
       .def_readwrite("fast_lr", &TransferParam::fast_lr)
       .def_readwrite("transfer_lr_vec", &TransferParam::transfer_lr_vec)
       .def_readwrite("scale_transfer_lr", &TransferParam::scale_transfer_lr)
+      .def_readwrite("scale_fast_lr", &TransferParam::scale_fast_lr)
       .def_readwrite("transfer_forward", &TransferParam::transfer_io)
       .def_readwrite("transfer_update", &TransferParam::transfer_up)
       .def(
@@ -901,6 +902,7 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
       .def_readwrite("auto_momentum", &ChoppedTransferParam::auto_momentum)
       .def_readwrite("auto_granularity", &ChoppedTransferParam::auto_granularity)
       .def_readwrite("no_buffer", &ChoppedTransferParam::no_buffer)
+      .def_readwrite("buffer_as_momentum", &ChoppedTransferParam::buffer_as_momentum)
       .def_readwrite("buffer_granularity", &ChoppedTransferParam::buffer_granularity)
       .def("__str__", [](ChoppedTransferParam &self) {
         std::stringstream ss;

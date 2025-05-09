@@ -750,6 +750,12 @@ class ChoppedTransferCompound(TransferCompound):
     ie. whether to scale the transfer LR with the current LR of the SGD.
     """
 
+    scale_fast_lr: bool = False
+    """Whether to give the transfer_lr in relative units.
+
+    ie. whether to scale the transfer LR with the current LR of the SGD.
+    """
+
     transfer_forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameters that define the read of a transfer event.
 
@@ -757,6 +763,8 @@ class ChoppedTransferCompound(TransferCompound):
     (forward or backward) of an transfer event. For instance the amount of noise
     or whether transfer is done using a ADC/DAC etc.
     """
+    
+    buffer_as_momentum: bool = False
 
     transfer_update: UpdateParameters = field(
         default_factory=lambda: UpdateParameters(
