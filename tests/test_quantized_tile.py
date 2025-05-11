@@ -49,7 +49,7 @@ def test_output_quantization(n_bits, symmetric, range_estimator):
         in_features=in_d, out_features=out_d, bias=False, rpu_config=quant_rpu_config
     )
     linear.load_state_dict(linear_ref.state_dict(), strict=False, load_rpu_config=False)
-    inp = 1.0 * torch.ones((1, in_d))
+    inp = torch.ones((1, in_d))
     out = linear(inp)
     out_ref = linear_ref(inp)
     if n_bits == 0:
@@ -89,7 +89,7 @@ def test_array_module_output_quantization(
         in_features=arr_rows, out_features=arr_columns, bias=True, rpu_config=quant_rpu_config
     )
     linear.load_state_dict(linear_ref.state_dict(), strict=False, load_rpu_config=False)
-    inp = 1.0 * torch.ones((1, arr_rows))
+    inp = torch.ones((1, arr_rows))
     out = linear(inp)
     out_ref = linear_ref(inp)
     if n_bits == 0:
@@ -127,7 +127,7 @@ def test_quantized_periphery(n_bits, symmetric, arr_rows, arr_columns):
         in_features=arr_rows, out_features=arr_columns, bias=True, rpu_config=quant_rpu_config
     )
     linear.load_state_dict(linear_ref.state_dict(), strict=False, load_rpu_config=False)
-    inp = 1.0 * torch.ones((1, arr_rows))
+    inp = torch.ones((1, arr_rows))
     out = linear(inp)
     out_ref = linear_ref(inp)
     if n_bits == 0:

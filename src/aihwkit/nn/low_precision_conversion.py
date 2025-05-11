@@ -6,7 +6,7 @@
 
 """ Functions to convert a given model to a quantized counterpart """
 
-import copy
+from copy import deepcopy
 
 from torch.nn import Module, Linear, Conv2d
 
@@ -44,7 +44,7 @@ def convert_to_quantized(model: Module, quantization_map: QuantizationMap) -> Mo
     torch.nn.Module
         The quantized model
     """
-    quant_model = copy.deepcopy(model)
+    quant_model = deepcopy(model)
     quant_model = quantize_model(quant_model, quantization_map)
     enable_quant_states(quant_model)
     return quant_model

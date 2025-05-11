@@ -4,7 +4,7 @@
 # pylint: skip-file
 # type: ignore
 
-import copy
+from copy import deepcopy
 
 import torch
 from torch import nn
@@ -40,7 +40,7 @@ class QuantizationHijacker(QuantizedModule):
         super().__init__(*args, **kwargs)
         if activation:
             assert isinstance(activation, tuple(activations_list))
-        self.activation_function = copy.deepcopy(activation) if activation else None
+        self.activation_function = deepcopy(activation) if activation else None
 
         weight_qparams = dict(n_bits=self.n_bits, scale_domain=self.scale_domain)
         act_qparams = dict(n_bits=self.n_bits_act, scale_domain=self.scale_domain)

@@ -52,6 +52,7 @@ def append_default_conversions(quantization_map: QuantizationMap) -> None:
     for module, q_module in DEFAULT_CONVERSIONS.items():
         if module in quantization_map.module_qconfig_map:
             continue
+
         quantization_map.module_qconfig_map[module] = QuantizedModuleConfig(
             quantized_module=q_module, module_qconfig=deepcopy(quantization_map.default_qconfig)
         )

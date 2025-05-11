@@ -345,6 +345,9 @@ def calibrate_quantization_ranges(
         model.eval()
         device = next(model.parameters()).device
         for i, data in enumerate(loader):
+            if i > max_num_batches:
+                break
+
             if isinstance(data, (tuple, list)):
                 # The case that the dataloader returns a list/tuple of (data, targets)
                 # (e.g., CIFAR dataloaders)
@@ -354,9 +357,6 @@ def calibrate_quantization_ranges(
                 # The case that the dataloader returns a dictionary, because the model takes kwargs.
                 x = {k: v.to(device=device) for k, v in data.items()}
                 model(**x)
-
-            if i > max_num_batches:
-                break
 
     # Place the model in `estimate_ranges` mode
     estimate_ranges(model)
@@ -368,5 +368,3 @@ def calibrate_quantization_ranges(
     fix_ranges(model)
     fix_act_ranges(model)
     fix_weight_ranges(model)
-
-    return model
