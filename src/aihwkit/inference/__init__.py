@@ -13,7 +13,7 @@ from aihwkit.inference.converter.conductance import (
     SingleDeviceConductanceConverter,
     DualPairConductanceConverter,
     NPairConductanceConverter,
-    CustomPairConductanceConverter
+    CustomPairConductanceConverter,
 )
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel, CustomDriftPCMLikeNoiseModel

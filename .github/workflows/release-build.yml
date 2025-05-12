@@ -1,0 +1,238 @@
+name: CI
+
+on:
+  push:
+    tags: 'release/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  COS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
+  COS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
+  COS_BUCKET:          ${{ secrets.COS_BUCKET }}
+  COS_ENDPOINT:        ${{ secrets.COS_ENDPOINT }}
+
+jobs:
+  # ────────────────────────────
+  # Test on Python 3.10
+  # ────────────────────────────
+  test-py310:
+    name: Test (Python 3.10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10.17
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y ca-certificates libopenblas-dev gcc-9 g++-9
+          sudo update-alternatives \
+            --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
+            --slave /usr/bin/g++ g++ /usr/bin/g++-9
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install travis-wait-improved
+          travis-wait-improved --timeout 60m pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -r requirements-examples.txt
+          VERBOSE=1 pip install -v -e ".[visualization, fitting]"
+
+      - name: Run pytest
+        run: make pytest
+        env:
+          TEST_DATASET: true
+
+  # ────────────────────────────
+  # Lint on Python 3.10
+  # ────────────────────────────
+  lint-py310:
+    name: Lint (Python 3.10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10.17
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y ca-certificates libopenblas-dev gcc-9 g++-9
+          sudo update-alternatives \
+            --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
+            --slave /usr/bin/g++ g++ /usr/bin/g++-9
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install travis-wait-improved
+          travis-wait-improved --timeout 60m pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -r requirements-examples.txt
+          VERBOSE=1 pip install -v -e ".[visualization, fitting]"
+
+      - name: Run lint checks
+        run: |
+          make pycodestyle
+          make pylint
+          make mypy
+  # ────────────────────────────────────────
+  # Stage: Test multiple Python versions
+  # ────────────────────────────────────────
+  test-matrix:
+    name: Tests (3.8 & 3.9)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system deps
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y ca-certificates libopenblas-dev gcc-9 g++-9
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 \
+                                   --slave /usr/bin/g++ g++ /usr/bin/g++-9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install travis-wait-improved
+          travis-wait-improved --timeout 60m pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -r requirements-examples.txt
+          VERBOSE=1 pip install -v -e ".[visualization, fitting]"
+
+      - name: Run pytest
+        run: make pytest
+
+  # ────────────────────────────
+  # Stage: Build & Deploy Wheels
+  # ────────────────────────────
+  build-and-deploy-linux:
+    name: Build & Deploy wheels (manylinux)
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:20.10.16
+        options: --privileged
+    env:
+      CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.4.1'"
+      CIBW_BEFORE_BUILD: "pip install torch==2.4.1 torchvision && pip install -r requirements.txt"
+      CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit"
+      CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
+      CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64"
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Pull manylinux image
+        run: docker pull $CIBW_MANYLINUX_X86_64_IMAGE
+
+      - name: Install cibuildwheel
+        run: python3 -m pip install cibuildwheel==2.8.1
+
+      - name: Build wheels
+        run: python3 -m cibuildwheel --output-dir wheelhouse
+
+      - name: Sync wheels to IBM COS
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-south-1
+        run: |
+          which aws || pip install awscli --upgrade
+          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
+            --acl public-read \
+            --delete \
+            --endpoint-url https://${{ env.COS_ENDPOINT }}
+
+  build-and-deploy-macos:
+    name: Build & Deploy wheels (macOS)
+    runs-on: macos-latest
+    env:
+      CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.0.1'"
+      CIBW_BEFORE_BUILD: "pip install torch==2.0.1 torchvision && pip install ./delocate && pip install -r requirements.txt"
+      CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64"
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Homebrew deps
+        run: |
+          brew update
+          brew install openblas
+
+      - name: Clone delocate
+        run: git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
+
+      - name: Install cibuildwheel
+        run: python3 -m pip install cibuildwheel==2.8.1
+
+      - name: Build wheels
+        run: python3 -m cibuildwheel --output-dir wheelhouse --platform macos
+
+      - name: Sync wheels to IBM COS
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-south-1
+        run: |
+          which aws || pip install awscli --upgrade
+          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
+            --acl public-read \
+            --delete \
+            --endpoint-url https://${{ env.COS_ENDPOINT }}
+
+  build-and-deploy-windows:
+    name: Build & Deploy wheels (Windows)
+    runs-on: windows-latest
+    env:
+      CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.4.1'"
+      CIBW_BEFORE_BUILD: "pip install torch==2.4.1 && pip install -r requirements.txt"
+      CIBW_BUILD: "cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
+      OPENBLAS_ROOT:  C:\\BLAS
+      OPENBLAS_ROOT_DIR: C:\\BLAS
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Python & BLAS
+        run: |
+          choco install python --version=3.8.6 -y
+          SET PATH=C:\Python38;C:\Python38\Scripts;%PATH%
+          mkdir C:\BLAS
+          Invoke-WebRequest -Uri https://github.com/xianyi/OpenBLAS/releases/download/v0.3.12/OpenBLAS-0.3.12-x64.zip -OutFile openblas.zip
+          Expand-Archive openblas.zip -DestinationPath C:\BLAS
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.8.1
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+
+      - name: Sync wheels to IBM COS
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-south-1
+        run: |
+          which aws || pip install awscli --upgrade
+          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
+            --acl public-read \
+            --delete \
+            --endpoint-url https://${{ env.COS_ENDPOINT }}

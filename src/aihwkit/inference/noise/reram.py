@@ -219,9 +219,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
         read_dict: Optional[Dict[str, float]] = None,
         acceptance_range: float = 2e-2,
     ):
-        g_converter = SingleDeviceConductanceConverter(
-            g_max=g_max, g_min=g_min
-        )
+        g_converter = SingleDeviceConductanceConverter(g_max=g_max, g_min=g_min)
         super().__init__(g_converter)
         g_max = getattr(self.g_converter, "g_max", g_max)
         g_min = getattr(self.g_converter, "g_min", g_min)
@@ -238,15 +236,9 @@ class ReRamCMONoiseModel(BaseNoiseModel):
                 2: [0.01129027418, 0.0112185391][::-1],
             }
         if read_dict is None:
-            read_dict = {
-                "K" : 0.0277316483,
-                "t_read" : 1e-6
-            }
+            read_dict = {"K": 0.0277316483, "t_read": 1e-6}
         if decay_dict is None:
-            decay_dict = {
-                "mean": [-0.08900206],
-                "std": [0.04201137, 0.41183342],
-            }
+            decay_dict = {"mean": [-0.08900206], "std": [0.04201137, 0.41183342]}
         if acceptance_range not in coeff_dict.keys():
             acceptance_range = min(coeff_dict.keys())
         self.coeff_dict = coeff_dict
@@ -287,8 +279,7 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
     @no_grad()
     def generate_drift_coefficients(self, g_target: Tensor) -> Tensor:
-        """Conductance relaxation is independent of the conductance level
-        """
+        """Conductance relaxation is independent of the conductance level"""
         return g_target
 
     @no_grad()
@@ -314,12 +305,13 @@ class ReRamCMONoiseModel(BaseNoiseModel):
 
         g_mean = g_prog + (self.decay_dict["mean"][0] * log(t_inference) * self.drift_scale)
 
-        sigma_relaxation = (
-            self.decay_dict["std"][0] * log(t_inference) + self.decay_dict["std"][1]
-        )
+        sigma_relaxation = self.decay_dict["std"][0] * log(t_inference) + self.decay_dict["std"][1]
         g_drift = g_mean + (randn_like(g_prog) * sigma_relaxation * self.drift_scale)
-        sigma_read = self.read_dict["K"] * log10(g_drift) * sqrt(
-            log((t_inference + self.read_dict["t_read"]) / (2 * self.read_dict["t_read"])))
+        sigma_read = (
+            self.read_dict["K"]
+            * log10(g_drift)
+            * sqrt(log((t_inference + self.read_dict["t_read"]) / (2 * self.read_dict["t_read"])))
+        )
         g_final = g_drift + sigma_read * randn_like(g_prog) * self.read_noise_scale
 
         return g_final.clamp(min=self.g_min, max=self.g_max)
