@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         SingleRPUConfig,
         UnitCellRPUConfig,
         TorchInferenceRPUConfig,
+        QuantizedTorchInferenceRPUConfig,
         DigitalRankUpdateRPUConfig,
     )
     from aihwkit.simulator.tiles.base import BaseTile
@@ -29,6 +30,7 @@ RPUConfigGeneric = Union[
     "UnitCellRPUConfig",
     "TorchInferenceRPUConfig",
     "DigitalRankUpdateRPUConfig",
+    "QuantizedTorchInferenceRPUConfig",
 ]
 
 

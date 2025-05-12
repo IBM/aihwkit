@@ -50,9 +50,10 @@ from .helpers.tiles import (
     TorchInferenceCuda,
     TorchInferenceIRDropT,
     TorchInferenceIRDropTCuda,
+    QuantizedTorchInference,
 )
 
-g_min, g_max = 0., 25.
+g_min, g_max = 0.0, 25.0
 
 
 @parametrize_over_tiles(
@@ -60,6 +61,7 @@ g_min, g_max = 0., 25.
         Inference,
         InferenceCuda,
         TorchInference,
+        QuantizedTorchInference,
         TorchInferenceCuda,
         TorchInferenceIRDropT,
         TorchInferenceIRDropTCuda,
@@ -271,28 +273,22 @@ class InferenceTileTest(ParametrizedTestCase):
 
     @parameterized.expand(
         [
-            ("single_pair", SinglePairConductanceConverter(g_min=g_min,
-                                                           g_max=g_max),),
-            ("dual_pair", DualPairConductanceConverter(f_lst=[1.0, 1.0],
-                                                       g_min=g_min,
-                                                       g_max=g_max),),
-            ("n_pair", NPairConductanceConverter(f_lst=[1.0, 1.0, 1.0],
-                                                 g_min=g_min,
-                                                 g_max=g_max),),
-            ("custom_pair", CustomPairConductanceConverter(f_lst=[1.0],
-                                                           g_lst=[[g_min,
-                                                                   g_min,
-                                                                   g_min,
-                                                                   (g_max - g_min) / 2 + g_min,
-                                                                   g_max],
-                                                                  [g_max,
-                                                                   (g_max - g_min) / 2 + g_min,
-                                                                   g_min,
-                                                                   g_min,
-                                                                   g_min]],
-                                                           g_min=g_min,
-                                                           g_max=g_max,
-                                                           invertibility_test=False),)
+            ("single_pair", SinglePairConductanceConverter(g_min=g_min, g_max=g_max)),
+            ("dual_pair", DualPairConductanceConverter(f_lst=[1.0, 1.0], g_min=g_min, g_max=g_max)),
+            ("n_pair", NPairConductanceConverter(f_lst=[1.0, 1.0, 1.0], g_min=g_min, g_max=g_max)),
+            (
+                "custom_pair",
+                CustomPairConductanceConverter(
+                    f_lst=[1.0],
+                    g_lst=[
+                        [g_min, g_min, g_min, (g_max - g_min) / 2 + g_min, g_max],
+                        [g_max, (g_max - g_min) / 2 + g_min, g_min, g_min, g_min],
+                    ],
+                    g_min=g_min,
+                    g_max=g_max,
+                    invertibility_test=False,
+                ),
+            ),
         ]
     )
     def test_weight_programming_optimization(self, _, g_converter: Type[BaseConductanceConverter]):
@@ -306,7 +302,7 @@ class InferenceTileTest(ParametrizedTestCase):
         weights = randn(16, 16)
 
         # get f_lst from g_converter if exists
-        f_lst = g_converter.f_lst if hasattr(g_converter, 'f_lst') else [1.0]
+        f_lst = g_converter.f_lst if hasattr(g_converter, "f_lst") else [1.0]
 
         # whether to optimize f_lst
         optimize_f_lst = True
@@ -314,20 +310,21 @@ class InferenceTileTest(ParametrizedTestCase):
         # keep or optimize f_lst params
         f_lst = [1.0] + [None] * (len(f_lst) - 1) if optimize_f_lst else f_lst
 
-        wpo = WeightProgrammingOptimizer(weights,
-                                         f_lst,
-                                         self.get_rpu_config(),
-                                         time_steps,
-                                         g_converter,
-                                         nbins=2,                       # speed up test
-                                         popsize=1,                     # speed up test
-                                         maxiter=1,                     # speed up test
-                                         baseline_iterations=1,         # speed up test
-                                         loss_margin=-1e9,              # speed up test
-                                         polish=False,                  # speed up test
-                                         disp=False,                    # suppress updates
-                                         callback=None,                 # suppress updates
-                                         )
+        wpo = WeightProgrammingOptimizer(
+            weights,
+            f_lst,
+            self.get_rpu_config(),
+            time_steps,
+            g_converter,
+            nbins=2,  # speed up test
+            popsize=1,  # speed up test
+            maxiter=1,  # speed up test
+            baseline_iterations=1,  # speed up test
+            loss_margin=-1e9,  # speed up test
+            polish=False,  # speed up test
+            disp=False,  # suppress updates
+            callback=None,  # suppress updates
+        )
         g_converter_optimized, success = wpo.run_optimizer()
 
         self.assertTrue(success)

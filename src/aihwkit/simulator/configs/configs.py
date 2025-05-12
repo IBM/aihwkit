@@ -11,9 +11,13 @@
 from dataclasses import dataclass, field
 from typing import ClassVar, Type, Optional, Union, Any
 
-from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
+from aihwkit.simulator.parameters.pre_post import (
+    PrePostProcessingRPU,
+    PrePostProcessingParameterQuant,
+)
 from aihwkit.simulator.parameters.mapping import MappableRPU
 from aihwkit.simulator.parameters.helpers import tile_parameters_to_bindings
+from aihwkit.simulator.parameters.quantization import ActivationQuantConfig
 from aihwkit.simulator.parameters.runtime import RuntimeParameter
 
 from aihwkit.simulator.configs.devices import (
@@ -39,11 +43,17 @@ from aihwkit.inference import (
     PCMLikeNoiseModel,
 )
 
-from aihwkit.simulator.tiles import AnalogTile, FloatingPointTile, InferenceTile, TorchInferenceTile
+from aihwkit.simulator.tiles import (
+    AnalogTile,
+    FloatingPointTile,
+    InferenceTile,
+    TorchInferenceTile,
+    QuantizedTorchInferenceTile,
+)
 
 from aihwkit.simulator.tiles.torch_tile import TorchSimulatorTile
 from aihwkit.simulator.tiles.torch_tile_irdrop_t import TorchSimulatorTileIRDropT
-from aihwkit.simulator.tiles.array import TileModuleArray
+from aihwkit.simulator.tiles.array import TileModuleArray, QuantizedTileModuleArray
 
 
 @dataclass
@@ -275,6 +285,28 @@ class TorchInferenceRPUConfig(InferenceRPUConfig):
 
     tile_array_class: Type = TileModuleArray
     """Tile class used for mapped logical tile arrays."""
+
+
+@dataclass
+class QuantizedTorchInferenceRPUConfig(TorchInferenceRPUConfig):
+    """Extends the TorchInference configuration with quantized functionality
+    in the periphery of the tile and the final output"""
+
+    tile_class: Type = QuantizedTorchInferenceTile
+    tile_array_class: Type = QuantizedTileModuleArray
+    """Tile and tile array classes used to simulate quantization
+    on the output and the periphery of the tiles"""
+
+    act_quant_config: Optional[ActivationQuantConfig] = None
+    """Activation quantization configuration for the output of the tiles,
+    including the output of the array, if multiple tiles are used"""
+
+    pre_post: PrePostProcessingParameterQuant = field(
+        default_factory=PrePostProcessingParameterQuant
+    )
+    """PrePostProcessing Parameter containing the periphery quantization
+    options, that are only supported in QuantizedTorchInferenceTile
+    and QuantizedTileModuleArray"""
 
 
 @dataclass

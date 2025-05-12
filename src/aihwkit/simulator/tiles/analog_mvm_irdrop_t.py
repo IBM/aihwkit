@@ -165,8 +165,7 @@ class AnalogMVMIRDropT(AnalogMVM):
 
             if not io_pars.split_mode_bit_shift % 1 == 0:
                 raise ConfigError(
-                    f"split_mode_bit_shift={io_pars.split_mode_bit_shift}"
-                    " must be integer"
+                    f"split_mode_bit_shift={io_pars.split_mode_bit_shift}" " must be integer"
                 )
 
             if not io_pars.split_mode_bit_shift < n_bits:
@@ -187,8 +186,7 @@ class AnalogMVMIRDropT(AnalogMVM):
             prepared_input_lsb = lower_bits * (2 * res)
 
             if not allclose(
-                (2**io_pars.split_mode_bit_shift) * prepared_input_msb
-                + prepared_input_lsb,
+                (2**io_pars.split_mode_bit_shift) * prepared_input_msb + prepared_input_lsb,
                 prepared_input,
             ):
                 raise ConfigError("Split mode pwm conversion error")
@@ -282,12 +280,7 @@ class AnalogMVMIRDropT(AnalogMVM):
         if use_extension and extension_ops is not None:
             # use C++ code for speedup if available
             output = extension_ops.thevenin_equiv(
-                input_,
-                gp_2d.T.contiguous(),
-                gm_2d.T.contiguous(),
-                r_s,
-                t_max,
-                time_steps,
+                input_, gp_2d.T.contiguous(), gm_2d.T.contiguous(), r_s, t_max, time_steps
             )
             vth_3d = output[0, :, :, :]
             rth_3d = output[1, :, :, :]
@@ -307,13 +300,7 @@ class AnalogMVMIRDropT(AnalogMVM):
                 return g_values
             shape = g_values.shape
             return g_values.view(
-                (
-                    shape[0],
-                    shape[1] // syn_rows_per_seg,
-                    syn_rows_per_seg,
-                    shape[2],
-                    shape[3],
-                )
+                (shape[0], shape[1] // syn_rows_per_seg, syn_rows_per_seg, shape[2], shape[3])
             ).sum(dim=2)
 
         # pp
@@ -410,17 +397,14 @@ class AnalogMVMIRDropT(AnalogMVM):
             "of segments (%s)" % (str(phys_input_size), str(io_pars.ir_drop_segments))
         )
 
-        input_, new_weight = cls._pad_symmetric(
-            input_, new_weight, phys_input_size=phys_input_size
-        )
+        input_, new_weight = cls._pad_symmetric(input_, new_weight, phys_input_size=phys_input_size)
         if g_converter is None:
             g_converter = SinglePairConductanceConverter()  # type: ignore
         g_lst, params = g_converter.convert_to_conductances(new_weight)
 
         mvm = zeros((input_.shape[0], g_lst[0].shape[1])).to(input_.device)
         # (f1, (gp1, gm1)), (f2, (gp2, gm2), ... , (fn, (gpn, gmn)) # low to highest significance
-        for f_factor, g_lst_pair in zip(params.get('f_lst', [1.]),
-                                        zip(g_lst[::2], g_lst[1::2])):
+        for f_factor, g_lst_pair in zip(params.get("f_lst", [1.0]), zip(g_lst[::2], g_lst[1::2])):
             vth_nd, rth_nd = cls._thev_equiv(
                 input_,
                 [g[:, 0::2] for g in g_lst_pair],  # even cols
@@ -449,7 +433,7 @@ class AnalogMVMIRDropT(AnalogMVM):
                 mvm_even_col_down_adc, mvm_odd_col_up_adc
             )  # symmetric ADCs
 
-        mvm /= params['scale_ratio']  # conductance normalization
+        mvm /= params["scale_ratio"]  # conductance normalization
         mvm /= 0.2  # hardware normalization
         mvm /= bit_res / 2.0  # normalize
         return mvm
@@ -513,9 +497,7 @@ class AnalogMVMIRDropT(AnalogMVM):
                 io_pars,
                 ir_drop=ir_drop,
                 t_max=1.0,
-                time_steps=int(
-                    (bit_res / 2) * io_pars.ir_drop_time_step_resolution_scale
-                ),
+                time_steps=int((bit_res / 2) * io_pars.ir_drop_time_step_resolution_scale),
                 phys_input_size=phys_input_size,
                 g_converter=g_converter,
             )
@@ -565,8 +547,7 @@ class AnalogMVMIRDropT(AnalogMVM):
             )
 
             finalized_outputs = (
-                finalized_outputs_lsb
-                + (2**io_pars.split_mode_bit_shift) * finalized_outputs_msb
+                finalized_outputs_lsb + (2**io_pars.split_mode_bit_shift) * finalized_outputs_msb
             )
             bound_test_passed = bound_test_passed_lsb * bound_test_passed_msb
 
@@ -644,14 +625,8 @@ class AnalogMVMIRDropT(AnalogMVM):
         if io_pars.slope_calibration > 0.0:
             raise ConfigError("Slope calibration not supported in torch tile")
 
-        if (
-            io_pars.v_offset_std > 0.0
-            or io_pars.v_offset_w_min > 0.0
-            or io_pars.r_series > 0.0
-        ):
+        if io_pars.v_offset_std > 0.0 or io_pars.v_offset_w_min > 0.0 or io_pars.r_series > 0.0:
             raise ConfigError("Voltage offset or R-series not supported in torch tile")
 
         if io_pars.w_read_asymmetry_dtod > 0.0:
-            raise ConfigError(
-                "Device polarity read dependence is not supported in torch tile"
-            )
+            raise ConfigError("Device polarity read dependence is not supported in torch tile")
