@@ -28,7 +28,11 @@ from .io import IOParameters, IOParametersIRDropT
 
 from .mapping import MappingParameter
 
-from .pre_post import InputRangeParameter, PrePostProcessingParameter
+from .pre_post import (
+    InputRangeParameter,
+    PrePostProcessingParameter,
+    PrePostProcessingParameterQuant,
+)
 
 from .inference import (
     WeightModifierParameter,
