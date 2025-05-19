@@ -607,6 +607,39 @@ class ChoppedTransferCompound(TransferCompound):
     at each transfer event (that is the settings
     ``random_selection=False``, ``with_reset_prob=0.0``,
     ``n_reads_per_transfer=1``).
+    
+    At each iteration, lr is first scaled as follows.
+    Let lr be the current learning rate of the optimizer, e.g. given by
+        ``AnalogSGD(model.parameters(), lr=0.01)``
+    
+        "final_buffer_granularity":
+            dw_min = granularity of weight (C) array
+            if `auto_granularity` > 0:
+                period = in_size * transfer_every
+                final_buffer_granularity = buffer_granularity * auto_granularity / period
+            else:
+                final_buffer_granularity = buffer_granularity
+        "final_fast_lr":
+            if `scale_fast_lr`:
+                final_fast_lr = fast_lr * current_lr
+            else:
+                final_fast_lr = fast_lr
+        "final_transfer_lr":
+            if `scale_transfer_lr`:
+                base_transfer_lr = gamma * transfer_lr * lr
+            else:
+                base_transfer_lr = gamma * transfer_lr
+            if `correct_gradient_magnitudes`:
+                ...
+            else:
+                final_transfer_lr = base_transfer_lr * current_lr
+
+    Recursion:
+        A += chopper * final_fast_lr * Gradient
+        H += chopper * final_trasfer_lr * A / final_buffer_granularity
+        if abs(H) > thres_scale * granularity:
+            C += H
+            H = momentum * H
 
     Note:
         This device is identical to :class:`BufferedTransferCompound` if
@@ -753,7 +786,7 @@ class ChoppedTransferCompound(TransferCompound):
     scale_fast_lr: bool = False
     """Whether to give the transfer_lr in relative units.
 
-    ie. whether to scale the transfer LR with the current LR of the SGD.
+    ie. whether to scale the fast LR with the current LR of the SGD.
     """
 
     transfer_forward: IOParameters = field(default_factory=IOParameters)
