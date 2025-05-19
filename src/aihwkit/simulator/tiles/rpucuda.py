@@ -153,8 +153,6 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
         if self.tile.__class__ in MAP_TILE_CLASS_TO_CUDA:
             with cuda_device(device):
                 self.tile = MAP_TILE_CLASS_TO_CUDA[self.tile.__class__](self.tile)
-                self.is_cuda = True
-                self.device = device
                 self.analog_ctx.data = self.analog_ctx.data.cuda(device)
                 self.analog_ctx.reset(self)  # type: ignore
 
