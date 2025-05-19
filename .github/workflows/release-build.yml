@@ -1,8 +1,9 @@
-name: CI
+name: release-build
 
 on:
-  push:
-    tags: 'release/**'
+  workflow_dispatch:
+  create:
+    tags: 'v**'
 
 permissions:
   id-token: write
