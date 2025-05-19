@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [1.0.0] - 2025/05/16
+## [1.0.0] - 2025/05/19
 
 ## Added
 
