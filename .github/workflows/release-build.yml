@@ -124,27 +124,19 @@ jobs:
   build-and-deploy-linux:
     name: Build & Deploy wheels (manylinux)
     runs-on: ubuntu-latest
-    services:
-      docker:
-        image: docker:20.10.16
-        options: --privileged
-    env:
-      CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.3.1'"
-      CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch==2.3.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
-      CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit"
-      CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
-      CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Pull manylinux image
-        run: docker pull $CIBW_MANYLINUX_X86_64_IMAGE
-
-      - name: Install cibuildwheel
-        run: python3 -m pip --no-cache-dir install cibuildwheel
+      - uses: actions/checkout@v4
 
       - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse
+        uses: pypa/cibuildwheel@v2.23.3
+        env:
+          CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
+          CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
+          CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit"
+          CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
+          CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
+        with:
+          output-dir: wheelhouse
 
       - name: Sync wheels to IBM COS
         env:
@@ -174,6 +166,7 @@ jobs:
         env:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
           CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
+          CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
           CIBW_ARCHS: x86_64
           CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
         with:
