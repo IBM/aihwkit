@@ -171,16 +171,16 @@ jobs:
       - name: Install Homebrew deps
         run: |
           brew update
-          brew install openblas
+          brew install openblas pipx
 
       - name: Clone delocate
         run: git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
 
       - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel==2.8.1
+        run: pipx install cibuildwheel==2.8.1
 
       - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse --platform macos
+        run: cibuildwheel --output-dir wheelhouse --platform macos
 
       - name: Sync wheels to IBM COS
         env:
