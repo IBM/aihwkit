@@ -164,6 +164,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Environment
+        run: |
+          brew install openblas
+          brew link --force openblas
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3
         env:
