@@ -170,8 +170,8 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3
         env:
-          CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.3.1'"
-          CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch==2.3.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
+          CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
+          CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
           CIBW_ARCHS: x86_64
           CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
         with:
