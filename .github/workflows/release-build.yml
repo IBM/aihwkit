@@ -23,7 +23,12 @@ jobs:
     name: Test (Python 3.10)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -57,7 +62,12 @@ jobs:
     name: Lint (Python 3.10)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -94,7 +104,12 @@ jobs:
       matrix:
         python-version: [3.8, 3.9]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -127,14 +142,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Cleanup runner
+        run: |
+          pip cache purge
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3
         env:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
-          CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
+          CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
           CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit"
           CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
-          CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
+          CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64"
         with:
           output-dir: wheelhouse
 
@@ -144,7 +170,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-south-1
         run: |
-          which aws || pip install --no-cache-dir awscli --upgrade
+          which aws || pip install awscli --upgrade
           aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
             --acl public-read \
             --delete \
@@ -156,6 +182,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Cleanup runner
+        run: |
+          pip cache purge
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+
       - name: Set up Environment
         run: |
           brew install openblas
@@ -165,7 +202,7 @@ jobs:
         uses: pypa/cibuildwheel@v2.23.3
         env:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
-          CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
+          CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
           CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
           CIBW_ARCHS: x86_64
           CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
