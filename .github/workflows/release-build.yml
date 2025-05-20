@@ -2,8 +2,8 @@ name: release-build
 
 on:
   workflow_dispatch:
-  create:
-    tags: 'v**'
+  # create:
+  #   tags: 'v**'
 
 permissions:
   id-token: write
@@ -130,7 +130,7 @@ jobs:
         options: --privileged
     env:
       CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.3.1'"
-      CIBW_BEFORE_BUILD: "pip install torch==2.3.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
+      CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch==2.3.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
       CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit"
       CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
       CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
@@ -141,7 +141,7 @@ jobs:
         run: docker pull $CIBW_MANYLINUX_X86_64_IMAGE
 
       - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel
+        run: python3 -m pip --no-cache-dir install cibuildwheel
 
       - name: Build wheels
         run: python3 -m cibuildwheel --output-dir wheelhouse
@@ -152,7 +152,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-south-1
         run: |
-          which aws || pip install awscli --upgrade
+          which aws || pip install --no-cache-dir awscli --upgrade
           aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
             --acl public-read \
             --delete \
@@ -161,26 +161,23 @@ jobs:
   build-and-deploy-macos:
     name: Build & Deploy wheels (macOS)
     runs-on: macos-latest
-    env:
-      CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.0.1'"
-      CIBW_BEFORE_BUILD: "pip install torch==2.0.1 torchvision && pip install ./delocate && pip install -r requirements.txt"
-      CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, 3.10]
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Homebrew deps
-        run: |
-          brew update
-          brew install openblas pipx
-
-      - name: Clone delocate
-        run: git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
-
-      - name: Install cibuildwheel
-        run: pipx install cibuildwheel==2.8.1
+      - uses: actions/checkout@v4
 
       - name: Build wheels
-        run: cibuildwheel --output-dir wheelhouse --platform macos
+        uses: pypa/cibuildwheel@v2.23.3
+        env:
+          CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.0.1'"
+          CIBW_BEFORE_BUILD: "pip install --no-cache-dir torch==2.0.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install --no-cache-dir -r requirements.txt"
+          CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
+        with:
+          # only build for macOS here
+          platform: macos
+          python-version: ${{ matrix.python-version }}
+          output-dir: wheelhouse
 
       - name: Sync wheels to IBM COS
         env:
@@ -188,7 +185,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-south-1
         run: |
-          which aws || pip install awscli --upgrade
+          which aws || pip install --no-cache-dir awscli --upgrade
           aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
             --acl public-read \
             --delete \
