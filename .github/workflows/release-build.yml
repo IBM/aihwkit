@@ -161,9 +161,6 @@ jobs:
   build-and-deploy-macos:
     name: Build & Deploy wheels (macOS)
     runs-on: macos-latest
-    strategy:
-      matrix:
-        python-version: [3.8, 3.9, 3.10]
     steps:
       - uses: actions/checkout@v4
 
