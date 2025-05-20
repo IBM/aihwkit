@@ -86,6 +86,7 @@ jobs:
           CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
           CIBW_ARCHS: x86_64
           CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
         with:
           output-dir: wheelhouse
 
