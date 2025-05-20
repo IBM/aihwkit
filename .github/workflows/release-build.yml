@@ -41,7 +41,7 @@ jobs:
           CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
           CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit"
           CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
-          CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64"
+          CIBW_BUILD: "cp310-manylinux_x86_64"
         with:
           output-dir: wheelhouse
 
@@ -57,9 +57,18 @@ jobs:
             --delete \
             --endpoint-url https://${{ env.COS_ENDPOINT }}
 
+      - name: Cleanup runner
+        if: always()
+        run: |
+          pip cache purge
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+          rm -rf wheelhouse build dist *.egg-info
+
   build-and-deploy-macos:
     name: Build & Deploy wheels (macOS)
     runs-on: macos-latest
+    needs: build-and-deploy-linux
     steps:
       - uses: actions/checkout@v4
 
@@ -67,11 +76,6 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-
-      - name: Cleanup runner
-        run: |
-          pip cache purge
-          sudo rm -rf /var/lib/apt/lists/*
 
       - name: Set up Environment
         run: |
@@ -83,9 +87,8 @@ jobs:
         env:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
           CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
-          CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
           CIBW_ARCHS: x86_64
-          CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
+          CIBW_BUILD: "cp310-macosx_x86_64"
           MACOSX_DEPLOYMENT_TARGET: "10.13"
         with:
           output-dir: wheelhouse
@@ -101,41 +104,11 @@ jobs:
             --acl public-read \
             --delete \
             --endpoint-url https://${{ env.COS_ENDPOINT }}
-
-  # build-and-deploy-windows:
-  #   name: Build & Deploy wheels (Windows)
-  #   runs-on: windows-latest
-  #   env:
-  #     CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.4.1'"
-  #     CIBW_BEFORE_BUILD: "pip install torch==2.4.1 && pip install -r requirements.txt"
-  #     CIBW_BUILD: "cp38-win_amd64 cp39-win_amd64 cp310-win_amd64"
-  #     OPENBLAS_ROOT:  C:\\BLAS
-  #     OPENBLAS_ROOT_DIR: C:\\BLAS
-  #   steps:
-  #     - uses: actions/checkout@v3
-
-  #     - name: Install Python & BLAS
-  #       run: |
-  #         choco install python --version=3.8.6 -y
-  #         SET PATH=C:\Python38;C:\Python38\Scripts;%PATH%
-  #         mkdir C:\BLAS
-  #         Invoke-WebRequest -Uri https://github.com/xianyi/OpenBLAS/releases/download/v0.3.12/OpenBLAS-0.3.12-x64.zip -OutFile openblas.zip
-  #         Expand-Archive openblas.zip -DestinationPath C:\BLAS
-
-  #     - name: Install cibuildwheel
-  #       run: python -m pip install cibuildwheel==2.8.1
-
-  #     - name: Build wheels
-  #       run: python -m cibuildwheel --output-dir wheelhouse
-
-  #     - name: Sync wheels to IBM COS
-  #       env:
-  #         AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
-  #         AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
-  #         AWS_DEFAULT_REGION: us-south-1
-  #       run: |
-  #         which aws || pip install awscli --upgrade
-  #         aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
-  #           --acl public-read \
-  #           --delete \
-  #           --endpoint-url https://${{ env.COS_ENDPOINT }}
+        
+      - name: Cleanup runner
+        if: always()
+        run: |
+          pip cache purge
+          brew cleanup --prune=all
+          rm -rf ~/Library/Caches/Homebrew/*
+          rm -rf wheelhouse build dist *.egg-info
