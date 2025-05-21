@@ -53,8 +53,6 @@ jobs:
         run: |
           which aws || pip install awscli --upgrade
           aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
-            --acl public-read \
-            --delete \
             --endpoint-url https://${{ env.COS_ENDPOINT }}
 
       - name: Cleanup runner
@@ -68,7 +66,6 @@ jobs:
   build-and-deploy-macos:
     name: Build & Deploy wheels (macOS)
     runs-on: macos-latest
-    needs: build-and-deploy-linux
     steps:
       - uses: actions/checkout@v4
 
@@ -87,8 +84,8 @@ jobs:
         env:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
           CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
-          CIBW_ARCHS: x86_64
-          CIBW_BUILD: "cp310-macosx_x86_64"
+          CIBW_ARCHS: "arm64"
+          CIBW_BUILD: "cp310-macosx_arm64"
           MACOSX_DEPLOYMENT_TARGET: "10.13"
         with:
           output-dir: wheelhouse
@@ -101,8 +98,6 @@ jobs:
         run: |
           which aws || pip install --no-cache-dir awscli --upgrade
           aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
-            --acl public-read \
-            --delete \
             --endpoint-url https://${{ env.COS_ENDPOINT }}
         
       - name: Cleanup runner
