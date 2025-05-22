@@ -35,7 +35,7 @@ jobs:
           sudo rm -rf /var/lib/apt/lists/*
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.3
+        uses: pypa/cibuildwheel@v2.8.1
         env:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
           CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
@@ -78,15 +78,16 @@ jobs:
         run: |
           brew install openblas
           brew link --force openblas
+          git clone -b aihwkit https://github.com/aihwkit-bot/delocate.git
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.3
+        uses: pypa/cibuildwheel@v2.8.1
         env:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
-          CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
-          CIBW_ARCHS: "arm64"
-          CIBW_BUILD: "cp310-macosx_arm64"
-          MACOSX_DEPLOYMENT_TARGET: "10.13"
+          CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install ./delocate && pip install -r requirements.txt"
+          CIBW_ARCHS: "x86_64"
+          CIBW_BUILD: "cp310-macosx_x86_64"
+          MACOSX_DEPLOYMENT_TARGET: "10.9"
         with:
           output-dir: wheelhouse
 
