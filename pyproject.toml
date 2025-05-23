@@ -1,5 +1,5 @@
 [build-system]
-requires = ["
+requires = [
   "setuptools>=66.0.0",
   "wheel",
   "ninja",
