@@ -3,15 +3,11 @@ name: release-build
 on:
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 env:
-  COS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
-  COS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
-  COS_BUCKET:          ${{ secrets.COS_BUCKET }}
-  COS_ENDPOINT:        ${{ secrets.COS_ENDPOINT }}
+  IBM_CLOUD_REGION: ${{ secrets.IBM_CLOUD_REGION }}
+  IBM_CLOUD_API_KEY: ${{ secrets.IBM_CLOUD_API_KEY }}
+  IBM_CLOUD_RESOURCE_GROUP: ${{ secrets.IBM_CLOUD_RESOURCE_GROUP }}
+  COS_BUCKET: ${{ secrets.COS_BUCKET }}
 
 jobs:
   # ────────────────────────────
@@ -47,13 +43,24 @@ jobs:
 
       - name: Sync wheels to IBM COS
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-south-1
+          IBM_CLOUD_REGION: ${{ secrets.IBM_CLOUD_REGION }}
+          IBM_CLOUD_API_KEY: ${{ secrets.IBM_CLOUD_API_KEY }}
+          IBM_CLOUD_RESOURCE_GROUP: ${{ secrets.IBM_CLOUD_RESOURCE_GROUP }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
         run: |
-          which aws || pip install awscli --upgrade
-          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
-            --endpoint-url https://${{ env.COS_ENDPOINT }}
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+          ibmcloud plugin install cos
+          ibmcloud login --apikey "$IBMCLOUD_API_KEY" -r "$IBM_CLOUD_REGION" -g "$IBM_CLOUD_RESOURCE_GROUP"
+          find "wheelhouse" -type f | while read filepath; do
+            relpath="${filepath#wheelhouse/}"
+            dest="$relpath"
+            echo "Uploading $filepath to $dest"
+            ibmcloud cos upload \
+              --bucket "$COS_BUCKET" \
+              --key "$dest" \
+              --file "$filepath" \
+              --region "$IBM_CLOUD_REGION"
+          done
 
       - name: Cleanup runner
         if: always()
@@ -93,14 +100,24 @@ jobs:
 
       - name: Sync wheels to IBM COS
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.COS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.COS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-south-1
+          IBM_CLOUD_REGION: ${{ secrets.IBM_CLOUD_REGION }}
+          IBM_CLOUD_API_KEY: ${{ secrets.IBM_CLOUD_API_KEY }}
+          IBM_CLOUD_RESOURCE_GROUP: ${{ secrets.IBM_CLOUD_RESOURCE_GROUP }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
         run: |
-          which aws || pip install --no-cache-dir awscli --upgrade
-          aws s3 sync wheelhouse/ s3://${{ env.COS_BUCKET }}/ \
-            --endpoint-url https://${{ env.COS_ENDPOINT }}
-        
+          curl -fsSL https://clis.cloud.ibm.com/install/osx | sh
+          ibmcloud plugin install cos
+          ibmcloud login --apikey "$IBMCLOUD_API_KEY" -r "$IBM_CLOUD_REGION" -g "$IBM_CLOUD_RESOURCE_GROUP"
+          find "wheelhouse" -type f | while read filepath; do
+            relpath="${filepath#wheelhouse/}"
+            dest="$relpath"
+            echo "Uploading $filepath to $dest"
+            ibmcloud cos upload \
+              --bucket "$COS_BUCKET" \
+              --key "$dest" \
+              --file "$filepath" \
+              --region "$IBM_CLOUD_REGION"
+          done
       - name: Cleanup runner
         if: always()
         run: |
