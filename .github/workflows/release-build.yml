@@ -37,7 +37,7 @@ jobs:
           CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install -r requirements.txt"
           CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit"
           CIBW_REPAIR_WHEEL_COMMAND: "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
-          CIBW_BUILD: "cp310-manylinux_x86_64"
+          CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64"
         with:
           output-dir: wheelhouse
 
@@ -93,7 +93,7 @@ jobs:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
           CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install ./delocate && pip install -r requirements.txt"
           CIBW_ARCHS: "x86_64"
-          CIBW_BUILD: "cp310-macosx_x86_64"
+          CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-macosx_x86_64"
           MACOSX_DEPLOYMENT_TARGET: "10.13"
         with:
           output-dir: wheelhouse
