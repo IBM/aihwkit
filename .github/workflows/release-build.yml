@@ -93,7 +93,7 @@ jobs:
           CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='>=2.1'"
           CIBW_BEFORE_BUILD: "pip install torch>=2.1 torchvision -f https://download.pytorch.org/whl/torch_stable.html && pip install ./delocate && pip install -r requirements.txt"
           CIBW_ARCHS: "x86_64"
-          CIBW_BUILD: "cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-macosx_x86_64"
+          CIBW_BUILD: "cp38-macosx_x86_64 cp39-macosx_x86_64 cp310-macosx_x86_64"
           MACOSX_DEPLOYMENT_TARGET: "10.13"
         with:
           output-dir: wheelhouse
