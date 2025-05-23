@@ -18,7 +18,6 @@ requires = [
   "ninja; platform_system!='Windows'",
 ]
 build-backend = "setuptools.build_meta"
-backend-path = ["."]
 
 [project]
 name = "aihwkit"
