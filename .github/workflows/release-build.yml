@@ -50,7 +50,7 @@ jobs:
         run: |
           curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
           ibmcloud plugin install cos
-          ibmcloud login --apikey "$IBMCLOUD_API_KEY" -r "$IBM_CLOUD_REGION" -g "$IBM_CLOUD_RESOURCE_GROUP"
+          ibmcloud login --apikey "$IBM_CLOUD_API_KEY" -r "$IBM_CLOUD_REGION" -g "$IBM_CLOUD_RESOURCE_GROUP"
           find "wheelhouse" -type f | while read filepath; do
             relpath="${filepath#wheelhouse/}"
             dest="$relpath"
@@ -107,7 +107,7 @@ jobs:
         run: |
           curl -fsSL https://clis.cloud.ibm.com/install/osx | sh
           ibmcloud plugin install cos
-          ibmcloud login --apikey "$IBMCLOUD_API_KEY" -r "$IBM_CLOUD_REGION" -g "$IBM_CLOUD_RESOURCE_GROUP"
+          ibmcloud login --apikey "$IBM_CLOUD_API_KEY" -r "$IBM_CLOUD_REGION" -g "$IBM_CLOUD_RESOURCE_GROUP"
           find "wheelhouse" -type f | while read filepath; do
             relpath="${filepath#wheelhouse/}"
             dest="$relpath"
