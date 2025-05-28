@@ -12,7 +12,7 @@ from setuptools import find_packages
 from skbuild import setup
 
 INSTALL_REQUIRES = [
-    "torch{}".format(os.getenv("TORCH_VERSION_SPECIFIER", ">=1.9")),
+    "torch{}".format(os.getenv("TORCH_VERSION_SPECIFIER", ">=1.9,<2.7")),
     "torchvision",
     "scipy",
     "requests>=2.25,<3",
@@ -20,13 +20,12 @@ INSTALL_REQUIRES = [
     "protobuf>=4.21.6",
 ]
 
-
 def get_version() -> str:
-    """Get the package version."""
+    """Get the package version for CUDA enabled wheels."""
     version_path = os.path.join(os.path.dirname(__file__), "src", "aihwkit", "VERSION.txt")
     with open(version_path, encoding="utf-8") as version_file:
-        return version_file.read().strip()
-
+        v = version_file.read().strip()
+        return f"{v}{os.getenv('AIHWKIT_VERSION_SUFFIX', '')}"
 
 def get_long_description() -> str:
     """Get the package long description."""
