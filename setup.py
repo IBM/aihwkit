@@ -24,8 +24,8 @@ def get_version() -> str:
     """Get the package version for CUDA enabled wheels."""
     version_path = os.path.join(os.path.dirname(__file__), "src", "aihwkit", "VERSION.txt")
     with open(version_path, encoding="utf-8") as version_file:
-        v = version_file.read().strip()
-        return f"{v}{os.getenv('AIHWKIT_VERSION_SUFFIX', '')}"
+        version_number = version_file.read().strip()
+        return f"{version_number}{os.getenv('AIHWKIT_VERSION_SUFFIX', '')}"
 
 def get_long_description() -> str:
     """Get the package long description."""
