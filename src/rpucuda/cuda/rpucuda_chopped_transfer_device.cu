@@ -423,7 +423,6 @@ __global__ void kernelChoppedTransferBufferAsMomentum(
     const T lr_scale_in,
     const T sub_momentum,
     const int max_steps_in,
-    const T to_weight_granularity,
     const bool no_buffer) {
 
   // W_buffer = momentum * W_buffer + transfer_in * (1-momentum);
@@ -455,7 +454,7 @@ __global__ void kernelChoppedTransferBufferAsMomentum(
       }
 
       chop_t out_chop = out_chopper[inp_idx];
-      T x = transfer_in[inp_idx] * lr_scale_in / to_weight_granularity;
+      T x = transfer_in[inp_idx] * lr_scale_in;
 
       x = out_chop > 0 ? x : -x;
       omega = momentum * omega + sub_momentum * x;
@@ -527,7 +526,7 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
     kernelChoppedTransferBufferAsMomentum<T><<<nblocks, nthreads, 0, this->context_->getStream()>>>(
         transfer_out, B, transfer_tmp, cwo_->getWeightOutputInChopperData(),
         cwo_->getWeightOutputOutChopperData(), out_size, in_size, n_vec, i_slice_start, lr_scale,
-        sub_momentum, up.desired_BL, to_weight_granularity, par.no_buffer);
+        sub_momentum, up.desired_BL, par.no_buffer);
   } else {
     // `transfer_tmp` is a column/row of the weight on `from_device_idx`
     // transfer a column/row from `from_device_device` to the digital buffer `B`
