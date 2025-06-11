@@ -29,7 +29,6 @@ from torchvision import datasets, transforms
 from aihwkit.nn import AnalogConv2d, AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
-    SingleRPUConfig,
     FloatingPointRPUConfig,
     SoftBoundsReferenceDevice,
     FloatingPointDevice,

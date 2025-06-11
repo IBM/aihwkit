@@ -96,7 +96,11 @@ TYPED_TEST(UMHTestFixture, computeScaleAndK) {
   c->synchronize();
   TypeParam *scale_val = new TypeParam[this->m_batch];
   int *K_val = new int[this->m_batch];
+  TypeParam *x_max_vals = new TypeParam[this->m_batch];
+  TypeParam *d_max_vals = new TypeParam[this->m_batch];
 
+  umh.getXMaxValues(x_max_vals);
+  umh.getDMaxValues(d_max_vals);
   umh.getScaleValues(scale_val);
   umh.getKValues(K_val);
 
@@ -109,21 +113,31 @@ TYPED_TEST(UMHTestFixture, computeScaleAndK) {
     TypeParam d_abs_max_value =
         Find_Absolute_Max<TypeParam>(this->d1 + this->size * i_batch, this->size);
 
-    int bl = ceilf(lr * x_abs_max_value * d_abs_max_value / dw_min);
+    ASSERT_FLOAT_EQ(x_abs_max_value, x_max_vals[i_batch]);
+    ASSERT_FLOAT_EQ(d_abs_max_value, d_max_vals[i_batch]);
+
+    TypeParam d_val = d_abs_max_value;
+    TypeParam x_val = x_abs_max_value;
+
+    TypeParam k_val = lr * x_val * d_val / dw_min;
+    if (k_val > (TypeParam)BL) {
+      d_val *= (TypeParam)BL / k_val;
+    }
+    TypeParam scale = sqrtf(x_val / d_val);
+
+    int bl = ceilf(k_val);
     if (bl > BL) {
       bl = BL;
     }
 
-    TypeParam reg = dw_min;
-
-    TypeParam scale = sqrtf((float)MAX(x_abs_max_value, reg) / (float)MAX(d_abs_max_value, reg));
-
-    EXPECT_FLOAT_EQ(scale, scale_val[i_batch]); // large error ?
+    ASSERT_NEAR(scale, scale_val[i_batch], 1e-4);
     ASSERT_EQ(bl, K_val[i_batch]);
   }
 
   delete[] scale_val;
   delete[] K_val;
+  delete[] d_max_vals;
+  delete[] x_max_vals;
 }
 
 } // namespace
