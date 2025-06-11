@@ -4,8 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Defines an analog matrix
-"""
+"""Defines an analog matrix"""
 
 from typing import Any, Union, Tuple
 from scipy.sparse.linalg import LinearOperator

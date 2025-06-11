@@ -4,8 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-"""aihwkit example 25: Simple correlation detection with analog optimizers.
-"""
+"""aihwkit example 25: Simple correlation detection with analog optimizers."""
 # pylint: disable=invalid-name, too-many-locals, too-many-statements
 
 from typing import Union, Tuple, Optional, List, Dict

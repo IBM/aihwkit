@@ -4,7 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Analog RNN modules. """
+"""Analog RNN modules."""
 
 import warnings
 import math

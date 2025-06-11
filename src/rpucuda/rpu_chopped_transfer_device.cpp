@@ -404,7 +404,7 @@ void ChoppedTransferRPUDevice<T>::readAndUpdate(
   this->readVector(FROM_DEVICE_IDX, v_in, v_out, (T)1.0);
 
   // add into to FP buffer
-  int i_w = use_cols ? i_slice_start : in_size * i_slice_start;
+  int i_w = use_cols ? i_slice_start : this->x_size_ * i_slice_start;
 
   int non_zero_count = 0;
   bool in_chop = in_chopper_[(size_t)(i_slice_start)];

@@ -33,7 +33,7 @@ from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
     SoftBoundsReferenceDevice,
     FloatingPointDevice,
-    build_config
+    build_config,
 )
 from aihwkit.simulator.rpu_base import cuda
 
@@ -65,12 +65,12 @@ N_CLASSES = 10
 #   floating point devices will be used
 USE_ANALOG_TRAINING = True
 if USE_ANALOG_TRAINING:
-    algo = 'agad'  # or e.g. ttv2
-    RPU_CONFIG = build_config(algo, device=SoftBoundsReferenceDevice(dw_min=0.1))
+    algo = "agad"  # or e.g. ttv2
+    RPU_CONFIG = build_config(algo, device=SoftBoundsReferenceDevice(dw_min=0.05))
 else:
     RPU_CONFIG = FloatingPointRPUConfig(device=FloatingPointDevice())
 print(RPU_CONFIG)
-    
+
 
 def load_images():
     """Load images for train from torchvision datasets."""

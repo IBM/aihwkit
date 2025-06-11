@@ -25,7 +25,7 @@ def test_output_quantization(n_bits, symmetric, range_estimator):
     """Test that output quantization works, returning the appropriate number of states"""
 
     def set_perfect_rpuconfig(
-        rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
+        rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig],
     ):
         rpu_config.forward.is_perfect = True
         if isinstance(rpu_config, QuantizedTorchInferenceRPUConfig):
@@ -70,7 +70,7 @@ def test_array_module_output_quantization(
     """Test that when an array is used, output quantization is properly applied"""
 
     def set_perfect_rpuconfig(
-        rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
+        rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig],
     ):
         rpu_config.forward.is_perfect = True
         if isinstance(rpu_config, QuantizedTorchInferenceRPUConfig):
@@ -107,7 +107,7 @@ def test_quantized_periphery(n_bits, symmetric, arr_rows, arr_columns):
     """Test that quantized periphery is properly applied"""
 
     def set_perfect_rpuconfig_with_periphery(
-        rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
+        rpu_config: Union[TorchInferenceRPUConfig, QuantizedTorchInferenceRPUConfig],
     ):
         rpu_config.forward.is_perfect = True
         rpu_config.mapping.weight_scaling_omega = 1.0

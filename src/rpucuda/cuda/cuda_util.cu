@@ -1094,7 +1094,7 @@ template <typename T> void CudaArray<T>::setConst(T set_value) {
       RPU::math::elemconst(context_, values_, size_, set_value);
     } else {
       CUDA_CALL(cudaMemset2DAsync(
-	  values_, pitch_, 0, this->getWidthBytes(), height_, context_->getStream()));
+          values_, pitch_, 0, this->getWidthBytes(), height_, context_->getStream()));
     }
   }
 }
@@ -1314,8 +1314,8 @@ template <typename T> void CudaArray<T>::assign(const CudaArray<T> &source) {
     cudaStream_t s = context_->getStream();
     context_->synchronizeWith(source.getContext());
     CUDA_CALL(cudaMemcpy2DAsync(
-	values_, pitch_, source.getDataConst(), pitch_, this->getWidthBytes(),
-        height_, cudaMemcpyDeviceToDevice, s));
+        values_, pitch_, source.getDataConst(), pitch_, this->getWidthBytes(), height_,
+        cudaMemcpyDeviceToDevice, s));
   }
 }
 
