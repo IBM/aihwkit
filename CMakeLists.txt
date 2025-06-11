@@ -23,7 +23,7 @@ option(RPU_USE_TORCH_BUFFERS "Use torch buffers for RPUCuda" ON)
 
 
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
-set(RPU_CUDA_ARCHITECTURES "75 80 89" CACHE STRING "Target CUDA architectures")
+set(RPU_CUDA_ARCHITECTURES "75;80;89" CACHE STRING "Target CUDA architectures")
 
 # Internal variables.
 set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
