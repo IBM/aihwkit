@@ -36,6 +36,10 @@ struct ChoppedTransferRPUDeviceMetaParameter : BufferedTransferRPUDeviceMetaPara
       (T)1.0; // does REPLACE the thres_scale (and is NOT scaled with weight_granularity)
   bool no_buffer = false; // turn off buffer (TTv1)
 
+  bool transfer_flexible_insize =
+      true; // whether to enable fast flexible insize weight output if possible
+  size_t transfer_max_vec_chunk_size =
+      10000000; // max in-size to preserve memory (~ m_batch**2 -> chunk_size)
   ChoppedTransferRPUDeviceMetaParameter() : BufferedTransferRPUDeviceMetaParameter<T>() {
     initDefaults();
   };
@@ -96,7 +100,7 @@ template <typename T> class ChoppedTransferRPUDevice : public BufferedTransferRP
 
 public:
   // constructor / destructor
-  ChoppedTransferRPUDevice(){};
+  ChoppedTransferRPUDevice() {};
   ChoppedTransferRPUDevice(int x_size, int d_size);
   ChoppedTransferRPUDevice(
       int x_size,

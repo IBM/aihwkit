@@ -32,9 +32,9 @@ public:
 template <typename T> class ForwardBackwardPass {
 
 public:
-  explicit ForwardBackwardPass(int x_size, int d_size) : x_size_(x_size), d_size_(d_size){};
-  ForwardBackwardPass(){};
-  virtual ~ForwardBackwardPass(){};
+  explicit ForwardBackwardPass(int x_size, int d_size) : x_size_(x_size), d_size_(d_size) {};
+  ForwardBackwardPass() {};
+  virtual ~ForwardBackwardPass() {};
 
   ForwardBackwardPass(const ForwardBackwardPass<T> &) = default;
   ForwardBackwardPass<T> &operator=(const ForwardBackwardPass<T> &) = default;
@@ -91,7 +91,7 @@ template <typename T> class ForwardBackwardPassIOManaged : public ForwardBackwar
 
 public:
   explicit ForwardBackwardPassIOManaged(int x_size, int d_size, std::shared_ptr<RNG<T>> rng);
-  ForwardBackwardPassIOManaged(){};
+  ForwardBackwardPassIOManaged() {};
 
   ~ForwardBackwardPassIOManaged();
   ForwardBackwardPassIOManaged(const ForwardBackwardPassIOManaged<T> &);

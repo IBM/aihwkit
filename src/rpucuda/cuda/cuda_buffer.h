@@ -21,7 +21,7 @@ template <typename T> class CudaArray;
 
 template <typename T> class CudaBuffer {
 public:
-  CudaBuffer(){};
+  CudaBuffer() {};
   CudaBuffer(const CudaBuffer<T> &);
   CudaBuffer &operator=(const CudaBuffer<T> &);
   CudaBuffer(CudaBuffer<T> &&);
@@ -38,10 +38,10 @@ public:
 #endif
   }
 
-  T *get(CudaContextPtr context, int size);
+  T *get(CudaContextPtr context, size_t size);
   void release();
 
-  void print(int size) const;
+  void print(size_t size) const;
 
 private:
 #if defined RPU_TORCH_CUDA_BUFFERS

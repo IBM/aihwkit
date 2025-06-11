@@ -31,11 +31,11 @@ from aihwkit.optim import AnalogSGD
 from aihwkit.simulator.configs import (
     SingleRPUConfig,
     FloatingPointRPUConfig,
-    ConstantStepDevice,
+    SoftBoundsReferenceDevice,
     FloatingPointDevice,
+    build_config
 )
 from aihwkit.simulator.rpu_base import cuda
-
 
 # Check device
 USE_CUDA = 0
@@ -59,14 +59,18 @@ N_CLASSES = 10
 # Select the device model to use in the training.
 # * If `SingleRPUConfig(device=ConstantStepDevice())` then analog tiles with
 #   constant step devices will be used,
+# * One can use `build_config` to build a config for different
+#   specialized analog gradient algorithms
 # * If `FloatingPointRPUConfig(device=FloatingPointDevice())` then standard
 #   floating point devices will be used
-USE_ANALOG_TRAINING = False
+USE_ANALOG_TRAINING = True
 if USE_ANALOG_TRAINING:
-    RPU_CONFIG = SingleRPUConfig(device=ConstantStepDevice())
+    algo = 'agad'  # or e.g. ttv2
+    RPU_CONFIG = build_config(algo, device=SoftBoundsReferenceDevice(dw_min=0.1))
 else:
     RPU_CONFIG = FloatingPointRPUConfig(device=FloatingPointDevice())
-
+print(RPU_CONFIG)
+    
 
 def load_images():
     """Load images for train from torchvision datasets."""

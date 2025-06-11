@@ -16,7 +16,7 @@ template <typename T> class SparseBitLineMaker {
 
 public:
   explicit SparseBitLineMaker(int x_size, int d_size);
-  SparseBitLineMaker(){};
+  SparseBitLineMaker() {};
   virtual ~SparseBitLineMaker();
   SparseBitLineMaker(const SparseBitLineMaker<T> &);
   SparseBitLineMaker<T> &operator=(const SparseBitLineMaker<T> &);
@@ -65,8 +65,8 @@ public:
   bool supports(RPU::PulseType pulse_type) const;
 
   /* Ignore the buffer / indices, as they will be generated anew each sample.*/
-  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
-  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) {};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {};
 
 private:
   void freeContainers();

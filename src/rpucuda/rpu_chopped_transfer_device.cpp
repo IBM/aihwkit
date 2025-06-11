@@ -42,8 +42,6 @@ void ChoppedTransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &
 
   ss << "\t auto_momentum:\t\t" << auto_momentum << std::endl;
 
-  ss << "\t auto_momentum:\t\t" << auto_momentum << std::endl;
-
   if (no_buffer) {
     ss << "\t buffer not used.";
     ss << std::endl;
@@ -58,6 +56,8 @@ void ChoppedTransferRPUDeviceMetaParameter<T>::printToStream(std::stringstream &
       ss << std::endl;
     }
   }
+  ss << "\t transfer_flexible_insize:\t\t" << transfer_flexible_insize << std::endl;
+  ss << "\t transfer_max_vec_chunk_size:\t\t" << transfer_max_vec_chunk_size << std::endl;
 
   BufferedTransferRPUDeviceMetaParameter<T>::printToStream(ss);
 };
@@ -82,8 +82,9 @@ template <typename T> void ChoppedTransferRPUDeviceMetaParameter<T>::checkSuppor
   if ((this->n_reads_per_transfer != 1) || (this->random_selection != false) ||
       (this->with_reset_prob > (T)0.0)) {
 
-    RPU_FATAL("In / out chopper not implemented the given parameters. \nRequired: "
-              "n_devices==2, n_reads_per_transfer==1, random_selection=false).\n");
+    RPU_FATAL(
+        "In / out chopper not implemented the given parameters. \nRequired: "
+        "n_devices==2, n_reads_per_transfer==1, random_selection=false).\n");
   }
 }
 
@@ -403,7 +404,7 @@ void ChoppedTransferRPUDevice<T>::readAndUpdate(
   this->readVector(FROM_DEVICE_IDX, v_in, v_out, (T)1.0);
 
   // add into to FP buffer
-  int i_w = use_cols ? i_slice_start : this->x_size_ * i_slice_start;
+  int i_w = use_cols ? i_slice_start : in_size * i_slice_start;
 
   int non_zero_count = 0;
   bool in_chop = in_chopper_[(size_t)(i_slice_start)];

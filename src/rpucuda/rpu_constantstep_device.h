@@ -14,17 +14,18 @@ namespace RPU {
 
 template <typename T> class ConstantStepRPUDevice;
 
-BUILD_PULSED_DEVICE_META_PARAMETER(ConstantStep,
-                                   /*implements*/
-                                   DeviceUpdateType::ConstantStep,
-                                   /*parameter def*/
-                                   ,
-                                   /*print body*/
-                                   ,
-                                   /* calc weight granularity body */
-                                   return this->dw_min;
-                                   ,
-                                   /*add*/
+BUILD_PULSED_DEVICE_META_PARAMETER(
+    ConstantStep,
+    /*implements*/
+    DeviceUpdateType::ConstantStep,
+    /*parameter def*/
+    ,
+    /*print body*/
+    ,
+    /* calc weight granularity body */
+    return this->dw_min;
+    ,
+    /*add*/
 );
 
 template <typename T> class ConstantStepRPUDevice : public PulsedRPUDevice<T> {

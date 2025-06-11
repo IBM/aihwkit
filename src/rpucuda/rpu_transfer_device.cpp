@@ -153,8 +153,9 @@ void TransferRPUDeviceMetaParameter<T>::initializeWithSize(int x_size, int d_siz
       g += this->gamma_vec[i];
     }
     if (this->gamma_vec[n_devices - 1] == (T)0.0) {
-      RPU_FATAL("Expect that last device has some constribution to the network weights. [otherwise "
-                "why transfer?]");
+      RPU_FATAL(
+          "Expect that last device has some constribution to the network weights. [otherwise "
+          "why transfer?]");
     }
     gamma = g;
   }

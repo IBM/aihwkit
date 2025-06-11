@@ -159,44 +159,50 @@ pwukpvec_t<T> ExpStepRPUDeviceCuda<T>::getUpdateKernels(
   const auto &pars = getPar();
 
   if (pars.hasComplexNoise()) {
-    v.push_back(RPU::make_unique<
-                PWUKernelParameterSingleFunctor<T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
-        pars.getName()));
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterSingleFunctor<T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+            pars.getName()));
 
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
             this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
             pars.getName()));
 
-    v.push_back(RPU::make_unique<
-                PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
-        pars.getName()));
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+            pars.getName()));
 
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
-                    T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
-        pars.getName()));
+    v.push_back(
+        RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+            T, UpdateFunctorExpStepComplexNoise<T>, 9>>(
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+            pars.getName()));
 
   } else {
-    v.push_back(RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorExpStep<T>, 7>>(
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
-        pars.getName()));
+    v.push_back(
+        RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorExpStep<T>, 7>>(
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+            pars.getName()));
 
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorExpStep<T>, 7>>(
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
-        pars.getName()));
+    v.push_back(
+        RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorExpStep<T>, 7>>(
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+            pars.getName()));
 
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorExpStep<T>, 7>>(
             this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
             pars.getName()));
 
-    v.push_back(RPU::make_unique<
-                PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorExpStep<T>, 7>>(
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
-        pars.getName()));
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorExpStep<T>, 7>>(
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,
+            pars.getName()));
   }
   return v;
 }

@@ -48,7 +48,7 @@ template <typename T> class ChoppedWeightOutput {
 public:
   explicit ChoppedWeightOutput(CudaContextPtr c, int x_size, int d_size);
 
-  ChoppedWeightOutput(){};
+  ChoppedWeightOutput() {};
 
   ~ChoppedWeightOutput() = default;
   ChoppedWeightOutput(const ChoppedWeightOutput<T> &);
@@ -112,8 +112,9 @@ public:
   inline int getOutSize() const { return par_.use_columns ? d_size_ : x_size_; };
   inline int getInSize() const { return par_.use_columns ? x_size_ : d_size_; };
   inline int getWODataSize() const {
-    return flexible_in_size_ ? getNumWeightOutputs() * getOutSize()
-                             : (getNumWeightOutputs() / getInSize() + 1) * x_size_ * d_size_;
+    return flexible_in_size_
+               ? getNumWeightOutputs() * getOutSize()
+               : ((getNumWeightOutputs() + getInSize() - 1) / getInSize() + 1) * x_size_ * d_size_;
   };
   int getBatchStart() const;
   int getValStart() const;

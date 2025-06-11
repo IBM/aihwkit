@@ -118,8 +118,8 @@ template <typename T> class PulsedRPUDeviceBase : public SimpleRPUDevice<T> {
 
 public:
   // constructor / destructor
-  PulsedRPUDeviceBase(){};
-  explicit PulsedRPUDeviceBase(int x_sz, int d_sz) : SimpleRPUDevice<T>(x_sz, d_sz){};
+  PulsedRPUDeviceBase() {};
+  explicit PulsedRPUDeviceBase(int x_sz, int d_sz) : SimpleRPUDevice<T>(x_sz, d_sz) {};
   virtual ~PulsedRPUDeviceBase() = default;
 
   PulsedRPUDeviceBase(const PulsedRPUDeviceBase<T> &other) = default;
@@ -161,10 +161,10 @@ public:
       const T *x_input = nullptr,
       const int x_inc = 1,
       const T *d_input = nullptr,
-      const int d_inc = 1){};
+      const int d_inc = 1) {};
   // called when update completed
   virtual void finishUpdateCycle(
-      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info){};
+      T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) {};
 
   inline T getWeightGranularity() const { return weight_granularity_; };
   inline T getNumStates() const { return num_states_; };
@@ -179,7 +179,7 @@ public:
      initUpdateCycle. Can be used to do some additional computation on
      the input */
   virtual void
-  initWithUpdateInput(const T *x_input, const int x_inc, const T *d_input, const int d_inc){};
+  initWithUpdateInput(const T *x_input, const int x_inc, const T *d_input, const int d_inc) {};
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix) override {
     SimpleRPUDevice<T>::dumpExtra(extra, prefix);
@@ -221,7 +221,7 @@ template <typename T> class PulsedRPUDevice : public PulsedRPUDeviceBase<T> {
 
 public:
   // constructor / destructor
-  PulsedRPUDevice(){};
+  PulsedRPUDevice() {};
   /* populate cannot be done through constructor because parameter
      objects reside in derived. Derived populate method needs to
      make sure to call the populate of base class */
@@ -434,7 +434,7 @@ public:                                                                         
       return new DEVICENAME##RPUDeviceMetaParameter<T>(*this);                                     \
     };                                                                                             \
                                                                                                    \
-    T calcWeightGranularity() const override{GRANULARITY_BODY};                                    \
+    T calcWeightGranularity() const override { GRANULARITY_BODY };                                 \
     T calcNumStates() const override {                                                             \
       return (this->w_max - this->w_min) / calcWeightGranularity();                                \
     };                                                                                             \
@@ -454,7 +454,9 @@ public:                                                                         
     int j_signed = x_signed_indices[jj];                                                           \
     int sign = (j_signed < 0) ? -d_sign : d_sign;                                                  \
     int j = (j_signed < 0) ? -j_signed - 1 : j_signed - 1;                                         \
-    { BODY; }                                                                                      \
+    {                                                                                              \
+      BODY;                                                                                        \
+    }                                                                                              \
   }
 
 #define PULSED_UPDATE_W_LOOP_DENSE(BODY)                                                           \

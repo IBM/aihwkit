@@ -16,11 +16,11 @@ namespace RPU {
 template <typename T> class BufferedTransferRPUDeviceCuda : public TransferRPUDeviceCuda<T> {
 
 public:
-  explicit BufferedTransferRPUDeviceCuda(){};
+  explicit BufferedTransferRPUDeviceCuda() {};
   explicit BufferedTransferRPUDeviceCuda(
       CudaContextPtr c, const BufferedTransferRPUDevice<T> &other);
 
-  ~BufferedTransferRPUDeviceCuda(){};
+  ~BufferedTransferRPUDeviceCuda() {};
   BufferedTransferRPUDeviceCuda(const BufferedTransferRPUDeviceCuda<T> &other);
   BufferedTransferRPUDeviceCuda<T> &operator=(const BufferedTransferRPUDeviceCuda<T> &other);
   BufferedTransferRPUDeviceCuda(BufferedTransferRPUDeviceCuda<T> &&other);

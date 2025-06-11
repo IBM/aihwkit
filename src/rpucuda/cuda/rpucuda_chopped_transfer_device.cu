@@ -106,7 +106,12 @@ void ChoppedTransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &r
   cwo_par.in_chop_random = par.in_chop_random;
   cwo_->setPar(cwo_par);
   cwo_->setCounter(this->current_update_idx_);
-  cwo_->setFlexibleInSize(this->transfer_fb_pass_->checkFlexibleInSize(par.transfer_io));
+
+  if (par.transfer_flexible_insize) {
+    cwo_->setFlexibleInSize(this->transfer_fb_pass_->checkFlexibleInSize(par.transfer_io));
+  } else {
+    cwo_->setFlexibleInSize(false);
+  }
 
   if (par.usesAutoTransferEvery()) {
     if (par.units_in_mbatch) {
@@ -158,7 +163,7 @@ int ChoppedTransferRPUDeviceCuda<T>::getTransferEvery(
 
 template <typename T>
 void ChoppedTransferRPUDeviceCuda<T>::readMatrix(
-    int device_idx, const T *in_vec, T *out_vec, int m_batch, T alpha) {
+    int device_idx, const T *in_vec, T *out_vec, int n_vec, T alpha) {
   const auto &par = getPar();
 
   if (device_idx != 0) {
@@ -168,40 +173,52 @@ void ChoppedTransferRPUDeviceCuda<T>::readMatrix(
   if (in_vec != nullptr) {
     RPU_FATAL("only one-hot transfer vectors supported.");
   }
-  if (m_batch != cwo_->getNumWeightOutputs()) {
-    RPU_FATAL("m_batch mismatch!");
+  if (n_vec != cwo_->getNumWeightOutputs()) {
+    RPU_FATAL("n_vec mismatch!");
   }
 
-  if (m_batch == 0) {
+  if (n_vec == 0) {
     return;
   }
 
   bool in_size_flexible = this->cwo_->getFlexibleInSize();
+  DEBUG_CALL(cwo_->print());
 
   if (in_size_flexible) {
     // in case no input dependence, we can read out in one go
 
+    DEBUG_CALL(cwo_->printWeightOutputInChopper());
     T *output_weights = cwo_->getWeightOutputData();
     chop_t *wo_chopper_data = cwo_->getWeightOutputInChopperData();
-    DiagInputIterator<T, chop_t> diag_iter(wo_chopper_data, m_batch, 0);
+    size_t max_n_vec_per_chunk = (par.transfer_max_vec_chunk_size + n_vec - 1) / n_vec;
+    size_t n_chunks = (n_vec + max_n_vec_per_chunk - 1) / max_n_vec_per_chunk;
 
-    if (par.transfer_columns) {
-      this->transfer_fb_pass_->forwardMatrixIterator(
-          output_weights, diag_iter, m_batch, false, out_vec, this->d_size_, false, m_batch, alpha,
-          *this->transfer_iom_, par.transfer_io, false);
+    for (int i_chunk = 0; i_chunk < n_chunks; i_chunk++) {
 
-    } else {
-      // backward with transfer vectors.
-      this->transfer_fb_pass_->backwardMatrixIterator(
-          output_weights, diag_iter, m_batch, false, out_vec, this->x_size_, false, m_batch, alpha,
-          *this->transfer_iom_, par.transfer_io);
+      size_t n_done_vec = i_chunk * max_n_vec_per_chunk;
+      size_t offset = n_done_vec * n_vec;
+
+      DiagInputIterator<T, chop_t> diag_iter(wo_chopper_data, n_vec, offset);
+      size_t m_chunk = i_chunk == n_chunks - 1 ? n_vec - n_done_vec : max_n_vec_per_chunk;
+
+      if (par.transfer_columns) {
+        this->transfer_fb_pass_->forwardMatrixIterator(
+            output_weights, diag_iter, n_vec, false, out_vec + n_done_vec * this->d_size_,
+            this->d_size_, false, m_chunk, alpha, *this->transfer_iom_, par.transfer_io, false);
+
+      } else {
+        // backward with transfer vectors.
+        this->transfer_fb_pass_->backwardMatrixIterator(
+            output_weights, diag_iter, n_vec, false, out_vec + n_done_vec * this->x_size_,
+            this->x_size_, false, m_chunk, alpha, *this->transfer_iom_, par.transfer_io);
+      }
     }
 
   } else {
 
     int out_size = cwo_->getOutSize();
     int in_size = cwo_->getInSize();
-    int n_pass = m_batch / in_size + 1;
+    int n_pass = (n_vec + in_size - 1) / in_size;
     int size = in_size * out_size;
     for (int i_pass = 0; i_pass < n_pass; i_pass++) {
       // we potentially need to run multiple passes in case a
@@ -211,26 +228,52 @@ void ChoppedTransferRPUDeviceCuda<T>::readMatrix(
 
       // NOTE: the non-read out weights might be arbitrary value. Should
       // not matter though as input is 0 for those.
+      DEBUG_OUT("Chopper output: ");
+      DEBUG_CALL(cwo_->printWeightOutputInChopper());
 
       int wo_offset = i_pass * size;
-
       chop_t *wo_chopper_data = cwo_->getWeightOutputInChopperData() + i_pass * in_size;
       DiagInputIterator<T, chop_t> diag_iter(
-          wo_chopper_data, in_size, cwo_->getValStart() * in_size);
+          wo_chopper_data, in_size, cwo_->getValStart() * in_size, -cwo_->getValStart());
       T *output_weights = cwo_->getWeightOutputData() + wo_offset;
-      int sub_m_batch = (i_pass < n_pass - 1) ? in_size : (m_batch - in_size * (n_pass - 1));
+
+      DEBUG_OUT("Iterator content: ");
+      DEBUG_CALL(
+          CudaArray<T> dev_a(this->context_, in_size * in_size);
+          math::copyWithIterator(this->context_, dev_a.getData(), diag_iter, in_size * in_size);
+          this->context_->synchronize(); dev_a.printMatrixValues(in_size););
+
+      DEBUG_OUT("Weight output content: ");
+      DEBUG_CALL(
+          CudaArray<T> dev_a(this->context_, in_size * out_size); math::copyWithIterator(
+              this->context_, dev_a.getData(), output_weights, in_size * out_size);
+          this->context_->synchronize(); dev_a.printMatrixValues(this->d_size_););
+
+      int sub_n_vec = (i_pass < n_pass - 1) ? in_size : (n_vec - in_size * i_pass);
+
+      DEBUG_OUT("sub_n_vec: " << sub_n_vec);
+      DEBUG_OUT("n_pass: " << n_pass);
+      DEBUG_OUT("i_pass: " << i_pass);
+      DEBUG_OUT("in_size: " << in_size);
+      DEBUG_OUT("n_vec: " << n_vec);
 
       if (par.transfer_columns) {
         this->transfer_fb_pass_->forwardMatrixIterator(
-            output_weights, diag_iter, this->x_size_, false, out_vec + wo_offset, this->d_size_,
-            false, sub_m_batch, alpha, *this->transfer_iom_, par.transfer_io, false);
+            output_weights, diag_iter, in_size, false, out_vec + wo_offset, out_size, false,
+            sub_n_vec, alpha, *this->transfer_iom_, par.transfer_io, false);
 
       } else {
         // backward with transfer vectors.
         this->transfer_fb_pass_->backwardMatrixIterator(
-            output_weights, diag_iter, this->d_size_, false, out_vec + wo_offset, this->x_size_,
-            false, sub_m_batch, alpha, *this->transfer_iom_, par.transfer_io);
+            output_weights, diag_iter, in_size, false, out_vec + wo_offset, out_size, false,
+            sub_n_vec, alpha, *this->transfer_iom_, par.transfer_io);
       }
+
+      DEBUG_OUT("Transfer output content: ");
+      DEBUG_CALL(
+          CudaArray<T> dev_a(this->context_, in_size * out_size); math::copyWithIterator(
+              this->context_, dev_a.getData(), out_vec + wo_offset, in_size * out_size);
+          this->context_->synchronize(); dev_a.printMatrixValues(out_size););
     }
   }
 }
@@ -277,6 +320,12 @@ void ChoppedTransferRPUDeviceCuda<T>::writeMatrix(
         out_vec, eye_iter, W, &*this->rpucuda_device_vec_[device_idx], up, fabsf(lr), m_batch,
         false, false);
   }
+
+  DEBUG_OUT("Updated W out: ");
+  DEBUG_CALL(
+      CudaArray<T> dev_a(this->context_, this->x_size_ * this->d_size_);
+      math::copyWithIterator(this->context_, dev_a.getData(), W, this->x_size_ * this->d_size_);
+      this->context_->synchronize(); dev_a.printMatrixValues(this->d_size_););
 }
 
 /*********************************************************************************/
@@ -288,12 +337,12 @@ template <typename T>
 __global__ void kernelChoppedTransfer(
     T *transfer_out,
     T *W_buffer,
-    const T *transfer_in,
-    const chop_t *in_chopper,  // size n_wo  NOTE: is already applied to transfer_in
-    const chop_t *out_chopper, // size n_wo * out_size
+    const T *transfer_in,      // size: out_size * n_wo  [starts with start_read_idx]
+    const chop_t *in_chopper,  // size: n_wo  NOTE: is already applied to transfer_in
+    const chop_t *out_chopper, // size: n_wo * out_size
     const int out_size,
     const int in_size,
-    const int m_batch,
+    const int n_vec,
     const int start_read_idx,
     const T lr_scale_in,
     const T sub_momentum,
@@ -303,7 +352,7 @@ __global__ void kernelChoppedTransfer(
 
   const T max_steps = (T)max_steps_in;
   const int w_size = out_size * in_size;
-  const int t_size = out_size * m_batch;
+  const int t_size = out_size * n_vec;
   const T momentum = -sub_momentum + (T)1.0;
   const bool forget_buffer = forget_buffer_in;
   const T lr_scale = lr_scale_in;
@@ -311,7 +360,7 @@ __global__ void kernelChoppedTransfer(
   // CAUTION: n_vec might have mulitple wraps around in_size, we need
   // to thus make sure that the same threads are working on the same
   // repeat.
-  int n_repeats = (m_batch + in_size - 1) / in_size;
+  int n_repeats = (n_vec + in_size - 1) / in_size;
 
   RPU_CUDA_1D_KERNEL_LOOP(idx, w_size) {
 
@@ -398,6 +447,23 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
       transfer_out, B, transfer_tmp, cwo_->getWeightOutputInChopperData(),
       cwo_->getWeightOutputOutChopperData(), out_size, in_size, n_vec, i_slice_start, lr_scale,
       sub_momentum, up.desired_BL, par.forget_buffer, par.no_buffer);
+
+  DEBUG_OUT("Out chopper: ");
+  DEBUG_CALL(
+      CudaArray<chop_t> dev_a(this->context_, out_size * n_vec); math::copyWithIterator(
+          this->context_, dev_a.getData(), cwo_->getWeightOutputOutChopperData(), out_size * n_vec);
+      this->context_->synchronize(); dev_a.printMatrixValues(out_size););
+
+  DEBUG_OUT("Transfer out: ");
+  DEBUG_CALL(
+      CudaArray<T> dev_a(this->context_, out_size * n_vec);
+      math::copyWithIterator(this->context_, dev_a.getData(), transfer_out, out_size * n_vec);
+      this->context_->synchronize(); dev_a.printMatrixValues(out_size););
+  DEBUG_OUT("Buffer out: ");
+  DEBUG_CALL(
+      CudaArray<T> dev_a(this->context_, out_size * in_size);
+      math::copyWithIterator(this->context_, dev_a.getData(), B, out_size * in_size);
+      this->context_->synchronize(); dev_a.printMatrixValues(out_size););
 
   // update according to device
   T write_lr = par.getWriteLR(to_weight_granularity);
@@ -489,7 +555,6 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
     const ChoppedWeightOutput<T> *cwo) {
   // calling kpars->run(..,this,..) directly should cause error because  derived from abstract
   // device..
-  DEBUG_OUT("start run update kernel.");
 
   if (x_counts_chunk != nullptr || d_counts_chunk != nullptr) {
     RPU_FATAL("Chunking not allowed here.");
@@ -524,9 +589,9 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
       nullptr, &*cwo_);
 
   if (up._currently_tuning) {
+    cwo_->releaseBuffers();
     return;
   }
-
   const auto &par = getPar();
   if (par.auto_scale) {
     T abs_m_x;
@@ -552,7 +617,7 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
     // always fully hidden, reduce is no-op anyway
     this->reduceToWeights(up_context, dev_weights);
   }
-
+  // will sync
   cwo_->releaseBuffers();
 }
 

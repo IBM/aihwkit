@@ -267,8 +267,10 @@ template <typename T> RPUSimple<T>::~RPUSimple() {
   if (!shared_weights_if_) {
     Array_2D_Free<T>(weights_);
   } else {
-    delete[] weights_;
-    weights_ = nullptr;
+    if (weights_ != nullptr) {
+      delete[] weights_;
+      weights_ = nullptr;
+    }
   }
 
   Array_2D_Free<T>(weights_buffer_);
@@ -513,6 +515,8 @@ void RPUSimple<T>::forward(
     bool d_trans,
     bool is_test) {
 
+  DEBUG_OUT("Forward[" << x_trans << ", " << d_trans << "] (m_batch = " << m_batch << ")");
+
   if ((m_batch == 1) && (!x_trans) && (!d_trans)) {
     if (bias) {
       this->forwardVectorBias(X_input, D_output, 1, 1, is_test);
@@ -531,6 +535,9 @@ void RPUSimple<T>::forward(
 template <typename T>
 void RPUSimple<T>::backward(
     const T *D_input, T *X_output, bool bias, int m_batch, bool d_trans, bool x_trans) {
+
+  DEBUG_OUT("Backward[" << d_trans << ", " << x_trans << "] (m_batch = " << m_batch << ")");
+
   if ((m_batch == 1) && (!x_trans) && (!d_trans)) {
     if (bias) {
       this->backwardVectorBias(D_input, X_output);
@@ -549,6 +556,7 @@ void RPUSimple<T>::backward(
 template <typename T>
 void RPUSimple<T>::update(
     const T *X_input, const T *D_input, bool bias, int m_batch, bool x_trans, bool d_trans) {
+  DEBUG_OUT("Update[" << x_trans << ", " << d_trans << "] (m_batch = " << m_batch << ")");
   last_update_m_batch_ = m_batch; // this is mini-batchsize * reuse_factor !
 
   // update weights

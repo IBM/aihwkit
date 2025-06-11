@@ -12,7 +12,7 @@
 namespace RPU {
 
 struct BatchSkipper {
-  explicit BatchSkipper(int skip) : skip_(skip){};
+  explicit BatchSkipper(int skip) : skip_(skip) {};
 
   __device__ __forceinline__ int operator()(const int &a) const { return int(a * skip_); }
   int skip_ = 1;
@@ -102,24 +102,31 @@ public:
   typedef T reference;
   typedef std::input_iterator_tag iterator_category;
 
-  __host__ __device__ __forceinline__ DiagInputIterator(const DataT *data, int dim, int offset) {
+  __host__ __device__ __forceinline__
+  DiagInputIterator(const DataT *data, int dim, int offset, int diag_offset = 0) {
     data_ = data;
     dim_ = dim;
+    dim2_ = dim * dim;
     offset_ = offset;
+    diag_offset_ = diag_offset;
   }
 
   __host__ __device__ __forceinline__ T operator[](int idx) const {
-    int i = idx + offset_;
-    return (i % dim_ == i / dim_) ? static_cast<T>(data_[idx / dim_]) : static_cast<T>(0);
+    int i = (idx + offset_) % dim2_;
+    int j = (diag_offset_ != 0) ? (((idx + offset_ + diag_offset_ * dim_) % dim2_) / dim_) % dim_
+                                : (i / dim_) % dim_;
+
+    return (i % dim_ == i / dim_) ? static_cast<T>(data_[j]) : static_cast<T>(0);
   }
   __host__ __device__ __forceinline__ self_type operator+(int shift_n) const {
-    self_type retval(data_, dim_, shift_n + offset_);
+    self_type retval(data_, dim_, shift_n + offset_, diag_offset_);
     return retval;
   }
 
   const DataT *data_;
-  int dim_;
+  int dim_, dim2_;
   int offset_;
+  int diag_offset_;
 };
 
 template <typename T> class EyeInputIterator {
