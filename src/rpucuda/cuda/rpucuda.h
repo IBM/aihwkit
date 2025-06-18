@@ -24,7 +24,7 @@ namespace RPU {
 template <typename T> class RPUCudaSimple : public RPUSimple<T> {
 
 public:
-  RPUCudaSimple(){};
+  RPUCudaSimple() {};
   explicit RPUCudaSimple(CudaContextPtr c, int x_size, int d_size);
   explicit RPUCudaSimple(CudaContextPtr c, RPUSimple<T> &o);
   explicit RPUCudaSimple(cudaStream_t s, int x_size, int d_size);

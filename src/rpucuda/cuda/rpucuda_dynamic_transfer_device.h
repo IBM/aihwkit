@@ -14,10 +14,10 @@ namespace RPU {
 template <typename T> class DynamicTransferRPUDeviceCuda : public ChoppedTransferRPUDeviceCuda<T> {
 
 public:
-  explicit DynamicTransferRPUDeviceCuda(){};
+  explicit DynamicTransferRPUDeviceCuda() {};
   explicit DynamicTransferRPUDeviceCuda(CudaContextPtr c, const DynamicTransferRPUDevice<T> &other);
 
-  ~DynamicTransferRPUDeviceCuda(){};
+  ~DynamicTransferRPUDeviceCuda() {};
   DynamicTransferRPUDeviceCuda(const DynamicTransferRPUDeviceCuda<T> &other);
   DynamicTransferRPUDeviceCuda<T> &operator=(const DynamicTransferRPUDeviceCuda<T> &other);
   DynamicTransferRPUDeviceCuda(DynamicTransferRPUDeviceCuda<T> &&other);

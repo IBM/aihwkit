@@ -230,8 +230,9 @@ typedef int8_t chop_t;   // chopper type
 #ifdef RPU_PARAM_FP16
 typedef half_t param_t;
 typedef half2_t param2_t;
-typedef struct __align__(8) { half_t x, y, z, w; }
-param4_t;
+typedef struct __align__(8) {
+  half_t x, y, z, w;
+} param4_t;
 #else
 typedef float param_t;
 typedef float2 param2_t;
@@ -241,7 +242,7 @@ typedef float4 param4_t;
 class CublasEnvironment {
 
 public:
-  explicit CublasEnvironment() : CublasEnvironment(-1){};
+  explicit CublasEnvironment() : CublasEnvironment(-1) {};
   explicit CublasEnvironment(int gpu_id);
   ~CublasEnvironment();
 
@@ -274,7 +275,7 @@ typedef CudaContext *CudaContextPtr;
 class CudaContext : public std::enable_shared_from_this<CudaContext>, public Context {
 
 public:
-  explicit CudaContext() : CudaContext(-1){};
+  explicit CudaContext() : CudaContext(-1) {};
   // NOTE: not tested on gpu_id (does a streams implicitely specifies a GPU id?)
   explicit CudaContext(int gpu_id, bool non_blocking = true);
   explicit CudaContext(cudaStream_t shared_stream, int gpu_id = -1);
@@ -368,9 +369,9 @@ public:
   void randUniform(float *dev_array, int size);
   void setRandomSeed(unsigned long long rseed);
 
-  template <typename T> T *getSharedBuffer(int id, int size);
+  template <typename T> T *getSharedBuffer(int id, size_t size);
   template <typename T> void releaseSharedBuffer(int id);
-  template <typename T> void printSharedBuffer(int id, int size);
+  template <typename T> void printSharedBuffer(int id, size_t size);
 
   void recordEvent();
   void waitEvent(CudaContextPtr wait_on_context);
@@ -424,7 +425,7 @@ private:
 template <typename T> class CudaArray {
 
 public:
-  CudaArray(){};
+  CudaArray() {};
   explicit CudaArray(CudaContextPtr c);
   explicit CudaArray(CudaContextPtr c, int n);
   explicit CudaArray(CudaContextPtr c, int n, const T *host_array);
@@ -447,6 +448,7 @@ public:
     swap(a.height_, b.height_);
     swap(a.context_, b.context_);
     swap(a.shared_if_, b.shared_if_);
+    swap(a.mem_size_, b.mem_size_);
   }
 
   void assign(const T *host_array);
@@ -476,9 +478,8 @@ public:
   inline T *getData() { return values_; };
   const T *getDataConst() const { return values_; };
 
-  int getLD() const { return (((int)this->getPitch()) / sizeof(T)); }
-
   void printValues(int nmax = 0) const;
+  void printMatrixValues(int first_size) const;
   void printNZValues(int nmax = 0) const;
 
 private:
@@ -487,6 +488,7 @@ private:
   int size_ = 0;
   size_t pitch_ = 0;
   int width_ = 0;
+  int mem_size_ = 0;
   int height_ = 0;
 
   CudaContextPtr context_ = nullptr;

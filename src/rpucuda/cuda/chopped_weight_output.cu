@@ -290,6 +290,8 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
     dev_x_chopper_buffer_2_->setConst(1);
     dev_d_chopper_buffer_2_->setConst(1);
 
+    this->context_->synchronize();
+
     x_chopper_in_ = dev_x_chopper_buffer_1_->getData();
     x_chopper_out_ = dev_x_chopper_buffer_2_->getData();
     d_chopper_in_ = dev_d_chopper_buffer_1_->getData();
@@ -338,8 +340,12 @@ void ChoppedWeightOutput<T>::makeWeightOutputChoppers(const BitLineMaker<T> *blm
     if (n_weight_outputs > 0) {
       nwo_counter_ += n_weight_outputs; // BEFORE applying
       RPU_GET_CUDA_BUFFER(
-          context_, chop_t, dev_weight_output_out_chopper_, n_weight_outputs * getOutSize());
-      RPU_GET_CUDA_BUFFER(context_, chop_t, dev_weight_output_in_chopper_, n_weight_outputs);
+          context_, chop_t, dev_weight_output_out_chopper_, max_weight_outputs * getOutSize());
+      RPU_GET_CUDA_BUFFER(context_, chop_t, dev_weight_output_in_chopper_, max_weight_outputs);
+      dev_weight_output_out_chopper_->setConst(
+          1); // should not be needed, but otherwise has some random issues
+      dev_weight_output_in_chopper_->setConst(
+          1); // should not be needed, but otherwise has some random issues
 
       if (par_.in_chop_random || par_.out_chop_prob > (T)0.0) {
         context_->randUniform(dev_switching_probs_->getData(), sw_size);

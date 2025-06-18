@@ -70,9 +70,7 @@ if __name__ == "__main__":
 
     pbar = tqdm.tqdm(enumerate(train_loader))
     for batch_idx, (data, target) in pbar:
-        data, target = data.to(device=device, dtype=torch.bfloat16), target.to(
-            device=device
-        )
+        data, target = data.to(device=device, dtype=torch.bfloat16), target.to(device=device)
         optimizer.zero_grad()
         output = model(data)
         loss = F.nll_loss(output.float(), target)

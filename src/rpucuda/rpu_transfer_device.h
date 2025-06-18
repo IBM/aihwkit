@@ -73,9 +73,9 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
   IOMetaParameter<T> transfer_io;
   PulsedUpdateMetaParameter<T> transfer_up;
 
-  TransferRPUDeviceMetaParameter(){};
+  TransferRPUDeviceMetaParameter() {};
   TransferRPUDeviceMetaParameter(const PulsedRPUDeviceMetaParameterBase<T> &dp, int n_devices)
-      : VectorRPUDeviceMetaParameter<T>(dp, n_devices){};
+      : VectorRPUDeviceMetaParameter<T>(dp, n_devices) {};
 
   TransferRPUDeviceMetaParameter(
       const PulsedRPUDeviceMetaParameterBase<T> &dp_fast,
@@ -83,7 +83,7 @@ template <typename T> struct TransferRPUDeviceMetaParameter : VectorRPUDeviceMet
       int n_total_devices);
 
   virtual void initializeWithSize(int x_size, int d_size);
-  void initialize() override{/* do nothing */};
+  void initialize() override { /* do nothing */ };
 
   inline bool fullyHidden() const { return (!gamma && this->gamma_vec.back() == (T)1.0); };
 
@@ -134,7 +134,7 @@ template <typename T> class TransferRPUDevice : public VectorRPUDevice<T> {
 
 public:
   // constructor / destructor
-  TransferRPUDevice(){};
+  TransferRPUDevice() {};
   TransferRPUDevice(int x_size, int d_size);
   TransferRPUDevice(
       int x_size, int d_size, const TransferRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
@@ -175,7 +175,7 @@ public:
 
   void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override;
   void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override;
-  void setHiddenUpdateIdx(int idx) override{};
+  void setHiddenUpdateIdx(int idx) override {};
 
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;

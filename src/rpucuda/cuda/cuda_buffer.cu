@@ -11,11 +11,11 @@ namespace RPU {
 
 #if defined(RPU_TORCH_CUDA_BUFFERS)
 
-template <typename T> void CudaBuffer<T>::print(int size) const {
+template <typename T> void CudaBuffer<T>::print(size_t size) const {
   auto values = buffer_.cpu();
 
-  int n = values.numel() > size ? size : values.numel();
-  for (int i = 0; i < n; ++i) {
+  size_t n = values.numel() > size ? size : values.numel();
+  for (size_t i = 0; i < n; ++i) {
     std::cout << "[" << i << "]:" << values[i] << ", ";
   }
   if (n < values.numel()) {
@@ -24,12 +24,12 @@ template <typename T> void CudaBuffer<T>::print(int size) const {
   std::cout << std::endl;
 }
 
-template <typename T> T *CudaBuffer<T>::get(CudaContextPtr c, int size) {
+template <typename T> T *CudaBuffer<T>::get(CudaContextPtr c, size_t size) {
   mutex_.lock(); // need to be explicitely released to avoid multi-threading issues
 
   if (buffer_.numel() < size || c->getGPUId() != buffer_.device().index()) {
     // Build the buffers.
-    std::vector<int64_t> dims{size};
+    std::vector<int64_t> dims{(signed long)size};
     auto options = at::TensorOptions().device(at::kCUDA, c->getGPUId()).requires_grad(false);
 
 #ifdef RPU_DEFINE_CUDA_HALF_ARRAY
@@ -83,13 +83,13 @@ template <typename T> CudaBuffer<T> &CudaBuffer<T>::operator=(const CudaBuffer &
 
 #else
 
-template <typename T> void CudaBuffer<T>::print(int size) const {
+template <typename T> void CudaBuffer<T>::print(size_t size) const {
   if (buffer_ != nullptr) {
     buffer_->printValues(size);
   }
 }
 
-template <typename T> T *CudaBuffer<T>::get(CudaContextPtr c, int size) {
+template <typename T> T *CudaBuffer<T>::get(CudaContextPtr c, size_t size) {
   mutex_.lock(); // need to be explicitely released to avoid multi-threading issues
   if (buffer_ == nullptr || buffer_->getSize() < size || &*(buffer_->getContext()) != &*c) {
     if (buffer_ != nullptr) {
@@ -125,7 +125,9 @@ template <typename T> CudaBuffer<T> &CudaBuffer<T>::operator=(const CudaBuffer &
 
 // move constructor
 template <typename T> CudaBuffer<T>::CudaBuffer(CudaBuffer<T> &&other) {
-  { const std::lock_guard<std::recursive_mutex> lock(other.mutex_); }
+  {
+    const std::lock_guard<std::recursive_mutex> lock(other.mutex_);
+  }
   *this = std::move(other);
 }
 

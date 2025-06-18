@@ -17,10 +17,10 @@ namespace RPU {
 template <typename T> class ChoppedTransferRPUDeviceCuda : public BufferedTransferRPUDeviceCuda<T> {
 
 public:
-  explicit ChoppedTransferRPUDeviceCuda(){};
+  explicit ChoppedTransferRPUDeviceCuda() {};
   explicit ChoppedTransferRPUDeviceCuda(CudaContextPtr c, const ChoppedTransferRPUDevice<T> &other);
 
-  ~ChoppedTransferRPUDeviceCuda(){};
+  ~ChoppedTransferRPUDeviceCuda() {};
   ChoppedTransferRPUDeviceCuda(const ChoppedTransferRPUDeviceCuda<T> &other);
   ChoppedTransferRPUDeviceCuda<T> &operator=(const ChoppedTransferRPUDeviceCuda<T> &other);
   ChoppedTransferRPUDeviceCuda(ChoppedTransferRPUDeviceCuda<T> &&other);

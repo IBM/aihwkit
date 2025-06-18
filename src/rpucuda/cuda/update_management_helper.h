@@ -65,6 +65,8 @@ public:
   inline const CudaArray<int> &getKValues() const { return *dev_K_values_; };
   inline void getScaleValues(T *dest) const { dev_scale_values_->copyTo(dest); };
   inline void getKValues(int *dest) const { dev_K_values_->copyTo(dest); };
+  inline void getXMaxValues(T *dest) const { x_maximizer_->copyMaxValuesToHost(dest); };
+  inline void getDMaxValues(T *dest) const { d_maximizer_->copyMaxValuesToHost(dest); };
 
   void getAverageAbsMax(T &m_x, T &m_d, int m_batch) const;
   void getAverageLogAbsMax(T &m_x, T &m_d, int m_batch) const;

@@ -100,7 +100,7 @@ template <typename T> class BufferedTransferRPUDevice : public TransferRPUDevice
 
 public:
   // constructor / destructor
-  BufferedTransferRPUDevice(){};
+  BufferedTransferRPUDevice() {};
   BufferedTransferRPUDevice(int x_size, int d_size);
   BufferedTransferRPUDevice(
       int x_size,

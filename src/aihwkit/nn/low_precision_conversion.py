@@ -4,7 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Functions to convert a given model to a quantized counterpart """
+"""Functions to convert a given model to a quantized counterpart"""
 
 from copy import deepcopy
 

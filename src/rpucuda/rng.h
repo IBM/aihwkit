@@ -45,7 +45,7 @@ inline randomint_t fastrand() {
 template <typename T> class RealWorldRNG {
 public:
   explicit RealWorldRNG(unsigned int seed);
-  RealWorldRNG() : RealWorldRNG(0){};
+  RealWorldRNG() : RealWorldRNG(0) {};
 
   void setSeed(unsigned int seed);
 
@@ -68,7 +68,7 @@ template <typename T> class RNG {
 
 public:
   explicit RNG(unsigned int seed);
-  RNG() : RNG<T>(0){};
+  RNG() : RNG<T>(0) {};
   ~RNG();
 
   RNG(const RNG<T> &);

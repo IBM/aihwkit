@@ -31,7 +31,7 @@ namespace {
 
 using namespace RPU;
 
-template <typename DeviceParT> void specific_settings(DeviceParT &par){};
+template <typename DeviceParT> void specific_settings(DeviceParT &par) {};
 
 template <> void specific_settings(PiecewiseStepRPUDeviceMetaParameter<num_t> &par) {
   par.piecewise_up_vec = std::vector<num_t>{0.1, 0.5, 1.0, 0.3, 0.1};

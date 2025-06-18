@@ -82,8 +82,9 @@ AbstractRPUDeviceCuda<T>::createFrom(CudaContextPtr c, const AbstractRPUDevice<T
     return new SoftBoundsReferenceRPUDeviceCuda<T>(
         c, static_cast<const SoftBoundsReferenceRPUDevice<T> &>(rpu_device));
   default:
-    RPU_FATAL("Pulsed device type not implemented in CUDA. Maybe not added to createFrom in "
-              "rpucuda_simple_device.cu?");
+    RPU_FATAL(
+        "Pulsed device type not implemented in CUDA. Maybe not added to createFrom in "
+        "rpucuda_simple_device.cu?");
   }
 }
 

@@ -149,7 +149,7 @@ template <typename T> class WeightModifier {
 
 public:
   explicit WeightModifier(int x_size, int d_size);
-  WeightModifier(){};
+  WeightModifier() {};
 
   /* buffers the weight changes and redraws the drop connection*/
   void apply(T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar);

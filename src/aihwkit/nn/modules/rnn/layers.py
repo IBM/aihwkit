@@ -4,7 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Analog RNN layers """
+"""Analog RNN layers"""
 
 from typing import Any, List, Tuple, Type, Union
 from torch import Tensor, stack, jit, cat
