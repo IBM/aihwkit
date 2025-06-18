@@ -147,8 +147,7 @@ class CustomSimulatorTile(SimulatorTile, Module):
         Args:
             weight: ``[out_size, in_size]`` weight matrix.
         """
-        device = self._analog_weight.device
-        self._analog_weight = weight.clone().to(device)
+        self._analog_weight.copy_(weight)
 
     def get_weights(self) -> Tensor:
         """Get the tile weights.
