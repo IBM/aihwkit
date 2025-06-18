@@ -18,8 +18,8 @@ namespace RPU {
 template <typename T> class RPUWeightUpdater {
 
 public:
-  explicit RPUWeightUpdater(int x_size, int d_size) : x_size_(x_size), d_size_(d_size){};
-  RPUWeightUpdater(){};
+  explicit RPUWeightUpdater(int x_size, int d_size) : x_size_(x_size), d_size_(d_size) {};
+  RPUWeightUpdater() {};
 
   friend void swap(RPUWeightUpdater<T> &a, RPUWeightUpdater<T> &b) noexcept {
     using std::swap;
@@ -35,8 +35,8 @@ public:
       const int d_inc,
       const T learning_rate);
 
-  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix){};
-  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+  virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) {};
+  virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {};
 
 protected:
   int x_size_ = 0;
@@ -48,7 +48,7 @@ template <typename T> class PulsedRPUWeightUpdater : public RPUWeightUpdater<T> 
 
 public:
   explicit PulsedRPUWeightUpdater(int x_size, int d_size, std::shared_ptr<RNG<T>> rng);
-  PulsedRPUWeightUpdater(){};
+  PulsedRPUWeightUpdater() {};
   virtual ~PulsedRPUWeightUpdater();
 
   PulsedRPUWeightUpdater(const PulsedRPUWeightUpdater<T> &);

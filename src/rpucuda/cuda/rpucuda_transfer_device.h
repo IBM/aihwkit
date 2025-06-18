@@ -18,11 +18,11 @@ namespace RPU {
 template <typename T> class TransferRPUDeviceCuda : public VectorRPUDeviceCuda<T> {
 
 public:
-  explicit TransferRPUDeviceCuda(){};
+  explicit TransferRPUDeviceCuda() {};
   // explicit TransferRPUDeviceCuda(CudaContextPtr  c, int x_size, int d_size);
   explicit TransferRPUDeviceCuda(CudaContextPtr c, const TransferRPUDevice<T> &other);
 
-  ~TransferRPUDeviceCuda(){};
+  ~TransferRPUDeviceCuda() {};
   TransferRPUDeviceCuda(const TransferRPUDeviceCuda<T> &other);
   TransferRPUDeviceCuda<T> &operator=(const TransferRPUDeviceCuda<T> &other);
   TransferRPUDeviceCuda(TransferRPUDeviceCuda<T> &&other);
@@ -46,7 +46,7 @@ public:
   };
   TransferRPUDeviceCuda<T> *clone() const override { return new TransferRPUDeviceCuda<T>(*this); };
 
-  void setHiddenUpdateIdx(int idx) override{};
+  void setHiddenUpdateIdx(int idx) override {};
   void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 

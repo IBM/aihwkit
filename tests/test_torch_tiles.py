@@ -459,7 +459,7 @@ def test_noise_and_bound_management(
     """
 
     def set_bm_nm(
-        rpu: Union[TorchInferenceRPUConfig, InferenceRPUConfig]
+        rpu: Union[TorchInferenceRPUConfig, InferenceRPUConfig],
     ) -> Union[TorchInferenceRPUConfig, InferenceRPUConfig]:
         """Set the rpu config."""
         rpu.forward.out_noise = 0.0

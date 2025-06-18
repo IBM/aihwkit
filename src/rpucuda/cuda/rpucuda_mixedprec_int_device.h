@@ -15,11 +15,11 @@ namespace RPU {
 template <typename T> class MixedPrecIntRPUDeviceCuda : public MixedPrecRPUDeviceBaseCuda<T> {
 
 public:
-  explicit MixedPrecIntRPUDeviceCuda(){};
+  explicit MixedPrecIntRPUDeviceCuda() {};
   explicit MixedPrecIntRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
   explicit MixedPrecIntRPUDeviceCuda(CudaContextPtr c, const MixedPrecIntRPUDevice<T> &other);
 
-  ~MixedPrecIntRPUDeviceCuda(){};
+  ~MixedPrecIntRPUDeviceCuda() {};
   MixedPrecIntRPUDeviceCuda(const MixedPrecIntRPUDeviceCuda<T> &other);
   MixedPrecIntRPUDeviceCuda<T> &operator=(const MixedPrecIntRPUDeviceCuda<T> &other);
   MixedPrecIntRPUDeviceCuda(MixedPrecIntRPUDeviceCuda<T> &&other);

@@ -156,7 +156,7 @@ namespace RPU {
                                                                                                    \
   int batch_idx = m_batch - 1;                                                                     \
   for (int j = 0; j < size * nK32; j++) {                                                          \
-    counts[j] = tmp32[(batch_idx)*size * nK32 + j];                                                \
+    counts[j] = tmp32[(batch_idx) * size * nK32 + j];                                              \
   }                                                                                                \
                                                                                                    \
   CUDA_CALL(cudaDeviceSynchronize());                                                              \
@@ -2127,15 +2127,13 @@ void BitLineMaker<T>::makeCounts(
             Kc_values = umh_->getKcValueData();
             Kn = umh_->getKnData(current_ublm_, m_batch);
           }
-
+          auto *random_states = context_->getRandomStates(nthreads_ * nblocks);
           RPU_BLM_SWITCH_TRANS_TEMPLATE_UM(
               x_trans, d_trans, out_trans, current_um_, current_ublm_,
               kernelUpdateGetCountsBatch_SimpleLoop2,
               (x_in, x_size_, B, dev_x_counts_bo64_->getData(), d_in, d_size_, A,
-               dev_d_counts_bo64_->getData(), dev_d_noz, current_BL_ + 1, m_batch,
-               context_->getRandomStates(nthreads_ * nblocks), res, sr, scale_values, K_values,
-               lr / weight_granularity, Kc_values, Kn));
-
+               dev_d_counts_bo64_->getData(), dev_d_noz, current_BL_ + 1, m_batch, random_states,
+               res, sr, scale_values, K_values, lr / weight_granularity, Kc_values, Kn));
         } else {
 
           // need to set buffers to zero for zero short-cut
@@ -2169,14 +2167,15 @@ void BitLineMaker<T>::makeCounts(
           dev_d_counts_->getData(), m_batch, current_BL_, current_ublm_);
     }
 
-    DEBUG_CALL(context_->synchronizeDevice(); CudaArray<T> dev_x(context_, x_size_);
-               CudaArray<T> dev_d(context_, d_size_);
-               RPU::math::copyWithIterator(context_, dev_x.getData(), x_in, x_size_);
-               RPU::math::copyWithIterator(context_, dev_d.getData(), d_in, d_size_);
-               context_->synchronizeDevice(); test_helper::checkCounts(
-                   dev_x.getData(), x_size_, dev_d.getData(), d_size_, current_BL_, A, B,
-                   &*dev_x_counts_, &*dev_d_counts_);
-               context_->synchronizeDevice(););
+    // TODO: check this debug code
+    // DEBUG_CALL(context_->synchronizeDevice(); CudaArray<T> dev_x(context_, x_size_);
+    //            CudaArray<T> dev_d(context_, d_size_);
+    //            RPU::math::copyWithIterator(context_, dev_x.getData(), x_in, x_size_);
+    //            RPU::math::copyWithIterator(context_, dev_d.getData(), d_in, d_size_);
+    //            context_->synchronizeDevice(); test_helper::checkCounts(
+    //                dev_x.getData(), x_size_, dev_d.getData(), d_size_, current_BL_, A, B,
+    //                &*dev_x_counts_, &*dev_d_counts_);
+    //            context_->synchronizeDevice(););
   } break;
 
   default:

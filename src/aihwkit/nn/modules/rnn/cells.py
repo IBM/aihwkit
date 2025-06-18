@@ -4,7 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-""" Analog cells for RNNs. """
+"""Analog cells for RNNs."""
 
 from typing import Optional, Tuple, Type
 from collections import namedtuple

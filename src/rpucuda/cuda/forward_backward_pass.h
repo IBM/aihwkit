@@ -91,7 +91,7 @@ void backwardMatrix(
 
 template <typename T> class MVParameterCuda {
 public:
-  MVParameterCuda(){};
+  MVParameterCuda() {};
   CudaArray<T> out_noise_values;
   CudaArray<T> v_offset;
   CudaArray<T> w_asymmetry;
@@ -110,7 +110,7 @@ public:
 
 template <typename T> class FBParameterCuda {
 public:
-  FBParameterCuda(){};
+  FBParameterCuda() {};
   MVParameterCuda<T> fwd;
   MVParameterCuda<T> bwd;
 
@@ -125,8 +125,8 @@ template <typename T> class ForwardBackwardPassIOManagedCuda {
 
 public:
   explicit ForwardBackwardPassIOManagedCuda(CudaContextPtr context, int x_size, int d_size)
-      : x_size_(x_size), d_size_(d_size), context_(context){};
-  ForwardBackwardPassIOManagedCuda(){};
+      : x_size_(x_size), d_size_(d_size), context_(context) {};
+  ForwardBackwardPassIOManagedCuda() {};
 
   ~ForwardBackwardPassIOManagedCuda() = default;
   ForwardBackwardPassIOManagedCuda(const ForwardBackwardPassIOManagedCuda<T> &);
@@ -188,6 +188,7 @@ public:
     }
 
     // init IO
+    DEBUG_OUT("in_size " << in_size << " batch " << m_batch);
     f_iom.initWithInput(X_input, f_io, in_size, m_batch, x_trans, alpha, is_test);
 
     bool bound_test_passed = false;

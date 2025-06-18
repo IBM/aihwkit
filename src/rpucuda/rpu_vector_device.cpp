@@ -409,8 +409,9 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
   reduce_weightening_.clear();
   T weight_granularity = (T)0.0;
   for (int k = 0; k < n_devices_; k++) {
-    rpu_device_vec_.push_back(std::unique_ptr<PulsedRPUDeviceBase<T>>(
-        par.vec_par[k]->createDevice(this->x_size_, this->d_size_, rng)));
+    rpu_device_vec_.push_back(
+        std::unique_ptr<PulsedRPUDeviceBase<T>>(
+            par.vec_par[k]->createDevice(this->x_size_, this->d_size_, rng)));
     weight_granularity += rpu_device_vec_.back()->getWeightGranularity();
 
     reduce_weightening_.push_back((T)1.0 / (T)n_devices_); // average per default

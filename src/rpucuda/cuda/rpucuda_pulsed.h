@@ -24,7 +24,7 @@ namespace RPU {
 template <typename T> class RPUCudaPulsed : public RPUCudaSimple<T> {
 
 public:
-  explicit RPUCudaPulsed(){}; // dummy
+  explicit RPUCudaPulsed() {}; // dummy
   explicit RPUCudaPulsed(CudaContextPtr c, int x_size, int d_size);
   explicit RPUCudaPulsed(CudaContextPtr c, RPUPulsed<T> &o);
   explicit RPUCudaPulsed(cudaStream_t s, int x_size, int d_size);

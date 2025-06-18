@@ -243,8 +243,9 @@ template <typename T> void PulsedRPUDevice<T>::getDPNames(std::vector<std::strin
   names.push_back(std::string("diffusion_rates"));
   if (!getPar().legacy_params) {
     names.push_back(std::string("reset_bias"));
-    names.push_back(std::string(
-        "drift_nu")); // we only save the nu, not the t/w0 etc. drift will thus reset at zero
+    names.push_back(
+        std::string(
+            "drift_nu")); // we only save the nu, not the t/w0 etc. drift will thus reset at zero
   }
   if (getPar().usesPersistentWeight()) {
     names.push_back(std::string("persistent_weights"));
@@ -325,8 +326,9 @@ void PulsedRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
   dw_min /= this->size_;
   // need dw_min for update management
   if ((T)fabsf(dw_min - getPar().dw_min) / getPar().dw_min > (T)2.0 * getPar().dw_min_dtod) {
-    RPU_WARNING("DW min seems to have changed during hidden parameter set. Will update parameter "
-                "with estimated value.");
+    RPU_WARNING(
+        "DW min seems to have changed during hidden parameter set. Will update parameter "
+        "with estimated value.");
     getPar().dw_min = dw_min; //!! update par. Should be possible since unique
     this->setWeightGranularity(getPar().calcWeightGranularity());
   }

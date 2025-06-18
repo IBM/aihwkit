@@ -163,7 +163,6 @@ class _AnalogConvNd(AnalogLayerBase, _ConvNd):
             input_size = x_input.numel() / x_input.size(0)
             if self.input_size != input_size or not self.analog_module.is_indexed():
                 self._recalculate_indexes(x_input)
-
             return self.analog_module(x_input, tensor_view=self.tensor_view)
 
         # Brute-force unfold.

@@ -25,7 +25,7 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   int first_update_idx = 0;
   std::vector<T> gamma_vec;
 
-  VectorRPUDeviceMetaParameter(){};
+  VectorRPUDeviceMetaParameter() {};
   explicit VectorRPUDeviceMetaParameter(
       const PulsedRPUDeviceMetaParameterBase<T> &dp, int n_devices);
 
@@ -131,7 +131,7 @@ template <typename T> class VectorRPUDevice : public PulsedRPUDeviceBase<T> {
 
 public:
   // constructor / destructor
-  VectorRPUDevice(){};
+  VectorRPUDevice() {};
   VectorRPUDevice(int x_size, int d_size);
   VectorRPUDevice(
       int x_size, int d_size, const VectorRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng);

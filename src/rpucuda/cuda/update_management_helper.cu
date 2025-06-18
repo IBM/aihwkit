@@ -357,7 +357,7 @@ int debugKernelTranslateTransFormatToBatchOrder64Format(
       for (int i = 0; i < k; i++) { // k is smaller than 32 because nK32==1
         kagg_t current_cK = Kc + i;
         kagg_t iB = (current_cK) >> 5;
-        int ibit = (current_cK)&0x1f;
+        int ibit = (current_cK) & 0x1f;
         if ((c & (one << i)) > 0) {
           counts_out_ref[iB + idx * nBref] |= ((uint64_t)1) << ibit;
         }
@@ -497,6 +497,7 @@ UpdateManagementHelper<T>::UpdateManagementHelper(CudaContextPtr c, int x_size, 
   x_maximizer_ = RPU::make_unique<Maximizer<T>>(c, x_size_, true);
   d_maximizer_ = RPU::make_unique<Maximizer<T>>(c, d_size_, true);
   dev_sumabsmax_value_ = RPU::make_unique<CudaArray<T>>(context_, 2);
+  context_->synchronize();
 }
 
 template <typename T> void UpdateManagementHelper<T>::initializeBuffers(int m_batch) {
@@ -519,18 +520,20 @@ template <typename T> void UpdateManagementHelper<T>::initializeBuffers(int m_ba
   size_t temp_storage_bytes = 0;
   auto s = context_->getStream();
 
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceScan::InclusiveSum(
-      temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kc_values_->getData() + 1,
-      m_batch, s));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceScan::InclusiveSum(
+          temp_storage, temp_storage_bytes, dev_K_values_->getData(), dev_Kc_values_->getData() + 1,
+          m_batch, s));
   context_->synchronize();
   dev_Kc_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, (int)temp_storage_bytes);
 
   // average max sum
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
-      nullptr, temp_storage_bytes, x_maximizer_->getMaxValues(), dev_sumabsmax_value_->getData(),
-      m_batch, s));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
+          nullptr, temp_storage_bytes, x_maximizer_->getMaxValues(),
+          dev_sumabsmax_value_->getData(), m_batch, s));
   dev_sumabsmax_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
-  context_->synchronize();
+  context_->synchronizeDevice();
 }
 
 template <typename T> void UpdateManagementHelper<T>::computeKcBlock(int m_batch) {
@@ -548,9 +551,10 @@ template <typename T> void UpdateManagementHelper<T>::computeKc(int m_batch) {
 
   // CAUTION: needs K_values to be already computed !!
   size_t temp_storage_bytes = dev_Kc_temp_storage_->getSize();
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceScan::InclusiveSum(
-      (void *)dev_Kc_temp_storage_->getData(), temp_storage_bytes, dev_K_values_->getData(),
-      dev_Kc_values_->getData() + 1, m_batch, context_->getStream()));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceScan::InclusiveSum(
+          (void *)dev_Kc_temp_storage_->getData(), temp_storage_bytes, dev_K_values_->getData(),
+          dev_Kc_values_->getData() + 1, m_batch, context_->getStream()));
 }
 
 template <typename T>
@@ -580,12 +584,14 @@ void UpdateManagementHelper<T>::getAverageAbsMax(T &m_x, T &m_d, int m_batch) co
 
   // first compute the average of the max over batch
   size_t ssz = dev_sumabsmax_temp_storage_->getSize();
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
-      (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_maximizer_->getMaxValues(),
-      dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
-      (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_maximizer_->getMaxValues(),
-      dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
+          (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_maximizer_->getMaxValues(),
+          dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
+          (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_maximizer_->getMaxValues(),
+          dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
   dev_sumabsmax_value_->copyTo(result);
   m_x = result[0] / (T)m_batch;
@@ -607,12 +613,14 @@ void UpdateManagementHelper<T>::getAverageLogAbsMax(T &m_x, T &m_d, int m_batch)
   LogInputIterator<T> x_input_iter(x_maximizer_->getMaxValues());
   LogInputIterator<T> d_input_iter(d_maximizer_->getMaxValues());
 
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
-      (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_input_iter,
-      dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
-      (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_input_iter,
-      dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
+          (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_input_iter,
+          dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
+          (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_input_iter,
+          dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
   dev_sumabsmax_value_->copyTo(result);
   m_x = expf(result[0] / (T)m_batch);
@@ -630,12 +638,14 @@ template <typename T> void UpdateManagementHelper<T>::getAbsMax(T &m_x, T &m_d, 
 
   // first compute the average of the max over batch
   size_t ssz = dev_sumabsmax_temp_storage_->getSize();
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
-      (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_maximizer_->getMaxValues(),
-      dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
-  CUDA_CALL(RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
-      (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_maximizer_->getMaxValues(),
-      dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
+          (void *)dev_sumabsmax_temp_storage_->getData(), ssz, x_maximizer_->getMaxValues(),
+          dev_sumabsmax_value_->getData(), m_batch, context_->getStream()));
+  CUDA_CALL(
+      RPU_CUB_NS_QUALIFIER DeviceReduce::Max(
+          (void *)dev_sumabsmax_temp_storage_->getData(), ssz, d_maximizer_->getMaxValues(),
+          dev_sumabsmax_value_->getData() + 1, m_batch, context_->getStream()));
   T result[2];
   dev_sumabsmax_value_->copyTo(&result[0]);
   m_x = result[0];

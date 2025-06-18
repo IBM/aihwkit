@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Fix Hardware-Aware training tutorial notebooks (\#700)
 * Fix Post-Training Input Range Calibration notebook (\#716)
+* Fix memory issues and bugs in analog training for CUDA (\#732)
 
 ## Changed
 

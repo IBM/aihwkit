@@ -86,7 +86,7 @@ template <typename T> class DynamicTransferRPUDevice : public ChoppedTransferRPU
 
 public:
   // constructor / destructor
-  DynamicTransferRPUDevice(){};
+  DynamicTransferRPUDevice() {};
   DynamicTransferRPUDevice(int x_size, int d_size);
   DynamicTransferRPUDevice(
       int x_size,

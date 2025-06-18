@@ -11,6 +11,7 @@ if(BUILD_TEST)
     URL_HASH          MD5=52943a59cefce0ae0491d4d2412c120b
     CMAKE_ARGS        "-DCMAKE_CXX_FLAGS=-D_GLIBCXX_USE_CXX11_ABI\=0"
     INSTALL_COMMAND   ""
+    DOWNLOAD_EXTRACT_TIMESTAMP true
   )
 
   ExternalProject_Get_Property(GTest source_dir)
@@ -20,4 +21,5 @@ if(BUILD_TEST)
 
   include_directories(SYSTEM ${GTest_INCLUDE_DIR})
   link_directories(SYSTEM ${GTest_LIBRARY_DIR})
+ 
 endif()

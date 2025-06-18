@@ -4,8 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-"""aihwkit example 22: Simple example of how to use an analog tile as a matrix
-"""
+"""aihwkit example 22: Simple example of how to use an analog tile as a matrix"""
 # pylint: disable=invalid-name
 # pylint: disable=too-many-locals
 

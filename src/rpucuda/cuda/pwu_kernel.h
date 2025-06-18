@@ -84,7 +84,7 @@ getIdxToLoad<false>(int batch_index, int count_index, int sz, int m_batch, int c
 #define DEFINE_GETNFROMCOUNT32(ONE_SIDED, OS_ADD)                                                  \
   template <>                                                                                      \
   __device__ __forceinline__ void getNfromCount<ONE_SIDED COMMA uint32_t>(                         \
-      uint32_t & n, uint32_t & negative, bool &mixed, uint32_t *x_ptr, uint32_t *d_ptr, int nK32,  \
+      uint32_t &n, uint32_t &negative, bool &mixed, uint32_t *x_ptr, uint32_t *d_ptr, int nK32,    \
       int shared_x_offset, int shared_d_offset, bool enforce_mixed) {                              \
     uint32_t x = *x_ptr;                                                                           \
     uint32_t d = *d_ptr;                                                                           \
@@ -97,7 +97,7 @@ getIdxToLoad<false>(int batch_index, int count_index, int sz, int m_batch, int c
                                                                                                    \
     uint32_t x_and_d = x & d;                                                                      \
     n = __popc(x_and_d);                                                                           \
-    n -= ((x_and_d)&1);                                                                            \
+    n -= ((x_and_d) & 1);                                                                          \
                                                                                                    \
     if (nK32 > 1) {                                                                                \
       int i_d = 0;                                                                                 \
@@ -129,7 +129,7 @@ DEFINE_GETNFROMCOUNT32(
 #define DEFINE_GETNFROMCOUNTFP(FPTYPE, ONE_SIDED, OS_ADD)                                          \
   template <>                                                                                      \
   __device__ __forceinline__ void getNfromCount<ONE_SIDED COMMA FPTYPE>(                           \
-      uint32_t & n, uint32_t & negative, bool &mixed, FPTYPE *x_ptr, FPTYPE *d_ptr, int nK32,      \
+      uint32_t &n, uint32_t &negative, bool &mixed, FPTYPE *x_ptr, FPTYPE *d_ptr, int nK32,        \
       int shared_x_offset, int shared_d_offset, bool enforce_mixed) {                              \
     FPTYPE x = *x_ptr;                                                                             \
     FPTYPE d = *d_ptr;                                                                             \
@@ -197,7 +197,7 @@ DEFINE_GETNFROMCOUNTFP(
 #define DEFINE_GETNFROMCOUNT64(ONE_SIDED, OS_ADD)                                                  \
   template <>                                                                                      \
   __device__ __forceinline__ void getNfromCount<ONE_SIDED COMMA uint64_t>(                         \
-      uint32_t & n, uint32_t & negative, bool &mixed, uint64_t *x_ptr, uint64_t *d_ptr, int nK32,  \
+      uint32_t &n, uint32_t &negative, bool &mixed, uint64_t *x_ptr, uint64_t *d_ptr, int nK32,    \
       int shared_x_offset, int shared_d_offset, bool enforce_mixed) {                              \
     /* -- nK32 is ignored (assumed 1). larger K will be in put into the batch order*/              \
     /* -- this is the bit-wise negative version */                                                 \
@@ -445,8 +445,8 @@ __global__ void kernelUpdateWFunctor(
       } sum_n = 0;                                                                                 \
       last_negative = 0;                                                                           \
                                                                                                    \
-      int pos_n = __popc((~negative) & n); int neg_n = __popc((negative)&n); T dw_pos = (T)pos_n;  \
-      T dw_neg = (T)neg_n;                                                                         \
+      int pos_n = __popc((~negative) & n); int neg_n = __popc((negative) & n);                     \
+      T dw_pos = (T)pos_n; T dw_neg = (T)neg_n;                                                    \
                                                                                                    \
       if (noise_std_dw > (T)0.0) {                                                                 \
         if (pos_n > 0) {                                                                           \
@@ -931,7 +931,7 @@ __global__ void kernelUpdateWBatchSharedSum(
       }
 
     } // within range
-  }   // batch strides
+  } // batch strides
   if (within_range) {
     weights[idx] = w;
   }
@@ -1004,7 +1004,7 @@ __global__ void kernelUpdateWBatchSharedSumBoundCheck(
       }
 
     } // within range
-  }   // batch strides
+  } // batch strides
 
   if (within_range) {
     weights[idx] = w;
@@ -1105,7 +1105,7 @@ __global__ void kernelUpdateWBatchSharedFunctor(
       } // batch
 
     } // within range
-  }   // batch strides
+  } // batch strides
 
   if (within_range) {
     weights[idx] = w;
@@ -1221,11 +1221,13 @@ __device__ __forceinline__ int getWeightOutputIdx(
     // is used
 
     if (wo_column) {
+      // out size is d-size
       int val_wo = (val_start + i_weight_output) % x_size;
       return d_index + d_size * (val_wo + i_weight_output / x_size * x_size);
     } else {
+      // out size is x-size
       int val_wo = (val_start + i_weight_output) % d_size;
-      return val_wo + d_size * x_index + i_weight_output / d_size * d_size * x_size;
+      return val_wo + d_size * (x_index + i_weight_output / d_size * x_size);
     }
   }
 }
@@ -1296,11 +1298,13 @@ __device__ __forceinline__ void updateChopper(
         x_index, d_index, i_weight_output, wo_column, xsz, dsz, n_wo, wo_val_start,                \
         wo_flexible_in_size);                                                                      \
     weight_output[wo_idx] = w;                                                                     \
-    weight_output_out_chopper[wo_idx] = wo_column ? d_chop : x_chop;                               \
-    if (0 == (wo_column ? d_index : x_index)) {                                                    \
+    int out_index = (wo_column ? d_index : x_index);                                               \
+    int out_size = (wo_column ? dsz : xsz);                                                        \
+    weight_output_out_chopper[out_index + i_weight_output * out_size] =                            \
+        wo_column ? d_chop : x_chop;                                                               \
+    if (0 == out_index) {                                                                          \
       weight_output_in_chopper[i_weight_output] = wo_column ? x_chop : d_chop;                     \
     }                                                                                              \
-    /* //printf("X %d, D %d, B %d:  WO\n", x_index, d_index, current_batch);	*/                    \
   }                                                                                                \
   updateChopper(                                                                                   \
       current_chop_neg, i_weight_output, x_chop, d_chop, x_switching_probs, d_switching_probs,     \
@@ -1499,7 +1503,7 @@ __global__ void kernelUpdateWBatchSharedWeightOutputFunctor(
       } // batch
 
     } // within range
-  }   // batch strides
+  } // batch strides
 
   if (within_range) {
     weights[idx] = w;

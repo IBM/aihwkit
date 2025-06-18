@@ -151,10 +151,11 @@ __global__ void kernelModifyWeightsAddNormal(
 
   const T stddev = amax * stddev_in;
 
-  RPU_WM_KERNEL_LOOP(true,
+  RPU_WM_KERNEL_LOOP(
+      true,
 
-                     T stoch_value = curand_normal(&local_state);
-                     new_weights[i] = weights[i] + stddev * stoch_value;);
+      T stoch_value = curand_normal(&local_state);
+      new_weights[i] = weights[i] + stddev * stoch_value;);
 }
 
 template <typename T>
@@ -173,12 +174,13 @@ __global__ void kernelModifyWeightsMultNormal(
 
   const T stddev = stddev_in * amax;
 
-  RPU_WM_KERNEL_LOOP(true,
+  RPU_WM_KERNEL_LOOP(
+      true,
 
-                     T w = weights[i];
-                     T stoch_value = curand_normal(&local_state);
+      T w = weights[i];
+      T stoch_value = curand_normal(&local_state);
 
-                     new_weights[i] = w * ((T)1.0 + stddev * stoch_value););
+      new_weights[i] = w * ((T)1.0 + stddev * stoch_value););
 }
 
 template <typename T, bool preserve_sign>

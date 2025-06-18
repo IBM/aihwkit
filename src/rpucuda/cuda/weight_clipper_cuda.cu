@@ -13,7 +13,7 @@
 namespace RPU {
 
 template <typename T> struct StdFunctor {
-  StdFunctor(T size, T *sum) : size_(size), sum_(sum){};
+  StdFunctor(T size, T *sum) : size_(size), sum_(sum) {};
 
   __device__ __forceinline__ T operator()(const T &a) const {
     T m = *sum_ / size_;

@@ -182,22 +182,29 @@ pwukpvec_t<T> SoftBoundsReferenceRPUDeviceCuda<T>::getUpdateKernels(
     v.push_back(
         RPU::make_unique<
             PWUKernelParameterBatchFunctor<T, UpdateFunctorSoftBoundsReferenceMult<T>, 1>> ARGS);
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedFunctor<
-                    T, UpdateFunctorSoftBoundsReferenceMult<T>, 1>> ARGS);
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
-                    T, UpdateFunctorSoftBoundsReferenceMult<T>, 1>> ARGS);
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorSoftBoundsReferenceMult<T>, 1>>
+            ARGS);
+    v.push_back(
+        RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+            T, UpdateFunctorSoftBoundsReferenceMult<T>, 1>> ARGS);
 
   } else {
 
     v.push_back(
         RPU::make_unique<
             PWUKernelParameterSingleFunctor<T, UpdateFunctorSoftBoundsReferenceAdd<T>, 1>> ARGS);
-    v.push_back(RPU::make_unique<
-                PWUKernelParameterBatchFunctor<T, UpdateFunctorSoftBoundsReferenceAdd<T>, 1>> ARGS);
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedFunctor<
-                    T, UpdateFunctorSoftBoundsReferenceAdd<T>, 1>> ARGS);
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
-                    T, UpdateFunctorSoftBoundsReferenceAdd<T>, 1>> ARGS);
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterBatchFunctor<T, UpdateFunctorSoftBoundsReferenceAdd<T>, 1>> ARGS);
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorSoftBoundsReferenceAdd<T>, 1>>
+            ARGS);
+    v.push_back(
+        RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+            T, UpdateFunctorSoftBoundsReferenceAdd<T>, 1>> ARGS);
   }
   return v;
 }

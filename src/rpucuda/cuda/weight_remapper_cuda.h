@@ -16,7 +16,7 @@ template <typename T> class WeightRemapperCuda {
 
 public:
   explicit WeightRemapperCuda(CudaContextPtr context, int x_size, int d_size);
-  WeightRemapperCuda(){};
+  WeightRemapperCuda() {};
 
   void apply(
       T *weights,
@@ -36,8 +36,8 @@ public:
       T *biases = nullptr,
       int *channel_exceded = nullptr);
 
-  void dumpExtra(RPU::state_t &extra, const std::string prefix){};
-  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict){};
+  void dumpExtra(RPU::state_t &extra, const std::string prefix) {};
+  void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) {};
 
 private:
   CudaContextPtr context_ = nullptr;
