@@ -2,7 +2,13 @@
 
 # (C) Copyright 2020, 2021, 2022, 2023, 2024 IBM. All Rights Reserved.
 #
-# Licensed under the MIT license. See LICENSE file in the project root for details.
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 # pylint: disable=too-many-instance-attributes
 
@@ -32,11 +38,7 @@ class IOParameters(_PrintableMixin):
     """Short-cut to compute a perfect forward pass.
 
     If ``True``, it assumes an ideal forward pass (e.g. no bound, ADC etc...).
-    Will disregard all other IOParameters settings in this case.
-
-    Note that other noise sources set by
-    :class:`aihwkit.simulator.parameters.inference.WeightModifierParameter`
-    and :class:`aihwkit.inference.noise` will still be applied.
+    Will disregard all other settings in this case.
     """
 
     mv_type: AnalogMVType = AnalogMVType.ONE_PASS
@@ -176,7 +178,7 @@ class IOParameters(_PrintableMixin):
     analog output (before the ADC), i.e. :math:`\frac{y_i}{1 +
     n_i*|y_i|}` where :math:`n_i` is drawn at the instantiation time
     by::
-    out_nonlinearity / out_bound * (1 + out_nonlinearity_std * rand)
+        out_nonlinearity / out_bound * (1 + out_nonlinearity_std * rand)
     """
 
     out_nonlinearity_std: float = 0.0
@@ -331,3 +333,35 @@ class IOParametersIRDropT(IOParameters):
     PWM/DAC operation increases throughput / energy efficiency
     of MVM tile hardware while potentially sacrificing some
     analog MVM accuracy."""
+
+    apply_xdep_pcm_read_noise: bool = False
+    """Sets whether to apply activation (x)-dependent PCM read 
+    noise. This model is implemented within analog_mvm_irdrop_t due
+    to the inputs needing to be 'prepared' (converted to a ns scale), 
+    which is only accomplished deeper into the mvm implementation (as
+    opposed to the noise_model parameters within PCMLikeNoiseModel()).
+    """
+
+    xdep_pcm_read_noise_scale: float = 1.0
+    """Scale for the activation (x)-dependent PCM read noise model.
+    """
+    
+    adc_quantization: bool = True
+    """Sets whether the ADC Quantization feature is applied; this
+    implements the 'floor' operation consistent with the behavior a
+    Current-Controlled Oscillator (CCO) (during current integration)
+    in the case where a capacitor is not fully charged to achieve a 
+    pulse/oscillation. This feature is particularly important in 
+    capturing the true behavior of SPLIT PWM mode. This feature is 
+    implemented within analog_mvm_irdrop_t taken that it requires
+    charge units, rather than unit-less quantities. 
+    """
+    adc_frequency: float = 6.24
+    """Sets the operating frequency of the ADC used for quantization; 
+    quantity provided is in GHz.
+    """
+
+    ir_drop_integration_sum: bool = False
+    """Sets current integration to use summation rather than the default
+    trapezoidal integation method.
+    """
