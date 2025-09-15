@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.11", "3.13", "pypy3.10"]
+        python-version: ["3.12"]
     services:
       docker:
         image: docker:20.10.16
@@ -19,7 +19,7 @@ jobs:
         pip install torch==2.3.1+cu121 torchvision
         -f https://download.pytorch.org/whl/torch_stable.html
         && pip install -r requirements.txt
-      CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit_cuda"
+      CIBW_MANYLINUX_X86_64_IMAGE: "quay.io/pypa/manylinux2014_x86_64-cuda12.1"
       CIBW_REPAIR_WHEEL_COMMAND: >
         auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so
     steps:
