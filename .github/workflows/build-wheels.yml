@@ -16,9 +16,9 @@ jobs:
     env:
       CIBW_BUILD: "cp312-manylinux_x86_64"
       CIBW_BEFORE_BUILD: >
-        pip install torch torchvision
+        pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
         && pip install -r requirements.txt
-      CIBW_MANYLINUX_X86_64_IMAGE: "sameli/manylinux_2_34_x86_64_cuda_12.8"
+      CIBW_MANYLINUX_X86_64_IMAGE: "quay.io/pypa/manylinux2014_x86_64"
       CIBW_REPAIR_WHEEL_COMMAND: >
         auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so
     steps:
