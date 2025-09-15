@@ -1,0 +1,46 @@
+name: build-wheels
+
+on: [push, pull_request]
+
+jobs:
+  build-and-deploy-linux:
+    name: Build wheels (manylinux) – ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.11", "3.13", "pypy3.10"]
+    services:
+      docker:
+        image: docker:20.10.16
+        options: --privileged
+    env:
+      CIBW_ENVIRONMENT: "TORCH_VERSION_SPECIFIER='==2.3.1+cu121'"
+      CIBW_BEFORE_BUILD: >
+        pip install torch==2.3.1+cu121 torchvision
+        -f https://download.pytorch.org/whl/torch_stable.html
+        && pip install -r requirements.txt
+      CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit_cuda"
+      CIBW_REPAIR_WHEEL_COMMAND: >
+        auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Pull manylinux image
+        run: docker pull $CIBW_MANYLINUX_X86_64_IMAGE
+
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==2.23.3
+
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir wheelhouse
+
+      - name: Upload wheels (per version)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.python-version }}
+          path: wheelhouse/*.whl
