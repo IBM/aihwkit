@@ -15,6 +15,8 @@ jobs:
         options: --privileged
     env:
       CIBW_BUILD: "cp312-manylinux_x86_64"
+      CIBW_BEFORE_ALL: >
+        yum install -y openblas-devel
       CIBW_BEFORE_BUILD: >
         pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
         && pip install -r requirements.txt
