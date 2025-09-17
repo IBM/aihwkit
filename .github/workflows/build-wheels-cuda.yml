@@ -16,7 +16,9 @@ jobs:
     env:
       CIBW_BUILD: "cp312-manylinux_x86_64"
       CIBW_BEFORE_ALL: >
-        yum install -y openblas-devel
+        sudo apt-get update
+        sudo apt-get install -y libopenblas-dev gcc-9 g++-9
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
       CIBW_BEFORE_BUILD: >
         pip install torch==2.3.1+cu121 torchvision -f https://download.pytorch.org/whl/torch_stable.html
         && pip install -r requirements.txt
