@@ -16,7 +16,7 @@ jobs:
     env:
       CIBW_BUILD: "cp312-manylinux_x86_64"
       CIBW_BEFORE_ALL: >
-        yum install -y openblas-devel gtest wget yum-utils && wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-rhel7-12-1-local-12.1.1_530.30.02-1.x86_64.rpm && rpm -i cuda-repo-rhel7-12-1-local-12.1.1_530.30.02-1.x86_64.rpm && yum clean all && yum -y install cuda-compiler-12-1 cuda-libraries-12-1 && yum clean all && rm -rf /var/cache/yum && export PATH "$PATH:/usr/local/cuda-12.1/bin" && export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/cuda-12.1/lib64"
+        yum install -y openblas-devel gtest wget yum-utils && wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-rhel7-12-1-local-12.1.1_530.30.02-1.x86_64.rpm && rpm -i cuda-repo-rhel7-12-1-local-12.1.1_530.30.02-1.x86_64.rpm && yum clean all && yum -y install cuda-compiler-12-1 cuda-libraries-12-1 && yum clean all && rm -rf /var/cache/yum
       CIBW_BEFORE_BUILD: >
         pip install torch==2.3.1+cu121 torchvision -f https://download.pytorch.org/whl/torch_stable.html
         && pip install -r requirements.txt
