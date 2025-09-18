@@ -16,11 +16,16 @@ jobs:
     env:
       CIBW_BUILD: "cp312-manylinux_x86_64"
       CIBW_BEFORE_ALL: >
-        apt-get install -y libopenblas-dev gcc-9 g++-9
+        yum install -y openblas-devel gtest wget yum-utils && \
+        wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-rhel7-12-1-local-12.1.1_530.30.02-1.x86_64.rpm && \
+        rpm -i cuda-repo-rhel7-12-1-local-12.1.1_530.30.02-1.x86_64.rpm && \
+        yum clean all && \
+        yum -y install nvidia-driver-latest-dkms && \
+        yum -y install cuda
       CIBW_BEFORE_BUILD: >
         pip install torch==2.3.1+cu121 torchvision -f https://download.pytorch.org/whl/torch_stable.html
         && pip install -r requirements.txt
-      CIBW_MANYLINUX_X86_64_IMAGE: "aihwkit/manylinux2014_x86_64_aihwkit_cuda"
+      CIBW_MANYLINUX_X86_64_IMAGE: "quay.io/pypa/manylinux2014_x86_64"
       CIBW_REPAIR_WHEEL_COMMAND: >
         auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so
     steps:
