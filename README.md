@@ -237,7 +237,7 @@ This project is licensed under [MIT License].
 [resistive random-access memory]: https://en.wikipedia.org/wiki/Resistive_random-access_memory
 [Flash memory]: https://en.wikipedia.org/wiki/Flash_memory
 [Kirchhoff’s circuits laws]: https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws
-[online demo]: https://analog-ai-demo.mybluemix.net/
+[online demo]: https://aihw-composer.draco.res.ibm.com/analog-ai
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
 [award]: https://conferences.computer.org/services/2023/awards/
 [CUDA Dockerfile instructions]: https://github.com/IBM/aihwkit/blob/master/docs/source/advanced_install.rst#cuda-enabled-docker-image
