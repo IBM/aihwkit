@@ -191,10 +191,6 @@ if (BUILD_EXTENSION)
     target_link_libraries(${extension_module_name} PRIVATE AIHWKIT_EXTENSION_OPS)
   endif()
 
-  if (NOT WIN32)
-    target_link_options(${extension_module_name} PRIVATE -Wl,--no-undefined)
-  endif()
-
   install(TARGETS ${extension_module_name} DESTINATION "src/aihwkit/extension")
 
   add_custom_command(TARGET ${extension_module_name}
