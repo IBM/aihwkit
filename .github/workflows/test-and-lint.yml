@@ -72,6 +72,7 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           pip install -r requirements-examples.txt
+          pip install matplotlib
           make pycodestyle
           make pylint
           make mypy
