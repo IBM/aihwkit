@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 * Add newly uploaded resources for CPU-only wheels (\#739)
 
+### Removed/Deprecated
+* Function `convert_to_analog_mapped` in `src/aihwkit/nn/conversion.py` **deprecated and removed**.
+
 ### Changed
 * Replace legacy release-build workflow with the updated build process (\#744)
 * Point the online demo link to the correct destination (\#743)
@@ -24,6 +27,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Fixed
 * Fix memory issues and bugs in analog training for CUDA (\#732)
+* Fix `convert_to_analog` for conv layers (\#627)
 
 ## [1.0.0] - 2025/05/19
 
