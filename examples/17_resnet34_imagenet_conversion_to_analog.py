@@ -41,9 +41,4 @@ rpu_config = TikiTakaReRamSBPreset(mapping=mapping)
 # convolutions)
 model = convert_to_analog(model, rpu_config)
 
-# Note: One can also use ``convert_to_analog_mapped`` instead to
-# convert e.g. ``Conv2d`` to ``AnalogConv2dMapped`` (using a special way to
-# unfold over multiple tiles in a more memory efficient way
-# for some analog tiles on GPU)
-
 print(model)
