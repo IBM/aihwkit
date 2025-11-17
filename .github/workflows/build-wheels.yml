@@ -14,6 +14,7 @@ jobs:
         image: docker:20.10.16
         options: --privileged
     env:
+      CIBW_BUILD: ${{ 'cp' }}${{ format(matrix.python-version, '.', '') }}${{'-manylinux_x86_64' }}
       CIBW_BEFORE_ALL: >
         yum install -y openblas-devel
       CIBW_BEFORE_BUILD: >
