@@ -1,9 +1,6 @@
 name: build-wheels
 
-on:
-  push:
-    tags:
-      - 'v**'
+on: [push, pull_request]
 
 jobs:
   build-and-deploy-linux:
@@ -11,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
     services:
       docker:
         image: docker:20.10.16
