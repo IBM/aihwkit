@@ -9,13 +9,12 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
-        cibw-version: ["310", "311", "312"]
     services:
       docker:
         image: docker:20.10.16
         options: --privileged
     env:
-      CIBW_BUILD: ${{ format('cp{0}-manylinux_x86_64', matrix.cibw-version) }}
+      CIBW_BUILD: cp310-* cp311-* cp312-*
       CIBW_BEFORE_ALL: >
         yum install -y openblas-devel
       CIBW_BEFORE_BUILD: >
