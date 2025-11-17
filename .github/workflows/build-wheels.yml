@@ -15,7 +15,9 @@ jobs:
       CIBW_BEFORE_ALL: >
         yum install -y openblas-devel
       CIBW_BEFORE_BUILD: >
-        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        rm -rf build/ _skbuild/ src/aihwkit/simulator/rpu_base*.so src/aihwkit/extension/*.so *.egg-info
+        && echo "Cleaned build dirs"
+        && pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
         && pip install -r requirements.txt
       CIBW_MANYLINUX_X86_64_IMAGE: "quay.io/pypa/manylinux2014_x86_64"
       CIBW_REPAIR_WHEEL_COMMAND: >
