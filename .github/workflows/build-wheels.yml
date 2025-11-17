@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build-and-deploy-linux:
-    name: Build wheels (manylinux) – ${{ matrix.python-version }}
+    name: Build wheels (manylinux)
     runs-on: ubuntu-latest
     services:
       docker:
