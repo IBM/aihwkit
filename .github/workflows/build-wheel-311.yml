@@ -1,6 +1,9 @@
 name: build-wheel-311
 
-on: [push]
+on:
+  push:
+    tags:
+    - 'v**'
 
 jobs:
   build-and-deploy-linux:
