@@ -6,9 +6,6 @@ jobs:
   build-and-deploy-linux:
     name: Build wheels (manylinux) – ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
     services:
       docker:
         image: docker:20.10.16
@@ -26,11 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Pull manylinux image
         run: docker pull $CIBW_MANYLINUX_X86_64_IMAGE
 
@@ -43,5 +35,5 @@ jobs:
       - name: Upload wheels (per version)
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.python-version }}
+          name: wheels
           path: wheelhouse/*.whl
