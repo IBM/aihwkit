@@ -39,5 +39,5 @@ jobs:
       - name: Upload wheels (per version)
         uses: actions/upload-artifact@v4
         with:
-          name: wheels
+          name: wheel_py311
           path: wheelhouse/*.whl
