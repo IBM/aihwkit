@@ -291,7 +291,7 @@ def calibrate_input_ranges(
         # set the input range
         tile.set_input_range(input_range)
         if verbose:
-            print(f"Calibrated tile {tile_name}: {input_range:.5f}.")
+            print(f"Calibrated tile {tile_name}: {input_range: .5f}.")
 
         # Store calibration info
         rpu_config.pre_post.input_range.init_value = tile.input_range.item()

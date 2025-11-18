@@ -76,4 +76,4 @@ if __name__ == "__main__":
         loss = F.nll_loss(output.float(), target)
         loss.backward()
         optimizer.step()
-        pbar.set_description(f"Loss {loss:.4f}")
+        pbar.set_description(f"Loss {loss: .4f}")
