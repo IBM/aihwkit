@@ -12,6 +12,23 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## [1.1.0] - 2025/11/10
+
+### Added
+* Add newly uploaded resources for CPU-only wheels (\#739)
+
+### Removed/Deprecated
+* Function `convert_to_analog_mapped` in `src/aihwkit/nn/conversion.py` **deprecated and removed**.
+
+### Changed
+* Replace legacy release-build workflow with the updated build process (\#744)
+* Point the online demo link to the correct destination (\#743)
+* Update bundled notebook wheel to the GPU-enabled 1.0.0 release (\#741)
+
+### Fixed
+* Fix memory issues and bugs in analog training for CUDA (\#732)
+* Fix `convert_to_analog` for conv layers (\#627)
+
 ## [1.0.0] - 2025/05/19
 
 ## Added
@@ -27,7 +44,6 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 * Fix Hardware-Aware training tutorial notebooks (\#700)
 * Fix Post-Training Input Range Calibration notebook (\#716)
-* Fix memory issues and bugs in analog training for CUDA (\#732)
 
 ## Changed
 
