@@ -39,7 +39,7 @@ M_fp = ml.aspreconditioner() * E
 M = AnalogMatrix(M_fp, rpu_config=rpu_config, realistic=False, device=DEVICE)
 
 (x, flag) = fgmres(A, b, M=M, maxiter=6, tol=1e-8)
-print(f"{norm(b - A*x):.6}")
+print(f"{norm(b - A * x): .6}")
 
 plt.clf()
 
