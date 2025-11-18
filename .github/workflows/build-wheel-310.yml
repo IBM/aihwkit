@@ -1,10 +1,9 @@
 name: build-wheel-310
 
 on:
-  ["push"]
-  # push:
-  #   tags:
-  #   - 'v**'
+  push:
+    tags:
+    - 'v**'
 
 jobs:
   build-and-deploy-linux:
