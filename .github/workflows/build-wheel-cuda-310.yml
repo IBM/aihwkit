@@ -1,9 +1,8 @@
 name: build-wheel-cuda-310
 
-on:
-  push:
-    tags:
-    - 'v**'
+on: [push]
+    # tags:
+    # - 'v**'
 
 jobs:
   build-and-deploy-linux:
