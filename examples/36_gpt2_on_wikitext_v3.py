@@ -15,7 +15,7 @@
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/language_modeling.ipynb
 """
-# pylint: disable=import-error, too-many-arguments
+# pylint: disable=import-error, too-many-arguments, invalid-name
 
 
 # revise original script: correct digital model code; add text generation code
