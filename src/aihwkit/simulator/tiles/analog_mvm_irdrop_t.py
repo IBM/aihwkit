@@ -238,37 +238,37 @@ class AnalogMVMIRDropT(AnalogMVM):
 
         read_noise_scale = io_pars.xdep_pcm_read_noise_scale
 
-        ## Default model analytical-fit coefficients
+        # Default model analytical-fit coefficients
         sigma_noise_slope_coefficients = [0.00021926, -0.00187352,
-                                            0.00655714, -0.0146159, 0.02578764]
+                                          0.00655714, -0.0146159, 0.02578764]
 
         sigma_noise_offset_coefficients = [1.11906167e-09, -9.08576764e-09,
-                                            3.07015063e-08, -6.77079241e-08, 1.17763144e-07]
+                                           3.07015063e-08, -6.77079241e-08, 1.17763144e-07]
 
         # First, convert activations/inputs into integer ns units
-        t_integration = torch_mean(torch_abs(input_) / (2*res))
+        t_integration = torch_mean(torch_abs(input_) / (2 * res))
 
         if t_integration > 0.:
             x = torch_log10(t_integration)
         else:
-            torch.tensor(0., dtype=t_integration.dtype,device=t_integration.device)
+            torch.tensor(0., dtype=t_integration.dtype, device=t_integration.device)
 
         # Convert weights into conductance units
         conductances_lst, params = g_converter.convert_to_conductances(weight)
-        conductances = torch_abs(conductances_lst[0] - conductances_lst[1])  #[uS]
+        conductances = torch_abs(conductances_lst[0] - conductances_lst[1])  # [uS]
 
-        sig_noise_slope = ( sigma_noise_slope_coefficients[0]*(x**4) +
-                            sigma_noise_slope_coefficients[1]*(x**3) +
-                            sigma_noise_slope_coefficients[2]*(x**2) +
-                            sigma_noise_slope_coefficients[3]*(x**1) +
-                            sigma_noise_slope_coefficients[4]
-                        )
-        sig_noise_offset = ( sigma_noise_offset_coefficients[0]*(x**4) +
-                            sigma_noise_offset_coefficients[1]*(x**3) +
-                            sigma_noise_offset_coefficients[2]*(x**2) +
-                            sigma_noise_offset_coefficients[3]*(x**1) +
-                            sigma_noise_offset_coefficients[4]
-                        ) * 1e6 #[uS]
+        sig_noise_slope = (sigma_noise_slope_coefficients[0] * (x ** 4)
+                           + sigma_noise_slope_coefficients[1] * (x**3)
+                           + sigma_noise_slope_coefficients[2] * (x**2)
+                           + sigma_noise_slope_coefficients[3] * (x**1)
+                           + sigma_noise_slope_coefficients[4]
+                           )
+        sig_noise_offset = (sigma_noise_offset_coefficients[0] * (x**4)
+                            + sigma_noise_offset_coefficients[1] * (x**3)
+                            + sigma_noise_offset_coefficients[2] * (x**2)
+                            + sigma_noise_offset_coefficients[3] * (x**1)
+                            + sigma_noise_offset_coefficients[4]
+                            ) * 1e6  # [uS]
         sig_noise = (sig_noise_slope * conductances) + sig_noise_offset
         g_final = conductances + read_noise_scale * sig_noise * randn_like(weight)
 
@@ -499,7 +499,7 @@ class AnalogMVMIRDropT(AnalogMVM):
             mvm_even_col_down_adc = torch_sum(i_out_nd, dim=-1)
         else:
             # Insert a '0th' time step trapz integration
-            i_out_nd = torch.cat( (i_out_nd[...,0].unsqueeze(-1), i_out_nd), -1)
+            i_out_nd = torch.cat((i_out_nd[..., 0].unsqueeze(-1), i_out_nd), -1)
             mvm_even_col_down_adc = torch_trapz(i_out_nd, dim=-1)
 
         if io_pars.adc_quantization:
@@ -520,7 +520,7 @@ class AnalogMVMIRDropT(AnalogMVM):
             mvm_even_col_down_adc = torch_sum(i_out_nd, dim=-1)
         else:
             # Insert a '0th' time step trapz integration
-            i_out_nd = torch.cat( (i_out_nd[...,0].unsqueeze(-1), i_out_nd), -1)
+            i_out_nd = torch.cat((i_out_nd[..., 0].unsqueeze(-1), i_out_nd), -1)
             mvm_odd_col_up_adc = torch_trapz(i_out_nd, dim=-1)
 
         if io_pars.adc_quantization:
@@ -643,7 +643,7 @@ class AnalogMVMIRDropT(AnalogMVM):
             finalized_outputs = (
                 finalized_outputs_lsb + (2**io_pars.split_mode_bit_shift) * finalized_outputs_msb
             )
-            bound_test_passed = ( bound_test_passed_lsb * bound_test_passed_msb )
+            bound_test_passed = (bound_test_passed_lsb * bound_test_passed_msb)
 
         elif io_pars.mv_type == AnalogMVType.BIT_WISE:
             finalized_outputs, bound_test_passed = 0.0, True

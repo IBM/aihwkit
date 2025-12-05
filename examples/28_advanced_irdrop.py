@@ -232,19 +232,18 @@ if __name__ == "__main__":
         IN_FEATURES, OUT_FEATURES, bias=False, rpu_config=rpu_config_default_conventional_dt_irdrop
     )
     model_dict.update({"default_conventional_model_dt_irdrop":
-        model_default_conventional_dt_irdrop})
+                      model_default_conventional_dt_irdrop})
 
     # conventional time-dependent ir drop with input-dependent PCM read noise (flag testing)
     rpu_config_conventional_dt_irdrop_PCMnoise = rpu_config_modifications(
-        TorchInferenceRPUConfigIRDropT()
-        )
+        TorchInferenceRPUConfigIRDropT())
     rpu_config_conventional_dt_irdrop_PCMnoise.forward.apply_xdep_pcm_read_noise = True
     rpu_config_conventional_dt_irdrop_PCMnoise.forward.xdep_pcm_read_noise_scale = 1.0
     model_conventional_dt_irdrop_PCMnoise = AnalogLinear(
         IN_FEATURES, OUT_FEATURES, bias=False, rpu_config=rpu_config_conventional_dt_irdrop_PCMnoise
     )
     model_dict.update({"conventional_model_dt_irdrop_PCMnoise":
-        model_conventional_dt_irdrop_PCMnoise})
+                      model_conventional_dt_irdrop_PCMnoise})
 
     # conventional time-dependent ir drop without ADC quantization (flag testing)
     rpu_config_conventional_dt_irdrop_noADC = rpu_config_modifications(
@@ -255,7 +254,7 @@ if __name__ == "__main__":
         IN_FEATURES, OUT_FEATURES, bias=False, rpu_config=rpu_config_conventional_dt_irdrop_noADC
     )
     model_dict.update({"conventional_model_dt_irdrop_noADC":
-        model_conventional_dt_irdrop_noADC})
+                      model_conventional_dt_irdrop_noADC})
 
     # split mode pwm time-dependent ir drop
     rpu_config_split_mode_dt_irdrop = rpu_config_modifications(
@@ -267,7 +266,7 @@ if __name__ == "__main__":
         IN_FEATURES, OUT_FEATURES, bias=False, rpu_config=rpu_config_split_mode_dt_irdrop
     )
     model_dict.update({"split_mode_pwm_dt_irdrop":
-        model_split_mode_dt_irdrop})
+                      model_split_mode_dt_irdrop})
 
     # bit wise time-dependent ir drop
     rpu_config_bitwise_dt_irdrop = rpu_config_modifications(
@@ -278,7 +277,7 @@ if __name__ == "__main__":
         IN_FEATURES, OUT_FEATURES, bias=False, rpu_config=rpu_config_bitwise_dt_irdrop
     )
     model_dict.update({"bit_wise_dt_irdrop":
-        model_bitwise_dt_irdrop})
+                      model_bitwise_dt_irdrop})
 
     # default model
     rpu_config_default = rpu_config_modifications(InferenceRPUConfig())
