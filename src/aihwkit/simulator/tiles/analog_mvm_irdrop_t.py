@@ -34,6 +34,7 @@ from torch import (
     randn_like,
     trunc,
     log10 as torch_log10,
+    zeros
 )
 import torch
 from torch.autograd import no_grad
@@ -287,8 +288,8 @@ class AnalogMVMIRDropT(AnalogMVM):
         Applies ADC Quantization
         """
 
-        adc_ticks_even = trunc((mvm / 100) * io_pars.adc_frequency)
-        mvm = adc_ticks_even * 100 / io_pars.adc_frequency
+        adc_ticks = trunc((mvm / 100) * io_pars.adc_frequency)
+        mvm = adc_ticks * 100 / io_pars.adc_frequency
 
         return mvm
 
@@ -484,49 +485,55 @@ class AnalogMVMIRDropT(AnalogMVM):
 
         g_lst, params = g_converter.convert_to_conductances(new_weight)
 
-        vth_nd, rth_nd = cls._thev_equiv(
-            input_,
-            [g[:, 0::2] for g in g_lst],  # even cols
-            time_steps=time_steps,
-            t_max=t_max,
-            segments=io_pars.ir_drop_segments,
-            r_s=ir_drop_rs,
-            phys_input_size=phys_input_size,
-        )
-        i_out_nd = (vth_nd - io_pars.ir_drop_v_read) / rth_nd  # uA
+        mvm = zeros((input_.shape[0], g_lst[0].shape[1])).to(input_.device)
+        # (f1, (gp1, gm1)), (f2, (gp2, gm2), ... , (fn, (gpn, gmn)) # low to highest significance
+        for f_factor, g_lst_pair in zip(params.get("f_lst", [1.0]), zip(g_lst[::2], g_lst[1::2])):
+            vth_nd, rth_nd = cls._thev_equiv(
+                input_,
+                [g[:, 0::2] for g in g_lst_pair],  # even cols
+                time_steps=time_steps,
+                t_max=t_max,
+                segments=io_pars.ir_drop_segments,
+                r_s=ir_drop_rs,
+                phys_input_size=phys_input_size,
+            )
+            i_out_nd = (vth_nd - io_pars.ir_drop_v_read) / rth_nd  # uA
 
-        if io_pars.ir_drop_integration_sum:
-            mvm_even_col_down_adc = torch_sum(i_out_nd, dim=-1)
-        else:
-            # Insert a '0th' time step trapz integration
-            i_out_nd = torch.cat((i_out_nd[..., 0].unsqueeze(-1), i_out_nd), -1)
-            mvm_even_col_down_adc = torch_trapz(i_out_nd, dim=-1)
+            if io_pars.ir_drop_integration_sum:
+                mvm_even_col_down_adc = torch_sum(i_out_nd, dim=-1)
+            else:
+                # Insert a '0th' time step trapz integration
+                i_out_nd = torch.cat((i_out_nd[..., 0].unsqueeze(-1), i_out_nd), -1)
+                mvm_even_col_down_adc = torch_trapz(i_out_nd, dim=-1)
 
-        if io_pars.adc_quantization:
-            mvm_even_col_down_adc = cls._apply_adc_quantization(mvm_even_col_down_adc, io_pars)
+            if io_pars.adc_quantization:
+                print('applying 1')
+                mvm_even_col_down_adc = cls._apply_adc_quantization(mvm_even_col_down_adc, io_pars)
 
-        vth_nd, rth_nd = cls._thev_equiv(
-            flip(input_, (-1,)),  # flip input
-            [flip(g[:, 1::2], (0,)) for g in g_lst],  # odd cols
-            time_steps=time_steps,
-            t_max=t_max,
-            segments=io_pars.ir_drop_segments,
-            r_s=ir_drop_rs,
-            phys_input_size=phys_input_size,
-        )
-        i_out_nd = (vth_nd - io_pars.ir_drop_v_read) / rth_nd   # uA
+            vth_nd, rth_nd = cls._thev_equiv(
+                flip(input_, (-1,)),  # flip input
+                [flip(g[:, 1::2], (0,)) for g in g_lst_pair],  # odd cols
+                time_steps=time_steps,
+                t_max=t_max,
+                segments=io_pars.ir_drop_segments,
+                r_s=ir_drop_rs,
+                phys_input_size=phys_input_size,
+            )
+            i_out_nd = (vth_nd - io_pars.ir_drop_v_read) / rth_nd   # uA
 
-        if io_pars.ir_drop_integration_sum:
-            mvm_even_col_down_adc = torch_sum(i_out_nd, dim=-1)
-        else:
-            # Insert a '0th' time step trapz integration
-            i_out_nd = torch.cat((i_out_nd[..., 0].unsqueeze(-1), i_out_nd), -1)
-            mvm_odd_col_up_adc = torch_trapz(i_out_nd, dim=-1)
+            if io_pars.ir_drop_integration_sum:
+                mvm_odd_col_up_adc = torch_sum(i_out_nd, dim=-1)
+            else:
+                # Insert a '0th' time step trapz integration
+                i_out_nd = torch.cat((i_out_nd[..., 0].unsqueeze(-1), i_out_nd), -1)
+                mvm_odd_col_up_adc = torch_trapz(i_out_nd, dim=-1)
 
-        if io_pars.adc_quantization:
-            mvm_odd_col_up_adc = cls._apply_adc_quantization(mvm_odd_col_up_adc, io_pars)
+            if io_pars.adc_quantization:
+                mvm_odd_col_up_adc = cls._apply_adc_quantization(mvm_odd_col_up_adc, io_pars)
 
-        mvm = cls._interleave_cols_nd(mvm_even_col_down_adc, mvm_odd_col_up_adc)  # symmetric ADCs
+            mvm += f_factor * cls._interleave_cols_nd(
+                mvm_even_col_down_adc, mvm_odd_col_up_adc
+            )  # symmetric ADCs
 
         mvm /= params['scale_ratio']    # conductance normalization
         mvm /= 0.2                      # hardware normalization
