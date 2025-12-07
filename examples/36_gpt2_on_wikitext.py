@@ -10,7 +10,15 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""aihwkit example: Example using convert_to_analog to run GPT-2 transformer on wikitext-2-raw-v1
+"""aihwkit example: Example of implementing GPT-2 based model distilgpt2 on the wikitext-2-raw-v1 
+dataset using AIHWKit. The example demonstrates how to convert the model to analog, run fine-tuning, 
+text-generation, and inference. 
+
+Use command-line arguments:
+For text generation (of both digital and analog models), use command line arguments: "gt", "L", "c", "pt"
+For digital model fine-tuning and loss calculation, use command line arguments: "d", "c", "lr", "L"
+For analog model HWA fine-tuning and loss calculation, use command line arguments: "t", "c", "n", "lr", "L"
+
 **Source**:
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/language_modeling.ipynb
@@ -293,7 +301,7 @@ def main() -> None:
     # If "-L", load checkpoint file
     if ARGS.load and ARGS.checkpoint is not None:
         print(f"Load model from '{ARGS.checkpoint}'.")
-        model.load_state_dict(torch_load(ARGS.checkpoint), strict=False)
+        model.load_state_dict(torch_load(ARGS.checkpoint, weights_only=False), strict=False)
     # Finetune digital or analog model
     if (ARGS.train_hwa or ARGS.digital) and not ARGS.load:
         trainer.train()
@@ -304,9 +312,13 @@ def main() -> None:
 
 def generate_text(prompt, model, max_length=50) -> str:   # type: ignore[no-untyped-def]
     """ Generate a text from the model using a prompt """
-    inputs = TOKENIZER.encode(prompt, return_tensors='pt')
+    device = next(model.parameters()).device
+    encoding = TOKENIZER(prompt, return_tensors='pt')
+    input_ids = encoding.input_ids.to(device) 
+    attention_mask = encoding.attention_mask.to(device)
     outputs = model.generate(
-        inputs,
+        input_ids,
+        attention_mask=attention_mask,
         max_length=max_length,
         num_return_sequences=1,
         do_sample=True,
@@ -322,9 +334,19 @@ def generate_text(prompt, model, max_length=50) -> str:   # type: ignore[no-unty
 if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
 elif ARGS.gen_txt:
-    Model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+    if ARGS.ideal:
+        rpu_config = create_ideal_rpu_config()
+    else:
+        rpu_config = create_rpu_config(modifier_noise=ARGS.noise)
+
+    Model = create_model(rpu_config, ARGS.digital)
+
     if ARGS.load:
-        Model.load_state_dict(torch_load(ARGS.checkpoint), strict=False)
+        print(f"Loading weights from {ARGS.checkpoint}")
+        Model.load_state_dict(torch_load(ARGS.checkpoint, weights_only=False), strict=False)
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    Model.to(device)
     Model.eval()
     print(generate_text(ARGS.prompt, Model))
 else:
