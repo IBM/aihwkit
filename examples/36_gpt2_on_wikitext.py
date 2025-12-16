@@ -40,7 +40,7 @@ from transformers import (
     DataCollatorForLanguageModeling,
 )
 
-from torch import save as torch_save, load as torch_load
+import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim import Adam
 from datasets import load_dataset, DatasetDict
@@ -301,11 +301,11 @@ def main() -> None:
     # If "-L", load checkpoint file
     if ARGS.load and ARGS.checkpoint is not None:
         print(f"Load model from '{ARGS.checkpoint}'.")
-        model.load_state_dict(torch_load(ARGS.checkpoint, weights_only=False), strict=False)
+        model.load_state_dict(torch.load(ARGS.checkpoint, weights_only=False), strict=False)
     # Finetune digital or analog model
     if (ARGS.train_hwa or ARGS.digital) and not ARGS.load:
         trainer.train()
-        torch_save(model.state_dict(), ARGS.checkpoint)
+        torch.save(model.state_dict(), ARGS.checkpoint)
     # Calculate inference loss
     do_inference(model, trainer, writer, ARGS.digital)  # type: ignore[no-untyped-call]
 
@@ -343,7 +343,7 @@ elif ARGS.gen_txt:
 
     if ARGS.load:
         print(f"Loading weights from {ARGS.checkpoint}")
-        Model.load_state_dict(torch_load(ARGS.checkpoint, weights_only=False), strict=False)
+        Model.load_state_dict(torch.load(ARGS.checkpoint, weights_only=False), strict=False)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Model.to(device)
