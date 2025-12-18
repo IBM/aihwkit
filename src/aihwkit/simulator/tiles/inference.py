@@ -23,7 +23,11 @@ from aihwkit.simulator.tiles.rpucuda import RPUCudaSimulatorTileWrapper
 from aihwkit.simulator.tiles.base import BaseTile
 from aihwkit.simulator.rpu_base import tiles
 from aihwkit.simulator.parameters.helpers import parameters_to_bindings
-from aihwkit.simulator.parameters.enums import WeightModifierType, WeightClipType, WeightRemapType
+from aihwkit.simulator.parameters.enums import (
+    WeightModifierType,
+    WeightClipType,
+    WeightRemapType,
+)
 from aihwkit.inference.noise.base import BaseNoiseModel
 
 if TYPE_CHECKING:
@@ -84,19 +88,28 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             This method is called from the constructor.
         """
         super().init_mapping_scales()
-        if hasattr(self.rpu_config, "remap") and self.rpu_config.remap.type != WeightRemapType.NONE:
+        if (
+            hasattr(self.rpu_config, "remap")
+            and self.rpu_config.remap.type != WeightRemapType.NONE
+        ):
             # needs to be always out_size
             mapping_scales = ones(
-                (self.out_size,), dtype=self.get_dtype(), device=self.device, requires_grad=False
+                (self.out_size,),
+                dtype=self.get_dtype(),
+                device=self.device,
+                requires_grad=False,
             )
             self.set_mapping_scales(mapping_scales)
 
     @no_grad()
-    def _forward_drift_readout_tensor(self, reset_if: bool = False) -> Optional[Tensor]:
+    def _forward_drift_readout_tensor(
+        self, reset_if: bool = False, exact_reference: bool = False
+    ) -> Optional[Tensor]:
         """Perform a forward pass using the drift read-out tensor.
 
         Args:
             reset_if: Will reset the readout tensor, otherwise use the stored one
+            exact_reference: Whether or not to compute the reference using an "ideal" forward pass.
 
         Returns:
             Readout tensor if drift compensation is on
@@ -109,20 +122,41 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
         if self.drift_readout_tensor is None or reset_if:
             self.drift_readout_tensor = (
-                self.rpu_config.drift_compensation.get_readout_tensor(self.tile.get_x_size())
+                self.rpu_config.drift_compensation.get_readout_tensor(
+                    self.tile.get_x_size()
+                )
                 .detach()
                 .to(self.device)
             )
             if self.in_trans:
-                self.drift_readout_tensor = self.drift_readout_tensor.tranpose(0, 1).clone()
+                self.drift_readout_tensor = self.drift_readout_tensor.tranpose(
+                    0, 1
+                ).clone()
         else:
             self.drift_readout_tensor = self.drift_readout_tensor.to(self.device)
 
         # We need to take the bias as a common column here, also we do
         # not want to use indexed.
-        return self.tile.forward(
-            self.drift_readout_tensor, False, self.in_trans, self.out_trans, True, self.non_blocking
-        )
+        if exact_reference:
+            input_ = self.drift_readout_tensor
+            if self.in_trans:
+                input_ = input_.T
+
+            output = (input_ @ self.reference_combined_weights.T)
+            if self.out_trans:
+                output = output.T
+
+        else:
+            output = self.tile.forward(
+                self.drift_readout_tensor,
+                False,
+                self.in_trans,
+                self.out_trans,
+                True,
+                self.non_blocking,
+            )
+
+        return output
 
     @no_grad()
     def program_weights(
@@ -160,7 +194,9 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
 
         if noise_model is not None:
             if not isinstance(noise_model, BaseNoiseModel):
-                raise ConfigError("Given noise model has to be of type 'BaseNoiseModel'")
+                raise ConfigError(
+                    "Given noise model has to be of type 'BaseNoiseModel'"
+                )
 
             self.rpu_config.noise_model = noise_model
 
@@ -177,8 +213,7 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             hasattr(self.rpu_config, "drift_compensation")
             and self.rpu_config.drift_compensation is not None
         ):
-            forward_output = self._forward_drift_readout_tensor(True)
-            self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(forward_output)
+            self.drift_baseline = self.rpu_config.drift_compensation.init_baseline(self)
 
     @no_grad()
     def drift_weights(self, t_inference: float = 0.0) -> None:
@@ -222,7 +257,9 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             and self.rpu_config.drift_compensation is not None
         ):
             forward_output = self._forward_drift_readout_tensor()
-            alpha = self.rpu_config.drift_compensation.apply(forward_output, self.drift_baseline)
+            alpha = self.rpu_config.drift_compensation.apply(
+                forward_output, self.drift_baseline
+            )
             if isinstance(self, Module):
                 # somehow legacy is incompatible with torch buffers
                 self.__dict__.pop("alpha", None)
@@ -267,14 +304,20 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         if not hasattr(self, "_tmp"):
             # pylint: disable=attribute-defined-outside-init
             self._tmp = {}  # type: Dict[str, Any]
-        if hasattr(self.rpu_config, "clip") and self.rpu_config.clip.type != WeightClipType.NONE:
+        if (
+            hasattr(self.rpu_config, "clip")
+            and self.rpu_config.clip.type != WeightClipType.NONE
+        ):
             if on_the_fly_bindings or "weight_clip_params" not in self._tmp:
                 self._tmp["weight_clip_params"] = parameters_to_bindings(
                     self.rpu_config.clip, data_type
                 )
             self.tile.clip_weights(self._tmp["weight_clip_params"])
 
-        if hasattr(self.rpu_config, "remap") and self.rpu_config.remap.type != WeightRemapType.NONE:
+        if (
+            hasattr(self.rpu_config, "remap")
+            and self.rpu_config.remap.type != WeightRemapType.NONE
+        ):
             if on_the_fly_bindings or "weight_remap_params" not in self._tmp:
                 self._tmp["weight_remap_params"] = parameters_to_bindings(
                     self.rpu_config.remap, data_type
@@ -305,7 +348,9 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         state = super().__getstate__()
         return state
 
-    def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "BaseTile":
+    def cuda(
+        self, device: Optional[Union[torch_device, str, int]] = None
+    ) -> "BaseTile":
         self.alpha = self.alpha.cuda(device)
         ret = super().cuda(device)
         return ret
@@ -316,7 +361,9 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
         return ret
 
 
-class InferenceTile(TileModule, InferenceTileWithPeriphery, RPUCudaSimulatorTileWrapper):
+class InferenceTile(
+    TileModule, InferenceTileWithPeriphery, RPUCudaSimulatorTileWrapper
+):
     """Tile used for analog inference and hardware-aware training for inference.
 
     Note:
