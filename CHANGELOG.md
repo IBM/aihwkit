@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Added
 * Add newly uploaded resources for CPU-only wheels (\#739)
+* Add a new drift compensation mechanism which uses an ideal reference readout. In the default global drift compensation mechanism, all non-idealities (as set by the corresponding `rpu_config`) are modeled, potentially resulting in sub-optimal drift compensation scales being computed in some scenarios, e.g., where the output noise is sufficiently large.
 
 ### Removed/Deprecated
 * Function `convert_to_analog_mapped` in `src/aihwkit/nn/conversion.py` **deprecated and removed**.
