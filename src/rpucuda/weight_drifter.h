@@ -95,7 +95,7 @@ public:
   explicit WeightDrifter(int size);
   explicit WeightDrifter(int size, const DriftParameter<T> &par); // forces SimpleDrift
   explicit WeightDrifter(int size, const DriftParameter<T> &par, RealWorldRNG<T> *rng);
-  WeightDrifter(){};
+  WeightDrifter() {};
   virtual ~WeightDrifter() = default;
 
   WeightDrifter(const WeightDrifter<T> &) = default;

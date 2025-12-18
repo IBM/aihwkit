@@ -233,10 +233,10 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
             print(
                 f"{datetime.now().time().replace(microsecond=0)} --- "
                 f"Epoch: {epoch}\t"
-                f"Train loss: {train_loss:.4f}\t"
-                f"Valid loss: {valid_loss:.4f}\t"
-                f"Test error: {error:.2f}%\t"
-                f"Accuracy: {accuracy:.2f}%\t"
+                f"Train loss: {train_loss: .4f}\t"
+                f"Valid loss: {valid_loss: .4f}\t"
+                f"Test error: {error: .2f}%\t"
+                f"Accuracy: {accuracy: .2f}%\t"
             )
 
     # Save results and plot figures
@@ -335,8 +335,8 @@ def inference_phase(t_inference_times, model, criterion, validation_data):
     _, error_pre, accuracy_pre = test_evaluation(validation_data, model, criterion)
     print(
         f"{datetime.now().time().replace(microsecond=0)} --- "
-        f"Error after training: {error_pre:.2f}%\t"
-        f"Accuracy after training: {accuracy_pre:.2f}%\t"
+        f"Error after training: {error_pre: .2f}%\t"
+        f"Accuracy after training: {accuracy_pre: .2f}%\t"
     )
 
     error_lst = []
@@ -350,8 +350,8 @@ def inference_phase(t_inference_times, model, criterion, validation_data):
 
         print(
             f"{datetime.now().time().replace(microsecond=0)} --- "
-            f"Error after inference: {error_post:.2f}%\t"
-            f"Accuracy after inference: {accuracy_post:.2f}%\t"
+            f"Error after inference: {error_post: .2f}%\t"
+            f"Accuracy after inference: {accuracy_post: .2f}%\t"
             f"Drift t={t_inference: .2e}\t"
         )
 

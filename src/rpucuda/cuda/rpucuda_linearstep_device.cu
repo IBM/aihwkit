@@ -153,8 +153,10 @@ pwukpvec_t<T> LinearStepRPUDeviceCuda<T>::getUpdateKernels(
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
             ARGS);
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
-                    T, UpdateFunctorLinearStepMult<T>, 1>> ARGS);
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
+            ARGS);
 
   } else {
 
@@ -166,8 +168,10 @@ pwukpvec_t<T> LinearStepRPUDeviceCuda<T>::getUpdateKernels(
     v.push_back(
         RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
             ARGS);
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
-                    T, UpdateFunctorLinearStepAdd<T>, 1>> ARGS);
+    v.push_back(
+        RPU::make_unique<
+            PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
+            ARGS);
   }
   return v;
 }

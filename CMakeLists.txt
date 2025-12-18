@@ -23,7 +23,7 @@ option(RPU_USE_TORCH_BUFFERS "Use torch buffers for RPUCuda" ON)
 
 
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
-set(RPU_CUDA_ARCHITECTURES "70;75;80" CACHE STRING "Target CUDA architectures")
+set(RPU_CUDA_ARCHITECTURES "75;80;89" CACHE STRING "Target CUDA architectures")
 
 # Internal variables.
 set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
@@ -110,12 +110,13 @@ if(USE_CUDA)
   if (RPU_USE_TORCH_BUFFERS)
     if (BUILD_TEST)
       # we could just link torch to the tests in principle
-      message(FATAL_ERROR "Cannot use torch buffers when BUILD_TEST=ON. Set RPU_USE_TORCH_BUFFERS=OFF")
+      message(STATUS "Cannot use torch buffers when BUILD_TEST=ON. Set RPU_USE_TORCH_BUFFERS=OFF")
+      set(RPU_USE_TORCH_BUFFERS OFF)
+    else (BUILD_TEST)
+      add_compile_definitions(RPU_TORCH_CUDA_BUFFERS)
+      set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
+      set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=186")
     endif(BUILD_TEST)
-
-    add_compile_definitions(RPU_TORCH_CUDA_BUFFERS)
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=186")
   endif(RPU_USE_TORCH_BUFFERS)
 
   if(${CUDAToolkit_VERSION_MAJOR} LESS 11)
@@ -138,18 +139,29 @@ if (BUILD_EXTENSION)
   set_target_properties(AIHWKIT_EXTENSION_OPS PROPERTIES CXX_STANDARD 17
     POSITION_INDEPENDENT_CODE ON)
 
-  target_link_libraries(AIHWKIT_EXTENSION_OPS torch_python c10 torch_cpu)
+  target_link_libraries(AIHWKIT_EXTENSION_OPS
+    PUBLIC
+      torch_python
+      c10
+      torch_cpu
+  )
   target_include_directories(AIHWKIT_EXTENSION_OPS PRIVATE src/aihwkit/extension/extension_src)
-  
+
   if(WIN32)
     target_link_libraries(AIHWKIT_EXTENSION_OPS c10.lib torch_cpu.lib)
   endif()
 
   if(USE_CUDA)
     add_library(AIHWKIT_EXTENSION_OPS_GPU ${AIHWKIT_EXTENSION_OPS_GPU_SRCS})
-    target_link_libraries(AIHWKIT_EXTENSION_OPS_GPU AIHWKIT_EXTENSION_OPS c10_cuda torch_cuda cudart)
+    target_link_libraries(AIHWKIT_EXTENSION_OPS_GPU
+      PUBLIC
+        AIHWKIT_EXTENSION_OPS
+        c10_cuda
+        torch_cuda
+        cudart
+    )
     target_include_directories(AIHWKIT_EXTENSION_OPS_GPU PRIVATE src/aihwkit/extension/extension_src)
-    
+
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=186")
     set_target_properties(AIHWKIT_EXTENSION_OPS_GPU PROPERTIES ${CUDA_TARGET_PROPERTIES})
@@ -170,7 +182,11 @@ if (BUILD_EXTENSION)
     POSITION_INDEPENDENT_CODE ON)
 
   if (USE_CUDA)
-    target_link_libraries(${extension_module_name} PRIVATE AIHWKIT_EXTENSION_OPS_GPU)
+    target_link_libraries(${extension_module_name}
+      PRIVATE
+        AIHWKIT_EXTENSION_OPS_GPU
+        AIHWKIT_EXTENSION_OPS
+    )
   else()
     target_link_libraries(${extension_module_name} PRIVATE AIHWKIT_EXTENSION_OPS)
   endif()
@@ -187,20 +203,34 @@ endif(BUILD_EXTENSION)
 
 # Add tests.
 if(BUILD_TEST)
+
   enable_testing()
 
   foreach(test_src ${RPU_CPU_TEST_SRCS} ${RPU_GPU_TEST_SRCS})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src})
     target_link_libraries(${test_name} gtest gmock)
+    target_link_libraries(${test_name} torch_python c10 torch_cpu)
+    set_target_properties(${test_name} PROPERTIES CXX_STANDARD 17
+      POSITION_INDEPENDENT_CODE ON)
+
+    if(WIN32)
+      target_link_libraries(${test_name} c10.lib torch_cpu.lib)
+    endif()
 
     # Link to main library.
-    if(${test_src} IN_LIST RPU_CPU_TEST_SRCS)
-      target_link_libraries(${test_name} RPU_CPU ${RPU_DEPENDENCY_LIBS})
-    else()
+    target_link_libraries(${test_name} RPU_CPU ${RPU_DEPENDENCY_LIBS})
+
+    if(${test_src} IN_LIST RPU_GPU_TEST_SRCS)
+      target_link_libraries(${test_name} torch_cuda c10_cuda cudart)
       target_link_libraries(${test_name} RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
       set_target_properties(${test_name} PROPERTIES ${CUDA_TARGET_PROPERTIES})
       set_property(TARGET ${test_name} PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
+
+      if(WIN32)
+	target_link_libraries(${test_name} c10_cuda.lib torch_cuda.lib)
+      endif(WIN32)
+
     endif()
 
     add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)

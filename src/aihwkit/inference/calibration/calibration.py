@@ -15,15 +15,23 @@ from tqdm import tqdm
 
 from torch import tensor, Tensor, cat, randperm, no_grad
 from torch.nn import Module
+from torch.utils.data.dataloader import DataLoader
 
 from aihwkit.exceptions import ConfigError, ArgumentError
 from aihwkit.simulator.parameters.enums import NoiseManagementType
 from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU
 from aihwkit.simulator.tiles.base import AnalogTileStateNames
 from aihwkit.nn.modules.base import AnalogLayerBase
+from aihwkit.nn.low_precision_modules.quantization_states import (
+    estimate_ranges,
+    fix_act_ranges,
+    fix_ranges,
+    fix_weight_ranges,
+)
+
 
 if TYPE_CHECKING:
-    from aihwkit.simulator.parameters.utils import IOParameters
+    from aihwkit.simulator.parameters import IOParameters
 
 
 class InputRangeCalibrationType(Enum):
@@ -283,7 +291,7 @@ def calibrate_input_ranges(
         # set the input range
         tile.set_input_range(input_range)
         if verbose:
-            print(f"Calibrated tile {tile_name}: {input_range:.5f}.")
+            print(f"Calibrated tile {tile_name}: {input_range: .5f}.")
 
         # Store calibration info
         rpu_config.pre_post.input_range.init_value = tile.input_range.item()
@@ -291,3 +299,72 @@ def calibrate_input_ranges(
 
     if was_training:
         model = model.train()
+
+
+def calibrate_quantization_ranges(
+    model: Module, loader: DataLoader, max_num_batches: int = 20
+) -> None:
+    """
+    Calibrate the scales and zero-point (if applicable) for a model. The algorithm for
+    estimating the ranges is directly defined inside the quantizers of this library.
+
+    The primary use of this function is for PTQ or for initializing the quantizers
+    with a value before proceeding to QAT.
+
+    Parameters
+    ----------
+    model : Module
+        The model to be calibrated
+    loader : DataLoader
+        The dataloader object to generate the batches of data for the estimation
+    max_num_batches : int, optional
+        The maximum number of batches to use for estimation, by default 20
+    """
+
+    def pass_data_for_range_estimation(
+        loader: DataLoader, model: Module, max_num_batches: int = 20, dataloader_inp_idx: int = 0
+    ) -> None:
+        """
+        Places the model in eval mode and passes a number of batches so that the
+        quantizers can estimate their ranges. Its primary use is for PTQ or for
+        initializing the quantizers with a value before proceeding to QAT.
+
+        Parameters
+        ----------
+        loader : DataLoader
+            The dataloader object to generate the batches of data for the estimation
+        model : Module
+            The model to be calibrated
+        max_num_batches : int, optional
+            The maximum number of batches to use for estimation, by default 20
+        dataloader_inp_idx : int, optional
+            Only applicable when the dataloader returns a list or tuple. Signifies which
+            position of the list or tuple are the input data to be provided to the model,
+            by default 0
+        """
+        model.eval()
+        device = next(model.parameters()).device
+        for i, data in enumerate(loader):
+            if i > max_num_batches:
+                break
+
+            if isinstance(data, (tuple, list)):
+                # The case that the dataloader returns a list/tuple of (data, targets)
+                # (e.g., CIFAR dataloaders)
+                x = data[dataloader_inp_idx].to(device=device)
+                model(x)
+            else:
+                # The case that the dataloader returns a dictionary, because the model takes kwargs.
+                x = {k: v.to(device=device) for k, v in data.items()}
+                model(**x)
+
+    # Place the model in `estimate_ranges` mode
+    estimate_ranges(model)
+
+    # Pass batches of data for estimation
+    pass_data_for_range_estimation(loader=loader, model=model, max_num_batches=max_num_batches)
+
+    # Fix all the quantizer ranges after they've been estimated
+    fix_ranges(model)
+    fix_act_ranges(model)
+    fix_weight_ranges(model)

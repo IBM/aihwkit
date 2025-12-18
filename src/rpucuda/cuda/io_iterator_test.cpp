@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <numeric>
@@ -127,6 +128,225 @@ TYPED_TEST(IteratorTestFixture, copyWithIteratorNoIterator) {
   for (int i = 0; i < this->unfolded_matrix_size * this->N; i++) {
     ASSERT_FLOAT_EQ(this->unfolded_vector[i], this->unfolded_vector2[i]);
   }
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, IndicatorInputIterator) {
+  CUDA_TIMING_INIT;
+
+  TypeParam scale = (TypeParam)2;
+  IndicatorInputIterator<TypeParam> in_iter(
+      this->dev_orig_vector->getDataConst(), this->orig_vector[this->N], scale);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N);
+
+  CUDA_TIMING_STOP(this->context, "Copy with IndicatorInputIterator");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    ASSERT_FLOAT_EQ(
+        this->unfolded_vector[i],
+        (TypeParam)(this->orig_vector[this->N] == this->orig_vector[i]) * scale);
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, NegateInputIterator) {
+  CUDA_TIMING_INIT;
+
+  NegateInputIterator<TypeParam> in_iter(this->dev_orig_vector->getDataConst());
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N);
+
+  CUDA_TIMING_STOP(this->context, "Copy with NegateInputIterator");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    ASSERT_FLOAT_EQ(this->unfolded_vector[i], -this->orig_vector[i]);
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, LogInputIterator) {
+  CUDA_TIMING_INIT;
+
+  LogInputIterator<TypeParam> in_iter(this->dev_orig_vector->getDataConst());
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N);
+
+  CUDA_TIMING_STOP(this->context, "Copy with LogInputIterator");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    ASSERT_NEAR(this->unfolded_vector[i], (float)std::log((float)this->orig_vector[i]), 1e-5);
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, DiagInputIterator) {
+  CUDA_TIMING_INIT;
+
+  DiagInputIterator<TypeParam, TypeParam> in_iter(
+      this->dev_orig_vector->getDataConst(), this->orig_matrix_size, (int)0);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N);
+
+  CUDA_TIMING_STOP(this->context, "Copy with DiagInputIterator");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  int j = 0;
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    if (i % (this->orig_matrix_size + 1) == 0) {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i], this->orig_vector[j++]);
+    } else {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i], (TypeParam)0.0);
+    };
+  };
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, DiagInputIteratorOffset) {
+  CUDA_TIMING_INIT;
+
+  const int offset = 10;
+  DiagInputIterator<TypeParam, TypeParam> in_iter(
+      this->dev_orig_vector->getDataConst(), this->orig_matrix_size, offset);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N - offset);
+
+  CUDA_TIMING_STOP(this->context, "Copy with DiagInputIterator w/Offset");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+
+  for (int i = offset; i < this->orig_matrix_size * this->N; i++) {
+    if (i % (this->orig_matrix_size + 1) == 0) {
+      ASSERT_FLOAT_EQ(
+          this->unfolded_vector[i - offset], this->orig_vector[i / (this->orig_matrix_size + 1)]);
+    } else {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i - offset], (TypeParam)0.0);
+    }
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, DiagInputIteratorDiagOffset) {
+  CUDA_TIMING_INIT;
+
+  const int diag_offset = 2;
+  DiagInputIterator<TypeParam, TypeParam> in_iter(
+      this->dev_orig_vector->getDataConst(), this->N, 0, diag_offset);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N);
+
+  CUDA_TIMING_STOP(this->context, "Copy with DiagInputIterator w/DiagOffset");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  int j = 0;
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    if ((i % (this->N * this->N)) % (this->N + 1) == 0) {
+      std::cout << i << std::endl;
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i], this->orig_vector[(diag_offset + j++) % this->N]);
+    } else {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i], (TypeParam)0.0);
+    }
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, EyeInputIterator) {
+  CUDA_TIMING_INIT;
+
+  EyeInputIterator<TypeParam> in_iter(this->orig_matrix_size, (int)0);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N);
+
+  CUDA_TIMING_STOP(this->context, "Copy with EyeInputIterator");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  for (int i = 0; i < this->orig_matrix_size * this->N; i++) {
+    if (i % (this->orig_matrix_size + 1) == 0) {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i], (TypeParam)1.0);
+    } else {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i], (TypeParam)0.0);
+    };
+  }
+
+  CUDA_TIMING_DESTROY;
+}
+
+TYPED_TEST(IteratorTestFixture, EyeInputIteratorOffset) {
+  CUDA_TIMING_INIT;
+
+  int offset = 10;
+  EyeInputIterator<TypeParam> in_iter(this->orig_matrix_size, offset);
+  this->context->synchronizeDevice();
+
+  CUDA_TIMING_START(this->context);
+  math::copyWithIterator(
+      this->context, this->dev_unfolded_vector->getData(), in_iter,
+      this->orig_matrix_size * this->N - offset);
+
+  CUDA_TIMING_STOP(this->context, "Copy with EyeInputIterator w/Offset");
+
+  this->dev_unfolded_vector->copyTo(this->unfolded_vector);
+
+  // compare to reference
+  for (int i = offset; i < this->orig_matrix_size * this->N; i++) {
+    if (i % (this->orig_matrix_size + 1) == 0) {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i - offset], (TypeParam)1.0);
+    } else {
+      ASSERT_FLOAT_EQ(this->unfolded_vector[i - offset], (TypeParam)0.0);
+    };
+  }
+
   CUDA_TIMING_DESTROY;
 }
 

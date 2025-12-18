@@ -217,14 +217,14 @@ DEFINE_PWU_KERNEL_BASE(
 /********************************************************************************
  * PWUKernelParameterBatchBaseInf // no limit on size
  *********************************************************************************/
-DEFINE_PWU_KERNEL_BASE(BatchBaseInf,
-                       /*ctor*/
-                       this->nthreads = MIN(RPU_THREADS_PER_BLOCK_UPDATE, this->size);
-                       this->nthreads = (this->nthreads + 31) / 32 * 32;
-                       this->nblocks =
-                           MIN(this->max_block_count,
-                               construction_context->getNBlocks(this->size, this->nthreads));
-                       this->nstates = this->nthreads * this->nblocks;);
+DEFINE_PWU_KERNEL_BASE(
+    BatchBaseInf,
+    /*ctor*/
+    this->nthreads = MIN(RPU_THREADS_PER_BLOCK_UPDATE, this->size);
+    this->nthreads = (this->nthreads + 31) / 32 * 32;
+    this->nblocks =
+        MIN(this->max_block_count, construction_context->getNBlocks(this->size, this->nthreads));
+    this->nstates = this->nthreads * this->nblocks;);
 
 /********************************************************************************
  * PWUKernelParameterBatchFunctor
@@ -294,16 +294,18 @@ DEFINE_PWU_KERNEL_PARAMETER(
   }
 
 template <typename T>
-DEFINE_PWU_KERNEL_PARAMETER(BatchSum,
-                            BatchBase,
-                            /*run*/
-                            RPU_PWU_START_BATCH_KERNEL(kernelUpdateWBatchSum););
+DEFINE_PWU_KERNEL_PARAMETER(
+    BatchSum,
+    BatchBase,
+    /*run*/
+    RPU_PWU_START_BATCH_KERNEL(kernelUpdateWBatchSum););
 
 template <typename T>
-DEFINE_PWU_KERNEL_PARAMETER(BatchSumBoundCheck,
-                            BatchBase,
-                            /*run*/
-                            RPU_PWU_START_BATCH_KERNEL(kernelUpdateWBatchSumBoundCheck););
+DEFINE_PWU_KERNEL_PARAMETER(
+    BatchSumBoundCheck,
+    BatchBase,
+    /*run*/
+    RPU_PWU_START_BATCH_KERNEL(kernelUpdateWBatchSumBoundCheck););
 
 #undef RPU_PWU_START_BATCH_KERNEL
 
@@ -411,10 +413,11 @@ DEFINE_PWU_KERNEL_PARAMETER(
   }
 
 template <typename T>
-DEFINE_PWU_KERNEL_PARAMETER(BatchSharedSum,
-                            BatchSharedBase,
-                            /*run*/
-                            RPU_PWU_START_BATCH_SHARED_KERNEL(kernelUpdateWBatchSharedSum););
+DEFINE_PWU_KERNEL_PARAMETER(
+    BatchSharedSum,
+    BatchSharedBase,
+    /*run*/
+    RPU_PWU_START_BATCH_SHARED_KERNEL(kernelUpdateWBatchSharedSum););
 
 template <typename T>
 DEFINE_PWU_KERNEL_PARAMETER(
@@ -590,10 +593,11 @@ DEFINE_PWU_KERNEL_PARAMETER(
   }
 
 template <typename T>
-DEFINE_PWU_KERNEL_PARAMETER(PulseCounter,
-                            BatchBaseInf,
-                            /*run*/
-                            RPU_PWU_COUNTER_KERNEL;);
+DEFINE_PWU_KERNEL_PARAMETER(
+    PulseCounter,
+    BatchBaseInf,
+    /*run*/
+    RPU_PWU_COUNTER_KERNEL;);
 
 #undef RPU_PWU_COUNTER_KERNEL
 

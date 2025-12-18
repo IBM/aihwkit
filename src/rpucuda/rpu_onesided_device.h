@@ -27,7 +27,7 @@ template <typename T> struct OneSidedRPUDeviceMetaParameter : VectorRPUDeviceMet
   T refresh_lower_thres = 0.25;
   bool copy_inverted = false; // whether to use copy inverted for second device
 
-  OneSidedRPUDeviceMetaParameter(){};
+  OneSidedRPUDeviceMetaParameter() {};
   OneSidedRPUDeviceMetaParameter(const PulsedRPUDeviceMetaParameterBase<T> &dp, int n_devices = 2)
       : VectorRPUDeviceMetaParameter<T>(dp, n_devices) {
     if (n_devices != 2) {
@@ -64,11 +64,11 @@ template <typename T> class OneSidedRPUDevice : public VectorRPUDevice<T> {
 
 public:
   // constructor / destructor
-  OneSidedRPUDevice(){};
+  OneSidedRPUDevice() {};
   OneSidedRPUDevice(int x_size, int d_size);
   OneSidedRPUDevice(
       int x_size, int d_size, const OneSidedRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
-  ~OneSidedRPUDevice(){};
+  ~OneSidedRPUDevice() {};
 
   OneSidedRPUDevice(const OneSidedRPUDevice<T> &);
   OneSidedRPUDevice<T> &operator=(const OneSidedRPUDevice<T> &);
@@ -103,7 +103,7 @@ public:
   void finishUpdateCycle(
       T **weights, const PulsedUpdateMetaParameter<T> &up, T current_lr, int m_batch_info) override;
 
-  void setHiddenUpdateIdx(int idx) override{};
+  void setHiddenUpdateIdx(int idx) override {};
 
   void doSparseUpdate(
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)

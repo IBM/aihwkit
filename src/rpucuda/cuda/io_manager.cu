@@ -81,10 +81,14 @@
 
 // if LOCAL_NM_SCALE is zero no need to scale up, since value is zero
 #define APPLY_INPUT_NOISE_MANAGMENT(LOCAL_NM_SCALE)                                                \
-  { value = LOCAL_NM_SCALE > (T)0.0 ? value / LOCAL_NM_SCALE : value; }
+  {                                                                                                \
+    value = LOCAL_NM_SCALE > (T)0.0 ? value / LOCAL_NM_SCALE : value;                              \
+  }
 
 #define APPLY_OUTPUT_NOISE_MANAGMENT(LOCAL_NM_SCALE)                                               \
-  { value = (LOCAL_NM_SCALE > (T)0.0) ? value * LOCAL_NM_SCALE : (T)0.0; }
+  {                                                                                                \
+    value = (LOCAL_NM_SCALE > (T)0.0) ? value * LOCAL_NM_SCALE : (T)0.0;                           \
+  }
 
 namespace RPU {
 
@@ -260,17 +264,18 @@ __global__ void kernelInputBoundManagement(
 
   local_scale *= bms;
 
-  STRIDE_LOOP(size, value,
+  STRIDE_LOOP(
+      size, value,
 
-              APPLY_INPUT_NOISE_MANAGMENT(local_scale);
+      APPLY_INPUT_NOISE_MANAGMENT(local_scale);
 
-              DISCRETIZE_VALUE_STOCH;
+      DISCRETIZE_VALUE_STOCH;
 
-              ADD_NOISE;
+      ADD_NOISE;
 
-              BOUND_CHECK;
+      BOUND_CHECK;
 
-              APPLY_ASYMMETRY;
+      APPLY_ASYMMETRY;
 
   );
 
@@ -351,20 +356,21 @@ __global__ void kernelInputBoundManagementBatch(
 
   STOCH_DEFINITIONS(stoch_if, total_size);
 
-  STRIDE_LOOP(total_size, value,
+  STRIDE_LOOP(
+      total_size, value,
 
-              int sidx = trans ? (idx % m_batch) : (idx / size);
-              T svalue = scale_values[sidx];
+      int sidx = trans ? (idx % m_batch) : (idx / size);
+      T svalue = scale_values[sidx];
 
-              APPLY_INPUT_NOISE_MANAGMENT(svalue);
+      APPLY_INPUT_NOISE_MANAGMENT(svalue);
 
-              DISCRETIZE_VALUE_STOCH;
+      DISCRETIZE_VALUE_STOCH;
 
-              ADD_NOISE;
+      ADD_NOISE;
 
-              BOUND_CHECK;
+      BOUND_CHECK;
 
-              APPLY_ASYMMETRY;);
+      APPLY_ASYMMETRY;);
 
   STOCH_FINALIZE(stoch_if);
 }
@@ -639,6 +645,7 @@ template <typename T> void InputOutputManager<T>::initializeBatchBuffer(int m_ba
 
     dev_scale_values_ = RPU::make_unique<CudaArray<T>>(context_, m_batch);
     dev_bound_exceeded_ = RPU::make_unique<CudaArray<int>>(context_, m_batch);
+    context_->synchronizeDevice();
   }
 }
 
@@ -679,7 +686,7 @@ void InputOutputManager<T>::initWithInput(
   temp_out_scale_ = add_out_scale * io.out_scale;
   temp_is_test_ = is_test;
   temp_in_size_ = in_size;
-
+  DEBUG_OUT("Init with in size " << in_size << " and batch " << m_batch);
   // in_size can be changed momentarily but only when noise management etc. is turned off.
   if (in_size != in_size_ && (io.noise_management != NoiseManagementType::None ||
                               io.bound_management != BoundManagementType::None)) {
@@ -691,8 +698,9 @@ void InputOutputManager<T>::initWithInput(
     this->initializeBatchBuffer(m_batch);
   }
   temp_input_applied_ =
-      context_->template getSharedBuffer<T>(RPU_BUFFER_IN, m_batch * temp_in_size_);
-  temp_output_applied_ = context_->template getSharedBuffer<T>(RPU_BUFFER_OUT, m_batch * out_size_);
+      context_->template getSharedBuffer<T>(RPU_BUFFER_IN, (size_t)m_batch * (size_t)temp_in_size_);
+  temp_output_applied_ =
+      context_->template getSharedBuffer<T>(RPU_BUFFER_OUT, (size_t)m_batch * (size_t)out_size_);
 
   // noise management
   this->noise_manager_->compute(dev_input, io.noise_management, io, m_batch, input_trans, is_test);

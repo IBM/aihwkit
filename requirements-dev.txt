@@ -2,7 +2,7 @@ mypy==0.991
 types-dataclasses
 types-requests==2.26.3
 pycodestyle==2.10.0
-pylint==2.15.7
+pylint==4.0.3
 pytest==6.2.4
 parameterized==0.8.1
 black==24.3.0

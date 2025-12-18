@@ -12,6 +12,48 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## [1.1.0] - 2025/11/10
+
+### Added
+* Add newly uploaded resources for CPU-only wheels (\#739)
+
+### Removed/Deprecated
+* Function `convert_to_analog_mapped` in `src/aihwkit/nn/conversion.py` **deprecated and removed**.
+
+### Changed
+* Replace legacy release-build workflow with the updated build process (\#744)
+* Point the online demo link to the correct destination (\#743)
+* Update bundled notebook wheel to the GPU-enabled 1.0.0 release (\#741)
+
+### Fixed
+* Fix memory issues and bugs in analog training for CUDA (\#732)
+* Fix `convert_to_analog` for conv layers (\#627)
+
+## [1.0.0] - 2025/05/19
+
+## Added
+
+* Add new Weight Programming Optimization Feature (\#703)
+* Add Floating Point Preset for inference (\#705)
+* Add new notebook on a tutorial for Analog Device Non Idealities setup (\#682)
+* Add new simulation for Analog Filamentary Conductive-Metal-Oxide (CMO)/HfOx ReRAM device noise models for inference (\#702)
+* Add new Quantization library (\#719)
+* Add new Half Precision training section on Using the Simulator documentation and related example (\#678)
+
+## Fixed
+
+* Fix Hardware-Aware training tutorial notebooks (\#700)
+* Fix Post-Training Input Range Calibration notebook (\#716)
+
+## Changed
+
+* Change License from Apache 2.0 to MIT (\#696)
+* Update examples index for better navigation (\#704)
+* Update tutorial notebooks to run with latest builds of aihwkit (\#713)
+* Update and enhance API documentation on `IOParameters` for `is_perfect` (\#718)
+* Migrate from Travis CI/CD integration to Github Actions (\#720)
+
+
 ## [0.9.2] - 2024/09/18
 
 ### Added

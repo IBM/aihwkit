@@ -84,7 +84,7 @@ template <typename T> class MixedPrecIntRPUDevice : public MixedPrecRPUDeviceBas
 
 public:
   // constructor / destructor
-  MixedPrecIntRPUDevice(){};
+  MixedPrecIntRPUDevice() {};
   MixedPrecIntRPUDevice(int x_size, int d_size);
   MixedPrecIntRPUDevice(
       int x_size,

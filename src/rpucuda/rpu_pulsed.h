@@ -24,7 +24,7 @@ template <typename T> class RPUPulsed : public RPUSimple<T> {
 
 public:
   // constructor / destructor
-  RPUPulsed(){}; // for move
+  RPUPulsed() {}; // for move
   RPUPulsed(int x_size, int d_size);
   ~RPUPulsed();
 
