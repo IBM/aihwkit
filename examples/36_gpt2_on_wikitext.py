@@ -14,6 +14,8 @@
 dataset using AIHWKit. The example demonstrates how to convert the model to analog, run fine-tuning, 
 text-generation, and inference. 
 
+This example was initiated by Gyujun Jeong (gjeong35@gatech.edu). 
+
 Use command-line arguments:
 For text generation (of both digital and analog models), use command line arguments: "gt", "L", "c", "pt"
 For digital model fine-tuning and loss calculation, use command line arguments: "d", "c", "lr", "L"
