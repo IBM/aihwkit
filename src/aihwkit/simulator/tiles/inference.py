@@ -142,7 +142,7 @@ class InferenceTileWithPeriphery(TileWithPeriphery):
             if self.in_trans:
                 input_ = input_.T
 
-            output = (input_ @ self.reference_combined_weights.T)
+            output = (input_ @ self.reference_combined_weights.T)  # type: ignore
             if self.out_trans:
                 output = output.T
 

@@ -63,7 +63,7 @@ class ClientConfiguration:
     @property
     def token(self) -> str:
         """Return the user token."""
-        return getenv("AIHW_API_TOKEN", self.stored_config.get("api_token", None))
+        return getenv("AIHW_API_TOKEN", self.stored_config.get("api_token", None))  # type: ignore
 
     @property
     def url(self) -> str:

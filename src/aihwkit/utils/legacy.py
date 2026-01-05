@@ -79,7 +79,7 @@ def convert_legacy_checkpoint(
             layer_dic[name] = analog_layer.__class__.__name__
 
     if not has_mapped:
-        for tile in model.analog_tiles():
+        for tile in model.analog_tiles():  # type: ignore
             tile.rpu_config.mapping.max_input_size = 0
             tile.rpu_config.mapping.max_output_size = 0
 
