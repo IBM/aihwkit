@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel", "scikit-build >= 0.18.1", "ninja"]
+requires = ["setuptools", "wheel", "scikit-build >= 0.18.1", "ninja", "mypy"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -57,7 +57,6 @@ classifiers=[
 
 [project.optional-dependencies]
 dev = [
-  "mypy",
   "types-dataclasses",
   "types-requests",
   "pycodestyle",
