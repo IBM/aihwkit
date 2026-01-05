@@ -16,6 +16,8 @@ from .helpers.testcases import AihwkitTestCase, SKIP_CUDA_TESTS
 
 if EXTENSION_COMPILED:
     from aihwkit.extension.aihwkit_extension.ops import float_precision_cast
+else:
+    float_precision_cast = None
 
 
 class FloatPrecisionCastTest(AihwkitTestCase):

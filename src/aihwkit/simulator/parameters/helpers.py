@@ -21,6 +21,7 @@ if version_info[0] >= 3 and version_info[1] > 7:
 
     HAS_ORIGIN = True
 else:
+    get_origin = None  # type: ignore
     HAS_ORIGIN = False
 
 ALL_SKIP_FIELD = "is_perfect"

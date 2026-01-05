@@ -8,7 +8,7 @@
 
 Mnist dataset on a LeNet5 inspired network.
 """
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, possibly-used-before-assignment
 
 import os
 from datetime import datetime
