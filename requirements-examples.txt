@@ -1,5 +1,4 @@
-torchvision>=0.7.0
-matplotlib>=3.0
+matplotlib>=3.10
 pyamg
 jupyter
 transformers

@@ -1,14 +1,13 @@
 # Build dependencies.
-cmake>=3.18
-scikit-build>=0.11.1
+cmake>=4.2.1
+scikit-build>=0.18.1
 scikit-learn
-pybind11>=2.6.2
+pybind11>=3.0.1
 # Runtime dependencies.
-torch>=1.9
+torch>=2.9.1
 torchvision
 scipy
-requests>=2.25,<3
-numpy>=1.22,<2
-protobuf>=4.21.6
+requests>=2.32,<3
+numpy
+protobuf
 tqdm
-mypy==0.991
