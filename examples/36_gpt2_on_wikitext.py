@@ -337,11 +337,11 @@ if ARGS.wandb:
     wandb.agent(SWEEP_ID, function=main, count=4)
 elif ARGS.gen_txt:
     if ARGS.ideal:
-        rpu_config_defined = create_ideal_rpu_config()
+        RPU_CONFIG = create_ideal_rpu_config()
     else:
-        rpu_config_defined = create_rpu_config(modifier_noise=ARGS.noise) # type: ignore[no-untyped-call]
+        RPU_CONFIG = create_rpu_config(modifier_noise=ARGS.noise)  # type: ignore[no-untyped-call]
 
-    Model = create_model(rpu_config_defined, ARGS.digital)
+    Model = create_model(RPU_CONFIG, ARGS.digital)
 
     if ARGS.load:
         print(f"Loading weights from {ARGS.checkpoint}")
