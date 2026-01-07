@@ -33,12 +33,12 @@ jobs:
 
       - name: Build and install aihwkit wheel
         run: |
-          pip install -r requirements.txt
+          pip install -e .
           make build_inplace
 
       - name: Run pytest
         run: |
-          pip install -r requirements-dev.txt
+          pip install -e ".[dev]"
           make pytest
         env:
           TEST_DATASET: true
@@ -67,13 +67,12 @@ jobs:
 
       - name: Build and install aihwkit wheel
         run: |
-          pip install -r requirements.txt
+          pip install -e .
           make build_inplace
 
       - name: Run lint checks
         run: |
-          pip install -r requirements-dev.txt
-          pip install -r requirements-examples.txt
+          pip install -e ".[dev, examples]"
           make pycodestyle
-          make pylint
           make mypy
+          make pylint
