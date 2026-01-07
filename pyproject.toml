@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel", "scikit-build >= 0.18.1", "ninja", "mypy"]
+requires = ["setuptools", "wheel", "scikit-build >= 0.18.1", "ninja"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -17,6 +17,7 @@ dependencies = [
   "numpy",
   "protobuf",
   "tqdm",
+  "mypy",
 ]
 requires-python = ">=3.10"
 authors = [
