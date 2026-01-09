@@ -13,7 +13,7 @@
 
 from typing import Any, Optional
 from torch import Tensor, nn
-from torch.nn import linear, conv2d, layer_norm, embedding
+from torch.nn.functional import linear, conv2d, layer_norm, embedding
 
 from aihwkit.simulator.digital_low_precision.base_quantized_classes import (
     FP32Acts,
