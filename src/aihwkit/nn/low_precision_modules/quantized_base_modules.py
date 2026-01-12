@@ -8,6 +8,7 @@
 # All Rights Reserved.
 
 # mypy: disable-error-code=attr-defined
+# pylint: disable=not-callable
 
 """Basic quantized modules"""
 
