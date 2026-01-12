@@ -6,12 +6,13 @@
 
 """Base drift compensation for inference."""
 
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
 
 from torch import Tensor
 from torch.autograd import no_grad
 
-from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
+if TYPE_CHECKING:
+    from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
 
 
 class BaseDriftCompensation:
@@ -21,7 +22,7 @@ class BaseDriftCompensation:
         pass
 
     @no_grad()
-    def init_baseline(self, tile: InferenceTileWithPeriphery) -> Tuple[Tensor, Tensor]:
+    def init_baseline(self, tile: "InferenceTileWithPeriphery") -> Tuple[Tensor, Tensor]:
         """Initialize the base line for applying the compensation.
 
         Uses a all one tensor for read_out.

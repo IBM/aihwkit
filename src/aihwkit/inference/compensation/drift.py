@@ -6,14 +6,16 @@
 
 """Global drift compensation for inference."""
 
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
 
 from torch.autograd import no_grad
 from torch import abs as torch_abs
 from torch import clamp, Tensor, eye
 
 from aihwkit.inference.compensation.base import BaseDriftCompensation
-from aihwkit.simulator.tiles.inference import InferenceTileWithPeriphery
+
+if TYPE_CHECKING:
+    from aihwkit.simulator.tiles import InferenceTileWithPeriphery
 
 
 class GlobalDriftCompensation(BaseDriftCompensation):
@@ -46,7 +48,7 @@ class GlobalDriftCompensationWithExactReference(GlobalDriftCompensation):
     """
 
     @no_grad()
-    def init_baseline(self, tile: InferenceTileWithPeriphery) -> Tuple[Tensor, Tensor]:
+    def init_baseline(self, tile: "InferenceTileWithPeriphery") -> Tuple[Tensor, Tensor]:
         """Initialize the base line for applying the compensation.
 
         Uses a all one tensor for read_out.
