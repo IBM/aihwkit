@@ -56,7 +56,7 @@ def create_analog_network(rpu_config):
 
 
 def get_rpu(
-    rpu: Union[TorchInferenceRPUConfig, InferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
+    rpu: Union[TorchInferenceRPUConfig, InferenceRPUConfig, QuantizedTorchInferenceRPUConfig],
 ):
     """Create test rpu config."""
     rpu.forward.out_noise = 0.01
