@@ -1,8 +1,0 @@
-mypy
-types-dataclasses
-types-requests
-pycodestyle
-pylint
-pytest
-parameterized
-black

@@ -75,6 +75,7 @@ examples = [
   "evaluate",
   "accelerate",
   "lmfit",
+  "tensorboard",
 ]
 
 [project.urls]

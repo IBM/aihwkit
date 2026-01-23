@@ -1,7 +1,0 @@
-matplotlib>=3.10
-pyamg
-jupyter
-transformers
-evaluate
-accelerate
-lmfit
