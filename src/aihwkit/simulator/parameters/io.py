@@ -347,7 +347,7 @@ class IOParametersIRDropT(IOParameters):
     in the case where a capacitor is not fully charged to achieve a
     pulse/oscillation. This feature is particularly important in
     capturing the true behavior of SPLIT PWM mode. This feature is
-    implemented within analog_mvm_irdrop_t taken that it requires
+    implemented within analog_mvm_irdrop_t given that it requires
     charge units, rather than unit-less quantities.
     """
     adc_frequency: float = 6.24
