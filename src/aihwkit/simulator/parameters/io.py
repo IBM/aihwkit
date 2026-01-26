@@ -357,5 +357,5 @@ class IOParametersIRDropT(IOParameters):
 
     ir_drop_integration_sum: bool = False
     """Sets current integration to use summation rather than the default
-    trapezoidal integation method.
+    trapezoidal integration method.
     """
