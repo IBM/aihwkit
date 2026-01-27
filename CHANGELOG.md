@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 ### Added
 * Add newly uploaded resources for CPU-only wheels (\#739)
 * Add a new drift compensation mechanism which uses an ideal reference readout. In the default global drift compensation mechanism, all non-idealities (as set by the corresponding `rpu_config`) are modeled, potentially resulting in sub-optimal drift compensation scales being computed in some scenarios, e.g., where the output noise is sufficiently large.
-* New example (examples/36_gpt2_on_wikitext.py) to run Distil GPT2 on aihwkit with text prediction.
+* New example (examples/36_gpt2_on_wikitext.py) to run Distil GPT2 on aihwkit with text prediction. (\#754)
 
 ### Removed/Deprecated
 * Function `convert_to_analog_mapped` in `src/aihwkit/nn/conversion.py` **deprecated and removed**.
@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Replace legacy release-build workflow with the updated build process (\#744)
 * Point the online demo link to the correct destination (\#743)
 * Update bundled notebook wheel to the GPU-enabled 1.0.0 release (\#741)
+* Modifications/Cleanup/Improvements to Time-Stepped Circuit IRDrop example and model implementation (\#753)
 
 ### Fixed
 * Fix memory issues and bugs in analog training for CUDA (\#732)
