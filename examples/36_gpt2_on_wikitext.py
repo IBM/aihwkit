@@ -25,7 +25,7 @@ For analog model HWA fine-tuning and loss calculation, use arguments: "t", "c", 
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/language_modeling.ipynb
 """
-# pylint: disable=import-error, too-many-arguments, invalid-name
+# pylint: disable=import-error, too-many-arguments, invalid-name, unexpected-keyword-arg
 
 
 # revise original script: correct digital model code; add text generation code
