@@ -267,10 +267,10 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
             print(
                 f"{datetime.now().time().replace(microsecond=0)} --- "
                 f"Epoch: {epoch}\t"
-                f"Train loss: {train_loss:.4f}\t"
-                f"Valid loss: {valid_loss:.4f}\t"
-                f"Test error: {error:.2f}%\t"
-                f"Test accuracy: {accuracy:.2f}%\t"
+                f"Train loss: {train_loss: .4f}\t"
+                f"Valid loss: {valid_loss: .4f}\t"
+                f"Test error: {error: .2f}%\t"
+                f"Test accuracy: {accuracy: .2f}%\t"
             )
 
     return model, optimizer

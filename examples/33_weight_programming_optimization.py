@@ -15,7 +15,7 @@ The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 """
 # pylint: disable=invalid-name, too-many-locals, import-error
-# pylint: disable=too-many-branches, too-many-lines, too-many-statements
+# pylint: disable=too-many-branches, too-many-lines, too-many-statements, unexpected-keyword-arg
 import os
 import pickle
 from typing import Type, Dict, List

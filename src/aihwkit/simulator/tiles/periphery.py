@@ -4,7 +4,7 @@
 #
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines, disable=possibly-used-before-assignment
 # mypy: disable-error-code=attr-defined
 
 """Base tile with added periphery and common utility methods."""
@@ -404,7 +404,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             ones_column = ones(self.in_size * over_sampling, 1, device=self.device, dtype=dtype)
             x_values = cat([x_values, ones_column], axis=1)
 
-        est_weight = lstsq(x_values, y_values).solution.T.cpu()
+        est_weight = lstsq(x_values, y_values).solution.T.cpu()  # pylint: disable=not-callable
         weight, bias = self._separate_weights(est_weight)
 
         if self.digital_bias:

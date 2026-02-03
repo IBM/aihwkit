@@ -73,10 +73,14 @@ class _AnalogConvNd(AnalogLayerBase, _ConvNd):
 
             rpu_config = SingleRPUConfig()
 
-        if tile_module_class is None:
-            tile_module_class = rpu_config.get_default_tile_module_class()
         self.in_features = self.get_tile_size(in_channels, groups, kernel_size)
         self.out_features = out_channels
+
+        if tile_module_class is None:
+            tile_module_class = rpu_config.get_default_tile_module_class(
+                out_size=self.out_features, in_size=self.in_features
+            )
+
         self.analog_module = tile_module_class(
             self.out_features, self.in_features, rpu_config, bias
         )

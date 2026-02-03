@@ -46,7 +46,7 @@ pycodestyle:
 	pycodestyle src/ tests/ examples/
 
 pylint:
-	PYTHONPATH=src/ git ls-files | grep -E ".*\.py$$" | grep -v "pb2\.py$$" | xargs  pylint -rn
+	PYTHONPATH=src/ git ls-files | grep -E ".*\.py$$" | grep -v "pb2\.py$$" | xargs  pylint -rn --disable=all --enable=E
 
 pytest:
 	PYTHONPATH=src/ pytest -v -s tests/

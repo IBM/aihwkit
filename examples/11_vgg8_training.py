@@ -65,7 +65,7 @@ def load_images():
     mean = Tensor([0.4377, 0.4438, 0.4728])
     std = Tensor([0.1980, 0.2010, 0.1970])
 
-    print(f"Normalization data: ({mean},{std})")
+    print(f"Normalization data: ({mean}, {std})")
 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
     train_set = datasets.SVHN(PATH_DATASET, download=True, split="train", transform=transform)
@@ -274,10 +274,10 @@ def training_loop(model, criterion, optimizer, train_data, validation_data, epoc
             print(
                 f"{datetime.now().time().replace(microsecond=0)} --- "
                 f"Epoch: {epoch}\t"
-                f"Train loss: {train_loss:.4f}\t"
-                f"Valid loss: {valid_loss:.4f}\t"
-                f"Test error: {error:.2f}%\t"
-                f"Test accuracy: {accuracy:.2f}%\t"
+                f"Train loss: {train_loss: .4f}\t"
+                f"Valid loss: {valid_loss: .4f}\t"
+                f"Test error: {error: .2f}%\t"
+                f"Test accuracy: {accuracy: .2f}%\t"
             )
 
     # Save results and plot figures

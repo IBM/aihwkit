@@ -8,12 +8,13 @@
 # All Rights Reserved.
 
 # mypy: disable-error-code=attr-defined
+# pylint: disable=not-callable
 
 """Basic quantized modules"""
 
 from typing import Any, Optional
 from torch import Tensor, nn
-from torch.nn import functional as F
+from torch.nn.functional import linear, conv2d, layer_norm, embedding
 
 from aihwkit.simulator.digital_low_precision.base_quantized_classes import (
     FP32Acts,
@@ -29,7 +30,7 @@ class QuantLinear(QuantizationHijacker, nn.Linear):
     def run_forward(
         self, x: Tensor, weight: Tensor, bias: Tensor, offsets: Optional[Any] = None
     ) -> Tensor:
-        return F.linear(x.contiguous(), weight.contiguous(), bias=bias)
+        return linear(x.contiguous(), weight.contiguous(), bias=bias)
 
 
 class QuantConv2d(QuantizationHijacker, nn.Conv2d):
@@ -38,7 +39,7 @@ class QuantConv2d(QuantizationHijacker, nn.Conv2d):
     def run_forward(
         self, x: Tensor, weight: Tensor, bias: Tensor, offsets: Optional[Any] = None
     ) -> Tensor:
-        return F.conv2d(
+        return conv2d(
             x.contiguous(),
             weight.contiguous(),
             bias,
@@ -55,7 +56,7 @@ class QuantLayerNorm(QuantizationHijacker, nn.LayerNorm):
     def run_forward(
         self, x: Tensor, weight: Tensor, bias: Tensor, offsets: Optional[Any] = None
     ) -> Tensor:
-        return F.layer_norm(
+        return layer_norm(
             input=x.contiguous(),
             normalized_shape=self.normalized_shape,
             weight=weight.contiguous(),
@@ -79,7 +80,7 @@ class QuantEmbedding(QuantizationHijacker, nn.Embedding):
     def run_forward(
         self, x: Tensor, weight: Tensor, bias: Tensor, offsets: Optional[Any] = None
     ) -> Tensor:
-        return F.embedding(
+        return embedding(
             input=x.contiguous(),
             weight=weight.contiguous(),
             padding_idx=self.padding_idx,
