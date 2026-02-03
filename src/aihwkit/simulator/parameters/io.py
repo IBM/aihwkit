@@ -271,6 +271,11 @@ class IOParametersIRDropT(IOParameters):
         "ir_drop_time_step_resolution_scale",
         "ir_drop_v_read",
         "split_mode_bit_shift",
+        "apply_xdep_pcm_read_noise",
+        "xdep_pcm_read_noise_scale",
+        "adc_quantization",
+        "adc_frequency",
+        "ir_drop_integration_sum",
     ]
 
     ir_drop: float = 1.0
