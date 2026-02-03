@@ -1,6 +1,7 @@
 name: build-wheel-311
 
 on:
+  workflow_dispatch:
   push:
     tags:
     - 'v**'
@@ -19,7 +20,7 @@ jobs:
         yum install -y openblas-devel
       CIBW_BEFORE_BUILD: >
         pip install torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cpu
-        && pip install -r requirements.txt
+        && pip install -e .
       CIBW_MANYLINUX_X86_64_IMAGE: "quay.io/pypa/manylinux_2_28_x86_64"
       CIBW_REPAIR_WHEEL_COMMAND: >
         auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so
