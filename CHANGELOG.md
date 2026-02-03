@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## [1.1.0] - 2025/11/10
+## [1.1.0] - 2026/02/03
 
 ### Added
 * Add newly uploaded resources for CPU-only wheels (\#739)
