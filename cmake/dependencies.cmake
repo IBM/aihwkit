@@ -77,7 +77,7 @@ else()
 endif()
 
 # Python and pybind11
-find_package(Python3 COMPONENTS Interpreter Development)
+find_package(Python3 COMPONENTS Interpreter Development.Module)
 include_directories(${Python3_INCLUDE_DIRS})  # order matters (before pybind)
 
 set(ignoreMe "${Python3_EXECUTABLE}${Python3_FIND_REGISTRY}${Python3_INCLUDE_DIR}${Python3_NumPy_INCLUDE_DIRS}${Python3_ROOT_DIR}${Python_INCLUDE_DIR}${Python_NumPy_INCLUDE_DIRS}")
