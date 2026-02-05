@@ -10,7 +10,7 @@ dependencies = [
   "scikit-build >= 0.18.1",
   "scikit-learn",
   "pybind11 >= 3.0.1",
-  "torch >= 2.9.1",
+  "torch == 2.9.1",
   "torchvision",
   "scipy",
   "requests >= 2.32, <3",
