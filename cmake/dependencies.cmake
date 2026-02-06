@@ -112,20 +112,33 @@ include_directories(${TORCH_INCLUDE_DIRS})
 link_directories(${TORCH_LIB_DIR})
 
 if (CMAKE_COMPILER_IS_GNUCXX)
-  # check for pytorch's ABI
-  execute_process(COMMAND "${RPU_PYTHON_EXECUTABLE}" -c "import torch; print('1' if torch._C._GLIBCXX_USE_CXX11_ABI else '0')"
-    RESULT_VARIABLE TORCH_GNU_ABI_RESULT
-    OUTPUT_VARIABLE OUTPUT_GNU_ABI
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_VARIABLE TORCH_GNU_ABI_ERROR)
-  if(NOT TORCH_GNU_ABI_RESULT EQUAL 0)
-    message(FATAL_ERROR "Failed to query torch CXX11 ABI with ${RPU_PYTHON_EXECUTABLE}: ${TORCH_GNU_ABI_ERROR}")
+  # Prefer ABI from Torch CMake config (works even when Python build isolation
+  # makes `import torch` unavailable in helper subprocesses).
+  set(OUTPUT_GNU_ABI "")
+  if(DEFINED TORCH_CXX_FLAGS AND NOT "${TORCH_CXX_FLAGS}" STREQUAL "")
+    string(REGEX MATCH "-D_GLIBCXX_USE_CXX11_ABI=[01]" TORCH_ABI_DEFINE "${TORCH_CXX_FLAGS}")
+    if(NOT TORCH_ABI_DEFINE STREQUAL "")
+      string(REGEX REPLACE ".*=([01]).*" "\\1" OUTPUT_GNU_ABI "${TORCH_ABI_DEFINE}")
+    endif()
   endif()
+
+  if(NOT OUTPUT_GNU_ABI MATCHES "^[01]$")
+    # Fallback: query torch Python runtime if ABI is not present in TORCH_CXX_FLAGS.
+    execute_process(COMMAND "${RPU_PYTHON_EXECUTABLE}" -c "import torch; print('1' if torch._C._GLIBCXX_USE_CXX11_ABI else '0')"
+      RESULT_VARIABLE TORCH_GNU_ABI_RESULT
+      OUTPUT_VARIABLE OUTPUT_GNU_ABI
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_VARIABLE TORCH_GNU_ABI_ERROR)
+    if(NOT TORCH_GNU_ABI_RESULT EQUAL 0)
+      message(FATAL_ERROR "Failed to determine torch CXX11 ABI. TORCH_CXX_FLAGS='${TORCH_CXX_FLAGS}'. Python probe error with ${RPU_PYTHON_EXECUTABLE}: ${TORCH_GNU_ABI_ERROR}")
+    endif()
+  endif()
+
   if(NOT OUTPUT_GNU_ABI MATCHES "^[01]$")
     message(FATAL_ERROR "Invalid torch CXX11 ABI value: '${OUTPUT_GNU_ABI}'. Expected 0 or 1.")
   endif()
   add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI})
-  message(STATUS "Set _GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI}")
+  message(STATUS "Set _GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI} (TORCH_CXX_FLAGS='${TORCH_CXX_FLAGS}')")
 endif()
 
 # Set compile definitions
