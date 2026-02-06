@@ -81,12 +81,26 @@ find_package(Python3 COMPONENTS Interpreter Development.Module)
 include_directories(${Python3_INCLUDE_DIRS})  # order matters (before pybind)
 
 set(ignoreMe "${Python3_EXECUTABLE}${Python3_FIND_REGISTRY}${Python3_INCLUDE_DIR}${Python3_NumPy_INCLUDE_DIRS}${Python3_ROOT_DIR}${Python_INCLUDE_DIR}${Python_NumPy_INCLUDE_DIRS}")
+set(RPU_PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
+
+if(NOT RPU_PYTHON_EXECUTABLE AND DEFINED PYTHON_EXECUTABLE AND NOT "${PYTHON_EXECUTABLE}" STREQUAL "")
+  # Keep compatibility with legacy FindPython variables if provided by callers.
+  set(RPU_PYTHON_EXECUTABLE "${PYTHON_EXECUTABLE}")
+endif()
+
+if(NOT RPU_PYTHON_EXECUTABLE)
+  message(FATAL_ERROR "Could not determine a Python executable for CMake helper commands.")
+endif()
 
 # Find pybind11Config.cmake
-execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
+execute_process(COMMAND "${RPU_PYTHON_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
+    RESULT_VARIABLE PYBIND11_CMAKE_DIR_RESULT
     OUTPUT_VARIABLE CUSTOM_PYTHON_PYBIND11_PATH
     OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET)
+    ERROR_VARIABLE PYBIND11_CMAKE_DIR_ERROR)
+if(NOT PYBIND11_CMAKE_DIR_RESULT EQUAL 0 OR CUSTOM_PYTHON_PYBIND11_PATH STREQUAL "")
+  message(FATAL_ERROR "Failed to query pybind11 CMake dir with ${RPU_PYTHON_EXECUTABLE}: ${PYBIND11_CMAKE_DIR_ERROR}")
+endif()
 set(pybind11_DIR ${CUSTOM_PYTHON_PYBIND11_PATH})
 
 find_package(pybind11 CONFIG REQUIRED)
@@ -99,11 +113,18 @@ link_directories(${TORCH_LIB_DIR})
 
 if (CMAKE_COMPILER_IS_GNUCXX)
   # check for pytorch's ABI
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import torch; print('1' if torch._C._GLIBCXX_USE_CXX11_ABI else '0')"
+  execute_process(COMMAND "${RPU_PYTHON_EXECUTABLE}" -c "import torch; print('1' if torch._C._GLIBCXX_USE_CXX11_ABI else '0')"
+    RESULT_VARIABLE TORCH_GNU_ABI_RESULT
     OUTPUT_VARIABLE OUTPUT_GNU_ABI
     OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET)
-  add_compile_definitions("_GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI}")
+    ERROR_VARIABLE TORCH_GNU_ABI_ERROR)
+  if(NOT TORCH_GNU_ABI_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to query torch CXX11 ABI with ${RPU_PYTHON_EXECUTABLE}: ${TORCH_GNU_ABI_ERROR}")
+  endif()
+  if(NOT OUTPUT_GNU_ABI MATCHES "^[01]$")
+    message(FATAL_ERROR "Invalid torch CXX11 ABI value: '${OUTPUT_GNU_ABI}'. Expected 0 or 1.")
+  endif()
+  add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI})
   message(STATUS "Set _GLIBCXX_USE_CXX11_ABI=${OUTPUT_GNU_ABI}")
 endif()
 
