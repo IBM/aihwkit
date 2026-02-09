@@ -3,7 +3,6 @@ requires = [
   "setuptools",
   "wheel",
   "scikit-build >= 0.18.1",
-  "torch >= 2.9.1",
   "pybind11 >= 3.0.1",
   "ninja"
 ]
