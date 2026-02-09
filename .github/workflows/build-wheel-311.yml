@@ -16,6 +16,7 @@ jobs:
         options: --privileged
     env:
       CIBW_BUILD: cp311-manylinux_x86_64
+      CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
       CIBW_BEFORE_ALL: >
         yum install -y openblas-devel
       CIBW_BEFORE_BUILD: |
