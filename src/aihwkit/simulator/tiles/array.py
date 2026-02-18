@@ -124,7 +124,7 @@ class TileModuleArray(Module, TileModuleBase):
             in_start = in_end
 
         if self.bias is not None and bias is not None:
-            self.bias.data = bias.detach().to(self.bias.device)
+            self.bias.data.copy_(bias)
 
     @no_grad()
     def get_weights(self, **kwargs: Any) -> Tuple[Tensor, Optional[Tensor]]:
@@ -149,7 +149,7 @@ class TileModuleArray(Module, TileModuleBase):
         weight = cat(weight_lst, 1)
 
         if self.bias is not None:
-            return weight, self.bias.clone().cpu()
+            return weight, self.bias
         return weight, None
 
     def forward(self, x_input: Tensor, tensor_view: Optional[Tuple] = None) -> Tensor:
