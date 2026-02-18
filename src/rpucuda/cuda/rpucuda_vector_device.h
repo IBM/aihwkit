@@ -14,11 +14,11 @@ namespace RPU {
 template <typename T> class VectorRPUDeviceCuda : public PulsedRPUDeviceCudaBase<T> {
 
 public:
-  explicit VectorRPUDeviceCuda(){};
+  explicit VectorRPUDeviceCuda() {};
   // explicit VectorRPUDeviceCuda(CudaContextPtr  c, int x_size, int d_size);
   explicit VectorRPUDeviceCuda(CudaContextPtr c, const VectorRPUDevice<T> &other);
 
-  ~VectorRPUDeviceCuda(){};
+  ~VectorRPUDeviceCuda() {};
   VectorRPUDeviceCuda(const VectorRPUDeviceCuda<T> &other);
   VectorRPUDeviceCuda<T> &operator=(const VectorRPUDeviceCuda<T> &other); // = default;
   VectorRPUDeviceCuda(VectorRPUDeviceCuda<T> &&other);                    // = default;

@@ -18,10 +18,10 @@ namespace RPU {
 template <typename T> class OneSidedRPUDeviceCuda : public VectorRPUDeviceCuda<T> {
 
 public:
-  explicit OneSidedRPUDeviceCuda(){};
+  explicit OneSidedRPUDeviceCuda() {};
   explicit OneSidedRPUDeviceCuda(CudaContextPtr c, const OneSidedRPUDevice<T> &other);
 
-  ~OneSidedRPUDeviceCuda(){};
+  ~OneSidedRPUDeviceCuda() {};
   OneSidedRPUDeviceCuda(const OneSidedRPUDeviceCuda<T> &other);
   OneSidedRPUDeviceCuda<T> &operator=(const OneSidedRPUDeviceCuda<T> &other);
   OneSidedRPUDeviceCuda(OneSidedRPUDeviceCuda<T> &&other);
@@ -47,7 +47,7 @@ public:
   };
   OneSidedRPUDeviceCuda<T> *clone() const override { return new OneSidedRPUDeviceCuda<T>(*this); };
 
-  void setHiddenUpdateIdx(int idx) override{};
+  void setHiddenUpdateIdx(int idx) override {};
 
   void runUpdateKernel(
       pwukp_t<T> kpars,

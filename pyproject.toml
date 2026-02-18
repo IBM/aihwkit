@@ -1,0 +1,92 @@
+[build-system]
+requires = [
+  "setuptools",
+  "wheel",
+  "scikit-build >= 0.18.1",
+  "pybind11 >= 3.0.1",
+  "ninja"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aihwkit"
+version = "1.1.0"
+dependencies = [
+  "cmake >= 4.2.1",
+  "scikit-build >= 0.18.1",
+  "scikit-learn",
+  "pybind11 >= 3.0.1",
+  "torch >= 2.9.1",
+  "torchvision",
+  "scipy",
+  "requests >= 2.32, <3",
+  "numpy",
+  "protobuf",
+  "tqdm",
+  "mypy",
+]
+requires-python = ">=3.10"
+authors = [
+  { name = "IBM Research", email = "aihwkit@us.ibm.com" },
+]
+description = "IBM Analog Hardware Acceleration Kit"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+keywords = [
+  "ai",
+  "analog",
+  "rpu",
+  "torch",
+  "memristor",
+  "pcm",
+  "reram",
+  "crossbar",
+  "in-memory",
+  "nvm",
+  "non-von-neumann",
+  "non-volatile memory",
+  "phase-change material",
+]
+classifiers=[
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Environment :: GPU :: NVIDIA CUDA",
+  "Intended Audience :: Science/Research",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+dev = [
+  "types-dataclasses",
+  "types-requests",
+  "pycodestyle",
+  "pylint",
+  "pytest",
+  "parameterized",
+  "black",
+]
+
+examples = [
+  "matplotlib >= 3.10",
+  "pyamg",
+  "jupyter",
+  "transformers",
+  "evaluate",
+  "accelerate",
+  "lmfit",
+  "tensorboard",
+]
+
+[project.urls]
+Homepage = "https://github.com/IBM/aihwkit"
+Documentation = "https://aihwkit.readthedocs.io/en/latest/"
+Repository = "https://github.com/IBM/aihwkit.git"
+Issues = "https://github.com/IBM/aihwkit/issues"
+Changelog = "https://github.com/IBM/aihwkit/blob/master/CHANGELOG.md"

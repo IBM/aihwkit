@@ -24,54 +24,51 @@ namespace {
 template <typename T> __forceinline__ __device__ T atomicMaxFP(T *addr, T value);
 
 template <> __forceinline__ __device__ float atomicMaxFP(float *addr, float value) {
-  float old = *addr, assumed;
-  if (old >= value)
-    return old;
+  int *address_as_i = (int *)addr;
+  int old = *address_as_i, assumed;
   do {
     assumed = old;
-    old = __int_as_float(atomicCAS((int *)addr, __float_as_int(assumed), __float_as_int(value)));
-  } while (old != assumed || old < value);
-  return old;
+    old =
+        ::atomicCAS(address_as_i, assumed, __float_as_int(::fmaxf(value, __int_as_float(assumed))));
+  } while (assumed != old);
+  return __int_as_float(old);
 }
 
 #ifdef RPU_USE_DOUBLE
 template <> __forceinline__ __device__ double atomicMaxFP(double *addr, double value) {
-  double old = *addr, assumed;
-  if (old >= value)
-    return old;
+  longlong *address_as_i = (longlong *)addr;
+  longlong old = *address_as_i, assumed;
   do {
     assumed = old;
-    old = __longlong_as_double(atomicCAS(
-        (long long int *)addr, __double_as_longlong(assumed), __double_as_longlong(value)));
-  } while (old != assumed || old < value);
-  return old;
+    old = ::atomicCAS(
+        address_as_i, assumed, __double_as_longlong(::fmaxf(value, __longlong_as_double(assumed))));
+  } while (assumed != old);
+  return __longlong_as_double(old);
 }
 #endif
 
 #ifdef RPU_USE_FP16
 #ifdef RPU_BFLOAT_AS_FP16
 template <> __forceinline__ __device__ half_t atomicMaxFP(half_t *addr, half_t value) {
-  half_t old = *addr, assumed;
-  if (old >= value)
-    return old;
+  short *address_as_i = (short *)addr;
+  short old = *address_as_i, assumed;
   do {
     assumed = old;
-    old = __short_as_bfloat16(atomicCAS(
-        (unsigned short *)addr, __bfloat16_as_short(assumed), __bfloat16_as_short(value)));
-  } while (old != assumed || old < value);
-  return old;
+    old = ::atomicCAS(
+        address_as_i, assumed, __bfloat16_as_short(::fmaxf(value, __short_as_bfloat16(assumed))));
+  } while (assumed != old);
+  return __short_as_bfloat16(old);
 }
 #else
 template <> __forceinline__ __device__ half_t atomicMaxFP(half_t *addr, half_t value) {
-  half_t old = *addr, assumed;
-  if (old >= value)
-    return old;
+  short *address_as_i = (short *)addr;
+  short old = *address_as_i, assumed;
   do {
     assumed = old;
-    old = __short_as_half(
-        atomicCAS((unsigned short *)addr, __half_as_short(assumed), __half_as_short(value)));
-  } while (old != assumed || old < value);
-  return old;
+    old = ::atomicCAS(
+        address_as_i, assumed, __half_as_short(::fmaxf(value, __short_as_half(assumed))));
+  } while (assumed != old);
+  return __short_as_half(old);
 }
 #endif
 #endif

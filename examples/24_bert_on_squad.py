@@ -9,7 +9,7 @@
     The example is adapted from code in
     https://github.com/huggingface/notebooks/blob/main/examples/question_answering.ipynb
 """
-# pylint: disable=invalid-name, too-many-locals, import-error
+# pylint: disable=invalid-name, too-many-locals, import-error, unexpected-keyword-arg
 
 from datetime import datetime
 from argparse import ArgumentParser

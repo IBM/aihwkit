@@ -94,10 +94,25 @@ typedef half2 half2_t;
 #ifdef RPU_DEBUG
 #define DEBUG_OUT(x) std::cout << __FILENAME__ << ":" << __LINE__ << " : " << x << std::endl;
 #define DEBUG_CALL(x)                                                                              \
-  { x; }
+  {                                                                                                \
+    x;                                                                                             \
+  }
 #else
 #define DEBUG_OUT(x)
 #define DEBUG_CALL(x)
+#endif
+#endif
+
+#ifndef DEBUG_ALL_OUT
+#ifdef RPU_DEBUG_ALL
+#define DEBUG_ALL_OUT(x) std::cout << __FILENAME__ << ":" << __LINE__ << " : " << x << std::endl;
+#define DEBUG_ALL_CALL(x)                                                                          \
+  {                                                                                                \
+    x;                                                                                             \
+  }
+#else
+#define DEBUG_ALL_OUT(x)
+#define DEBUG_ALL_CALL(x)
 #endif
 #endif
 
@@ -221,10 +236,12 @@ template <typename T> inline T **Array_2D_Get_Eye(size_t n) {
 
 template <typename T> void Array_2D_Free(T **arr) {
   if (arr != nullptr) {
-    delete[] (*arr);
-    *arr = nullptr;
+    if (*arr != nullptr) {
+      delete[] (*arr);
+      // *arr = nullptr;
+    }
     delete[] arr;
-    arr = nullptr;
+    // arr = nullptr;
   }
 }
 

@@ -171,7 +171,6 @@ void declare_rpu_tiles_cuda(py::module &m, std::string type_name_add, bool add_u
             int expected_in_size = self.getXSize() - (bias ? 1 : 0);
             int m_batch = x_input.numel() / in_size;
             int out_size = self.getDSize();
-
             // Validate the x_input dimensions.
             if (in_size != expected_in_size) {
               std::string shape_str = x_trans ? ("[*, " + std::to_string(expected_in_size) + "]")

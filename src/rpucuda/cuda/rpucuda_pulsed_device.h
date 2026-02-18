@@ -21,7 +21,7 @@ template <typename T> class PulsedRPUDeviceCudaBase : public SimpleRPUDeviceCuda
 public:
   explicit PulsedRPUDeviceCudaBase() = default;
   explicit PulsedRPUDeviceCudaBase(CudaContextPtr c, int x_size, int d_size)
-      : SimpleRPUDeviceCuda<T>(c, x_size, d_size){};
+      : SimpleRPUDeviceCuda<T>(c, x_size, d_size) {};
 
   ~PulsedRPUDeviceCudaBase() = default;
   PulsedRPUDeviceCudaBase(const PulsedRPUDeviceCudaBase<T> &other) = default;
@@ -135,11 +135,11 @@ private:
 template <typename T> class PulsedRPUDeviceCuda : public PulsedRPUDeviceCudaBase<T> {
 
 public:
-  explicit PulsedRPUDeviceCuda(){};
+  explicit PulsedRPUDeviceCuda() {};
   explicit PulsedRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
   // explicit PulsedRPUDeviceCuda(CudaContextPtr  c, const PulsedRPUDevice<T> * other);
 
-  ~PulsedRPUDeviceCuda(){};
+  ~PulsedRPUDeviceCuda() {};
   PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other);
   PulsedRPUDeviceCuda<T> &operator=(const PulsedRPUDeviceCuda<T> &other);
   PulsedRPUDeviceCuda(PulsedRPUDeviceCuda<T> &&other);
@@ -238,14 +238,18 @@ public:                                                                         
   CUDACLASS(const CUDACLASS<T> &other) : PulsedRPUDeviceCuda<T>(other) {                           \
                                                                                                    \
     initialize();                                                                                  \
-    { COPY_BODY; }                                                                                 \
+    {                                                                                              \
+      COPY_BODY;                                                                                   \
+    }                                                                                              \
     this->context_->synchronize();                                                                 \
   };                                                                                               \
                                                                                                    \
   friend void swap(CUDACLASS<T> &a, CUDACLASS<T> &b) noexcept {                                    \
     using std::swap;                                                                               \
     swap(static_cast<PulsedRPUDeviceCuda<T> &>(a), static_cast<PulsedRPUDeviceCuda<T> &>(b));      \
-    { SWAP_BODY; }                                                                                 \
+    {                                                                                              \
+      SWAP_BODY;                                                                                   \
+    }                                                                                              \
   };                                                                                               \
                                                                                                    \
   CUDACLASS<T> &operator=(const CUDACLASS<T> &other) {                                             \
@@ -270,7 +274,9 @@ public:                                                                         
       RPU_FATAL("populateFrom expects " << #CPUCLASS << ".");                                      \
     }                                                                                              \
     PulsedRPUDeviceCuda<T>::populateFrom(rpu_device);                                              \
-    { HOST_COPY_BODY; }                                                                            \
+    {                                                                                              \
+      HOST_COPY_BODY;                                                                              \
+    }                                                                                              \
     this->context_->synchronize();                                                                 \
   }                                                                                                \
                                                                                                    \
@@ -295,17 +301,20 @@ public:                                                                         
                                                                                                    \
     pwukpvec_t<T> v;                                                                               \
                                                                                                    \
-    v.push_back(RPU::make_unique<PWUKernelParameterSingleFunctor<T, FUNCTOR, GPCOUNT>>(            \
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,      \
-        getPar().getName()));                                                                      \
+    v.push_back(                                                                                   \
+        RPU::make_unique<PWUKernelParameterSingleFunctor<T, FUNCTOR, GPCOUNT>>(                    \
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,  \
+            getPar().getName()));                                                                  \
                                                                                                    \
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchFunctor<T, FUNCTOR, GPCOUNT>>(             \
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,      \
-        getPar().getName()));                                                                      \
+    v.push_back(                                                                                   \
+        RPU::make_unique<PWUKernelParameterBatchFunctor<T, FUNCTOR, GPCOUNT>>(                     \
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,  \
+            getPar().getName()));                                                                  \
                                                                                                    \
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, FUNCTOR, GPCOUNT>>(       \
-        this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,      \
-        getPar().getName()));                                                                      \
+    v.push_back(                                                                                   \
+        RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, FUNCTOR, GPCOUNT>>(               \
+            this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,  \
+            getPar().getName()));                                                                  \
                                                                                                    \
     return v;                                                                                      \
   }

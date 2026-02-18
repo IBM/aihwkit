@@ -16,7 +16,7 @@ template <typename T> class WeightDrifterCuda {
 public:
   explicit WeightDrifterCuda(CudaContextPtr context, int size);
   explicit WeightDrifterCuda(CudaContextPtr, const WeightDrifter<T> &wd, int x_size, int d_size);
-  WeightDrifterCuda(){};
+  WeightDrifterCuda() {};
   virtual ~WeightDrifterCuda() = default;
 
   WeightDrifterCuda(const WeightDrifterCuda<T> &); // = default;

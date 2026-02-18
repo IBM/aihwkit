@@ -117,7 +117,7 @@ template <typename T> class AbstractRPUDevice {
 
 public:
   // constructor / destructor
-  AbstractRPUDevice(){};
+  AbstractRPUDevice() {};
   virtual ~AbstractRPUDevice() = default;
 
   virtual AbstractRPUDevice<T> *clone() const = 0;
@@ -130,7 +130,7 @@ public:
   virtual int getHiddenWeightsCount() const = 0;
   virtual void setHiddenWeights(const std::vector<T> &data) = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
-  virtual void setHiddenUpdateIdx(int idx){};
+  virtual void setHiddenUpdateIdx(int idx) {};
   virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) = 0;
   virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) = 0;
 
@@ -191,7 +191,7 @@ public:
 template <typename T> class SimpleRPUDevice : public AbstractRPUDevice<T> {
 
 public:
-  SimpleRPUDevice(){};
+  SimpleRPUDevice() {};
   explicit SimpleRPUDevice(int x_sz, int d_sz);
   explicit SimpleRPUDevice(
       int x_sz, int d_sz, const SimpleRPUDeviceMetaParameter<T> &par, RealWorldRNG<T> *rng);
@@ -214,11 +214,11 @@ public:
   SimpleRPUDevice<T> *clone() const override { return new SimpleRPUDevice<T>(*this); }
 
   void getDPNames(std::vector<std::string> &names) const override { names.clear(); };
-  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override{};
-  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override{};
+  void getDeviceParameter(T **weights, std::vector<T *> &data_ptrs) override {};
+  void setDeviceParameter(T **out_weights, const std::vector<T *> &data_ptrs) override {};
   int getHiddenWeightsCount() const override { return 0; };
-  void setHiddenWeights(const std::vector<T> &data) override{};
-  void printDP(int x_count, int d_count) const override{};
+  void setHiddenWeights(const std::vector<T> &data) override {};
+  void printDP(int x_count, int d_count) const override {};
   void printToStream(std::stringstream &ss) const override { this->getPar().printToStream(ss); };
   void disp(std::stringstream &ss) const override {
     ss << "Device " << this->getPar().getName() << " [" << this->x_size_ << "," << this->d_size_

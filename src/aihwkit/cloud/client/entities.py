@@ -120,7 +120,7 @@ class CloudExperiment:
             training_output.ParseFromString(output_)
             converter = BasicTrainingResultConverter()
             output = converter.from_proto(training_output)
-            result = output["epochs"]
+            return output["epochs"]
         if self.category == CloudExperimentCategory.BASIC_INFERENCE:
             output_ = self._api_client.output_get(self.job.output_id)  # type: ignore
             # Convert from protobuf.
@@ -128,8 +128,7 @@ class CloudExperiment:
             inferencing_output.ParseFromString(output_)
             iconverter = BasicInferencingResultConverter()
             i_output = iconverter.result_from_proto(inferencing_output)
-            result = i_output
-        return result
+            return i_output
 
     def status(self) -> CloudJobStatus:
         """Return the status of the experiment."""

@@ -15,8 +15,8 @@ namespace RPU {
 
 template <typename T> class AbstractRPUDeviceCuda {
 public:
-  explicit AbstractRPUDeviceCuda(){};
-  virtual ~AbstractRPUDeviceCuda(){};
+  explicit AbstractRPUDeviceCuda() {};
+  virtual ~AbstractRPUDeviceCuda() {};
 
   virtual void decayWeights(T *dev_weights, bool bias_no_decay) = 0;
   virtual void decayWeights(T *dev_weights, T alpha, bool bias_no_decay) = 0;
@@ -43,7 +43,7 @@ public:
       T *d_buffer) = 0;
   virtual bool hasDirectUpdate() const = 0;
   virtual int getHiddenUpdateIdx() const { return 0; };
-  virtual void setHiddenUpdateIdx(int idx){};
+  virtual void setHiddenUpdateIdx(int idx) {};
   virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) = 0;
   virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) = 0;
   virtual void populateFrom(const AbstractRPUDevice<T> &rpu_device) = 0;
@@ -65,11 +65,11 @@ public:
 template <typename T> class SimpleRPUDeviceCuda : public AbstractRPUDeviceCuda<T> {
 
 public:
-  explicit SimpleRPUDeviceCuda(){};
+  explicit SimpleRPUDeviceCuda() {};
   explicit SimpleRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
   explicit SimpleRPUDeviceCuda(CudaContextPtr c, const SimpleRPUDevice<T> &other);
 
-  ~SimpleRPUDeviceCuda(){};
+  ~SimpleRPUDeviceCuda() {};
   SimpleRPUDeviceCuda(const SimpleRPUDeviceCuda<T> &other);
   SimpleRPUDeviceCuda<T> &operator=(const SimpleRPUDeviceCuda<T> &other);
   SimpleRPUDeviceCuda(SimpleRPUDeviceCuda<T> &&other);

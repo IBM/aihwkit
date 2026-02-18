@@ -21,6 +21,7 @@ if version_info[0] >= 3 and version_info[1] > 7:
 
     HAS_ORIGIN = True
 else:
+    get_origin = None  # type: ignore
     HAS_ORIGIN = False
 
 ALL_SKIP_FIELD = "is_perfect"
@@ -110,7 +111,7 @@ def parameters_to_bindings(params: Any, data_type: RPUDataType, check_fields: bo
         else:
             if HAS_ORIGIN:
                 expected_type = get_origin(dataclass_field.type) or dataclass_field.type
-                if (not isinstance(value, expected_type)) and not (
+                if (not isinstance(value, expected_type)) and not (  # type: ignore
                     expected_type == float
                     and isinstance(value, int)
                     and not isinstance(value, bool)

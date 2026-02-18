@@ -582,7 +582,7 @@ def plot_device_compact(
     axis_left.set_xlim(0.0, limit)
     axis_right.set_xlim(0.0, limit)
 
-    return figure
+    return w_trace
 
 
 def plot_device_symmetry(
@@ -668,7 +668,7 @@ def plot_weight_drift(
     weights.sort()
     weights = np.tile(weights, [n_repeats, 1])  # type: ignore
 
-    analog_tile = InferenceTile(weights.shape[0], weights.shape[1], rpu_config)
+    analog_tile = InferenceTile(weights.shape[0], weights.shape[1], rpu_config)  # type: ignore
     analog_tile.set_weights(from_numpy(weights))
     analog_tile.program_weights()
     programmed_weights, _ = analog_tile.get_weights()

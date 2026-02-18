@@ -73,10 +73,14 @@ class _AnalogConvNd(AnalogLayerBase, _ConvNd):
 
             rpu_config = SingleRPUConfig()
 
-        if tile_module_class is None:
-            tile_module_class = rpu_config.get_default_tile_module_class()
         self.in_features = self.get_tile_size(in_channels, groups, kernel_size)
         self.out_features = out_channels
+
+        if tile_module_class is None:
+            tile_module_class = rpu_config.get_default_tile_module_class(
+                out_size=self.out_features, in_size=self.in_features
+            )
+
         self.analog_module = tile_module_class(
             self.out_features, self.in_features, rpu_config, bias
         )
@@ -163,7 +167,6 @@ class _AnalogConvNd(AnalogLayerBase, _ConvNd):
             input_size = x_input.numel() / x_input.size(0)
             if self.input_size != input_size or not self.analog_module.is_indexed():
                 self._recalculate_indexes(x_input)
-
             return self.analog_module(x_input, tensor_view=self.tensor_view)
 
         # Brute-force unfold.

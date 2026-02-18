@@ -10,5 +10,6 @@
 
 from aihwkit.simulator.tiles.analog import AnalogTile
 from aihwkit.simulator.tiles.floating_point import FloatingPointTile
-from aihwkit.simulator.tiles.inference import InferenceTile
+from aihwkit.simulator.tiles.inference import InferenceTile, InferenceTileWithPeriphery
 from aihwkit.simulator.tiles.inference_torch import TorchInferenceTile
+from aihwkit.simulator.tiles.quantized_inference_torch import QuantizedTorchInferenceTile

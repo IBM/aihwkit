@@ -340,7 +340,7 @@ class BasicInferencing(Experiment):
             if not isinstance(module, AnalogLayerBase):
                 continue
 
-            print(f"RPUConfig of module {name}:")
+            print(f"RPUConfig of module {name}: ")
             tile = next(module.analog_tiles())
             print(tile.rpu_config)
             print(tile.tile)

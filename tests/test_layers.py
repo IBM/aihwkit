@@ -30,7 +30,14 @@ from .helpers.layers import (
     Conv3dCuda,
 )
 from .helpers.testcases import ParametrizedTestCase
-from .helpers.tiles import ConstantStep, Inference, Custom, TorchTransfer, TorchInference
+from .helpers.tiles import (
+    ConstantStep,
+    Inference,
+    Custom,
+    TorchTransfer,
+    TorchInference,
+    QuantizedTorchInference,
+)
 from .helpers.testcases import SKIP_CUDA_TESTS
 
 CUDA_TILE_CLASS = tiles.CudaAnalogTile if hasattr(tiles, "CudaAnalogTile") else None
@@ -45,7 +52,7 @@ TILE_CLASSES = {
 
 @parametrize_over_layers(
     layers=[Linear, Conv1d, Conv2d, Conv3d, LinearCuda, Conv1dCuda, Conv2dCuda, Conv3dCuda],
-    tiles=[ConstantStep, Inference, TorchTransfer, TorchInference],
+    tiles=[ConstantStep, Inference, TorchTransfer, TorchInference, QuantizedTorchInference],
     biases=["digital"],
 )
 class AnalogLayerMoveTest(ParametrizedTestCase):
@@ -220,7 +227,7 @@ class AnalogLayerMoveTest(ParametrizedTestCase):
 
 @parametrize_over_layers(
     layers=[Linear, Conv1d, Conv2d, Conv3d],
-    tiles=[ConstantStep, Inference, TorchTransfer, TorchInference],
+    tiles=[ConstantStep, Inference, TorchTransfer, TorchInference, QuantizedTorchInference],
     biases=["analog", "digital", None],
 )
 class CpuAnalogLayerTest(ParametrizedTestCase):
@@ -316,7 +323,7 @@ class AnalogLayerTest(ParametrizedTestCase):
 
 @parametrize_over_layers(
     layers=[Linear, Conv2d, LinearCuda, Conv2dCuda],
-    tiles=[Custom, TorchTransfer, TorchInference],
+    tiles=[Custom, TorchTransfer, TorchInference, QuantizedTorchInference],
     biases=["digital", None],
 )
 class CustomTileTest(ParametrizedTestCase):

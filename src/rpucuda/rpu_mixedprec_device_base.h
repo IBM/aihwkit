@@ -76,9 +76,9 @@ template <typename T> class MixedPrecRPUDeviceBase : public SimpleRPUDevice<T> {
 
 public:
   // constructor / destructor
-  MixedPrecRPUDeviceBase(){};
+  MixedPrecRPUDeviceBase() {};
   MixedPrecRPUDeviceBase(int x_size, int d_size);
-  virtual ~MixedPrecRPUDeviceBase(){};
+  virtual ~MixedPrecRPUDeviceBase() {};
 
   MixedPrecRPUDeviceBase(const MixedPrecRPUDeviceBase<T> &);
   MixedPrecRPUDeviceBase<T> &operator=(const MixedPrecRPUDeviceBase<T> &);

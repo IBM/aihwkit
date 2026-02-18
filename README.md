@@ -2,7 +2,6 @@
 
 ![PyPI](https://img.shields.io/pypi/v/aihwkit)
 [![Documentation Status](https://readthedocs.org/projects/aihwkit/badge/?version=latest)](https://aihwkit.readthedocs.io/en/latest/?badge=latest)
-[![Build Status](https://travis-ci.com/IBM/aihwkit.svg?branch=master)](https://travis-ci.com/IBM/aihwkit)
 ![PyPI - License](https://img.shields.io/pypi/l/aihwkit)
 [![arXiv](https://img.shields.io/badge/arXiv-2104.02184-green.svg)](https://arxiv.org/abs/2104.02184)
 
@@ -238,7 +237,7 @@ This project is licensed under [MIT License].
 [resistive random-access memory]: https://en.wikipedia.org/wiki/Resistive_random-access_memory
 [Flash memory]: https://en.wikipedia.org/wiki/Flash_memory
 [Kirchhoff’s circuits laws]: https://en.wikipedia.org/wiki/Kirchhoff%27s_circuit_laws
-[online demo]: https://analog-ai-demo.mybluemix.net/
+[online demo]: https://aihw-composer.draco.res.ibm.com/analog-ai
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
 [award]: https://conferences.computer.org/services/2023/awards/
 [CUDA Dockerfile instructions]: https://github.com/IBM/aihwkit/blob/master/docs/source/advanced_install.rst#cuda-enabled-docker-image

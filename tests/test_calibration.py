@@ -18,6 +18,7 @@ from aihwkit.nn import AnalogLinear, AnalogSequential, AnalogConv2d
 from aihwkit.simulator.configs import (
     TorchInferenceRPUConfig,
     InferenceRPUConfig,
+    QuantizedTorchInferenceRPUConfig,
     NoiseManagementType,
     BoundManagementType,
 )
@@ -54,7 +55,9 @@ def create_analog_network(rpu_config):
     return model
 
 
-def get_rpu(rpu: Union[TorchInferenceRPUConfig, InferenceRPUConfig]):
+def get_rpu(
+    rpu: Union[TorchInferenceRPUConfig, InferenceRPUConfig, QuantizedTorchInferenceRPUConfig],
+):
     """Create test rpu config."""
     rpu.forward.out_noise = 0.01
     rpu.forward.noise_management = NoiseManagementType.NONE
@@ -88,7 +91,9 @@ def fix_random(seed):
     np.random.seed(seed)
 
 
-@mark.parametrize("rpu_cls", [TorchInferenceRPUConfig, InferenceRPUConfig])
+@mark.parametrize(
+    "rpu_cls", [TorchInferenceRPUConfig, InferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
+)
 @mark.parametrize("strategy", STRATEGIES)
 def test_determinism(rpu_cls, strategy):
     """Test whether the calibration is deterministic."""
@@ -108,7 +113,9 @@ def test_determinism(rpu_cls, strategy):
             assert allclose(ir_dict[tile_name], tile.input_range.data, atol=1e-5)
 
 
-@mark.parametrize("rpu_cls", [TorchInferenceRPUConfig, InferenceRPUConfig])
+@mark.parametrize(
+    "rpu_cls", [TorchInferenceRPUConfig, InferenceRPUConfig, QuantizedTorchInferenceRPUConfig]
+)
 @mark.parametrize("strategy", STRATEGIES)
 def test_state_before_and_after(rpu_cls, strategy):
     """Test the correct state of the tile before and after calibration."""

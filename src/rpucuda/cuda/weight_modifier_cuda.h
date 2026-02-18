@@ -16,7 +16,7 @@ template <typename T> class WeightModifierCuda {
 
 public:
   explicit WeightModifierCuda(CudaContextPtr context, int x_size, int d_size);
-  WeightModifierCuda(){};
+  WeightModifierCuda() {};
 
   void apply(T *new_weights, const T *weights, const WeightModifierParameter<T> &wmpar);
 

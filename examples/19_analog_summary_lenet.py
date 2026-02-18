@@ -10,7 +10,7 @@ The information can also be accessed via the returned AnalogInfo object.
 from torch import nn
 
 # Imports from aihwkit.
-from aihwkit.nn.conversion import convert_to_analog_mapped
+from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
 from aihwkit.utils.analog_info import analog_summary
 
@@ -36,6 +36,6 @@ model = nn.Sequential(
     nn.LogSoftmax(dim=1),
 )
 
-analog_model = convert_to_analog_mapped(model, rpu_config=rpu_config)
+analog_model = convert_to_analog(model, rpu_config=rpu_config)
 
 analog_summary(analog_model, (1, 1, 28, 28))

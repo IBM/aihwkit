@@ -618,7 +618,7 @@ class SimulatorTileWrapper:
             if not isinstance(bias, Tensor):
                 bias = from_numpy(array(bias))
 
-            bias = unsqueeze(bias.clone().detach().cpu().to(d_type), 1)
+            bias = unsqueeze(bias.clone().detach().cpu().to(d_type), 1)  # type: ignore
             return cat((weight, bias), dim=1)
         # Use only the ``[out_size, in_size]`` matrix.
         return weight

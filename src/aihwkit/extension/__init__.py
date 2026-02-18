@@ -6,7 +6,7 @@
 
 # pylint: disable=import-error, no-name-in-module, invalid-name
 
-"""AIHWKIT extension """
+"""AIHWKIT extension"""
 
 from importlib.util import find_spec
 
