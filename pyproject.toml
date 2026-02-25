@@ -31,8 +31,7 @@ authors = [
 ]
 description = "IBM Analog Hardware Acceleration Kit"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE.txt"]
+license = {file = "LICENSE.txt"}
 keywords = [
   "ai",
   "analog",
