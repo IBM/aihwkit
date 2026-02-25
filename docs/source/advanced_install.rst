@@ -30,27 +30,22 @@ AIHWKIT can also be installed using pip commands as shown below.
 
  - GPU:
 
-  To install the GPU version, select the appropriate combination of Python and CUDA versions:
+  To install the GPU version, select the appropriate Python version:
 
-  - For Python 3.9 and CUDA 11.8::
+  - For Python 3.10::
 
-    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.9.2+cuda118-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
-    $ pip install aihwkit-0.9.2+cuda118-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-1.1.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+    $ pip install aihwkit-1.1.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 
-  - For Python 3.9 and CUDA 12.1::
+  - For Python 3.11::
 
-    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.9.2+cuda121-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
-    $ pip install aihwkit-0.9.2+cuda121-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-1.1.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+    $ pip install aihwkit-1.1.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 
-  - For Python 3.10 and CUDA 11.8::
+  - For Python 3.12::
 
-    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.9.2+cuda118-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
-    $ pip install aihwkit-0.9.2+cuda118-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-
-  - For Python 3.10 and CUDA 12.1::
-
-    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-0.9.2+cuda121-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
-    $ pip install aihwkit-0.9.2+cuda121-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+    $ wget https://aihwkit-gpu-demo.s3.us-east.cloud-object-storage.appdomain.cloud/aihwkit-1.1.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl 
+    $ pip install aihwkit-1.1.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 
 .. note::
 
