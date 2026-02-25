@@ -49,7 +49,7 @@ C++11 compatible compiler
 `CUDA`_                       11.3+     Optional, for GPU-enabled simulator
 ============================  ========  ======
 
-Other requirements are listed in the ``requirements.txt``, ``requirements-dev.txt``, ``requirements-examples.txt`` in the ``aihwkit`` source.
+Other requirements are listed in the ``pyproject.toml`` file in `project.dependencies`, `project.optional-dependencies.dev` and `project.optional-dependencies.examples` sections you can find in the ``aihwkit`` source.
 
 Please refer to your operating system documentation for instructions on how to install different dependencies.
 The following sections contain quick instructions for how to set up the conda environment in Linux
@@ -59,7 +59,7 @@ Install pytorch
 """""""""""""""
 
 If your system contains GPU, then you want to install CUDA-enabled pytorch.
-The minimum required version of Torch/Pytorch is specified in the ``requirements.txt`` file. You also need to consider the installed version of the CUDA driver in the installation of pytorch.
+The minimum required version of Torch/Pytorch is specified in the ``pyproject.toml`` file. You also need to consider the installed version of the CUDA driver in the installation of pytorch.
 Please refer to `pytorch.org <https://pytorch.org/>`_ for the command to install pytorch. For example:
 
     - GPU::      
@@ -76,15 +76,15 @@ The installation of pytorch conda package would also install additional required
 Install additional required packages
 """"""""""""""""""""""""""""""""""""
 
-Install ``mkl-include`` conda package if you want to use ``-DRPU_BLAS=MKL`` compilation flag::
+Install ``mkl`` and ``mkl-include`` conda packages if you want to use ``-DRPU_BLAS=MKL`` compilation flag::
 
-      $ conda install mkl-include
+      $ conda install mkl-include mkl
 
 Install the rest of the required packages::
 
-      $ pip install -r requirements.txt
-      $ pip install -r requirements-dev.txt
-      $ pip install -r requirements-example.txt
+      $ pip install -e .
+      $ pip install -e .[dev]
+      $ pip install -e .[examples]
      
 
 Compile the library for development
