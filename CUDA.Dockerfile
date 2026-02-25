@@ -3,7 +3,7 @@ ARG CUDA_VERSION=12.2.2
 FROM intel/oneapi-basekit AS mkl-env
 
 # Stage 1: Build dependencies
-FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu22.04 AS build-env
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu24.04 AS build-env
 
 # Install as root
 USER root
@@ -61,7 +61,7 @@ RUN python setup.py install --user -j$(nproc) \
     -DRPU_CUDA_ARCHITECTURES=${CUDA_ARCH}
 
 # Stage 2: Final runtime environment
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu24.04
 
 # Copy from build-env
 COPY --from=build-env /opt/intel/oneapi/mkl/latest/lib/intel64 /opt/intel/oneapi/mkl/latest/lib/intel64
