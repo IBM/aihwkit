@@ -6,6 +6,8 @@ myst-parser
 matplotlib == 3.10
 lmfit
 # Dependencies needed for building the package
+scikit-build >= 0.18.1
+pybind11 >= 3.0.1
 torch >= 2.9.1
 torchvision
 scipy
