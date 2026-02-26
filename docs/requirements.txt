@@ -6,5 +6,10 @@ myst-parser
 matplotlib == 3.10
 lmfit
 # Dependencies needed for building the package
-mypy
 torch >= 2.9.1
+torchvision
+scipy
+requests >= 2.32, <3
+numpy
+protobuf
+mypy
