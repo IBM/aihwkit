@@ -158,7 +158,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             if not isinstance(bias, Tensor):
                 bias = from_numpy(array(bias))
 
-            self.bias.data[:] = bias[:].clone().detach().to(self.get_dtype()).to(self.bias.device)
+            self.bias.data.copy_(bias)
             bias = None
 
         combined_weights = self._combine_weights(weight, bias)

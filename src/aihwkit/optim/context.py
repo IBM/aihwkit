@@ -10,7 +10,7 @@
 
 from typing import Optional, Type, Union, Any, TYPE_CHECKING
 
-from torch import ones, dtype, Tensor, no_grad
+from torch import dtype, Tensor, no_grad
 from torch.nn import Parameter
 from torch import device as torch_device
 
@@ -19,7 +19,30 @@ if TYPE_CHECKING:
 
 
 class AnalogContext(Parameter):
-    """Context for analog optimizer."""
+    """Context for analog optimizer.
+
+    Note: `data` attribution, inherited from `torch.nn.Parameter`, is a tensor of training parameter
+    If `analog_bias` (which is provided by `analog_tile`) is False,
+        `data` has the same meaning as `torch.nn.Parameter`
+    If `analog_bias` (which is provided by `analog_tile`) is True,
+        The last column of `data` is the `bias` term
+
+    Even though it allows us to access the weights directly, always keep in mind that it is used
+        only for studying propuses. To simulate the real reading, call the `read_weights` method
+        instead, i.e. given `analog_ctx: AnalogContext`,
+        estimated_weights, estimated_bias = analog_ctx.analog_tile.read_weights()
+
+    Similarly, even though this feature allows us to update the weights directly,
+        always keep in mind that the real RPU devices change their weights only
+        by "pulse update" method.
+
+    Therefore, use the following update methods instead of
+        writing `data` directly in the analog optimizer:
+        ---
+        analog_ctx.analog_tile.update(...)
+        analog_ctx.analog_tile.update_indexed(...)
+        ---
+    """
 
     def __new__(
         cls: Type["AnalogContext"],
@@ -30,9 +53,15 @@ class AnalogContext(Parameter):
         if parameter is None:
             return Parameter.__new__(
                 cls,
-                data=ones((), device=analog_tile.device, dtype=analog_tile.get_dtype()),
+                data=analog_tile.tile.get_weights(),
                 requires_grad=True,
             )
+        # analog_tile.tile can comes from different classes:
+        #   aihwkit.silulator.rpu_base.devices.AnalogTile (C++)
+        #   TorchInferenceTile (Python)
+        # It stores the "weight" matrix;
+        #   If analog_tile.analog_bias is True, it also stores the "bias" matrix
+
         parameter.__class__ = cls
         return parameter
 
@@ -92,8 +121,8 @@ class AnalogContext(Parameter):
         Returns:
             This context in the specified device.
         """
-        self.data = self.data.cuda(device)  # type: Tensor
         if not self.analog_tile.is_cuda:
+            self.data = self.analog_tile.tile.get_weights()  # type: Tensor
             self.analog_tile = self.analog_tile.cuda(device)
             self.reset(self.analog_tile)
         return self
