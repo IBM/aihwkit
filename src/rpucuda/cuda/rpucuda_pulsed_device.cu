@@ -24,6 +24,11 @@ template <typename T>
 PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size)
     : PulsedRPUDeviceCudaBase<T>(c, x_size, d_size){};
 
+template <typename T>
+PulsedRPUDeviceCuda<T>::~PulsedRPUDeviceCuda() {
+  freeHSGPU();
+}
+
 template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
 
   dev_4params_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 4 * this->size_);
@@ -33,6 +38,10 @@ template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
   dev_persistent_weights_ = nullptr;
   dev_neg_pulse_counter_ = nullptr;
   dev_pos_pulse_counter_ = nullptr;
+  dev_global_params_ = nullptr;
+  dev_hs_states_ = nullptr;
+  hs_gpu_enabled_ = false;
+  gp_count_ = 1;
 
   this->context_->synchronize();
 };
@@ -65,6 +74,17 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other)
     dev_pos_pulse_counter_ = RPU::make_unique<CudaArray<uint64_t>>(this->context_, this->size_);
     dev_pos_pulse_counter_->assign(*other.dev_pos_pulse_counter_);
   }
+  if (other.dev_global_params_ != nullptr) {
+    dev_global_params_ = RPU::make_unique<CudaArray<T>>(this->context_, other.gp_count_);
+    dev_global_params_->assign(*other.dev_global_params_);
+    gp_count_ = other.gp_count_;
+  }
+  if (other.dev_hs_states_ != nullptr) {
+    size_t hs_size = this->d_size_ * this->x_size_ * sizeof(uint8_t);
+    cudaMalloc(&dev_hs_states_, hs_size);
+    cudaMemcpy(dev_hs_states_, other.dev_hs_states_, hs_size, cudaMemcpyDeviceToDevice);
+    hs_gpu_enabled_ = other.hs_gpu_enabled_;
+  }
 
   this->context_->synchronize();
 };
@@ -92,6 +112,11 @@ PulsedRPUDeviceCuda<T> &PulsedRPUDeviceCuda<T>::operator=(PulsedRPUDeviceCuda<T>
   dev_persistent_weights_ = std::move(other.dev_persistent_weights_);
   dev_pos_pulse_counter_ = std::move(other.dev_pos_pulse_counter_);
   dev_neg_pulse_counter_ = std::move(other.dev_neg_pulse_counter_);
+  dev_global_params_ = std::move(other.dev_global_params_);
+  gp_count_ = other.gp_count_;
+  dev_hs_states_ = other.dev_hs_states_;
+  other.dev_hs_states_ = nullptr;
+  hs_gpu_enabled_ = other.hs_gpu_enabled_;
   return *this;
 };
 
@@ -493,6 +518,35 @@ void PulsedRPUDeviceCuda<T>::runUpdateKernel(
   kpars->run(
       c->getStream(), dev_weights, m_batch, blm, this, up, dev_states, one_sided, x_counts_chunk,
       d_counts_chunk, cwo);
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::allocateHSGPU() {
+  if (hs_gpu_enabled_) {
+    return;
+  }
+  
+  size_t hs_size = this->d_size_ * this->x_size_;
+  cudaMalloc(&dev_hs_states_, hs_size * sizeof(uint8_t));
+  cudaMemset(dev_hs_states_, (uint8_t)1, hs_size);
+  
+  hs_gpu_enabled_ = true;
+  this->context_->synchronize();
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::freeHSGPU() {
+  if (dev_hs_states_ != nullptr) {
+    cudaFree(dev_hs_states_);
+    dev_hs_states_ = nullptr;
+  }
+  hs_gpu_enabled_ = false;
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::resetHSGPU() {
+  if (dev_hs_states_ != nullptr) {
+    size_t hs_size = this->d_size_ * this->x_size_;
+    cudaMemset(dev_hs_states_, (uint8_t)1, hs_size);
+    this->context_->synchronize();
+  }
 }
 
 template class PulsedRPUDeviceCuda<float>;
