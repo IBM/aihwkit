@@ -303,3 +303,71 @@ class AnalogTileTest(ParametrizedTestCase):
         input_weights = Tensor([[6, 5, 4], [3, 2, 1]])
         cpp_tile.set_weights(input_weights)
         self.assertEqual(cpp_tile.get_weights().shape, (2, 3))
+
+    def test_update_mbatch_change(self):
+        """Regression test: weight update must be correct when m_batch grows after m=1.
+
+        Before the fix in pulsed_weight_updater.cu, tuneUpdate() could select
+        SingleFunctor (no inner batch loop) when the first update uses m_batch=1.
+        If m_batch then grew to M>1 the same kernel was reused silently, processing
+        only batch item 0 and producing a weight change of ~1/M → ~99% error.
+
+        Fix: track tuned_m_batch_; force-retune when m_batch grows.
+        """
+        if not self.use_cuda or SKIP_CUDA_TESTS:
+            raise SkipTest("tuneUpdate() only runs on CUDA tiles")
+
+        in_size, out_size, m_batch = 32, 16, 128
+
+        # Zero-noise config with large BL so the update is fully deterministic
+        # for all-ones signals: both tiles produce identical weight changes.
+        rpu_config = SingleRPUConfig(
+            device=ConstantStepDevice(
+                dw_min=2 / 12000,
+                w_max=1.0,
+                w_min=-1.0,
+                w_max_dtod=0.0,
+                w_min_dtod=0.0,
+                up_down_dtod=0.0,
+                dw_min_dtod=0.0,
+                dw_min_std=0.0,
+            )
+        )
+        rpu_config.update.desired_bl = 255
+        rpu_config.mapping.max_input_size = 2**30
+        rpu_config.mapping.max_output_size = 2**30
+        rpu_config.forward.is_perfect = True
+        rpu_config.backward.is_perfect = True
+
+        zeros = Tensor(out_size, in_size).fill_(0.0).cuda()
+        x_main = Tensor(m_batch, in_size).fill_(1.0).cuda()
+        d_main = Tensor(m_batch, out_size).fill_(1.0).cuda()
+        x_prime = Tensor(1, in_size).fill_(1.0).cuda()
+        d_prime = Tensor(1, out_size).fill_(1.0).cuda()
+
+        # Reference tile: no priming; tuneUpdate fires on the large-batch update.
+        t_ref = self.get_tile(out_size, in_size, rpu_config)
+        t_ref.set_learning_rate(1.0)
+        t_ref.set_weights(zeros)
+        t_ref.update(x_main, d_main)
+        w_ref = t_ref.get_weights()[0]
+
+        # Primed tile: tuneUpdate fires on m=1 first, then m_batch grows to m_batch.
+        # The fix must detect the growth and force-retune with the larger batch size.
+        t_test = self.get_tile(out_size, in_size, rpu_config)
+        t_test.set_learning_rate(1.0)
+        t_test.set_weights(zeros)
+        t_test.update(x_prime, d_prime)  # tuneUpdate(m=1) — may pick SingleFunctor
+        t_test.set_weights(zeros)
+        t_test.update(x_main, d_main)  # fix: detects m_batch grew 1→m_batch, retuning
+        w_test = t_test.get_weights()[0]
+
+        rel_err = (w_test - w_ref).norm() / w_ref.norm()
+        self.assertLess(
+            rel_err.item(),
+            0.5,
+            f"Weight change after m=1 priming should match reference (got {rel_err:.1%} "
+            f"error). SingleFunctor may have been reused without retuning for "
+            f"m_batch={m_batch} — check tuned_m_batch_ tracking in "
+            f"pulsed_weight_updater.cu.",
+        )
