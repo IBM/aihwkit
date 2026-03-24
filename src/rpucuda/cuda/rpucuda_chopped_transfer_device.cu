@@ -409,67 +409,62 @@ __global__ void kernelChoppedTransfer(
   }
 }
 
+
+// Applies chopper correction when gamma > 0.
+// The fast weight A is stored in "chopped" form: A_stored[i,j] ≈ c_d[i] * c_x[j] * A_true[i,j].
+// After the base GEMV produces W = gamma * A_stored + C, this kernel corrects it to
+//   W = gamma * c_d[i] * c_x[j] * A_stored[i,j] + C[i,j]
+// by adding gamma * (c_d[i]*c_x[j] - 1) * A_stored[i,j] to each element.
+// Layout: W[x_idx * d_size + d_idx] (column-major, d as inner dimension).
 template <typename T>
-__global__ void kernelChoppedTransferBufferAsMomentum(
-    T *transfer_out,
-    T *W_buffer,
-    const T *transfer_in,
-    const chop_t *in_chopper,  // size n_wo  NOTE: is already applied to transfer_in
-    const chop_t *out_chopper, // size n_wo * out_size
-    const int out_size,
-    const int in_size,
-    const int m_batch,
-    const int start_read_idx,
-    const T lr_scale_in,
-    const T sub_momentum,
-    const int max_steps_in,
-    const bool no_buffer) {
+__global__ void kernelApplyChopperCorrectionToWeights(
+    T *dev_weights,
+    const T *A,
+    const chop_t *c_x, // size: x_size
+    const chop_t *c_d, // size: d_size
+    const T gamma,
+    const int d_size,
+    const int total_size) {
 
-  // W_buffer = momentum * W_buffer + transfer_in * (1-momentum);
-  // transfer_out: the number of step to increase by `W_buffer`;
-
-  UNUSED(in_chopper);
-
-  const T max_steps = (T)max_steps_in;
-  const int w_size = out_size * in_size;
-  const int t_size = out_size * m_batch;
-  const T momentum = -sub_momentum + (T)1.0;
-
-  // CAUTION: n_vec might have mulitple wraps around in_size, we need
-  // to thus make sure that the same threads are working on the same
-  // repeat.
-  int n_repeats = (m_batch + in_size - 1) / in_size;
-
-  RPU_CUDA_1D_KERNEL_LOOP(idx, w_size) {
-
-    int buffer_idx = (idx + start_read_idx * out_size) % w_size;
-    T omega = no_buffer ? (T)0.0 : W_buffer[buffer_idx];
-
-    for (int i_rep = 0; i_rep < n_repeats; i_rep++) {
-
-      int inp_idx = idx + i_rep * w_size;
-
-      if (inp_idx >= t_size) {
-        break;
-      }
-
-      chop_t out_chop = out_chopper[inp_idx];
-      T x = transfer_in[inp_idx] * lr_scale_in;
-
-      x = out_chop > 0 ? x : -x;
-      omega = momentum * omega + sub_momentum * x;
-
-      // writing
-      T n_steps = 0;
-      if (fabs(omega) >= 1.0) {
-        n_steps = MIN(MAX(trunc(omega), -max_steps), max_steps);
-      }
-      transfer_out[inp_idx] = -n_steps; // negative because of LR has reverse meaning
-    }
-    if (!no_buffer) {
-      W_buffer[buffer_idx] = omega;
-    }
+  RPU_CUDA_1D_KERNEL_LOOP(idx, total_size) {
+    int d_idx = idx % d_size;
+    int x_idx = idx / d_size;
+    T chop = (T)(c_x[x_idx] * c_d[d_idx]);
+    dev_weights[idx] += gamma * (chop - (T)1.0) * A[idx];
   }
+}
+
+template <typename T>
+void ChoppedTransferRPUDeviceCuda<T>::reduceToWeights(CudaContextPtr context, T *dev_weights) {
+  const auto &par = getPar();
+
+  if (par.fullyHidden()) {
+    // fully_hidden_: dev_weights_ptrs_[last] == dev_weights already, no-op.
+    return;
+  }
+
+  // Standard GEMV: W = gamma * A + C (+ any additional slow devices)
+  VectorRPUDeviceCuda<T>::reduceToWeights(context, dev_weights);
+
+  T gamma = par.gamma_vec[0]; // fast weight (device[0]) contribution scale
+  if (gamma == (T)0.0) {
+    return;
+  }
+
+  // Apply chopper correction: replace gamma*A with gamma*(c_d⊗c_x)*A element-wise.
+  chop_t *c_x = cwo_->getXChopperInData();
+  chop_t *c_d = cwo_->getDChopperInData();
+  if (c_x == nullptr || c_d == nullptr) {
+    // No chopper active — base GEMV result is already correct.
+    return;
+  }
+
+  int n = this->size_;
+  int nthreads = context->getNThreads(n);
+  int nblocks = context->getNBlocks(n, nthreads);
+
+  kernelApplyChopperCorrectionToWeights<T><<<nblocks, nthreads, 0, context->getStream()>>>(
+      dev_weights, this->dev_weights_ptrs_[0], c_x, c_d, gamma, this->d_size_, n);
 }
 
 template <typename T>
@@ -514,28 +509,13 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
   int nblocks = this->context_->getNBlocks(n, nthreads);
   T sub_momentum = (T)1.0 - MAX(MIN(par.momentum, (T)1.0), (T)0.0);
 
-  if (par.buffer_as_momentum) {
-    // In original TTv3 paper, the H stores the number of pulses to transfer to C
-    // here we use an equivalent way, which updates H by
-    //    H = momentum * H + (1-momentum) * A
-    // so that H \approx A if A \approx constant
-
-    // `transfer_tmp` is a column/row of the weight on `from_device_idx`
-    // transfer a column/row from `from_device_device` to the digital buffer `B`
-    // `transfer_out`: the number of step to increase weight in `to_device_idx` by `B`;
-    kernelChoppedTransferBufferAsMomentum<T><<<nblocks, nthreads, 0, this->context_->getStream()>>>(
-        transfer_out, B, transfer_tmp, cwo_->getWeightOutputInChopperData(),
-        cwo_->getWeightOutputOutChopperData(), out_size, in_size, n_vec, i_slice_start, lr_scale,
-        sub_momentum, up.desired_BL, par.no_buffer);
-  } else {
-    // `transfer_tmp` is a column/row of the weight on `from_device_idx`
-    // transfer a column/row from `from_device_device` to the digital buffer `B`
-    // `transfer_out`: the number of step to increase weight in `to_device_idx` by `B`;
-    kernelChoppedTransfer<T><<<nblocks, nthreads, 0, this->context_->getStream()>>>(
-        transfer_out, B, transfer_tmp, cwo_->getWeightOutputInChopperData(),
-        cwo_->getWeightOutputOutChopperData(), out_size, in_size, n_vec, i_slice_start, lr_scale,
-        sub_momentum, up.desired_BL, par.forget_buffer, par.no_buffer);
-  }
+  // `transfer_tmp` is a column/row of the weight on `from_device_idx`
+  // transfer a column/row from `from_device_device` to the digital buffer `B`
+  // `transfer_out`: the number of step to increase weight in `to_device_idx` by `B`;
+  kernelChoppedTransfer<T><<<nblocks, nthreads, 0, this->context_->getStream()>>>(
+      transfer_out, B, transfer_tmp, cwo_->getWeightOutputInChopperData(),
+      cwo_->getWeightOutputOutChopperData(), out_size, in_size, n_vec, i_slice_start, lr_scale,
+      sub_momentum, up.desired_BL, par.forget_buffer, par.no_buffer);
 
   DEBUG_OUT("Out chopper: ");
   DEBUG_CALL(
@@ -577,6 +557,9 @@ T ChoppedTransferRPUDeviceCuda<T>::getPulseCountLearningRate(
     out_count_lr = par.getPulseCountAutoLR(
         m_x_, m_d_, d_sparsity_, this->rpucuda_device_vec_[0]->getWeightGranularity(),
         transfer_every, up);
+    if (par.scale_fast_lr) {
+      out_count_lr *= lr;
+    }
   } else {
     out_count_lr =
         BufferedTransferRPUDeviceCuda<T>::getPulseCountLearningRate(lr, current_m_batch, up);
@@ -669,9 +652,9 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
 
   const auto &par = getPar();
   // set full hidden
-  // [TODO] in the original TTv3, `fully_hidden_` is asserted to be true
-  // However, I want to use non-zero gamma in TTv3, which could be problematic if chopper is used
-  // Need to figure out how to combine chopper and non-zero gamma
+  // When gamma > 0, A contributes to the visible weight W = gamma*(c_d⊗c_x)*A + C.
+  // The chopper correction is applied in reduceToWeights() via
+  // kernelApplyChopperCorrectionToWeights, so no special handling is needed here.
   if (par.fullyHidden()) {
     this->dev_weights_ptrs_[this->n_devices_ - 1] = dev_weights;
   }

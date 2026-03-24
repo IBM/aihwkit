@@ -483,6 +483,14 @@ class TransferCompound(UnitCell):
     ie. whether to scale the transfer LR with the current LR of the SGD.
     """
 
+    scale_fast_lr: bool = True
+    """Whether to scale the fast LR with the current LR of the SGD.
+
+    When ``True`` (default), the effective fast LR is ``fast_lr * current_lr``.
+    When ``False``, ``fast_lr`` is used as an absolute value regardless of
+    the optimizer LR schedule.
+    """
+
     transfer_forward: IOParameters = field(default_factory=IOParameters)
     """Input-output parameters that define the read of a transfer event.
 
@@ -609,37 +617,64 @@ class ChoppedTransferCompound(TransferCompound):
     ``n_reads_per_transfer=1``).
     
     At each iteration, lr is first scaled as follows.
-    Let lr be the current learning rate of the optimizer, e.g. given by
-        ``AnalogSGD(model.parameters(), lr=0.01)``
+    Let current_lr be the current learning rate of the optimizer, e.g. given by
+        ``AnalogSGD(model.parameters(), lr=0.01)``,
+    which varys during training if a PyTorch learning rate scheduler is used, e.g. controlled by
+        ``StepLR(optimizer, step_size=10, gamma=0.1)``.
     
-        "final_buffer_granularity":
-            dw_min = granularity of weight (C) array
-            if `auto_granularity` > 0:
+        "base_buffer_granularity":
+            dw_min_A  = granularity of fast array (A)
+            threshold = thres_scale * buffer_granularity * dw_min_A
+            if auto_granularity > 0:
                 period = in_size * transfer_every
-                final_buffer_granularity = buffer_granularity * auto_granularity / period
+                base_buffer_granularity = threshold * auto_granularity / period
             else:
-                final_buffer_granularity = buffer_granularity
-        "final_fast_lr":
-            if `scale_fast_lr`:
-                final_fast_lr = fast_lr * current_lr
+                base_buffer_granularity = threshold
+        "final_fast_lr":  (a.k.a. pulse-count lr, used to update A)
+            if fast_lr > 0:
+                if scale_fast_lr:
+                    base_fast_lr = fast_lr * current_lr
+                else:
+                    base_fast_lr = fast_lr
             else:
-                final_fast_lr = fast_lr
+                base_fast_lr = current_lr
+            if auto_scale:
+                dw_min_A      = granularity of fast array (A)
+                x_max         = EMA of max(|x_input|)  [see `auto_scale`]
+                d_max         = EMA of max(|d_input|)  [see `auto_scale`]
+                final_fast_lr = base_fast_lr * desired_BL * dw_min_A / (x_max * d_max)
+            else:
+                final_fast_lr = base_fast_lr
         "final_transfer_lr":
-            if `scale_transfer_lr`:
-                base_transfer_lr = gamma * transfer_lr * lr
+            if scale_transfer_lr:
+                base_transfer_lr = transfer_lr * current_lr
             else:
-                base_transfer_lr = gamma * transfer_lr
-            if `correct_gradient_magnitudes`:
-                ...
+                base_transfer_lr = transfer_lr
+            if correct_gradient_magnitudes:
+                final_buffer_granularity = base_buffer_granularity * (dw_min_C / dw_min_A)
+                final_transfer_lr = base_transfer_lr  / final_buffer_granularity / final_fast_lr
             else:
-                final_transfer_lr = base_transfer_lr * current_lr
+                final_buffer_granularity = base_buffer_granularity
+                final_transfer_lr = base_transfer_lr / final_buffer_granularity
 
     Recursion:
-        A += chopper * final_fast_lr * Gradient
-        H += chopper * final_trasfer_lr * A / final_buffer_granularity
-        if abs(H) > thres_scale * granularity:
-            C += H
-            H = momentum * H
+        1. Gradient computation
+            Gradient = outer product of input/output vectors, computed at W = gamma * A + C
+        2. fast weight update (A)
+            A += chopper * final_fast_lr * Gradient
+        3. buffer update (H)
+            H = H + chopper * final_transfer_lr * A
+        4. transfer from buffer to slow weight (C)
+            if abs(H) >= 1:
+                n_steps = trunc(H)            # integer pulse count, clamped to desired_BL
+                Send n_steps pulses to C      # (i.e., C += n_steps * dw_min_C)
+                if forget_buffer:
+                    H = momentum * H      # decay full buffer
+                else:
+                    H -= (1 - momentum) * n_steps  # subtract steps taken, keep remainder
+
+        Here H is a dimensionless pulse-count accumulator (threshold = 1.0).
+        The granularity factors are absorbed into final_transfer_lr via lr_scale.
 
     Note:
         This device is identical to :class:`BufferedTransferCompound` if
@@ -733,10 +768,13 @@ class ChoppedTransferCompound(TransferCompound):
     This will dynamically compute a reasonable update strength onto
     the fast matrix. ``fast_lr`` can be used to scale the gradient
     update further.
+
+    When ``auto_scale=True``, this keeps the number of pulses roughly
+    constant across training regardless of the gradient magnitude.
     """
 
     auto_momentum: float = 0.99
-    """Momentum of the gradient when using auto scale """
+    """Momentum of the gradient magnitude EMA when ``auto_scale`` is enabled."""
 
     correct_gradient_magnitudes: bool = False
     """Scale the transfer LR with the fast LR to yield the
@@ -784,9 +822,10 @@ class ChoppedTransferCompound(TransferCompound):
     """
 
     scale_fast_lr: bool = False
-    """Whether to give the transfer_lr in relative units.
+    """Whether to scale the fast device LR with the current optimizer LR.
 
-    ie. whether to scale the fast LR with the current LR of the SGD.
+    When ``True``, the effective fast LR is ``fast_lr * current_lr``.
+    When ``False`` (default), ``fast_lr`` is used as an absolute value.
     """
 
     transfer_forward: IOParameters = field(default_factory=IOParameters)
@@ -797,8 +836,6 @@ class ChoppedTransferCompound(TransferCompound):
     or whether transfer is done using a ADC/DAC etc.
     """
     
-    buffer_as_momentum: bool = False
-
     transfer_update: UpdateParameters = field(
         default_factory=lambda: UpdateParameters(
             desired_bl=1, update_bl_management=False, update_management=False
