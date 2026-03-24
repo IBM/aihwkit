@@ -98,6 +98,7 @@ public:
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
+  void reduceToWeights(CudaContextPtr c, T *dev_weights) override;
   int getTransferEvery(
       int didx, int m_batch, const PulsedUpdateMetaParameter<T> &up) const override;
   T getPulseCountLearningRate(

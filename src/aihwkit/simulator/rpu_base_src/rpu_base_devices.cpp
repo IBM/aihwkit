@@ -902,7 +902,6 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
       .def_readwrite("auto_momentum", &ChoppedTransferParam::auto_momentum)
       .def_readwrite("auto_granularity", &ChoppedTransferParam::auto_granularity)
       .def_readwrite("no_buffer", &ChoppedTransferParam::no_buffer)
-      .def_readwrite("buffer_as_momentum", &ChoppedTransferParam::buffer_as_momentum)
       .def_readwrite("buffer_granularity", &ChoppedTransferParam::buffer_granularity)
       .def("__str__", [](ChoppedTransferParam &self) {
         std::stringstream ss;
