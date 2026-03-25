@@ -177,6 +177,7 @@ class TileModule(Module, TileModuleBase):
         # at the end. shared weight might be updated above which might
         # yeild issues if the tile is not first updated
         self._apply_without_context(lambda t: t.cuda(device))
+        self._sync_analog_ctx_weights()
         return self
 
     def cpu(self) -> "TileModule":
@@ -194,6 +195,7 @@ class TileModule(Module, TileModuleBase):
             super(BaseTile, self).cpu()  # type: ignore
 
         self._apply_without_context(lambda t: t.cpu())
+        self._sync_analog_ctx_weights()
         return self
 
     def to(self, *args: Any, **kwargs: Any) -> "TileModule":

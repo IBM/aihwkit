@@ -333,6 +333,38 @@ template <typename T> void RPUCudaSimple<T>::setSharedWeights(T *device_source) 
   }
 }
 
+template <typename T> void RPUCudaSimple<T>::getWeightsCuda(T *device_dest) const {
+  // D2D read of dev_weights_ in its native transposed [x_size, d_size] layout.
+  //
+  // cf. getWeights(T*): copies dev_weights_ to host and transposes to
+  //   row-major [d_size, x_size] — involves GPU sync + D2H + O(n^2) transpose.
+  // This method stays entirely on device: one async D2D memcpy, no transpose.
+  // Use when the caller needs a GPU tensor (e.g. Python get_weights_cuda()).
+  dev_weights_->synchronize();
+  CUDA_CALL(cudaMemcpyAsync(
+      device_dest, dev_weights_->getData(),
+      (size_t)this->x_size_ * this->d_size_ * sizeof(T), cudaMemcpyDeviceToDevice,
+      context_->getStream()));
+}
+
+template <typename T> void RPUCudaSimple<T>::setWeightsCuda(const T *device_source) {
+  // D2D write into dev_weights_ from a device buffer already in transposed
+  // [x_size, d_size] layout, then sync the host copy for serialisation.
+  //
+  // cf. setWeights(const T* host_source): takes a host pointer in row-major
+  //   [d_size, x_size], copies H2H into weights_, then assignTranspose H2D
+  //   into dev_weights_ — involves a full transpose upload.
+  // This method avoids the GPU->CPU->GPU round-trip when the source tensor
+  // is already on the same GPU (e.g. Python set_weights_cuda()).
+  dev_weights_->synchronize();
+  CUDA_CALL(cudaMemcpyAsync(
+      dev_weights_->getData(), device_source,
+      (size_t)this->x_size_ * this->d_size_ * sizeof(T), cudaMemcpyDeviceToDevice,
+      context_->getStream()));
+  // Keep host copy in sync for serialisation (__getstate__).
+  this->copyWeightsToHost(RPUSimple<T>::getWeightsPtr()[0]);
+}
+
 template <typename T>
 void RPUCudaSimple<T>::getAndResetWeightUpdate(T *prev_weight_and_dw_out, T scale) {
   RPU::math::elemsubcopy<T>(

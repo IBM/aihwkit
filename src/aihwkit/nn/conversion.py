@@ -16,6 +16,7 @@ from copy import deepcopy
 from torch.nn import Module, Linear, Conv1d, Conv2d, Conv3d, Sequential
 
 from aihwkit.exceptions import ArgumentError
+from aihwkit.optim.context import AnalogContext
 from aihwkit.simulator.tiles.module import TileModule
 from aihwkit.nn.modules.container import AnalogWrapper
 from aihwkit.nn.modules.base import AnalogLayerBase
@@ -88,6 +89,7 @@ def convert_to_analog(
     exclude_modules: Optional[List[str]] = None,
     inplace: bool = False,
     verbose: bool = False,
+    readonly: Optional[bool] = None,
 ) -> Module:
     """Convert a given digital model to its analog counterpart.
 
@@ -137,6 +139,13 @@ def convert_to_analog(
         inplace: Whether to perform in-place conversion (without deepcopy)
 
         verbose: Increase verbosity. Will print converted layers.
+
+        readonly: If not ``None``, override the ``readonly`` flag on
+            every :class:`~aihwkit.optim.context.AnalogContext` after
+            conversion.  When ``True``, in-place weight modifications
+            are blocked; when ``False``, they are allowed.  If ``None``
+            (default), each tile uses the value from
+            ``rpu_config.mapping.readonly_weights``.
 
     Returns:
         Module where all the digital layers are replaced with analog
@@ -193,6 +202,7 @@ def convert_to_analog(
                 exclude_modules,
                 True,
                 verbose,
+                readonly,
             )
             continue
 
@@ -210,6 +220,12 @@ def convert_to_analog(
     # in case of root, make sure it is wrapped as analog
     if ensure_analog_root and not module_name and not isinstance(module, AnalogLayerBase):
         module = AnalogWrapper(module)
+
+    # Apply global readonly override if specified
+    if readonly is not None and not module_name:
+        for param in module.parameters():
+            if isinstance(param, AnalogContext):
+                param.readonly = readonly
 
     return module
 
