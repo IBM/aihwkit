@@ -149,7 +149,7 @@ class TileModuleArray(Module, TileModuleBase):
         weight = cat(weight_lst, 1)
 
         if self.bias is not None:
-            return weight, self.bias
+            return weight, self.bias.data
         return weight, None
 
     def forward(self, x_input: Tensor, tensor_view: Optional[Tuple] = None) -> Tensor:
