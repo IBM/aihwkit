@@ -149,15 +149,19 @@ class CustomSimulatorTile(SimulatorTile, Module):
         """
         self._analog_weight.copy_(weight)
 
-    def get_weights(self) -> Tensor:
+    def get_weights(self, as_ref: bool = False) -> Tensor:
         """Get the tile weights.
 
+        Args:
+            as_ref: if True, return a reference to the internal weight tensor.
+                If False (default), return a detached CPU copy.
+
         Returns:
-            a tuple where the first item is the ``[out_size, in_size]`` weight
-            matrix; and the second item is either the ``[out_size]`` bias vector
-            or ``None`` if the tile is set not to use bias.
+            the ``[out_size, in_size]`` weight matrix.
         """
-        return self._analog_weight.data.detach().cpu()
+        if as_ref:
+            return self._analog_weight.data
+        return self._analog_weight.data.detach().cpu().clone()
 
     def get_x_size(self) -> int:
         """Returns input size of tile"""
