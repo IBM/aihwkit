@@ -190,6 +190,8 @@ void ChoppedTransferRPUDeviceCuda<T>::readMatrix(
     DEBUG_CALL(cwo_->printWeightOutputInChopper());
     T *output_weights = cwo_->getWeightOutputData();
     chop_t *wo_chopper_data = cwo_->getWeightOutputInChopperData();
+    // matrix consisting of transfer vectors. each column is a one-hot vector
+    // also the in-chopper is applied
     size_t max_n_vec_per_chunk = (par.transfer_max_vec_chunk_size + n_vec - 1) / n_vec;
     size_t n_chunks = (n_vec + max_n_vec_per_chunk - 1) / max_n_vec_per_chunk;
 
@@ -350,6 +352,11 @@ __global__ void kernelChoppedTransfer(
     const bool forget_buffer_in,
     const bool no_buffer) {
 
+  // W_buffer += transfer_in * lr_scale_in;
+  // transfer_out: the number of step to increase by `W_buffer`;
+
+  UNUSED(in_chopper);
+
   const T max_steps = (T)max_steps_in;
   const int w_size = out_size * in_size;
   const int t_size = out_size * n_vec;
@@ -402,17 +409,75 @@ __global__ void kernelChoppedTransfer(
   }
 }
 
+
+// Applies chopper correction when gamma > 0.
+// The fast weight A is stored in "chopped" form: A_stored[i,j] ≈ c_d[i] * c_x[j] * A_true[i,j].
+// After the base GEMV produces W = gamma * A_stored + C, this kernel corrects it to
+//   W = gamma * c_d[i] * c_x[j] * A_stored[i,j] + C[i,j]
+// by adding gamma * (c_d[i]*c_x[j] - 1) * A_stored[i,j] to each element.
+// Layout: W[x_idx * d_size + d_idx] (column-major, d as inner dimension).
+template <typename T>
+__global__ void kernelApplyChopperCorrectionToWeights(
+    T *dev_weights,
+    const T *A,
+    const chop_t *c_x, // size: x_size
+    const chop_t *c_d, // size: d_size
+    const T gamma,
+    const int d_size,
+    const int total_size) {
+
+  RPU_CUDA_1D_KERNEL_LOOP(idx, total_size) {
+    int d_idx = idx % d_size;
+    int x_idx = idx / d_size;
+    T chop = (T)(c_x[x_idx] * c_d[d_idx]);
+    dev_weights[idx] += gamma * (chop - (T)1.0) * A[idx];
+  }
+}
+
+template <typename T>
+void ChoppedTransferRPUDeviceCuda<T>::reduceToWeights(CudaContextPtr context, T *dev_weights) {
+  const auto &par = getPar();
+
+  if (par.fullyHidden()) {
+    // fully_hidden_: dev_weights_ptrs_[last] == dev_weights already, no-op.
+    return;
+  }
+
+  // Standard GEMV: W = gamma * A + C (+ any additional slow devices)
+  VectorRPUDeviceCuda<T>::reduceToWeights(context, dev_weights);
+
+  T gamma = par.gamma_vec[0]; // fast weight (device[0]) contribution scale
+  if (gamma == (T)0.0) {
+    return;
+  }
+
+  // Apply chopper correction: replace gamma*A with gamma*(c_d⊗c_x)*A element-wise.
+  chop_t *c_x = cwo_->getXChopperInData();
+  chop_t *c_d = cwo_->getDChopperInData();
+  if (c_x == nullptr || c_d == nullptr) {
+    // No chopper active — base GEMV result is already correct.
+    return;
+  }
+
+  int n = this->size_;
+  int nthreads = context->getNThreads(n);
+  int nblocks = context->getNBlocks(n, nthreads);
+
+  kernelApplyChopperCorrectionToWeights<T><<<nblocks, nthreads, 0, context->getStream()>>>(
+      dev_weights, this->dev_weights_ptrs_[0], c_x, c_d, gamma, this->d_size_, n);
+}
+
 template <typename T>
 void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
     int to_device_idx,
     int from_device_idx,
     int i_slice_start,
-    const T lr,
+    const T transfer_lr,
     const T count_lr,
     const T *vec,
     const int n_vec,
     const PulsedUpdateMetaParameter<T> &up) {
-  if (lr == (T)0.0) {
+  if (transfer_lr == (T)0.0) {
     return;
   }
   if (!this->transfer_buffer_vec_.size()) {
@@ -430,7 +495,8 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
   T *transfer_tmp = this->context_->template getSharedBuffer<T>(RPU_BUFFER_DEVICE_0, t_size);
   T *transfer_out = this->context_->template getSharedBuffer<T>(RPU_BUFFER_DEVICE_1, t_size);
   T lr_scale = par.getTransferLRScale(
-      from_weight_granularity, to_weight_granularity, lr, count_lr, cwo_->getCurrentMBatch());
+      from_weight_granularity, to_weight_granularity, transfer_lr, count_lr, 
+      cwo_->getCurrentMBatch());
 
   // forward/backward with transfer vectors into tmp
   this->readMatrix(from_device_idx, nullptr, transfer_tmp, n_vec, (T)1.0);
@@ -443,6 +509,9 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
   int nblocks = this->context_->getNBlocks(n, nthreads);
   T sub_momentum = (T)1.0 - MAX(MIN(par.momentum, (T)1.0), (T)0.0);
 
+  // `transfer_tmp` is a column/row of the weight on `from_device_idx`
+  // transfer a column/row from `from_device_device` to the digital buffer `B`
+  // `transfer_out`: the number of step to increase weight in `to_device_idx` by `B`;
   kernelChoppedTransfer<T><<<nblocks, nthreads, 0, this->context_->getStream()>>>(
       transfer_out, B, transfer_tmp, cwo_->getWeightOutputInChopperData(),
       cwo_->getWeightOutputOutChopperData(), out_size, in_size, n_vec, i_slice_start, lr_scale,
@@ -464,9 +533,11 @@ void ChoppedTransferRPUDeviceCuda<T>::readAndUpdate(
       CudaArray<T> dev_a(this->context_, out_size * in_size);
       math::copyWithIterator(this->context_, dev_a.getData(), B, out_size * in_size);
       this->context_->synchronize(); dev_a.printMatrixValues(out_size););
-
   // update according to device
   T write_lr = par.getWriteLR(to_weight_granularity);
+  // the second and third arguments of `writeMatrix` are the vectors of rank-updates
+  // (1) `transfer_out`, a column of the digital buffer B
+  // (2) an one-hot vector, which will be assigned in `writeMatrix`. So `nullptr` is passed here
   this->writeMatrix(to_device_idx, nullptr, transfer_out, n_vec, write_lr, up);
 
   this->context_->template releaseSharedBuffer<T>(RPU_BUFFER_DEVICE_0);
@@ -486,6 +557,9 @@ T ChoppedTransferRPUDeviceCuda<T>::getPulseCountLearningRate(
     out_count_lr = par.getPulseCountAutoLR(
         m_x_, m_d_, d_sparsity_, this->rpucuda_device_vec_[0]->getWeightGranularity(),
         transfer_every, up);
+    if (par.scale_fast_lr) {
+      out_count_lr *= lr;
+    }
   } else {
     out_count_lr =
         BufferedTransferRPUDeviceCuda<T>::getPulseCountLearningRate(lr, current_m_batch, up);
@@ -508,12 +582,17 @@ void ChoppedTransferRPUDeviceCuda<T>::transfer(
   int in_size = par.getInSize();
   int out_size = par.getOutSize();
 
+  // the index of transferred column/row
   int i_slice = cwo_->getValStart();
-  int n_transfers = cwo_->getNumWeightOutputs(); // could be more than in_size !
-  T lr = par.getTransferLR(to_device_idx, from_device_idx, current_lr);
 
+  int n_transfers = cwo_->getNumWeightOutputs(); // could be more than in_size !
+  T transfer_lr = par.getTransferLR(to_device_idx, from_device_idx, current_lr);
+
+  // unlike `TransferRPUDeviceCuda`, which use a transfer vector (`transfer_vecs_`) to mark
+  //   the index of transferred column/row, here `i_slice` is used to mark the index
+  //   So the argument `vec` is nullptr here
   readAndUpdate(
-      to_device_idx, from_device_idx, i_slice, lr, current_count_lr, nullptr, n_transfers,
+      to_device_idx, from_device_idx, i_slice, transfer_lr, current_count_lr, nullptr, n_transfers,
       par.transfer_up);
   this->current_slice_indices_[from_device_idx] = (i_slice + n_transfers) % in_size;
 }
@@ -563,17 +642,22 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
     RPU_FATAL("Explicit CWO as input not allowed here.");
   }
 
-  if (!this->fully_hidden_) {
-    RPU_FATAL("Expects fully hidden fast matrix.");
-  }
+  // if (!this->fully_hidden_) {
+  //   RPU_FATAL("Expects fully hidden fast matrix.");
+  // }
 
   if (blm->getCurrentLR() == (T)0.0) {
     return;
   }
 
+  const auto &par = getPar();
   // set full hidden
-  this->dev_weights_ptrs_[this->n_devices_ - 1] = dev_weights;
-
+  // When gamma > 0, A contributes to the visible weight W = gamma*(c_d⊗c_x)*A + C.
+  // The chopper correction is applied in reduceToWeights() via
+  // kernelApplyChopperCorrectionToWeights, so no special handling is needed here.
+  if (par.fullyHidden()) {
+    this->dev_weights_ptrs_[this->n_devices_ - 1] = dev_weights;
+  }
   // TODO: enable asynchronous update on a separate update stream.
   //       for that one needs to make sure that wait events are
   //       inserted in the main stream and that all the context
@@ -584,6 +668,9 @@ void ChoppedTransferRPUDeviceCuda<T>::runUpdateKernel(
   // generate the choppers, advance counter, etc
   cwo_->makeWeightOutputChoppers(blm);
 
+  // here m_batch data samples (gradients) are used to update the fast weight (the last device)
+  //   no transfer happens during the update process
+  // if m_batch is greater than `transfer_every`, all transfers are deferred to the end 
   this->rpucuda_device_vec_[0]->runUpdateKernel(
       kpars, c, this->dev_weights_ptrs_[0], m_batch, blm, up, lr, dev_states, one_sided, nullptr,
       nullptr, &*cwo_);
