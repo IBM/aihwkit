@@ -100,6 +100,20 @@ class MappingParameter(_PrintableMixin):
         :class:`aihwkit.nn.modules.linear_mapped.AnalogLinearMapped`.
     """
 
+    readonly_weights: bool = True
+    """Whether the analog context data is read-only.
+
+    When ``True`` (default), ``analog_ctx.data`` is wrapped in a
+    :class:`~aihwkit.optim.weight_view.ReadOnlyWeightView` that blocks
+    in-place mutations (e.g. ``add_``, ``copy_``, ``__setitem__``).
+    This prevents users from accidentally modifying analog weights in
+    a way that bypasses the physical constraints of the analog device.
+
+    Set to ``False`` to allow direct weight access for research or
+    hardware-aware training scenarios.  The flag can also be toggled at
+    runtime via ``analog_ctx.readonly``.
+    """
+
     def compatible_with(self, mapping: "MappingParameter") -> bool:
         """Checks compatiblity
 
@@ -117,6 +131,7 @@ class MappingParameter(_PrintableMixin):
                 "weight_scaling_omega",
                 "weight_scaling_columnwise",
                 "weight_scaling_lr_compensation",
+                "readonly_weights",
             ]:
                 continue
 

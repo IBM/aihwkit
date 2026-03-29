@@ -153,9 +153,18 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
         if self.tile.__class__ in MAP_TILE_CLASS_TO_CUDA:
             with cuda_device(device):
                 self.tile = MAP_TILE_CLASS_TO_CUDA[self.tile.__class__](self.tile)
-                self.is_cuda = True
-                self.device = device
-                self.analog_ctx.data = self.analog_ctx.data.cuda(device)
+                # CPU shared tensor is no longer valid for the new CUDA tile.
+                self._shared_weight_tensor = None
+                # Re-establish shared weight binding for the new CUDA tile,
+                # but only when not using the shared_weights DDP path.  When
+                # shared_weights is set, ensure_shared_weights() (called on
+                # the first forward) handles populating dev_weights_ from
+                # self.shared_weights.data — calling _bind_shared_weights()
+                # here would set shared_weights_if_=True prematurely and
+                # prevent that population step from running.
+                if self.shared_weights is None:
+                    self._bind_shared_weights()
+                self.analog_ctx.data = self.tile.get_weights().cuda(device)
                 self.analog_ctx.reset(self)  # type: ignore
 
             if self.shared_weights is not None:
@@ -165,7 +174,22 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
                     dtype=self.get_dtype(),
                     requires_grad=True,
                 ).cuda(device)
-                # ensure shared weights will be called later (needs copying still)
+                # Eagerly populate shared_weights and bind _shared_weight_tensor,
+                # unless the tile uses is_perfect forward.  When is_perfect=True,
+                # calling ensure_shared_weights() here would invoke C++
+                # setSharedWeights() which replaces dev_weights_ with the
+                # still-zero shared buffer *before* the first forward has a
+                # chance to populate it — resulting in all-zero output.
+                # Example: InferenceRPUConfig(forward=IOParameters(is_perfect=True))
+                # We defer to ensure_shared_weights() on the first forward(),
+                # where the C++ copyTo() properly fills the buffer first.
+                is_perfect_fwd = getattr(
+                    getattr(getattr(self, "rpu_config", None), "forward", None),
+                    "is_perfect",
+                    False,
+                )
+                if not is_perfect_fwd:
+                    self.ensure_shared_weights()
 
         return self
 
@@ -183,6 +207,9 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
 
         if self.shared_weights is not None:
             self.tile.set_shared_weights(self.shared_weights.data)  # type: ignore
+            # Keep _shared_weight_tensor in sync: the RPUCuda shared_weights
+            # path replaces the C++ tile's backing store.
+            self._shared_weight_tensor = self.shared_weights.data
 
     @no_grad()
     def set_delta_weights(self, delta_weights: Optional[Tensor] = None) -> None:
