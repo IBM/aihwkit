@@ -165,6 +165,7 @@ public:
   void getWeightsReal(T *weightsptr) override;
   void setWeightsReal(const T *weightsptr, int n_loops = 25) override;
   void setWeights(const T *weightsptr) override;
+  void setWeightsCuda(const T *device_source) override;
 
   void applyWeightUpdate(T *dw_and_current_weights_out) override;
 
