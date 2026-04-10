@@ -979,6 +979,10 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         Tensor
             The output of the tile added with the bias
         """
+         # Ensure an iterable tuple for .view(*tensor_view)
+        if tensor_view is None:
+            tensor_view = self.get_tensor_view(output.dim())
+
         if self.bias_quantizer is None:
             return output + self.bias.view(*tensor_view)
 
