@@ -110,7 +110,6 @@ template <typename T> struct PulsedRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
     }
     reset_dtod = MAX(reset_dtod, (T)0.0);
     this->reset_std = MAX(this->reset_std, (T)0.0);
-    reset = MAX(reset, (T)0.0);
   };
 };
 
