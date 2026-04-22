@@ -75,9 +75,9 @@ template <typename T> void ChoppedTransferRPUDeviceMetaParameter<T>::checkSuppor
     RPU_FATAL("Only same context supported");
   }
 
-  if (!this->fullyHidden()) {
-    RPU_FATAL("Expects a fully hidden fast device.");
-  }
+  // if (!this->fullyHidden()) {
+  //   RPU_FATAL("Expects a fully hidden fast device.");
+  // }
 
   if ((this->n_reads_per_transfer != 1) || (this->random_selection != false) ||
       (this->with_reset_prob > (T)0.0)) {
@@ -341,6 +341,9 @@ T ChoppedTransferRPUDevice<T>::getPulseCountLearningRate(
     count_lr = par.getPulseCountAutoLR(
         m_x_, m_d_, d_sparsity_, this->rpu_device_vec_[0]->getWeightGranularity(), transfer_every,
         up);
+    if (par.scale_fast_lr) {
+      count_lr *= lr;
+    }
 
   } else {
     count_lr = BufferedTransferRPUDevice<T>::getPulseCountLearningRate(lr, current_m_batch, up);
@@ -409,6 +412,9 @@ void ChoppedTransferRPUDevice<T>::readAndUpdate(
   int non_zero_count = 0;
   bool in_chop = in_chopper_[(size_t)(i_slice_start)];
 
+  // Standard TTv2/TTv3 buffer accumulation:
+  //   H += lr_scale * A
+  // After taking steps, H is reduced (momentum decay or forget_buffer).
   PRAGMA_SIMD
   for (int j = 0; j < out_size; j++) {
 
@@ -508,6 +514,40 @@ void ChoppedTransferRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, 
   }
 
   TransferRPUDevice<T>::doDenseUpdate(weights, coincidences, rng);
+}
+
+template <typename T>
+void ChoppedTransferRPUDevice<T>::reduceToWeights(T **weights) const {
+  const auto &par = getPar();
+
+  if (par.fullyHidden()) {
+    // fully_hidden_: weights == dev_weights_ptrs_[last] already, no-op.
+    return;
+  }
+
+  // Standard GEMV: W = gamma * A + C (+ any additional slow devices)
+  TransferRPUDevice<T>::reduceToWeights(weights);
+
+  T gamma = par.gamma_vec[0]; // fast weight (device[0]) contribution scale
+  if (gamma == (T)0.0) {
+    return;
+  }
+
+  // Apply chopper correction: W = gamma * (c_d ⊗ c_x) * A + C
+  // The fast weight A is stored in "chopped" form and needs de-chopping
+  // when it contributes to the final weight W.
+  // Correction: add gamma * (c_d[i] * c_x[j] - 1) * A[i,j] to each element.
+
+  T *A = *this->weights_vec_[0];
+  int size = this->x_size_ * this->d_size_;
+
+  // Layout: W[x_idx * d_size + d_idx] (column-major, d as inner dimension)
+  for (int idx = 0; idx < size; idx++) {
+    int d_idx = idx % this->d_size_;
+    int x_idx = idx / this->d_size_;
+    T chop = (T)(in_chopper_[x_idx] * out_chopper_[d_idx]);
+    weights[0][idx] += gamma * (chop - (T)1.0) * A[idx];
+  }
 }
 
 template class ChoppedTransferRPUDevice<float>;
