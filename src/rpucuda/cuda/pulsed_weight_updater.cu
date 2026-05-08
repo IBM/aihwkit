@@ -304,6 +304,44 @@ void PulsedWeightUpdater<T>::doDirectUpdate(
 }
 
 template <typename T>
+template <typename XInputIteratorT, typename DInputIteratorT>
+void PulsedWeightUpdater<T>::doInfiniteGranularityUpdate(
+    XInputIteratorT x_in,
+    DInputIteratorT d_in,
+    PulsedRPUDeviceCuda<T> *pulsed_device,
+    T *dev_weights,
+    const T lr,
+    const int m_batch,
+    const bool x_trans,
+    const bool d_trans) {
+
+  T *fpx_buffer = context_->template getSharedBuffer<T>(RPU_BUFFER_IN, x_size_ * m_batch);
+  T *fpd_buffer = context_->template getSharedBuffer<T>(RPU_BUFFER_OUT, d_size_ * m_batch);
+  T *grad_buffer = context_->template getSharedBuffer<T>(RPU_BUFFER_TEMP_0, x_size_ * d_size_);
+
+  const T *x_out = copyIterator2Buffer(x_in, fpx_buffer, x_size_ * m_batch);
+  const T *d_out = copyIterator2Buffer(d_in, fpd_buffer, d_size_ * m_batch);
+
+  // G = -lr * D^T @ X, written into grad_buffer (beta=0 overwrites).
+  // Uniform gemm path; for m_batch==1 this is a rank-1 update equivalent to ger.
+  RPU::math::gemm<T>(
+      context_, d_trans, !x_trans,
+      d_size_, // M
+      x_size_, // N
+      m_batch, // K
+      -lr, d_out, d_trans ? m_batch : d_size_, x_out, x_trans ? m_batch : x_size_, (T)0.0,
+      grad_buffer, d_size_);
+
+  const int total_size = x_size_ * d_size_;
+  pulsed_device->doInfiniteGranularityUpdate(
+      dev_weights, grad_buffer, context_->getRandomStates(total_size));
+
+  context_->template releaseSharedBuffer<T>(RPU_BUFFER_TEMP_0);
+  context_->template releaseSharedBuffer<T>(RPU_BUFFER_OUT);
+  context_->template releaseSharedBuffer<T>(RPU_BUFFER_IN);
+}
+
+template <typename T>
 bool PulsedWeightUpdater<T>::checkForFPUpdate(
     AbstractRPUDeviceCuda<T> *rpucuda_device_in, const PulsedUpdateMetaParameter<T> &up) {
 
@@ -358,6 +396,16 @@ void PulsedWeightUpdater<T>::update(
   // safe because of isPulsedDevice
   PulsedRPUDeviceCudaBase<T> *rpucuda_device =
       static_cast<PulsedRPUDeviceCudaBase<T> *>(rpucuda_device_in);
+
+  // Infinite granularity mode (dw_min=0): exact mean-field update
+  if (rpucuda_device->getWeightGranularity() <= (T)0.0) {
+    auto *pulsed_device = static_cast<PulsedRPUDeviceCuda<T> *>(rpucuda_device);
+    T abs_lr = lr < (T)0.0 ? -lr : lr;
+    doInfiniteGranularityUpdate(
+        x_in, d_in, pulsed_device, dev_weights, abs_lr, m_batch, x_trans, d_trans);
+    return;
+  }
+
   bool force_tuning = false;
 
   // check need for init (or re-init)
@@ -428,6 +476,9 @@ void PulsedWeightUpdater<T>::update(
   template void PulsedWeightUpdater<NUM_T>::doDirectUpdate(                                        \
       XITERT, DITERT, AbstractRPUDeviceCuda<NUM_T> *, NUM_T *, const NUM_T,                        \
       const PulsedUpdateMetaParameter<NUM_T> &, const int, const bool, const bool, const NUM_T);   \
+  template void PulsedWeightUpdater<NUM_T>::doInfiniteGranularityUpdate(                           \
+      XITERT, DITERT, PulsedRPUDeviceCuda<NUM_T> *, NUM_T *, const NUM_T, const int, const bool,   \
+      const bool);                                                                                 \
   template void PulsedWeightUpdater<NUM_T>::tuneUpdate(                                            \
       pwukp_t<NUM_T> &, pwukpvec_t<NUM_T> &, XITERT, DITERT, NUM_T *,                              \
       PulsedRPUDeviceCudaBase<NUM_T> *, const PulsedUpdateMetaParameter<NUM_T> &, const NUM_T,     \

@@ -588,6 +588,40 @@ template <typename T> void PulsedRPUDevice<T>::applyUpdateWriteNoise(T **weights
 }
 
 /*********************************************************************************/
+/* infinite granularity update (dw_min=0 mean-field limit) */
+
+template <typename T>
+void PulsedRPUDevice<T>::doInfiniteGranularityUpdate(
+    T **weights,
+    const T *x_input,
+    int x_inc,
+    const T *d_input,
+    int d_inc,
+    T learning_rate,
+    RNG<T> *rng) {
+  UNUSED(rng);
+  // Default implementation: ConstantStep response (no weight dependence).
+  // Devices with weight-dependent response (LinearStep, ExpStep, PowStep, etc.)
+  // override this method.
+  for (int i = 0; i < this->d_size_; i++) {
+    T d_val = d_input[i * d_inc];
+    if (d_val == (T)0.0) {
+      continue;
+    }
+    T *w = weights[i];
+    T *max_bound = w_max_bound_[i];
+    T *min_bound = w_min_bound_[i];
+    IG_UPDATE_W_LOOP_INNER(
+      T sd = w_scale_down_[i][j] * abs_G_lr;
+      T su = w_scale_up_[i][j] * abs_G_lr;
+      w[j] += (sign > 0) ? -sd : su;
+      w[j] = MIN(w[j], max_bound[j]);
+      w[j] = MAX(w[j], min_bound[j]);
+    );
+  }
+}
+
+/*********************************************************************************/
 /* populate */
 
 template <typename T>
@@ -603,7 +637,14 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
   T up_bias = up_down > (T)0.0 ? (T)0.0 : up_down;
   T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
 
+  // Infinite granularity mode: when dw_min=0, use dw_min=1 for scale
+  // computation (unit response) and disable dw_min d-to-d variation.
+  T effective_dw_min = par.dw_min;
   T gain_std = par.dw_min_dtod;
+  if (par.dw_min == (T)0.0) {
+    effective_dw_min = (T)1.0;
+    gain_std = (T)0.0;
+  }
 
   // par.w_min = -(T)fabsf(par.w_min);
   // par.w_max = (T)fabsf(par.w_max);
@@ -625,8 +666,8 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
       }
 
       T r = up_down_std * rng->sampleGauss();
-      w_scale_up_[i][j] = (up_bias + gain + r) * par.dw_min; // to reduce mults in updates
-      w_scale_down_[i][j] = (down_bias + gain - r) * par.dw_min;
+      w_scale_up_[i][j] = (up_bias + gain + r) * effective_dw_min; // to reduce mults in updates
+      w_scale_down_[i][j] = (down_bias + gain - r) * effective_dw_min;
 
       // enforce consistency
       if (par.enforce_consistency) {
@@ -697,8 +738,8 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
 
       // perfect bias
       if ((par.perfect_bias) && (j == this->x_size_ - 1)) {
-        w_scale_up_[i][j] = par.dw_min;
-        w_scale_down_[i][j] = par.dw_min;
+        w_scale_up_[i][j] = effective_dw_min;
+        w_scale_down_[i][j] = effective_dw_min;
         w_min_bound_[i][j] = (T)100. * par.w_min; // essentially no bound
         w_max_bound_[i][j] = (T)100. * par.w_max; // essentially no bound
       }

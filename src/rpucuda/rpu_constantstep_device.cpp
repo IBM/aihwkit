@@ -77,6 +77,19 @@ void ConstantStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG
   );
 }
 
+template <typename T>
+void ConstantStepRPUDevice<T>::doInfiniteGranularityUpdate(
+    T **weights,
+    const T *x_input,
+    int x_inc,
+    const T *d_input,
+    int d_inc,
+    T learning_rate,
+    RNG<T> *rng) {
+  PulsedRPUDevice<T>::doInfiniteGranularityUpdate(
+      weights, x_input, x_inc, d_input, d_inc, learning_rate, rng);
+}
+
 template class ConstantStepRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class ConstantStepRPUDevice<double>;
