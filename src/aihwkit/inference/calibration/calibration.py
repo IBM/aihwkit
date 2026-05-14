@@ -6,7 +6,7 @@
 
 """Calibration for inference."""
 
-from typing import Optional, Dict, Tuple, TYPE_CHECKING
+from typing import Optional, Dict, Tuple, TYPE_CHECKING, cast
 from collections.abc import Iterator
 from functools import partial
 from enum import Enum
@@ -177,8 +177,8 @@ def calibrate_input_ranges(
     if not isinstance(model, AnalogLayerBase) or not isinstance(model, Module):
         raise ArgumentError("Expect an analog module")
 
-    was_training = model.training
-    model = model.eval()
+    was_training = cast(Module, model).training
+    model = cast(Module, model).eval()
     handles = []
     is_perfect_dic = {}
     cache = {}  # type: Dict[str, Tensor]
@@ -298,7 +298,7 @@ def calibrate_input_ranges(
         rpu_config.pre_post.input_range.calibration_info = calibration_type.value
 
     if was_training:
-        model = model.train()
+        model = cast(Module, model).train()
 
 
 def calibrate_quantization_ranges(
