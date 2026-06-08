@@ -37,7 +37,7 @@ A series of primitives and features that allow using the toolkit within
 
 ### Analog devices simulator
 
-A high-performant (CUDA-capable) C++ simulator that allows for
+A high-performant (CUDA- and ROCm/HIP-capable) C++ simulator that allows for
 simulating a wide range of analog devices and crossbar configurations
 by using abstract functional models of material characteristics with
 adjustable parameters. Features include:
