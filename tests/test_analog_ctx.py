@@ -7,13 +7,15 @@
 # pylint: disable=too-many-locals, no-member
 """Tests for AnalogContext data attribution (PR #717).
 
-Verifies that analog_ctx.data reflects the actual weight matrix stored in the
-tile, rather than being an empty scalar tensor.
+Verifies that analog_ctx.data exposes the logical weight matrix used by the
+tile, rather than being an empty scalar tensor or raw tile-only storage.
 """
 
 from unittest import SkipTest
 
-from torch import zeros, randn, allclose, Tensor, Size, manual_seed
+import torch
+from torch import zeros, randn, rand_like, allclose, Tensor, Size, device, manual_seed
+from torch.cuda import device_count, device as cuda_device
 from torch.nn import Parameter
 from torch.nn import Linear as TorchLinear, Sequential, Conv2d as TorchConv2d
 
@@ -59,18 +61,18 @@ class AnalogCtxDataAttributionTest(ParametrizedTestCase):
         self.assertEqual(len(ctx.size()), 2)
 
         expected_rows = tile.out_size
-        in_size = tile.in_size + (1 if tile.analog_bias else 0)
-        self.assertEqual(ctx.size(), Size([expected_rows, in_size]))
+        self.assertEqual(ctx.size(), Size([expected_rows, tile.in_size]))
 
     def test_ctx_data_values_match_tile_weights(self):
-        """analog_ctx.data must reflect the actual tile weights."""
+        """analog_ctx.data must reflect the logical tile weights."""
         model = self.get_layer(in_features=4, out_features=6)
         tile = self._get_analog_tile(model)
 
-        weights_from_tile = tile.tile.get_weights()
-        ctx_data = tile.analog_ctx.data
+        weights_from_tile, _ = tile.get_weights()
+        ctx_data = tile.analog_ctx.data.detach().cpu()
 
         self.assertEqual(ctx_data.shape, weights_from_tile.shape)
+        self.assertTrue(allclose(ctx_data, weights_from_tile))
 
     def test_ctx_norm_is_meaningful(self):
         """analog_ctx.norm() should reflect the weight magnitude, not 1.0."""
@@ -119,9 +121,10 @@ class AnalogCtxDataAttributionTest(ParametrizedTestCase):
         new_bias = randn(tile.out_size) if tile.analog_bias else None
         tile.set_weights(new_weight, new_bias)
 
-        # ctx should still have a valid non-scalar shape
+        # ctx should still have a valid logical non-scalar shape and value.
         self.assertNotEqual(tile.analog_ctx.size(), Size([]))
-        self.assertEqual(len(tile.analog_ctx.size()), 2)
+        self.assertEqual(tile.analog_ctx.size(), Size([tile.out_size, tile.in_size]))
+        self.assertTrue(allclose(tile.analog_ctx.data.detach().cpu(), tile.get_weights()[0]))
 
 
 @parametrize_over_layers(
@@ -143,7 +146,7 @@ class AnalogCtxDataAttributionCudaTest(ParametrizedTestCase):
 
         self.assertTrue(tile.analog_ctx.is_cuda)
         self.assertNotEqual(tile.analog_ctx.size(), Size([]))
-        self.assertEqual(len(tile.analog_ctx.size()), 2)
+        self.assertEqual(tile.analog_ctx.size(), Size([tile.out_size, tile.in_size]))
 
     def test_ctx_device_after_cuda(self):
         """analog_ctx.device should be CUDA after .cuda()."""
@@ -179,6 +182,48 @@ class AnalogCtxBackwardCompatibilityTest(ParametrizedTestCase):
 
         model2 = AnalogLinear(4, 6, bias=True, rpu_config=FloatingPointRPUConfig())
         model2.load_state_dict(state, strict=True, load_rpu_config=False)
+
+    def test_missing_analog_state_non_strict_skips_ctx_copy(self):
+        """Non-strict load should not copy into the read-only analog context."""
+        model = AnalogLinear(4, 6, bias=True, rpu_config=FloatingPointRPUConfig())
+        state = model.state_dict()
+        for key in list(state.keys()):
+            if key.endswith("analog_tile_state"):
+                del state[key]
+
+        model.load_state_dict(state, strict=False, load_rpu_config=False)
+
+
+class AnalogCtxStateDictLoadTest(ParametrizedTestCase):
+    """Tests for analog state restoration with read-only contexts."""
+
+    use_cuda = False
+
+    def test_inference_tile_load_restores_raw_weights(self):
+        """Loading analog_tile_state should update shared raw tile backing."""
+        source = AnalogLinear(4, 2, bias=False, rpu_config=InferenceRPUConfig())
+        target = AnalogLinear(4, 2, bias=False, rpu_config=InferenceRPUConfig())
+
+        source.set_weights(randn(2, 4), None)
+        saved_raw = next(source.analog_tiles()).tile.get_weights().clone()
+
+        target.load_state_dict(source.state_dict(), load_rpu_config=False)
+        loaded_raw = next(target.analog_tiles()).tile.get_weights()
+
+        self.assertTrue(allclose(loaded_raw, saved_raw))
+
+    def test_square_tile_load_does_not_transpose_cpu_weights(self):
+        """Square CPU tile state should not be mistaken for CUDA layout."""
+        source = AnalogLinear(3, 3, bias=False, rpu_config=FloatingPointRPUConfig())
+        target = AnalogLinear(3, 3, bias=False, rpu_config=FloatingPointRPUConfig())
+
+        source.set_weights(randn(3, 3), None)
+        saved_raw = next(source.analog_tiles()).tile.get_weights().clone()
+
+        target.load_state_dict(source.state_dict(), load_rpu_config=False)
+        loaded_raw = next(target.analog_tiles()).tile.get_weights()
+
+        self.assertTrue(allclose(loaded_raw, saved_raw))
 
 
 class AnalogCtxConversionTest(ParametrizedTestCase):
@@ -232,6 +277,31 @@ class AnalogCtxDevicePropertyTest(ParametrizedTestCase):
 
         self.assertEqual(tile.device.type, "cuda")
         self.assertTrue(tile.is_cuda)
+
+    def test_ctx_device_properties_do_not_read_logical_weights(self):
+        """Device metadata should use raw backing without calling get_scales()."""
+        model = AnalogLinear(4, 6, rpu_config=FloatingPointRPUConfig())
+        tile = next(model.analog_tiles())
+
+        def fail_get_scales():
+            raise AssertionError("get_scales should not be called for device metadata")
+
+        tile.get_scales = fail_get_scales
+        self.assertEqual(tile.analog_ctx.device.type, "cpu")
+        self.assertFalse(tile.analog_ctx.is_cuda)
+        self.assertEqual(tile.analog_ctx.dtype, tile.analog_ctx._raw_data().dtype)
+
+    def test_ctx_is_leaf_uses_raw_backing_with_learned_out_scaling(self):
+        """Optimizer construction should not see ctx as a logical non-leaf tensor."""
+        from aihwkit.optim import AnalogSGD
+
+        rpu_config = InferenceRPUConfig()
+        rpu_config.mapping.learn_out_scaling = True
+        model = AnalogLinear(4, 6, bias=False, rpu_config=rpu_config)
+        ctx = next(model.analog_tiles()).analog_ctx
+
+        self.assertTrue(ctx.is_leaf)
+        AnalogSGD(model.parameters(), lr=0.1)
 
 
 class AnalogCtxSyncAfterSetWeightsTest(ParametrizedTestCase):
@@ -421,8 +491,8 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
     """Tests that C++ tiles use zero-copy shared weights with analog_ctx.
 
     After ``_bind_shared_weights``, the C++ tile's internal weight storage
-    and ``analog_ctx.data`` share the same memory.  ``tile.update()`` and
-    ``tile.set_weights()`` must be visible through the shared tensor
+    and the private ``analog_ctx._raw_data()`` share the same memory.
+    ``tile.update()`` and ``tile.set_weights()`` must be visible through the shared tensor
     without any explicit sync call.
     """
 
@@ -446,35 +516,35 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
         self.assertIsNone(tile._shared_weight_tensor,
                           "Python tile should not use shared weight tensor")
 
-    def test_ctx_data_shares_memory_with_cpp_tile(self):
-        """analog_ctx.data and _shared_weight_tensor should share memory."""
+    def test_raw_context_shares_memory_with_cpp_tile(self):
+        """analog_ctx._raw_data() and _shared_weight_tensor should share memory."""
         tile = self._get_tile(FloatingPointRPUConfig())
-        ctx_ptr = tile.analog_ctx.data.data_ptr()
+        ctx_ptr = tile.analog_ctx._raw_data().data_ptr()
         shared_ptr = tile._shared_weight_tensor.data_ptr()
         self.assertEqual(ctx_ptr, shared_ptr,
-                         "analog_ctx.data and shared tensor should have same data_ptr")
+                         "analog_ctx raw data and shared tensor should have same data_ptr")
 
     def test_update_reflects_in_ctx_without_sync(self):
         """After tile.update(), analog_ctx.data should reflect changes (zero-copy)."""
         tile = self._get_tile(FloatingPointRPUConfig())
         tile.tile.set_learning_rate(0.1)
 
-        snapshot = tile.analog_ctx.data.detach().clone()
+        snapshot = tile.analog_ctx._raw_data().detach().clone()
 
         x = randn(1, 4)
         d = randn(1, 6)
         tile.tile.update(x, d, False)
 
-        # analog_ctx.data should have changed without explicit sync
+        # raw context backing should have changed without explicit sync
         self.assertFalse(
-            allclose(tile.analog_ctx.data.detach(), snapshot),
-            "analog_ctx.data should change after tile.update() without sync")
+            allclose(tile.analog_ctx._raw_data().detach(), snapshot),
+            "analog_ctx raw data should change after tile.update() without sync")
 
         # And it should match get_weights()
         w_from_tile = tile.tile.get_weights()
         self.assertTrue(
             allclose(tile.analog_ctx.data.detach(), w_from_tile),
-            "analog_ctx.data should match get_weights() after update")
+            "analog_ctx.data should match logical get_weights() after update")
 
     def test_set_weights_reflects_in_ctx_without_sync(self):
         """After tile.set_weights(), analog_ctx.data should reflect changes."""
@@ -499,7 +569,7 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
             w_from_tile = tile.tile.get_weights()
             self.assertTrue(
                 allclose(tile.analog_ctx.data.detach(), w_from_tile),
-                "analog_ctx.data drifted from tile weights during updates")
+                "analog_ctx.data drifted from logical tile weights during updates")
 
     def test_get_weights_ref_returns_shared_tensor(self):
         """_get_tile_weights_ref should return the shared tensor for C++ tiles."""
@@ -552,228 +622,201 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
 
 
 class AnalogCtxReadOnlyTest(ParametrizedTestCase):
-    """Tests for ReadOnlyWeightView and the readonly flag on AnalogContext."""
+    """Tests for the always-read-only logical AnalogContext view."""
 
     use_cuda = False
 
-    def _make_model(self, readonly=True):
-        """Create an AnalogLinear model with the given readonly setting."""
-        rpu_config = TorchInferenceRPUConfig()
-        rpu_config.mapping.readonly_weights = readonly
-        return AnalogLinear(4, 6, bias=False, rpu_config=rpu_config)
+    def _make_model(self, bias=False, analog_bias=False):
+        """Create an AnalogLinear model for context tests."""
+        rpu_config = FloatingPointRPUConfig() if analog_bias else TorchInferenceRPUConfig()
+        if analog_bias:
+            rpu_config.mapping.digital_bias = False
+        return AnalogLinear(4, 6, bias=bias, rpu_config=rpu_config)
 
-    def _get_ctx(self, model):
+    def _get_tile_and_ctx(self, model):
         tile = next(model.analog_tiles())
-        return tile.analog_ctx
+        return tile, tile.analog_ctx
 
-    # -- default behaviour ----------------------------------------------------
+    # -- public logical read view ---------------------------------------------
 
-    def test_default_readonly_true(self):
-        """By default, analog_ctx.data should be a ReadOnlyWeightView."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-        self.assertTrue(ctx.readonly)
+    def test_ctx_has_no_readonly_flag(self):
+        """The public readonly switch was removed."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+        self.assertFalse(hasattr(ctx, "readonly"))
+
+    def test_ctx_data_is_always_readonly_view(self):
+        """analog_ctx.data should always be a ReadOnlyWeightView."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
         self.assertIsInstance(ctx.data, ReadOnlyWeightView)
 
-    def test_default_readonly_false_via_config(self):
-        """Setting readonly_weights=False in config should disable protection."""
-        model = self._make_model(readonly=False)
-        ctx = self._get_ctx(model)
-        self.assertFalse(ctx.readonly)
-        self.assertNotIsInstance(ctx.data, ReadOnlyWeightView)
-
-    # -- read operations work transparently -----------------------------------
-
-    def test_read_ops_work_when_readonly(self):
-        """size, norm, nonzero, comparisons should all work on readonly data."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
+    def test_read_ops_use_logical_data(self):
+        """size, norm, detach, nonzero, comparisons all use logical weights."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        tile.set_scales(2.0)
+        logical_weight, _ = tile.get_weights()
 
         self.assertEqual(ctx.size(), Size([6, 4]))
-        self.assertGreater(ctx.norm().item(), 0.0)
+        self.assertEqual(ctx.shape, Size([6, 4]))
+        self.assertTrue(allclose(ctx.detach().cpu(), logical_weight))
+        self.assertAlmostEqual(ctx.norm().item(), logical_weight.norm().item(), places=5)
         self.assertGreater(len(ctx.nonzero()), 0)
         mask = ctx > 10
         self.assertEqual(mask.shape, ctx.shape)
 
-    # -- in-place ops blocked when readonly -----------------------------------
+    def test_scaled_context_returns_logical_weight(self):
+        """Scaled tiles expose scaled logical weights, not raw tile weights."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        tile.set_scales(2.0)
 
-    def test_add_inplace_blocked(self):
-        """ctx.data.add_() should raise RuntimeError when readonly."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-        with self.assertRaises(RuntimeError):
-            ctx.data.add_(1.0)
+        logical_weight = tile.get_weights()[0]
+        raw_weight = tile.get_weights(apply_weight_scaling=False)[0]
 
-    def test_mul_inplace_blocked(self):
-        """ctx.data.mul_() should raise RuntimeError when readonly."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-        with self.assertRaises(RuntimeError):
-            ctx.data.mul_(2.0)
+        self.assertIsInstance(ctx.data, ReadOnlyWeightView)
+        self.assertTrue(allclose(ctx.data.detach().cpu(), logical_weight))
+        self.assertFalse(allclose(ctx.data.detach().cpu(), raw_weight))
 
-    def test_copy_inplace_blocked(self):
-        """ctx.data.copy_() should raise RuntimeError when readonly."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-        with self.assertRaises(RuntimeError):
-            ctx.data.copy_(randn(6, 4))
+    def test_setting_scale_changes_ctx_data(self):
+        """Manually setting scales should update logical ctx.data values."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        before = ctx.data.detach().clone()
 
-    def test_fill_inplace_blocked(self):
-        """ctx.data.fill_() should raise RuntimeError when readonly."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-        with self.assertRaises(RuntimeError):
-            ctx.data.fill_(0.0)
+        tile.set_scales(2.0)
 
-    def test_zero_inplace_blocked(self):
-        """ctx.data.zero_() should raise RuntimeError when readonly."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
+        after = ctx.data.detach()
+        w_from_tile, _ = tile.get_weights()
+        self.assertFalse(allclose(after, before))
+        self.assertTrue(allclose(after, before * 2.0))
+        self.assertTrue(allclose(after.cpu(), w_from_tile))
+
+    def test_analog_bias_column_is_not_exposed(self):
+        """analog_bias=True should not expose the raw bias column through ctx.data."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model(bias=True, analog_bias=True))
+        self.assertTrue(tile.analog_bias)
+        self.assertEqual(ctx.data.shape, Size([tile.out_size, tile.in_size]))
+        self.assertEqual(
+            tile.analog_ctx._raw_data().shape,
+            Size([tile.out_size, tile.in_size + 1]),
+        )
+
+        new_weight = randn(tile.out_size, tile.in_size)
+        new_bias = randn(tile.out_size)
+        tile.set_weights(new_weight, new_bias)
+        self.assertTrue(allclose(ctx.data.detach().cpu(), tile.get_weights()[0]))
+
+    # -- direct writes are always blocked --------------------------------------
+
+    def test_data_inplace_ops_blocked(self):
+        """ctx.data in-place ops should raise RuntimeError."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+        for op in [
+            lambda: ctx.data.add_(1.0),
+            lambda: ctx.data.mul_(2.0),
+            lambda: ctx.data.copy_(randn(6, 4)),
+            lambda: ctx.data.fill_(0.0),
+            lambda: ctx.data.zero_(),
+        ]:
+            with self.subTest(op=op):
+                with self.assertRaises(RuntimeError):
+                    op()
+
+    def test_context_inplace_ops_blocked(self):
+        """Direct in-place ops on ctx should raise RuntimeError."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.requires_grad = False
+        snapshot = ctx.data.detach().clone()
+
         with self.assertRaises(RuntimeError):
-            ctx.data.zero_()
+            ctx.add_(1.0)
+        with self.assertRaises(RuntimeError):
+            ctx.copy_(snapshot)
+
+        self.assertTrue(allclose(ctx.data.detach(), snapshot))
+
+    def _assert_out_writes_blocked(self, ctx):
+        """Assert that torch out= cannot target ctx or ctx.data."""
+        ctx.requires_grad = False
+        raw_snapshot = ctx._raw_data().detach().clone()
+        logical_snapshot = ctx.data.detach().clone()
+        lhs = torch.ones(ctx.shape, dtype=ctx.dtype, device=ctx.device)
+        rhs = torch.ones(ctx.shape, dtype=ctx.dtype, device=ctx.device)
+
+        for out in [ctx, ctx.data]:
+            with self.subTest(out_type=type(out).__name__):
+                with self.assertRaises(RuntimeError):
+                    torch.add(lhs, rhs, out=out)
+                self.assertTrue(allclose(ctx._raw_data().detach(), raw_snapshot))
+                self.assertTrue(allclose(ctx.data.detach(), logical_snapshot))
+
+    def test_out_kwarg_writes_blocked_without_scaling(self):
+        """out= writes must not bypass read-only weights without scaling."""
+        rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+        tile, ctx = self._get_tile_and_ctx(
+            AnalogLinear(4, 6, bias=False, rpu_config=rpu_config)
+        )
+
+        self.assertIsNone(tile.get_scales())
+        self._assert_out_writes_blocked(ctx)
+
+    def test_out_kwarg_writes_blocked_with_scaling(self):
+        """out= writes must fail instead of silently writing to a temporary."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        tile.set_scales(2.0)
+
+        self.assertIsNotNone(tile.get_scales())
+        self._assert_out_writes_blocked(ctx)
+
+    def test_copy_from_context_to_external_tensor_allowed(self):
+        """copy_ may read from ctx or ctx.data when the destination is external."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+        expected = ctx.data.detach().clone()
+
+        for source in [ctx, ctx.data]:
+            with self.subTest(source_type=type(source).__name__):
+                destination = torch.empty_like(expected)
+                destination.copy_(source)
+                self.assertTrue(allclose(destination, expected))
 
     def test_setitem_blocked(self):
-        """ctx.data[0, 0] = ... should raise RuntimeError when readonly."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
+        """Item assignment through ctx or ctx.data should raise RuntimeError."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+        snapshot = ctx.data.detach().clone()
+
         with self.assertRaises(RuntimeError):
             ctx.data[0, 0] = 999.0
-
-    # -- in-place ops allowed when writable -----------------------------------
-
-    def test_add_inplace_allowed_when_not_readonly(self):
-        """ctx.data.add_() should work when readonly=False."""
-        model = self._make_model(readonly=False)
-        ctx = self._get_ctx(model)
-        ctx.data.add_(1.0)  # should not raise
-
-    def test_setitem_allowed_when_not_readonly(self):
-        """ctx.data[0,0] = ... should work when readonly=False."""
-        model = self._make_model(readonly=False)
-        ctx = self._get_ctx(model)
-        ctx.data[0, 0] = 999.0  # should not raise
-
-    # -- flag toggling --------------------------------------------------------
-
-    def test_toggle_readonly_on(self):
-        """Switching readonly from False to True should wrap data."""
-        model = self._make_model(readonly=False)
-        ctx = self._get_ctx(model)
-        self.assertNotIsInstance(ctx.data, ReadOnlyWeightView)
-
-        ctx.readonly = True
-        self.assertIsInstance(ctx.data, ReadOnlyWeightView)
         with self.assertRaises(RuntimeError):
-            ctx.data.add_(1.0)
+            ctx[0, 0] = 999.0
 
-    def test_toggle_readonly_off(self):
-        """Switching readonly from True to False should unwrap data."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
+        self.assertTrue(allclose(ctx.data.detach(), snapshot))
+
+    def test_data_assignment_blocked(self):
+        """ctx.data rebinding should raise RuntimeError."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+        snapshot = ctx.data.detach().clone()
+
+        with self.assertRaisesRegex(RuntimeError, "Direct replacement"):
+            ctx.data = rand_like(ctx.data)
+
         self.assertIsInstance(ctx.data, ReadOnlyWeightView)
+        self.assertTrue(allclose(ctx.data.detach(), snapshot))
 
-        ctx.readonly = False
-        self.assertNotIsInstance(ctx.data, ReadOnlyWeightView)
-        ctx.data.add_(1.0)  # should not raise
+    def test_public_write_escape_apis_removed(self):
+        """Old direct-write escape hatches should not exist."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+        self.assertFalse(hasattr(ctx, "set_data"))
+        self.assertFalse(hasattr(ctx, "writable"))
+        self.assertFalse(hasattr(ctx, "readonly"))
+        self.assertFalse(hasattr(TorchInferenceRPUConfig().mapping, "readonly_weights"))
 
-    # -- context manager ------------------------------------------------------
-
-    def test_writable_context_manager(self):
-        """writable() should temporarily allow in-place ops."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-
-        with ctx.writable():
-            self.assertFalse(ctx.readonly)
-            ctx.data.add_(1.0)  # should not raise
-
-        # Readonly restored
-        self.assertTrue(ctx.readonly)
-        with self.assertRaises(RuntimeError):
-            ctx.data.add_(1.0)
-
-    def test_writable_context_manager_restores_on_exception(self):
-        """writable() should restore readonly even if an exception occurs."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-
-        try:
-            with ctx.writable():
-                raise ValueError("test exception")
-        except ValueError:
-            pass
-
-        self.assertTrue(ctx.readonly)
-
-    # -- data assignment auto-wraps -------------------------------------------
-
-    def test_data_assignment_auto_wraps(self):
-        """Assigning to ctx.data should auto-wrap when readonly=True."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-
-        ctx.data = randn(6, 4)
-        self.assertIsInstance(ctx.data, ReadOnlyWeightView)
-
-    def test_data_assignment_no_wrap_when_writable(self):
-        """Assigning to ctx.data should NOT wrap when readonly=False."""
-        model = self._make_model(readonly=False)
-        ctx = self._get_ctx(model)
-
-        ctx.data = randn(6, 4)
-        self.assertNotIsInstance(ctx.data, ReadOnlyWeightView)
-
-    # -- set_data respects readonly -------------------------------------------
-
-    def test_set_data_works_when_readonly(self):
-        """set_data() should succeed even when readonly (uses assignment)."""
-        model = self._make_model(readonly=True)
-        ctx = self._get_ctx(model)
-
-        new_data = randn(6, 4)
-        ctx.set_data(new_data)
-        self.assertIsInstance(ctx.data, ReadOnlyWeightView)
-        self.assertTrue(allclose(ctx.data.detach(), new_data))
-
-    # -- convert_to_analog readonly parameter ---------------------------------
-
-    def test_convert_to_analog_readonly_override_false(self):
-        """convert_to_analog(readonly=False) should set all ctx.readonly=False."""
+    def test_convert_to_analog_readonly_argument_removed(self):
+        """convert_to_analog(readonly=...) should no longer be accepted."""
         digital_model = Sequential(TorchLinear(8, 4), TorchLinear(4, 2))
-        analog_model = convert_to_analog(
-            digital_model, TorchInferenceRPUConfig(),
-            ensure_analog_root=False, readonly=False,
-        )
-        for param in analog_model.parameters():
-            if isinstance(param, AnalogContext):
-                self.assertFalse(param.readonly)
-                self.assertNotIsInstance(param.data, ReadOnlyWeightView)
-
-    def test_convert_to_analog_readonly_override_true(self):
-        """convert_to_analog(readonly=True) should set all ctx.readonly=True."""
-        rpu_config = TorchInferenceRPUConfig()
-        rpu_config.mapping.readonly_weights = False  # config says writable
-        digital_model = Sequential(TorchLinear(8, 4), TorchLinear(4, 2))
-        analog_model = convert_to_analog(
-            digital_model, rpu_config,
-            ensure_analog_root=False, readonly=True,
-        )
-        for param in analog_model.parameters():
-            if isinstance(param, AnalogContext):
-                self.assertTrue(param.readonly)
-                self.assertIsInstance(param.data, ReadOnlyWeightView)
-
-    def test_convert_to_analog_readonly_default_from_config(self):
-        """convert_to_analog() without readonly uses rpu_config.mapping value."""
-        rpu_config = TorchInferenceRPUConfig()
-        rpu_config.mapping.readonly_weights = False
-        digital_model = Sequential(TorchLinear(8, 4))
-        analog_model = convert_to_analog(
-            digital_model, rpu_config, ensure_analog_root=False,
-        )
-        for param in analog_model.parameters():
-            if isinstance(param, AnalogContext):
-                self.assertFalse(param.readonly)
+        with self.assertRaises(TypeError):
+            convert_to_analog(  # pylint: disable=unexpected-keyword-arg
+                digital_model,
+                TorchInferenceRPUConfig(),
+                ensure_analog_root=False,
+                readonly=False,
+            )
 
 
 class SharedWeightsCudaBindingTest(ParametrizedTestCase):
@@ -820,6 +863,26 @@ class SharedWeightsCudaBindingTest(ParametrizedTestCase):
                              rpu_config=FloatingPointRPUConfig()).cuda()
         tile = next(model.analog_tiles())
         self.assertEqual(tile._shared_weight_tensor.device.type, "cuda")
+
+    def test_shared_tensor_uses_nonzero_cuda_device(self):
+        """Rebinding should use the tile device, not the current CUDA context."""
+        self._skip_if_no_cuda()
+        if device_count() < 2:
+            raise SkipTest("Need at least two devices for this test")
+
+        target_device = device("cuda", 1)
+        model = AnalogLinear(8, 4, bias=False,
+                             rpu_config=FloatingPointRPUConfig()).cuda(target_device)
+        tile = next(model.analog_tiles())
+        expected_weights = tile.tile.get_weights().clone()
+
+        tile._shared_weight_tensor = None
+        with cuda_device(0):
+            tile._bind_shared_weights()
+
+        self.assertEqual(tile.device, target_device)
+        self.assertEqual(tile._shared_weight_tensor.device, target_device)
+        self.assertTrue(allclose(tile._shared_weight_tensor.t().cpu(), expected_weights))
 
     def test_shared_tensor_has_correct_values_after_cuda(self):
         """Shared tensor should contain actual weights, not zeros."""
@@ -1038,8 +1101,8 @@ class SharedWeightsCudaBindingTest(ParametrizedTestCase):
                              rpu_config=FloatingPointRPUConfig()).cuda()
         tile = next(model.analog_tiles())
 
-        self.assertTrue(hasattr(tile.tile, "get_weights_cuda"),
-                        "CudaFloatingPointTile should have get_weights_cuda binding")
+        if not hasattr(tile.tile, "get_weights_cuda"):
+            raise SkipTest("get_weights_cuda binding is not exposed in this build")
         out = tile.tile.get_weights_cuda()
         d = tile.tile.get_d_size()
         x = tile.tile.get_x_size()
@@ -1057,8 +1120,8 @@ class SharedWeightsCudaBindingTest(ParametrizedTestCase):
         """_get_tile_weights_ref should return a CUDA tensor in standard (d_size, x_size) layout.
 
         CUDA C++ tiles store weights in transposed layout (x_size, d_size).
-        _get_tile_weights_ref uses get_weights_cuda().t() so callers see the
-        standard (d_size, x_size) shape without a CPU round-trip.
+        _get_tile_weights_ref returns a standard (d_size, x_size) CUDA tensor,
+        either through shared weights or the optional get_weights_cuda fast path.
         """
         self._skip_if_no_cuda()
         model = AnalogLinear(8, 4, bias=False,

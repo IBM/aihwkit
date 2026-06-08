@@ -169,8 +169,10 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
                 self.tile = MAP_TILE_CLASS_TO_CUDA[self.tile.__class__](self.tile)
                 # CPU shared tensor is no longer valid for the new CUDA tile.
                 self._shared_weight_tensor = None
+                self.analog_ctx._replace_raw_data(self.tile.get_weights().cuda(device))
+                self.analog_ctx.reset(self)  # type: ignore
                 # Re-establish shared weight binding for the new CUDA tile,
-                # but only when not using the shared_weights DDP path.  When
+                # but only when not using the shared_weights DDP path. When
                 # shared_weights is set, ensure_shared_weights() (called on
                 # the first forward) handles populating dev_weights_ from
                 # self.shared_weights.data — calling _bind_shared_weights()
@@ -178,8 +180,7 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
                 # prevent that population step from running.
                 if self.shared_weights is None:
                     self._bind_shared_weights()
-                self.analog_ctx.data = self.tile.get_weights().cuda(device)
-                self.analog_ctx.reset(self)  # type: ignore
+                    self._sync_analog_ctx_weights()
 
             if self.shared_weights is not None:
                 self.shared_weights.data = zeros(

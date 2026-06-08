@@ -8,14 +8,18 @@
 
 # pylint: disable=attribute-defined-outside-init
 
-from contextlib import contextmanager
 from typing import Optional, Type, Union, Any, TYPE_CHECKING
 
-from torch import dtype, Tensor, no_grad
+from torch import dtype, Tensor
+from torch._C import DisableTorchFunction
 from torch.nn import Parameter
 from torch import device as torch_device
+from torch.utils._pytree import tree_map
 
-from aihwkit.optim.weight_view import ReadOnlyWeightView
+from aihwkit.optim.weight_view import (
+    ReadOnlyWeightView,
+    raise_if_readonly_write_target,
+)
 
 if TYPE_CHECKING:
     from aihwkit.simulator.tiles.base import SimulatorTileWrapper
@@ -24,32 +28,48 @@ if TYPE_CHECKING:
 class AnalogContext(Parameter):
     """Context for analog optimizer.
 
-    Note: `data` attribution, inherited from `torch.nn.Parameter`, is a tensor of training parameter
     If `analog_bias` (which is provided by `analog_tile`) is False,
         `data` has the same meaning as `torch.nn.Parameter`
     If `analog_bias` (which is provided by `analog_tile`) is True,
         The last column of `data` is the `bias` term
 
-    Even though it allows us to access the weights directly, always keep in mind that it is used
-        only for studying propuses. To simulate the real reading, call the `read_weights` method
-        instead, i.e. given `analog_ctx: AnalogContext`,
-        estimated_weights, estimated_bias = analog_ctx.analog_tile.read_weights()
+    Note: For diagnostic purposes, `AnalogContext` exposes a read-only logical weight view
+        through the `data` attribute, which is equivalent to `analog_tile.get_weights()[0]`.
+        This allows users to inspect the effective weights.
+    Direct tensor reads on ``ctx`` or ``ctx.data``, such as ``size()``, ``norm()`` are
+        equivalent to do so on ``ctx.analog_tile.get_weights()[0]``.
+        i.e, ctx.data == ctx.analog_tile.get_weights()[0]
 
-    Similarly, even though this feature allows us to update the weights directly,
-        always keep in mind that the real RPU devices change their weights only
-        by "pulse update" method.
+    The `data` attribution inherited from `torch.nn.Parameter` stores the raw tile weights,
+        i.e., the weights without scaling
+    Its public tensor value is a read-only logical weight view: ``physical weights x scaling``
+        # Example usage:
+        ---
+        layer = AnalogLinear(4, 3, bias=False, rpu_config=rpu_config)
+        analog_tile = layer.analog_module
+        analog_ctx = analog_tile.analog_ctx
+        weight = analog_tile.get_weights()[0]
 
-    Therefore, use the following update methods instead of
+        # The following two lines will print the same value:
+        analog_ctx.size()
+        analog_ctx.data.size()
+        weight.size()
+        ---
+    Since the changes of both weights and scaling affect the logical weights, 
+        we adopt the convetion that this logical view is read-only
+    Therefore, in-place operations, such as ``add_``, ``mul_``, etc, are blocked
+        ctx.data.add_(1.0)     # RuntimeError
+    Use the following update methods instead of
         writing `data` directly in the analog optimizer:
         ---
         analog_ctx.analog_tile.update(...)
         analog_ctx.analog_tile.update_indexed(...)
         ---
 
-    The ``readonly`` flag (default ``True``) causes ``.data`` reads to
-    return a :class:`~aihwkit.optim.weight_view.ReadOnlyWeightView`
-    that blocks in-place mutations.  Toggle it via the property or the
-    :meth:`writable` context manager.
+    Even though it allows us to access the weights directly, always keep in mind that it is used
+        only for diagnostic purposes. To simulate the real reading, call the `read_weights` method
+        instead, i.e. given `analog_ctx: AnalogContext`,
+        estimated_weights, estimated_bias = analog_ctx.analog_tile.read_weights()
     """
 
     def __new__(
@@ -65,11 +85,11 @@ class AnalogContext(Parameter):
                 data=weights_ref,
                 requires_grad=True,
             )
-        # analog_tile.tile can comes from different classes:
-        #   aihwkit.silulator.rpu_base.devices.AnalogTile (C++)
+        # analog_tile.tile can come from different classes:
+        #   aihwkit.simulator.rpu_base.devices.AnalogTile (C++)
         #   TorchInferenceTile (Python)
-        # It stores the "weight" matrix;
-        #   If analog_tile.analog_bias is True, it also stores the "bias" matrix
+        # It stores the raw tile matrix; if analog_tile.analog_bias is True,
+        # the last raw column stores the bias.
 
         parameter.__class__ = cls
         return parameter
@@ -78,7 +98,6 @@ class AnalogContext(Parameter):
         self, analog_tile: "SimulatorTileWrapper", parameter: Optional[Parameter] = None
     ):  # pylint: disable=unused-argument
         super().__init__()
-        self._readonly = self._default_readonly(analog_tile)
         self.analog_tile = analog_tile
         self.use_torch_update = False
         self.use_indexed = False
@@ -86,60 +105,91 @@ class AnalogContext(Parameter):
         self.analog_grad_output = []  # type: list
         self.reset(analog_tile)
 
-    # -- readonly flag --------------------------------------------------------
+    @classmethod
+    def __torch_function__(
+        cls, func: Any, _types: Any, args: Any = (), kwargs: Optional[Any] = None
+    ) -> Any:
+        kwargs = kwargs or {}
+        func_name = getattr(func, "__name__", "")
 
-    @staticmethod
-    def _default_readonly(analog_tile: "SimulatorTileWrapper") -> bool:
-        """Read the default ``readonly`` setting from ``rpu_config.mapping``."""
-        rpu_config = getattr(analog_tile, "rpu_config", None)
-        if rpu_config is not None:
-            mapping = getattr(rpu_config, "mapping", None)
-            if mapping is not None:
-                return getattr(mapping, "readonly_weights", True)
-        return True
+        def is_readonly(value: Any) -> bool:
+            return isinstance(value, (AnalogContext, ReadOnlyWeightView))
 
-    @property
-    def readonly(self) -> bool:
-        """Whether in-place modifications on ``data`` are blocked."""
+        raise_if_readonly_write_target(func_name, args, kwargs, is_readonly)
+
+        def to_logical_tensor(value: Any) -> Any:
+            if isinstance(value, AnalogContext):
+                return value._logical_data()
+            return value
+
+        args = tree_map(to_logical_tensor, args)
+        kwargs = tree_map(to_logical_tensor, kwargs)
+        return func(*args, **kwargs)
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        """Block direct item assignment."""
+        raise RuntimeError(
+            "Direct item assignment on analog weights is not allowed. "
+            "Use analog_tile.set_weights() instead."
+        )
+
+    def _raw_data(self) -> Tensor:
+        """Return the internal raw tile backing tensor."""
+        with DisableTorchFunction():  # pylint: disable=not-context-manager
+            return super().__getattribute__("data")
+
+    def _logical_data(self) -> Tensor:
+        """Return logical weights equivalent to ``analog_tile.get_weights()[0]``."""
+        raw = self._raw_data()
         try:
-            return object.__getattribute__(self, "_readonly")
+            analog_tile = object.__getattribute__(self, "analog_tile")
         except AttributeError:
-            return True
+            return raw
 
-    @readonly.setter
-    def readonly(self, value: bool) -> None:
-        self._readonly = value
+        logical = raw
+        if getattr(analog_tile, "analog_bias", False) and raw.dim() >= 2:
+            logical = raw[:, : analog_tile.in_size]
+
+        get_scales = getattr(analog_tile, "get_scales", None)
+        if get_scales is None:
+            return logical
+
+        scales = get_scales()
+        if scales is None:
+            return logical
+
+        scales = scales.to(device=logical.device, dtype=logical.dtype)
+        return logical * scales.view(-1, 1)
 
     def __getattribute__(self, name: str) -> Any:
-        """Intercept ``.data`` reads: return a :class:`ReadOnlyWeightView`
-        when ``readonly`` is ``True``, otherwise the raw tensor."""
+        """Intercept public tensor reads that expose the logical view."""
+        if name == "grad_fn":
+            return None
+        if name in ("device", "dtype", "grad", "is_cuda", "is_leaf", "layout"):
+            return getattr(self._raw_data(), name)
         if name == "data":
-            raw = super().__getattribute__(name)
-            try:
-                readonly = object.__getattribute__(self, "_readonly")
-            except AttributeError:
-                return raw
-            if readonly:
-                return ReadOnlyWeightView(raw)
-            return raw
+            return ReadOnlyWeightView(self._logical_data())
+        if name == "shape":
+            return self._logical_data().shape
+        if name == "ndim":
+            return self._logical_data().ndim
         return super().__getattribute__(name)
 
-    @contextmanager
-    def writable(self):
-        """Context manager that temporarily allows direct weight modification.
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Block user-level replacement of ``.data``."""
+        if name == "data":
+            raise RuntimeError(
+                "Direct replacement of analog_ctx.data is not allowed. "
+                "Use analog_tile.set_weights(new_weight) for programmatic writes."
+            )
+        super().__setattr__(name, value)
 
-        Example::
-
-            with analog_ctx.writable():
-                analog_ctx.data.add_(delta)
-            # readonly is restored automatically
-        """
-        old = self.readonly
-        self.readonly = False
-        try:
-            yield self
-        finally:
-            self.readonly = old
+    def _replace_raw_data(self, data: Tensor) -> None:
+        """Replace the internal raw ``Parameter.data`` for tile rebinding."""
+        if isinstance(data, ReadOnlyWeightView):
+            data = data.as_subclass(Tensor)
+        with DisableTorchFunction():  # pylint: disable=not-context-manager
+            super().__setattr__("data", data)
 
     # -- existing API ---------------------------------------------------------
 
@@ -147,19 +197,8 @@ class AnalogContext(Parameter):
         """Set the context to forward_indexed."""
         self.use_indexed = value
 
-    def set_data(self, data: Tensor) -> None:
-        """Set the data value of the Tensor."""
-        with no_grad():
-            # Unwrap source if it is a ReadOnlyWeightView so that
-            # copy_() does not trigger the in-place guard.
-            if isinstance(data, ReadOnlyWeightView):
-                data = data.as_writable()
-            # Access raw data directly (bypassing readonly wrap) to
-            # preserve storage sharing with the tile weight tensor.
-            super().__getattribute__("data").copy_(data)
-
     def get_data(self) -> Tensor:
-        """Get the data value of the underlying Tensor."""
+        """Get a detached logical weight tensor."""
         return self.data.detach()
 
     def reset(self, analog_tile: Optional["SimulatorTileWrapper"] = None) -> None:
@@ -179,11 +218,11 @@ class AnalogContext(Parameter):
     def __copy__(self) -> Parameter:
         """Turn off copying of the pointers. Context will be re-created
         when tile is created"""
-        return Parameter(super().__getattribute__("data"))
+        return Parameter(self._raw_data())
 
     def __deepcopy__(self, memo: Any) -> Parameter:
         """Turn off deep copying. Context will be re-created when tile is created"""
-        return Parameter(super().__getattribute__("data"))
+        return Parameter(self._raw_data())
 
     def cuda(self, device: Optional[Union[torch_device, str, int]] = None) -> "AnalogContext":
         """Move the context to a cuda device.
@@ -195,7 +234,7 @@ class AnalogContext(Parameter):
             This context in the specified device.
         """
         if not self.analog_tile.is_cuda:
-            self.data = self.analog_tile._get_tile_weights_ref()  # type: Tensor
+            self._replace_raw_data(self.analog_tile._get_tile_weights_ref())
             self.analog_tile = self.analog_tile.cuda(device)
             self.reset(self.analog_tile)
         return self
@@ -209,7 +248,7 @@ class AnalogContext(Parameter):
         Returns:
             self
         """
-        self.data = self.data.cpu()
+        self._replace_raw_data(self._raw_data().cpu())
         if self.analog_tile is not None and self.analog_tile.is_cuda:
             self.analog_tile = self.analog_tile.cpu()
             self.reset(self.analog_tile)
@@ -231,7 +270,7 @@ class AnalogContext(Parameter):
             This module in the specified device.
         """
         # pylint: disable=invalid-name
-        self.data = self.data.to(*args, **kwargs)
+        self._replace_raw_data(self._raw_data().to(*args, **kwargs))
         device = None
         if "device" in kwargs:
             device = kwargs["device"]

@@ -6,66 +6,88 @@
 
 """Read-only tensor view for analog tile weights."""
 
+from typing import Any, Callable, Optional
+
 from torch import Tensor
 from torch.utils._pytree import tree_map
 
 
+def is_inplace_operation(func_name: str) -> bool:
+    """Return whether ``func_name`` follows the PyTorch in-place convention."""
+    return func_name.endswith("_") and not func_name.endswith("__")
+
+
+def raise_readonly_error(func_name: str) -> None:
+    """Raise the standard read-only analog weight mutation error."""
+    raise RuntimeError(
+        f"  In-place operation '{func_name}' is not allowed on analog weights.\n"
+        f"  AnalogContext exposes an always-read-only logical weight view.\n"
+        f"  Direct writes would bypass the analog tile update semantics.\n"
+        f"  Please use the appropriate analog tile API to update weights:\n"
+        f"    - For programmatic writes: analog_tile.set_weights(new_weight)\n"
+        f"    - For gradient updates:    analog_tile.update(x_input, d_input)"
+    )
+
+
+def raise_if_readonly_write_target(
+    func_name: str,
+    args: Any,
+    kwargs: Any,
+    is_readonly: Callable[[Any], bool],
+) -> None:
+    """Raise if a read-only analog weight view is used as a write target."""
+    if is_inplace_operation(func_name) and args and is_readonly(args[0]):
+        raise_readonly_error(func_name)
+
+    if "out" not in kwargs:
+        return
+
+    def block_out_target(value: Any) -> Any:
+        if is_readonly(value):
+            raise_readonly_error(func_name)
+        return value
+
+    tree_map(block_out_target, kwargs["out"])
+
+
 class ReadOnlyWeightView(Tensor):
-    """A tensor that shares storage with tile weights but blocks in-place mutations.
+    """A tensor view that blocks in-place mutations on analog weights.
 
-    All read operations (``size``, ``norm``, ``sum``, indexing, comparisons, etc.)
-    work transparently because this IS a real tensor sharing the same memory.
-    In-place write operations raise ``RuntimeError`` with guidance to use the
-    correct analog tile API.
-
-    This class is stateless — it always blocks in-place operations. The policy
-    of whether to wrap or unwrap is managed by :class:`AnalogContext` via its
-    ``readonly`` flag.
+    This class is stateless — it always blocks in-place operations, such as ``add_``,
+    ``mul_``, etc, which raise ``RuntimeError``.
+    All read operations (``size``, ``norm``, ``sum``, indexing, comparisons,
+    etc.) work transparently.
     """
 
     @staticmethod
     def __new__(cls, data: Tensor) -> "ReadOnlyWeightView":
-        """Create a ReadOnlyWeightView sharing storage with ``data``."""
+        """Create a ReadOnlyWeightView sharing storage with ``data`` when possible."""
         if isinstance(data, ReadOnlyWeightView):
             return data
         return Tensor._make_subclass(cls, data)
 
     @classmethod
-    def __torch_function__(cls, func, types, args=(), kwargs=None):
+    def __torch_function__(
+        cls, func: Any, _types: Any, args: Any = (), kwargs: Optional[Any] = None
+    ) -> Any:
         kwargs = kwargs or {}
         func_name = getattr(func, "__name__", "")
 
-        # PyTorch convention: in-place ops end with single '_' (add_, mul_, ...)
-        # Dunder methods (__repr__, __eq__, ...) end with '__' and must pass through
-        if func_name.endswith("_") and not func_name.endswith("__"):
-            raise RuntimeError(
-                f"In-place operation '{func_name}' is not allowed on analog weights. "
-                f"Analog weights cannot be modified directly — this would bypass "
-                f"the physical constraints of the analog device.\n"
-                f"  - For programmatic writes: analog_tile.set_weights(new_weight)\n"
-                f"  - For gradient updates:    analog_tile.update(x_input, d_input)\n"
-                f"  - To unlock direct access: analog_ctx.readonly = False"
-            )
+        def is_readonly(value: Any) -> bool:
+            return isinstance(value, ReadOnlyWeightView)
 
-        # Unwrap to plain Tensor so downstream ops don't propagate our subclass
-        def unwrap(t):
+        raise_if_readonly_write_target(func_name, args, kwargs, is_readonly)
+
+        def unwrap(t: Any) -> Any:
             return t.as_subclass(Tensor) if isinstance(t, ReadOnlyWeightView) else t
 
         args = tree_map(unwrap, args)
         kwargs = tree_map(unwrap, kwargs)
         return func(*args, **kwargs)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: Any, value: Any) -> None:
         """Block item assignment (e.g., ``ctx.data[0, 0] = 999``)."""
         raise RuntimeError(
             "Direct item assignment on analog weights is not allowed. "
-            "Use analog_tile.set_weights() instead, "
-            "or set analog_ctx.readonly = False to unlock direct access."
+            "Use analog_tile.set_weights() instead."
         )
-
-    def as_writable(self) -> Tensor:
-        """Return the underlying plain Tensor (for internal tile use only).
-
-        This removes the read-only guard.  Only tile internals should call this.
-        """
-        return self.as_subclass(Tensor)
