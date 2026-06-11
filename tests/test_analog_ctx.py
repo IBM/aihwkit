@@ -7,8 +7,8 @@
 # pylint: disable=too-many-locals, no-member
 """Tests for AnalogContext data attribution (PR #717).
 
-Verifies that analog_ctx.data exposes the logical weight matrix used by the
-tile, rather than being an empty scalar tensor or raw tile-only storage.
+Verifies the public AnalogContext data modes: metadata-only placeholder,
+read-only logical data view, and independent digital buffer.
 """
 
 from unittest import SkipTest
@@ -23,13 +23,14 @@ from aihwkit.nn import AnalogLinear, AnalogConv2d
 from aihwkit.nn.conversion import convert_to_analog
 from aihwkit.optim.context import AnalogContext
 from aihwkit.optim.weight_view import ReadOnlyWeightView
+from aihwkit.simulator.parameters.enums import AnalogContextDataViewMode
 from aihwkit.simulator.configs import (
     FloatingPointRPUConfig,
     InferenceRPUConfig,
     SingleRPUConfig,
     TorchInferenceRPUConfig,
 )
-from aihwkit.simulator.configs.devices import ConstantStepDevice
+from aihwkit.simulator.configs.devices import ConstantStepDevice, SoftBoundsDevice
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Linear, LinearCuda, LinearMapped, LinearMappedCuda
@@ -64,9 +65,10 @@ class AnalogCtxDataAttributionTest(ParametrizedTestCase):
         self.assertEqual(ctx.size(), Size([expected_rows, tile.in_size]))
 
     def test_ctx_data_values_match_tile_weights(self):
-        """analog_ctx.data must reflect the logical tile weights."""
+        """data_view mode must reflect the logical tile weights."""
         model = self.get_layer(in_features=4, out_features=6)
         tile = self._get_analog_tile(model)
+        tile.analog_ctx.enable_data_view()
 
         weights_from_tile, _ = tile.get_weights()
         ctx_data = tile.analog_ctx.data.detach().cpu()
@@ -82,6 +84,7 @@ class AnalogCtxDataAttributionTest(ParametrizedTestCase):
 
         # With randomly initialized weights, the norm should be > 0
         # and should NOT be exactly 1.0 (which the old scalar ones(()) returned).
+        tile.analog_ctx.enable_data_view()
         norm_val = tile.analog_ctx.norm().item()
         self.assertGreater(norm_val, 0.0)
 
@@ -91,6 +94,7 @@ class AnalogCtxDataAttributionTest(ParametrizedTestCase):
         tile = self._get_analog_tile(model)
 
         # With random initialization, most weights are nonzero.
+        tile.analog_ctx.enable_data_view()
         nz = tile.analog_ctx.nonzero()
         self.assertGreater(len(nz), 0)
 
@@ -100,6 +104,7 @@ class AnalogCtxDataAttributionTest(ParametrizedTestCase):
         tile = self._get_analog_tile(model)
 
         # Weights are initialized near zero with std ~1, so most are < 10.
+        tile.analog_ctx.enable_data_view()
         mask = tile.analog_ctx > 10
         self.assertIsInstance(mask, Tensor)
         self.assertEqual(mask.shape, tile.analog_ctx.shape)
@@ -124,6 +129,7 @@ class AnalogCtxDataAttributionTest(ParametrizedTestCase):
         # ctx should still have a valid logical non-scalar shape and value.
         self.assertNotEqual(tile.analog_ctx.size(), Size([]))
         self.assertEqual(tile.analog_ctx.size(), Size([tile.out_size, tile.in_size]))
+        tile.analog_ctx.enable_data_view()
         self.assertTrue(allclose(tile.analog_ctx.data.detach().cpu(), tile.get_weights()[0]))
 
 
@@ -315,6 +321,7 @@ class AnalogCtxSyncAfterSetWeightsTest(ParametrizedTestCase):
         if use_cuda:
             model = model.cuda()
         tile = next(model.analog_tiles())
+        tile.analog_ctx.enable_data_view()
 
         new_w = randn(6, 4)
         tile.set_weights(new_w, None)
@@ -348,6 +355,7 @@ class AnalogCtxSyncAfterSetWeightsTest(ParametrizedTestCase):
         """ctx should stay in sync after multiple consecutive set_weights."""
         model = AnalogLinear(4, 6, bias=False, rpu_config=TorchInferenceRPUConfig())
         tile = next(model.analog_tiles())
+        tile.analog_ctx.enable_data_view()
 
         for _ in range(5):
             new_w = randn(6, 4)
@@ -370,6 +378,7 @@ class AnalogCtxSyncAfterSetWeightsTest(ParametrizedTestCase):
         # Move to CUDA
         model.cuda()
         tile = next(model.analog_tiles())
+        tile.analog_ctx.enable_data_view()
         w_cuda, _ = tile.get_weights()
         ctx_cuda = tile.analog_ctx.data.detach().cpu()
         self.assertTrue(allclose(ctx_cuda, w_cuda),
@@ -541,6 +550,7 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
             "analog_ctx raw data should change after tile.update() without sync")
 
         # And it should match get_weights()
+        tile.analog_ctx.enable_data_view()
         w_from_tile = tile.tile.get_weights()
         self.assertTrue(
             allclose(tile.analog_ctx.data.detach(), w_from_tile),
@@ -551,6 +561,7 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
         tile = self._get_tile(FloatingPointRPUConfig())
         new_w = randn(6, 4)
         tile.tile.set_weights(new_w)
+        tile.analog_ctx.enable_data_view()
 
         self.assertTrue(
             allclose(tile.analog_ctx.data.detach(), new_w),
@@ -566,6 +577,7 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
             d = randn(4, 6)
             tile.tile.update(x, d, False)
 
+            tile.analog_ctx.enable_data_view()
             w_from_tile = tile.tile.get_weights()
             self.assertTrue(
                 allclose(tile.analog_ctx.data.detach(), w_from_tile),
@@ -621,8 +633,8 @@ class AnalogCtxSharedWeightsZeroCopyTest(ParametrizedTestCase):
             "C++ tile: shared weight ref should match get_weights() after update")
 
 
-class AnalogCtxReadOnlyTest(ParametrizedTestCase):
-    """Tests for the always-read-only logical AnalogContext view."""
+class AnalogCtxDataViewModeTest(ParametrizedTestCase):
+    """Tests for AnalogContext public data view modes."""
 
     use_cuda = False
 
@@ -637,24 +649,74 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
         tile = next(model.analog_tiles())
         return tile, tile.analog_ctx
 
-    # -- public logical read view ---------------------------------------------
+    # -- placeholder mode -------------------------------------------------------
 
     def test_ctx_has_no_readonly_flag(self):
         """The public readonly switch was removed."""
         _, ctx = self._get_tile_and_ctx(self._make_model())
         self.assertFalse(hasattr(ctx, "readonly"))
 
-    def test_ctx_data_is_always_readonly_view(self):
-        """analog_ctx.data should always be a ReadOnlyWeightView."""
+    def test_default_mode_is_placeholder(self):
+        """AnalogContext should default to metadata-only placeholder mode."""
         _, ctx = self._get_tile_and_ctx(self._make_model())
-        self.assertIsInstance(ctx.data, ReadOnlyWeightView)
 
-    def test_read_ops_use_logical_data(self):
+        self.assertEqual(ctx.data_view_mode, AnalogContextDataViewMode.PLACEHOLDER)
+        self.assertNotIsInstance(ctx.data, ReadOnlyWeightView)
+
+    def test_placeholder_allows_metadata_only(self):
+        """Placeholder mode should expose shape-like metadata only."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        expected_shape = Size([tile.out_size, tile.in_size])
+
+        self.assertEqual(ctx.size(), expected_shape)
+        self.assertEqual(ctx.data.size(), expected_shape)
+        self.assertEqual(ctx.shape, expected_shape)
+        self.assertEqual(ctx.data.shape, expected_shape)
+        self.assertEqual(ctx.ndim, 2)
+        self.assertEqual(ctx.data.ndim, 2)
+        self.assertEqual(ctx.device, ctx._raw_data().device)
+        self.assertEqual(ctx.dtype, ctx._raw_data().dtype)
+
+    def test_placeholder_blocks_value_reads(self):
+        """Placeholder mode should block operations that read weight values."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+
+        for op in [
+            lambda: ctx.norm(),
+            lambda: ctx.data.norm(),
+            lambda: ctx.nonzero(),
+            lambda: ctx.data.nonzero(),
+            lambda: ctx > 10,
+            lambda: ctx.data > 10,
+            lambda: ctx.get_data(),
+            lambda: ctx.detach().norm(),
+        ]:
+            with self.subTest(op=op):
+                with self.assertRaises(RuntimeError):
+                    op()
+
+    def test_placeholder_state_dict_round_trip(self):
+        """Saving and loading should not require public weight reads."""
+        source = self._make_model()
+        target = self._make_model()
+
+        self.assertEqual(
+            next(source.analog_tiles()).analog_ctx.data_view_mode,
+            AnalogContextDataViewMode.PLACEHOLDER,
+        )
+        target.load_state_dict(source.state_dict(), load_rpu_config=False)
+
+    # -- data_view mode ---------------------------------------------------------
+
+    def test_enable_data_view_uses_logical_data(self):
         """size, norm, detach, nonzero, comparisons all use logical weights."""
         tile, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         tile.set_scales(2.0)
         logical_weight, _ = tile.get_weights()
 
+        self.assertEqual(ctx.data_view_mode, AnalogContextDataViewMode.DATA_VIEW)
+        self.assertIsInstance(ctx.data, ReadOnlyWeightView)
         self.assertEqual(ctx.size(), Size([6, 4]))
         self.assertEqual(ctx.shape, Size([6, 4]))
         self.assertTrue(allclose(ctx.detach().cpu(), logical_weight))
@@ -663,9 +725,10 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
         mask = ctx > 10
         self.assertEqual(mask.shape, ctx.shape)
 
-    def test_scaled_context_returns_logical_weight(self):
+    def test_scaled_context_returns_logical_weight_in_data_view(self):
         """Scaled tiles expose scaled logical weights, not raw tile weights."""
         tile, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         tile.set_scales(2.0)
 
         logical_weight = tile.get_weights()[0]
@@ -675,9 +738,10 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
         self.assertTrue(allclose(ctx.data.detach().cpu(), logical_weight))
         self.assertFalse(allclose(ctx.data.detach().cpu(), raw_weight))
 
-    def test_setting_scale_changes_ctx_data(self):
+    def test_setting_scale_changes_ctx_data_in_data_view(self):
         """Manually setting scales should update logical ctx.data values."""
         tile, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         before = ctx.data.detach().clone()
 
         tile.set_scales(2.0)
@@ -689,7 +753,7 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
         self.assertTrue(allclose(after.cpu(), w_from_tile))
 
     def test_analog_bias_column_is_not_exposed(self):
-        """analog_bias=True should not expose the raw bias column through ctx.data."""
+        """Public views should not expose the raw analog-bias column."""
         tile, ctx = self._get_tile_and_ctx(self._make_model(bias=True, analog_bias=True))
         self.assertTrue(tile.analog_bias)
         self.assertEqual(ctx.data.shape, Size([tile.out_size, tile.in_size]))
@@ -701,13 +765,15 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
         new_weight = randn(tile.out_size, tile.in_size)
         new_bias = randn(tile.out_size)
         tile.set_weights(new_weight, new_bias)
+        ctx.enable_data_view()
         self.assertTrue(allclose(ctx.data.detach().cpu(), tile.get_weights()[0]))
 
-    # -- direct writes are always blocked --------------------------------------
+    # -- data_view direct writes stay blocked ----------------------------------
 
-    def test_data_inplace_ops_blocked(self):
-        """ctx.data in-place ops should raise RuntimeError."""
+    def test_data_view_data_inplace_ops_blocked(self):
+        """ctx.data in-place ops should raise RuntimeError in data_view mode."""
         _, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         for op in [
             lambda: ctx.data.add_(1.0),
             lambda: ctx.data.mul_(2.0),
@@ -719,9 +785,10 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
                 with self.assertRaises(RuntimeError):
                     op()
 
-    def test_context_inplace_ops_blocked(self):
+    def test_data_view_context_inplace_ops_blocked(self):
         """Direct in-place ops on ctx should raise RuntimeError."""
         _, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         ctx.requires_grad = False
         snapshot = ctx.data.detach().clone()
 
@@ -734,6 +801,7 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
 
     def _assert_out_writes_blocked(self, ctx):
         """Assert that torch out= cannot target ctx or ctx.data."""
+        ctx.enable_data_view()
         ctx.requires_grad = False
         raw_snapshot = ctx._raw_data().detach().clone()
         logical_snapshot = ctx.data.detach().clone()
@@ -766,8 +834,9 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
         self._assert_out_writes_blocked(ctx)
 
     def test_copy_from_context_to_external_tensor_allowed(self):
-        """copy_ may read from ctx or ctx.data when the destination is external."""
+        """copy_ may read from ctx or ctx.data in data_view mode."""
         _, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         expected = ctx.data.detach().clone()
 
         for source in [ctx, ctx.data]:
@@ -776,9 +845,10 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
                 destination.copy_(source)
                 self.assertTrue(allclose(destination, expected))
 
-    def test_setitem_blocked(self):
+    def test_setitem_blocked_in_data_view(self):
         """Item assignment through ctx or ctx.data should raise RuntimeError."""
         _, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         snapshot = ctx.data.detach().clone()
 
         with self.assertRaises(RuntimeError):
@@ -789,8 +859,9 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
         self.assertTrue(allclose(ctx.data.detach(), snapshot))
 
     def test_data_assignment_blocked(self):
-        """ctx.data rebinding should raise RuntimeError."""
+        """ctx.data rebinding should raise RuntimeError in all modes."""
         _, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_data_view()
         snapshot = ctx.data.detach().clone()
 
         with self.assertRaisesRegex(RuntimeError, "Direct replacement"):
@@ -798,6 +869,57 @@ class AnalogCtxReadOnlyTest(ParametrizedTestCase):
 
         self.assertIsInstance(ctx.data, ReadOnlyWeightView)
         self.assertTrue(allclose(ctx.data.detach(), snapshot))
+
+    # -- buffer mode -----------------------------------------------------------
+
+    def test_buffer_mode_creates_zero_logical_tensor(self):
+        """buffer mode should create a zero tensor with logical weight shape."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        ctx.enable_buffer()
+
+        self.assertEqual(ctx.data_view_mode, AnalogContextDataViewMode.BUFFER)
+        self.assertNotIsInstance(ctx.data, ReadOnlyWeightView)
+        self.assertEqual(ctx.data.shape, Size([tile.out_size, tile.in_size]))
+        self.assertTrue(allclose(ctx.data, torch.zeros_like(ctx.data)))
+
+    def test_buffer_inplace_ops_mutate_only_buffer(self):
+        """buffer writes should not modify analog tile weights."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        weight_snapshot = tile.get_weights()[0].clone()
+        ctx.enable_buffer()
+
+        ctx.data.add_(2.0)
+        self.assertTrue(allclose(ctx.data, torch.full_like(ctx.data, 2.0)))
+        self.assertTrue(allclose(tile.get_weights()[0], weight_snapshot))
+
+    def test_buffer_is_independent_after_mode_switches(self):
+        """Switching modes should not link the buffer to tile weights."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model())
+        weight_snapshot = tile.get_weights()[0].clone()
+
+        ctx.enable_buffer()
+        ctx.data.fill_(3.0)
+        self.assertTrue(allclose(ctx.data, torch.full_like(ctx.data, 3.0)))
+
+        ctx.enable_data_view()
+        self.assertTrue(allclose(ctx.data.detach().cpu(), weight_snapshot))
+
+        ctx.enable_buffer()
+        self.assertTrue(allclose(ctx.data, torch.zeros_like(ctx.data)))
+        self.assertTrue(allclose(tile.get_weights()[0], weight_snapshot))
+
+    def test_buffer_analog_bias_uses_logical_shape(self):
+        """buffer mode should not include the raw analog-bias column."""
+        tile, ctx = self._get_tile_and_ctx(self._make_model(bias=True, analog_bias=True))
+        ctx.enable_buffer()
+
+        self.assertEqual(ctx.data.shape, Size([tile.out_size, tile.in_size]))
+        self.assertEqual(
+            tile.analog_ctx._raw_data().shape,
+            Size([tile.out_size, tile.in_size + 1]),
+        )
+
+    # -- removed APIs ----------------------------------------------------------
 
     def test_public_write_escape_apis_removed(self):
         """Old direct-write escape hatches should not exist."""
@@ -1169,3 +1291,586 @@ class SharedWeightsCudaBindingTest(ParametrizedTestCase):
         r2 = tile._get_tile_weights_ref()
         self.assertEqual(r1.data_ptr(), r2.data_ptr(),
                          "CUDA: _get_tile_weights_ref should return same ptr")
+
+
+class AnalogCtxOptimizerInteropTest(ParametrizedTestCase):
+    """Optimizer-facing AnalogContext behaviour.
+
+    These guard the interception of ``grad``, ``requires_grad`` and the
+    BUFFER-mode in-place writes that mixed-precision / TT optimizers depend on.
+    Before the fix, ``grad`` reads were redirected to a transient ``.data`` view
+    (always ``None``), ``requires_grad`` reported ``False`` (so the context was
+    dropped from the optimizer param groups), and BUFFER-mode in-place ops were
+    blocked by the always-read-only guard.
+    """
+
+    use_cuda = False
+
+    # (label, factory) pairs covering the Python inference tile and the C++
+    # analog devices (SoftBounds). These behaviours are about the
+    # AnalogContext Python wrapper, so they must hold for every backing tile.
+    def _rpu_configs(self):
+        """Return fresh (label, rpu_config) pairs to parametrize over."""
+        return [
+            ("torch_inference", TorchInferenceRPUConfig()),
+            ("softbounds", SingleRPUConfig(device=SoftBoundsDevice())),
+        ]
+
+    def _ctx(self, rpu_config, bias=False):
+        """Return the analog_ctx of a freshly built AnalogLinear."""
+        model = AnalogLinear(4, 6, bias=bias, rpu_config=rpu_config)
+        return next(model.analog_tiles()).analog_ctx
+
+    def test_requires_grad_is_true(self):
+        """analog_ctx.requires_grad must be True so optimizers keep the context."""
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                self.assertTrue(ctx.requires_grad)
+
+    def test_grad_get_set_roundtrip(self):
+        """Setting analog_ctx.grad and reading it back must return the same tensor."""
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                grad = randn(Size(ctx.shape))
+
+                ctx.grad = grad
+
+                self.assertIsNotNone(ctx.grad, "analog_ctx.grad read returned None after set")
+                self.assertTrue(allclose(ctx.grad, grad))
+
+    def test_grad_none_by_default(self):
+        """A fresh analog_ctx has no gradient yet (read does not raise)."""
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                self.assertIsNone(ctx.grad)
+
+    def test_buffer_mode_inplace_add_allowed(self):
+        """BUFFER mode exposes an independent writable digital buffer.
+
+        In-place ops on the context (e.g. AdamW's ``mul_``/``addcdiv_``) must
+        write the buffer instead of raising the read-only error.
+        """
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                ctx.enable_buffer()
+
+                # Buffer starts zero-initialised with the logical weight shape.
+                self.assertEqual(ctx.data.shape, Size([6, 4]))
+                self.assertEqual(float(ctx.data.sum()), 0.0)
+
+                ctx.add_(2.0)
+                self.assertTrue(allclose(ctx.data, torch.full((6, 4), 2.0)))
+
+                ctx.mul_(3.0)
+                self.assertTrue(allclose(ctx.data, torch.full((6, 4), 6.0)))
+
+    def test_data_view_mode_inplace_still_blocked(self):
+        """Non-BUFFER modes keep the read-only guard on in-place writes."""
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                ctx.enable_data_view()
+                with self.assertRaises(RuntimeError):
+                    ctx.add_(1.0)
+
+
+class AnalogCtxPlaceholderReprTest(ParametrizedTestCase):
+    """Placeholder-mode metadata access must not read meaningless values."""
+
+    use_cuda = False
+
+    def _rpu_configs(self):
+        """Return fresh (label, rpu_config) pairs to parametrize over."""
+        return [
+            ("torch_inference", TorchInferenceRPUConfig()),
+            ("softbounds", SingleRPUConfig(device=SoftBoundsDevice())),
+            ("constant_step", SingleRPUConfig(device=ConstantStepDevice())),
+        ]
+
+    def _ctx(self, rpu_config):
+        model = AnalogLinear(4, 6, bias=False, rpu_config=rpu_config)
+        return next(model.analog_tiles()).analog_ctx
+
+    def test_placeholder_data_repr_is_metadata_only(self):
+        """repr(analog_ctx.data) in placeholder mode returns a metadata summary.
+
+        The old PlaceholderDataView had no __repr__, so the default tensor repr
+        tried to read values and raised RuntimeError.
+        """
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                ctx.enable_placeholder()
+
+                text = repr(ctx.data)
+                self.assertIn("PlaceholderDataView", text)
+                self.assertIn("shape=", text)
+                # str() goes through the same __repr__ and must not raise either.
+                self.assertEqual(str(ctx.data), text)
+
+    def test_placeholder_type_metadata_allowed(self):
+        """analog_ctx.type() is metadata and must work in placeholder mode.
+
+        ``type`` was newly added to the placeholder metadata allow-list; the old
+        code raised the placeholder read error.
+        """
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                ctx.enable_placeholder()
+
+                self.assertIn("Tensor", ctx.type())
+                self.assertIn("Tensor", ctx.data.type())
+
+
+class AnalogCtxRequiresGradBackwardTest(ParametrizedTestCase):
+    """Toggling analog_ctx.requires_grad must keep backward() correct.
+
+    Freezing/unfreezing an analog layer is done via ``ctx.requires_grad``.
+    The setter must work in the default PLACEHOLDER mode (its dispatch used to
+    be routed through __torch_function__ as ``__set__`` and raised a placeholder
+    read error), and backward() must remain runnable in both states:
+
+    * requires_grad True  -> the analog gradient trace is recorded (the analog
+      optimizer would update the tile).
+    * requires_grad False -> the analog layer is frozen (no trace recorded), yet
+      downstream digital parameters still receive gradients, so backward() does
+      not raise.
+    """
+
+    use_cuda = False
+
+    # Analog-training configs whose backward records the analog gradient trace
+    # (i.e. ``has_gradient()`` is the freeze signal). Inference tiles use the
+    # torch-update path instead and are intentionally excluded here.
+    def _rpu_configs(self):
+        """Return fresh (label, rpu_config) pairs to parametrize over."""
+        return [
+            ("floating_point", FloatingPointRPUConfig()),
+            ("softbounds", SingleRPUConfig(device=SoftBoundsDevice())),
+            ("constant_step", SingleRPUConfig(device=ConstantStepDevice())),
+        ]
+
+    @staticmethod
+    def _build(rpu_config):
+        """Build an analog layer with a learnable digital scale.
+
+        ``learn_out_scaling`` adds a downstream digital parameter so the loss
+        always has a grad path, letting backward() run even when the analog
+        context is frozen.
+        """
+        rpu_config.mapping.learn_out_scaling = True
+        model = AnalogLinear(4, 3, bias=False, rpu_config=rpu_config)
+        tile = next(model.analog_tiles())
+        return model, tile.analog_ctx, tile.out_scaling_alpha
+
+    @staticmethod
+    def _fwd_bwd(model, ctx, alpha):
+        """Run one forward/backward with a non-grad input; return signals.
+
+        Returns ``(out.requires_grad, ctx.has_gradient(), alpha.grad, ctx.grad)``.
+        ``ctx.grad`` must stay None: AnalogFunction.backward returns None for the
+        context, so autograd never populates its ``.grad`` slot; the gradient
+        information is captured in the analog trace (``has_gradient()``) instead.
+        """
+        ctx.reset()  # clear the analog gradient trace
+        alpha.grad = None
+        x = randn(2, 4)  # leaf input, requires_grad=False
+        out = model(x)
+        requires_grad = out.requires_grad
+        out.sum().backward()
+        return requires_grad, ctx.has_gradient(), alpha.grad, ctx.grad
+
+    def test_set_requires_grad_in_default_mode_does_not_raise(self):
+        """Setting requires_grad in default (placeholder) mode must not raise.
+
+        Regression: the setter dispatched through __torch_function__ as
+        ``__set__`` and raised the placeholder read error.
+        """
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                _, ctx, _ = self._build(rpu_config)
+
+                ctx.requires_grad = False
+                self.assertFalse(ctx.requires_grad)
+
+                ctx.requires_grad = True
+                self.assertTrue(ctx.requires_grad)
+
+    def test_backward_true_to_false_freezes_analog_gradient(self):
+        """True -> False: backward still runs, but analog trace stops recording."""
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                model, ctx, alpha = self._build(rpu_config)
+
+                # requires_grad True: analog gradient recorded, digital param learns.
+                # Both the forward signal (analog_input) and the backward signal
+                # (analog_grad_output) must be attached to the trace.
+                ctx.requires_grad = True
+                requires_grad, has_grad, alpha_grad, ctx_grad = self._fwd_bwd(model, ctx, alpha)
+                self.assertTrue(requires_grad)
+                self.assertTrue(has_grad, "forward signal must be recorded when requires_grad=True")
+                self.assertEqual(
+                    len(ctx.analog_grad_output), 1, "backward signal must be attached"
+                )
+                self.assertIsNotNone(alpha_grad)
+                # The analog context never uses the autograd .grad slot.
+                self.assertIsNone(ctx_grad, "ctx.grad must stay None; gradient lives in the trace")
+
+                # requires_grad False: backward must still run without error, but the
+                # analog layer is frozen (neither signal recorded); the digital scale
+                # keeps learning.
+                ctx.requires_grad = False
+                _, has_grad, alpha_grad, ctx_grad = self._fwd_bwd(model, ctx, alpha)
+                self.assertFalse(has_grad, "forward signal must NOT be recorded when frozen")
+                self.assertEqual(
+                    len(ctx.analog_grad_output), 0, "no backward signal when frozen"
+                )
+                self.assertIsNotNone(alpha_grad, "downstream digital param must still get grad")
+                self.assertIsNone(ctx_grad, "ctx.grad must stay None when frozen")
+
+    def test_backward_false_to_true_unfreezes_analog_gradient(self):
+        """False -> True: re-enabling restores analog gradient recording."""
+        for label, rpu_config in self._rpu_configs():
+            with self.subTest(rpu_config=label):
+                model, ctx, alpha = self._build(rpu_config)
+
+                # requires_grad False: frozen, neither signal recorded.
+                ctx.requires_grad = False
+                _, has_grad, alpha_grad, ctx_grad = self._fwd_bwd(model, ctx, alpha)
+                self.assertFalse(has_grad)
+                self.assertEqual(len(ctx.analog_grad_output), 0, "no backward signal when frozen")
+                self.assertIsNotNone(alpha_grad)
+                self.assertIsNone(ctx_grad, "ctx.grad must stay None when frozen")
+
+                # requires_grad True: both signals recorded again.
+                ctx.requires_grad = True
+                requires_grad, has_grad, alpha_grad, ctx_grad = self._fwd_bwd(model, ctx, alpha)
+                self.assertTrue(requires_grad)
+                self.assertTrue(
+                    has_grad, "forward signal must resume after re-enabling requires_grad"
+                )
+                self.assertEqual(
+                    len(ctx.analog_grad_output), 1, "backward signal must resume after re-enabling"
+                )
+                self.assertIsNotNone(alpha_grad)
+                # The analog context never uses the autograd .grad slot.
+                self.assertIsNone(ctx_grad, "ctx.grad must stay None; gradient lives in the trace")
+
+
+class AnalogCtxExactGradientTest(ParametrizedTestCase):
+    """The analog backward must produce the exact gradient, including out_scaling.
+
+    Uses a noise-free FloatingPoint tile with known weights and a known, non-unit
+    out_scaling vector ``alpha``, and a quadratic loss ``L = 0.5 * sum((y - t)^2)``.
+    Unlike a linear loss, ``dL/dy = (y - t)`` depends on the forward output, so the
+    backward must thread the out_scaling through correctly. With ``raw = x @ W^T``
+    and ``y = alpha * raw`` the chain rule gives closed forms the test checks:
+
+    * ``analog_input``        == ``x``                       (forward activation)
+    * ``analog_grad_output``  == ``(y - t) * alpha``         (grad w.r.t. tile output)
+    * ``x.grad``              == ``((y - t) * alpha) @ W``   (grad w.r.t. the input)
+    * ``out_scaling.grad``    == ``sum_b (y - t) * raw``     (grad w.r.t. alpha)
+
+    The ``alpha`` factor is the point: a backward that dropped or misapplied
+    out_scaling would still pass with ``alpha == 1`` but fail here.
+    """
+
+    use_cuda = False
+
+    def test_exact_gradient_with_non_unit_out_scaling(self):
+        """Quadratic-loss backward gradients match the closed form when alpha != 1."""
+        rpu_config = FloatingPointRPUConfig()
+        rpu_config.mapping.weight_scaling_omega = 0.0  # logical weight == set weight
+        rpu_config.mapping.learn_out_scaling = True
+        rpu_config.mapping.out_scaling_columnwise = True  # per-output-channel alpha
+
+        model = AnalogLinear(3, 2, bias=False, rpu_config=rpu_config)
+        tile = next(model.analog_tiles())
+        ctx = tile.analog_ctx
+
+        # ``weight`` is the physical tile weight (used by the forward MVM);
+        # ``get_weights`` returns the logical weight = physical * out_scaling.
+        weight = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        alpha = torch.tensor([0.5, 2.0])  # non-unit out_scaling, one per output
+        tile.set_weights(weight, None)
+        with torch.no_grad():
+            tile.out_scaling_alpha.copy_(alpha.view_as(tile.out_scaling_alpha))
+
+        # Sanity: physical weight set cleanly (no hidden mapping scale), and the
+        # logical weight folds in out_scaling per output channel.
+        self.assertTrue(allclose(tile.get_weights()[0], weight * alpha.view(-1, 1)))
+
+        ctx.reset()
+        x = torch.tensor([[1.0, 0.0, -1.0], [2.0, 1.0, 0.0]], requires_grad=True)
+        target = torch.tensor([[0.5, -1.0], [1.0, 2.0]])
+
+        out = model(x)
+        # Forward must be alpha * (x @ W^T).
+        raw = x.detach() @ weight.t()
+        self.assertTrue(allclose(out.detach(), raw * alpha), "forward out_scaling is wrong")
+
+        # Quadratic (MSE-style) loss: dL/dy = (y - target).
+        loss = 0.5 * ((out - target) ** 2).sum()
+        loss.backward()
+
+        residual = (raw * alpha) - target  # dL/dy = y - target
+
+        # Forward signal: the activation that entered the tile.
+        self.assertTrue(allclose(ctx.analog_input[0], x.detach()))
+        # Backward signal: gradient w.r.t. the (pre-scaling) tile output.
+        self.assertTrue(
+            allclose(ctx.analog_grad_output[0], residual * alpha),
+            "analog_grad_output must include the out_scaling factor",
+        )
+        # Gradient w.r.t. the input flows back through W and alpha.
+        self.assertTrue(
+            allclose(x.grad, (residual * alpha) @ weight),
+            "input gradient must account for out_scaling",
+        )
+        # Gradient w.r.t. alpha is sum over the batch of (y - target) * raw.
+        self.assertTrue(
+            allclose(tile.out_scaling_alpha.grad.flatten(), (residual * raw).sum(dim=0)),
+            "out_scaling gradient is wrong",
+        )
+
+
+# Configs covering the three backing-tile flavors that the AnalogContext Python
+# wrapper sits on top of: a pure-Python inference tile, a C++ FloatingPoint tile,
+# and a C++ analog-device tile. Attribute handling must hold for all of them.
+def _ctx_attribute_rpu_configs():
+    """Return fresh (label, rpu_config) pairs to parametrize attribute tests."""
+    return [
+        ("torch_inference", TorchInferenceRPUConfig()),
+        ("floating_point", FloatingPointRPUConfig()),
+        ("softbounds", SingleRPUConfig(device=SoftBoundsDevice())),
+    ]
+
+
+class AnalogCtxTabCompletionTest(ParametrizedTestCase):
+    """dir(analog_ctx) must list tensor ops for interactive tab-completion.
+
+    ``Tensor.__dir__`` dispatches through ``__torch_function__`` (this class
+    defines one); in PLACEHOLDER mode that routed ``__dir__`` through the
+    weight-read guard and raised, so completers (rlcompleter / IPython) caught
+    the error and offered nothing. ``AnalogContext.__dir__`` now lists the class
+    and instance attribute names directly, without a value-read dispatch.
+    """
+
+    use_cuda = False
+
+    def _ctx(self, rpu_config):
+        model = AnalogLinear(4, 6, bias=False, rpu_config=rpu_config)
+        return next(model.analog_tiles()).analog_ctx
+
+    def test_dir_does_not_raise_in_placeholder(self):
+        """dir(ctx) must not raise in the default placeholder mode."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                self.assertEqual(ctx.data_view_mode, AnalogContextDataViewMode.PLACEHOLDER)
+                names = dir(ctx)  # must not raise
+                self.assertIsInstance(names, list)
+
+    def test_dir_lists_tensor_ops_and_ctx_methods(self):
+        """Completion must offer both tensor ops and AnalogContext-specific names."""
+        ctx = self._ctx(TorchInferenceRPUConfig())
+        names = set(dir(ctx))
+        for op in ["reshape", "relu", "reciprocal", "norm", "size", "real", "T"]:
+            self.assertIn(op, names, f"tensor op '{op}' missing from dir()")
+        for member in ["analog_tile", "enable_data_view", "enable_buffer", "reset"]:
+            self.assertIn(member, names, f"AnalogContext member '{member}' missing from dir()")
+
+    def test_dir_is_consistent_across_modes(self):
+        """The attribute listing must not depend on the active data-view mode."""
+        ctx = self._ctx(TorchInferenceRPUConfig())
+        placeholder_names = set(dir(ctx))
+        ctx.enable_data_view()
+        self.assertEqual(set(dir(ctx)), placeholder_names)
+        ctx.enable_buffer()
+        self.assertEqual(set(dir(ctx)), placeholder_names)
+
+
+class AnalogCtxMetadataQueryTest(ParametrizedTestCase):
+    """Pure metadata queries must work in every mode and return correct values.
+
+    These depend only on dtype / device / layout, never on weight values, so
+    they belong in the placeholder allow-list. Before the fix, queries such as
+    ``get_device``, ``is_floating_point``, ``is_complex`` and ``is_signed``
+    raised the placeholder read error.
+    """
+
+    use_cuda = False
+
+    # Metadata methods whose value must equal a plain reference tensor of the
+    # same logical shape / dtype / device. ``data_ptr`` is excluded: it returns a
+    # storage address, which legitimately differs from the reference tensor.
+    METADATA_METHODS = [
+        "dim",
+        "ndimension",
+        "numel",
+        "nelement",
+        "element_size",
+        "is_contiguous",
+        "stride",
+        "storage_offset",
+        "get_device",
+        "is_floating_point",
+        "is_complex",
+        "is_signed",
+        "is_pinned",
+        "dense_dim",
+        "sparse_dim",
+        "has_names",
+    ]
+
+    def _ctx(self, rpu_config):
+        model = AnalogLinear(4, 6, bias=False, rpu_config=rpu_config)
+        return next(model.analog_tiles()).analog_ctx
+
+    def test_metadata_queries_correct_in_all_modes(self):
+        """Each metadata query must match a reference tensor in every mode."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                reference = torch.empty(ctx.size(), dtype=ctx.dtype, device=ctx.device)
+
+                for enable in (ctx.enable_placeholder, ctx.enable_data_view, ctx.enable_buffer):
+                    enable()
+                    with self.subTest(mode=ctx.data_view_mode):
+                        for method in self.METADATA_METHODS:
+                            self.assertEqual(
+                                getattr(ctx, method)(),
+                                getattr(reference, method)(),
+                                f"{method}() mismatch in {ctx.data_view_mode}",
+                            )
+
+    def test_data_ptr_is_an_int_in_placeholder(self):
+        """data_ptr must answer (an integer address) instead of raising."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                ctx = self._ctx(rpu_config)
+                self.assertIsInstance(ctx.data_ptr(), int)
+
+
+class AnalogCtxValueViewPropertyTest(ParametrizedTestCase):
+    """T / mT / H / mH / real / imag must honor the data-view mode.
+
+    These tensor properties materialize weight values, so they must behave like
+    their method equivalents (``t()`` / ``conj()``): blocked in PLACEHOLDER mode,
+    and served from the logical view / buffer otherwise. Previously the getset
+    descriptors fell through to ``__torch_function__`` as the whitelisted
+    ``__get__`` and silently returned uninitialized placeholder memory.
+    """
+
+    use_cuda = False
+
+    VALUE_VIEW_PROPERTIES = ["T", "mT", "H", "mH", "real", "imag"]
+    # ``imag`` is excluded from value checks: it is undefined for real dtypes and
+    # raises the same error as a plain real tensor would.
+    REAL_VALUED_PROPERTIES = ["T", "mT", "H", "mH", "real"]
+
+    def _tile_ctx(self, rpu_config):
+        model = AnalogLinear(4, 6, bias=False, rpu_config=rpu_config)
+        tile = next(model.analog_tiles())
+        return tile, tile.analog_ctx
+
+    def test_placeholder_blocks_value_view_properties(self):
+        """Every value-bearing property must raise the placeholder read error."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                _, ctx = self._tile_ctx(rpu_config)
+                for prop in self.VALUE_VIEW_PROPERTIES:
+                    with self.subTest(prop=prop):
+                        with self.assertRaises(RuntimeError):
+                            getattr(ctx, prop)
+
+    def test_data_view_properties_match_logical_weight(self):
+        """In data_view mode the properties must reflect the logical weights."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                tile, ctx = self._tile_ctx(rpu_config)
+                ctx.enable_data_view()
+                logical, _ = tile.get_weights()
+
+                for prop in self.REAL_VALUED_PROPERTIES:
+                    with self.subTest(prop=prop):
+                        ctx_view = getattr(ctx, prop).detach().cpu()
+                        expected = getattr(logical, prop)
+                        self.assertEqual(ctx_view.shape, expected.shape)
+                        self.assertTrue(
+                            allclose(ctx_view, expected), f"ctx.{prop} != logical.{prop}"
+                        )
+
+    def test_buffer_properties_reflect_buffer(self):
+        """In buffer mode the properties must reflect the digital buffer."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                tile, ctx = self._tile_ctx(rpu_config)
+                ctx.enable_buffer()
+                ctx.data.add_(5.0)  # buffer is now uniformly 5.0
+                expected = torch.full((tile.out_size, tile.in_size), 5.0)
+
+                self.assertTrue(allclose(ctx.T.detach().cpu(), expected.T))
+                self.assertTrue(allclose(ctx.real.detach().cpu(), expected))
+
+
+class AnalogCtxRequiresGradMethodTest(ParametrizedTestCase):
+    """``requires_grad_()`` (method) must toggle the real autograd flag.
+
+    Regression: ``requires_grad_`` was allow-listed but the read-only in-place
+    guard rejected it first (it ends with ``_``), and the data-view redirection
+    would have set the flag on a throwaway placeholder. Consequently the standard
+    PyTorch freezing idiom ``module.requires_grad_(False)`` -- which iterates the
+    parameters and calls ``param.requires_grad_()`` -- raised on the context.
+    """
+
+    use_cuda = False
+
+    def _model_ctx(self, rpu_config, bias=False):
+        model = AnalogLinear(4, 6, bias=bias, rpu_config=rpu_config)
+        return model, next(model.analog_tiles()).analog_ctx
+
+    def test_method_toggles_flag_and_returns_self(self):
+        """ctx.requires_grad_(flag) must set the flag and return the context."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                _, ctx = self._model_ctx(rpu_config)
+
+                self.assertIs(ctx.requires_grad_(False), ctx)
+                self.assertFalse(ctx.requires_grad)
+                ctx.requires_grad_(True)
+                self.assertTrue(ctx.requires_grad)
+
+    def test_method_defaults_to_true(self):
+        """ctx.requires_grad_() with no argument must enable gradients."""
+        _, ctx = self._model_ctx(TorchInferenceRPUConfig())
+        ctx.requires_grad = False
+        ctx.requires_grad_()
+        self.assertTrue(ctx.requires_grad)
+
+    def test_module_requires_grad_freezes_analog_layer(self):
+        """nn.Module.requires_grad_() must (un)freeze the context without raising."""
+        for label, rpu_config in _ctx_attribute_rpu_configs():
+            with self.subTest(rpu_config=label):
+                model, ctx = self._model_ctx(rpu_config)
+
+                model.requires_grad_(False)
+                self.assertFalse(ctx.requires_grad)
+                model.requires_grad_(True)
+                self.assertTrue(ctx.requires_grad)
+
+    def test_method_works_in_every_mode(self):
+        """The flag toggle must not depend on the active data-view mode."""
+        for enable in ("enable_placeholder", "enable_data_view", "enable_buffer"):
+            with self.subTest(mode=enable):
+                _, ctx = self._model_ctx(TorchInferenceRPUConfig())
+                getattr(ctx, enable)()
+                ctx.requires_grad_(False)
+                self.assertFalse(ctx.requires_grad)
+                ctx.requires_grad_(True)
+                self.assertTrue(ctx.requires_grad)

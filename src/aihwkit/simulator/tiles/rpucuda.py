@@ -137,7 +137,7 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
         state_dict = self.__getstate__()
         for value in state_dict.values():
             if isinstance(value, AnalogContext):
-                value.data = value.data.cpu()
+                value._replace_raw_data(value._raw_data().cpu())
         self.__setstate__(state_dict)
         return self
 
