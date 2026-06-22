@@ -369,6 +369,7 @@ void PulsedWeightUpdater<T>::update(
     update_type_ = update_type;
 
     update_count_ = 0;
+    tuned_m_batch_ = 0; // reset so the m_batch check below will also retune
 
     // init kernels
     valid_kernels_ = getValidUpdateKernels(rpucuda_device, m_batch, up);
@@ -402,6 +403,18 @@ void PulsedWeightUpdater<T>::update(
     }
   }
 
+  // Retune if m_batch has grown beyond what was used during the last tuning.
+  // This prevents a kernel valid only for small m_batch (e.g. SingleFunctor,
+  // which has no batch loop) from being reused incorrectly for larger batches.
+  if (!force_tuning && m_batch > tuned_m_batch_) {
+    force_tuning = true;
+    valid_kernels_ = getValidUpdateKernels(rpucuda_device, m_batch, up);
+    if (valid_kernels_.size() == 0) {
+      RPU_FATAL("Cannot find valid update kernels");
+    }
+    kernel_pars_ = valid_kernels_[0];
+  }
+
   if (update_count_ < FORCE_TUNING_THRES) { // only once again
     update_count_ += 1;
     force_tuning = force_tuning || (update_count_ == FORCE_TUNING_THRES);
@@ -412,6 +425,7 @@ void PulsedWeightUpdater<T>::update(
     this->tuneUpdate(
         kernel_pars_, valid_kernels_, x_in, d_in, dev_weights, rpucuda_device, up, lr, m_batch,
         x_trans, d_trans);
+    tuned_m_batch_ = m_batch;
   }
 
   // do update

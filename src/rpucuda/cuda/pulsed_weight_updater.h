@@ -107,6 +107,12 @@ private:
   int x_size_ = 0;
   int d_size_ = 0;
   int update_count_ = 0;
+  // Tracks the m_batch value used during the last tuneUpdate() call.
+  // When m_batch grows beyond this value, kernel_pars_ is invalidated and
+  // tuneUpdate() is re-run with the new batch size. This prevents kernels
+  // that are only valid for small batches (e.g. SingleFunctor, which has no
+  // inner batch loop) from being silently reused for larger batches.
+  int tuned_m_batch_ = 0;
   bool is_async_update_ = false;
   int verbose_ = 0;
   DeviceUpdateType update_type_ = DeviceUpdateType::Undefined;
