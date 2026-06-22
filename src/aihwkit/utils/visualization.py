@@ -632,7 +632,7 @@ def plot_device_symmetry(
     )
 
     plot_pulse_response(analog_tile, direction, use_forward=False)
-    plt.ylim([-1, 1])
+    plt.ylim(-1, 1)
     plt.grid(True)
 
 
