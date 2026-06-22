@@ -14,7 +14,7 @@ from copy import deepcopy
 from numpy import array
 from numpy.typing import ArrayLike
 
-from torch import Tensor, from_numpy, float32, unsqueeze, cat, empty, stack, dtype
+from torch import Tensor, from_numpy, float32, unsqueeze, cat, empty, stack, dtype, zeros
 from torch import device as torch_device
 from torch.cuda import device as cuda_device
 from torch.autograd import no_grad
@@ -171,8 +171,15 @@ class SimulatorTile:
         """Returns a brief info"""
         raise NotImplementedError
 
-    def get_weights(self) -> Tensor:
-        """Returns the analog weights."""
+    def get_weights(self, as_ref: bool = False) -> Tensor:
+        """Returns the analog weights.
+
+        Args:
+            as_ref: if True, return a reference to the internal weight tensor
+                (not detached, stays on the current device). If False (default),
+                return a detached CPU copy. Not all tile types support true
+                references; C++ tiles always return a copy regardless.
+        """
         raise NotImplementedError
 
     def set_weights(self, weight: Tensor) -> None:
@@ -264,6 +271,7 @@ class SimulatorTile:
         raise NotImplementedError
 
 
+# pylint: disable=too-many-public-methods
 class SimulatorTileWrapper:
     """Wrapper base class for defining the necessary tile
     functionality.
@@ -281,6 +289,18 @@ class SimulatorTileWrapper:
             should be used.
         handle_output_bound: whether the bound clamp gradient should be inserted
         ignore_analog_state: whether to ignore the analog state when __getstate__ is called
+
+    Attributes:
+        tile: A simulator tile object that handles the computations
+                for the given input/output sizes.
+              It is created by `self._create_simulator_tile` method,
+                which is provided by the derived class.
+              E.g., `aihwkit.simulator.tiles.analog.AnalogTile` and
+                    `aihwkit.simulator.tiles.inference_torch.TorchInferenceTile`
+                implement this method.
+              The weight data is stored in the tile object.
+        analog_ctx: `AnalogContext`, which exposes the tile's logical
+            weights as a read-only `torch.nn.Parameter` view.
     """
 
     def __init__(
@@ -295,8 +315,6 @@ class SimulatorTileWrapper:
         handle_output_bound: bool = False,
         ignore_analog_state: bool = False,
     ):
-        self.is_cuda = False
-        self.device = torch_device("cpu")
         self.out_size = out_size
         self.in_size = in_size
         self.rpu_config = deepcopy(rpu_config)
@@ -321,8 +339,200 @@ class SimulatorTileWrapper:
 
         self.tile = self._create_simulator_tile(x_size, d_size, rpu_config)
 
+        # Set up zero-copy shared weight tensor for C++ tiles.
+        self._shared_weight_tensor = None  # type: Optional[Tensor]
+        self._bind_shared_weights()
+
         self.analog_ctx = AnalogContext(self)
         self.analog_ctx.use_torch_update = torch_update
+
+    def _bind_shared_weights(self) -> None:
+        """Bind a PyTorch tensor as the C++ tile's weight storage.
+
+        For C++ tiles that expose ``set_shared_weights``, this allocates a
+        contiguous tensor and passes its ``data_ptr`` to the C++ side so that
+        both Python and C++ operate on the same memory.  After this call
+        ``tile.update()`` / ``tile.set_weights()`` modify the tensor
+        in-place — no explicit sync is needed.
+
+        For pure-Python tiles (which already store weights as
+        ``torch.Tensor``), this is a no-op.
+        """
+        if not hasattr(self.tile, "set_shared_weights"):
+            return
+
+        # Probe whether the tile is a pure-Python tile by trying to call
+        # get_weights(as_ref=True).
+        #
+        # Tiles that accept ``as_ref``:
+        #   TorchSimulatorTile  — returns self.weight.data
+        #   CustomSimulatorTile — returns self._analog_weight.data
+        #   TransferSimulatorTile — accepts but delegates to C++ tile
+        #
+        # C++ tiles (pybind11 bindings) do NOT accept keyword arguments
+        # and raise TypeError.  These are the ones that need binding:
+        #   tiles.AnalogTile / CudaAnalogTile
+        #   tiles.FloatingPointTile / CudaFloatingPointTile
+        #   (and their half/double/bfloat16 variants)
+        try:
+            self.tile.get_weights(as_ref=True)
+            return  # Pure-Python tile — already backed by torch.Tensor.
+        except TypeError:
+            pass  # C++ tile — proceed with shared weight binding below.
+
+        d_size = self.tile.get_d_size()
+        x_size = self.tile.get_x_size()
+        # C++ get_weights() always returns CPU. For CUDA tiles, use the
+        # private raw analog context backing when available: AIHWKIT keeps that
+        # context on the same concrete device as the tile during
+        # .cuda(device)/.to(device) moves. Fall back to the active CUDA context
+        # only during initialization windows where analog_ctx is not CUDA-backed
+        # yet.
+        #
+        # CUDA C++ tiles expect transposed layout (x_size, d_size) for
+        # set_shared_weights, while CPU tiles expect (d_size, x_size).
+        is_cuda = "Cuda" in type(self.tile).__name__
+        if is_cuda:
+            w_cpu = self.tile.get_weights()  # (d_size, x_size) on CPU
+            # Normal path after .cuda(device) / .to(device): analog_ctx has
+            # already been refreshed onto the target GPU, so it is the most
+            # reliable source of the tile's concrete cuda:N placement.
+            if hasattr(self, "analog_ctx") and self.analog_ctx._raw_data().is_cuda:
+                tile_device = self.analog_ctx._raw_data().device
+            else:
+                # Fallback for partial-initialization / transition windows
+                # where analog_ctx does not exist yet or still points to CPU.
+                # In particular, __init__() binds shared weights before
+                # analog_ctx is created, so CUDA tiles must use the active
+                # CUDA context established by the caller.
+                tile_device = torch_device("cuda", cuda_device(None).idx)
+            shared = zeros(x_size, d_size, dtype=self.get_dtype(), device=tile_device)
+        else:
+            tile_device = torch_device("cpu")
+            shared = zeros(d_size, x_size, dtype=self.get_dtype(), device=tile_device)
+        self.tile.set_shared_weights(shared)
+        # CUDA set_shared_weights does not auto-populate the buffer (unlike CPU).
+        # Force-sync from the tile's internal device weights into the shared tensor.
+        if is_cuda:
+            shared.copy_(w_cpu.t().to(tile_device))
+        self._shared_weight_tensor = shared
+
+    def _get_tile_weights_ref(self) -> Tensor:
+        """Get raw tile weights, preferring a reference if the tile supports it.
+
+        This returns the backing weights stored by the simulator tile. It does
+        not apply digital mapping/output scales. The higher-level
+        ``AnalogContext.data`` accessor applies those scales when it presents
+        read-only logical weights to users.
+
+        Possible sources for the returned tensor are:
+
+        - ``self._shared_weight_tensor``: allocated and bound by
+          :meth:`_bind_shared_weights` in this class for C++ tiles exposing
+          ``set_shared_weights``.
+        - ``self.tile.get_weights_cuda()``: native CUDA C++ binding that returns
+          device weights in transposed layout when available.
+        - ``self.tile.get_weights(as_ref=True)``: Python simulator tiles define
+          this reference-returning path, for example ``TorchSimulatorTile`` in
+          ``torch_tile.py`` and ``CustomSimulatorTile`` in ``custom.py``.
+        - ``self.tile.get_weights()``: fallback for C++ bindings that cannot
+          return a reference and therefore provide only a detached copy.
+        """
+        if self._shared_weight_tensor is not None:
+            # CUDA C++ tiles store shared weights in transposed layout
+            # (x_size, d_size).  Return .t() so callers always see the
+            # standard (d_size, x_size) shape — still zero-copy because
+            # .t() on a 2-D tensor is a stride-only view.
+            if "Cuda" in type(self.tile).__name__:
+                return self._shared_weight_tensor.t()
+            return self._shared_weight_tensor
+        # Fast path: CUDA C++ tiles with native GPU weight access.
+        # get_weights_cuda() returns [x_size, d_size] on device; .t() gives
+        # the standard [d_size, x_size] view without any CPU roundtrip.
+        if hasattr(self.tile, "get_weights_cuda"):
+            return self.tile.get_weights_cuda().t()
+        try:
+            return self.tile.get_weights(as_ref=True)
+        except TypeError:
+            # C++ tile bindings don't accept as_ref
+            return self.tile.get_weights()
+
+    def _sync_analog_ctx_weights(self) -> None:
+        """Sync the private analog context raw backing with tile weights.
+
+        With shared weight tensors, the context raw backing and the tile's
+        internal weights already share the same memory, so during normal
+        training (forward -> update) this is a no-op (same ``data_ptr``).
+
+        This method is still necessary for device moves (cpu <-> cuda): moving
+        the tile to a different device replaces its backing store, which
+        invalidates the old ``data_ptr``. Public ``analog_ctx.data`` is a
+        logical read-only view and must not be used for this raw rebinding.
+        """
+        if not hasattr(self, "analog_ctx"):
+            return
+        current = self.analog_ctx._raw_data()
+        target_device = current.device
+        ref = self._get_tile_weights_ref()
+        if current.data_ptr() != ref.data_ptr() or current.device != ref.device:
+            self.analog_ctx._replace_raw_data(ref.to(target_device))
+
+    def _copy_weights_to_shared_tensors(self, weights: Tensor) -> None:
+        """Copy loaded raw weights into Python-side shared backing tensors.
+
+        ``weights`` is the canonical raw tile matrix saved in CPU layout
+        ``[d_size, x_size]``. During pickle loading, Python-side
+        ``shared_weights`` may be restored from a CUDA checkpoint with the CUDA
+        internal layout ``[x_size, d_size]`` while the C++ tile is first
+        recreated on CPU. Normalize that tensor before rebinding it to the CPU
+        tile.
+        """
+
+        def copy_to(target: Optional[Tensor]) -> None:
+            if target is None:
+                return
+            source = weights
+            if target.shape != source.shape:
+                transposed = weights.t()
+                if target.shape == transposed.shape:
+                    source = transposed
+                else:
+                    raise TileError(
+                        "Mismatch with loaded analog state: shared weight shape is unexpected."
+                    )
+            target.copy_(source.to(device=target.device, dtype=target.dtype))
+
+        with no_grad():
+            copy_to(self._shared_weight_tensor)
+            shared_weights = getattr(self, "shared_weights", None)
+            if shared_weights is not None:
+                target = shared_weights.data
+                if (
+                    not hasattr(self.tile, "get_weights_cuda")
+                    and target.shape != weights.shape
+                ):
+                    # Replacing .data is intentional here: a CUDA checkpoint can
+                    # restore the Parameter with transposed CUDA layout, and
+                    # copy_ cannot change the target tensor shape.
+                    transposed = weights.t()
+                    if target.shape != transposed.shape:
+                        raise TileError(
+                            "Mismatch with loaded analog state: shared weight shape is unexpected."
+                        )
+                    shared_weights.data = weights.to(
+                        device=target.device, dtype=target.dtype
+                    ).clone()
+                copy_to(shared_weights.data)
+
+    @property
+    def device(self) -> torch_device:
+        """Return the device of the tile."""
+        return self.analog_ctx.device
+
+    @property
+    def is_cuda(self) -> bool:
+        """Return the is_cuda state of the tile."""
+        return self.analog_ctx.is_cuda
 
     def get_runtime(self) -> RuntimeParameter:
         """Returns the runtime parameter."""
@@ -450,17 +660,17 @@ class SimulatorTileWrapper:
         current_dict[SN.CLASS] = type(self).__name__
         current_dict[SN.LR] = self.tile.get_learning_rate()
         current_dict.pop("tile", None)
-        current_dict[SN.CONTEXT] = self.analog_ctx.data
+        current_dict[SN.CONTEXT] = self.analog_ctx._raw_data().detach()
         current_dict[SN.EXTRA] = self.tile.dump_extra()
         current_dict[SN.VERSION] = __version__
 
         # don't save device. Will be determined by loading object
         current_dict.pop("stream", None)
-        current_dict.pop("is_cuda", None)
-        current_dict.pop("device", None)
 
         # this is should not be saved.
         current_dict.pop("image_sizes", None)
+        # Shared weight tensor is rebuilt by _bind_shared_weights().
+        current_dict.pop("_shared_weight_tensor", None)
 
         return current_dict
 
@@ -527,9 +737,6 @@ class SimulatorTileWrapper:
             self.rpu_config = rpu_config
             self.__dict__.update(current_dict)
 
-            self.device = torch_device("cpu")
-            self.is_cuda = False
-
             # recreate attributes not saved
             # always first create on CPU
             x_size = self.in_size + 1 if self.analog_bias else self.in_size
@@ -537,6 +744,8 @@ class SimulatorTileWrapper:
 
             # Recreate the tile.
             self.tile = self._recreate_simulator_tile(x_size, d_size, self.rpu_config)
+            self._shared_weight_tensor = None
+            self._bind_shared_weights()
 
             names = self.tile.get_hidden_parameter_names()
             if len(hidden_parameters_names) > 0 and names != hidden_parameters_names:
@@ -551,7 +760,28 @@ class SimulatorTileWrapper:
             if not isinstance(weights, Tensor):
                 weights = from_numpy(array(weights))
             self.tile.set_weights(weights)
+            self._copy_weights_to_shared_tensors(weights)
 
+            # set_weights() fills the fresh CPU C++ tile from the serialized raw
+            # weights. _copy_weights_to_shared_tensors() then makes the Python
+            # Parameter hold the same CPU-layout data. ensure_shared_weights()
+            # completes the hand-off by making the C++ tile use that Parameter
+            # as its shared backing store, so tile weights, AnalogContext, and
+            # optimizer state all observe the same storage.
+            #
+            # This rebinding is only valid while the recreated tile is CPU-side.
+            # If the loaded object is later moved to CUDA, cuda() recreates the
+            # CUDA tile and binds CUDA-layout shared weights there. The method is
+            # only present on RPUCudaSimulatorTileWrapper, so keep the dynamic
+            # callable guard for non-shared tile wrappers.
+            shared_weights = getattr(self, "shared_weights", None)
+            ensure_shared_weights = getattr(self, "ensure_shared_weights", None)
+            if (
+                shared_weights is not None
+                and not shared_weights.is_cuda
+                and callable(ensure_shared_weights)
+            ):
+                ensure_shared_weights()  # pylint: disable=not-callable
             if analog_lr is not None:
                 self.tile.set_learning_rate(analog_lr)
 
@@ -568,9 +798,16 @@ class SimulatorTileWrapper:
         if analog_ctx is not None:
             # Keep the object ID and device
             to_device = analog_ctx.device
-            if self.device != to_device:
-                self.analog_ctx = self.analog_ctx.to(to_device)
-            self.analog_ctx.set_data(analog_ctx.data)
+            if self.analog_ctx.device != to_device:
+                # aihwkit implements analog tiles in both CPU and CUDA versions,
+                #   e.g. FloatingPointTile(RPUSimple<float>(4, 3))
+                #   v.s. FloatingPointTile(RPUCudaSimple<float>(4, 3))
+                # Here we need to manually convert the tile to the corresponding version
+                self.to(to_device)
+                # Note: `self.to(to_device)` will rebind the private raw
+                #        analog context backing, so no additional context copy
+                #        is needed.
+                # self.analog_ctx = self.analog_ctx.to(to_device)
 
     @no_grad()
     def post_update_step(self) -> None:
@@ -623,6 +860,35 @@ class SimulatorTileWrapper:
         # Use only the ``[out_size, in_size]`` matrix.
         return weight
 
+    def _combine_weights_cuda(
+        self, weight: Union[Tensor, "ArrayLike"], bias: Optional[Union[Tensor, "ArrayLike"]] = None
+    ) -> Tensor:
+        """Like _combine_weights but keeps tensors on the tile's CUDA device.
+
+        Returns a **contiguous** ``[x_size, d_size]`` CUDA tensor in the
+        internal transposed layout expected by ``set_weights_cuda``.
+        """
+        d_type = self.get_dtype()
+        device = self.device  # the tile's CUDA device
+        if not isinstance(weight, Tensor):
+            weight = from_numpy(array(weight))
+        weight = weight.detach().to(dtype=d_type, device=device).reshape(
+            self.out_size, self.in_size
+        )
+
+        if self.analog_bias:
+            if bias is None:
+                raise ValueError("Analog tile has a bias, but no bias given")
+            if not isinstance(bias, Tensor):
+                bias = from_numpy(array(bias))
+            bias = unsqueeze(bias.detach().to(dtype=d_type, device=device), 1)  # type: ignore
+            combined = cat((weight, bias), dim=1)  # [out_size, in_size+1]
+        else:
+            combined = weight  # [out_size, in_size]
+
+        # Transpose to [x_size, d_size] (the internal CUDA storage layout).
+        return combined.t().contiguous()
+
     def _separate_weights(self, combined_weights: Tensor) -> Tuple[Tensor, Optional[Tensor]]:
         """Helper to separate the combined weights and biases"""
         # Split the internal weights (and potentially biases) matrix.
@@ -631,6 +897,16 @@ class SimulatorTileWrapper:
             return Tensor(combined_weights[:, :-1]), Tensor(combined_weights[:, -1])
 
         return combined_weights, None
+
+    # pylint: disable=invalid-name
+    def to(self, device: torch_device) -> "SimulatorTileWrapper":
+        """Move the tile to a device.
+        """
+        if device.type == "cuda":
+            self.cuda(device)
+        else:
+            self.cpu()
+        return self
 
     @no_grad()
     def cpu(self) -> "SimulatorTileWrapper":
@@ -642,10 +918,11 @@ class SimulatorTileWrapper:
         if not self.is_cuda:
             return self
 
-        self.is_cuda = False
-        self.device = torch_device("cpu")
-        self.analog_ctx.data = self.analog_ctx.data.cpu()
+        self.analog_ctx._replace_raw_data(self.analog_ctx._raw_data().cpu())
         self.analog_ctx.reset(self)
+        self._shared_weight_tensor = None
+        self._bind_shared_weights()
+        self._sync_analog_ctx_weights()
 
         return self
 
@@ -665,10 +942,11 @@ class SimulatorTileWrapper:
             CudaError: if the library has not been compiled with CUDA.
         """
         device = torch_device("cuda", cuda_device(device).idx)
-        self.is_cuda = True
-        self.device = device
-        self.analog_ctx.data = self.analog_ctx.data.cuda(device)
+        self.analog_ctx._replace_raw_data(self.analog_ctx._raw_data().cuda(device))
         self.analog_ctx.reset(self)
+        self._shared_weight_tensor = None
+        self._bind_shared_weights()
+        self._sync_analog_ctx_weights()
         return self
 
     def get_hidden_parameters(self) -> "OrderedDict":

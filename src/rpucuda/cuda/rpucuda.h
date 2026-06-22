@@ -198,6 +198,11 @@ public:
   void setWeightsUniformRandom(T min_value, T max_value) override;
   void setSharedWeights(T *weightsptr) override;
 
+  // Direct device-to-device weight access (no CPU roundtrip).
+  // Both buffers use the internal transposed [x_size, d_size] layout.
+  virtual void getWeightsCuda(T *device_dest) const;
+  virtual void setWeightsCuda(const T *device_source);
+
   void getAndResetWeightUpdate(T *prev_weights_and_dw_out, T scale = 1.0) override;
   void applyWeightUpdate(T *dw_and_current_weights_out) override;
 

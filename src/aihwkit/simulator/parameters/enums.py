@@ -37,6 +37,24 @@ class RPUDataType(Enum):
         return _TORCH_DATA_TYPE_MAP[self.value]
 
 
+class AnalogContextDataViewMode(Enum):
+    """Public data access mode for analog optimizer contexts."""
+
+    PLACEHOLDER = "placeholder"
+    """Expose tensor metadata only, without allowing direct weight reads."""
+
+    DATA_VIEW = "data_view"
+    """Expose a read-only logical weight view for diagnostics."""
+
+    BUFFER = "buffer"
+    """Expose an independent digital buffer with the logical weight shape.
+
+    This mode is useful for optimizers that need digital auxiliary state, such
+    as mixed-precision training or TT-v2. The buffer is not synchronized with
+    the analog tile weights.
+    """
+
+
 class BoundManagementType(Enum):
     """Bound management type.
 
