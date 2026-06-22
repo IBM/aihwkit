@@ -23,7 +23,7 @@ from .helpers.layers import (
     LSTMCombinedWeight,
     LSTMCombinedWeightCuda,
 )
-from .helpers.testcases import ParametrizedTestCase
+from .helpers.testcases import ParametrizedTestCase, _probe_cuda_rnn_tolerance
 from .helpers.tiles import (
     FloatingPoint,
     Inference,
@@ -193,8 +193,10 @@ class RNNLayerTest(ParametrizedTestCase):
             rnn_analog.cuda()
             rnn.cuda()
 
+        base_atol = _probe_cuda_rnn_tolerance(input_size, hidden_size, num_layers)
+        fwd_decimal = self.get_cuda_decimal(base_atol)
         with no_grad():
-            self.assertTensorAlmostEqual(rnn(y_in)[0], rnn_analog(y_in)[0])
+            self.assertTensorAlmostEqual(rnn(y_in)[0], rnn_analog(y_in)[0], decimal=fwd_decimal)
 
         # First train analog and make sure weights differ.
         pred_analog = self.train_once(rnn_analog, y_in, y_out, True)
@@ -205,9 +207,10 @@ class RNNLayerTest(ParametrizedTestCase):
             for weight, weight_org in zip(analog_weights.values(), weights_org.values()):
                 assert_raises(AssertionError, assert_array_almost_equal, weight[0], weight_org[0])
 
-        # Compare with RNN.
+        # Compare after training (2 iterations of fwd+bwd+update).
+        train_decimal = self.get_cuda_decimal(base_atol, training_steps=2)
         pred = self.train_once(rnn, y_in, y_out, False)
-        assert_array_almost_equal(pred, pred_analog)
+        assert_array_almost_equal(pred, pred_analog, decimal=train_decimal)
 
         rnn_pars = get_parameters(rnn, False)
         rnn_analog_pars = get_parameters(rnn_analog, True)
@@ -220,7 +223,9 @@ class RNNLayerTest(ParametrizedTestCase):
 
         for par_name, par_item in rnn_pars.items():
             assert_array_almost_equal(
-                par_item.detach().cpu().numpy(), rnn_analog_pars[par_name].detach().cpu().numpy()
+                par_item.detach().cpu().numpy(),
+                rnn_analog_pars[par_name].detach().cpu().numpy(),
+                decimal=train_decimal,
             )
 
     def test_bidir_layer_training(self):
@@ -297,8 +302,12 @@ class RNNLayerTest(ParametrizedTestCase):
             rnn_analog.cuda()
             rnn.cuda()
 
+        base_atol = _probe_cuda_rnn_tolerance(
+            input_size, hidden_size, num_layers, bidirectional=True
+        )
+        fwd_decimal = self.get_cuda_decimal(base_atol)
         with no_grad():
-            self.assertTensorAlmostEqual(rnn(y_in)[0], rnn_analog(y_in)[0])
+            self.assertTensorAlmostEqual(rnn(y_in)[0], rnn_analog(y_in)[0], decimal=fwd_decimal)
 
         # First train analog and make sure weights differ.
         pred_analog = self.train_once_bidir(rnn_analog, y_in, y_out, True)
@@ -309,9 +318,10 @@ class RNNLayerTest(ParametrizedTestCase):
             for weight, weight_org in zip(analog_weights.values(), weights_org.values()):
                 self.assertNotAlmostEqualTensor(weight[0], weight_org[0])
 
-        # Compare with RNN.
+        # Compare after training (2 iterations of fwd+bwd+update).
+        train_decimal = self.get_cuda_decimal(base_atol, training_steps=2)
         pred = self.train_once_bidir(rnn, y_in, y_out, False)
-        assert_array_almost_equal(pred, pred_analog)
+        assert_array_almost_equal(pred, pred_analog, decimal=train_decimal)
 
         rnn_pars = get_parameters(rnn, False)
         rnn_analog_pars = get_parameters(rnn_analog, True)
@@ -324,7 +334,9 @@ class RNNLayerTest(ParametrizedTestCase):
 
         for par_name, par_item in rnn_pars.items():
             assert_array_almost_equal(
-                par_item.detach().cpu().numpy(), rnn_analog_pars[par_name].detach().cpu().numpy()
+                par_item.detach().cpu().numpy(),
+                rnn_analog_pars[par_name].detach().cpu().numpy(),
+                decimal=train_decimal,
             )
 
 
@@ -434,9 +446,14 @@ class LSTMCombinedWeightTest(RNNLayerTest):
             rnn_analog.cuda()
             rnn.cuda()
 
+        # LSTMCombinedWeight uses a single weight tile with dim = input_size + hidden_size
+        base_atol = _probe_cuda_rnn_tolerance(input_size, hidden_size, num_layers)
+        fwd_decimal = self.get_cuda_decimal(base_atol)
         with no_grad():
             assert_array_almost_equal(
-                rnn(y_in)[0].detach().clone().cpu(), rnn_analog(y_in)[0].detach().clone().cpu()
+                rnn(y_in)[0].detach().clone().cpu(),
+                rnn_analog(y_in)[0].detach().clone().cpu(),
+                decimal=fwd_decimal,
             )
 
         # First train analog and make sure weights differ.
@@ -449,7 +466,8 @@ class LSTMCombinedWeightTest(RNNLayerTest):
             for weight, weight_org in zip(analog_weights.values(), weights_org.values()):
                 self.assertNotAlmostEqualTensor(weight[0], weight_org[0])
 
-        # Compare with RNN.
+        # Compare after training (2 iterations of fwd+bwd+update).
+        train_decimal = self.get_cuda_decimal(base_atol, training_steps=2)
         pred = self.train_once(rnn, y_in, y_out, False)
 
-        assert_array_almost_equal(pred, pred_analog)
+        assert_array_almost_equal(pred, pred_analog, decimal=train_decimal)

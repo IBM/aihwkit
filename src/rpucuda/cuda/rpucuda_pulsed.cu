@@ -529,6 +529,28 @@ template <typename T> void RPUCudaPulsed<T>::setWeights(const T *host_source) {
   RPUCudaSimple<T>::setWeights(this->getWeightsPtr()[0]); // set device weights
 }
 
+template <typename T> void RPUCudaPulsed<T>::setWeightsCuda(const T *device_source) {
+  CHECK_RPU_DEVICE_INIT;
+
+  // 1. D2D copy device_source -> dev_weights_, then sync to host (weights_).
+  RPUCudaSimple<T>::setWeightsCuda(device_source);
+
+  // 2. If a pulsed device is attached (e.g. ConstantStep, LinearStep),
+  //    let it inspect / clamp the new host weights via onSetWeights().
+  if (rpu_device_) {
+    // onSetWeights() returns true when it modified the host weights
+    // (e.g. applied weight bounds or symmetry constraints).
+    if (rpu_device_->onSetWeights(this->getWeightsPtr())) {
+      // 3. Device parameters derived from weights may have changed
+      //    (e.g. slope / reference levels). Sync host device -> CUDA device.
+      rpucuda_device_->populateFrom(*rpu_device_);
+      // 4. Host weights were modified by onSetWeights(); push them back
+      //    to dev_weights_ so the GPU copy reflects the clamped values.
+      RPUCudaSimple<T>::setWeights(this->getWeightsPtr()[0]);
+    }
+  }
+}
+
 template <typename T> void RPUCudaPulsed<T>::applyWeightUpdate(T *dw_and_current_weight_out) {
 
   CHECK_RPU_DEVICE_INIT;

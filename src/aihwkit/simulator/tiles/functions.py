@@ -32,6 +32,8 @@ class AnalogFunction(Function):
         Note: Indexed versions can used when analog_ctx.use_indexed is
         set to True.
         """
+        # `ctx` is the parameter required by PyTorch to store the context
+        # no need to pass it through ```AnalogFunction.apply(...)````.
         # Store in context for using during `backward()`.
         ctx.analog_ctx = analog_ctx
         ctx.analog_tile = analog_tile

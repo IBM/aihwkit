@@ -177,6 +177,7 @@ class TileModule(Module, TileModuleBase):
         # at the end. shared weight might be updated above which might
         # yeild issues if the tile is not first updated
         self._apply_without_context(lambda t: t.cuda(device))
+        self._sync_analog_ctx_weights()
         return self
 
     def cpu(self) -> "TileModule":
@@ -194,6 +195,7 @@ class TileModule(Module, TileModuleBase):
             super(BaseTile, self).cpu()  # type: ignore
 
         self._apply_without_context(lambda t: t.cpu())
+        self._sync_analog_ctx_weights()
         return self
 
     def to(self, *args: Any, **kwargs: Any) -> "TileModule":
@@ -323,7 +325,10 @@ class TileModule(Module, TileModuleBase):
         # pylint: disable=unused-argument
         missing_keys, unexpected_keys = incompatible_keys
         for key in missing_keys.copy():
-            if AnalogTileStateNames.SHARED_WEIGHTS in key:
+            if (
+                AnalogTileStateNames.SHARED_WEIGHTS in key
+                or key.endswith(AnalogTileStateNames.CONTEXT)
+            ):
                 missing_keys.remove(key)
         for key in unexpected_keys.copy():
             if ".tile." in key:
@@ -397,6 +402,7 @@ class TileModule(Module, TileModuleBase):
         analog_state_name = TileModule.get_analog_state_name(prefix)
 
         if analog_state_name not in state_dict:
+            state_dict.pop(prefix + AnalogTileStateNames.CONTEXT, None)
             missing_keys.append(analog_state_name)
             return
 
@@ -405,6 +411,11 @@ class TileModule(Module, TileModuleBase):
         shared_weights_key = prefix + AnalogTileStateNames.SHARED_WEIGHTS
         if shared_weights_key in state_dict and isinstance(state_dict[shared_weights_key], Tensor):
             state_dict.pop(shared_weights_key, None)
+
+        # The analog state restores analog_ctx explicitly. Letting PyTorch
+        # copy the registered Parameter afterwards is redundant and would
+        # look like a direct user write to the logical read-only context.
+        state_dict.pop(prefix + AnalogTileStateNames.CONTEXT, None)
 
         analog_state = state_dict.pop(analog_state_name).copy()
         if not analog_tile.load_rpu_config:

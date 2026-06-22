@@ -158,14 +158,23 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             if not isinstance(bias, Tensor):
                 bias = from_numpy(array(bias))
 
-            self.bias.data[:] = bias[:].clone().detach().to(self.get_dtype()).to(self.bias.device)
+            self.bias.data.copy_(bias)
             bias = None
 
-        combined_weights = self._combine_weights(weight, bias)
-
-        if apply_weight_scaling:
-            combined_weights = self.apply_weight_scaling(combined_weights, weight_scaling_omega)
-        self.tile.set_weights(combined_weights)
+        if hasattr(self.tile, "set_weights_cuda"):
+            combined_weights = self._combine_weights_cuda(weight, bias)
+            if apply_weight_scaling:
+                # apply_weight_scaling works on any device; re-transpose after.
+                combined_weights = self.apply_weight_scaling(
+                    combined_weights.t().contiguous(), weight_scaling_omega
+                ).t().contiguous()
+            self.tile.set_weights_cuda(combined_weights)
+        else:
+            combined_weights = self._combine_weights(weight, bias)
+            if apply_weight_scaling:
+                combined_weights = self.apply_weight_scaling(combined_weights, weight_scaling_omega)
+            self.tile.set_weights(combined_weights)
+        self._sync_analog_ctx_weights()
 
         if realistic:
             self.program_weights()
@@ -211,7 +220,13 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             return self.read_weights(apply_weight_scaling=apply_weight_scaling)
 
         # Retrieve the internal weights (and potentially biases) matrix.
-        combined_weights = self.tile.get_weights()
+        # Use the CUDA-native path when available to avoid a full device sync
+        # and the CPU-side transpose loop inside the C++ binding.
+        if hasattr(self.tile, "get_weights_cuda"):
+            # get_weights_cuda() → [x_size, d_size] on CUDA; .t() → [d_size, x_size]
+            combined_weights = self.tile.get_weights_cuda().t().detach().cpu()
+        else:
+            combined_weights = self.tile.get_weights()
         weight, bias = self._separate_weights(combined_weights)
 
         if self.digital_bias:

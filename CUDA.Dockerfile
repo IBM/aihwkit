@@ -1,5 +1,5 @@
 # Stage 0: Intel MKL
-ARG CUDA_VERSION=12.2.2
+ARG CUDA_VERSION=13.3.0
 FROM intel/oneapi-basekit AS mkl-env
 
 # Stage 1: Build dependencies
@@ -51,7 +51,24 @@ RUN pip install --no-cache-dir --no-warn-script-location torch torchvision
 WORKDIR /aihwkit
 ENV MKLROOT /opt/intel/oneapi/mkl/latest
 ENV CUDACXX /usr/local/cuda/bin/nvcc
-ARG CUDA_ARCH=86
+# CUDA architecture codes (CMAKE_CUDA_ARCHITECTURES):
+#   75 = Turing (RTX 20xx, T4)
+#   80 = Ampere (A100)
+#   86 = Ampere (RTX 30xx, A40/A10)
+#   87 = Ampere (Jetson Orin)
+#   89 = Ada Lovelace (RTX 40xx)
+#   90 = Hopper (H100, H200)
+#   100 = Blackwell (B100/B200)
+#   120 = Blackwell RTX (RTX 50xx consumer GPUs)
+#
+# Example:
+#   -DCMAKE_CUDA_ARCHITECTURES="75;86;89"
+#
+# To compile only for the GPU installed on your system:
+#   nvidia-smi --query-gpu=compute_cap --format=csv,noheader
+# or
+#   nvcc --list-gpu-arch
+ARG CUDA_ARCH=75
 RUN python setup.py install --user -j$(nproc) \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE \
@@ -61,7 +78,7 @@ RUN python setup.py install --user -j$(nproc) \
     -DRPU_CUDA_ARCHITECTURES=${CUDA_ARCH}
 
 # Stage 2: Final runtime environment
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu24.04
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn-runtime-ubuntu24.04
 
 # Copy from build-env
 COPY --from=build-env /opt/intel/oneapi/mkl/latest/lib/intel64 /opt/intel/oneapi/mkl/latest/lib/intel64

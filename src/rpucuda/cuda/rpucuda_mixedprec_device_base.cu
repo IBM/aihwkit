@@ -100,7 +100,7 @@ MixedPrecRPUDeviceBaseCuda<T>::operator=(MixedPrecRPUDeviceBaseCuda<T> &&other) 
   SimpleRPUDeviceCuda<T>::operator=(std::move(other));
 
   rpucuda_device_ = std::move(other.rpucuda_device_);
-  rw_rng_ = std::move(rw_rng_);
+  rw_rng_ = std::move(other.rw_rng_);
 
   transfer_pwu_ = std::move(other.transfer_pwu_);
   noise_manager_x_ = std::move(other.noise_manager_x_);
@@ -116,8 +116,8 @@ MixedPrecRPUDeviceBaseCuda<T>::operator=(MixedPrecRPUDeviceBaseCuda<T> &&other) 
   dev_sparsity_x_ = std::move(other.dev_sparsity_x_);
   dev_avg_sparsity_ = std::move(other.dev_avg_sparsity_);
 
-  dev_transfer_tmp_ = std::move(dev_transfer_tmp_);
-  dev_transfer_d_vecs_ = std::move(dev_transfer_d_vecs_);
+  dev_transfer_tmp_ = std::move(other.dev_transfer_tmp_);
+  dev_transfer_d_vecs_ = std::move(other.dev_transfer_d_vecs_);
 
   io_ = other.io_;
   up_ptr_ = other.up_ptr_;

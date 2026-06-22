@@ -49,11 +49,16 @@ message(STATUS "The BLAS backend of choice:" ${RPU_BLAS})
 if(RPU_BLAS STREQUAL "OpenBLAS")
   find_package(OpenBLAS REQUIRED)
   include_directories(SYSTEM ${OpenBLAS_INCLUDE_DIR})
+  # Remember the BLAS include dir so it can also be handed to nvcc explicitly
+  # (see CMakeLists.txt): global include_directories(SYSTEM ...) is not reliably
+  # forwarded to the CUDA host compilation under all toolchains.
+  set(RPU_BLAS_INCLUDE_DIRS ${OpenBLAS_INCLUDE_DIR})
   list(APPEND RPU_DEPENDENCY_LIBS ${OpenBLAS_LIB})
   add_compile_definitions(RPU_USE_OPENBLAS)
 elseif(RPU_BLAS STREQUAL "MKL")
   find_package(MKL REQUIRED)
   include_directories(SYSTEM ${MKL_INCLUDE_DIR})
+  set(RPU_BLAS_INCLUDE_DIRS ${MKL_INCLUDE_DIR})
   list(APPEND RPU_DEPENDENCY_LIBS ${MKL_LIBRARIES} )
   if(USE_OMP)
     list(APPEND RPU_DEPENDENCY_LIBS ${MKL_OPENMP_LIBRARY} )
@@ -110,6 +115,39 @@ include_directories(${pybind11_INCLUDE_DIR})
 find_package(Torch REQUIRED)
 include_directories(${TORCH_INCLUDE_DIRS})
 link_directories(${TORCH_LIB_DIR})
+
+# C++ standard. torch's headers carry a hard requirement on the language
+# standard (ATen/ATen.h: `#if __cplusplus < 202002L` / `< 201703L` followed by
+# an #error): releases up to 2.13 build with C++17, 2.14 and later need C++20.
+# Read the number out of that guard so the standard follows whichever torch is
+# installed, unless RPU_CXX_STANDARD was given explicitly.
+if(NOT RPU_CXX_STANDARD)
+  set(RPU_CXX_STANDARD 17)
+  set(_rpu_aten_h "")
+  foreach(_dir ${TORCH_INCLUDE_DIRS})
+    if(EXISTS "${_dir}/ATen/ATen.h")
+      set(_rpu_aten_h "${_dir}/ATen/ATen.h")
+      break()
+    endif()
+  endforeach()
+  if(_rpu_aten_h)
+    file(STRINGS "${_rpu_aten_h}" _rpu_aten_guard
+      REGEX "__cplusplus[ \t]*<[ \t]*20[0-9][0-9][0-9][0-9]L" LIMIT_COUNT 1)
+    if(_rpu_aten_guard MATCHES "__cplusplus[ \t]*<[ \t]*20([0-9][0-9])[0-9][0-9]L")
+      set(RPU_CXX_STANDARD ${CMAKE_MATCH_1})
+    endif()
+  endif()
+  message(STATUS "Using C++${RPU_CXX_STANDARD} (required by ${_rpu_aten_h})")
+else()
+  message(STATUS "Using C++${RPU_CXX_STANDARD} (from RPU_CXX_STANDARD)")
+endif()
+
+if(RPU_CXX_STANDARD GREATER 17 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+   AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10)
+  message(WARNING "C++${RPU_CXX_STANDARD} is required by the installed torch, but GCC "
+    "${CMAKE_CXX_COMPILER_VERSION} has no usable C++20 support (concepts, <compare>). "
+    "Use GCC 10 or newer, or install torch <= 2.13.")
+endif()
 
 if (CMAKE_COMPILER_IS_GNUCXX)
   # Prefer ABI from Torch CMake config (works even when Python build isolation

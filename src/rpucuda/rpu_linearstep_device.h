@@ -69,7 +69,7 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
 
 template <typename T>
 struct SoftBoundsRPUDeviceMetaParameter : LinearStepRPUDeviceMetaParameter<T> {
-  SoftBoundsRPUDeviceMetaParameter<T>() {
+  SoftBoundsRPUDeviceMetaParameter() {
     // ctor, to overwrite default values to softbounds
     this->ls_decrease_up = (T)1.0;   // meaning 0 update at bounds
     this->ls_decrease_down = (T)1.0; // meaning 0 update at bounds

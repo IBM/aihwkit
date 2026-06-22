@@ -57,6 +57,9 @@ class CustomSimulatorTile(SimulatorTile, Module):
         AnalogMVM.check_support(rpu_config.backward)
         self.set_config(rpu_config)
 
+        # Type declaration for static analysis (pylint/mypy): register_buffer sets this
+        # attribute dynamically and static analyzers cannot infer it from the string-based API.
+        self._analog_weight: Tensor
         # just buffer to handle device, since do not use auto grad
         self.register_buffer("_analog_weight", zeros(self.d_size, self.x_size, dtype=float32))
 
@@ -147,18 +150,21 @@ class CustomSimulatorTile(SimulatorTile, Module):
         Args:
             weight: ``[out_size, in_size]`` weight matrix.
         """
-        device = self._analog_weight.device
-        self._analog_weight = weight.clone().to(device)
+        self._analog_weight.copy_(weight)
 
-    def get_weights(self) -> Tensor:
+    def get_weights(self, as_ref: bool = False) -> Tensor:
         """Get the tile weights.
 
+        Args:
+            as_ref: if True, return a reference to the internal weight tensor.
+                If False (default), return a detached CPU copy.
+
         Returns:
-            a tuple where the first item is the ``[out_size, in_size]`` weight
-            matrix; and the second item is either the ``[out_size]`` bias vector
-            or ``None`` if the tile is set not to use bias.
+            the ``[out_size, in_size]`` weight matrix.
         """
-        return self._analog_weight.data.detach().cpu()
+        if as_ref:
+            return self._analog_weight.data
+        return self._analog_weight.data.detach().cpu().clone()
 
     def get_x_size(self) -> int:
         """Returns input size of tile"""

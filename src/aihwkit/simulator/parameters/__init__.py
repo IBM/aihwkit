@@ -10,6 +10,7 @@
 # the simulator shared library is linked against.
 
 from .enums import (
+    AnalogContextDataViewMode,
     RPUDataType,
     BoundManagementType,
     NoiseManagementType,
