@@ -29,9 +29,8 @@ set(RPU_CXX_STANDARD "17" CACHE STRING "C++ standard used for all RPU targets")
 
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
 set(RPU_CUDA_ARCHITECTURES "75;80;89" CACHE STRING "Target CUDA architectures")
-if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
-  set(CMAKE_HIP_ARCHITECTURES "gfx90a" CACHE STRING "Target HIP (ROCm) architectures")
-endif()
+# CMAKE_HIP_ARCHITECTURES is left to enable_language(HIP) to auto-detect the host
+# GPU when not set explicitly via -DCMAKE_HIP_ARCHITECTURES.
 
 # Internal variables.
 set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
