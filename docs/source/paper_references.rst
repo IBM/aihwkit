@@ -45,6 +45,17 @@ Paper References
 * [14] 2023 Nature,
   `An analog-AI chip for energy-efficient speech recognition and transcription`_
 
+* [15] 2025 NeurIPS,
+  `Analog In-memory Training on General Non-ideal Resistive Elements: The Impact of Response Functions`_
+
+* [16] 2021 Frontiers in Artificial Intelligence,
+  `Enabling Training of Neural Networks on Noisy Hardware`_
+
+* [17] 2024 Nature Communications,
+  `Fast and robust analog in-memory deep neural network training`_
+
+* [18] 2026 AISTATS,
+  `In-memory Training on Analog Devices with Limited Conductance States via Multi-tile Residual Learning`_
 
 .. _`Memory devices and applications for in-memory computing`: https://www.nature.com/articles/s41565-020-0655-z
 .. _`Accurate deep neural network inference using computational phase-change memory`: https://www.nature.com/articles/s41467-020-16108-9
@@ -60,7 +71,7 @@ Paper References
 .. _`Hardware-aware training for large-scale and diverse deep learning inference workloads using in-memory computing-based accelerators`: https://www.nature.com/articles/s41467-023-40770-4
 .. _`A 64-core mixed-signal in-memory compute chip based on phase-change memory for deep neural network inference`: https://www.nature.com/articles/s41928-023-01010-1
 .. _`An analog-AI chip for energy-efficient speech recognition and transcription`: https://www.nature.com/articles/s41586-023-06337-5
-
-
-
-
+.. _`Analog In-memory Training on General Non-ideal Resistive Elements: The Impact of Response Functions`: https://openreview.net/forum?id=WhEPg4mUs6
+.. _`Enabling Training of Neural Networks on Noisy Hardware`: https://www.frontiersin.org/articles/10.3389/frai.2021.699148/full
+.. _`Fast and robust analog in-memory deep neural network training`: https://www.nature.com/articles/s41467-024-51221-z
+.. _`In-memory Training on Analog Devices with Limited Conductance States via Multi-tile Residual Learning`: https://arxiv.org/abs/2510.02516

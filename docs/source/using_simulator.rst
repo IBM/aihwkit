@@ -128,12 +128,15 @@ Resistive device class                                                Descriptio
 Compound Devices
 """"""""""""""""
 
-====================================================================  ========
-Resistive device class                                                Description
-====================================================================  ========
-:class:`~aihwkit.simulator.configs.devices.TransferCompound`          abstract device model that takes 2 or more devices per crosspoint and implements a 'transfer' based learning rule such as Tiki-Taka (see `Gokmen & Haensch 2020`_).
-:class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`    abstract device model that takes one devices per crosspoint and implements a 'mixed-precision' based learning rule where the rank-update is done in digital instead of using a fully analog parallel write (see `Nandakumar et al. 2020`_).
-====================================================================  ========
+=========================================================================      ========
+Resistive device class                                                         Description
+=========================================================================      ========
+:class:`~aihwkit.simulator.configs.devices.TransferCompound`                   abstract device model that takes 2 or more devices per crosspoint and implements a transfer-based learning rule (TTv1 / Tiki-Taka, see `Gokmen & Haensch 2020`_).
+:class:`~aihwkit.simulator.configs.compounds.BufferedTransferCompound`         extends TransferCompound with a floating-point H buffer between the fast and slow arrays, implementing the TTv2 algorithm (see `Gokmen 2021`_).
+:class:`~aihwkit.simulator.configs.compounds.ChoppedTransferCompound`          extends BufferedTransferCompound with input/output choppers, implementing TTv3 (c-TTv2) (see `Rasch et al. 2024`_).
+:class:`~aihwkit.simulator.configs.compounds.DynamicTransferCompound`          extends ChoppedTransferCompound with dynamic on-the-fly reference estimation, implementing the TTv4 (AGAD) algorithm (see `Rasch et al. 2024`_).
+:class:`~aihwkit.simulator.configs.devices.MixedPrecisionCompound`             abstract device model that takes one devices per crosspoint and implements a 'mixed-precision' based learning rule where the rank-update is done in digital instead of using a fully analog parallel write (see `Nandakumar et al. 2020`_).
+=========================================================================      ========
 
 RPU Configurations
 ------------------
@@ -270,8 +273,8 @@ contribution simple adds up to form a joined effective weight. During
 forward/backward this joint effective weight will be used. Update,
 however, will be done on each of the "hidden" weights independently.
 
-Transfer Compound Device
-""""""""""""""""""""""""
+Transfer Compound Device (TTv1 / Tiki-taka)
+""""""""""""""""""""""""""""""""""""""""""""
 Compound devices are more complex than unit cell devices, which have a
 number of devices per crosspoint, however, they share the underlying
 implementation. For instance, the "Transfer Compound Device" does
@@ -336,6 +339,118 @@ Note that this analog tile now will perform tiki-taka as the learning
 rule instead of plain SGD. Once the configuration is done, the usage
 of this complex analog tile for testing or training from the user
 point of view is however the same as for other tiles.
+
+Buffered Transfer Compound Device (TTv2)
+"""""""""""""""""""""""""""""""""""""""""
+The :class:`~aihwkit.simulator.configs.compounds.BufferedTransferCompound`
+extends the basic transfer compound with a floating-point H buffer that sits
+between the fast analog array A and the slow weight array C (see `Gokmen 2021`_).
+
+At each transfer event, a column of A is read and the result is accumulated
+into H.  An integer pulse is sent to C only when the accumulated value exceeds
+the device granularity threshold (:math:`|H| \geq 1`), after which H is
+reduced by the number of steps taken.  This design has two practical advantages
+over plain Tiki-taka (TTv1):
+
+* **Reduced write noise on C** — the slow device is updated infrequently and
+  only with integer-aligned steps that match its conductance granularity.
+* **Lossless accumulation** — fractional gradient contributions are preserved
+  in the floating-point buffer until they can be committed as full pulses.
+
+A minimal TTv2 configuration::
+
+    from aihwkit.nn import AnalogLinear
+    from aihwkit.simulator.configs import UnitCellRPUConfig
+    from aihwkit.simulator.configs.compounds import BufferedTransferCompound
+    from aihwkit.simulator.configs.devices import SoftBoundsDevice
+
+    rpu_config = UnitCellRPUConfig(
+        device=BufferedTransferCompound(
+            unit_cell_devices=[SoftBoundsDevice(), SoftBoundsDevice()],
+            transfer_every=2,    # transfer every 2 batches
+            momentum=0.1,        # fraction of buffer kept after transfer
+        )
+    )
+    model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
+
+Chopped Transfer Compound Device (TTv3 / c-TTv2)
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+The :class:`~aihwkit.simulator.configs.compounds.ChoppedTransferCompound`
+extends the basic transfer compound with two additional features:
+
+* **Choppers** — input and output sign-flip patterns that are toggled
+  stochastically after each transfer read, suppressing systematic offset
+  errors and enabling faster transfer rates (TTv3/v4 behaviour).
+* **Floating-point H buffer** — a per-weight accumulator that collects
+  fractional transfer increments; an integer pulse is sent to the slow
+  device only when the buffer reaches ±1.
+
+*Buffer update strategies*
+
+The H buffer is updated via standard accumulation: each transfer event reads a column
+of A, scales it by a learning-rate factor α, and adds the result directly to the buffer:
+
+.. math::
+
+   H \mathrel{+}= \alpha \cdot \text{chopper} \cdot A
+
+When ``|H| ≥ 1`` an integer number of pulses is sent to C.  After
+stepping, H is reduced either by subtracting the steps taken or by an
+exponential decay, controlled by ``forget_buffer`` and ``momentum``.
+Because H grows without bound between transfer events, its magnitude at
+step time is determined by the inter-transfer gradient history.
+
+For a detailed description of all governing parameters see
+`analog_update`_.  For the ``gamma`` residual-learning parameter see the
+*Residual learning* discussion in the Transfer Compound Device (TTv1) section above.
+
+A minimal TTv3 configuration (no residual, standard buffer)::
+
+    from aihwkit.nn import AnalogLinear
+    from aihwkit.simulator.configs import UnitCellRPUConfig
+    from aihwkit.simulator.configs.compounds import ChoppedTransferCompound
+    from aihwkit.simulator.configs.devices import SoftBoundsDevice
+
+    rpu_config = UnitCellRPUConfig(
+        device=ChoppedTransferCompound(
+            unit_cell_devices=[SoftBoundsDevice(), SoftBoundsDevice()],
+            transfer_every=10,      # transfer every 10 batches
+            in_chop_prob=0.1,       # chopper switching probability
+        )
+    )
+    model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
+
+Dynamic Transfer Compound Device (TTv4 / AGAD)
+"""""""""""""""""""""""""""""""""""""""""""""""
+The :class:`~aihwkit.simulator.configs.compounds.DynamicTransferCompound`,
+originally named **Analog Gradient Accumulation with Dynamic reference (AGAD)**
+(see `Rasch et al. 2024`_), extends
+:class:`~aihwkit.simulator.configs.compounds.ChoppedTransferCompound` with a
+*dynamic on-the-fly reference* for computing the transfer update from A to C.
+
+Rather than relying on a separate reference conductance array or differential
+read circuitry, TTv4 establishes reference values from the device reads
+themselves: the running mean of reads from the two most recent chopper
+half-periods are compared, and the transfer onto C is proportional to their
+*difference*.  No update is dispatched when the difference is smaller than the
+estimated noise floor (standard error of the mean), acting as a noise gate.
+This greatly simplifies hardware design while maintaining robust training.
+
+A minimal TTv4 configuration::
+
+    from aihwkit.nn import AnalogLinear
+    from aihwkit.simulator.configs import UnitCellRPUConfig
+    from aihwkit.simulator.configs.compounds import DynamicTransferCompound
+    from aihwkit.simulator.configs.devices import SoftBoundsDevice
+
+    rpu_config = UnitCellRPUConfig(
+        device=DynamicTransferCompound(
+            unit_cell_devices=[SoftBoundsDevice(), SoftBoundsDevice()],
+            transfer_every=10,   # number of batches per chopper period
+            in_chop_prob=0.1,    # chopper switching frequency (regular)
+        )
+    )
+    model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
 
 Mixed Precision Compound
 """"""""""""""""""""""""
@@ -415,6 +530,9 @@ For more info look into :py:mod:`aihwkit.simulator.parameters.enums.RPUDataType`
 
 
 .. _Gokmen & Haensch 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00103/full
+.. _Gokmen 2021: https://www.frontiersin.org/articles/10.3389/frai.2021.699148/full
 .. _Example 7: https://github.com/IBM/aihwkit/blob/master/examples/07_simple_layer_with_other_devices.py
 .. _Example 8: https://github.com/IBM/aihwkit/blob/master/examples/08_simple_layer_with_tiki_taka.py
 .. _Nandakumar et al. 2020: https://www.frontiersin.org/articles/10.3389/fnins.2020.00406/full
+.. _Rasch et al. 2024: https://www.nature.com/articles/s41467-024-51221-z
+.. _analog_update: analog_update.html

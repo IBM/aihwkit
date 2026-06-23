@@ -372,7 +372,11 @@ T TransferRPUDevice<T>::getPulseCountLearningRate(
   const auto &par = getPar();
 
   if (par.fast_lr > (T)0.0) {
-    return par.fast_lr;
+    if (par.scale_fast_lr) {
+      return par.fast_lr * learning_rate;
+    } else {
+      return par.fast_lr;
+    }
   } else {
     return learning_rate;
   }

@@ -154,6 +154,8 @@ public:
 
   void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
 
+  void reduceToWeights(T **weights) const override;
+
   void initUpdateCycle(
       T **weights,
       const PulsedUpdateMetaParameter<T> &up,
