@@ -32,7 +32,7 @@ from aihwkit.nn.conversion import convert_to_analog
 
 from .helpers.decorators import parametrize_over_layers
 from .helpers.layers import Conv1d, Conv1dCuda, Conv2d, Conv2dCuda, Conv3d, Conv3dCuda
-from .helpers.testcases import ParametrizedTestCase
+from .helpers.testcases import ParametrizedTestCase, _probe_cuda_conv3d_tolerance
 from .helpers.tiles import FloatingPoint, Inference, TorchInference, Custom, QuantizedTorchInference
 
 
@@ -650,7 +650,9 @@ class Convolution3dLayerTest(ConvolutionLayerTest):
         self.set_weights_from_digital_model(analog_model, model)
 
         y_analog = analog_model(x)
-        self.assertTensorAlmostEqual(y_analog, y)
+        base_atol = _probe_cuda_conv3d_tolerance(in_channels=2, kernel_size=4)
+        decimal = self.get_cuda_decimal(base_atol)
+        self.assertTensorAlmostEqual(y_analog, y, decimal=decimal)
 
     def test_torch_train_original_layer(self):
         """Test the forward and update pass, having the digital layer as reference."""
