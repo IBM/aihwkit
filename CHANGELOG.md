@@ -12,6 +12,26 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## Latest
+
+### Added
+
+* Define data attribution for AnalogContext with read-only protection [(\#765)](https://github.com/IBM/aihwkit/pull/765)
+* Non-zero gamma support in ChoppedTransferCompound [(\#764)](https://github.com/IBM/aihwkit/pull/764)
+
+### Changed
+
+* Updated and corrected analog_device_nonidealities_tutorial notebook [(\#758)](https://github.com/IBM/aihwkit/pull/758)
+* Remove reset bias clamp in rpu_pulsed_device.h [(\#761)](https://github.com/IBM/aihwkit/pull/761)
+
+### Fixed
+* Improve Python executable detection and error handling in CMake [(\#757)](https://github.com/IBM/aihwkit/pull/757)
+* Retune PWU kernel when m_batch grows after initial m=1 update [(\#763)](https://github.com/IBM/aihwkit/pull/763)
+* Tests for dynamic tolerance for cuDNN TF32 precision on Ampere+ GPUs [(\#771)](https://github.com/IBM/aihwkit/pull/771)
+
+### Security
+* Bump jupyter-server from 2.18.2 to 2.20.0 [(\#777)](https://github.com/IBM/aihwkit/pull/777)
+
 ## [1.1.0] - 2026/02/03
 
 ### Added
