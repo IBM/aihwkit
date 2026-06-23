@@ -537,6 +537,10 @@ void ChoppedTransferRPUDevice<T>::reduceToWeights(T **weights) const {
   // The fast weight A is stored in "chopped" form and needs de-chopping
   // when it contributes to the final weight W.
   // Correction: add gamma * (c_d[i] * c_x[j] - 1) * A[i,j] to each element.
+  //
+  // in_chopper_/out_chopper_ are boolean flags; the de-chopping sign matches
+  // the read path (readAndUpdate): +1 when the two choppers agree, -1 when
+  // they differ (i.e. c_d[i] * c_x[j] expressed as an XOR of the flags).
 
   T *A = *this->weights_vec_[0];
   int size = this->x_size_ * this->d_size_;
@@ -545,7 +549,7 @@ void ChoppedTransferRPUDevice<T>::reduceToWeights(T **weights) const {
   for (int idx = 0; idx < size; idx++) {
     int d_idx = idx % this->d_size_;
     int x_idx = idx / this->d_size_;
-    T chop = (T)(in_chopper_[x_idx] * out_chopper_[d_idx]);
+    T chop = (in_chopper_[x_idx] != out_chopper_[d_idx]) ? (T)-1.0 : (T)1.0;
     weights[0][idx] += gamma * (chop - (T)1.0) * A[idx];
   }
 }

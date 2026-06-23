@@ -415,6 +415,9 @@ __global__ void kernelChoppedTransfer(
 // After the base GEMV produces W = gamma * A_stored + C, this kernel corrects it to
 //   W = gamma * c_d[i] * c_x[j] * A_stored[i,j] + C[i,j]
 // by adding gamma * (c_d[i]*c_x[j] - 1) * A_stored[i,j] to each element.
+// The choppers are boolean flags; the de-chopping sign is +1 when c_x and c_d
+// agree and -1 when they differ (matching the read path), which equals
+// c_d[i]*c_x[j] when the flags are interpreted as +/-1.
 // Layout: W[x_idx * d_size + d_idx] (column-major, d as inner dimension).
 template <typename T>
 __global__ void kernelApplyChopperCorrectionToWeights(
@@ -429,7 +432,7 @@ __global__ void kernelApplyChopperCorrectionToWeights(
   RPU_CUDA_1D_KERNEL_LOOP(idx, total_size) {
     int d_idx = idx % d_size;
     int x_idx = idx / d_size;
-    T chop = (T)(c_x[x_idx] * c_d[d_idx]);
+    T chop = (c_x[x_idx] != c_d[d_idx]) ? (T)-1.0 : (T)1.0;
     dev_weights[idx] += gamma * (chop - (T)1.0) * A[idx];
   }
 }
