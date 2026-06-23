@@ -51,7 +51,8 @@ public:
           tmp_gamma[kk + 1] = w_gamma_up[i][j];
         }
       } dev_gamma_->assign(tmp_gamma);
-      dev_write_noise_std_->setConst(getPar().getScaledWriteNoise());
+      dev_write_noise_std_->setConst(
+          getPar().write_noise_std * (getPar().dw_min == (T)0.0 ? (T)1.0 : getPar().dw_min));
 
       this->context_->synchronize();
       delete[] tmp_gamma;);
@@ -73,6 +74,9 @@ public:
                ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + (T)1e-6
                : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
+
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
 
 private:
   std::unique_ptr<CudaArray<param_t>> dev_gamma_ = nullptr;

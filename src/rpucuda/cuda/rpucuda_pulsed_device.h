@@ -68,6 +68,10 @@ public:
 
   bool isPulsedDevice() const override { return true; };
   bool hasDirectUpdate() const override { return false; };
+  virtual void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
+    RPU_FATAL("Infinite granularity update not available for this device!");
+  };
   void doDirectUpdate(
       const T *x_input,
       const T *d_input,
@@ -167,6 +171,8 @@ public:
   void resetCols(T *dev_weights, int start_col, int n_cols, T reset_prob) override;
   virtual void resetAt(T *dev_weights, const char *dev_non_zero_msk);
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override;
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
   void
   populateFrom(const AbstractRPUDevice<T> &rpu_device) override; // need to be called by derived
   PulsedRPUDeviceCuda<T> *clone() const override { RPU_FATAL("Needs implementations"); };

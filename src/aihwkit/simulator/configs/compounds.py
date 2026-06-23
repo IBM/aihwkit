@@ -499,10 +499,37 @@ class TransferCompound(UnitCell):
     define the type of update used for each transfer event.
     """
 
+    def __post_init__(self) -> None:
+        self._assert_nonzero_dw_min()
+
+    def _assert_nonzero_dw_min(self) -> None:
+        """Reject infinite-granularity (``dw_min = 0``) sub-devices.
+
+        Transfer compounds scale the transfer learning rate and the buffer
+        granularity by the sub-device weight granularity (``dw_min``). A zero
+        ``dw_min`` (infinite-granularity mode) collapses these to zero (or
+        divides by zero), which silently disables learning. Infinite
+        granularity is therefore only supported for plain pulsed devices, not
+        for devices placed inside a transfer compound.
+
+        Raises:
+            ConfigError: if any ``unit_cell_device`` has ``dw_min == 0``.
+        """
+        for device in self.unit_cell_devices:
+            if getattr(device, "dw_min", None) == 0:
+                raise ConfigError(
+                    "dw_min=0 (infinite-granularity mode) is not supported for "
+                    "devices inside a transfer compound: the transfer learning "
+                    "rate and buffer granularity scale with the sub-device weight "
+                    "granularity, so dw_min=0 would disable learning."
+                )
+
     def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
+
+        self._assert_nonzero_dw_min()
 
         n_devices = len(self.unit_cell_devices)
 
@@ -775,6 +802,8 @@ class ChoppedTransferCompound(TransferCompound):
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
 
+        self._assert_nonzero_dw_min()
+
         n_devices = len(self.unit_cell_devices)
         if n_devices != 2:
             raise ConfigError("Only 2 devices supported for ChoppedTransferCompound")
@@ -951,6 +980,8 @@ class DynamicTransferCompound(ChoppedTransferCompound):
         """Return a representation of this instance as a simulator bindings object."""
         if not isinstance(self.unit_cell_devices, list):
             raise ConfigError("unit_cell_devices should be a list of devices")
+
+        self._assert_nonzero_dw_min()
 
         n_devices = len(self.unit_cell_devices)
         if n_devices != 2:
