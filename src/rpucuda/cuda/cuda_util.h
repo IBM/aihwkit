@@ -15,12 +15,16 @@
 #include <queue>
 #include <string.h>
 
+#if defined(USE_HIP)
+#include "cuda_to_hip.h"
+#else
 #include "cublas_v2.h"
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#endif
 
 #define RPU_BUFFER_IN 0
 #define RPU_BUFFER_OUT 1

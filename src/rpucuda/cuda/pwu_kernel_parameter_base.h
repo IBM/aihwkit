@@ -11,7 +11,7 @@
 namespace RPU {
 
 template <typename T> class PulsedRPUDeviceCuda;
-template <typename T> class PulsedUpdateMetaParameter;
+template <typename T> struct PulsedUpdateMetaParameter;
 template <typename T> class BitLineMaker;
 template <typename T> class ChoppedWeightOutput;
 

@@ -9,6 +9,7 @@ project(aihwkit C CXX)
 option(BUILD_TEST "Build C++ test binaries" OFF)
 option(BUILD_EXTENSION "Build additional C++ tools" OFF)
 option(USE_CUDA "Build with CUDA support" $ENV{USE_CUDA})
+option(USE_HIP "Build with ROCm/HIP support" $ENV{USE_HIP})
 
 # experimental precision flags
 option(RPU_USE_FP16 "EXPERIMENTAL: Build FP16 support (only available with CUDA)" OFF)
@@ -22,14 +23,23 @@ option(RPU_USE_FASTRAND "Use fastrand" OFF)
 option(RPU_USE_TORCH_BUFFERS "Use torch buffers for RPUCuda" ON)
 
 
+# The C++ standard tracks the linked PyTorch headers; newer Torch releases
+# require C++20. Default stays 17 to match older Torch.
+set(RPU_CXX_STANDARD "17" CACHE STRING "C++ standard used for all RPU targets")
+
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
 set(RPU_CUDA_ARCHITECTURES "75;80;89" CACHE STRING "Target CUDA architectures")
+# CMAKE_HIP_ARCHITECTURES is left to enable_language(HIP) to auto-detect the host
+# GPU when not set explicitly via -DCMAKE_HIP_ARCHITECTURES.
 
 # Internal variables.
 set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
                            CUDA_RESOLVE_DEVICE_SYMBOLS ON
                            CUDA_SEPARABLE_COMPILATION ON
-                           CXX_STANDARD 17)
+                           CXX_STANDARD ${RPU_CXX_STANDARD})
+set(HIP_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
+                          INTERPROCEDURAL_OPTIMIZATION OFF
+                          CXX_STANDARD ${RPU_CXX_STANDARD})
 
 # Append the virtualenv library path to cmake.
 if(DEFINED ENV{VIRTUAL_ENV})
@@ -41,13 +51,16 @@ endif()
 # Check for dependencies.
 include(cmake/dependencies.cmake)
 include(cmake/dependencies_cuda.cmake)
+include(cmake/dependencies_hip.cmake)
 include(cmake/dependencies_test.cmake)
 
 # Set compilation flags.
 if(WIN32)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2")
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD ${RPU_CXX_STANDARD})
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+if(MSVC)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-narrowing -Wno-strict-overflow")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ftree-vectorize")
@@ -68,7 +81,7 @@ if(WIN32)
   target_link_libraries(RPU_CPU c10.lib torch_cpu.lib)
 endif()
 
-set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 17
+set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
   POSITION_INDEPENDENT_CODE ON)
 
 add_compile_definitions(RPU_USE_WITH_TORCH)
@@ -78,9 +91,12 @@ if (RPU_USE_DOUBLE)
 endif(RPU_USE_DOUBLE)
 
 
-if(USE_CUDA)
+if(USE_CUDA OR USE_HIP)
   add_subdirectory(src/rpucuda/cuda)
   include_directories(SYSTEM src/rpucuda/cuda)
+  if (USE_HIP)
+    set_source_files_properties(${RPU_GPU_SRCS} PROPERTIES LANGUAGE HIP)
+  endif()
   add_library(RPU_GPU ${RPU_GPU_SRCS})
 
   if (RPU_USE_FP16)
@@ -99,13 +115,19 @@ if(USE_CUDA)
     message(STATUS "Use FP16 parameters for CUDA (for all RPU number types).")
   endif(RPU_PARAM_FP16)
 
-  target_link_libraries(RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
-  if(WIN32)
-    target_link_libraries(RPU_GPU c10_cuda.lib torch_cuda.lib)
-  endif(WIN32)
+  if (USE_HIP)
+    target_link_libraries(RPU_GPU RPU_CPU roc::hipblas hip::hiprand hip::hipcub ${RPU_DEPENDENCY_LIBS})
+    set_target_properties(RPU_GPU PROPERTIES ${HIP_TARGET_PROPERTIES})
+    set_property(TARGET RPU_GPU PROPERTY HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
+  else()
+    target_link_libraries(RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
+    if(WIN32)
+      target_link_libraries(RPU_GPU c10_cuda.lib torch_cuda.lib)
+    endif(WIN32)
 
-  set_target_properties(RPU_GPU PROPERTIES ${CUDA_TARGET_PROPERTIES})
-  set_property(TARGET RPU_GPU PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
+    set_target_properties(RPU_GPU PROPERTIES ${CUDA_TARGET_PROPERTIES})
+    set_property(TARGET RPU_GPU PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
+  endif()
 
   if (RPU_USE_TORCH_BUFFERS)
     if (BUILD_TEST)
@@ -114,18 +136,20 @@ if(USE_CUDA)
       set(RPU_USE_TORCH_BUFFERS OFF)
     else (BUILD_TEST)
       add_compile_definitions(RPU_TORCH_CUDA_BUFFERS)
-      set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
-      set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=186")
+      if (NOT USE_HIP)
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=186")
+      endif()
     endif(BUILD_TEST)
   endif(RPU_USE_TORCH_BUFFERS)
 
-  if(${CUDAToolkit_VERSION_MAJOR} LESS 11)
+  if(USE_CUDA AND CUDAToolkit_VERSION_MAJOR LESS 11)
     # The "cub" target only exists if cub was downloaded during build.
     if(TARGET cub)
         add_dependencies(RPU_GPU cub)
     endif()
   endif()
-endif(USE_CUDA)
+endif()
 
 # Add aihwkit targets.
 add_subdirectory(src/aihwkit/simulator)
@@ -136,7 +160,7 @@ if (BUILD_EXTENSION)
 
   add_library(AIHWKIT_EXTENSION_OPS ${AIHWKIT_EXTENSION_OPS_CPU_SRCS})
 
-  set_target_properties(AIHWKIT_EXTENSION_OPS PROPERTIES CXX_STANDARD 17
+  set_target_properties(AIHWKIT_EXTENSION_OPS PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
     POSITION_INDEPENDENT_CODE ON)
 
   target_link_libraries(AIHWKIT_EXTENSION_OPS
@@ -178,7 +202,7 @@ if (BUILD_EXTENSION)
   target_link_libraries(${extension_module_name} PRIVATE torch_python)
   target_include_directories(${extension_module_name} PRIVATE src/aihwkit/extension/extension_src)
   target_include_directories(${extension_module_name} PRIVATE src/aihwkit/extension/extension_src/ops)
-  set_target_properties(${extension_module_name} PROPERTIES CXX_STANDARD 17
+  set_target_properties(${extension_module_name} PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
     POSITION_INDEPENDENT_CODE ON)
 
   if (USE_CUDA)
@@ -211,7 +235,7 @@ if(BUILD_TEST)
     add_executable(${test_name} ${test_src})
     target_link_libraries(${test_name} gtest gmock)
     target_link_libraries(${test_name} torch_python c10 torch_cpu)
-    set_target_properties(${test_name} PROPERTIES CXX_STANDARD 17
+    set_target_properties(${test_name} PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
       POSITION_INDEPENDENT_CODE ON)
 
     if(WIN32)
@@ -222,14 +246,20 @@ if(BUILD_TEST)
     target_link_libraries(${test_name} RPU_CPU ${RPU_DEPENDENCY_LIBS})
 
     if(${test_src} IN_LIST RPU_GPU_TEST_SRCS)
-      target_link_libraries(${test_name} torch_cuda c10_cuda cudart)
-      target_link_libraries(${test_name} RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
-      set_target_properties(${test_name} PROPERTIES ${CUDA_TARGET_PROPERTIES})
-      set_property(TARGET ${test_name} PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
+      if(USE_HIP)
+        target_link_libraries(${test_name} RPU_GPU RPU_CPU roc::hipblas hip::hiprand hip::hipcub ${RPU_DEPENDENCY_LIBS})
+        set_target_properties(${test_name} PROPERTIES ${HIP_TARGET_PROPERTIES})
+        set_property(TARGET ${test_name} PROPERTY HIP_ARCHITECTURES ${CMAKE_HIP_ARCHITECTURES})
+      else()
+        target_link_libraries(${test_name} torch_cuda c10_cuda cudart)
+        target_link_libraries(${test_name} RPU_GPU RPU_CPU cublas curand ${RPU_DEPENDENCY_LIBS})
+        set_target_properties(${test_name} PROPERTIES ${CUDA_TARGET_PROPERTIES})
+        set_property(TARGET ${test_name} PROPERTY CUDA_ARCHITECTURES ${RPU_CUDA_ARCHITECTURES})
 
-      if(WIN32)
-	target_link_libraries(${test_name} c10_cuda.lib torch_cuda.lib)
-      endif(WIN32)
+        if(WIN32)
+	  target_link_libraries(${test_name} c10_cuda.lib torch_cuda.lib)
+        endif(WIN32)
+      endif()
 
     endif()
 

@@ -102,6 +102,10 @@ Via python command
 
       $ python setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace -DRPU_BLAS=MKL -j16 -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="60;70" -DCMAKE_PREFIX_PATH=$CONDA_PREFIX
 
+    - GPU with MKL (AMD, ROCm/HIP)::
+
+      $ python setup.py build_ext -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace -DRPU_BLAS=MKL -j16 -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_PREFIX_PATH=$CONDA_PREFIX
+
 
 If you want to use ``OpenBLAS`` instead ``MKL``, you need to set ``-DRPU_BLAS=OpenBLAS``.
 
@@ -110,6 +114,11 @@ To identify the ``CUDA_ARCH`` for your GPU using ``nvidia-smi`` in your system::
 
     $ export CUDA_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv | sed -n '2 p' | tr -d '.')
     $ echo $CUDA_ARCH
+
+For an AMD GPU, set ``-DCMAKE_HIP_ARCHITECTURES`` to its ``gfx`` target instead
+(for example ``gfx90a`` or ``gfx1100``). To identify it::
+
+    $ rocminfo | grep -m1 -o 'gfx[0-9a-f]*'
 
 This will produce a shared library under the ``src/aihwkit/simulator``
 directory, without installing the package.  For how to use the shared library see the :ref:`use-the-library` section below.
@@ -222,6 +231,7 @@ compilation process:
 Flag                        Description                                       Default
 ==========================  ================================================  =======
 ``USE_CUDA``                Build with CUDA support                           ``OFF``
+``USE_HIP``                 Build with ROCm/HIP support (AMD GPUs)            ``OFF``
 ``BUILD_TEST``              Build the C++ test binaries                       ``OFF``
 ``RPU_BLAS``                BLAS backend of choice (``OpenBLAS`` or ``MKL``)  ``OpenBLAS``
 ``RPU_USE_FASTMOD``         Use fast mod                                      ``ON``
@@ -237,6 +247,18 @@ example, for compiling and installing with CUDA support::
 or if using ``cmake`` directly::
 
     build$ cmake -DUSE_CUDA=ON -DRPU_CUDA_ARCHITECTURES="60;70" ..
+
+For AMD GPUs, build with ROCm/HIP support instead (``USE_HIP`` and ``USE_CUDA``
+are mutually exclusive)::
+
+    $ python setup.py build_ext --inplace -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a
+
+or if using ``cmake`` directly::
+
+    build$ cmake -DUSE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a ..
+
+Set ``-DCMAKE_HIP_ARCHITECTURES`` to your GPU's ``gfx`` target (for example
+``gfx90a`` or ``gfx1100``).
 
 Passing other ``cmake`` flags
 """""""""""""""""""""""""""""

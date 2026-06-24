@@ -6,13 +6,39 @@
 
 #ifdef RPU_USE_CUDA
 #define __RPU_CUDA_HALF_DEFINED
+#if !defined(USE_HIP)
 #include "cuda.h"
+#endif
 #include "cuda_util.h"
 #include "rpu_base.h"
 
 #include "rpucuda.h"
 #include "rpucuda_pulsed.h"
+#if defined(USE_HIP)
+// The full ATen HIP context header transitively pulls in hipSOLVER / hipSPARSE
+// headers that are not part of this build; only the current-stream accessor is
+// needed, so include the lightweight c10 stream header and surface it under the
+// at::cuda namespace the call sites use.
+#include <c10/hip/HIPStream.h>
+namespace at {
+namespace cuda {
+inline auto getCurrentCUDAStream(c10::DeviceIndex device_index = -1) {
+#if defined(TORCH_HIPIFY_V2)
+  // torch hipify v2 masquerades: c10::cuda::getCurrentCUDAStream is the public
+  // stream API, while c10::hip::getCurrentHIPStream stays guarded by USE_ROCM,
+  // which this build does not define.
+  return c10::cuda::getCurrentCUDAStream(device_index);
+#else
+  // torch hipify v1 renames CUDA spellings to HIP: getCurrentCUDAStream is gone
+  // from c10::cuda, so use the hip-prefixed equivalent.
+  return c10::hip::getCurrentHIPStream(device_index);
+#endif
+}
+}
+} // namespace at
+#else
 #include <ATen/cuda/CUDAContext.h>
+#endif
 
 #define CHECK_CUDA(x)                                                                              \
   TORCH_CHECK(                                                                                     \
