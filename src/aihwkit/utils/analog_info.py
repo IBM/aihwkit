@@ -20,8 +20,6 @@ from torch import zeros
 from torch.nn import Module
 
 from aihwkit.nn.modules.base import AnalogLayerBase
-from aihwkit.nn.modules.conv_mapped import _AnalogConvNdMapped
-from aihwkit.nn.modules.linear_mapped import AnalogLinearMapped
 from aihwkit.nn.modules.conv import _AnalogConvNd
 from aihwkit.nn import AnalogLinear
 from aihwkit.simulator.tiles.module import TileModule
@@ -58,15 +56,20 @@ class TileInfo:
     phy_out_size: Any
     utilization: float
 
-    def __init__(self, tile: TileModule, is_mapped: bool):
+    def __init__(self, tile: TileModule):
         self.log_in_size = tile.in_size
         self.log_out_size = tile.out_size
         self.phy_in_size = tile.rpu_config.mapping.max_input_size
         self.phy_out_size = tile.rpu_config.mapping.max_output_size
-        self.is_mapped = is_mapped
-        max_space = self.phy_in_size * self.phy_out_size
-        log_space = self.log_in_size * self.log_out_size
-        self.utilization = log_space * 100 / max_space if is_mapped else 100
+        
+        self.is_mapped = self.phy_in_size > 0 and self.phy_out_size > 0
+        
+        if self.is_mapped:
+            max_space = self.phy_in_size * self.phy_out_size
+            log_space = self.log_in_size * self.log_out_size
+            self.utilization = log_space * 100 / max_space
+        else:
+            self.utilization = 100.0
 
     def tile_summary_dict(self) -> dict:
         """Return a dictionary with the tile info."""
@@ -123,11 +126,9 @@ class LayerInfo:
     def set_tiles_info(self) -> List[TileInfo]:
         """Create TileInfo objects for each tile of the layer."""
         tiles_info = []
-        is_mapped = isinstance(self.module, AnalogLinearMapped)
-        is_mapped = is_mapped or isinstance(self.module, _AnalogConvNdMapped)
         if isinstance(self.module, AnalogLayerBase):
             for tile in self.module.analog_tiles():
-                tiles_info.append(TileInfo(tile, is_mapped))
+                tiles_info.append(TileInfo(tile))
         return tiles_info
 
     def set_kernel_size(self) -> None:
@@ -142,10 +143,10 @@ class LayerInfo:
         a layer computes.
 
         """
-        if isinstance(self.module, (AnalogLinear, AnalogLinearMapped)):
+        if isinstance(self.module, AnalogLinear):
             ruf = reduce(operator.mul, (self.input_size), 1) // int(self.input_size[-1])
             self.__set_reuse_factor(ruf)
-        elif isinstance(self.module, (_AnalogConvNd, _AnalogConvNdMapped)):
+        elif isinstance(self.module, _AnalogConvNd):
             ruf = reduce(operator.mul, (self.output_size), 1) // self.output_size[1]
             self.__set_reuse_factor(ruf)
 
@@ -288,27 +289,6 @@ class AnalogInfo:
 def analog_summary(
     model: Module, input_size: Optional[Any] = None, rpu_config: Optional[RPUConfigBase] = None
 ) -> AnalogInfo:
-    """Summarize the given PyTorch model.
-
-    Summarized information includes:
-
-        1) Layer names,
-        2) input/output shapes,
-        3) kernel shape,
-        4) # of digital parameters,
-        5) # of analog parameters,
-        6) # of analog tiles
-        7) reuse factor
-
-    Args:
-        model: PyTorch model to run on the analog platform.
-
-        input_size: required to run a forward pass of the model.
-
-        rpu_config: resistive processing unit configuration.
-
-    Returns:
-        AnalogInfo Object.
-    """
+    """Summarize the given PyTorch model."""
     results = AnalogInfo(model, input_size, rpu_config)
     return results
