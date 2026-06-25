@@ -123,7 +123,7 @@ class LayerInfo:
         """Private method to set layer's reuse factor attribute."""
         self.reuse_factor = reuse_factor
 
-    def set[118;1:3u_tiles_info(self) -> List[TileInfo]:
+    def set_tiles_info(self) -> List[TileInfo]:
         """Create TileInfo objects for each tile of the layer."""
         tiles_info = []
         if isinstance(self.module, AnalogLayerBase):
