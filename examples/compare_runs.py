@@ -41,7 +41,10 @@ def latest_runs(count=2):
     runs = sorted((p for p in RESULTS_DIR.glob("run_*") if (p / "metrics.json").is_file()))
     if len(runs) < count:
         raise SystemExit(
-            f"Need at least {count} completed runs under {RESULTS_DIR} to compare, found {len(runs)}."
+            (
+                f"Need at least {count} completed runs under {RESULTS_DIR} "
+                f"to compare, found {len(runs)}."
+            )
         )
     return runs[-count:]
 
@@ -52,7 +55,9 @@ def index_by_script(summary):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_a", nargs="?", help="Older run id/folder (default: second-to-last run).")
+    parser.add_argument(
+        "run_a", nargs="?", help="Older run id/folder (default: second-to-last run)."
+    )
     parser.add_argument("run_b", nargs="?", help="Newer run id/folder (default: last run).")
     args = parser.parse_args()
 
@@ -83,7 +88,11 @@ def main():
             continue
 
         status_changed = ra["status"] != rb["status"]
-        header = f"[{script}] {ra['status']} -> {rb['status']}" if status_changed else f"[{script}] {rb['status']}"
+        header = (
+            f"[{script}] {ra['status']} -> {rb['status']}"
+            if status_changed
+            else f"[{script}] {rb['status']}"
+        )
         print(header)
 
         lines_a = ra.get("metric_lines", [])
