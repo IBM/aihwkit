@@ -10,7 +10,7 @@ build_inplace:
 	python setup.py build_ext -j8 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE --inplace ${flags}
 
 build_inplace_mkl:
-	make build_inplace flags="-DRPU_BLAS=MKL -DINTEL_MKL_DIR=${MKLROOT} ${flags}"
+	make build_inplace flags="-DRPU_BLAS=MKL -DMKLROOT=${MKLROOT} -DINTEL_MKL_DIR=${MKLROOT} -DCMAKE_LIBRARY_PATH=${CONDA_PREFIX}/lib -DCMAKE_INCLUDE_PATH=${CONDA_PREFIX}/include ${flags}"
 
 build:
 	python setup.py install --user -j8 -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE  ${flags}

@@ -83,6 +83,26 @@ if(USE_CUDA)
   include_directories(SYSTEM src/rpucuda/cuda)
   add_library(RPU_GPU ${RPU_GPU_SRCS})
 
+  # Make the BLAS (MKL/OpenBLAS) headers visible to nvcc. A global
+  # include_directories(SYSTEM ...) is not reliably forwarded to the CUDA host
+  # compilation on all toolchains (e.g. a conda-provided nvcc), which otherwise
+  # fails to find mkl.h / cblas.h while compiling the .cu sources.
+  foreach(_blas_inc ${RPU_BLAS_INCLUDE_DIRS})
+    if(_blas_inc)
+      set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -isystem ${_blas_inc}")
+    endif()
+  endforeach()
+
+  # CUDA 13 / GCC 15: nvcc's cudafe front-end re-emits some PyTorch headers
+  # (e.g. ATen/core/List_inl.h) in a form that trips GCC 15's new -Wtemplate-body
+  # check, which defaults to a hard error. The code itself is valid, so downgrade
+  # it back to a warning for the host compilation of the .cu sources.
+  # (-Wtemplate-body only exists in GCC 15+.)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND
+     CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=-Wno-error=template-body")
+  endif()
+
   if (RPU_USE_FP16)
     add_compile_definitions(RPU_USE_FP16)
     if (RPU_BFLOAT_AS_FP16)

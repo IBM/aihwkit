@@ -49,11 +49,16 @@ message(STATUS "The BLAS backend of choice:" ${RPU_BLAS})
 if(RPU_BLAS STREQUAL "OpenBLAS")
   find_package(OpenBLAS REQUIRED)
   include_directories(SYSTEM ${OpenBLAS_INCLUDE_DIR})
+  # Remember the BLAS include dir so it can also be handed to nvcc explicitly
+  # (see CMakeLists.txt): global include_directories(SYSTEM ...) is not reliably
+  # forwarded to the CUDA host compilation under all toolchains.
+  set(RPU_BLAS_INCLUDE_DIRS ${OpenBLAS_INCLUDE_DIR})
   list(APPEND RPU_DEPENDENCY_LIBS ${OpenBLAS_LIB})
   add_compile_definitions(RPU_USE_OPENBLAS)
 elseif(RPU_BLAS STREQUAL "MKL")
   find_package(MKL REQUIRED)
   include_directories(SYSTEM ${MKL_INCLUDE_DIR})
+  set(RPU_BLAS_INCLUDE_DIRS ${MKL_INCLUDE_DIR})
   list(APPEND RPU_DEPENDENCY_LIBS ${MKL_LIBRARIES} )
   if(USE_OMP)
     list(APPEND RPU_DEPENDENCY_LIBS ${MKL_OPENMP_LIBRARY} )
