@@ -18,6 +18,12 @@
 #include "io_iterator.h"
 #include "rpu_cub.h"
 
+// CUDA 13+ (CCCL) removed cub::TransformInputIterator and cub::CountingInputIterator.
+// They are now cuda::transform_iterator and cuda::counting_iterator.
+#if CUDART_VERSION >= 13000
+#include <cuda/iterator>
+#endif
+
 namespace RPU {
 
 namespace {
@@ -218,18 +224,25 @@ void debugMaxBatched(const T *indata, int size, int m_batch, bool trans, T *max_
   CUDA_CALL(cudaDeviceSynchronize());
 
   IndexReader<T> idx_reader(dev_in.getData());
+#if CUDART_VERSION >= 13000
+  auto in_itr = ::cuda::make_transform_iterator(dev_in_index.getData(), idx_reader);
+  auto index = ::cuda::make_counting_iterator(0);
+  BatchTransposer<T> batch_transposer(dev_in.getData(), size, m_batch);
+  auto in_trans_itr = ::cuda::make_transform_iterator(index, batch_transposer);
+  IndexReader<int> idx_reader_host(tmp);
+  auto test_host = ::cuda::make_transform_iterator(tmp, idx_reader_host);
+#else
   RPU_CUB_NS_QUALIFIER TransformInputIterator<T, IndexReader<T>, int *> in_itr(
       dev_in_index.getData(), idx_reader);
-
   RPU_CUB_NS_QUALIFIER CountingInputIterator<int> index(0);
   BatchTransposer<T> batch_transposer(dev_in.getData(), size, m_batch);
   RPU_CUB_NS_QUALIFIER
   TransformInputIterator<T, BatchTransposer<T>, RPU_CUB_NS_QUALIFIER CountingInputIterator<int>>
       in_trans_itr(index, batch_transposer);
-
   IndexReader<int> idx_reader_host(tmp);
   RPU_CUB_NS_QUALIFIER TransformInputIterator<int, IndexReader<int>, int *> test_host(
       tmp, idx_reader_host);
+#endif
   std::cout << test_host[0] << std::endl;
 
   CustomMaxAbs max_abs;

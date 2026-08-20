@@ -16,6 +16,11 @@
 #include "cuda_util.h"
 #include "rpu_cub.h"
 
+// CUDA 13+ (CCCL) removed cub::TransformInputIterator; use cuda::transform_iterator instead.
+#if CUDART_VERSION >= 13000
+#include <cuda/iterator>
+#endif
+
 #include "io_iterator.h"
 
 namespace RPU {
@@ -239,7 +244,7 @@ template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
     size_t temp_storage_bytes = 0;
     RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
         nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(),
-        m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, 0,
+        m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, (T)0,
         context_->getStream());
     dev_m_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
 
@@ -496,8 +501,13 @@ void NoiseManager<T>::compute(
 
         if (m_batch > 1) {
           NonZeroFunctor<T> nonzero_functor;
+#if CUDART_VERSION >= 13000
+          auto nz_input =
+              ::cuda::make_transform_iterator(amaximizer_->getMaxValues(), nonzero_functor);
+#else
           RPU_CUB_NS_QUALIFIER TransformInputIterator<T, NonZeroFunctor<T>, T *> nz_input(
               amaximizer_->getMaxValues(), nonzero_functor);
+#endif
           // temp storage already requested above
           size_t ssz = dev_a_temp_storage_->getSize();
           RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(

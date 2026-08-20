@@ -10,6 +10,11 @@
 #include "rpu_cub.h"
 #include "weight_clipper_cuda.h"
 
+// CUDA 13+ (CCCL) removed cub::TransformInputIterator; use cuda::transform_iterator instead.
+#if CUDART_VERSION >= 13000
+#include <cuda/iterator>
+#endif
+
 namespace RPU {
 
 template <typename T> struct StdFunctor {
@@ -51,7 +56,11 @@ WeightClipperCuda<T>::WeightClipperCuda(CudaContextPtr context, int x_size, int 
 
   T *tmp = nullptr;
   StdFunctor<T> std_functor((T)x_size_, tmp);
+#if CUDART_VERSION >= 13000
+  auto std_input = ::cuda::make_transform_iterator(tmp, std_functor);
+#else
   RPU_CUB_NS_QUALIFIER TransformInputIterator<T, StdFunctor<T>, T *> std_input(tmp, std_functor);
+#endif
 
   RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
       nullptr, temp_storage_bytes_, std_input, tmp, size_, context_->getStream());
@@ -96,8 +105,12 @@ void WeightClipperCuda<T>::apply(T *weights, const WeightClipParameter &wclpar) 
     }
 
     StdFunctor<T> std_functor((T)size_, dev_sum_value_->getData());
+#if CUDART_VERSION >= 13000
+    auto std_input = ::cuda::make_transform_iterator(weights, std_functor);
+#else
     RPU_CUB_NS_QUALIFIER TransformInputIterator<T, StdFunctor<T>, T *> std_input(
         weights, std_functor);
+#endif
 
     // mean (sum)
     RPU_CUB_NS_QUALIFIER DeviceReduce::Sum(
