@@ -16,7 +16,7 @@
 #include "cuda_util.h"
 #include "rpu_cub.h"
 
-// CUDA 13+ (CCCL) removed cub::TransformInputIterator; use cuda::transform_iterator instead.
+// cub::TransformInputIterator is getting deprecated. Using cuda::transform_iterator instead.
 #if CUDART_VERSION >= 13000
 #include <cuda/iterator>
 #endif
