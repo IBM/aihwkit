@@ -189,7 +189,7 @@ class HermesNoiseModel(BaseNoiseModel):
         # experimental data
         g_rel_low_mean, g_rel_high_mean = (
             g_relative[g_relative < 0.0945],
-            g_relative[[g_relative >= 0.0945]],
+            g_relative[g_relative >= 0.0945],
         )
         mu_drift[g_relative < 0.0945] = (-0.0387 * log(g_rel_low_mean) - 0.0182).clamp(
             min=0.0720, max=0.13
@@ -200,7 +200,7 @@ class HermesNoiseModel(BaseNoiseModel):
         if self.num_devices == 1:
             g_rel_low_std, g_rel_high_std = (
                 g_relative[g_relative < 0.3039],
-                g_relative[[g_relative >= 0.3039]],
+                g_relative[g_relative >= 0.3039],
             )
             sig_drift[g_relative < 0.3039] = (-0.0120 * log(g_rel_low_std) - 0.0023).clamp(
                 min=0.0124, max=0.04
@@ -211,7 +211,7 @@ class HermesNoiseModel(BaseNoiseModel):
         elif self.num_devices == 2:
             g_rel_low_std, g_rel_high_std = (
                 g_relative[g_relative < 0.3055],
-                g_relative[[g_relative >= 0.3055]],
+                g_relative[g_relative >= 0.3055],
             )
             sig_drift[g_relative < 0.3055] = (-0.0117 * log(g_rel_low_std) - 0.0057).clamp(
                 min=0.0091, max=0.04
@@ -245,7 +245,7 @@ class HermesNoiseModel(BaseNoiseModel):
             if self.num_devices == 1:
                 g_rel_low, g_rel_high = (
                     g_relative[g_relative < 0.1591],
-                    g_relative[[g_relative >= 0.1591]],
+                    g_relative[g_relative >= 0.1591],
                 )
                 q_s[g_relative < 0.1591] = (-0.0078 * log(g_rel_low) + 0.0038).clamp(
                     min=0.0179, max=0.04
@@ -256,7 +256,7 @@ class HermesNoiseModel(BaseNoiseModel):
             elif self.num_devices == 2:
                 g_rel_low, g_rel_high = (
                     g_relative[g_relative < 0.16],
-                    g_relative[[g_relative >= 0.16]],
+                    g_relative[g_relative >= 0.16],
                 )
                 q_s[g_relative < 0.16] = (-0.0117 * log(g_rel_low) - 0.0069).clamp(
                     min=0.015, max=0.04

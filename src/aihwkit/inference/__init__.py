@@ -18,6 +18,7 @@ from aihwkit.inference.converter.conductance import (
 from aihwkit.inference.noise.base import BaseNoiseModel
 from aihwkit.inference.noise.pcm import PCMLikeNoiseModel, CustomDriftPCMLikeNoiseModel
 from aihwkit.inference.noise.reram import ReRamWan2022NoiseModel, ReRamCMONoiseModel
+from aihwkit.inference.noise.hermes import HermesNoiseModel
 from aihwkit.inference.noise.custom import StateIndependentNoiseModel
 from aihwkit.inference.compensation.base import BaseDriftCompensation
 from aihwkit.inference.compensation.drift import GlobalDriftCompensation
