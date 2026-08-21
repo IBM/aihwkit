@@ -359,7 +359,7 @@ class MSE_Estimator(RangeEstimatorBase):
             )  # 1D search space
             self.loss_array[:, 0] = np.inf  # exclude interval_start=interval_finish
             # Defining the search range for clipping thresholds
-            self.max_pos_thr = max(abs(float(data.min())), float(data.max())) + self.range_margin
+            self.max_pos_thr = max(abs(float(data.detach().min())), float(data.detach().max())) + self.range_margin
             self.max_neg_thr = -self.max_pos_thr
             self.max_search_range = self.max_pos_thr
         else:
@@ -370,8 +370,8 @@ class MSE_Estimator(RangeEstimatorBase):
             )  # 2D search space
             self.loss_array[:, 0, :, :] = np.inf  # exclude interval_start=interval_finish
             # Define the search range for clipping thresholds in asymmetric case
-            self.max_pos_thr = float(data.max()) + self.range_margin
-            self.max_neg_thr = float(data.min()) - self.range_margin
+            self.max_pos_thr = float(data.detach().max()) + self.range_margin
+            self.max_neg_thr = float(data.detach().min()) - self.range_margin
             self.max_search_range = max(abs(self.max_pos_thr), abs(self.max_neg_thr))
 
     def _perform_1D_search(self, data):
