@@ -512,14 +512,12 @@ void RPUPulsed<T>::backwardVector(const T *d_input, T *x_output, int d_inc, int 
 
 template <typename T>
 void RPUPulsed<T>::updateVector(const T *x_input, const T *d_input, int x_inc, int d_inc) {
-
   if (this->getDeltaWeights()) {
     if ((x_inc != 1) || (d_inc != 1)) {
       RPU_FATAL("Update_Vector for delta weights and xd_inc>1 is not implemented.");
     }
     this->updateMatrix(x_input, d_input, 1, false, false);
   } else {
-
     pwu_->updateVectorWithDevice(
         this->getUpWeights(), x_input, x_inc, d_input, d_inc, this->getAlphaLearningRate(),
         this->last_update_m_batch_, // for info
@@ -581,6 +579,57 @@ void RPUPulsed<T>::updateMatrix(
       this->setDeltaWeights(local_dw); // changes LR potentially
       this->getAndResetWeightUpdate(local_dw, this->getAlphaLearningRate() / used_lr);
     }
+  }
+}
+
+/*********************************************************************************/
+/* HS tracking methods */
+
+template <typename T>
+void RPUPulsed<T>::enableHSTracking() {
+  CHECK_RPU_DEVICE_INIT;
+  auto* pulsed_device = dynamic_cast<PulsedRPUDeviceBase<T>*>(rpu_device_.get());
+  if (pulsed_device) {
+    pulsed_device->enableHSTracking();
+  }
+}
+
+template <typename T>
+void RPUPulsed<T>::disableHSTracking() {
+  CHECK_RPU_DEVICE_INIT;
+  auto* pulsed_device = dynamic_cast<PulsedRPUDeviceBase<T>*>(rpu_device_.get());
+  if (pulsed_device) {
+    pulsed_device->disableHSTracking();
+  }
+}
+
+template <typename T>
+void RPUPulsed<T>::resetHSStates() {
+  CHECK_RPU_DEVICE_INIT;
+  auto* pulsed_device = dynamic_cast<PulsedRPUDeviceBase<T>*>(rpu_device_.get());
+  if (pulsed_device) {
+    pulsed_device->resetHSStates();
+  }
+}
+
+template <typename T>
+bool RPUPulsed<T>::isHSTrackingEnabled() const {
+  CHECK_RPU_DEVICE_INIT;
+  auto* pulsed_device = dynamic_cast<PulsedRPUDeviceBase<T>*>(rpu_device_.get());
+  if (pulsed_device) {
+    return pulsed_device->isHSTrackingEnabled();
+  }
+  return false;
+}
+
+template <typename T>
+void RPUPulsed<T>::getHSTransitionCounts(std::vector<int> &counts) const {
+  CHECK_RPU_DEVICE_INIT;
+  auto* pulsed_device = dynamic_cast<PulsedRPUDeviceBase<T>*>(rpu_device_.get());
+  if (pulsed_device) {
+    pulsed_device->getHSTransitionCounts(counts);
+  } else {
+    counts.resize(16, 0);
   }
 }
 

@@ -907,6 +907,30 @@ void RPUCudaPulsed<T>::updateMatrixIterator(
   }
 }
 
+/********************************************************************************/
+/* HS tracking API forwarding to the CUDA device (PulsedRPUDeviceCuda<T>)       */
+
+template <typename T> void RPUCudaPulsed<T>::enableHSTracking() {
+  auto *dev = dynamic_cast<PulsedRPUDeviceCuda<T> *>(rpucuda_device_.get());
+  if (dev) { dev->enableHSTracking(); }
+}
+template <typename T> void RPUCudaPulsed<T>::disableHSTracking() {
+  auto *dev = dynamic_cast<PulsedRPUDeviceCuda<T> *>(rpucuda_device_.get());
+  if (dev) { dev->disableHSTracking(); }
+}
+template <typename T> void RPUCudaPulsed<T>::resetHSStates() {
+  auto *dev = dynamic_cast<PulsedRPUDeviceCuda<T> *>(rpucuda_device_.get());
+  if (dev) { dev->resetHSStates(); }
+}
+template <typename T> bool RPUCudaPulsed<T>::isHSTrackingEnabled() const {
+  auto *dev = dynamic_cast<PulsedRPUDeviceCuda<T> *>(rpucuda_device_.get());
+  return dev ? dev->isHSTrackingEnabled() : false;
+}
+template <typename T> void RPUCudaPulsed<T>::getHSTransitionCounts(std::vector<int> &counts) const {
+  auto *dev = dynamic_cast<PulsedRPUDeviceCuda<T> *>(rpucuda_device_.get());
+  if (dev) { dev->getHSTransitionCounts(counts); } else { counts.assign(16, 0); }
+}
+
 template class RPUCudaPulsed<float>;
 #ifdef RPU_USE_DOUBLE
 template class RPUCudaPulsed<double>;

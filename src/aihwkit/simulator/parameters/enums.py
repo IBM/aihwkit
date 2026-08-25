@@ -183,6 +183,28 @@ class PulseType(Enum):
     generate these coincidences.
     """
 
+    STOCHASTIC_STREAM = "StochasticStream"
+    """Generates continuous pulse streams.
+
+    x pulses start from position 0, d pulses start from random position.
+    Pulse length is determined by BL * pulse probability. d pulses wrap
+    around using modulo operation when exceeding BL.
+    """
+
+    HALFSELECTED_STOCHASTIC = "HalfselectedStochastic"
+    """Stochastic pulse type with halfselected state tracking.
+
+    Tracks halfselected states (HS1-HS4) based on pulse coincidence patterns
+    between x and d inputs. Updates weights based on current and previous HS states.
+    """
+
+    HALFSELECTED_STOCHASTIC_STREAM = "HalfselectedStochasticStream"
+    """Stochastic stream pulse type with halfselected state tracking.
+
+    Similar to STOCHASTIC_STREAM but with halfselected state tracking capability.
+    Enables monitoring of HS state transitions for synaptic analysis.
+    """
+
 
 class WeightModifierType(Enum):
     """Weight modifier type."""

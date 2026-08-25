@@ -9,6 +9,7 @@
 from typing import Optional, Union, Dict, Tuple, Any
 
 from torch import Tensor, zeros, tensor
+import torch
 from torch import device as torch_device
 from torch.nn import Parameter
 from torch.cuda import device as cuda_device
@@ -363,6 +364,51 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
         """
         return self.tile.diffuse_weights()
 
+    def enable_hs_tracking(self) -> None:
+        """Enable halfselected state tracking for the tile.
+
+        This enables tracking of HS1-HS4 transitions during pulse updates
+        when using halfselected pulse types.
+
+        Returns:
+            None
+        """
+        return self.tile.enable_hs_tracking()
+
+    def disable_hs_tracking(self) -> None:
+        """Disable halfselected state tracking for the tile.
+
+        Returns:
+            None
+        """
+        return self.tile.disable_hs_tracking()
+
+    def reset_hs_states(self) -> None:
+        """Reset all halfselected states and transition counters.
+
+        Returns:
+            None
+        """
+        return self.tile.reset_hs_states()
+
+    def get_hs_transition_counts(self) -> Tensor:
+        """Get the halfselected state transition counts.
+
+        Returns:
+            Tensor containing 16 transition counts representing the HS1->HS1,
+            HS1->HS2, ..., HS4->HS4 transitions that occurred during training.
+        """
+        counts = self.tile.get_hs_transition_counts()
+        return tensor(counts, dtype=torch.int32)
+
+    def is_hs_tracking_enabled(self) -> bool:
+        """Check if halfselected state tracking is enabled.
+
+        Returns:
+            True if HS tracking is enabled, False otherwise.
+        """
+        return self.tile.is_hs_tracking_enabled()
+
     def reset_columns(
         self, start_column_idx: int = 0, num_columns: int = 1, reset_prob: float = 1.0
     ) -> None:
@@ -455,3 +501,12 @@ class RPUCudaSimulatorTileWrapper(SimulatorTileWrapper):
             self.tile.diffuse_weights()
         if self.rpu_config.device.requires_decay():
             self.tile.decay_weights()
+
+    @property
+    def update_count(self) -> int:
+        """Get the total number of updates performed on this tile.
+
+        Returns:
+            The total number of updates (accumulated batch size).
+        """
+        return self.tile.get_update_count()

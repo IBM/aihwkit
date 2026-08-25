@@ -35,7 +35,18 @@ enum class PulseType {
   Stochastic,
   NoneWithDevice,
   MeanCount,
-  DeterministicImplicit
+  DeterministicImplicit,
+  StochasticStream,
+  HalfselectedStochastic,
+  HalfselectedStochasticStream
+};
+
+enum class HalfSelectedState {
+  HS0, // Coincidence (both x and d pulses)
+  HS1, // x pulse only, same sign as d
+  HS2, // d pulse only, same sign as x
+  HS3, // x pulse only, opposite sign to d
+  HS4  // d pulse only, opposite sign to x
 };
 
 enum class AnalogMVType {

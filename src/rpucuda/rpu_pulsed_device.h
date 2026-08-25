@@ -120,18 +120,51 @@ public:
   // constructor / destructor
   PulsedRPUDeviceBase() {};
   explicit PulsedRPUDeviceBase(int x_sz, int d_sz) : SimpleRPUDevice<T>(x_sz, d_sz) {};
-  virtual ~PulsedRPUDeviceBase() = default;
+  virtual ~PulsedRPUDeviceBase();
 
-  PulsedRPUDeviceBase(const PulsedRPUDeviceBase<T> &other) = default;
-  PulsedRPUDeviceBase<T> &operator=(const PulsedRPUDeviceBase<T> &other) = default;
-  PulsedRPUDeviceBase(PulsedRPUDeviceBase<T> &&other) noexcept = default;
-  PulsedRPUDeviceBase<T> &operator=(PulsedRPUDeviceBase<T> &&other) noexcept = default;
+  // NOTE: the HS containers (hs_states_/hs_transition_counts_) are raw pointers
+  // owned by this object (freed in the dtor). The defaulted copy/move would
+  // shallow-copy those pointers -> double free when a tracking-enabled device is
+  // copied (e.g. by .cuda(), which duplicates the CPU device). Implement the
+  // rule-of-5 explicitly: copy deep-copies the HS state; move/assign transfer
+  // ownership via swap; swap now includes the HS members.
+  PulsedRPUDeviceBase(const PulsedRPUDeviceBase<T> &other) : SimpleRPUDevice<T>(other) {
+    weight_granularity_ = other.weight_granularity_;
+    num_states_ = other.num_states_;
+    hs_states_ = nullptr;
+    hs_transition_counts_ = nullptr;
+    hs_tracking_enabled_ = false;
+    if (other.hs_tracking_enabled_) {
+      enableHSTracking(); // allocates fresh containers on this (uses d_size_/x_size_)
+      for (int i = 0; i < this->d_size_; ++i) {
+        for (int j = 0; j < this->x_size_; ++j) {
+          hs_states_[i][j] = other.hs_states_[i][j];
+        }
+        for (int k = 0; k < 16; ++k) {
+          hs_transition_counts_[i][k] = other.hs_transition_counts_[i][k];
+        }
+      }
+    }
+  }
+  PulsedRPUDeviceBase<T> &operator=(const PulsedRPUDeviceBase<T> &other) {
+    PulsedRPUDeviceBase<T> tmp(other);
+    swap(*this, tmp);
+    return *this;
+  }
+  PulsedRPUDeviceBase(PulsedRPUDeviceBase<T> &&other) noexcept { swap(*this, other); }
+  PulsedRPUDeviceBase<T> &operator=(PulsedRPUDeviceBase<T> &&other) noexcept {
+    swap(*this, other);
+    return *this;
+  }
 
   friend void swap(PulsedRPUDeviceBase<T> &a, PulsedRPUDeviceBase<T> &b) noexcept {
     using std::swap;
     swap(static_cast<SimpleRPUDevice<T> &>(a), static_cast<SimpleRPUDevice<T> &>(b));
     swap(a.weight_granularity_, b.weight_granularity_);
     swap(a.num_states_, b.num_states_);
+    swap(a.hs_states_, b.hs_states_);
+    swap(a.hs_transition_counts_, b.hs_transition_counts_);
+    swap(a.hs_tracking_enabled_, b.hs_tracking_enabled_);
   }
 
   virtual void copyInvertDeviceParameter(const PulsedRPUDeviceBase<T> *rpu_device) {
@@ -149,8 +182,17 @@ public:
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
     RPU_FATAL("Sparse update not available for this device!");
   };
+  virtual void doSparseUpdateHS(
+      T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
+    // Default implementation: call standard sparse update
+    doSparseUpdate(weights, i, x_signed_indices, x_count, d_sign, rng);
+  };
   virtual void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) {
     RPU_FATAL("Dense update not available for this device!");
+  };
+  virtual void doDenseUpdateHS(T **weights, int *coincidences, RNG<T> *rng) {
+    // Default implementation: call standard dense update
+    doDenseUpdate(weights, coincidences, rng);
   };
   // for Meta-devices [like vector/transfer]: called once before each update starts
   virtual void initUpdateCycle(
@@ -200,6 +242,19 @@ public:
     RPU::load(state, "weight_granularity", weight_granularity_, strict);
   };
 
+  // Half-selected state management
+  inline HalfSelectedState **getHSStates() const { return hs_states_; };
+  inline int **getHSTransitionCounts() const { return hs_transition_counts_; };
+  inline bool isHSTrackingEnabled() const { return hs_tracking_enabled_; };
+  void enableHSTracking();
+  void disableHSTracking();
+  void resetHSStates();
+  void getHSTransitionCounts(std::vector<int> &counts) const;
+  void updateHSStateOnly(
+      int i, const int *x_signed_indices, int x_count, int d_sign, bool x_pulse_exists, bool d_pulse_exists);
+  void updateHSTransitionCount(HalfSelectedState prev_hs, HalfSelectedState curr_hs, int d_idx);
+  bool shouldApplyHSDecay(HalfSelectedState prev_hs, HalfSelectedState curr_hs) const;
+
 protected:
   inline void setWeightGranularity(T weight_granularity) {
     weight_granularity_ = weight_granularity;
@@ -211,6 +266,17 @@ protected:
     setWeightGranularity(par.calcWeightGranularity());
     setNumStates(par.calcNumStates());
   };
+
+  // HS state helper methods (internal use only)
+  HalfSelectedState determineHSState(int j_signed, int d_sign) const;
+  void allocateHSContainers();
+  void freeHSContainers();
+
+protected:
+  // Half-selected state tracking
+  HalfSelectedState **hs_states_ = nullptr;        // Current HS state for each synapse
+  int **hs_transition_counts_ = nullptr;           // 16 transition counters (HS1->HS1, HS1->HS2, etc.)
+  bool hs_tracking_enabled_ = false;
 
 private:
   T weight_granularity_ = 0.0;
@@ -267,6 +333,7 @@ public:
   inline T **getResetBias() const { return w_reset_bias_; };
   inline T **getScaleUp() const { return w_scale_up_; };
   inline T **getScaleDown() const { return w_scale_down_; };
+
   PulsedRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<PulsedRPUDeviceMetaParameter<T> &>(SimpleRPUDevice<T>::getPar());
   };
@@ -473,5 +540,33 @@ public:                                                                         
       BODY;                                                                                        \
     }                                                                                              \
   }
+
+// Macro for HS-aware weight updates
+#define PULSED_UPDATE_W_LOOP_HS(BODY, HS_BODY)                                                     \
+  PRAGMA_SIMD                                                                                      \
+  for (int jj = 0; jj < x_count; jj++) {                                                           \
+    int j_signed = x_signed_indices[jj];                                                           \
+    int sign = (j_signed < 0) ? -d_sign : d_sign;                                                  \
+    int j = (j_signed < 0) ? -j_signed - 1 : j_signed - 1;                                         \
+    if (this->hs_tracking_enabled_) {                                                              \
+      int d_idx = i;                                                                               \
+      HalfSelectedState prev_hs = this->hs_states_[d_idx][j];                                      \
+      HalfSelectedState curr_hs = this->determineHSState(j_signed, d_sign);                        \
+      this->updateHSTransitionCount(prev_hs, curr_hs, d_idx);                                      \
+      this->hs_states_[d_idx][j] = curr_hs;                                                        \
+      { HS_BODY; }                                                                                 \
+    } else {                                                                                       \
+      { BODY; }                                                                                    \
+    }                                                                                              \
+  }
+
+// Helper macro to determine HS state from pulse pattern
+#define DETERMINE_HS_STATE(x_pulse_exists, d_pulse_exists, x_sign, d_sign)                         \
+  (x_pulse_exists && d_pulse_exists) ? HalfSelectedState::HS0 :                                    \
+  (x_pulse_exists && !d_pulse_exists && x_sign == d_sign) ? HalfSelectedState::HS1 :              \
+  (!x_pulse_exists && d_pulse_exists && x_sign == d_sign) ? HalfSelectedState::HS2 :              \
+  (x_pulse_exists && !d_pulse_exists && x_sign != d_sign) ? HalfSelectedState::HS3 :              \
+  (!x_pulse_exists && d_pulse_exists && x_sign != d_sign) ? HalfSelectedState::HS4 :              \
+  HalfSelectedState::HS0
 
 } // namespace RPU

@@ -10,6 +10,7 @@
 #include "chopped_weight_output.h"
 #include "cuda_util.h"
 #include "pwu_kernel.h"
+#include "pwu_kernel_hs.h"
 #include "pwu_kernel_parameter_base.h"
 #include "rpu_pulsed_meta_parameter.h"
 #include "rpucuda_pulsed_device.h"
@@ -600,6 +601,38 @@ DEFINE_PWU_KERNEL_PARAMETER(
     RPU_PWU_COUNTER_KERNEL;);
 
 #undef RPU_PWU_COUNTER_KERNEL
+
+/********************************************************************************
+ * PWUKernelParameterBatchSharedFunctorHS
+ *********************************************************************************/
+
+template <typename T, typename FunctorT, int gp_count>
+DEFINE_PWU_KERNEL_PARAMETER(
+    BatchSharedFunctorHS,
+    BatchSharedBase,
+    /*run*/
+    RPU_PWU_START_BATCH_SHARED_INIT;
+    uint8_t *dev_hs_states = rpucuda_device->getDevHSStates();
+    unsigned long long *dev_hs_counts = rpucuda_device->getDevHSCounts();
+    // The half-select kernel tracks per-synapse HS state across the bit line and
+    // therefore only supports the plain uint32 bit-line count path. The implicit
+    // (count_t=T) and BO64 (count_t=uint64_t) variants are intentionally rejected:
+    // instantiating the HS kernel with those count types trips its
+    // static_assert(count_t==uint32_t), so we must NOT instantiate them at all.
+    if (this->implicit_pulses || this->use_bo64) {
+      RPU_FATAL("Half-select update supports only the uint32 bit-line count path "
+                "(implicit-pulse and BO64 update variants are not supported).");
+    } else {
+      RPU_SWITCH_TRANS_TEMPLATE_FUNCTOR(
+          T, one_sided, uint32_t, this->out_trans, this->out_trans, s, this->nblocks,
+          this->nthreads, shared_mem, kernelUpdateWBatchSharedFunctorHS, FunctorT, gp_count,
+          (dev_weights, x_counts_chunk ? x_counts_chunk : blm->getXCountsData(), this->x_size,
+           d_counts_chunk ? d_counts_chunk : blm->getDCountsData(), this->d_size,
+           rpucuda_device->get4ParamsData(), rpucuda_device->get2ParamsData(),
+           rpucuda_device->get1ParamsData(), rpucuda_device->getGlobalParamsData(), this->nK32,
+           m_batch, batch_load_stride, rpucuda_device->getWeightGranularityNoise(),
+           dev_hs_states, dev_states, dev_hs_counts));
+    });
 
 #undef RPU_PWU_START_BATCH_SHARED_KERNEL
 #undef RPU_PWU_START_BATCH_SHARED_INIT

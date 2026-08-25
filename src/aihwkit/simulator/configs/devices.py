@@ -368,6 +368,17 @@ class ConstantStepDevice(PulsedDevice):
 
     bindings_class: ClassVar[Optional[Union[Type, str]]] = "ConstantStepResistiveDeviceParameter"
 
+    hs_decay: float = 0.99
+    """Multiplicative weight decay applied to a cross-point when its
+    half-selected state flips during a pulsed update.
+
+    Only used when the update pulse type is one of the half-selected
+    variants (:class:`~aihwkit.simulator.parameters.enums.PulseType`
+    ``HALFSELECTED_STOCHASTIC`` / ``HALFSELECTED_STOCHASTIC_STREAM``) and
+    half-select tracking is enabled on the tile. A value of ``1.0``
+    disables the decay.
+    """
+
 
 @dataclass
 class LinearStepDevice(PulsedDevice):

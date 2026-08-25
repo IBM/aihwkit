@@ -19,8 +19,10 @@ BUILD_PULSED_DEVICE_META_PARAMETER(
     /*implements*/
     DeviceUpdateType::ConstantStep,
     /*parameter def*/
+    T hs_decay = (T)0.99;
     ,
     /*print body*/
+    ss << "\t hs_decay:\t\t" << hs_decay << std::endl;
     ,
     /* calc weight granularity body */
     return this->dw_min;
@@ -55,5 +57,10 @@ template <typename T> class ConstantStepRPUDevice : public PulsedRPUDevice<T> {
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
       override;
   void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
+
+  // HS-aware update methods for halfselected pulse types
+  void doSparseUpdateHS(
+      T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) override;
+  void doDenseUpdateHS(T **weights, int *coincidences, RNG<T> *rng) override;
 };
 } // namespace RPU

@@ -160,6 +160,7 @@ public:
     swap(a.dev_global_params_, b.dev_global_params_);
     swap(a.gp_count_, b.gp_count_);
     swap(a.dev_hs_states_, b.dev_hs_states_);
+    swap(a.dev_hs_counts_, b.dev_hs_counts_);
     swap(a.hs_gpu_enabled_, b.hs_gpu_enabled_);
   };
 
@@ -203,9 +204,18 @@ public:
   virtual param_t *get2ParamsData() { return nullptr; };
   virtual param_t *get4ParamsData() { return dev_4params_->getData(); }
   virtual T getWeightGranularityNoise() const { return getPar().dw_min_std; };
+  virtual uint8_t *getDevHSStates() { return dev_hs_states_; }
+  virtual unsigned long long *getDevHSCounts() { return dev_hs_counts_; }
   virtual uint64_t *getPosPulseCountData();
   virtual uint64_t *getNegPulseCountData();
   std::vector<uint64_t> getPulseCounters() const override;
+
+  // Half-select (HS) tracking API (GPU). Mirrors the CPU PulsedRPUDeviceBase API.
+  virtual void enableHSTracking();
+  virtual void disableHSTracking();
+  virtual void resetHSStates();
+  virtual bool isHSTrackingEnabled() const { return hs_gpu_enabled_; }
+  virtual void getHSTransitionCounts(std::vector<int> &counts) const;
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
@@ -217,14 +227,15 @@ protected:
   virtual void allocateHSGPU();
   virtual void freeHSGPU();
   virtual void resetHSGPU();
-  virtual uint8_t *getDevHSStates() { return dev_hs_states_; }
-  
+  void setupHSGlobalParams(T hs_decay);
+
   std::unique_ptr<CudaArray<T>> dev_persistent_weights_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_pos_pulse_counter_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_neg_pulse_counter_ = nullptr;
-  
+
   // HS state memory (d_size * x_size uint8_t values)
   uint8_t *dev_hs_states_ = nullptr;
+  unsigned long long *dev_hs_counts_ = nullptr;
   bool hs_gpu_enabled_ = false;
 
 private:

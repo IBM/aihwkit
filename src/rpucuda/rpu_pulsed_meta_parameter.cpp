@@ -161,19 +161,34 @@ void PulsedUpdateMetaParameter<T>::calculateBlAB(
     return;
   }
 
+  // if (debug_mode) {
+  //   std::cout << "[DEBUG] calculateBlAB: lr=" << lr << ", weight_granularity=" << weight_granularity << std::endl;
+  //   std::cout << "[DEBUG] calculateBlAB: fixed_BL=" << fixed_BL << ", update_bl_management=" << update_bl_management << std::endl;
+  //   std::cout << "[DEBUG] calculateBlAB: desired_BL=" << desired_BL << std::endl;
+  // }
+
   if (fixed_BL || update_bl_management) {
     BL = desired_BL; // actually max for UBLM
     A = (T)sqrtf(lr / (weight_granularity * (T)BL));
     B = A;
+    // if (debug_mode) {
+    //   std::cout << "[DEBUG] calculateBlAB: Using fixed_BL path - BL=" << BL << ", A=B=" << A << std::endl;
+    // }
   } else {
     if ((weight_granularity * (T)desired_BL) < lr) {
       A = (T)1.0;
       B = (T)1.0;
       BL = MAX((int)ceilf(lr / weight_granularity), 1);
+      // if (debug_mode) {
+      //   std::cout << "[DEBUG] calculateBlAB: Large lr path - A=B=1.0, BL=" << BL << std::endl;
+      // }
     } else {
       BL = desired_BL;
       A = (T)sqrtf(lr / (weight_granularity * (T)BL));
       B = A;
+      // if (debug_mode) {
+      //   std::cout << "[DEBUG] calculateBlAB: Normal path - BL=" << BL << ", A=B=" << A << std::endl;
+      // }
     }
   }
 }
@@ -205,6 +220,11 @@ void PulsedUpdateMetaParameter<T>::performUpdateManagement(
       T d_val = um_grad_scale * d_abs_max;
       T k_val = lr * x_val * d_val / weight_granularity;
 
+      // if (debug_mode) {
+      //   std::cout << "[DEBUG] performUpdateManagement: x_val=" << x_val << ", d_val=" << d_val
+      //             << ", k_val=" << k_val << ", um_grad_scale=" << um_grad_scale << std::endl;
+      // }
+
       if (this->update_bl_management) {
         BL = (int)ceilf(k_val);
         if (BL > max_BL) {
@@ -212,6 +232,9 @@ void PulsedUpdateMetaParameter<T>::performUpdateManagement(
         }
         A = (T)sqrtf(lr / (weight_granularity * (T)BL));
         B = A;
+        // if (debug_mode) {
+        //   std::cout << "[DEBUG] performUpdateManagement: After BL management - A=B=" << A << ", BL=" << BL << std::endl;
+        // }
       }
 
       if (this->update_management) {
@@ -219,10 +242,18 @@ void PulsedUpdateMetaParameter<T>::performUpdateManagement(
         if (k_val > (T)max_BL) {
           // avoid clipping of x
           d_val *= (T)max_BL / k_val;
+          // if (debug_mode) {
+          //   std::cout << "[DEBUG] performUpdateManagement: Clipped d_val to " << d_val << std::endl;
+          // }
         }
 
         A *= (T)sqrtf(x_val / d_val);
         B *= (T)sqrtf(d_val / x_val);
+
+        // if (debug_mode) {
+        //   std::cout << "[DEBUG] performUpdateManagement: Update management scaling - A: " << old_A
+        //             << " -> " << A << ", B: " << old_B << " -> " << B << std::endl;
+        // }
 
         // that is:
         //     prob(x) = B * x = x * sqrt(d_amax / x_amax) * sqrt(lr / dw_min / BL)
