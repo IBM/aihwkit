@@ -1725,7 +1725,6 @@ class AnalogCtxMetadataQueryTest(ParametrizedTestCase):
         "is_pinned",
         "dense_dim",
         "sparse_dim",
-        "has_names",
     ]
 
     def _ctx(self, rpu_config):

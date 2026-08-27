@@ -117,7 +117,6 @@ _PLACEHOLDER_METADATA_FUNCTIONS = {
     "data_ptr",
     "dense_dim",
     "sparse_dim",
-    "has_names",
     "is_floating_point",
     "is_complex",
     "is_signed",

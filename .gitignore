@@ -170,3 +170,6 @@ cython_debug/
 .codex
 CLAUDE.md
 AGENT.md
+
+# aihwkit examples runner output
+examples/run_results/
