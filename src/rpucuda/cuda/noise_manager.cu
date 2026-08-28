@@ -239,7 +239,7 @@ template <typename T> void NoiseManager<T>::initializeBatchBuffer(int m_batch) {
     size_t temp_storage_bytes = 0;
     RPU_CUB_NS_QUALIFIER DeviceSegmentedReduce::Reduce(
         nullptr, temp_storage_bytes, dev_psum_values_->getData(), dev_psum_values_->getData(),
-        m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, 0,
+        m_batch, dev_offsets_->getData(), dev_offsets_->getData() + 1, psum_op_, (T)0,
         context_->getStream());
     dev_m_temp_storage_ = RPU::make_unique<CudaArray<char>>(context_, temp_storage_bytes);
 
