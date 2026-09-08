@@ -209,6 +209,56 @@ You can then run a GPU enabled docker container using the follwing command from 
 docker run --rm -it --gpus all -v $(pwd):$HOME --name aihwkit aihwkit:cuda bash
 ```
 
+## Running on AMD GPUs (ROCm/HIP)
+
+The `RPUCuda` backend is not limited to NVIDIA hardware: the analog tile
+simulator can also be built for AMD GPUs through ROCm/HIP. The port adds an
+optional `USE_HIP` build that compiles the existing CUDA-spelled device sources
+against HIP, hipBLAS, hipRAND and hipCUB via a single compatibility header, so
+the simulator kernels (including the stochastic pulse trains of the analog
+update) run natively on AMD GPUs. The CUDA path is untouched and both builds are
+mutually exclusive.
+
+From Python nothing changes: analog tiles are moved to the GPU with the usual
+`.cuda()` calls, and `aihwkit.simulator.rpu_base.cuda.is_compiled()` reports the
+GPU build as usual.
+
+This work is proposed upstream in [aihwkit PR #770] and is maintained by AMD in
+a separate fork, [AMD-Ecosystem/aihwkit], on the `moat-port` branch:
+
+```shell
+git clone -b moat-port https://github.com/AMD-Ecosystem/aihwkit.git
+cd aihwkit
+python setup.py build_ext --inplace -j16 \
+    -DUSE_HIP=ON -DUSE_CUDA=OFF \
+    -DCMAKE_HIP_ARCHITECTURES=gfx90a \
+    -DCMAKE_PREFIX_PATH=$CONDA_PREFIX
+```
+
+Set `-DCMAKE_HIP_ARCHITECTURES` to the `gfx` target of your card, which you can
+look up with:
+
+```shell
+rocminfo | grep -m1 -o 'gfx[0-9a-f]*'
+```
+
+Depending on the environment you may also need `-DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++`,
+`-DCMAKE_PREFIX_PATH` pointing at both the `torch` cmake directory and `/opt/rocm`,
+and `-DRPU_CXX_STANDARD=20` for recent PyTorch headers.
+
+The port has been validated against the CPU tiles with the tile, bindings, torch
+and inference test suites on:
+
+| GPU               | Architecture               | OS / ROCm          |
+| ----------------- | -------------------------- | ------------------ |
+| Instinct MI250X   | `gfx90a` (CDNA2, wave64)   | Linux, ROCm 7.2.1  |
+| Radeon Pro W7800  | `gfx1100` (RDNA3, wave32)  | Linux, ROCm 7.2.1  |
+| Radeon RX 9070 XT | `gfx1201` (RDNA4, wave32)  | Windows, ROCm 7.14 |
+
+Wave32 (RDNA) and wave64 (CDNA) devices produce the same pulse stream as the
+CUDA build, as the warp-level primitives used by the bit line maker are mapped
+to width-32 logical warp operations.
+
 ## Authors
 
 IBM Research has developed IBM Analog Hardware Acceleration Kit,
@@ -241,3 +291,5 @@ This project is licensed under [MIT License].
 [AIHW Composer]: https://aihw-composer.draco.res.ibm.com
 [award]: https://conferences.computer.org/services/2023/awards/
 [CUDA Dockerfile instructions]: https://github.com/IBM/aihwkit/blob/master/docs/source/advanced_install.rst#cuda-enabled-docker-image
+[aihwkit PR #770]: https://github.com/IBM/aihwkit/pull/770
+[AMD-Ecosystem/aihwkit]: https://github.com/AMD-Ecosystem/aihwkit
