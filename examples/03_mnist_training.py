@@ -26,9 +26,32 @@ from torchvision import datasets, transforms
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear, AnalogSequential
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
+from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice, UnitCellRPUConfig, TransferCompound, SoftBoundsDevice
+from aihwkit.simulator.presets import CapacitorPresetDevice
+
 from aihwkit.simulator.rpu_base import cuda
 
+from aihwkit.simulator.parameters import PulseType
+
+cap_device = CapacitorPresetDevice(w_min=-0.3, w_max=0.3, lifetime=1000)
+rpu_config = UnitCellRPUConfig(
+    device=TransferCompound(
+        # Devices that compose the Tiki-taka compound.
+        unit_cell_devices=[
+            cap_device,
+            SoftBoundsDevice(w_min=-0.6, w_max=0.6),
+        ],
+        # Make some adjustments of the way Tiki-Taka is performed.
+        units_in_mbatch=True,  # batch_size=1 anyway
+        transfer_every=2,  # every 2 batches do a transfer-read
+        n_reads_per_transfer=1,  # one forward read for each transfer
+        gamma=0.0,  # all SGD weight in second device
+        scale_transfer_lr=True,  # in relative terms to SGD LR
+        transfer_lr=1.0,  # same transfer LR as for SGD
+        fast_lr=0.1,  # SGD update onto first matrix constant
+        transfer_columns=True,  # transfer use columns (not rows)
+    )
+)
 
 # Check device
 USE_CUDA = 0
@@ -45,7 +68,7 @@ HIDDEN_SIZES = [256, 128]
 OUTPUT_SIZE = 10
 
 # Training parameters.
-EPOCHS = 30
+EPOCHS = 10
 BATCH_SIZE = 64
 
 
@@ -62,7 +85,7 @@ def load_images():
     return train_data, validation_data
 
 
-def create_analog_network(input_size, hidden_sizes, output_size):
+def create_analog_network(input_size, hidden_sizes, output_size, rpu_config):
     """Create the neural network using analog and digital layers.
 
     Args:
@@ -77,22 +100,22 @@ def create_analog_network(input_size, hidden_sizes, output_size):
         AnalogLinear(
             input_size,
             hidden_sizes[0],
-            True,
-            rpu_config=SingleRPUConfig(device=ConstantStepDevice()),
+            False,
+            rpu_config=rpu_config,
         ),
         nn.Sigmoid(),
         AnalogLinear(
             hidden_sizes[0],
             hidden_sizes[1],
-            True,
-            rpu_config=SingleRPUConfig(device=ConstantStepDevice()),
+            False,
+            rpu_config=rpu_config,
         ),
         nn.Sigmoid(),
         AnalogLinear(
             hidden_sizes[1],
             output_size,
-            True,
-            rpu_config=SingleRPUConfig(device=ConstantStepDevice()),
+            False,
+            rpu_config=rpu_config,
         ),
         nn.LogSoftmax(dim=1),
     )
@@ -191,9 +214,12 @@ def test_evaluation(model, val_set):
 if __name__ == "__main__":
     # Load datasets.
     train_dataset, validation_dataset = load_images()
-
+    rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+    rpu_config.update.pulse_type=PulseType.HALFSELECTED_STOCHASTIC
+    rpu_config.update.desired_bl=10
+    
     # Prepare the model.
-    model = create_analog_network(INPUT_SIZE, HIDDEN_SIZES, OUTPUT_SIZE)
+    model = create_analog_network(INPUT_SIZE, HIDDEN_SIZES, OUTPUT_SIZE, rpu_config=rpu_config)
 
     # Train the model.
     train(model, train_dataset)

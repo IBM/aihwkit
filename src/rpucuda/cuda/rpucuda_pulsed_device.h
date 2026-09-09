@@ -139,7 +139,8 @@ public:
   explicit PulsedRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size);
   // explicit PulsedRPUDeviceCuda(CudaContextPtr  c, const PulsedRPUDevice<T> * other);
 
-  ~PulsedRPUDeviceCuda() {};
+  ~PulsedRPUDeviceCuda();
+
   PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other);
   PulsedRPUDeviceCuda<T> &operator=(const PulsedRPUDeviceCuda<T> &other);
   PulsedRPUDeviceCuda(PulsedRPUDeviceCuda<T> &&other);
@@ -156,6 +157,11 @@ public:
     swap(a.dev_persistent_weights_, b.dev_persistent_weights_);
     swap(a.dev_neg_pulse_counter_, b.dev_neg_pulse_counter_);
     swap(a.dev_pos_pulse_counter_, b.dev_pos_pulse_counter_);
+    swap(a.dev_global_params_, b.dev_global_params_);
+    swap(a.gp_count_, b.gp_count_);
+    swap(a.dev_hs_states_, b.dev_hs_states_);
+    swap(a.dev_hs_counts_, b.dev_hs_counts_);
+    swap(a.hs_gpu_enabled_, b.hs_gpu_enabled_);
   };
 
   // implement abstract functions
@@ -191,23 +197,46 @@ public:
       const ChoppedWeightOutput<T> *cwo = nullptr) override;
 
   // for interfacing with pwu_kernel
-  virtual T *getGlobalParamsData() { return nullptr; };
+  virtual T *getGlobalParamsData() { 
+    return dev_global_params_ ? dev_global_params_->getData() : nullptr; 
+  };
   virtual T *get1ParamsData() { return nullptr; };
   virtual param_t *get2ParamsData() { return nullptr; };
   virtual param_t *get4ParamsData() { return dev_4params_->getData(); }
   virtual T getWeightGranularityNoise() const { return getPar().dw_min_std; };
+  virtual uint8_t *getDevHSStates() { return dev_hs_states_; }
+  virtual unsigned long long *getDevHSCounts() { return dev_hs_counts_; }
   virtual uint64_t *getPosPulseCountData();
   virtual uint64_t *getNegPulseCountData();
   std::vector<uint64_t> getPulseCounters() const override;
+
+  // Half-select (HS) tracking API (GPU). Mirrors the CPU PulsedRPUDeviceBase API.
+  virtual void enableHSTracking();
+  virtual void disableHSTracking();
+  virtual void resetHSStates();
+  virtual bool isHSTrackingEnabled() const { return hs_gpu_enabled_; }
+  virtual void getHSTransitionCounts(std::vector<int> &counts) const;
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix) override;
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) override;
 
 protected:
   virtual void applyUpdateWriteNoise(T *dev_weights);
+  
+  // HS GPU state management
+  virtual void allocateHSGPU();
+  virtual void freeHSGPU();
+  virtual void resetHSGPU();
+  void setupHSGlobalParams(T hs_decay);
+
   std::unique_ptr<CudaArray<T>> dev_persistent_weights_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_pos_pulse_counter_ = nullptr;
   std::unique_ptr<CudaArray<uint64_t>> dev_neg_pulse_counter_ = nullptr;
+
+  // HS state memory (d_size * x_size uint8_t values)
+  uint8_t *dev_hs_states_ = nullptr;
+  unsigned long long *dev_hs_counts_ = nullptr;
+  bool hs_gpu_enabled_ = false;
 
 private:
   void initialize();
@@ -216,6 +245,8 @@ private:
   std::unique_ptr<CudaArray<T>> dev_diffusion_rate_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_decay_scale_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_reset_bias_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_global_params_ = nullptr;
+  int gp_count_ = 1;
 };
 
 #define BUILD_PULSED_DEVICE_CONSTRUCTORS_CUDA(                                                     \

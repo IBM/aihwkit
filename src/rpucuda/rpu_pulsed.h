@@ -99,6 +99,13 @@ public:
   const FBParameter<T> &getFBParameter() const;
   void setFBParameter(FBParameter<T> &fb_pars);
 
+  // HS tracking methods
+  void enableHSTracking();
+  void disableHSTracking();
+  void resetHSStates();
+  bool isHSTrackingEnabled() const;
+  void getHSTransitionCounts(std::vector<int> &counts) const;
+
 protected:
   void forwardVector(const T *x_input, T *d_output, int x_inc, int d_inc, bool is_test) override;
   void backwardVector(const T *d_input, T *x_output, int d_inc = 1, int x_inc = 1) override;

@@ -583,6 +583,7 @@ template <typename T> void declare_rpu_devices(py::module &m, std::string type_n
   py::class_<ConstantStepParam, PyConstantStepParam, PulsedParam>(
       m, NAME("ConstantStepResistiveDeviceParameter"))
       .def(py::init<>())
+      .def_readwrite("hs_decay", &ConstantStepParam::hs_decay)
       .def(
           "__str__",
           [](ConstantStepParam &self) {

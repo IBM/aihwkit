@@ -143,35 +143,48 @@ pwukpvec_t<T> LinearStepRPUDeviceCuda<T>::getUpdateKernels(
 
   pwukpvec_t<T> v;
   const auto &par = getPar();
-  if (par.ls_mult_noise) {
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
-            ARGS);
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
-            ARGS);
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
-            ARGS);
-    v.push_back(
-        RPU::make_unique<
-            PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
-            ARGS);
-
+  if (
+      up.pulse_type == PulseType::HalfselectedStochastic ||
+      up.pulse_type == PulseType::HalfselectedStochasticStream) {
+    if (par.ls_mult_noise) {
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedFunctorHS<
+              T, UpdateFunctorLinearStepMult<T>, 2>> ARGS);
+    } else {
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedFunctorHS<
+              T, UpdateFunctorLinearStepAdd<T>, 2>> ARGS);
+    }
   } else {
+    if (par.ls_mult_noise) {
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
+              ARGS);
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorLinearStepMult<T>, 1>>
+              ARGS);
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedFunctor<
+              T, UpdateFunctorLinearStepMult<T>, 1>> ARGS);
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+              T, UpdateFunctorLinearStepMult<T>, 1>> ARGS);
 
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
-            ARGS);
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>> ARGS);
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
-            ARGS);
-    v.push_back(
-        RPU::make_unique<
-            PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
-            ARGS);
+    } else {
+
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
+              ARGS);
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorLinearStepAdd<T>, 1>>
+              ARGS);
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedFunctor<
+              T, UpdateFunctorLinearStepAdd<T>, 1>> ARGS);
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+              T, UpdateFunctorLinearStepAdd<T>, 1>> ARGS);
+    }
   }
   return v;
 }

@@ -540,7 +540,51 @@ void declare_rpu_tiles_cuda(py::module &m, std::string type_name_add, bool add_u
       .def(
           "__deepcopy__", [](const ClassPulsed &self, py::dict) { return ClassPulsed(self); },
           py::arg("memo"))
-      .def("get_meta_parameters", &ClassPulsed::getMetaPar);
+      .def("get_meta_parameters", &ClassPulsed::getMetaPar)
+      .def(
+          "enable_hs_tracking", &ClassPulsed::enableHSTracking,
+          R"pbdoc(
+           Enable halfselected state tracking for the tile.
+
+           This enables tracking of HS1-HS4 transitions during pulse updates
+           when using halfselected pulse types.
+           )pbdoc")
+      .def(
+          "disable_hs_tracking", &ClassPulsed::disableHSTracking,
+          R"pbdoc(
+           Disable halfselected state tracking for the tile.
+           )pbdoc")
+      .def(
+          "reset_hs_states", &ClassPulsed::resetHSStates,
+          R"pbdoc(
+           Reset all halfselected states and transition counters.
+           )pbdoc")
+      .def(
+          "is_hs_tracking_enabled", &ClassPulsed::isHSTrackingEnabled,
+          R"pbdoc(
+           Check if halfselected state tracking is enabled.
+
+           Returns:
+               bool: True if HS tracking is enabled, False otherwise.
+           )pbdoc")
+      .def(
+          "get_hs_transition_counts",
+          [](ClassPulsed &self) {
+            std::vector<int> counts;
+            self.getHSTransitionCounts(counts);
+
+            DEFAULT_TENSOR_OPTIONS;
+            torch::Tensor result = torch::empty({16}, torch::dtype(torch::kInt32).device(torch::kCPU));
+            std::copy(counts.begin(), counts.end(), result.data_ptr<int32_t>());
+            return result;
+          },
+          R"pbdoc(
+           Get the halfselected state transition counts.
+
+           Returns:
+               torch.Tensor: Tensor containing 16 transition counts representing the HS1->HS1,
+               HS1->HS2, ..., HS4->HS4 transitions that occurred during training.
+           )pbdoc");
 };
 #undef NAME
 

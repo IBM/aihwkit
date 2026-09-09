@@ -572,6 +572,7 @@ void RPUSimple<T>::update(
     else
       this->updateMatrix(X_input, D_input, m_batch, x_trans, d_trans);
   }
+  this->update_count_ += m_batch;
 }
 
 /*********************************************************************************/

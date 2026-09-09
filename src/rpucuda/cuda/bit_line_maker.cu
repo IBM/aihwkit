@@ -2064,9 +2064,13 @@ void BitLineMaker<T>::makeCounts(
          up.d_res_implicit, dev_d_->getData(), dev_d_noz, current_BL_ + 1, m_batch, scale_values,
          K_values, lr / weight_granularity));
 
-  } break;
+   } break;
 
+  case PulseType::HalfselectedStochastic:
+  case PulseType::HalfselectedStochasticStream:
   case PulseType::StochasticCompressed: {
+    // Pulse generation is identical to StochasticCompressed for HS variants.
+    // The difference is only in which kernel dispatches after BLM.
     // here we generate stochastic bitlines. These are either in 64
     // bit format (32 bits for sign and 32 bits for data) or
     // standard 32 bit format. In the latter case the first bit is

@@ -199,6 +199,13 @@ public:
 
   const AbstractRPUDeviceCuda<T> &getRPUDeviceCuda() { return *rpucuda_device_; };
 
+  // HS tracking methods
+  void enableHSTracking();
+  void disableHSTracking();
+  void resetHSStates();
+  bool isHSTrackingEnabled() const;
+  void getHSTransitionCounts(std::vector<int> &counts) const;
+
   void setVerbosityLevel(int verbose) {
     if (up_pwu_) {
       up_pwu_->setVerbosityLevel(verbose);

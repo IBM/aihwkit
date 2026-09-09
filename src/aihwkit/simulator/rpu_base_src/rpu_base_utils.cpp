@@ -82,7 +82,17 @@ void declare_utils(py::module &m_devices, py::module &m_tiles) {
       .value("Stochastic", RPU::PulseType::Stochastic)
       .value("NoneWithDevice", RPU::PulseType::NoneWithDevice)
       .value("MeanCount", RPU::PulseType::MeanCount)
-      .value("DeterministicImplicit", RPU::PulseType::DeterministicImplicit);
+      .value("DeterministicImplicit", RPU::PulseType::DeterministicImplicit)
+      .value("StochasticStream", RPU::PulseType::StochasticStream)
+      .value("HalfselectedStochastic", RPU::PulseType::HalfselectedStochastic)
+      .value("HalfselectedStochasticStream", RPU::PulseType::HalfselectedStochasticStream);
+
+  py::enum_<RPU::HalfSelectedState>(m_devices, "HalfSelectedState")
+      .value("HS0", RPU::HalfSelectedState::HS0)
+      .value("HS1", RPU::HalfSelectedState::HS1)
+      .value("HS2", RPU::HalfSelectedState::HS2)
+      .value("HS3", RPU::HalfSelectedState::HS3)
+      .value("HS4", RPU::HalfSelectedState::HS4);
 
   py::enum_<RPU::AnalogMVType>(m_devices, "AnalogMVType")
       .value("Ideal", RPU::AnalogMVType::Ideal)

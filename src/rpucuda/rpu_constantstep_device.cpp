@@ -77,6 +77,70 @@ void ConstantStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG
   );
 }
 
+// HS-aware update methods
+template <typename T>
+void ConstantStepRPUDevice<T>::doSparseUpdateHS(
+    T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
+
+  T *scale_down = this->w_scale_down_[i];
+  T *scale_up = this->w_scale_up_[i];
+  T *w = weights[i];
+  T *min_bound = this->w_min_bound_[i];
+  T *max_bound = this->w_max_bound_[i];
+  T dw_min_std = getPar().dw_min_std;
+
+  if (dw_min_std > (T)0.0) {
+    PULSED_UPDATE_W_LOOP_HS(
+        // Standard weight update body
+        T dw = 0; if (sign > 0) {
+          dw = ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_down[j];
+          w[j] -= dw;
+        } else {
+          dw = ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_up[j];
+          w[j] += dw;
+        } w[j] = MIN(w[j], max_bound[j]);
+        w[j] = MAX(w[j], min_bound[j]);,
+
+        // HS-aware weight update body
+        if (this->shouldApplyHSDecay(prev_hs, curr_hs)) {
+          T hs_decay_factor = getPar().hs_decay;
+          w[j] *= hs_decay_factor;
+        }
+        T dw = 0; if (sign > 0) {
+          dw = ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_down[j];
+          w[j] -= dw;
+        } else {
+          dw = ((T)1.0 + dw_min_std * rng->sampleGauss()) * scale_up[j];
+          w[j] += dw;
+        } w[j] = MIN(w[j], max_bound[j]);
+        w[j] = MAX(w[j], min_bound[j]);
+    );
+  } else {
+    PULSED_UPDATE_W_LOOP_HS(
+        // Standard weight update body
+        if (sign > 0) { w[j] -= scale_down[j]; } else { w[j] += scale_up[j]; } w[j] =
+            MIN(w[j], max_bound[j]);
+        w[j] = MAX(w[j], min_bound[j]);,
+
+        // HS-aware weight update body
+        if (this->shouldApplyHSDecay(prev_hs, curr_hs)) {
+          T hs_decay_factor = getPar().hs_decay;
+          w[j] *= hs_decay_factor;
+        }
+        if (sign > 0) { w[j] -= scale_down[j]; } else { w[j] += scale_up[j]; } w[j] =
+            MIN(w[j], max_bound[j]);
+        w[j] = MAX(w[j], min_bound[j]);
+    );
+  }
+}
+
+template <typename T>
+void ConstantStepRPUDevice<T>::doDenseUpdateHS(T **weights, int *coincidences, RNG<T> *rng) {
+  // For now, use the same implementation as standard dense update
+  // In future versions, this can be enhanced with HS state tracking for dense updates
+  doDenseUpdate(weights, coincidences, rng);
+}
+
 template class ConstantStepRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class ConstantStepRPUDevice<double>;

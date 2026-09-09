@@ -13,6 +13,13 @@
 namespace RPU {
 
 /******************************************************************************************/
+/* PulsedRPUDeviceBase*/
+
+template <typename T> PulsedRPUDeviceBase<T>::~PulsedRPUDeviceBase() {
+  freeHSContainers();
+}
+
+/******************************************************************************************/
 /* PulsedRPUDeviceMetaParameter*/
 
 template <typename T>
@@ -743,33 +750,177 @@ template <typename T> void PulsedRPUDevice<T>::printDP(int x_count, int d_count)
     d_count1 = this->d_size_;
   }
 
-  bool persist_if = getPar().usesPersistentWeight();
-
   for (int i = 0; i < d_count1; ++i) {
     for (int j = 0; j < x_count1; ++j) {
-      std::cout << "[<" << w_max_bound_[i][j] << ", ";
-      std::cout << w_min_bound_[i][j] << ">, <";
-      std::cout << w_scale_up_[i][j] << ", ";
-      std::cout << w_scale_down_[i][j] << "> ";
-      std::cout.precision(10);
-      std::cout << w_decay_scale_[i][j] << ", ";
-      std::cout.precision(6);
-      std::cout << w_diffusion_rate_[i][j] << ", ";
-      std::cout << w_reset_bias_[i][j];
-      if (persist_if) {
-        std::cout << ", " << w_persistent_[i][j];
-      }
-      std::cout << "]";
     }
-    std::cout << std::endl;
   }
 }
 
+// HS state management methods
+template <typename T> void PulsedRPUDeviceBase<T>::enableHSTracking() {
+  if (!hs_tracking_enabled_) {
+    allocateHSContainers();
+    resetHSStates();
+    hs_tracking_enabled_ = true;
+  }
+}
+
+template <typename T> void PulsedRPUDeviceBase<T>::disableHSTracking() {
+  if (hs_tracking_enabled_) {
+    freeHSContainers();
+    hs_tracking_enabled_ = false;
+  }
+}
+
+template <typename T> void PulsedRPUDeviceBase<T>::allocateHSContainers() {
+  if (!hs_states_) {
+    hs_states_ = Array_2D_Get<HalfSelectedState>(this->d_size_, this->x_size_);
+    hs_transition_counts_ = Array_2D_Get<int>(this->d_size_, 16); // 4x4 = 16 transitions
+
+    // Initialize all states to HS1 (no longer use HS0 as initial state)
+    for (int i = 0; i < this->d_size_; i++) {
+      for (int j = 0; j < this->x_size_; j++) {
+        hs_states_[i][j] = HalfSelectedState::HS1;
+      }
+      for (int k = 0; k < 16; k++) {
+        hs_transition_counts_[i][k] = 0;
+      }
+    }
+  }
+}
+
+template <typename T> void PulsedRPUDeviceBase<T>::freeHSContainers() {
+  if (hs_states_) {
+    Array_2D_Free<HalfSelectedState>(hs_states_);
+    Array_2D_Free<int>(hs_transition_counts_);
+    hs_states_ = nullptr;
+    hs_transition_counts_ = nullptr;
+  }
+}
+
+template <typename T> void PulsedRPUDeviceBase<T>::resetHSStates() {
+  if (hs_states_) {
+    for (int i = 0; i < this->d_size_; i++) {
+      for (int j = 0; j < this->x_size_; j++) {
+        hs_states_[i][j] = HalfSelectedState::HS1;
+      }
+      for (int k = 0; k < 16; k++) {
+        hs_transition_counts_[i][k] = 0;
+      }
+    }
+  }
+}
+
+template <typename T>
+HalfSelectedState PulsedRPUDeviceBase<T>::determineHSState(int j_signed, int d_sign) const {
+  // This function is called from PULSED_UPDATE_W_LOOP_HS where both x and d pulses exist (coincidence)
+  // For coincidence, determine state based on weight update direction
+  int update_sign = (j_signed < 0) ? -d_sign : d_sign;
+
+  // Weight update direction determines the HS state after coincidence
+  return (update_sign > 0) ? HalfSelectedState::HS1 : HalfSelectedState::HS3;
+}
+
+template <typename T>
+bool PulsedRPUDeviceBase<T>::shouldApplyHSDecay(HalfSelectedState prev_hs, HalfSelectedState curr_hs) const {
+  // 8가지 decay 케이스: 부호 반전 + 펄스 타입 변경
+  bool should_decay = (prev_hs == HalfSelectedState::HS1 && curr_hs == HalfSelectedState::HS3) ||  // 1->3: 부호 반전
+         (prev_hs == HalfSelectedState::HS3 && curr_hs == HalfSelectedState::HS1) ||  // 3->1: 부호 반전
+         (prev_hs == HalfSelectedState::HS2 && curr_hs == HalfSelectedState::HS4) ||  // 2->4: 부호 반전
+         (prev_hs == HalfSelectedState::HS4 && curr_hs == HalfSelectedState::HS2) ||  // 4->2: 부호 반전
+         (prev_hs == HalfSelectedState::HS1 && curr_hs == HalfSelectedState::HS2) ||  // 1->2: 펄스 타입 변경
+         (prev_hs == HalfSelectedState::HS2 && curr_hs == HalfSelectedState::HS1) ||  // 2->1: 펄스 타입 변경
+         (prev_hs == HalfSelectedState::HS3 && curr_hs == HalfSelectedState::HS4) ||  // 3->4: 펄스 타입 변경
+         (prev_hs == HalfSelectedState::HS4 && curr_hs == HalfSelectedState::HS3);    // 4->3: 펄스 타입 변경
+
+  return should_decay;
+}
+
+template <typename T>
+void PulsedRPUDeviceBase<T>::updateHSTransitionCount(
+    HalfSelectedState prev_hs, HalfSelectedState curr_hs, int d_idx) {
+  if (hs_transition_counts_) {
+    // Map HS states to indices: HS1=0, HS2=1, HS3=2, HS4=3 (skip HS0 for now)
+    int prev_idx = static_cast<int>(prev_hs);
+    int curr_idx = static_cast<int>(curr_hs);
+
+    // Only count transitions between HS1-HS4 (16 cases)
+    if (prev_idx >= 1 && prev_idx <= 4 && curr_idx >= 1 && curr_idx <= 4) {
+      int transition_idx = (prev_idx - 1) * 4 + (curr_idx - 1);
+      hs_transition_counts_[d_idx][transition_idx]++;
+    }
+  }
+}
+
+template <typename T>
+void PulsedRPUDeviceBase<T>::getHSTransitionCounts(std::vector<int> &counts) const {
+  counts.clear();
+  if (hs_transition_counts_) {
+    counts.resize(16, 0);
+    // Sum across all d_size rows
+    for (int i = 0; i < this->d_size_; i++) {
+      for (int k = 0; k < 16; k++) {
+        counts[k] += hs_transition_counts_[i][k];
+      }
+    }
+  }
+}
+
+template <typename T>
+void PulsedRPUDeviceBase<T>::updateHSStateOnly(
+    int i, const int *x_signed_indices, int x_count, int d_sign, bool x_pulse_exists, bool d_pulse_exists) {
+
+  if (!hs_tracking_enabled_) {
+    return;
+  }
+
+  if (x_pulse_exists && x_count > 0) {
+    // x 펄스가 있는 경우: HS1 또는 HS3
+    for (int jj = 0; jj < x_count; jj++) {
+      int j_signed = x_signed_indices[jj];
+      int x_sign = (j_signed < 0) ? -1 : 1;
+      int j = (j_signed < 0) ? -j_signed - 1 : j_signed - 1;
+
+      if (j >= 0 && j < this->x_size_ && i >= 0 && i < this->d_size_) {
+        HalfSelectedState prev_hs = hs_states_[i][j];
+        HalfSelectedState curr_hs;
+
+        if (!d_pulse_exists) {
+          // x만 있고 d 없음: HS1 (같은 부호) 또는 HS3 (다른 부호)
+          curr_hs = (x_sign == d_sign) ? HalfSelectedState::HS1 : HalfSelectedState::HS3;
+        } else {
+          // coincidence는 여기서 처리하지 않음 (doSparseUpdate에서 처리)
+          continue;
+        }
+
+        updateHSTransitionCount(prev_hs, curr_hs, i);
+        hs_states_[i][j] = curr_hs;
+      }
+    }
+  } else if (d_pulse_exists && !x_pulse_exists) {
+    // d만 있고 x 없음: HS2 또는 HS4
+    // 모든 x 위치에 대해 처리
+    for (int j = 0; j < this->x_size_; j++) {
+       HalfSelectedState prev_hs = hs_states_[i][j];
+       // Simplified: assume prev_x_sign = +1 for d-only pulses (no x-sign tracking in this path)
+       // Full x-sign tracking would require maintaining per-cell x-sign history
+       int prev_x_sign = 1;
+       HalfSelectedState curr_hs = (prev_x_sign == d_sign) ? HalfSelectedState::HS2 : HalfSelectedState::HS4;
+
+      updateHSTransitionCount(prev_hs, curr_hs, i);
+      hs_states_[i][j] = curr_hs;
+    }
+  }
+}
+
+template class PulsedRPUDeviceBase<float>;
 template class PulsedRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
+template class PulsedRPUDeviceBase<double>;
 template class PulsedRPUDevice<double>;
 #endif
 #ifdef RPU_USE_FP16
+template class PulsedRPUDeviceBase<half_t>;
 template class PulsedRPUDevice<half_t>;
 #endif
 

@@ -47,7 +47,7 @@ public:
       /*swap body*/
       ,
       /*host copy from cpu (rpu_device). Parent device params are copyied automatically*/
-  )
+      this->setupHSGlobalParams(this->getPar().hs_decay);)
 
   pwukpvec_t<T> getUpdateKernels(
       int m_batch,

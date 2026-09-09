@@ -24,6 +24,11 @@ template <typename T>
 PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(CudaContextPtr c, int x_size, int d_size)
     : PulsedRPUDeviceCudaBase<T>(c, x_size, d_size){};
 
+template <typename T>
+PulsedRPUDeviceCuda<T>::~PulsedRPUDeviceCuda() {
+  freeHSGPU();
+}
+
 template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
 
   dev_4params_ = RPU::make_unique<CudaArray<param_t>>(this->context_, 4 * this->size_);
@@ -33,6 +38,11 @@ template <typename T> void PulsedRPUDeviceCuda<T>::initialize() {
   dev_persistent_weights_ = nullptr;
   dev_neg_pulse_counter_ = nullptr;
   dev_pos_pulse_counter_ = nullptr;
+  dev_global_params_ = nullptr;
+  dev_hs_states_ = nullptr;
+  dev_hs_counts_ = nullptr;
+  hs_gpu_enabled_ = false;
+  gp_count_ = 1;
 
   this->context_->synchronize();
 };
@@ -65,6 +75,22 @@ PulsedRPUDeviceCuda<T>::PulsedRPUDeviceCuda(const PulsedRPUDeviceCuda<T> &other)
     dev_pos_pulse_counter_ = RPU::make_unique<CudaArray<uint64_t>>(this->context_, this->size_);
     dev_pos_pulse_counter_->assign(*other.dev_pos_pulse_counter_);
   }
+  if (other.dev_global_params_ != nullptr) {
+    dev_global_params_ = RPU::make_unique<CudaArray<T>>(this->context_, other.gp_count_);
+    dev_global_params_->assign(*other.dev_global_params_);
+    gp_count_ = other.gp_count_;
+  }
+  if (other.dev_hs_states_ != nullptr) {
+    size_t hs_size = this->d_size_ * this->x_size_ * sizeof(uint8_t);
+    cudaMalloc(&dev_hs_states_, hs_size);
+    cudaMemcpy(dev_hs_states_, other.dev_hs_states_, hs_size, cudaMemcpyDeviceToDevice);
+    hs_gpu_enabled_ = other.hs_gpu_enabled_;
+  }
+  if (other.dev_hs_counts_ != nullptr) {
+    size_t cnt_bytes = (size_t)this->d_size_ * 16 * sizeof(unsigned long long);
+    cudaMalloc(&dev_hs_counts_, cnt_bytes);
+    cudaMemcpy(dev_hs_counts_, other.dev_hs_counts_, cnt_bytes, cudaMemcpyDeviceToDevice);
+  }
 
   this->context_->synchronize();
 };
@@ -92,6 +118,13 @@ PulsedRPUDeviceCuda<T> &PulsedRPUDeviceCuda<T>::operator=(PulsedRPUDeviceCuda<T>
   dev_persistent_weights_ = std::move(other.dev_persistent_weights_);
   dev_pos_pulse_counter_ = std::move(other.dev_pos_pulse_counter_);
   dev_neg_pulse_counter_ = std::move(other.dev_neg_pulse_counter_);
+  dev_global_params_ = std::move(other.dev_global_params_);
+  gp_count_ = other.gp_count_;
+  dev_hs_states_ = other.dev_hs_states_;
+  other.dev_hs_states_ = nullptr;
+  dev_hs_counts_ = other.dev_hs_counts_;
+  other.dev_hs_counts_ = nullptr;
+  hs_gpu_enabled_ = other.hs_gpu_enabled_;
   return *this;
 };
 
@@ -493,6 +526,99 @@ void PulsedRPUDeviceCuda<T>::runUpdateKernel(
   kpars->run(
       c->getStream(), dev_weights, m_batch, blm, this, up, dev_states, one_sided, x_counts_chunk,
       d_counts_chunk, cwo);
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::allocateHSGPU() {
+  // Allocates ONLY the per-synapse HS-state buffer (needed for the decay
+  // physics). It is intentionally decoupled from hs_gpu_enabled_ (which means
+  // "transition tracking/counting is on"): the HS kernel may auto-allocate
+  // states lazily, and that must NOT flip the tracking flag, otherwise a later
+  // enableHSTracking() would no-op and never allocate the counts buffer.
+  if (dev_hs_states_ != nullptr) {
+    return;
+  }
+
+  size_t hs_size = this->d_size_ * this->x_size_;
+  cudaMalloc(&dev_hs_states_, hs_size * sizeof(uint8_t));
+  cudaMemset(dev_hs_states_, (uint8_t)1, hs_size);
+
+  this->context_->synchronize();
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::freeHSGPU() {
+  if (dev_hs_states_ != nullptr) {
+    cudaFree(dev_hs_states_);
+    dev_hs_states_ = nullptr;
+  }
+  if (dev_hs_counts_ != nullptr) {
+    cudaFree(dev_hs_counts_);
+    dev_hs_counts_ = nullptr;
+  }
+  hs_gpu_enabled_ = false;
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::resetHSGPU() {
+  if (dev_hs_states_ != nullptr) {
+    size_t hs_size = this->d_size_ * this->x_size_;
+    cudaMemset(dev_hs_states_, (uint8_t)1, hs_size);
+    this->context_->synchronize();
+  }
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::setupHSGlobalParams(T hs_decay) {
+  // global_par[1] carries hs_decay to the HS kernel; global_par[0] is unused (0).
+  gp_count_ = 2;
+  dev_global_params_ = RPU::make_unique<CudaArray<T>>(this->context_, 2);
+  T host_gp[2] = {(T)0.0, hs_decay};
+  dev_global_params_->assign(host_gp);
+  this->context_->synchronize();
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::enableHSTracking() {
+  if (!hs_gpu_enabled_) {
+    allocateHSGPU();                       // ensure per-synapse HS states exist
+    if (dev_hs_counts_ == nullptr) {
+      size_t cnt_bytes = (size_t)this->d_size_ * 16 * sizeof(unsigned long long);
+      cudaMalloc(&dev_hs_counts_, cnt_bytes);
+      cudaMemset(dev_hs_counts_, 0, cnt_bytes);
+    }
+    hs_gpu_enabled_ = true;
+  }
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::disableHSTracking() {
+  if (hs_gpu_enabled_) {
+    if (dev_hs_counts_ != nullptr) {
+      cudaFree(dev_hs_counts_);
+      dev_hs_counts_ = nullptr;
+    }
+    hs_gpu_enabled_ = false;
+  }
+}
+
+template <typename T> void PulsedRPUDeviceCuda<T>::resetHSStates() {
+  resetHSGPU();                            // memset states to HS1
+  if (dev_hs_counts_ != nullptr) {
+    size_t cnt_bytes = (size_t)this->d_size_ * 16 * sizeof(unsigned long long);
+    cudaMemset(dev_hs_counts_, 0, cnt_bytes);
+  }
+}
+
+template <typename T>
+void PulsedRPUDeviceCuda<T>::getHSTransitionCounts(std::vector<int> &counts) const {
+  counts.clear();
+  counts.resize(16, 0);
+  if (dev_hs_counts_ != nullptr) {
+    size_t n = (size_t)this->d_size_ * 16;
+    std::vector<unsigned long long> host(n, 0);
+    cudaMemcpy(host.data(), dev_hs_counts_, n * sizeof(unsigned long long),
+               cudaMemcpyDeviceToHost);
+    for (int i = 0; i < this->d_size_; i++) {
+      for (int k = 0; k < 16; k++) {
+        counts[k] += (int)host[(size_t)i * 16 + k];
+      }
+    }
+  }
 }
 
 template class PulsedRPUDeviceCuda<float>;

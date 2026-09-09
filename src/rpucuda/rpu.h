@@ -217,6 +217,7 @@ public:
 
     swap(a.weights_buffer_, b.weights_buffer_);
     swap(a.use_delayed_update_, b.use_delayed_update_);
+    swap(a.update_count_, b.update_count_);
 
     swap(a.temp_x_vector_bias_, b.temp_x_vector_bias_);
     swap(a.temp_x_matrix_bias_, b.temp_x_matrix_bias_);
@@ -411,6 +412,8 @@ public:
   virtual T *getDeltaWeights() const { return delta_weights_extern_[0]; };
 
   virtual void setVerbosityLevel(int verbose) {};
+
+  long long int getUpdateCount() const { return update_count_; }
 
   /* public interfaces for forward/backward/update. Format is
      expected in x-major order. However, the batch dimension comes
@@ -677,6 +680,7 @@ protected:
 
   int last_update_m_batch_ = 1;
   bool use_delayed_update_ = false;
+  long long int update_count_ = 0;
 
 private:
   std::vector<T *> delta_weights_extern_;

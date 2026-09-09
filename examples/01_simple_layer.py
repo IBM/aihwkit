@@ -18,17 +18,31 @@ from torch.nn.functional import mse_loss
 # Imports from aihwkit.
 from aihwkit.nn import AnalogLinear
 from aihwkit.optim import AnalogSGD
-from aihwkit.simulator.configs import SingleRPUConfig, ConstantStepDevice
+from aihwkit.simulator.configs import SingleRPUConfig, IdealDevice, ConstantStepDevice
 from aihwkit.simulator.rpu_base import cuda
+from aihwkit.simulator.parameters import PulseType
 
 # Prepare the datasets (input and expected output).
 x = Tensor([[0.1, 0.2, 0.4, 0.3], [0.2, 0.1, 0.1, 0.3]])
 y = Tensor([[1.0, 0.5], [0.7, 0.3]])
 
 # Define a single-layer network, using a constant step device type.
-rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+device = ConstantStepDevice()
+# TODO: Once Python binding is ready, set hs_decay like this:
+# device.hs_decay = 0.8  # 20% weight decay for specific HS transitions
 
-model = AnalogLinear(4, 2, bias=True, rpu_config=rpu_config)
+rpu_config = SingleRPUConfig(device=device)
+rpu_config.update.pulse_type=PulseType.STOCHASTIC_STREAM
+rpu_config.update.desired_bl=10
+
+print("HS decay will be applied with default value (0.95) for transitions:")
+
+print(rpu_config.device.dw_min)
+model = AnalogLinear(4, 2, bias=False, rpu_config=rpu_config)
+ 
+# Enable HS tracking
+model.analog_module.tile.enable_hs_tracking()
+print("HS tracking enabled")
 
 # Move the model and tensors to cuda if it is available.
 if cuda.is_compiled():
@@ -52,4 +66,16 @@ for epoch in range(100):
 
     opt.step()
 
-    print("Loss error: {:.16f}".format(loss))
+    # Get HS counts after update
+    hs_counts = model.analog_module.tile.get_hs_transition_counts()
+    total_hs_counts = hs_counts.sum().item()
+
+    print("Epoch {}: Loss error: {:.6f}, Total HS counts: {}".format(epoch, loss, total_hs_counts))
+
+    # Print detailed HS counts every 10 epochs
+    if epoch % 10 == 0 and total_hs_counts > 0:
+        print("  Detailed HS transition counts:")
+        for i in range(min(16, len(hs_counts))):
+            if hs_counts[i] > 0:
+                print(f"    Transition {i}: {hs_counts[i].item()}")
+

@@ -62,51 +62,87 @@ template <typename T> struct UpdateFunctorConstantStepLargeNoise {
   (this->context_, this->x_size_, this->d_size_, m_batch, nK32, use_bo64, out_trans, up,           \
    getPar().getName() + #NAME)
 
+// Half-select kernels support ONLY the plain uint32 bit-line path (no BO64), so
+// force use_bo64=0 when constructing them. This makes the HS kernel valid/selected
+// only for the uint32 path; the pulsed weight updater then generates uint32 counts
+// (kpars->getUseBo64()==0) instead of BO64, avoiding the RPU_FATAL in the HS run().
+#define ARGS_HS(NAME)                                                                              \
+  (this->context_, this->x_size_, this->d_size_, m_batch, nK32, 0, out_trans, up,                  \
+   getPar().getName() + #NAME)
+
 template <typename T>
 pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
     int m_batch, int nK32, int use_bo64, bool out_trans, const PulsedUpdateMetaParameter<T> &up) {
 
   pwukpvec_t<T> v;
 
-  if (getPar().dw_min_std > (T)0.33) { // 3 sigma
-    v.push_back(
-        RPU::make_unique<
-            PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
-            ARGS(FunctorLargeNoise));
-    v.push_back(
-        RPU::make_unique<
-            PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
-            ARGS(FunctorLargeNoise));
-    v.push_back(
-        RPU::make_unique<
-            PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
-            ARGS(FunctorLargeNoise));
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
-            T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
+  // Check for Half-Selected PulseType first
+  if (up.pulse_type == PulseType::HalfselectedStochastic ||
+      up.pulse_type == PulseType::HalfselectedStochasticStream) {
+    // Half-Selected kernel path - uses HS-specific kernels with gp_count=2
+    // Note: Sum/SumBoundCheck optimizations not supported for HS (need per-bit state tracking)
+
+    // The HS kernel always reads per-synapse HS state; make sure it exists even
+    // if HS tracking (diagnostic counting) was never explicitly enabled.
+    if (this->getDevHSStates() == nullptr) {
+      this->allocateHSGPU();
+    }
+
+    if (getPar().dw_min_std > (T)0.33) { // 3 sigma - large noise
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedFunctorHS<
+              T, UpdateFunctorConstantStepLargeNoise<T>, 2>>
+              ARGS_HS(FunctorLargeNoiseHS));
+    } else {
+      // Standard noise - use HS kernel with standard functor
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedFunctorHS<
+              T, UpdateFunctorConstantStep<T>, 2>>
+              ARGS_HS(FunctorHS));
+    }
 
   } else {
-    // use summing approximation is save in this case
-    // Update functor and kernels are in pwu_kernels.h
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStep<T>, 1>>
-            ARGS(Functor));
-    v.push_back(
-        RPU::make_unique<
-            PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorConstantStep<T>, 1>>
-            ARGS(Functor));
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
-            Functor));
+    // Standard (non-HS) kernel path
+    if (getPar().dw_min_std > (T)0.33) { // 3 sigma
+      v.push_back(
+          RPU::make_unique<
+              PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
+              ARGS(FunctorLargeNoise));
+      v.push_back(
+          RPU::make_unique<
+              PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
+              ARGS(FunctorLargeNoise));
+      v.push_back(
+          RPU::make_unique<
+              PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStepLargeNoise<T>, 1>>
+              ARGS(FunctorLargeNoise));
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedWeightOutputFunctor<
+              T, UpdateFunctorConstantStepLargeNoise<T>, 1>> ARGS(FunctorLargeNoise));
 
-    v.push_back(
-        RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
-            Functor));
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
+    } else {
+      // use summing approximation is save in this case
+      // Update functor and kernels are in pwu_kernels.h
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchSharedFunctor<T, UpdateFunctorConstantStep<T>, 1>>
+              ARGS(Functor));
+      v.push_back(
+          RPU::make_unique<
+              PWUKernelParameterBatchSharedWeightOutputFunctor<T, UpdateFunctorConstantStep<T>, 1>>
+              ARGS(Functor));
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterBatchFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
+              Functor));
 
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
-    v.push_back(RPU::make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
+      v.push_back(
+          RPU::make_unique<PWUKernelParameterSingleFunctor<T, UpdateFunctorConstantStep<T>, 1>> ARGS(
+              Functor));
+      v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSum<T>> ARGS(Sum));
+      v.push_back(RPU::make_unique<PWUKernelParameterBatchSharedSumBoundCheck<T>> ARGS(SumBC));
+
+      v.push_back(RPU::make_unique<PWUKernelParameterBatchSum<T>> ARGS(Sum));
+      v.push_back(RPU::make_unique<PWUKernelParameterBatchSumBoundCheck<T>> ARGS(SumBC));
+    }
   }
 
   return v;
