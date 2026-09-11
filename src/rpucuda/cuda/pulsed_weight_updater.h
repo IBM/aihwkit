@@ -62,6 +62,17 @@ public:
       const bool x_trans,
       const bool d_trans,
       const T beta = (T)1.0);
+
+  template <typename XInputIteratorT, typename DInputIteratorT>
+  void doInfiniteGranularityUpdate(
+      XInputIteratorT x_in,
+      DInputIteratorT d_in,
+      PulsedRPUDeviceCuda<T> *pulsed_device,
+      T *dev_weights,
+      const T lr,
+      const int m_batch,
+      const bool x_trans,
+      const bool d_trans);
   void setVerbosityLevel(int level) { verbose_ = level; };
   void dumpExtra(RPU::state_t &extra, const std::string prefix);
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);

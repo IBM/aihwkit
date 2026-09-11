@@ -55,6 +55,8 @@ public:
       int use_bo64,
       bool out_trans,
       const PulsedUpdateMetaParameter<T> &up) override;
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
 };
 
 } // namespace RPU

@@ -226,6 +226,45 @@ void SoftBoundsReferenceRPUDevice<T>::doDenseUpdate(T **weights, int *coincidenc
   }
 }
 
+/* infinite granularity update */
+template <typename T>
+void SoftBoundsReferenceRPUDevice<T>::doInfiniteGranularityUpdate(
+    T **weights,
+    const T *x_input,
+    int x_inc,
+    const T *d_input,
+    int d_inc,
+    T learning_rate,
+    RNG<T> *rng) {
+
+  const auto &par = getPar();
+  T write_noise_std = par.write_noise_std * (par.dw_min == (T)0.0 ? (T)1.0 : par.dw_min);
+
+  for (int i = 0; i < this->d_size_; i++) {
+    T d_val = d_input[i * d_inc];
+    if (d_val == (T)0.0) {
+      continue;
+    }
+
+    T *scale_down = this->w_scale_down_[i];
+    T *scale_up = this->w_scale_up_[i];
+    T *ref = w_reference_[i];
+    T *w = par.usesPersistentWeight() ? this->w_persistent_[i] : weights[i];
+    T *w_apparent = weights[i];
+    T *min_bound = this->w_min_bound_[i];
+    T *max_bound = this->w_max_bound_[i];
+
+    IG_UPDATE_W_LOOP_INNER(
+      T sd = scale_down[j] * abs_G_lr;
+      T su = scale_up[j] * abs_G_lr;
+      update_once_mult(
+          w[j], w_apparent[j], sign, sd, su, ref[j],
+          min_bound[j], max_bound[j], (T)0.0, write_noise_std,
+          rng);
+    );
+  }
+}
+
 template class SoftBoundsReferenceRPUDevice<float>;
 #ifdef RPU_USE_DOUBLE
 template class SoftBoundsReferenceRPUDevice<double>;

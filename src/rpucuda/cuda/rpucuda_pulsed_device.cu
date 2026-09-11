@@ -495,6 +495,18 @@ void PulsedRPUDeviceCuda<T>::runUpdateKernel(
       d_counts_chunk, cwo);
 }
 
+/*********************************************************************************/
+/* infinite granularity update — default (ConstantStep) */
+
+template <typename T>
+void PulsedRPUDeviceCuda<T>::doInfiniteGranularityUpdate(
+    T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
+  UNUSED(dev_weights);
+  UNUSED(grad_matrix);
+  UNUSED(dev_states);
+  RPU_FATAL("Infinite granularity update not available for this device!");
+}
+
 template class PulsedRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class PulsedRPUDeviceCuda<double>;

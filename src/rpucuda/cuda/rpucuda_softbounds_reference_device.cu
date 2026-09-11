@@ -211,6 +211,100 @@ pwukpvec_t<T> SoftBoundsReferenceRPUDeviceCuda<T>::getUpdateKernels(
 
 #undef ARGS
 
+/*********************************************************************************/
+/* infinite granularity update */
+
+namespace {
+constexpr int IG_THREADS_PER_BLOCK = 256;
+
+inline int ig_num_blocks(int total_size) {
+  return (total_size + IG_THREADS_PER_BLOCK - 1) / IG_THREADS_PER_BLOCK;
+}
+
+template <typename T>
+__device__ __forceinline__ void igStoreWeight(
+    T *weights,
+    T *persistent_weights,
+    const T *write_noise_std,
+    curandState_t *random_states,
+    int idx,
+    T w) {
+  if (persistent_weights == nullptr) {
+    weights[idx] = w;
+    return;
+  }
+
+  persistent_weights[idx] = w;
+  T uw_std = write_noise_std == nullptr ? (T)0.0 : *write_noise_std;
+  if (uw_std > (T)0.0 && random_states != nullptr) {
+    curandState local_state = random_states[idx];
+    weights[idx] = w + uw_std * (T)curand_normal(&local_state);
+    random_states[idx] = local_state;
+  } else {
+    weights[idx] = w;
+  }
+}
+
+template <typename T>
+__global__ void kernelIGSoftBoundsReference(
+    T *weights,
+    const T *grad_matrix,
+    const param_t *params4,
+    const param_t *params_ref,
+    int total_size,
+    T *persistent_weights,
+    const T *write_noise_std,
+    curandState_t *random_states) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_size) {
+    return;
+  }
+
+  T G = grad_matrix[idx];
+  if (G == (T)0.0) {
+    return;
+  }
+
+  param4_t p4 = reinterpret_cast<const param4_t *>(params4)[idx];
+  param2_t pr = reinterpret_cast<const param2_t *>(params_ref)[idx];
+
+  T wmin = p4.x;
+  T wmax = p4.z;
+  T ref = pr.x;
+  T abs_G = (G > (T)0.0) ? G : -G;
+  T w_shifted = (persistent_weights == nullptr ? weights[idx] : persistent_weights[idx]) + ref;
+
+  T lin_a = (T)0.0;
+  T lin_dw = (T)0.0;
+  if (G > (T)0.0) {
+    lin_dw = (T)p4.w * abs_G;
+    if (wmax > (T)0.0) {
+      lin_a = -lin_dw / wmax;
+    }
+  } else {
+    lin_dw = -(T)p4.y * abs_G;
+    if (wmin < (T)0.0) {
+      lin_a = -lin_dw / wmin;
+    }
+  }
+
+  w_shifted += lin_a * w_shifted + lin_dw;
+  w_shifted = (w_shifted > wmax) ? wmax : w_shifted;
+  w_shifted = (w_shifted < wmin) ? wmin : w_shifted;
+  igStoreWeight(weights, persistent_weights, write_noise_std, random_states, idx, w_shifted - ref);
+}
+} // namespace
+
+template <typename T>
+void SoftBoundsReferenceRPUDeviceCuda<T>::doInfiniteGranularityUpdate(
+    T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
+  int total_size = this->x_size_ * this->d_size_;
+  kernelIGSoftBoundsReference<T>
+      <<<ig_num_blocks(total_size), IG_THREADS_PER_BLOCK, 0, this->context_->getStream()>>>(
+          dev_weights, grad_matrix, this->get4ParamsData(), this->get2ParamsData(), total_size,
+          this->get1ParamsData(), this->getGlobalParamsData(), dev_states);
+}
+
 template class SoftBoundsReferenceRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class SoftBoundsReferenceRPUDeviceCuda<double>;

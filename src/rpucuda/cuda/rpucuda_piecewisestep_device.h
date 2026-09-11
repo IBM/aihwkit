@@ -52,7 +52,8 @@ public:
       // n_points info
       tmp_global_pars[gp_count_ / 2 - 1] = (T)n_points;
       // write std info
-      tmp_global_pars[gp_count_ - 1] = getPar().getScaledWriteNoise();
+      tmp_global_pars[gp_count_ - 1] =
+          getPar().write_noise_std * (getPar().dw_min == (T)0.0 ? (T)1.0 : getPar().dw_min);
 
       dev_global_pars_ = RPU::make_unique<CudaArray<T>>(this->context_, gp_count_, tmp_global_pars);
       this->context_->synchronize();
@@ -75,6 +76,9 @@ public:
                ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + (T)1e-6
                : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
+
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
 
 private:
   std::unique_ptr<CudaArray<T>> dev_global_pars_ = nullptr;
