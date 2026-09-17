@@ -218,16 +218,22 @@ Compilation flags
 There are several ``cmake`` options that can be used for customizing the
 compilation process:
 
-==========================  ================================================  =======
+==========================  ================================================  ==============
 Flag                        Description                                       Default
-==========================  ================================================  =======
+==========================  ================================================  ==============
 ``USE_CUDA``                Build with CUDA support                           ``OFF``
 ``BUILD_TEST``              Build the C++ test binaries                       ``OFF``
 ``RPU_BLAS``                BLAS backend of choice (``OpenBLAS`` or ``MKL``)  ``OpenBLAS``
 ``RPU_USE_FASTMOD``         Use fast mod                                      ``ON``
 ``RPU_USE_FASTRAND``        Use fastrand                                      ``OFF``
 ``RPU_CUDA_ARCHITECTURES``  Target CUDA architectures                         ``60;70;75;80``
-==========================  ================================================  =======
+``RPU_CXX_STANDARD``        C++ standard (``17`` or ``20``)                   auto-detected
+==========================  ================================================  ==============
+
+The C++ standard is taken from the installed ``PyTorch`` headers when
+``RPU_CXX_STANDARD`` is not set: ``torch`` releases up to ``2.13`` are built
+with C++17, ``torch >= 2.14`` requires C++20 (and hence a C++20-capable
+compiler, e.g. ``gcc >= 10`` or ``CUDA >= 12`` for the GPU build).
 
 The options can be passed both to ``setuptools`` or to ``cmake`` directly. For
 example, for compiling and installing with CUDA support::
