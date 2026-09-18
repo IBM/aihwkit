@@ -1,6 +1,7 @@
 # IBM Analog Hardware Acceleration Kit
 
 ![PyPI](https://img.shields.io/pypi/v/aihwkit)
+[![test-and-lint](https://github.com/IBM/aihwkit/actions/workflows/test-and-lint.yml/badge.svg?branch=master)](https://github.com/IBM/aihwkit/actions/workflows/test-and-lint.yml)
 [![Documentation Status](https://readthedocs.org/projects/aihwkit/badge/?version=latest)](https://aihwkit.readthedocs.io/en/latest/?badge=latest)
 ![PyPI - License](https://img.shields.io/pypi/l/aihwkit)
 [![arXiv](https://img.shields.io/badge/arXiv-2104.02184-green.svg)](https://arxiv.org/abs/2104.02184)
