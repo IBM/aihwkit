@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Improve Python executable detection and error handling in CMake [(\#757)](https://github.com/IBM/aihwkit/pull/757)
 * Retune PWU kernel when m_batch grows after initial m=1 update [(\#763)](https://github.com/IBM/aihwkit/pull/763)
 * Tests for dynamic tolerance for cuDNN TF32 precision on Ampere+ GPUs [(\#771)](https://github.com/IBM/aihwkit/pull/771)
+* Correct self-move assignments in RPU device move operators, removing a `-Wself-move` warning on GCC 13+ builds[(\#793)](https://github.com/IBM/aihwkit/pull/793)
 
 ### Security
 * Bump jupyter-server from 2.18.2 to 2.20.0 [(\#777)](https://github.com/IBM/aihwkit/pull/777)
