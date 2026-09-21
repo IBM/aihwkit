@@ -184,7 +184,7 @@ template <typename T> RPUCudaSimple<T> &RPUCudaSimple<T>::operator=(RPUCudaSimpl
 
   dev_x_vector_ = std::move(other.dev_x_vector_);
   dev_d_vector_ = std::move(other.dev_d_vector_);
-  dev_x_vector_bias_ = std::move(dev_x_vector_bias_);
+  dev_x_vector_bias_ = std::move(other.dev_x_vector_bias_);
 
   dev_temp_tensor_ = std::move(other.dev_temp_tensor_);
 

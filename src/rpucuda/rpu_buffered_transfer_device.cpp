@@ -109,7 +109,7 @@ template <typename T>
 BufferedTransferRPUDevice<T> &
 BufferedTransferRPUDevice<T>::operator=(BufferedTransferRPUDevice<T> &&other) noexcept {
   TransferRPUDevice<T>::operator=(std::move(other));
-  transfer_buffer_vec_ = std::move(transfer_buffer_vec_);
+  transfer_buffer_vec_ = std::move(other.transfer_buffer_vec_);
 
   return *this;
 }
