@@ -163,10 +163,10 @@ SimpleRPUDeviceCuda<T> &SimpleRPUDeviceCuda<T>::operator=(SimpleRPUDeviceCuda<T>
   par_storage_ = std::move(other.par_storage_);
   wdrifter_cuda_ = std::move(other.wdrifter_cuda_);
 
-  dev_reset_nrnd_ = std::move(dev_reset_nrnd_);
-  dev_reset_flag_ = std::move(dev_reset_flag_);
-  rnd_context_ = std::move(rnd_context_);
-  dev_diffusion_nrnd_ = std::move(dev_diffusion_nrnd_);
+  dev_reset_nrnd_ = std::move(other.dev_reset_nrnd_);
+  dev_reset_flag_ = std::move(other.dev_reset_flag_);
+  rnd_context_ = std::move(other.rnd_context_);
+  dev_diffusion_nrnd_ = std::move(other.dev_diffusion_nrnd_);
 
   return *this;
 };
