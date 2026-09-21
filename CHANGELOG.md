@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Remove reset bias clamp in rpu_pulsed_device.h [(\#761)](https://github.com/IBM/aihwkit/pull/761)
 
 ### Fixed
+* Build against `torch >= 2.14`, whose headers require C++20: the C++ standard is now detected from the installed torch headers (C++17 for `torch <= 2.13`, C++20 for `torch >= 2.14`) and can be overridden with the new `RPU_CXX_STANDARD` cmake option
 * Improve Python executable detection and error handling in CMake [(\#757)](https://github.com/IBM/aihwkit/pull/757)
 * Retune PWU kernel when m_batch grows after initial m=1 update [(\#763)](https://github.com/IBM/aihwkit/pull/763)
 * Tests for dynamic tolerance for cuDNN TF32 precision on Ampere+ GPUs [(\#771)](https://github.com/IBM/aihwkit/pull/771)

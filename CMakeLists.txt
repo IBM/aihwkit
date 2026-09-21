@@ -21,15 +21,13 @@ option(RPU_USE_FASTMOD "Use fast mod" OFF)
 option(RPU_USE_FASTRAND "Use fastrand" OFF)
 option(RPU_USE_TORCH_BUFFERS "Use torch buffers for RPUCuda" ON)
 
+# C++ standard used for every target (17 or 20). Leave empty to pick it up from
+# the installed torch headers (see cmake/dependencies.cmake): torch <= 2.13
+# builds with C++17, torch >= 2.14 requires C++20.
+set(RPU_CXX_STANDARD "" CACHE STRING "C++ standard (17, 20). Empty: detect from torch headers")
 
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
 set(RPU_CUDA_ARCHITECTURES "75;80;89" CACHE STRING "Target CUDA architectures")
-
-# Internal variables.
-set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
-                           CUDA_RESOLVE_DEVICE_SYMBOLS ON
-                           CUDA_SEPARABLE_COMPILATION ON
-                           CXX_STANDARD 17)
 
 # Append the virtualenv library path to cmake.
 if(DEFINED ENV{VIRTUAL_ENV})
@@ -43,10 +41,17 @@ include(cmake/dependencies.cmake)
 include(cmake/dependencies_cuda.cmake)
 include(cmake/dependencies_test.cmake)
 
+# Internal variables.
+set(CUDA_TARGET_PROPERTIES POSITION_INDEPENDENT_CODE ON
+                           CUDA_RESOLVE_DEVICE_SYMBOLS ON
+                           CUDA_SEPARABLE_COMPILATION ON
+                           CXX_STANDARD ${RPU_CXX_STANDARD}
+                           CUDA_STANDARD ${RPU_CXX_STANDARD})
+
 # Set compilation flags.
 if(WIN32)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2")
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD ${RPU_CXX_STANDARD})
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-narrowing -Wno-strict-overflow")
@@ -68,7 +73,7 @@ if(WIN32)
   target_link_libraries(RPU_CPU c10.lib torch_cpu.lib)
 endif()
 
-set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD 17
+set_target_properties(RPU_CPU PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
   POSITION_INDEPENDENT_CODE ON)
 
 add_compile_definitions(RPU_USE_WITH_TORCH)
@@ -156,7 +161,7 @@ if (BUILD_EXTENSION)
 
   add_library(AIHWKIT_EXTENSION_OPS ${AIHWKIT_EXTENSION_OPS_CPU_SRCS})
 
-  set_target_properties(AIHWKIT_EXTENSION_OPS PROPERTIES CXX_STANDARD 17
+  set_target_properties(AIHWKIT_EXTENSION_OPS PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
     POSITION_INDEPENDENT_CODE ON)
 
   target_link_libraries(AIHWKIT_EXTENSION_OPS
@@ -198,7 +203,7 @@ if (BUILD_EXTENSION)
   target_link_libraries(${extension_module_name} PRIVATE torch_python)
   target_include_directories(${extension_module_name} PRIVATE src/aihwkit/extension/extension_src)
   target_include_directories(${extension_module_name} PRIVATE src/aihwkit/extension/extension_src/ops)
-  set_target_properties(${extension_module_name} PROPERTIES CXX_STANDARD 17
+  set_target_properties(${extension_module_name} PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
     POSITION_INDEPENDENT_CODE ON)
 
   if (USE_CUDA)
@@ -231,7 +236,7 @@ if(BUILD_TEST)
     add_executable(${test_name} ${test_src})
     target_link_libraries(${test_name} gtest gmock)
     target_link_libraries(${test_name} torch_python c10 torch_cpu)
-    set_target_properties(${test_name} PROPERTIES CXX_STANDARD 17
+    set_target_properties(${test_name} PROPERTIES CXX_STANDARD ${RPU_CXX_STANDARD}
       POSITION_INDEPENDENT_CODE ON)
 
     if(WIN32)
