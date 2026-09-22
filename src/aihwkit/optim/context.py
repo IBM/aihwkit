@@ -21,6 +21,7 @@ from aihwkit.optim.weight_view import (
     raise_if_readonly_write_target,
     PlaceholderDataView,
     _PLACEHOLDER_METADATA_FUNCTIONS,
+    _PLACEHOLDER_LIKE_FACTORY_FUNCTIONS,
     _raise_placeholder_read_error,
 )
 from aihwkit.simulator.parameters.enums import AnalogContextDataViewMode
@@ -323,7 +324,10 @@ class AnalogContext(Parameter):
         """Return the tensor used to dispatch public torch operations."""
         mode = self._get_data_view_mode()
         if mode == AnalogContextDataViewMode.PLACEHOLDER:
-            if func_name not in _PLACEHOLDER_METADATA_FUNCTIONS:
+            if (
+                func_name not in _PLACEHOLDER_METADATA_FUNCTIONS
+                and func_name not in _PLACEHOLDER_LIKE_FACTORY_FUNCTIONS
+            ):
                 _raise_placeholder_read_error(func_name)
             return self._placeholder_data()
         if mode == AnalogContextDataViewMode.DATA_VIEW:

@@ -695,6 +695,51 @@ class AnalogCtxDataViewModeTest(ParametrizedTestCase):
                 with self.assertRaises(RuntimeError):
                     op()
 
+    def test_placeholder_allows_like_factories(self):
+        """Like factories should use placeholder metadata without reading values."""
+        _, ctx = self._get_tile_and_ctx(self._make_model())
+
+        factories = [
+            ("empty_like", torch.empty_like, (), None),
+            ("zeros_like", torch.zeros_like, (), 0.0),
+            ("ones_like", torch.ones_like, (), 1.0),
+            ("full_like", torch.full_like, (2.0,), 2.0),
+            ("rand_like", torch.rand_like, (), None),
+            ("randn_like", torch.randn_like, (), None),
+            ("randint_like", torch.randint_like, (10,), None),
+        ]
+
+        for source in [ctx, ctx.data]:
+            for name, factory, factory_args, expected_value in factories:
+                with self.subTest(source_type=type(source).__name__, factory=name):
+                    result = factory(source, *factory_args)
+                    self.assertIs(type(result), Tensor)
+                    self.assertEqual(result.shape, ctx.shape)
+                    self.assertEqual(result.dtype, ctx.dtype)
+                    self.assertEqual(result.device, ctx.device)
+                    if expected_value is not None:
+                        self.assertTrue(
+                            allclose(result, torch.full_like(result, expected_value))
+                        )
+
+    def test_cuda_zeros_like_context_uses_metadata_only(self):
+        """zeros_like(ctx) should work after moving an analog layer to CUDA."""
+        if SKIP_CUDA_TESTS:
+            raise SkipTest("not compiled with CUDA support")
+
+        rpu_config = SingleRPUConfig(device=ConstantStepDevice())
+        model = AnalogLinear(1, 1, bias=False, rpu_config=rpu_config).to(
+            device("cuda")
+        )
+        ctx = next(model.parameters())
+
+        result = torch.zeros_like(ctx)
+
+        self.assertIs(type(result), Tensor)
+        self.assertEqual(result.shape, ctx.shape)
+        self.assertEqual(result.device, ctx.device)
+        self.assertTrue(allclose(result, torch.zeros(1, 1, device=result.device)))
+
     def test_placeholder_state_dict_round_trip(self):
         """Saving and loading should not require public weight reads."""
         source = self._make_model()
