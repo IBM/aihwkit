@@ -228,6 +228,18 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
   // check learning rate and update management
   T weight_granularity = rpu_device->getWeightGranularity();
 
+  // Infinite granularity mode (dw_min=0): exact mean-field update
+  if (weight_granularity <= (T)0.0) {
+    rpu_device->initUpdateCycle(
+        weights, up_, learning_rate, m_batch_info, x_input, x_inc, d_input, d_inc);
+    T pc_learning_rate = rpu_device->getPulseCountLearningRate(learning_rate, m_batch_info, up_);
+    T abs_lr = pc_learning_rate < (T)0.0 ? -pc_learning_rate : pc_learning_rate;
+    rpu_device->doInfiniteGranularityUpdate(
+        weights, x_input, x_inc, d_input, d_inc, abs_lr, &*rng_);
+    rpu_device->finishUpdateCycle(weights, up_, learning_rate, m_batch_info);
+    return;
+  }
+
   // pulsed device update
   if (up_.d_sparsity) {
     up_._d_sparsity = getCurrentDSparsity();

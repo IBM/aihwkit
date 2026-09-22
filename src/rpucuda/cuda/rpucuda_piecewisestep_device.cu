@@ -12,7 +12,6 @@
 namespace RPU {
 
 namespace {
-
 template <typename T>
 __device__ __forceinline__ T get_interpolated_scale(
     const T &w,
@@ -154,6 +153,90 @@ pwukpvec_t<T> PiecewiseStepRPUDeviceCuda<T>::getUpdateKernels(
 
 #undef ARGS
 #undef ADD_KERNELS
+
+/*********************************************************************************/
+/* infinite granularity update */
+
+namespace {
+constexpr int IG_THREADS_PER_BLOCK = 256;
+
+inline int ig_num_blocks(int total_size) {
+  return (total_size + IG_THREADS_PER_BLOCK - 1) / IG_THREADS_PER_BLOCK;
+}
+
+template <typename T>
+__device__ __forceinline__ void igStoreWeight(
+    T *weights,
+    T *persistent_weights,
+    const T *write_noise_std,
+    curandState_t *random_states,
+    int idx,
+    T w) {
+  if (persistent_weights == nullptr) {
+    weights[idx] = w;
+    return;
+  }
+
+  persistent_weights[idx] = w;
+  T uw_std = write_noise_std == nullptr ? (T)0.0 : *write_noise_std;
+  if (uw_std > (T)0.0 && random_states != nullptr) {
+    curandState local_state = random_states[idx];
+    weights[idx] = w + uw_std * (T)curand_normal(&local_state);
+    random_states[idx] = local_state;
+  } else {
+    weights[idx] = w;
+  }
+}
+
+template <typename T>
+__global__ void kernelIGPiecewiseStep(
+    T *weights,
+    const T *grad_matrix,
+    const param_t *params4,
+    const T *global_pars,
+    int gp_count,
+    int total_size,
+    T *persistent_weights,
+    curandState_t *random_states) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_size) {
+    return;
+  }
+
+  T G = grad_matrix[idx];
+  if (G == (T)0.0) {
+    return;
+  }
+
+  param4_t p4 = reinterpret_cast<const param4_t *>(params4)[idx];
+  T wmin = p4.x;
+  T wmax = p4.z;
+  T w_range = wmax - wmin;
+
+  T abs_G = (G > (T)0.0) ? G : -G;
+  T w = persistent_weights == nullptr ? weights[idx] : persistent_weights[idx];
+  const T *piecewise_vec =
+      (G > (T)0.0) ? global_pars : global_pars + (size_t)gp_count / 2;
+  const int n_points = (int)round(global_pars[gp_count / 2 - 1]);
+  const int n_sections = n_points - 1;
+  T scale = (G > (T)0.0) ? (T)p4.w * abs_G : -(T)p4.y * abs_G;
+
+  w += get_interpolated_scale(w, piecewise_vec, scale, n_sections, w_range, wmin);
+  w = (w > wmax) ? wmax : w;
+  w = (w < wmin) ? wmin : w;
+  igStoreWeight(weights, persistent_weights, global_pars + gp_count - 1, random_states, idx, w);
+}
+} // namespace
+
+template <typename T>
+void PiecewiseStepRPUDeviceCuda<T>::doInfiniteGranularityUpdate(
+    T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
+  int total_size = this->x_size_ * this->d_size_;
+  kernelIGPiecewiseStep<T>
+      <<<ig_num_blocks(total_size), IG_THREADS_PER_BLOCK, 0, this->context_->getStream()>>>(
+          dev_weights, grad_matrix, this->get4ParamsData(), this->getGlobalParamsData(), gp_count_,
+          total_size, this->get1ParamsData(), dev_states);
+}
 
 template class PiecewiseStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE

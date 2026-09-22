@@ -164,7 +164,24 @@ class PulsedDevice(_PrintableMixin):
     """Parameter governing a power-law drift."""
 
     dw_min: float = 0.001
-    """Mean of the minimal update step sizes across devices and directions."""
+    r"""Mean of the minimal update step sizes across devices and directions.
+
+    Note:
+        Setting ``dw_min = 0`` activates **infinite-granularity** mode.
+        In this mode the stochastic pulse-train update is replaced by
+        its exact mean-field limit:
+
+        .. math::
+
+            w \leftarrow w - \mathrm{lr} \cdot (d^\top x) \cdot q(w)
+
+        where :math:`q(w)` is the device-specific response function
+        (the weight-dependent factor normally applied per pulse
+        coincidence), x and d are the forward and backward signals, respetively.
+        Cycle-to-cycle noise and ``dw_min``-related device-to-device variation,
+        like ``dw_min_dtod``, ``dw_min_std``, are dropped, while all other variation parameters,
+        like bounds, gamma, slopes are preserved.
+    """
 
     dw_min_dtod: float = 0.3
     """Device-to-device std deviation of ``dw_min`` (in relative units to
