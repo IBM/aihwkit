@@ -710,7 +710,16 @@ class SoftBoundsReferenceDevice(PulsedDevice):
 
         \delta W_- = \alpha_{-}(1 - \frac{w}{\beta_{min}}) (1 + \sigma \xi)
 
-    Where the same device-to-device variation can be given as for the
+    where
+
+    .. math::
+        \beta_{max} = w_{max} (1 + \text{w_max_dtod} \xi)
+
+        \beta_{min} = w_{min} (1 + \text{w_min_dtod} \xi)
+
+    are the maximum and minimum weight bounds, respectively.
+
+    The same device-to-device variation can be given as for the
     ``PulsedDevice``. In addition, a device-to-device variation can be
     directly given on the slope.  The :math:`\alpha_{+}` and :math:`\alpha_{-}` are
     the scaling factors that determine the magnitude of positive and negative
@@ -718,6 +727,10 @@ class SoftBoundsReferenceDevice(PulsedDevice):
 
     Moreover, a fixed reference conductance can be subtracted from the
     resulting weight, which implemented a differential read of :math:`w - r`.
+
+    A direction with a zero update scale retains its original bound. When
+    both directional slopes are zero, every point is symmetric point and
+    ``subtract_symmetry_point`` adds no offset.
 
     """
 

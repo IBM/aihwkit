@@ -28,9 +28,13 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
 
     for (int j = 0; j < this->x_size_; ++j) {
 
+      // weight bounds that include d2d variation
       T w_min = this->w_min_bound_[i][j];
-      T scale_down = this->w_scale_down_[i][j];
       T w_max = this->w_max_bound_[i][j];
+      // scale_down and scale_up is dw_min with d2d variation
+      // In the infinite granularity mode (dw_min=0), 
+      //   the scale_down/scale_up are set to 1 and no d2d variation is applied.
+      T scale_down = this->w_scale_down_[i][j];
       T scale_up = this->w_scale_up_[i][j];
 
       if (w_max > (T)0.0 && w_min < (T)0.0) {
@@ -43,8 +47,14 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
         T current_slope_up = scale_up / w_max;
         current_slope_up *= (T)fabsf((T)1.0 + par.slope_up_dtod * rng->sampleGauss());
 
-        w_max = scale_up / current_slope_up;
-        w_min = -scale_down / current_slope_down;
+        // A zero update scale has no slope to vary. Keep its original bound
+        // instead of reconstructing it through 0 / 0.
+        if (scale_up != (T)0.0) {
+          w_max = scale_up / current_slope_up;
+        }
+        if (scale_down != (T)0.0) {
+          w_min = -scale_down / current_slope_down;
+        }
         this->w_max_bound_[i][j] = w_max;
         this->w_min_bound_[i][j] = w_min;
       }
@@ -53,12 +63,17 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
       w_reference_[i][j] = par.reference_mean + par.reference_std * rng->sampleGauss();
 
       if (par.subtract_symmetry_point && (w_max > (T)0.0 && w_min < (T)0.0)) {
-        // scale_down (1 - w / w_min) == scale_up * (1 - w / w_max)
-        // scale_down -  scale_down * w / w_min == scale_up  -scale_up *  w / w_max
-        // scale_up *  w / w_max -  scale_down * w / w_min == scale_up - scale_down
-        // w ==  (scale_up - scale_down) / (scale_up  / w_max  -  scale_down / w_min)
+        // Solve the following equation to find the symmetry point:
+        //   scale_down (1 - w / w_min) == scale_up * (1 - w / w_max)
+        // Arithmetic manipulation yields:
+        //   scale_down -  scale_down * w / w_min == scale_up - scale_up * w / w_max
+        //   scale_up * w / w_max -  scale_down * w / w_min == scale_up - scale_down
+        // Then the symmetry point is:
+        //   w = (scale_up - scale_down) / (scale_up  / w_max  -  scale_down / w_min)
 
-        T sp = (scale_up - scale_down) / (scale_up / w_max - scale_down / w_min);
+        // With both update scales zero there is no unique symmetry point.
+        T slope_sum = scale_up / w_max - scale_down / w_min;
+        T sp = slope_sum != (T)0.0 ? (scale_up - scale_down) / slope_sum : (T)0.0;
         w_reference_[i][j] += sp;
 
         this->w_reset_bias_[i][j] += sp;
