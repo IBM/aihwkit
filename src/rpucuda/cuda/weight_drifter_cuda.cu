@@ -154,6 +154,25 @@ void WeightDrifterCuda<T>::loadExtra(
 }
 
 template <typename T>
+void WeightDrifterCuda<T>::setNuFrom(const WeightDrifter<T> &wd, int x_size, int d_size) {
+
+  if (x_size * d_size != size_ || wd.getSize() != size_) {
+    RPU_FATAL("Size mismatch!");
+  }
+
+  if (wd.getNu() == nullptr) {
+    dev_nu_ = nullptr;
+    return;
+  }
+  if (dev_nu_ == nullptr) {
+    dev_nu_ = RPU::make_unique<CudaArray<T>>(context_, size_);
+    context_->synchronize();
+  }
+  dev_nu_->assignTranspose(wd.getNu(), d_size, x_size);
+  context_->synchronize();
+}
+
+template <typename T>
 void WeightDrifterCuda<T>::populateFrom(const WeightDrifter<T> &wd, int x_size, int d_size) {
   // only copies the parameter from nu. Other parameters are set when set to active.
 

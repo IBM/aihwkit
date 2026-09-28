@@ -193,6 +193,23 @@ void DynamicTransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &r
 };
 
 template <typename T>
+void DynamicTransferRPUDeviceCuda<T>::setDeviceParameterFrom(
+    const AbstractRPUDevice<T> &rpu_device_in, T *dev_weights) {
+
+  const auto &rpu_device = dynamic_cast<const DynamicTransferRPUDevice<T> &>(rpu_device_in);
+  if (&rpu_device == nullptr) {
+    RPU_FATAL("setDeviceParameterFrom expects DynamicTransferRPUDevice.");
+  }
+
+  ChoppedTransferRPUDeviceCuda<T>::setDeviceParameterFrom(rpu_device_in, dev_weights);
+
+  // feedback, choppers and transfer counters are kept
+  dev_running_mean_->assign(rpu_device.getRunningMean());
+  dev_past_mean_->assign(rpu_device.getPastMean());
+  this->context_->synchronize();
+}
+
+template <typename T>
 void DynamicTransferRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
   ChoppedTransferRPUDeviceCuda<T>::dumpExtra(extra, prefix);
 

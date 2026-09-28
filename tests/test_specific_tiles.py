@@ -6,7 +6,7 @@
 
 """Some more tests for specific tiles."""
 
-from torch import ones, Tensor
+from torch import ones, zeros_like, Tensor
 from torch.nn.functional import mse_loss
 
 from aihwkit.simulator.configs.devices import SoftBoundsDevice
@@ -491,9 +491,17 @@ class ChoppedTransferCompoundTest(ParametrizedTestCase):
 
         analog_tile = next(model.analog_tiles())
         state_before = analog_tile.tile.dump_extra()
-        analog_tile.set_hidden_parameters(analog_tile.get_hidden_parameters())
-        state_after = analog_tile.tile.dump_extra()
 
+        # reset the fast array only
+        params = analog_tile.get_hidden_parameters()
+        params["hidden_weights_0"] = zeros_like(params["hidden_weights_0"])
+        analog_tile.set_hidden_parameters(params)
+
+        new_params = analog_tile.get_hidden_parameters()
+        self.assertTensorAlmostEqual(new_params["hidden_weights_0"], params["hidden_weights_0"])
+        self.assertTensorAlmostEqual(new_params["hidden_weights_1"], params["hidden_weights_1"])
+
+        state_after = analog_tile.tile.dump_extra()
         self.assertEqual(state_before.keys(), state_after.keys())
         for key, value in state_before.items():
             self.assertEqual(value, state_after[key], msg=key)

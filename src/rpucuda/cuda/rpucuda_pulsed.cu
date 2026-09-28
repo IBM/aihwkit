@@ -459,18 +459,16 @@ template <typename T> void RPUCudaPulsed<T>::setDeviceParameter(const std::vecto
   this->copyWeightsToHost();
   rpu_device_->setDeviceParameter(this->getWeightsPtr(), data_ptrs);
 
-  // populateFrom re-creates the CUDA device from the host device, which
-  // does not track the runtime state accumulated on the GPU (update
-  // counters, chopper states, transfer indices, etc.). Save that state
-  // and restore it afterwards, so that only the device parameters change
-  // (consistent with the CPU behavior).
-  RPU::state_t extra;
-  rpucuda_device_->dumpExtra(extra, "rpucuda_device");
-  rpucuda_device_->populateFrom(*rpu_device_);
-  rpucuda_device_->loadExtra(extra, "rpucuda_device", false);
-
   // set device weights which might have been updated because of the hidden parameters
   RPUCudaSimple<T>::setWeights(this->getWeightsPtr()[0]);
+
+  // Only copy the device parameters into the existing CUDA device
+  // (instead of re-creating it with populateFrom), so that the runtime
+  // state accumulated on the GPU (update counters, chopper states,
+  // transfer indices, etc.) is kept, consistent with the CPU behavior.
+  // Compound devices re-compute the device weights with the current state.
+  rpucuda_device_->setDeviceParameterFrom(*rpu_device_, this->dev_weights_->getData());
+  this->copyWeightsToHost();
 };
 
 template <typename T> int RPUCudaPulsed<T>::getHiddenUpdateIdx() const {

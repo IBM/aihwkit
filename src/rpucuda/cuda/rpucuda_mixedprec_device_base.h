@@ -73,6 +73,7 @@ public:
   T getAvgSparsity() const;
 
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
+  void setDeviceParameterFrom(const AbstractRPUDevice<T> &rpu_device, T *dev_weights) override;
 
   MixedPrecRPUDeviceBaseMetaParameter<T> &getPar() const override {
     return static_cast<MixedPrecRPUDeviceBaseMetaParameter<T> &>(SimpleRPUDeviceCuda<T>::getPar());
