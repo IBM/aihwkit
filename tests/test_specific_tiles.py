@@ -467,3 +467,33 @@ class ChoppedTransferCompoundTest(ParametrizedTestCase):
             self.assertAlmostEqual(bias[0].item(), gamma * (-1.0) * a + c, 5)
 
         self.assertAlmostEqual(weight[0][0].item(), gamma * (-1.0) * a + c, 5)
+
+    def test_set_hidden_parameters_keeps_extra_state(self):
+        """Setting hidden parameters must not reset the runtime state (issue #746)."""
+        rpu_config = self.get_chopped_transfer_compound(0.0, transfer_every=3.0)
+        rpu_config.device.in_chop_prob = 0.5
+        rpu_config.device.out_chop_prob = 0.5
+        model = self.get_layer(in_features=2, out_features=1, rpu_config=rpu_config)
+
+        x_b = Tensor([[0.1, 0.2], [0.2, 0.4]])
+        y_b = Tensor([[0.3], [0.6]])
+        if self.use_cuda:
+            x_b = x_b.cuda()
+            y_b = y_b.cuda()
+
+        # advance counters and chopper states (mid transfer period)
+        opt = AnalogSGD(model.parameters(), lr=0.1)
+        for _ in range(4):
+            opt.zero_grad()
+            loss = mse_loss(model(x_b), y_b)
+            loss.backward()
+            opt.step()
+
+        analog_tile = next(model.analog_tiles())
+        state_before = analog_tile.tile.dump_extra()
+        analog_tile.set_hidden_parameters(analog_tile.get_hidden_parameters())
+        state_after = analog_tile.tile.dump_extra()
+
+        self.assertEqual(state_before.keys(), state_after.keys())
+        for key, value in state_before.items():
+            self.assertEqual(value, state_after[key], msg=key)
