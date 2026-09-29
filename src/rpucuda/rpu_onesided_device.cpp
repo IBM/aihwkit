@@ -329,7 +329,7 @@ template <typename T> int OneSidedRPUDevice<T>::refreshWeights() {
 
   for (int j_col = 0; j_col < this->x_size_; j_col++) {
 
-    T *x = &refresh_vecs_[j_col * this->x_size_];
+    T *x = &refresh_vecs_[static_cast<size_t>(j_col) * static_cast<size_t>(this->x_size_)];
     // read out with forward pass
     refresh_fb_pass_->forwardVector(weights_p, x, 1, refresh_p_tmp_.data(), 1, (T)1.0, false);
     refresh_fb_pass_->forwardVector(weights_m, x, 1, refresh_m_tmp_.data(), 1, (T)1.0, false);
