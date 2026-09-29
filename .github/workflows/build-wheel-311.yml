@@ -6,6 +6,9 @@ on:
     tags:
     - 'v**'
 
+permissions:
+  contents: read
+
 jobs:
   build-and-deploy-linux:
     name: Build wheel 3.11 (manylinux)
