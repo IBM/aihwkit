@@ -680,10 +680,7 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             input_range = value[0].item()
         else:
             input_range = value
-        if isinstance(self.input_range, Parameter):
-            self.input_range.data[0] = abs(input_range)
-        else:
-            self.input_range[0] = abs(input_range)
+        self.input_range.data[0] = abs(input_range)
 
     @no_grad()
     def set_scales(self, scales: Union[Tensor, float]) -> None:
