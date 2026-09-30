@@ -139,7 +139,7 @@ OneSidedRPUDevice<T> &OneSidedRPUDevice<T>::operator=(OneSidedRPUDevice<T> &&oth
 }
 
 template <typename T> void OneSidedRPUDevice<T>::setRefreshVecs() {
-  refresh_vecs_.resize(this->x_size_ * this->x_size_); //!!  square matrix
+  refresh_vecs_.resize(static_cast<size_t>(this->x_size_) * static_cast<size_t>(this->x_size_)); //!!  square matrix
   std::fill(refresh_vecs_.begin(), refresh_vecs_.end(), (T)0.0);
 
   // initialize refresh vectors with unit vectors. This might be overridden
