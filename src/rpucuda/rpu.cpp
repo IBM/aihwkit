@@ -409,7 +409,9 @@ template <typename T> void RPUSimple<T>::dumpExtra(RPU::state_t &extra, const st
   // getDeviceParameters
   using V = std::vector<T>;
 
-  V tmp(this->x_size_ * this->d_size_);
+  V tmp(
+      static_cast<typename V::size_type>(this->x_size_) *
+      static_cast<typename V::size_type>(this->d_size_));
   RPU::state_t state;
 
   if (this->fb_weights_) {
