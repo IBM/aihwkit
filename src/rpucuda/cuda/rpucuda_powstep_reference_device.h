@@ -73,6 +73,9 @@ public:
   param_t *get2ParamsData() override { return dev_gamma_->getData(); };
   T *get1ParamsData() override { return dev_reference_->getData(); };
 
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
+
 private:
   std::unique_ptr<CudaArray<param_t>> dev_gamma_ = nullptr;
   std::unique_ptr<CudaArray<T>> dev_reference_ = nullptr;

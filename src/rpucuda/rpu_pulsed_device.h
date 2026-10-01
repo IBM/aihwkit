@@ -151,6 +151,16 @@ public:
   virtual void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) {
     RPU_FATAL("Dense update not available for this device!");
   };
+  virtual void doInfiniteGranularityUpdate(
+      T **weights,
+      const T *x_input,
+      int x_inc,
+      const T *d_input,
+      int d_inc,
+      T learning_rate,
+      RNG<T> *rng) {
+    RPU_FATAL("Infinite granularity update not available for this device!");
+  };
   // for Meta-devices [like vector/transfer]: called once before each update starts
   virtual void initUpdateCycle(
       T **weights,
@@ -274,6 +284,16 @@ public:
      affect the perstistent state and ALL apparent weight elements
      will be re-drawn with noise (even if they were not
      e.g. clipped) */
+
+  void doInfiniteGranularityUpdate(
+      T **weights,
+      const T *x_input,
+      int x_inc,
+      const T *d_input,
+      int d_inc,
+      T learning_rate,
+      RNG<T> *rng)
+      override;
 
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
@@ -471,6 +491,21 @@ public:                                                                         
     for (int i_c = 0; i_c < ac; i_c++) {                                                           \
       BODY;                                                                                        \
     }                                                                                              \
+  }
+
+// Macro for infinite-granularity (IG) update inner j-loop.
+// Computes G = d_val * x_input[j], derives sign and abs_G_lr = lr * |G|.
+// BODY should scale device params by abs_G_lr and call update_once with dw_min_std=0.
+#define IG_UPDATE_W_LOOP_INNER(BODY)                                                                 \
+  PRAGMA_SIMD                                                                                        \
+  for (int j = 0; j < this->x_size_; j++) {                                                          \
+    T G = d_val * x_input[j * x_inc];                                                                \
+    if (G == (T)0.0) {                                                                               \
+      continue;                                                                                      \
+    }                                                                                                \
+    int sign = (G > (T)0.0) ? 1 : -1;                                                                \
+    T abs_G_lr = learning_rate * ((G > (T)0.0) ? G : -G);                                             \
+    { BODY; }                                                                                        \
   }
 
 } // namespace RPU

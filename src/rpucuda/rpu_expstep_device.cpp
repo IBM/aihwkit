@@ -13,7 +13,7 @@ void ExpStepRPUDevice<T>::populate(
     const ExpStepRPUDeviceMetaParameter<T> &p, RealWorldRNG<T> *rng) {
   PulsedRPUDevice<T>::populate(p, rng);
 }
-template <typename T>
+template <typename T, typename RngT>
 inline void update_once(
     T &w,
     T &w_apparent,
@@ -30,7 +30,7 @@ inline void update_once(
     const T &es_gamma_up,
     const T &dw_min_std,
     const T &write_noise_std,
-    RNG<T> *rng) {
+    RngT *rng) {
   T b_diff = (max_bound - min_bound);
   if (b_diff > (T)0.0) {
     T z = (T)2.0 * w / b_diff * es_a + es_b;
@@ -54,7 +54,7 @@ inline void update_once(
   }
 }
 
-template <typename T>
+template <typename T, typename RngT>
 inline void update_once_complex_noise(
     T &w,
     T &w_apparent,
@@ -73,7 +73,7 @@ inline void update_once_complex_noise(
     const T &dw_min_std_add,
     const T &dw_min_std_slope,
     const T &write_noise_std,
-    RNG<T> *rng) {
+    RngT *rng) {
   T b_diff = (max_bound - min_bound);
   if (b_diff > (T)0.0) {
     T z = (T)2.0 * w / b_diff * es_a + es_b;
@@ -156,6 +156,45 @@ void ExpStepRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *
                                    scale_down[j], scale_up[j], par.es_a, par.es_b, par.es_A_down,
                                    par.es_A_up, par.es_gamma_down, par.es_gamma_up, par.dw_min_std,
                                    write_noise_std, rng););
+  }
+}
+
+/* infinite granularity update */
+template <typename T>
+void ExpStepRPUDevice<T>::doInfiniteGranularityUpdate(
+    T **weights,
+    const T *x_input,
+    int x_inc,
+    const T *d_input,
+    int d_inc,
+    T learning_rate,
+    RNG<T> *rng) {
+
+  const auto &par = getPar();
+  T write_noise_std = par.write_noise_std * (par.dw_min == (T)0.0 ? (T)1.0 : par.dw_min);
+
+  for (int i = 0; i < this->d_size_; i++) {
+    T d_val = d_input[i * d_inc];
+    if (d_val == (T)0.0) {
+      continue;
+    }
+
+    T *scale_down = this->w_scale_down_[i];
+    T *scale_up = this->w_scale_up_[i];
+    T *w = par.usesPersistentWeight() ? this->w_persistent_[i] : weights[i];
+    T *w_apparent = weights[i];
+    T *min_bound = this->w_min_bound_[i];
+    T *max_bound = this->w_max_bound_[i];
+
+    IG_UPDATE_W_LOOP_INNER(
+      T sd = scale_down[j] * abs_G_lr;
+      T su = scale_up[j] * abs_G_lr;
+      update_once(
+          w[j], w_apparent[j], sign, min_bound[j], max_bound[j], sd, su,
+          par.es_a, par.es_b, par.es_A_down, par.es_A_up,
+          par.es_gamma_down, par.es_gamma_up, (T)0.0, write_noise_std,
+          rng);
+    );
   }
 }
 
