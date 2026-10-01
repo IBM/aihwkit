@@ -519,7 +519,7 @@ __global__ void kernelOutputBoundManagement(
 
       if (value < bl) {
         value = bl;
-        exceeded += test_neg ? 0 : 1;
+        exceeded += test_neg ? 1 : 0;
       }
 
       APPLY_OUTPUT_NOISE_MANAGMENT(local_scale);
@@ -782,7 +782,9 @@ void InputOutputManager<T>::applyToInputWithBoundManagement(InputIteratorT dev_i
       kernelUpdateScaleValuesAndInitialize<T><<<nblocks, nthreads_, 0, s>>>(
           dev_scale_values_->getData(), dev_bound_exceeded_->getData(),
           dev_any_exceeded_->getData(), m_batch, nm_scale_values,
-          reduction_due_to_bound_management_);
+          // With NM the kernel rebuilds the absolute scale from the NM value. Without NM it
+          // multiplies the previous scale, so only the incremental factor must be applied.
+          nm_scale_values ? reduction_due_to_bound_management_ : bound_management_factor_);
     }
 
     // run

@@ -10,16 +10,20 @@
 
 from unittest import SkipTest
 
-from torch import Tensor, zeros, ones, manual_seed
+from pytest import mark
+from torch import Tensor, zeros, ones, full, manual_seed
+from torch.testing import assert_close
 
 from aihwkit.exceptions import ArgumentError, TileModuleError
-from aihwkit.simulator.configs.configs import UnitCellRPUConfig
+from aihwkit.simulator.configs.configs import SingleRPUConfig, UnitCellRPUConfig
 from aihwkit.simulator.configs.compounds import VectorUnitCell, ReferenceUnitCell
+from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.parameters.enums import (
     VectorUnitCellUpdatePolicy,
     NoiseManagementType,
     BoundManagementType,
 )
+from aihwkit.simulator.parameters.io import IOParameters
 from aihwkit.simulator.configs.configs import PrePostProcessingRPU, FloatingPointRPUConfig
 from aihwkit.simulator.rpu_base import tiles
 from aihwkit.simulator.tiles.analog import AnalogTile
@@ -688,3 +692,71 @@ class TileForwardBackwardTest(ParametrizedTestCase):
         with self.assertRaises(ArgumentError):
             forward_parameters["_not_existent"] = Tensor([1.0])
             analog_tile.set_forward_parameters(forward_parameters)
+
+
+def _forward_bm_cuda_tile(
+    weights: Tensor, inp_res: float = 0.0, test_negative_bound: bool = False
+) -> AnalogTile:
+    """Build a deterministic native CUDA tile with iterative forward BM."""
+    forward = IOParameters(
+        bound_management=BoundManagementType.ITERATIVE,
+        noise_management=NoiseManagementType.NONE,
+        inp_res=inp_res,
+        out_res=0.0,
+        out_noise=0.0,
+        inp_bound=1.0,
+        out_bound=1.0,
+        bm_test_negative_bound=test_negative_bound,
+    )
+    config = SingleRPUConfig(
+        device=ConstantStepDevice(w_min=-1.0, w_max=1.0, w_min_dtod=0.0, w_max_dtod=0.0),
+        forward=forward,
+    )
+    tile = AnalogTile(weights.shape[0], weights.shape[1], config)
+    tile.set_weights(weights)
+    return tile.cuda()
+
+
+def _forward_bm_output(tile: AnalogTile, inputs: Tensor) -> Tensor:
+    """Run native forward on CUDA and return its result on CPU."""
+    return tile.tile.forward(inputs.to(tile.device)).cpu()
+
+
+@mark.skipif(SKIP_CUDA_TESTS, reason="CUDA unavailable")
+def test_cuda_batch_uses_incremental_bm_factor_without_nm() -> None:
+    """Identical vectors must not depend on selecting the single or batch CUDA kernel."""
+    weights = full((1, 8), 0.75)
+    tile = _forward_bm_cuda_tile(weights, inp_res=1 / 16)
+    vector = full((1, 8), 0.625)
+
+    single = _forward_bm_output(tile, vector)
+    batch = _forward_bm_output(tile, vector.repeat(4, 1))
+
+    # DAC step delta = 2 * inp_bound * inp_res = 1 / 8. For BM scale s,
+    # y_raw(s) = 8 * 0.75 * Q_delta(0.625 / s). The first two attempts saturate:
+    #   s=1: y_raw = 8 * 0.75 * 0.625 = 3.75 > 1,
+    #   s=2: y_raw = 8 * 0.75 * 0.375 = 2.25 > 1.
+    # The third attempt succeeds and restores its scale in the final output:
+    #   s=4: y_raw = 8 * 0.75 * 0.125 = 0.75; y = s * y_raw = 3.0.
+    assert_close(single, full((1, 1), 3.0), atol=0, rtol=0)
+    assert_close(batch, single.repeat(4, 1), atol=0, rtol=0)
+
+
+@mark.skipif(SKIP_CUDA_TESTS, reason="CUDA unavailable")
+@mark.parametrize("test_negative_bound,expected", [(True, -2.25), (False, -1.0)])
+def test_cuda_single_vector_tests_negative_bound(
+    test_negative_bound: bool, expected: float
+) -> None:
+    """Negative-bound handling must agree between single-vector and batch CUDA kernels."""
+    weights = full((8, 3), -0.75)
+    tile = _forward_bm_cuda_tile(weights, test_negative_bound=test_negative_bound)
+    vector = ones(1, 3)
+
+    single = _forward_bm_output(tile, vector)
+    batch = _forward_bm_output(tile, vector.repeat(4, 1))
+
+    # Before the ADC bound, each result is y = 3 * 1 * (-0.75) = -2.25.
+    # When enabled, negative-bound testing retries and restores -2.25;
+    # otherwise the first pass is accepted with its ADC-clipped value of -1.0.
+    assert_close(batch, full((4, 8), expected), atol=1e-6, rtol=0)
+    assert_close(single, batch[:1], atol=1e-6, rtol=0)
