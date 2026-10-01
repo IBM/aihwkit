@@ -174,6 +174,49 @@ void VectorRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 }
 
 template <typename T>
+void VectorRPUDeviceCuda<T>::setDeviceParameterFrom(
+    const AbstractRPUDevice<T> &rpu_device_in, T *dev_weights) {
+
+  const auto &rpu_device = dynamic_cast<const VectorRPUDevice<T> &>(rpu_device_in);
+  if (&rpu_device == nullptr) {
+    RPU_FATAL("setDeviceParameterFrom expects VectorRPUDevice.");
+  }
+
+  PulsedRPUDeviceCudaBase<T>::setDeviceParameterFrom(rpu_device_in, dev_weights);
+
+  const auto &rpu_device_vec = rpu_device.getRpuVec();
+  T ***weights_vec = rpu_device.getWeightVec();
+
+  if (rpu_device_vec.size() != (size_t)n_devices_ ||
+      rpucuda_device_vec_.size() != (size_t)n_devices_) {
+    RPU_FATAL("Vector dimension mismatch in rpu_device.");
+  }
+
+  // Only the hidden weights and the device parameters of the
+  // sub-devices are set. Update / device indices are kept.
+  CudaArray<T> tmp_weights(this->context_, this->size_);
+  this->context_->synchronize();
+
+  for (int k = 0; k < n_devices_; k++) {
+    tmp_weights.assignTranspose(weights_vec[k][0], this->d_size_, this->x_size_);
+    this->context_->synchronize();
+    RPU::math::copy(
+        this->context_, tmp_weights.getSize(), tmp_weights.getData(), 1, dev_weights_ptrs_[k], 1);
+    this->context_->synchronize();
+
+    rpucuda_device_vec_[k]->setDeviceParameterFrom(*rpu_device_vec[k], dev_weights_ptrs_[k]);
+  }
+  this->context_->synchronizeDevice();
+
+  // re-compute the visible weights with the current device state
+  // (e.g. current choppers)
+  if (dev_weights != nullptr) {
+    reduceToWeights(this->context_, dev_weights);
+  }
+  this->context_->synchronize();
+}
+
+template <typename T>
 void VectorRPUDeviceCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
   PulsedRPUDeviceCudaBase<T>::dumpExtra(extra, prefix);
 

@@ -103,13 +103,34 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
     RPU_FATAL("populateFrom expects PulsedRPUDevice.");
   }
 
-  int x_size = rpu_device.getXSize();
-  int d_size = rpu_device.getDSize();
-  int size = x_size * d_size;
-
   initialize();
 
   PulsedRPUDeviceCudaBase<T>::populateFrom(rpu_device_in);
+
+  copyParametersFrom(rpu_device);
+}
+
+template <typename T>
+void PulsedRPUDeviceCuda<T>::setDeviceParameterFrom(
+    const AbstractRPUDevice<T> &rpu_device_in, T *dev_weights) {
+
+  const auto &rpu_device = dynamic_cast<const PulsedRPUDevice<T> &>(rpu_device_in);
+  if (&rpu_device == nullptr) {
+    RPU_FATAL("setDeviceParameterFrom expects PulsedRPUDevice.");
+  }
+
+  PulsedRPUDeviceCudaBase<T>::setDeviceParameterFrom(rpu_device_in, dev_weights);
+
+  // buffers are re-used, pulse counters are kept
+  copyParametersFrom(rpu_device);
+}
+
+template <typename T>
+void PulsedRPUDeviceCuda<T>::copyParametersFrom(const PulsedRPUDevice<T> &rpu_device) {
+
+  int x_size = rpu_device.getXSize();
+  int d_size = rpu_device.getDSize();
+  int size = x_size * d_size;
 
   T *mn = rpu_device.getMinBound()[0];
   T *mx = rpu_device.getMaxBound()[0];
@@ -161,18 +182,30 @@ void PulsedRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu_device
 
   // other parameters (on the fly)
   if (with_diffusion) {
-    dev_diffusion_rate_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    if (dev_diffusion_rate_ == nullptr) {
+      dev_diffusion_rate_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    }
     dev_diffusion_rate_->assign(tmp_df);
+  } else {
+    dev_diffusion_rate_ = nullptr;
   }
 
   if (with_reset_bias) {
-    dev_reset_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    if (dev_reset_bias_ == nullptr) {
+      dev_reset_bias_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    }
     dev_reset_bias_->assign(tmp_rb);
+  } else {
+    dev_reset_bias_ = nullptr;
   }
 
   if (getPar().usesPersistentWeight()) {
-    dev_persistent_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    if (dev_persistent_weights_ == nullptr) {
+      dev_persistent_weights_ = RPU::make_unique<CudaArray<T>>(this->context_, size);
+    }
     dev_persistent_weights_->assign(tmp_pw);
+  } else {
+    dev_persistent_weights_ = nullptr;
   }
 
   this->context_->synchronize();

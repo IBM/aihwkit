@@ -147,6 +147,23 @@ void MixedPrecRPUDeviceBaseCuda<T>::populateFrom(const AbstractRPUDevice<T> &rpu
 }
 
 template <typename T>
+void MixedPrecRPUDeviceBaseCuda<T>::setDeviceParameterFrom(
+    const AbstractRPUDevice<T> &rpu_device_in, T *dev_weights) {
+
+  const auto &rpu_device = dynamic_cast<const MixedPrecRPUDeviceBase<T> &>(rpu_device_in);
+  if (&rpu_device == nullptr) {
+    RPU_FATAL("setDeviceParameterFrom expects MixedPrecRPUDeviceBase.");
+  }
+
+  SimpleRPUDeviceCuda<T>::setDeviceParameterFrom(rpu_device_in, dev_weights);
+
+  // as on CPU, only the parameters of the underlying device are set
+  // (chi and the update counters are kept)
+  rpucuda_device_->setDeviceParameterFrom(rpu_device.getRPUDevice(), dev_weights);
+  this->context_->synchronize();
+}
+
+template <typename T>
 void MixedPrecRPUDeviceBaseCuda<T>::dumpExtra(RPU::state_t &extra, const std::string prefix) {
   SimpleRPUDeviceCuda<T>::dumpExtra(extra, prefix);
 
