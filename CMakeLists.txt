@@ -27,7 +27,7 @@ option(RPU_USE_TORCH_BUFFERS "Use torch buffers for RPUCuda" ON)
 set(RPU_CXX_STANDARD "" CACHE STRING "C++ standard (17, 20). Empty: detect from torch headers")
 
 set(RPU_BLAS "OpenBLAS" CACHE STRING "BLAS backend of choice (OpenBLAS, MKL)")
-set(RPU_CUDA_ARCHITECTURES "75;80;89" CACHE STRING "Target CUDA architectures")
+set(RPU_CUDA_ARCHITECTURES "75;80;89;120" CACHE STRING "Target CUDA architectures")
 
 # Append the virtualenv library path to cmake.
 if(DEFINED ENV{VIRTUAL_ENV})
