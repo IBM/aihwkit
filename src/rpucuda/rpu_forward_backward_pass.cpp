@@ -705,7 +705,8 @@ inline bool finalizeOutputImplStage5(ARGS) {
         bound_test_passed = false;
       } else if (value < -bound) {
         value = -bound;
-        bound_test_passed = !io.bm_test_negative_bound;
+        // Ignoring a negative saturation must not clear an earlier positive failure.
+        bound_test_passed = bound_test_passed && !io.bm_test_negative_bound;
       }
     } else {
       value = value > bound ? bound : value;
