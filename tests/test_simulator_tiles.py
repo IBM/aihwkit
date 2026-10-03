@@ -19,6 +19,7 @@ from aihwkit.simulator.configs.configs import SingleRPUConfig, UnitCellRPUConfig
 from aihwkit.simulator.configs.compounds import VectorUnitCell, ReferenceUnitCell
 from aihwkit.simulator.configs.devices import ConstantStepDevice
 from aihwkit.simulator.parameters.enums import (
+    AnalogMVType,
     VectorUnitCellUpdatePolicy,
     NoiseManagementType,
     BoundManagementType,
@@ -694,10 +695,14 @@ class TileForwardBackwardTest(ParametrizedTestCase):
             analog_tile.set_forward_parameters(forward_parameters)
 
 
-def _forward_bm_cuda_tile(
-    weights: Tensor, inp_res: float = 0.0, test_negative_bound: bool = False
+def _forward_bm_tile(
+    weights: Tensor,
+    inp_res: float = 0.0,
+    test_negative_bound: bool = False,
+    mv_type: AnalogMVType = AnalogMVType.ONE_PASS,
+    use_cuda: bool = True,
 ) -> AnalogTile:
-    """Build a deterministic native CUDA tile with iterative forward BM."""
+    """Build a deterministic native tile with iterative forward BM."""
     forward = IOParameters(
         bound_management=BoundManagementType.ITERATIVE,
         noise_management=NoiseManagementType.NONE,
@@ -707,6 +712,7 @@ def _forward_bm_cuda_tile(
         inp_bound=1.0,
         out_bound=1.0,
         bm_test_negative_bound=test_negative_bound,
+        mv_type=mv_type,
     )
     config = SingleRPUConfig(
         device=ConstantStepDevice(w_min=-1.0, w_max=1.0, w_min_dtod=0.0, w_max_dtod=0.0),
@@ -714,7 +720,7 @@ def _forward_bm_cuda_tile(
     )
     tile = AnalogTile(weights.shape[0], weights.shape[1], config)
     tile.set_weights(weights)
-    return tile.cuda()
+    return tile.cuda() if use_cuda else tile
 
 
 def _forward_bm_output(tile: AnalogTile, inputs: Tensor) -> Tensor:
@@ -726,7 +732,7 @@ def _forward_bm_output(tile: AnalogTile, inputs: Tensor) -> Tensor:
 def test_cuda_batch_uses_incremental_bm_factor_without_nm() -> None:
     """Identical vectors must not depend on selecting the single or batch CUDA kernel."""
     weights = full((1, 8), 0.75)
-    tile = _forward_bm_cuda_tile(weights, inp_res=1 / 16)
+    tile = _forward_bm_tile(weights, inp_res=1 / 16)
     vector = full((1, 8), 0.625)
 
     single = _forward_bm_output(tile, vector)
@@ -749,7 +755,7 @@ def test_cuda_single_vector_tests_negative_bound(
 ) -> None:
     """Negative-bound handling must agree between single-vector and batch CUDA kernels."""
     weights = full((8, 3), -0.75)
-    tile = _forward_bm_cuda_tile(weights, test_negative_bound=test_negative_bound)
+    tile = _forward_bm_tile(weights, test_negative_bound=test_negative_bound)
     vector = ones(1, 3)
 
     single = _forward_bm_output(tile, vector)
@@ -760,3 +766,35 @@ def test_cuda_single_vector_tests_negative_bound(
     # otherwise the first pass is accepted with its ADC-clipped value of -1.0.
     assert_close(batch, full((4, 8), expected), atol=1e-6, rtol=0)
     assert_close(single, batch[:1], atol=1e-6, rtol=0)
+
+
+def test_cpu_ignored_negative_bound_does_not_hide_positive_clipping() -> None:
+    """An ignored negative saturation must not clear an earlier positive failure."""
+    weights = full((2, 8), 0.75)
+    weights[1] *= -1
+    tile = _forward_bm_tile(weights, use_cuda=False)
+    inputs = ones(1, 8)
+
+    actual = tile.tile.forward(inputs)
+
+    # The first pass clips [6, -6] to [1, -1]. Although the negative saturation
+    # is ignored, the preceding positive saturation must still make BM retry.
+    assert_close(actual, Tensor([[6.0, -6.0]]), atol=1e-6, rtol=0)
+
+
+@mark.skipif(SKIP_CUDA_TESTS, reason="CUDA unavailable")
+@mark.parametrize(
+    "mv_type", [AnalogMVType.POS_NEG_SEPARATE, AnalogMVType.POS_NEG_SEPARATE_DIGITAL_SUM]
+)
+def test_cuda_split_mvm_retries_restore_input_buffer(mv_type: AnalogMVType) -> None:
+    """Each split-MVM retry must rebuild its input from the original buffer."""
+    weights = full((3, 8), 0.75)
+    tile = _forward_bm_tile(weights, mv_type=mv_type)
+    inputs = ones(2, 8)
+    inputs[:, -1] = -1.0
+
+    actual = _forward_bm_output(tile, inputs)
+
+    # Each output is (7 * 1 + 1 * -1) * 0.75 = 4.5. The first pass clips,
+    # so this also verifies that split MVMs preserve both signs on every retry.
+    assert_close(actual, full((2, 3), 4.5), atol=1e-6, rtol=0)

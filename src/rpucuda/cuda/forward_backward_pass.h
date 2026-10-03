@@ -191,13 +191,17 @@ public:
     DEBUG_OUT("in_size " << in_size << " batch " << m_batch);
     f_iom.initWithInput(X_input, f_io, in_size, m_batch, x_trans, alpha, is_test);
 
+    T *in_buffer = f_iom.getInBuffer();
     bool bound_test_passed = false;
     while (bound_test_passed == false) {
+      // Split positive/negative MVMs temporarily replace the input buffer.
+      f_iom.setInBuffer(in_buffer);
       // input management
       f_iom.applyToInput(X_input);
       bound_test_passed =
           computeAnalogMV(D_output, d_trans, dev_weights, f_iom, fb_pars_.fwd, false);
     }
+    f_iom.setInBuffer(in_buffer);
     f_iom.releaseBuffer();
   }
 
