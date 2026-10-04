@@ -952,6 +952,7 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
       nm_scale_value = computeNoiseManagement(
           x_input, this->x_size_, x_inc, NoiseManagementType::AbsMaxNPSum, aux_nm_value_, f_io_);
       reduction_due_to_bound_management = 1.0; // reset to 1.0
+      nm = true; // The NPSum retry enables NM even if the first pass had none.
     }
 
     bm_round++;

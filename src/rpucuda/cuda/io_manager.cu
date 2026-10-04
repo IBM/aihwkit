@@ -609,8 +609,9 @@ __global__ void kernelOutputBoundManagementBatch(
 #define RPU_IO_USE_SINGLE_BATCH_VERSION 1
 #define RPU_IO_THREADS_PER_BLOCK 512
 
+// Worst-case BM can enable NPSum after a first pass configured with no NM.
 #define LAUNCH_NM_KERNEL(KNAME, TEMP, BLOCKS, ARGS)                                                \
-  if (io_->noise_management != NoiseManagementType::None) {                                        \
+  if (noise_manager_->getScaleValues() != nullptr) {                                               \
     KNAME<T, TEMP, true><<<BLOCKS, nthreads_, 0, s>>> ARGS;                                        \
   } else {                                                                                         \
     KNAME<T, TEMP, false><<<BLOCKS, nthreads_, 0, s>>> ARGS;                                       \

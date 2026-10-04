@@ -10,7 +10,7 @@
 
 from unittest import SkipTest
 
-from pytest import mark
+from pytest import mark, param
 from torch import Tensor, zeros, ones, full, manual_seed
 from torch.testing import assert_close
 
@@ -726,6 +726,47 @@ def _forward_bm_tile(
 def _forward_bm_output(tile: AnalogTile, inputs: Tensor) -> Tensor:
     """Run native forward on CUDA and return its result on CPU."""
     return tile.tile.forward(inputs.to(tile.device)).cpu()
+
+
+@mark.parametrize(
+    "use_cuda",
+    [False, param(True, marks=mark.skipif(SKIP_CUDA_TESTS, reason="CUDA unavailable"))],
+)
+@mark.parametrize("batch", [1, 4])
+@mark.parametrize(
+    "bm_type,nm_type",
+    [
+        (BoundManagementType.NONE, NoiseManagementType.ABS_MAX_NP_SUM),
+        (BoundManagementType.ITERATIVE_WORST_CASE, NoiseManagementType.NONE),
+    ],
+)
+def test_forward_npsum_without_dac_resolution(
+    use_cuda: bool, batch: int, bm_type: BoundManagementType, nm_type: NoiseManagementType
+) -> None:
+    """NPSum scaling works directly and on a worst-case retry, including without initial NM."""
+    forward = IOParameters(
+        bound_management=bm_type,
+        noise_management=nm_type,
+        inp_res=0.0,
+        out_res=0.0,
+        inp_bound=1.0,
+        out_bound=1.0,
+        out_noise=0.0,
+        max_bm_factor=1,
+    )
+    config = SingleRPUConfig(
+        device=ConstantStepDevice(w_min=-1.0, w_max=1.0, w_min_dtod=0.0, w_max_dtod=0.0),
+        forward=forward,
+    )
+    tile = AnalogTile(3, 8, config)
+    tile.set_weights(full((3, 8), 0.5))
+    if use_cuda:
+        tile = tile.cuda()
+
+    # The raw MVM result is 4 and clips to 1. Direct NPSum, or NPSum on the
+    # second worst-case pass, uses scale 8 * 0.6 = 4.8 and restores 4.
+    actual = tile.joint_forward(ones(batch, 8, device=tile.device)).cpu()
+    assert_close(actual, full((batch, 3), 4.0), atol=1e-6, rtol=0)
 
 
 @mark.skipif(SKIP_CUDA_TESTS, reason="CUDA unavailable")
