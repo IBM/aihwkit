@@ -34,6 +34,7 @@ public:
   };
 
   void populateFrom(const AbstractRPUDevice<T> &rpu_device) override;
+  void setDeviceParameterFrom(const AbstractRPUDevice<T> &rpu_device, T *dev_weights) override;
   BufferedTransferRPUDeviceMetaParameter<T> &getPar() const {
     return static_cast<BufferedTransferRPUDeviceMetaParameter<T> &>(
         SimpleRPUDeviceCuda<T>::getPar());

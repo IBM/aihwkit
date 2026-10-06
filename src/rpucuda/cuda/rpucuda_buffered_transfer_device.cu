@@ -108,6 +108,38 @@ void BufferedTransferRPUDeviceCuda<T>::populateFrom(const AbstractRPUDevice<T> &
   this->context_->synchronize();
 }
 
+template <typename T>
+void BufferedTransferRPUDeviceCuda<T>::setDeviceParameterFrom(
+    const AbstractRPUDevice<T> &rpu_device_in, T *dev_weights) {
+
+  const auto &rpu_device = dynamic_cast<const BufferedTransferRPUDevice<T> &>(rpu_device_in);
+  if (&rpu_device == nullptr) {
+    RPU_FATAL("setDeviceParameterFrom expects BufferedTransferRPUDevice.");
+  }
+
+  TransferRPUDeviceCuda<T>::setDeviceParameterFrom(rpu_device_in, dev_weights);
+
+  std::vector<std::vector<T>> t_vec = rpu_device.getTransferBuffers();
+  if (t_vec.size() != transfer_buffer_vec_.size()) {
+    RPU_FATAL("Wrong number of buffers to set from.");
+  }
+
+  const auto &par = getPar();
+  for (size_t k = 0; k < t_vec.size(); k++) {
+    if (t_vec[k].size() != this->size_) {
+      RPU_FATAL("Wrong number of elements in buffers to set from.");
+    }
+    if (par.transfer_columns) {
+      // d_major
+      transfer_buffer_vec_[k]->assignTranspose(t_vec[k].data(), this->d_size_, this->x_size_);
+    } else {
+      // x_major in this case. Always out-size-major
+      transfer_buffer_vec_[k]->assign(t_vec[k].data());
+    }
+  }
+  this->context_->synchronize();
+}
+
 /* partially transfer using the given "readout" transfer vectors
    (with io-managed forward) and buffer the results in
    digital. Transfer only to next device if threshold is reached. */

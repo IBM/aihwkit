@@ -30,6 +30,8 @@ public:
 
   void saturate(T *weights, param_t *dev_4params);
   const T *getNu() const { return dev_nu_ == nullptr ? nullptr : dev_nu_->getDataConst(); };
+  // copies nu from the host drifter without resetting the drift state
+  void setNuFrom(const WeightDrifter<T> &wd, int x_size, int d_size);
 
   void dumpExtra(RPU::state_t &extra, const std::string prefix);
   void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict);

@@ -459,10 +459,16 @@ template <typename T> void RPUCudaPulsed<T>::setDeviceParameter(const std::vecto
   this->copyWeightsToHost();
   rpu_device_->setDeviceParameter(this->getWeightsPtr(), data_ptrs);
 
-  rpucuda_device_->populateFrom(*rpu_device_);
-
   // set device weights which might have been updated because of the hidden parameters
   RPUCudaSimple<T>::setWeights(this->getWeightsPtr()[0]);
+
+  // Only copy the device parameters into the existing CUDA device
+  // (instead of re-creating it with populateFrom), so that the runtime
+  // state accumulated on the GPU (update counters, chopper states,
+  // transfer indices, etc.) is kept, consistent with the CPU behavior.
+  // Compound devices re-compute the device weights with the current state.
+  rpucuda_device_->setDeviceParameterFrom(*rpu_device_, this->dev_weights_->getData());
+  this->copyWeightsToHost();
 };
 
 template <typename T> int RPUCudaPulsed<T>::getHiddenUpdateIdx() const {

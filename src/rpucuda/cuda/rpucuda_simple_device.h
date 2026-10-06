@@ -47,6 +47,12 @@ public:
   virtual void dumpExtra(RPU::state_t &extra, const std::string prefix) = 0;
   virtual void loadExtra(const RPU::state_t &extra, const std::string prefix, bool strict) = 0;
   virtual void populateFrom(const AbstractRPUDevice<T> &rpu_device) = 0;
+  /* Copies only the device parameters (hidden parameters) of the given
+     host device into the already allocated device buffers. In contrast
+     to populateFrom, the runtime state (counters, choppers, etc.) is
+     kept. dev_weights are the current (visible) device weights, which
+     compound devices re-compute from their hidden weights.*/
+  virtual void setDeviceParameterFrom(const AbstractRPUDevice<T> &rpu_device, T *dev_weights) = 0;
   virtual DeviceUpdateType implements() const = 0;
   virtual bool isPulsedDevice() const { return false; };
   virtual AbstractRPUDeviceCuda<T> *clone() const = 0;
@@ -103,6 +109,7 @@ public:
   void applyWeightUpdate(T *dev_weights, T *dw_and_current_weight_out) override;
   void
   populateFrom(const AbstractRPUDevice<T> &rpu_device) override; // need to be called by derived
+  void setDeviceParameterFrom(const AbstractRPUDevice<T> &rpu_device, T *dev_weights) override;
   SimpleRPUDeviceMetaParameter<T> &getPar() const override {
     return static_cast<SimpleRPUDeviceMetaParameter<T> &>(*par_storage_);
   };
