@@ -1,5 +1,5 @@
 <!---
-Copyright 2021, 2022, 2023, 2024 IBM Analog Hardware Acceleration Kit  All rights reserved.
+Copyright 2026 IBM Analog Hardware Acceleration Kit. All rights reserved.
 
 Licensed under the MIT license. See LICENSE file in the project root for details.
 -->
