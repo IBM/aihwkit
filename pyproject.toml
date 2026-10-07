@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aihwkit"
-version = "1.1.0"
+dynamic = ["version"]
 dependencies = [
   "cmake >= 4.2.1",
   "scikit-build >= 0.18.1",
@@ -91,6 +91,9 @@ Documentation = "https://aihwkit.readthedocs.io/en/latest/"
 Repository = "https://github.com/IBM/aihwkit.git"
 Issues = "https://github.com/IBM/aihwkit/issues"
 Changelog = "https://github.com/IBM/aihwkit/blob/master/CHANGELOG.md"
+
+[tool.setuptools.dynamic]
+version = {file = "src/aihwkit/VERSION.txt"}
 
 [tool.black]
 line-length = 100
