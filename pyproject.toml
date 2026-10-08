@@ -99,7 +99,14 @@ version = {file = "src/aihwkit/VERSION.txt"}
 line-length = 100
 
 [tool.cibuildwheel]
-build = ["cp314-manylinux_x86_64", "cp314-macosx_*"]
+build = [
+  "cp312-manylinux_x86_64",
+  "cp313-manylinux_x86_64",
+  "cp314-manylinux_x86_64",
+  "cp312-macosx_*",
+  "cp313-macosx_*",
+  "cp314-macosx_*"
+]
 
 build-frontend = "pip; args: --no-build-isolation"
 
