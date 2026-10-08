@@ -393,28 +393,30 @@ class SimulatorTileWrapper:
         # set_shared_weights, while CPU tiles expect (d_size, x_size).
         is_cuda = "Cuda" in type(self.tile).__name__
         if is_cuda:
-            w_cpu = self.tile.get_weights()  # (d_size, x_size) on CPU
-            # Normal path after .cuda(device) / .to(device): analog_ctx has
-            # already been refreshed onto the target GPU, so it is the most
-            # reliable source of the tile's concrete cuda:N placement.
-            if hasattr(self, "analog_ctx") and self.analog_ctx._raw_data().is_cuda:
+            # A later binding can occur while analog_ctx has already moved to
+            # CPU. The previous shared tensor then identifies the CUDA device.
+            old_shared = self._shared_weight_tensor
+            if old_shared is None and hasattr(self, "analog_ctx"):
+                old_context = self.analog_ctx._raw_data()
+                if old_context.is_cuda and old_context.shape == (d_size, x_size):
+                    old_shared = old_context.t()
+            if old_shared is not None and old_shared.is_cuda:
+                tile_device = old_shared.device
+            elif hasattr(self, "analog_ctx") and self.analog_ctx._raw_data().is_cuda:
                 tile_device = self.analog_ctx._raw_data().device
             else:
-                # Fallback for partial-initialization / transition windows
-                # where analog_ctx does not exist yet or still points to CPU.
-                # In particular, __init__() binds shared weights before
-                # analog_ctx is created, so CUDA tiles must use the active
-                # CUDA context established by the caller.
+                # During initial CUDA construction, the caller selects the
+                # tile's device through the active CUDA context.
                 tile_device = torch_device("cuda", cuda_device(None).idx)
-            shared = zeros(x_size, d_size, dtype=self.get_dtype(), device=tile_device)
+            shared = empty(x_size, d_size, dtype=self.get_dtype(), device=tile_device)
+            # On first binding, C++ copies its device weights into shared.
+            # On a later binding it already points to the previous shared tensor.
+            if old_shared is not None and old_shared.is_cuda:
+                shared.copy_(old_shared)
         else:
             tile_device = torch_device("cpu")
             shared = zeros(d_size, x_size, dtype=self.get_dtype(), device=tile_device)
         self.tile.set_shared_weights(shared)
-        # CUDA set_shared_weights does not auto-populate the buffer (unlike CPU).
-        # Force-sync from the tile's internal device weights into the shared tensor.
-        if is_cuda:
-            shared.copy_(w_cpu.t().to(tile_device))
         self._shared_weight_tensor = shared
 
     def _get_tile_weights_ref(self) -> Tensor:
@@ -920,7 +922,8 @@ class SimulatorTileWrapper:
 
         self.analog_ctx._replace_raw_data(self.analog_ctx._raw_data().cpu())
         self.analog_ctx.reset(self)
-        self._shared_weight_tensor = None
+        # Keep the CUDA backing until _bind_shared_weights copies its data to
+        # the replacement tensor. The native tile is still on CUDA here.
         self._bind_shared_weights()
         self._sync_analog_ctx_weights()
 

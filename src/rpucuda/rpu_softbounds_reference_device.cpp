@@ -5,6 +5,7 @@
  */
 
 #include "rpu_softbounds_reference_device.h"
+#include "rpu_parallel_init.h"
 #include "utility_functions.h"
 #include <chrono>
 #include <cmath>
@@ -24,8 +25,13 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
   PulsedRPUDevice<T>::populate(p, rng); // will clone par
   auto &par = getPar();
 
+  const bool parallel_init = useParallelDeviceInit(this->size_);
+  const auto row_seeds =
+      parallel_init ? makeDeviceInitRowSeeds(rng, this->d_size_) : std::vector<unsigned int>();
+#pragma omp parallel for if(parallel_init) schedule(static)
   for (int i = 0; i < this->d_size_; ++i) {
-
+    RealWorldRNG<T> row_rng(parallel_init ? row_seeds[i] : 1);
+    RealWorldRNG<T> *cell_rng = parallel_init ? &row_rng : rng;
     for (int j = 0; j < this->x_size_; ++j) {
 
       T w_min = this->w_min_bound_[i][j];
@@ -38,10 +44,10 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
         // no real need to compute the full slope here, but for clarity
 
         T current_slope_down = -scale_down / w_min;
-        current_slope_down *= (T)fabsf((T)1.0 + par.slope_down_dtod * rng->sampleGauss());
+        current_slope_down *= (T)fabsf((T)1.0 + par.slope_down_dtod * cell_rng->sampleGauss());
 
         T current_slope_up = scale_up / w_max;
-        current_slope_up *= (T)fabsf((T)1.0 + par.slope_up_dtod * rng->sampleGauss());
+        current_slope_up *= (T)fabsf((T)1.0 + par.slope_up_dtod * cell_rng->sampleGauss());
 
         w_max = scale_up / current_slope_up;
         w_min = -scale_down / current_slope_down;
@@ -50,7 +56,7 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
       }
 
       // reference
-      w_reference_[i][j] = par.reference_mean + par.reference_std * rng->sampleGauss();
+      w_reference_[i][j] = par.reference_mean + par.reference_std * cell_rng->sampleGauss();
 
       if (par.subtract_symmetry_point && (w_max > (T)0.0 && w_min < (T)0.0)) {
         // scale_down (1 - w / w_min) == scale_up * (1 - w / w_max)
