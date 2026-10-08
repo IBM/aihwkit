@@ -116,13 +116,16 @@ pip install \
     numpy \
     protobuf \
     tqdm \
-    mypy
+    mypy \
+    ninja
+make clean
 '''
 
 container-engine = "podman"
 
-test-command = "PYTHONPATH=src/ pytest -v -s ./tests/"
-test-requires = "pytest"
+# before-test = "pip install -e '.[dev]'"
+# test-command = "pytest -v -s {project}/tests/"
+# test-requires = "pytest"
 
 manylinux-x86_64-image = "manylinux_2_28"
 
@@ -134,4 +137,5 @@ repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libtor
 
 [tool.cibuildwheel.macos]
 archs = ["arm64"]
-repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+environment = { MACOSX_DEPLOYMENT_TARGET = "26.0" }
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel} --exclude libomp.dylib --exclude libtorch --exclude libc10"
