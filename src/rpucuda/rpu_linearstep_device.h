@@ -195,6 +195,15 @@ template <typename T> class LinearStepRPUDevice : public PulsedRPUDevice<T> {
       T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng)
       override;
   void doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) override;
+  void doInfiniteGranularityUpdate(
+      T **weights,
+      const T *x_input,
+      int x_inc,
+      const T *d_input,
+      int d_inc,
+      T learning_rate,
+      RNG<T> *rng)
+      override;
 
 private:
   T **w_slope_up_ = nullptr;
