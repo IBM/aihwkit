@@ -116,8 +116,6 @@ pip install \
     "scikit-build>=0.18.1" \
     "pybind11>=3.0.1" \
     "requests>=2.32,<3" \
-    torch \
-    torchvision \
     scikit-learn \
     scipy \
     numpy \
@@ -125,10 +123,11 @@ pip install \
     tqdm \
     mypy \
     ninja
+pip install torch torchvision ${TORCH_INDEX_URL:+--index-url "$TORCH_INDEX_URL"}
 make clean
 '''
 
-container-engine = "podman"
+container-engine = "docker"
 
 # before-test = "pip install -e '.[dev]'"
 # test-command = "pytest -v -s {project}/tests/"
@@ -138,8 +137,26 @@ manylinux-x86_64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64"]
-before-all = "yum install -y openblas-devel"
-
+before-all = '''
+yum install -y openblas-devel yum-utils
+yum-config-manager --add-repo \
+    https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+CUDA_PKG_VERSION=$(echo "$CUDA_VERSION" | tr . -)
+yum install -y \
+    cuda-nvcc-${CUDA_PKG_VERSION} \
+    cuda-cudart-devel-${CUDA_PKG_VERSION} \
+    cuda-cccl-${CUDA_PKG_VERSION} \
+    cuda-nvrtc-devel-${CUDA_PKG_VERSION} \
+    cuda-nvtx-${CUDA_PKG_VERSION} \
+    cuda-driver-devel-${CUDA_PKG_VERSION} \
+    libcublas-devel-${CUDA_PKG_VERSION} \
+    libcurand-devel-${CUDA_PKG_VERSION} \
+    libcusparse-devel-${CUDA_PKG_VERSION} \
+    libcusolver-devel-${CUDA_PKG_VERSION}
+ln -sfn /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda
+'''
+# Keep CUDA_VERSION and the cuXYZ suffix of TORCH_INDEX_URL in sync.
+environment = { CUDA_VERSION = "13.2", CUDA_HOME = "/usr/local/cuda", CUDACXX = "/usr/local/cuda/bin/nvcc", USE_CUDA = "ON", TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu132" }
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
 
 [tool.cibuildwheel.macos]

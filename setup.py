@@ -7,6 +7,7 @@
 """Setup.py for `aihwkit`."""
 
 import os
+from typing import Optional
 
 from setuptools import find_packages
 from skbuild import setup
@@ -21,11 +22,35 @@ INSTALL_REQUIRES = [
 ]
 
 
+def get_cuda_version() -> Optional[str]:
+    """Get the ``<major><minor>`` CUDA version (e.g. ``126``) of the installed torch."""
+    try:
+        import torch  # pylint: disable=import-outside-toplevel
+    except ImportError:
+        return None
+    if torch.version.cuda is None:
+        return None
+    major, minor = torch.version.cuda.split(".")[:2]
+    return f"{major}{minor}"
+
+
 def get_version() -> str:
-    """Get the package version."""
+    """Get the package version.
+
+    When building with ``USE_CUDA`` enabled, a ``+cu<cuda_version>`` local version label is
+    appended (e.g. ``1.2.0+cu126``), so that CUDA wheels are distinguishable from CPU ones.
+    """
     version_path = os.path.join(os.path.dirname(__file__), "src", "aihwkit", "VERSION.txt")
     with open(version_path, encoding="utf-8") as version_file:
-        return version_file.read().strip()
+        version = version_file.read().strip()
+
+    if os.getenv("USE_CUDA", "").upper() in ("ON", "1", "TRUE", "YES", "Y"):
+        cuda_version = get_cuda_version()
+        if cuda_version is None:
+            raise RuntimeError("USE_CUDA is enabled but no CUDA-enabled torch is installed")
+        version = f"{version}+cu{cuda_version}"
+
+    return version
 
 
 def get_long_description() -> str:
