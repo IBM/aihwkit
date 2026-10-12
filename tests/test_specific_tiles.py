@@ -6,7 +6,10 @@
 
 """Some more tests for specific tiles."""
 
-from torch import ones, zeros_like, Tensor
+from unittest import SkipTest
+
+from numpy.testing import assert_array_equal
+from torch import arange, ones, zeros, zeros_like, Tensor
 from torch.nn.functional import mse_loss
 
 from aihwkit.simulator.configs.devices import SoftBoundsDevice
@@ -277,7 +280,8 @@ class ChoppedTransferCompoundTest(ParametrizedTestCase):
 
         Choppers live in the device ``extra`` state rather than in the hidden
         parameters, so they are round-tripped through ``dump_extra`` /
-        ``load_extra`` (the same mechanism as ``test_dump_extra``).
+        ``load_extra``. CUDA keeps separate signed chopper buffers; changing
+        the CPU device copy alone does not change the active GPU choppers.
         """
         state = analog_tile.tile.dump_extra()
         for key in state:
@@ -285,6 +289,10 @@ class ChoppedTransferCompoundTest(ParametrizedTestCase):
                 state[key] = [float(in_chop)] * len(state[key])
             elif key.endswith("rpu_device.out_chopper"):
                 state[key] = [float(out_chop)] * len(state[key])
+            elif ".cwo.dev_x_chopper_buffer_" in key:
+                state[key] = [1.0 - 2.0 * in_chop] * analog_tile.tile.get_x_size()
+            elif ".cwo.dev_d_chopper_buffer_" in key:
+                state[key] = [1.0 - 2.0 * out_chop] * analog_tile.tile.get_d_size()
         analog_tile.tile.load_extra(state, True)
 
     def test_chopper_correction(self):
@@ -390,6 +398,61 @@ class ChoppedTransferCompoundTest(ParametrizedTestCase):
             self.assertAlmostEqual(bias[0].item(), gamma * a + c, 5)
 
         self.assertAlmostEqual(weight[0][0].item(), gamma * a + c, 5)
+
+    def test_cuda_chopper_restore(self) -> None:
+        """Restored GPU choppers are used immediately, before another update."""
+        # pylint: disable=too-many-locals
+        if not self.use_cuda:
+            raise SkipTest("CUDA chopper buffers are specific to the CUDA device")
+
+        for warm in (False, True):
+            model = self.get_layer(
+                in_features=3,
+                out_features=2,
+                rpu_config=self.get_chopped_transfer_compound(0.1, transfer_every=1.0e6),
+            )
+            analog_tile = next(model.analog_tiles())
+            empty_state = analog_tile.tile.dump_extra()
+            if warm:
+                # Exercise replacing allocated buffers as well as loading them
+                # before their first allocation. No gradient or transfer occurs.
+                analog_tile.set_learning_rate(0.1)
+                analog_tile.update(ones(1, 3, device="cuda"), zeros(1, 2, device="cuda"))
+
+            params = analog_tile.get_hidden_parameters()
+            shape = params["hidden_weights_0"].shape
+            fast = arange(1, params["hidden_weights_0"].numel() + 1).reshape(shape) / 20.0
+            slow = 0.2 * ones(*shape)
+            params["hidden_weights_0"] = fast
+            params["hidden_weights_1"] = slow
+
+            for swapped in (False, True):
+                state = analog_tile.tile.dump_extra()
+                x_first = [1.0 if idx % 2 == 0 else -1.0 for idx in range(shape[1])]
+                x_second = [-value for value in x_first]
+                d_first, d_second = [1.0, 1.0], [1.0, -1.0]
+                buffers = {
+                    "dev_x_chopper_buffer_1": x_first,
+                    "dev_x_chopper_buffer_2": x_second,
+                    "dev_d_chopper_buffer_1": d_first,
+                    "dev_d_chopper_buffer_2": d_second,
+                    "swapped_choppers": [float(swapped)],
+                }
+                for key in state:
+                    if ".cwo." in key and key.rsplit(".", 1)[-1] in buffers:
+                        state[key] = buffers[key.rsplit(".", 1)[-1]]
+                analog_tile.tile.load_extra(state, True)
+                analog_tile.set_hidden_parameters(params)
+
+                x_sign = Tensor(x_second if swapped else x_first)
+                d_sign = Tensor(d_second if swapped else d_first)
+                expected = 0.1 * d_sign[:, None] * x_sign[None, :] * fast + slow
+                self.assertTensorAlmostEqual(analog_tile.tile.get_weights(), expected)
+
+            # Loading the original lazy state must also clear the cached pointers.
+            analog_tile.tile.load_extra(empty_state, True)
+            analog_tile.set_hidden_parameters(params)
+            self.assertTensorAlmostEqual(analog_tile.tile.get_weights(), 0.1 * fast + slow)
 
     def test_decay_with_negative_reset_bias(self):
         """Negative reset bias survives decay; a chopper flip then flips A."""
@@ -504,4 +567,6 @@ class ChoppedTransferCompoundTest(ParametrizedTestCase):
         state_after = analog_tile.tile.dump_extra()
         self.assertEqual(state_before.keys(), state_after.keys())
         for key, value in state_before.items():
-            self.assertEqual(value, state_after[key], msg=key)
+            # Unused CUDA scratch buffers can contain NaNs. Finite values must
+            # match exactly, and NaNs must remain at the same positions.
+            assert_array_equal(value, state_after[key], err_msg=key)
