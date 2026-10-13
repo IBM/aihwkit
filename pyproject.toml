@@ -100,12 +100,7 @@ line-length = 100
 
 [tool.cibuildwheel]
 build = [
-  "cp312-manylinux_x86_64",
-  "cp313-manylinux_x86_64",
-  "cp314-manylinux_x86_64",
-  "cp312-macosx_*",
-  "cp313-macosx_*",
-  "cp314-macosx_*"
+  "cp314-manylinux_x86_64"
 ]
 
 build-frontend = "pip; args: --no-build-isolation"
@@ -155,8 +150,8 @@ yum install -y \
     libcusolver-devel-${CUDA_PKG_VERSION}
 ln -sfn /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda
 '''
-# Keep CUDA_VERSION and the cuXYZ suffix of TORCH_INDEX_URL in sync.
-environment = { CUDA_VERSION = "13.2", CUDA_HOME = "/usr/local/cuda", CUDACXX = "/usr/local/cuda/bin/nvcc", USE_CUDA = "ON", TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu132" }
+# Keep CUDA_VERSION, AIHWKIT_CUDA_VERSION and the cuXYZ suffix of TORCH_INDEX_URL in sync.
+environment = { CUDA_VERSION = "13.2", AIHWKIT_CUDA_VERSION = "132", CUDA_HOME = "/usr/local/cuda", CUDACXX = "/usr/local/cuda/bin/nvcc", USE_CUDA = "ON", TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu132" }
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libtorch_python.so"
 
 [tool.cibuildwheel.macos]
