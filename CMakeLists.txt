@@ -218,7 +218,7 @@ if (BUILD_EXTENSION)
 
   install(TARGETS ${extension_module_name} DESTINATION "src/aihwkit/extension")
 
-  add_custom_command(TARGET ${extension_module_name}
+  add_custom_command(TARGET ${extension_module_name} POST_BUILD
     COMMAND stubgen --module "src/aihwkit/extension" --output .
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
   )
