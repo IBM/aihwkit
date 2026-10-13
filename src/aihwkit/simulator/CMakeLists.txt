@@ -17,7 +17,7 @@ endif()
 
 install(TARGETS ${python_module_name} DESTINATION "src/aihwkit/simulator")
 
-add_custom_command(TARGET ${python_module_name}
+add_custom_command(TARGET ${python_module_name} POST_BUILD
   COMMAND stubgen --module "src/aihwkit/simulator" --output .
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
