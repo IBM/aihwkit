@@ -5,11 +5,25 @@
 # Licensed under the MIT license. See LICENSE file in the project root for details.
 
 """Tests for the high level simulator devices functionality."""
+from os import environ, getenv
+from statistics import median
 from sys import version_info
+from time import perf_counter
 from unittest import SkipTest
 
+from pytest import mark
+from torch import cuda, equal, manual_seed
+
 from aihwkit.exceptions import ConfigError
+from aihwkit.simulator.configs import SingleRPUConfig
+from aihwkit.simulator.configs.devices import (
+    PowStepDevice,
+    PowStepReferenceDevice,
+    SoftBoundsReferenceDevice,
+)
 from aihwkit.simulator.parameters import IOParameters, UpdateParameters
+from aihwkit.simulator.presets.devices import EcRamPresetDevice
+from aihwkit.simulator.tiles.analog import AnalogTile
 
 from .helpers.decorators import parametrize_over_tiles
 from .helpers.testcases import ParametrizedTestCase
@@ -168,3 +182,83 @@ class RPUConfigurationsTest(ParametrizedTestCase):
                 # exclude weights as these are not governed by construction seed
                 continue
             self.assertTrue(old.allclose(new))
+
+
+@mark.parametrize(
+    "device_type",
+    [EcRamPresetDevice, SoftBoundsReferenceDevice, PowStepDevice, PowStepReferenceDevice],
+)
+def test_parallel_device_init_is_seeded(monkeypatch, device_type):
+    """Row-local random streams give identical parameters for the same seed."""
+    monkeypatch.setenv("AIHWKIT_PARALLEL_DEVICE_INIT", "1")
+    config = SingleRPUConfig(device=device_type(construction_seed=123))
+    first = AnalogTile(256, 256, config, bias=False).get_hidden_parameters()
+    second = AnalogTile(256, 256, config, bias=False).get_hidden_parameters()
+
+    assert first.keys() == second.keys()
+    parameters = [name for name in first if "weights" not in name]
+    assert parameters
+    for name in parameters:
+        assert equal(first[name], second[name]), name
+
+
+@mark.skipif(
+    getenv("AIHWKIT_RUN_LARGE_TILE_BENCHMARK") != "1",
+    reason="Set AIHWKIT_RUN_LARGE_TILE_BENCHMARK=1 to run the large tile timing test",
+)
+def test_large_tile_initialization_timing():
+    """Manually time a large tile; run this node with ``pytest -s``.
+
+    Defaults: 3072x768 EcRam, three repetitions, CPU construction plus CUDA
+    transfer. Override with AIHWKIT_BENCHMARK_DEVICE, _OUT_SIZE, _IN_SIZE,
+    _REPEATS, or _CPU_ONLY=1. AIHWKIT_PARALLEL_DEVICE_INIT=1 enables the
+    optimized path, whose fixed-seed device samples differ from the old path.
+    """
+    device_types = {
+        "ecram": EcRamPresetDevice,
+        "softbounds": SoftBoundsReferenceDevice,
+        "powstep": PowStepDevice,
+        "powstep-reference": PowStepReferenceDevice,
+    }
+    device_name = getenv("AIHWKIT_BENCHMARK_DEVICE", "ecram")
+    assert device_name in device_types, f"Unknown benchmark device: {device_name}"
+
+    out_size = int(getenv("AIHWKIT_BENCHMARK_OUT_SIZE", "3072"))
+    in_size = int(getenv("AIHWKIT_BENCHMARK_IN_SIZE", "768"))
+    repeats = int(getenv("AIHWKIT_BENCHMARK_REPEATS", "3"))
+    assert min(out_size, in_size, repeats) > 0
+    use_cuda = getenv("AIHWKIT_BENCHMARK_CPU_ONLY") != "1"
+    if use_cuda:
+        assert cuda.is_available(), "CUDA is unavailable; set AIHWKIT_BENCHMARK_CPU_ONLY=1"
+
+    config = SingleRPUConfig(device=device_types[device_name]())
+    if use_cuda:
+        warmup = AnalogTile(32, 32, config, bias=False).cuda()
+        cuda.synchronize()
+        del warmup
+
+    cpu_times = []
+    cuda_times = []
+    total_times = []
+    for run in range(repeats):
+        manual_seed(1234 + run)
+        start = perf_counter()
+        tile = AnalogTile(out_size, in_size, config, bias=False)
+        cpu_times.append(perf_counter() - start)
+        if use_cuda:
+            start = perf_counter()
+            tile.cuda()
+            cuda.synchronize()
+            cuda_times.append(perf_counter() - start)
+            total_times.append(cpu_times[-1] + cuda_times[-1])
+        del tile
+
+    print(
+        f"tile={out_size}x{in_size} device={device_name} repeats={repeats} "
+        f"parallel_init={environ.get('AIHWKIT_PARALLEL_DEVICE_INIT', '0')} "
+        f"omp_threads={environ.get('OMP_NUM_THREADS', 'default')}"
+    )
+    print(f"CPU construction: {median(cpu_times):.3f} s median; samples={cpu_times}")
+    if use_cuda:
+        print(f"CUDA transfer: {median(cuda_times):.3f} s median; samples={cuda_times}")
+        print(f"CPU + CUDA: {median(total_times):.3f} s median; samples={total_times}")
