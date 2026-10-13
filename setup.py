@@ -22,10 +22,16 @@ INSTALL_REQUIRES = [
 
 
 def get_version() -> str:
-    """Get the package version."""
+    """Get the package version, with a ``+cu<AIHWKIT_CUDA_VERSION>`` label if that is set."""
     version_path = os.path.join(os.path.dirname(__file__), "src", "aihwkit", "VERSION.txt")
     with open(version_path, encoding="utf-8") as version_file:
-        return version_file.read().strip()
+        version = version_file.read().strip()
+
+    cuda_version = os.getenv("AIHWKIT_CUDA_VERSION")
+    if cuda_version:
+        version = f"{version}+cu{cuda_version}"
+
+    return version
 
 
 def get_long_description() -> str:
