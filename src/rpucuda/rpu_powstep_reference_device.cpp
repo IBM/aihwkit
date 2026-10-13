@@ -114,7 +114,7 @@ template <typename T> void PowStepReferenceRPUDevice<T>::printDP(int x_count, in
 }
 
 namespace {
-template <typename T>
+template <typename T, typename RngT>
 inline void update_once_reference(
     T &w,
     int &sign,
@@ -126,7 +126,7 @@ inline void update_once_reference(
     T &min_bound,
     T &max_bound,
     const T &dw_min_std,
-    RNG<T> *rng) {
+    RngT *rng) {
   T range = max_bound - min_bound;
   if (range == (T)0.0) {
     return;
@@ -185,6 +185,42 @@ void PowStepReferenceRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences,
   PULSED_UPDATE_W_LOOP_DENSE(update_once_reference(
                                  w[j], sign, scale_down[j], scale_up[j], gamma_down[j], gamma_up[j],
                                  ref[j], min_bound[j], max_bound[j], par.dw_min_std, rng););
+}
+
+/* infinite granularity update */
+template <typename T>
+void PowStepReferenceRPUDevice<T>::doInfiniteGranularityUpdate(
+    T **weights,
+    const T *x_input,
+    int x_inc,
+    const T *d_input,
+    int d_inc,
+    T learning_rate,
+    RNG<T> *rng) {
+
+  for (int i = 0; i < this->d_size_; i++) {
+    T d_val = d_input[i * d_inc];
+    if (d_val == (T)0.0) {
+      continue;
+    }
+
+    T *scale_down = this->w_scale_down_[i];
+    T *scale_up = this->w_scale_up_[i];
+    T *gamma_down = w_gamma_down_[i];
+    T *gamma_up = w_gamma_up_[i];
+    T *ref = w_reference_[i];
+    T *w = weights[i];
+    T *min_bound = this->w_min_bound_[i];
+    T *max_bound = this->w_max_bound_[i];
+
+    IG_UPDATE_W_LOOP_INNER(
+      T sd = scale_down[j] * abs_G_lr;
+      T su = scale_up[j] * abs_G_lr;
+      update_once_reference(
+          w[j], sign, sd, su, gamma_down[j], gamma_up[j],
+          ref[j], min_bound[j], max_bound[j], (T)0.0, rng);
+    );
+  }
 }
 
 template class PowStepReferenceRPUDevice<float>;
