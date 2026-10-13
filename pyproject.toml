@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-  "setuptools",
+  "setuptools >= 77.0.0",
   "wheel",
   "scikit-build >= 0.18.1",
   "pybind11 >= 3.0.1",
@@ -33,7 +33,8 @@ authors = [
 ]
 description = "IBM Analog Hardware Acceleration Kit"
 readme = "README.md"
-license = {file = "LICENSE.txt"}
+license = "MIT"
+license-files = ["LICENSE.txt"]
 keywords = [
   "ai",
   "analog",
