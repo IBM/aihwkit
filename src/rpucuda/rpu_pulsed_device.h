@@ -138,6 +138,9 @@ public:
   }
 
   bool isPulsedDevice() const override { return true; };
+  virtual bool hasInfiniteGranularityUpdate() const { return weight_granularity_ <= (T)0.0; };
+  virtual bool hasPulsedUpdate() const { return weight_granularity_ > (T)0.0; };
+  virtual T getPulsedUpdateWeight() const { return hasPulsedUpdate() ? (T)1.0 : (T)0.0; };
   PulsedRPUDeviceBase<T> *clone() const override { RPU_FATAL("Needs implementation"); };
 
   void

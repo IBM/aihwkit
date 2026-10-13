@@ -108,6 +108,7 @@ VectorRPUDeviceCuda<T> &VectorRPUDeviceCuda<T>::operator=(VectorRPUDeviceCuda<T>
   current_device_idx_ = other.current_device_idx_;
 
   dev_reduce_weightening_ = std::move(other.dev_reduce_weightening_);
+  dev_ig_gradient_ = std::move(other.dev_ig_gradient_);
   dev_weights_vec_ = std::move(other.dev_weights_vec_);
   rpucuda_device_vec_ = std::move(other.rpucuda_device_vec_);
   other.rpucuda_device_vec_.clear();
@@ -264,17 +265,27 @@ pwukpvec_t<T> VectorRPUDeviceCuda<T>::getUpdateKernels(
     RPU_FATAL("No RPUCuda device found.");
   }
 
-  // not possible to have different device types for now. No easy
-  // way to do (get rid of PWU(PK)?). However, probably not needed anyway
-  DeviceUpdateType pt = rpucuda_device_vec_[0]->implements();
+  // Pulsed children must share a kernel family; IG children use a separate path.
+  int pulsed_index = -1;
+  for (int k = 0; k < rpucuda_device_vec_.size(); ++k) {
+    if (getPar().hasPulsedContribution(k) && rpucuda_device_vec_[k]->hasPulsedUpdate()) {
+      pulsed_index = k;
+      break;
+    }
+  }
+  if (pulsed_index < 0) {
+    RPU_FATAL("No pulsed child in vector device.");
+  }
+  DeviceUpdateType pt = rpucuda_device_vec_[pulsed_index]->implements();
   for (int k = 0; k < rpucuda_device_vec_.size(); k++) {
-    if (pt != rpucuda_device_vec_[k]->implements()) { // should be unique
+    if (getPar().hasPulsedContribution(k) && rpucuda_device_vec_[k]->hasPulsedUpdate() &&
+        pt != rpucuda_device_vec_[k]->implements()) { // pulsed children must share kernels
       RPU_FATAL("No RPUCuda vector devices cannot be of different types (for now).");
     }
   }
-  // just use vec device idx 1 for tuning the kernels
+  // Use the first contributing pulsed child to construct and tune kernels.
   pwukpvec_t<T> v =
-      rpucuda_device_vec_[0]->getUpdateKernels(m_batch, nK32, use_bo64, out_trans, up);
+      rpucuda_device_vec_[pulsed_index]->getUpdateKernels(m_batch, nK32, use_bo64, out_trans, up);
 
   if (!getPar().singleDeviceUpdate()) {
     // need to adjust the number of requested states for execution on multiple streams
@@ -291,6 +302,112 @@ pwukpvec_t<T> VectorRPUDeviceCuda<T>::getUpdateKernels(
 
   DEBUG_OUT("getUpdateKernel " << v.size());
   return v;
+}
+
+template <typename T> bool VectorRPUDeviceCuda<T>::containsInfiniteGranularityDevice() const {
+  for (const auto &device : rpucuda_device_vec_) {
+    if (device->containsInfiniteGranularityDevice()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T> bool VectorRPUDeviceCuda<T>::hasInfiniteGranularityUpdate() const {
+  return getPar().singleDeviceUpdate()
+             ? rpucuda_device_vec_[current_device_idx_]->hasInfiniteGranularityUpdate()
+             : containsInfiniteGranularityDevice();
+}
+
+template <typename T> bool VectorRPUDeviceCuda<T>::hasPulsedUpdate() const {
+  if (getPar().singleDeviceUpdate()) {
+    return rpucuda_device_vec_[current_device_idx_]->hasPulsedUpdate();
+  }
+  for (size_t k = 0; k < rpucuda_device_vec_.size(); ++k) {
+    if (getPar().hasPulsedContribution(k) && rpucuda_device_vec_[k]->hasPulsedUpdate()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T> void VectorRPUDeviceCuda<T>::initUpdateCycle(int m_batch) {
+  if (!containsInfiniteGranularityDevice()) {
+    return; // pulsed-only vectors retain selection inside runUpdateKernel
+  }
+  if (getPar().update_policy == VectorDeviceUpdatePolicy::SingleRandom) {
+    current_device_idx_ = floorf((float)rw_rng_.sampleUniform() * n_devices_);
+  } else if (getPar().update_policy == VectorDeviceUpdatePolicy::SingleSequential) {
+    current_device_idx_ = ++current_device_idx_ % n_devices_;
+  }
+  for (int k = 0; k < n_devices_; ++k) {
+    if (!getPar().singleDeviceUpdate() || k == current_device_idx_) {
+      rpucuda_device_vec_[k]->initUpdateCycle(m_batch);
+    }
+  }
+  if (!hasPulsedUpdate()) {
+    current_update_idx_ += m_batch;
+  }
+}
+
+template <typename T>
+T VectorRPUDeviceCuda<T>::getPulsedUpdateWeight() const {
+  if (getPar().singleDeviceUpdate()) {
+    return rpucuda_device_vec_[current_device_idx_]->getPulsedUpdateWeight();
+  }
+  T pulsed_weight = (T)0.0;
+  for (size_t k = 0; k < rpucuda_device_vec_.size(); ++k) {
+    pulsed_weight += getPar().getReductionWeight(k) * rpucuda_device_vec_[k]->getPulsedUpdateWeight();
+  }
+  const T sum = getPar().getReductionWeightSum();
+  return sum > (T)0.0 ? pulsed_weight / sum : (T)0.0;
+}
+
+template <typename T>
+T VectorRPUDeviceCuda<T>::getPulseCountLearningRate(
+    T learning_rate, int m_batch, const PulsedUpdateMetaParameter<T> &up) {
+  UNUSED(m_batch);
+  UNUSED(up);
+  return getPar().implements() == DeviceUpdateType::Vector && !getPar().singleDeviceUpdate() &&
+                 hasInfiniteGranularityUpdate()
+             ? learning_rate * getPulsedUpdateWeight()
+             : learning_rate;
+}
+
+template <typename T>
+void VectorRPUDeviceCuda<T>::doInfiniteGranularityUpdate(
+    T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
+  if (getPar().implements() != DeviceUpdateType::Vector) {
+    RPU_FATAL("Infinite granularity updates are not supported for transfer or one-sided devices.");
+  }
+  UNUSED(dev_states);
+  const T scale = getPar().getInfiniteGranularityLearningRate((T)1.0);
+  if (scale != (T)1.0) {
+    if (!dev_ig_gradient_) {
+      dev_ig_gradient_ = RPU::make_unique<CudaArray<T>>(this->context_, this->size_);
+    }
+    RPU::math::copy<T>(this->context_, this->size_, grad_matrix, 1, dev_ig_gradient_->getData(), 1);
+    RPU::math::scal<T>(this->context_, this->size_, scale, dev_ig_gradient_->getData());
+    grad_matrix = dev_ig_gradient_->getDataConst();
+  }
+  if (!getPar().same_context) {
+    this->context_->recordEvent();
+  }
+  for (int k = 0; k < n_devices_; ++k) {
+    if ((!getPar().singleDeviceUpdate() || k == current_device_idx_) &&
+        rpucuda_device_vec_[k]->hasInfiniteGranularityUpdate()) {
+      CudaContextPtr c = getPar().same_context ? this->context_ : &*context_vec_[k];
+      if (!getPar().same_context) {
+        c->waitEvent(this->context_);
+      }
+      rpucuda_device_vec_[k]->doInfiniteGranularityUpdate(
+          dev_weights_ptrs_[k], grad_matrix, c->getRandomStates(this->size_));
+      if (!getPar().same_context) {
+        this->context_->recordWaitEvent(c);
+      }
+    }
+  }
+  reduceToWeights(this->context_, dev_weights);
 }
 
 template <typename T>
@@ -321,9 +438,11 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
 
   if (par.singleDeviceUpdate()) {
     // random states and context are shared, since only one is updated at a time.
-    if (par.update_policy == VectorDeviceUpdatePolicy::SingleRandom) {
+    if (!containsInfiniteGranularityDevice() &&
+        par.update_policy == VectorDeviceUpdatePolicy::SingleRandom) {
       current_device_idx_ = floorf((float)rw_rng_.sampleUniform() * m);
-    } else if (par.update_policy == VectorDeviceUpdatePolicy::SingleSequential) {
+    } else if (!containsInfiniteGranularityDevice() &&
+               par.update_policy == VectorDeviceUpdatePolicy::SingleSequential) {
       current_device_idx_ = ++current_device_idx_ % m;
     }
 
@@ -343,6 +462,9 @@ void VectorRPUDeviceCuda<T>::runUpdateKernel(
     int n = kpars->getNStates() / m; // each device uses different random states
 
     for (int k = 0; k < m; k++) {
+      if (!par.hasPulsedContribution(k) || !rpucuda_device_vec_[k]->hasPulsedUpdate()) {
+        continue;
+      }
       if (!par.same_context) {
         context_vec_[k]->waitEvent(up_context->getEvent());
         c = &*context_vec_[k];

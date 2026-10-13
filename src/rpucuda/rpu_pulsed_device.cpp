@@ -325,7 +325,8 @@ void PulsedRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
 
   dw_min /= this->size_;
   // need dw_min for update management
-  if ((T)fabsf(dw_min - getPar().dw_min) / getPar().dw_min > (T)2.0 * getPar().dw_min_dtod) {
+  if (getPar().dw_min != (T)0.0 &&
+      (T)fabsf(dw_min - getPar().dw_min) / getPar().dw_min > (T)2.0 * getPar().dw_min_dtod) {
     RPU_WARNING(
         "DW min seems to have changed during hidden parameter set. Will update parameter "
         "with estimated value.");

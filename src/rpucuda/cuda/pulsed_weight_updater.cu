@@ -308,7 +308,7 @@ template <typename XInputIteratorT, typename DInputIteratorT>
 void PulsedWeightUpdater<T>::doInfiniteGranularityUpdate(
     XInputIteratorT x_in,
     DInputIteratorT d_in,
-    PulsedRPUDeviceCuda<T> *pulsed_device,
+    PulsedRPUDeviceCudaBase<T> *pulsed_device,
     T *dev_weights,
     const T lr,
     const int m_batch,
@@ -397,12 +397,13 @@ void PulsedWeightUpdater<T>::update(
   PulsedRPUDeviceCudaBase<T> *rpucuda_device =
       static_cast<PulsedRPUDeviceCudaBase<T> *>(rpucuda_device_in);
 
-  // Infinite granularity mode (dw_min=0): exact mean-field update
-  if (rpucuda_device->getWeightGranularity() <= (T)0.0) {
-    auto *pulsed_device = static_cast<PulsedRPUDeviceCuda<T> *>(rpucuda_device);
+  rpucuda_device->initUpdateCycle(m_batch);
+  if (rpucuda_device->hasInfiniteGranularityUpdate()) {
     T abs_lr = lr < (T)0.0 ? -lr : lr;
     doInfiniteGranularityUpdate(
-        x_in, d_in, pulsed_device, dev_weights, abs_lr, m_batch, x_trans, d_trans);
+        x_in, d_in, rpucuda_device, dev_weights, abs_lr, m_batch, x_trans, d_trans);
+  }
+  if (!rpucuda_device->hasPulsedUpdate()) {
     return;
   }
 
@@ -491,7 +492,7 @@ void PulsedWeightUpdater<T>::update(
       XITERT, DITERT, AbstractRPUDeviceCuda<NUM_T> *, NUM_T *, const NUM_T,                        \
       const PulsedUpdateMetaParameter<NUM_T> &, const int, const bool, const bool, const NUM_T);   \
   template void PulsedWeightUpdater<NUM_T>::doInfiniteGranularityUpdate(                           \
-      XITERT, DITERT, PulsedRPUDeviceCuda<NUM_T> *, NUM_T *, const NUM_T, const int, const bool,   \
+      XITERT, DITERT, PulsedRPUDeviceCudaBase<NUM_T> *, NUM_T *, const NUM_T, const int, const bool, \
       const bool);                                                                                 \
   template void PulsedWeightUpdater<NUM_T>::tuneUpdate(                                            \
       pwukp_t<NUM_T> &, pwukpvec_t<NUM_T> &, XITERT, DITERT, NUM_T *,                              \

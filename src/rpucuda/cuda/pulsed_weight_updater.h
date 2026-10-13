@@ -67,7 +67,7 @@ public:
   void doInfiniteGranularityUpdate(
       XInputIteratorT x_in,
       DInputIteratorT d_in,
-      PulsedRPUDeviceCuda<T> *pulsed_device,
+      PulsedRPUDeviceCudaBase<T> *pulsed_device,
       T *dev_weights,
       const T lr,
       const int m_batch,

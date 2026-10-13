@@ -85,11 +85,67 @@ template <typename T> struct VectorRPUDeviceMetaParameter : PulsedRPUDeviceMetaP
   }
 
   T calcWeightGranularity() const override {
-    T weight_granularity = 0.0;
-    for (size_t k = 0; k < vec_par.size(); k++) {
-      weight_granularity += vec_par[k]->calcWeightGranularity() / (T)vec_par.size();
+    std::vector<T> granularities;
+    for (const auto &device : vec_par) {
+      granularities.push_back(device->calcWeightGranularity());
     }
-    return weight_granularity;
+    return calcPulsedWeightGranularity(granularities);
+  }
+
+  // Shared by configuration, population, and hidden-parameter restoration.
+  T calcPulsedWeightGranularity(const std::vector<T> &granularities) const {
+    if (!gamma_vec.empty() && gamma_vec.size() != granularities.size()) {
+      RPU_FATAL("Gamma vector should have the same length as number of devices (or empty)!");
+    }
+    T weighted_sum = (T)0.0;
+    T weight_sum = (T)0.0;
+    for (size_t k = 0; k < granularities.size(); ++k) {
+      const T granularity = granularities[k];
+      // Derived transfer/one-sided devices retain their existing calibration.
+      if (implements() != DeviceUpdateType::Vector) {
+        weighted_sum += granularity;
+        weight_sum += (T)1.0;
+      } else if (granularity > (T)0.0) {
+        // Selected-device policies retain their existing shared calibration.
+        if (singleDeviceUpdate()) {
+          weighted_sum += granularity;
+          weight_sum += (T)1.0;
+        } else {
+          const T weight = gamma_vec.empty() ? (T)1.0 / (T)granularities.size()
+                                            : (T)fabsf(gamma_vec[k]);
+          weighted_sum += weight * granularity;
+        }
+      }
+    }
+    if (weight_sum > (T)0.0) {
+      return weighted_sum / weight_sum;
+    }
+    return weighted_sum;
+  }
+
+  bool hasPulsedContribution(size_t index) const {
+    return implements() != DeviceUpdateType::Vector || singleDeviceUpdate() ||
+           gamma_vec.empty() || gamma_vec[index] != (T)0.0;
+  }
+
+  T getReductionWeight(size_t index) const {
+    return gamma_vec.empty() ? (T)1.0 / (T)vec_par.size() : (T)fabsf(gamma_vec[index]);
+  }
+
+  T getReductionWeightSum() const {
+    T sum = (T)0.0;
+    for (size_t k = 0; k < vec_par.size(); ++k) {
+      sum += getReductionWeight(k);
+    }
+    return sum;
+  }
+
+  T getInfiniteGranularityLearningRate(T learning_rate) const {
+    if (implements() != DeviceUpdateType::Vector || singleDeviceUpdate()) {
+      return learning_rate;
+    }
+    const T sum = getReductionWeightSum();
+    return sum > (T)0.0 ? learning_rate / sum : (T)0.0;
   }
   T calcNumStates() const override {
     T num_states = 0.0;
@@ -183,6 +239,14 @@ public:
   inline int getCurrentDeviceIdx() const { return current_device_idx_; };
 
   VectorRPUDevice<T> *clone() const override { return new VectorRPUDevice<T>(*this); };
+  bool hasInfiniteGranularityUpdate() const override;
+  bool hasPulsedUpdate() const override;
+  T getPulsedUpdateWeight() const override;
+  T getPulseCountLearningRate(
+      T learning_rate, int m_batch_info, const PulsedUpdateMetaParameter<T> &up) override;
+  void doInfiniteGranularityUpdate(
+      T **weights, const T *x_input, int x_inc, const T *d_input, int d_inc,
+      T learning_rate, RNG<T> *rng) override;
 
   void decayWeights(T **weights, bool bias_no_decay) override;
   void decayWeights(T **weights, T alpha, bool bias_no_decay) override;
@@ -224,6 +288,7 @@ protected:
   RealWorldRNG<T> rw_rng_{0};
 
   virtual int resetCounters(bool force = false);
+  void updateWeightGranularity();
 
 private:
   void freeContainers();

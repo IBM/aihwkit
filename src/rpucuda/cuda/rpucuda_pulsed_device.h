@@ -68,6 +68,11 @@ public:
 
   bool isPulsedDevice() const override { return true; };
   bool hasDirectUpdate() const override { return false; };
+  virtual bool hasInfiniteGranularityUpdate() const { return weight_granularity_ <= (T)0.0; };
+  virtual bool hasPulsedUpdate() const { return weight_granularity_ > (T)0.0; };
+  virtual T getPulsedUpdateWeight() const { return hasPulsedUpdate() ? (T)1.0 : (T)0.0; };
+  virtual bool containsInfiniteGranularityDevice() const { return hasInfiniteGranularityUpdate(); };
+  virtual void initUpdateCycle(int m_batch) { UNUSED(m_batch); };
   virtual void doInfiniteGranularityUpdate(
       T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
     RPU_FATAL("Infinite granularity update not available for this device!");

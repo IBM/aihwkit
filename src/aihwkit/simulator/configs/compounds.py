@@ -90,6 +90,19 @@ class VectorUnitCell(UnitCell):
     User-defined weightening can be given as a list if factors. If not
     given, each device index of the unit cell is weighted by equal
     amounts (:math:`1/n`).
+
+    For ``ALL`` updates, the effective pulse granularity is the sum of the
+    positive child granularities multiplied by the absolute reduction factors.
+    For nonnegative factors this is ``sum(gamma_i * dw_min_i)``. In a mixed
+    vector, the pulsed learning-rate budget is scaled by the fraction of the
+    total reduction weight assigned to pulsed children. Children with
+    ``dw_min=0`` receive one separate infinite-granularity update, scaled by
+    the inverse total reduction weight, and do not consume pulse counts.
+    Thus noiseless constant-response devices with normalized factors produce
+    the nominal combined update. Zero-weight pulsed children are not updated.
+    An all-IG vector bypasses pulse generation entirely. Selected-device
+    policies retain their shared pulsed calibration and update only the
+    selected child in its own mode.
     """
 
     def as_bindings(self, data_type: RPUDataType) -> Any:
@@ -517,13 +530,15 @@ class TransferCompound(UnitCell):
         granularity by the sub-device weight granularity (``dw_min``). A zero
         ``dw_min`` (infinite-granularity mode) collapses these to zero (or
         divides by zero), which silently disables learning. Infinite
-        granularity is therefore only supported for plain pulsed devices, not
-        for devices placed inside a transfer compound.
+        granularity is supported for plain pulsed devices and vector unit
+        cells, but not for devices placed inside a transfer compound.
 
         Raises:
             ConfigError: if any ``unit_cell_device`` has ``dw_min == 0``.
         """
-        for device in self.unit_cell_devices:
+        pending_devices = list(self.unit_cell_devices)
+        while pending_devices:
+            device = pending_devices.pop()
             if getattr(device, "dw_min", None) == 0:
                 raise ConfigError(
                     "dw_min=0 (infinite-granularity mode) is not supported for "
@@ -531,6 +546,7 @@ class TransferCompound(UnitCell):
                     "rate and buffer granularity scale with the sub-device weight "
                     "granularity, so dw_min=0 would disable learning."
                 )
+            pending_devices.extend(getattr(device, "unit_cell_devices", []))
 
     def as_bindings(self, data_type: RPUDataType) -> Any:
         """Return a representation of this instance as a simulator bindings object."""
