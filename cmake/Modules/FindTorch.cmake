@@ -9,47 +9,40 @@
 # Require Python in order to find the site-packages location.
 find_package(Python REQUIRED)
 
-# Attempt to locate torch/extension.h.
-find_path(TORCH_EXTENSION_H_INCLUDE_DIR
-  NAMES torch/extension.h
-  DOC "The directory where Torch includes (extension.h) reside"
-  PATHS "${Python_SITELIB}/torch/include"
-        "${Python_STDARCH}/torch/include"
-        "${Python_SITEARCH}/torch/include"
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -c
+          "import pathlib, torch; print(pathlib.Path(torch.__file__).parent)"
+  RESULT_VARIABLE TORCH_PYTHON_RESULT
+  OUTPUT_VARIABLE CUSTOM_PYTHON_TORCH_PATH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-if(TORCH_EXTENSION_H_INCLUDE_DIR STREQUAL "TORCH_EXTENSION_H_INCLUDE_DIR-NOTFOUND")
-  # Attempt to locate the path by invoking python.
-  execute_process(COMMAND python -c "import torch; print(torch.__path__[0])"
-    OUTPUT_VARIABLE CUSTOM_PYTHON_TORCH_PATH
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-else()
-  set(CUSTOM_PYTHON_TORCH_PATH "")
+if(NOT TORCH_PYTHON_RESULT EQUAL 0 OR
+   NOT EXISTS "${CUSTOM_PYTHON_TORCH_PATH}/include/torch/extension.h")
+  message(FATAL_ERROR
+    "Could not locate PyTorch headers for ${Python_EXECUTABLE}: "
+    "${CUSTOM_PYTHON_TORCH_PATH}")
 endif()
 
-# extension.h
-find_path(TORCH_EXTENSION_H_INCLUDE_DIR REQUIRED
+find_path(TORCH_EXTENSION_H_INCLUDE_DIR
   NAMES torch/extension.h
-  DOC "The directory where Torch includes (extension.h) reside"
-  PATHS "${Python_SITELIB}/torch/include"
-        "${Python_STDARCH}/torch/include"
-        "${Python_SITEARCH}/torch/include"
-        "${CUSTOM_PYTHON_TORCH_PATH}/include"
+  PATHS "${CUSTOM_PYTHON_TORCH_PATH}/include"
+  NO_DEFAULT_PATH
+  REQUIRED
 )
 
-# torch.h
-find_path(TORCH_H_INCLUDE_DIR REQUIRED
+find_path(TORCH_H_INCLUDE_DIR
   NAMES torch/torch.h
-  DOC "The directory where Torch includes (torch.h) reside"
-  PATHS ${TORCH_EXTENSION_H_INCLUDE_DIR}/torch/csrc/api/include
+  PATHS "${TORCH_EXTENSION_H_INCLUDE_DIR}/torch/csrc/api/include"
+  NO_DEFAULT_PATH
+  REQUIRED
 )
 
-# libtorch_python.so
-find_library(TORCH_PYTHON_SO torch_python REQUIRED
-    PATHS "${Python_SITELIB}/torch/lib"
-          "${Python_STDARCH}/torch/lib"
-          "${Python_SITEARCH}/torch/lib"
-          "${CUSTOM_PYTHON_TORCH_PATH}/lib"
+find_library(TORCH_PYTHON_SO
+  NAMES torch_python
+  PATHS "${CUSTOM_PYTHON_TORCH_PATH}/lib"
+  NO_DEFAULT_PATH
+  REQUIRED
 )
 
 # Set variables.
