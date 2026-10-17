@@ -183,7 +183,7 @@ def convert_to_analog(
 
         n_grand_children = len(list(mod.named_children()))
         if n_grand_children > 0:
-            convert_dic[name] = convert_to_analog(
+            convert_dic[mod] = convert_to_analog(
                 mod,
                 rpu_config,
                 tile_module_class,
@@ -201,12 +201,14 @@ def convert_to_analog(
             continue
         if verbose:
             print(f"Converted '{full_name}' to '{conversion_map[mod.__class__].__name__}'.")
-        convert_dic[name] = conversion_map[mod.__class__].from_digital(
+        convert_dic[mod] = conversion_map[mod.__class__].from_digital(
             mod, specific_rpu_config_fun(full_name, mod, deepcopy(rpu_config)), tile_module_class
         )
 
-    for name, new_mod in convert_dic.items():
-        module._modules[name] = new_mod  # pylint: disable=protected-access
+    for name, mod in module._modules.items():  # pylint: disable=protected-access
+        full_name = module_name + "." + name if module_name else name
+        if mod in convert_dic and full_name not in exclude_modules:
+            module._modules[name] = convert_dic[mod]  # pylint: disable=protected-access
 
     # in case of root, make sure it is wrapped as analog
     if ensure_analog_root and not module_name and not isinstance(module, AnalogLayerBase):
