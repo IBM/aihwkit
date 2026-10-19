@@ -101,7 +101,12 @@ line-length = 100
 
 [tool.cibuildwheel]
 build = [
-  "cp314-manylinux_x86_64"
+  "cp312-manylinux_x86_64",
+  "cp313manylinux_x86_64",
+  "cp314-manylinux_x86_64",
+  "cp312-macosx_arm64",
+  "cp313-macosx_arm64",
+  "cp314-macosx_arm64"
 ]
 
 build-frontend = "pip; args: --no-build-isolation"
