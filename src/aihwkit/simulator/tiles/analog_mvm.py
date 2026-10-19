@@ -9,8 +9,7 @@
 from typing import Union, Any, Optional
 from numbers import Number
 
-from torch import Tensor, zeros, randn_like, clamp, bmm
-from torch.autograd import no_grad
+from torch import Tensor, zeros, randn_like, clamp, bmm, where
 
 from aihwkit.exceptions import ConfigError
 from aihwkit.simulator.tiles.utils import UniformQuantize
@@ -311,9 +310,13 @@ class AnalogMVM:
                 scaled_input, res, io_pars.inp_bound, io_pars.inp_sto_round
             )
 
-        # - Clip between -bound and bound
-        if no_grad():
-            scaled_input = clamp(scaled_input, min=-bound, max=bound)
+        # - Clip between -bound and bound. Note that the gradient is
+        # passed for values exactly at the bound (torch >= 2.14 zeros
+        # the clamp gradient there), as these carry the input range
+        # gradient of the clipped inputs.
+        scaled_input = where(
+            scaled_input.abs() <= bound, scaled_input, clamp(scaled_input, -bound, bound).detach()
+        )
 
         if noise > 0.0:
             # - Apply input noise
