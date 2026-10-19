@@ -223,6 +223,15 @@ void ChoppedWeightOutput<T>::loadExtra(
   RPU::load(this->context_, state, "dev_x_chopper_buffer_2", dev_x_chopper_buffer_2_, strict);
   RPU::load(this->context_, state, "dev_d_chopper_buffer_1", dev_d_chopper_buffer_1_, strict);
   RPU::load(this->context_, state, "dev_d_chopper_buffer_2", dev_d_chopper_buffer_2_, strict);
+
+  // Loading replaces the CudaArray objects. Rebind the cached pointers before
+  // weight reduction can read the restored choppers, including before the
+  // first update or when loading an uninitialized state.
+  const auto data = [](const auto &buffer) { return buffer ? buffer->getData() : nullptr; };
+  x_chopper_in_ = data(swapped_choppers_ ? dev_x_chopper_buffer_2_ : dev_x_chopper_buffer_1_);
+  x_chopper_out_ = data(swapped_choppers_ ? dev_x_chopper_buffer_1_ : dev_x_chopper_buffer_2_);
+  d_chopper_in_ = data(swapped_choppers_ ? dev_d_chopper_buffer_2_ : dev_d_chopper_buffer_1_);
+  d_chopper_out_ = data(swapped_choppers_ ? dev_d_chopper_buffer_1_ : dev_d_chopper_buffer_2_);
 }
 
 /******************************************************************************************************************/
