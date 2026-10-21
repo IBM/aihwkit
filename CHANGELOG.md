@@ -20,16 +20,22 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Non-zero gamma support in ChoppedTransferCompound [(\#764)](https://github.com/IBM/aihwkit/pull/764)
 * Add a section to the README linking to aihwkit-lightning [(\#804)](https://github.com/IBM/aihwkit/pull/804)
 * Add `cibuildwheel` configuration to `pyproject.toml` for building wheels for Python 3.12–3.14 on Linux x86_64 and macOS arm64 [(\#820)](https://github.com/IBM/aihwkit/pull/820)
+* Add `examples/run_examples.py` to run the numbered examples and write a report, and `examples/compare_runs.py` to compare the outputs of two runs [(\#782)](https://github.com/IBM/aihwkit/pull/782)
+* Add a section to the README for running on AMD GPUs with ROCm/HIP [(\#789)](https://github.com/IBM/aihwkit/pull/789)
 
 ### Changed
 
 * Updated and corrected analog_device_nonidealities_tutorial notebook [(\#758)](https://github.com/IBM/aihwkit/pull/758)
-* Remove reset bias clamp in rpu_pulsed_device.h [(\#761)](https://github.com/IBM/aihwkit/pull/761)
+* Remove the reset bias clamp in `rpu_pulsed_device.h` so that a negative `reset` bias is kept (\#755) [(\#768)](https://github.com/IBM/aihwkit/pull/768)
+* Update the install instructions in the notebooks and docs to use the GPU-enabled 1.1.0 wheel [(\#759)](https://github.com/IBM/aihwkit/pull/759) [(\#760)](https://github.com/IBM/aihwkit/pull/760)
+* Update `CUDA.Dockerfile` to CUDA 13.3.0 and change the default `CUDA_ARCH` from 86 to 75
+* Replace the per-Python-version wheel workflows with a single `build-wheels` workflow driven by the `cibuildwheel` configuration
 * Bump version to 1.2.0, make the package version dynamic and update the license year in the license file and source headers [(\#818)](https://github.com/IBM/aihwkit/pull/818)
 
 ### Fixed
 * Build against `torch >= 2.14`, whose headers require C++20: the C++ standard is now detected from the installed torch headers (C++17 for `torch <= 2.13`, C++20 for `torch >= 2.14`) and can be overridden with the new `RPU_CXX_STANDARD` cmake option [(\#792)](https://github.com/IBM/aihwkit/pull/792)
 * Preserve device runtime state (update counters, chopper states, transfer slice indices, pulse counters) when calling `set_hidden_parameters` on CUDA tiles [(\#794)](https://github.com/IBM/aihwkit/pull/794)
+* Support CUDA 13.x / CCCL 3.x toolchains: add compatibility aliases for the CUB iterators removed in CCCL 3.0, forward the MKL/OpenBLAS include path to nvcc, silence the GCC 15 `-Wtemplate-body` error in PyTorch headers, and fix an int/float mismatch in a CUB reduction call [(\#783)](https://github.com/IBM/aihwkit/pull/783)
 * Build the CUDA native extension for Blackwell GPUs by adding `120` to the default `RPU_CUDA_ARCHITECTURES` [(\#805)](https://github.com/IBM/aihwkit/pull/805)
 * Wrap `partial` in `staticmethod` in the test decorators to fix tile parameters on Python 3.14 [(\#817)](https://github.com/IBM/aihwkit/pull/817)
 * Return the plot figure instead of `w_trace` in `utils/visualization.py`, which had broken example 21 since \#702 [(\#819)](https://github.com/IBM/aihwkit/pull/819)
@@ -40,14 +46,20 @@ The format is based on [Keep a Changelog], and this project adheres to
 * Improve Python executable detection and error handling in CMake [(\#757)](https://github.com/IBM/aihwkit/pull/757)
 * Retune PWU kernel when m_batch grows after initial m=1 update [(\#763)](https://github.com/IBM/aihwkit/pull/763)
 * Tests for dynamic tolerance for cuDNN TF32 precision on Ampere+ GPUs [(\#771)](https://github.com/IBM/aihwkit/pull/771)
-* Correct self-move assignments in RPU device move operators, removing a `-Wself-move` warning on GCC 13+ builds[(\#793)](https://github.com/IBM/aihwkit/pull/793)
+* Correct self-move assignments in RPU device move operators, removing a `-Wself-move` warning on GCC 13+ builds [(\#793)](https://github.com/IBM/aihwkit/pull/793)
 * Support PyTorch *_like factory operations in AnalogContext placeholder mode without reading backing weight values, with CPU and CUDA regression coverage [(\#785)](https://github.com/IBM/aihwkit/pull/785)
+* Fix double bracket indexing in `HermesNoiseModel` and export it from `aihwkit.inference` [(\#786)](https://github.com/IBM/aihwkit/pull/786)
+* Pass the y-limits of `plot_device_symmetry` as separate arguments to `plt.ylim` [(\#773)](https://github.com/IBM/aihwkit/pull/773)
+* Remove `has_names` from the `AnalogContext` placeholder metadata, deprecated in `torch >= 2.13`
+* Add `cmake` and `mypy` as build dependencies in `pyproject.toml` to fix `pip install .`, and fix the Read the Docs build
 
 ### Security
 * Bump jupyter-server from 2.18.2 to 2.20.0 [(\#777)](https://github.com/IBM/aihwkit/pull/777)
 * Fix code scanning alerts for multiplication results converted to a larger type in the C++ simulator and tile periphery [(\#797)](https://github.com/IBM/aihwkit/pull/797) [(\#798)](https://github.com/IBM/aihwkit/pull/798) [(\#802)](https://github.com/IBM/aihwkit/pull/802)
 * Add explicit `permissions` to GitHub workflows to fix code scanning alerts [(\#796)](https://github.com/IBM/aihwkit/pull/796) [(\#799)](https://github.com/IBM/aihwkit/pull/799) [(\#800)](https://github.com/IBM/aihwkit/pull/800) [(\#801)](https://github.com/IBM/aihwkit/pull/801)
 * Bump urllib3 from 2.7.0 to 2.8.0 [(\#808)](https://github.com/IBM/aihwkit/pull/808)
+* Bump pillow from 12.2.0 to 12.3.0 [(\#784)](https://github.com/IBM/aihwkit/pull/784)
+* Update `uv.lock` to solve dependency vulnerabilities, including `accelerate` [(\#791)](https://github.com/IBM/aihwkit/pull/791)
 * Bump several dependencies to solve security vulnerabilities [(\#816)](https://github.com/IBM/aihwkit/pull/816)
 
 ## [1.1.0] - 2026/02/03
