@@ -12,20 +12,31 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
-## Latest
+## [1.2.0] - 2026/10/21
 
-### Added
+### Added 
 
 * Define data attribution for AnalogContext with read-only protection [(\#765)](https://github.com/IBM/aihwkit/pull/765)
 * Non-zero gamma support in ChoppedTransferCompound [(\#764)](https://github.com/IBM/aihwkit/pull/764)
+* Add a section to the README linking to aihwkit-lightning [(\#804)](https://github.com/IBM/aihwkit/pull/804)
+* Add `cibuildwheel` configuration to `pyproject.toml` for building wheels for Python 3.12–3.14 on Linux x86_64 and macOS arm64 [(\#820)](https://github.com/IBM/aihwkit/pull/820)
 
 ### Changed
 
 * Updated and corrected analog_device_nonidealities_tutorial notebook [(\#758)](https://github.com/IBM/aihwkit/pull/758)
 * Remove reset bias clamp in rpu_pulsed_device.h [(\#761)](https://github.com/IBM/aihwkit/pull/761)
+* Bump version to 1.2.0, make the package version dynamic and update the license year in the license file and source headers [(\#818)](https://github.com/IBM/aihwkit/pull/818)
 
 ### Fixed
-* Build against `torch >= 2.14`, whose headers require C++20: the C++ standard is now detected from the installed torch headers (C++17 for `torch <= 2.13`, C++20 for `torch >= 2.14`) and can be overridden with the new `RPU_CXX_STANDARD` cmake option
+* Build against `torch >= 2.14`, whose headers require C++20: the C++ standard is now detected from the installed torch headers (C++17 for `torch <= 2.13`, C++20 for `torch >= 2.14`) and can be overridden with the new `RPU_CXX_STANDARD` cmake option [(\#792)](https://github.com/IBM/aihwkit/pull/792)
+* Preserve device runtime state (update counters, chopper states, transfer slice indices, pulse counters) when calling `set_hidden_parameters` on CUDA tiles [(\#794)](https://github.com/IBM/aihwkit/pull/794)
+* Build the CUDA native extension for Blackwell GPUs by adding `120` to the default `RPU_CUDA_ARCHITECTURES` [(\#805)](https://github.com/IBM/aihwkit/pull/805)
+* Wrap `partial` in `staticmethod` in the test decorators to fix tile parameters on Python 3.14 [(\#817)](https://github.com/IBM/aihwkit/pull/817)
+* Return the plot figure instead of `w_trace` in `utils/visualization.py`, which had broken example 21 since \#702 [(\#819)](https://github.com/IBM/aihwkit/pull/819)
+* Add `POST_BUILD` explicitly to custom commands in CMake to remove the warning for policy CMP0175 [(\#822)](https://github.com/IBM/aihwkit/pull/822)
+* Use SPDX license expression and `license-files` in `pyproject.toml` (requires `setuptools >= 77.0.0`) [(\#823)](https://github.com/IBM/aihwkit/pull/823)
+* Keep the input clamp gradient at the bound for `torch >= 2.14`, fixing the input range gradient in the analog MVM [(\#827)](https://github.com/IBM/aihwkit/pull/827)
+* Use the restored ChoppedTransfer choppers in the CUDA weight reduction [(\#821)](https://github.com/IBM/aihwkit/pull/821)
 * Improve Python executable detection and error handling in CMake [(\#757)](https://github.com/IBM/aihwkit/pull/757)
 * Retune PWU kernel when m_batch grows after initial m=1 update [(\#763)](https://github.com/IBM/aihwkit/pull/763)
 * Tests for dynamic tolerance for cuDNN TF32 precision on Ampere+ GPUs [(\#771)](https://github.com/IBM/aihwkit/pull/771)
@@ -34,6 +45,10 @@ The format is based on [Keep a Changelog], and this project adheres to
 
 ### Security
 * Bump jupyter-server from 2.18.2 to 2.20.0 [(\#777)](https://github.com/IBM/aihwkit/pull/777)
+* Fix code scanning alerts for multiplication results converted to a larger type in the C++ simulator and tile periphery [(\#797)](https://github.com/IBM/aihwkit/pull/797) [(\#798)](https://github.com/IBM/aihwkit/pull/798) [(\#802)](https://github.com/IBM/aihwkit/pull/802)
+* Add explicit `permissions` to GitHub workflows to fix code scanning alerts [(\#796)](https://github.com/IBM/aihwkit/pull/796) [(\#799)](https://github.com/IBM/aihwkit/pull/799) [(\#800)](https://github.com/IBM/aihwkit/pull/800) [(\#801)](https://github.com/IBM/aihwkit/pull/801)
+* Bump urllib3 from 2.7.0 to 2.8.0 [(\#808)](https://github.com/IBM/aihwkit/pull/808)
+* Bump several dependencies to solve security vulnerabilities [(\#816)](https://github.com/IBM/aihwkit/pull/816)
 
 ## [1.1.0] - 2026/02/03
 
