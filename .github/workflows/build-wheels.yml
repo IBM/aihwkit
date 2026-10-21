@@ -1,0 +1,48 @@
+name: build-wheels
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+    - 'v**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-wheels:
+    name: Build wheel ${{ matrix.python }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Build settings (images, before-all/before-build, repair) live in
+        # [tool.cibuildwheel] in pyproject.toml; only the build selector is narrowed here.
+        python: [cp312, cp313, cp314]
+        os: [ubuntu-latest, macos-26]
+        include:
+          - os: ubuntu-latest
+            platform: manylinux_x86_64
+          - os: macos-26
+            platform: macosx_arm64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v4.3.3
+        env:
+          CIBW_BUILD: ${{ matrix.python }}-${{ matrix.platform }}
+          # CPU-only: replace the CUDA toolkit install and environment from pyproject.toml.
+          CIBW_BEFORE_ALL_LINUX: yum install -y openblas-devel
+          CIBW_ENVIRONMENT_LINUX: >-
+            USE_CUDA=OFF
+            TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+        with:
+          output-dir: wheelhouse
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          # Upload the wheel unzipped; the artifact takes the wheel's own file name.
+          path: wheelhouse/*.whl
+          archive: false
