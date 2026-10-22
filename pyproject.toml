@@ -27,7 +27,7 @@ dependencies = [
   "tqdm",
   "mypy",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 authors = [
   { name = "IBM Research", email = "aihwkit@us.ibm.com" },
 ]
