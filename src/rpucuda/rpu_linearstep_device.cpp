@@ -5,6 +5,7 @@
  */
 
 #include "rpu_linearstep_device.h"
+#include "rpu_parallel_init.h"
 #include "utility_functions.h"
 #include <chrono>
 #include <cmath>
@@ -28,13 +29,19 @@ void LinearStepRPUDevice<T>::populate(
     RPU_FATAL("Only mulitplicative noise supported with reverse up/down!");
   }
 
+  const bool parallel_init = useParallelDeviceInit(this->size_);
+  const auto row_seeds =
+      parallel_init ? makeDeviceInitRowSeeds(rng, this->d_size_) : std::vector<unsigned int>();
+#pragma omp parallel for if(parallel_init) schedule(static)
   for (int i = 0; i < this->d_size_; ++i) {
-
+    RealWorldRNG<T> row_rng(parallel_init ? row_seeds[i] : 1);
+    RealWorldRNG<T> *cell_rng = parallel_init ? &row_rng : rng;
     for (int j = 0; j < this->x_size_; ++j) {
 
-      T diff_slope_at_bound_up = par.ls_decrease_up + par.ls_decrease_up_dtod * rng->sampleGauss();
+      T diff_slope_at_bound_up =
+          par.ls_decrease_up + par.ls_decrease_up_dtod * cell_rng->sampleGauss();
       T diff_slope_at_bound_down =
-          par.ls_decrease_down + par.ls_decrease_down_dtod * rng->sampleGauss();
+          par.ls_decrease_down + par.ls_decrease_down_dtod * cell_rng->sampleGauss();
 
       if (!par.ls_allow_increasing_slope) {
         /* we force the number to be positive when requested [RRAM]*/
