@@ -28,9 +28,13 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
 
     for (int j = 0; j < this->x_size_; ++j) {
 
+      // weight bounds that include d2d variation
       T w_min = this->w_min_bound_[i][j];
-      T scale_down = this->w_scale_down_[i][j];
       T w_max = this->w_max_bound_[i][j];
+      // scale_down and scale_up is dw_min with d2d variation
+      // In the infinite granularity mode (dw_min=0), 
+      //   the scale_down/scale_up are set to 1 and no d2d variation is applied.
+      T scale_down = this->w_scale_down_[i][j];
       T scale_up = this->w_scale_up_[i][j];
 
       if (w_max > (T)0.0 && w_min < (T)0.0) {
@@ -43,8 +47,14 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
         T current_slope_up = scale_up / w_max;
         current_slope_up *= (T)fabsf((T)1.0 + par.slope_up_dtod * rng->sampleGauss());
 
-        w_max = scale_up / current_slope_up;
-        w_min = -scale_down / current_slope_down;
+        // A zero update scale has no slope to vary. Keep its original bound
+        // instead of reconstructing it through 0 / 0.
+        if (scale_up != (T)0.0) {
+          w_max = scale_up / current_slope_up;
+        }
+        if (scale_down != (T)0.0) {
+          w_min = -scale_down / current_slope_down;
+        }
         this->w_max_bound_[i][j] = w_max;
         this->w_min_bound_[i][j] = w_min;
       }
@@ -53,12 +63,17 @@ void SoftBoundsReferenceRPUDevice<T>::populate(
       w_reference_[i][j] = par.reference_mean + par.reference_std * rng->sampleGauss();
 
       if (par.subtract_symmetry_point && (w_max > (T)0.0 && w_min < (T)0.0)) {
-        // scale_down (1 - w / w_min) == scale_up * (1 - w / w_max)
-        // scale_down -  scale_down * w / w_min == scale_up  -scale_up *  w / w_max
-        // scale_up *  w / w_max -  scale_down * w / w_min == scale_up - scale_down
-        // w ==  (scale_up - scale_down) / (scale_up  / w_max  -  scale_down / w_min)
+        // Solve the following equation to find the symmetry point:
+        //   scale_down (1 - w / w_min) == scale_up * (1 - w / w_max)
+        // Arithmetic manipulation yields:
+        //   scale_down -  scale_down * w / w_min == scale_up - scale_up * w / w_max
+        //   scale_up * w / w_max -  scale_down * w / w_min == scale_up - scale_down
+        // Then the symmetry point is:
+        //   w = (scale_up - scale_down) / (scale_up  / w_max  -  scale_down / w_min)
 
-        T sp = (scale_up - scale_down) / (scale_up / w_max - scale_down / w_min);
+        // With both update scales zero there is no unique symmetry point.
+        T slope_sum = scale_up / w_max - scale_down / w_min;
+        T sp = slope_sum != (T)0.0 ? (scale_up - scale_down) / slope_sum : (T)0.0;
         w_reference_[i][j] += sp;
 
         this->w_reset_bias_[i][j] += sp;
@@ -223,6 +238,45 @@ void SoftBoundsReferenceRPUDevice<T>::doDenseUpdate(T **weights, int *coincidenc
                                    w[j], w_apparent[j], sign, scale_down[j], scale_up[j], ref[j],
                                    min_bound[j], max_bound[j], par.dw_min_std, write_noise_std,
                                    rng););
+  }
+}
+
+/* infinite granularity update */
+template <typename T>
+void SoftBoundsReferenceRPUDevice<T>::doInfiniteGranularityUpdate(
+    T **weights,
+    const T *x_input,
+    int x_inc,
+    const T *d_input,
+    int d_inc,
+    T learning_rate,
+    RNG<T> *rng) {
+
+  const auto &par = getPar();
+  T write_noise_std = par.write_noise_std * (par.dw_min == (T)0.0 ? (T)1.0 : par.dw_min);
+
+  for (int i = 0; i < this->d_size_; i++) {
+    T d_val = d_input[i * d_inc];
+    if (d_val == (T)0.0) {
+      continue;
+    }
+
+    T *scale_down = this->w_scale_down_[i];
+    T *scale_up = this->w_scale_up_[i];
+    T *ref = w_reference_[i];
+    T *w = par.usesPersistentWeight() ? this->w_persistent_[i] : weights[i];
+    T *w_apparent = weights[i];
+    T *min_bound = this->w_min_bound_[i];
+    T *max_bound = this->w_max_bound_[i];
+
+    IG_UPDATE_W_LOOP_INNER(
+      T sd = scale_down[j] * abs_G_lr;
+      T su = scale_up[j] * abs_G_lr;
+      update_once_mult(
+          w[j], w_apparent[j], sign, sd, su, ref[j],
+          min_bound[j], max_bound[j], (T)0.0, write_noise_std,
+          rng);
+    );
   }
 }
 
