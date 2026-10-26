@@ -61,6 +61,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "black" },
+    { name = "datasets" },
     { name = "parameterized" },
     { name = "pycodestyle" },
     { name = "pylint" },
@@ -84,6 +85,7 @@ requires-dist = [
     { name = "accelerate", marker = "extra == 'examples'" },
     { name = "black", marker = "extra == 'dev'" },
     { name = "cmake", specifier = ">=4.2.1" },
+    { name = "datasets", marker = "extra == 'dev'" },
     { name = "evaluate", marker = "extra == 'examples'" },
     { name = "jupyter", marker = "extra == 'examples'" },
     { name = "lmfit", marker = "extra == 'examples'" },
