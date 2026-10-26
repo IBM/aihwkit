@@ -50,4 +50,4 @@ def _check_integrity(self: SVHN) -> bool:
 
 
 SVHN.download = _download_from_hf  # type: ignore[method-assign]
-SVHN._check_integrity = _check_integrity  # type: ignore[method-assign]  # pylint: disable=protected-access
+setattr(SVHN, "_check_integrity", _check_integrity)
