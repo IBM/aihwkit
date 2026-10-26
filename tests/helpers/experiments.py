@@ -35,6 +35,8 @@ from aihwkit.simulator.presets import (
     IdealizedPreset,
 )
 
+from . import svhn_hf  # noqa: F401  pylint: disable=unused-import
+
 
 class FullyConnectedFashionMNIST:
     """3 fully-connected layers; with FashionMNIST."""
