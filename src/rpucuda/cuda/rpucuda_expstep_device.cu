@@ -207,6 +207,103 @@ pwukpvec_t<T> ExpStepRPUDeviceCuda<T>::getUpdateKernels(
   return v;
 }
 
+/*********************************************************************************/
+/* infinite granularity update */
+
+namespace {
+constexpr int IG_THREADS_PER_BLOCK = 256;
+
+inline int ig_num_blocks(int total_size) {
+  return (total_size + IG_THREADS_PER_BLOCK - 1) / IG_THREADS_PER_BLOCK;
+}
+
+template <typename T>
+__device__ __forceinline__ void igStoreWeight(
+    T *weights,
+    T *persistent_weights,
+    const T *write_noise_std,
+    curandState_t *random_states,
+    int idx,
+    T w) {
+  if (persistent_weights == nullptr) {
+    weights[idx] = w;
+    return;
+  }
+
+  persistent_weights[idx] = w;
+  T uw_std = write_noise_std == nullptr ? (T)0.0 : *write_noise_std;
+  if (uw_std > (T)0.0 && random_states != nullptr) {
+    curandState local_state = random_states[idx];
+    weights[idx] = w + uw_std * (T)curand_normal(&local_state);
+    random_states[idx] = local_state;
+  } else {
+    weights[idx] = w;
+  }
+}
+
+template <typename T>
+__global__ void kernelIGExpStep(
+    T *weights,
+    const T *grad_matrix,
+    const param_t *params4,
+    const T *es_par,
+    int total_size,
+    T *persistent_weights,
+    curandState_t *random_states) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_size) {
+    return;
+  }
+
+  T G = grad_matrix[idx];
+  if (G == (T)0.0) {
+    return;
+  }
+
+  param4_t p4 = reinterpret_cast<const param4_t *>(params4)[idx];
+  T wmin = p4.x;
+  T wmax = p4.z;
+  T b_diff = wmax - wmin;
+  if (b_diff <= (T)0.0) {
+    return;
+  }
+
+  T A_down = es_par[0];
+  T A_up = es_par[1];
+  T gamma_down = es_par[2];
+  T gamma_up = es_par[3];
+  T a = es_par[4];
+  T b = es_par[5];
+
+  T w = persistent_weights == nullptr ? weights[idx] : persistent_weights[idx];
+  T abs_G = (G > (T)0.0) ? G : -G;
+  T z = (T)2.0 * w / b_diff * a + b;
+  T dw;
+  if (G < (T)0.0) {
+    T y = (T)1.0 - A_down * __expf(-gamma_down * z);
+    dw = (y > (T)0.0) ? -y * (T)p4.y * abs_G : (T)0.0;
+  } else {
+    T y = (T)1.0 - A_up * __expf(gamma_up * z);
+    dw = (y > (T)0.0) ? y * (T)p4.w * abs_G : (T)0.0;
+  }
+
+  w += dw;
+  w = (w > wmax) ? wmax : w;
+  w = (w < wmin) ? wmin : w;
+  igStoreWeight(weights, persistent_weights, es_par + 6, random_states, idx, w);
+}
+} // namespace
+
+template <typename T>
+void ExpStepRPUDeviceCuda<T>::doInfiniteGranularityUpdate(
+    T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
+  int total_size = this->x_size_ * this->d_size_;
+  kernelIGExpStep<T>
+      <<<ig_num_blocks(total_size), IG_THREADS_PER_BLOCK, 0, this->context_->getStream()>>>(
+          dev_weights, grad_matrix, this->get4ParamsData(), this->getGlobalParamsData(),
+          total_size, this->get1ParamsData(), dev_states);
+}
+
 template class ExpStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class ExpStepRPUDeviceCuda<double>;

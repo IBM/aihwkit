@@ -36,6 +36,7 @@ public:
     swap(a.current_device_idx_, b.current_device_idx_);
     swap(a.current_update_idx_, b.current_update_idx_);
     swap(a.dev_reduce_weightening_, b.dev_reduce_weightening_);
+    swap(a.dev_ig_gradient_, b.dev_ig_gradient_);
     swap(a.rw_rng_, b.rw_rng_);
   };
 
@@ -64,6 +65,15 @@ public:
     return static_cast<VectorRPUDeviceMetaParameter<T> &>(SimpleRPUDeviceCuda<T>::getPar());
   };
   VectorRPUDeviceCuda<T> *clone() const override { return new VectorRPUDeviceCuda<T>(*this); };
+  bool hasInfiniteGranularityUpdate() const override;
+  bool hasPulsedUpdate() const override;
+  T getPulsedUpdateWeight() const override;
+  T getPulseCountLearningRate(
+      T learning_rate, int m_batch, const PulsedUpdateMetaParameter<T> &up) override;
+  bool containsInfiniteGranularityDevice() const override;
+  void initUpdateCycle(int m_batch) override;
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
 
   void runUpdateKernel(
       pwukp_t<T> kpars,
@@ -101,6 +111,7 @@ protected:
   int current_device_idx_ = 0;
   uint64_t current_update_idx_ = 0;
   std::unique_ptr<CudaArray<T>> dev_reduce_weightening_ = nullptr;
+  std::unique_ptr<CudaArray<T>> dev_ig_gradient_ = nullptr;
 
 private:
   void allocateContainers();
