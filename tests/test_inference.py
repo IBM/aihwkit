@@ -6,11 +6,12 @@
 
 """Tests for general functionality of layers."""
 
-from torch import randn
+from torch import randn, full, manual_seed
 
 from aihwkit.inference import (
     PCMLikeNoiseModel,
     ReRamCMONoiseModel,
+    ReRamWan2022NoiseModel,
     CustomDriftPCMLikeNoiseModel,
     StateIndependentNoiseModel,
     SinglePairConductanceConverter,
@@ -19,6 +20,8 @@ from aihwkit.inference import (
     NPairConductanceConverter,
     CustomPairConductanceConverter,
 )
+
+from aihwkit.inference.noise.hermes import HermesNoiseModel
 
 from .helpers.testcases import AihwkitTestCase
 
@@ -74,6 +77,68 @@ class NoiseModelTest(AihwkitTestCase):
         noisy_weights = noise_model.apply_noise(weights, t_inference)
 
         self.assertNotAlmostEqualTensor(noisy_weights, weights)
+
+    def test_g_max_reference_explicit(self):
+        """Test that an explicit g_max reference is stored and used (#830)."""
+        g_target = full((2, 2), 10.0)
+        drift = dict(
+            g_lst=[0.0, 10.0, 40.0], nu_mean_lst=[0.08, 0.05, 0.03], nu_std_lst=[0.03, 0.02, 0.01]
+        )
+        coeff = [0.2, 1.9, -1.1]
+        models = [
+            (PCMLikeNoiseModel(g_max=25.0, prog_coeff_g_max_reference=40.0), 40.0),
+            (
+                PCMLikeNoiseModel(g_max=25.0, prog_coeff=coeff, prog_coeff_g_max_reference=40.0),
+                40.0,
+            ),
+            (
+                CustomDriftPCMLikeNoiseModel(
+                    drift, g_max=25.0, prog_coeff=coeff, prog_coeff_g_max_reference=40.0
+                ),
+                40.0,
+            ),
+            (
+                HermesNoiseModel(g_max=20.0, prog_coeff=coeff, prog_coeff_g_max_reference=40.0),
+                40.0,
+            ),
+            (HermesNoiseModel(g_max=20.0, prog_coeff_g_max_reference=40.0), 40.0),
+        ]
+        for model, reference in models:
+            self.assertEqual(model.prog_coeff_g_max_reference, reference)
+            model.apply_programming_noise_to_conductance(g_target.clone())
+
+        model = ReRamWan2022NoiseModel(g_max=25.0, coeff_g_max_reference=50.0)
+        self.assertEqual(model.coeff_g_max_reference, 50.0)
+        model.apply_programming_noise_to_conductance(g_target.clone())
+
+    def test_g_max_reference_defaults(self):
+        """Test the default g_max reference values (#830)."""
+        coeff = [0.2, 1.9, -1.1]
+        self.assertEqual(PCMLikeNoiseModel(g_max=20.0).prog_coeff_g_max_reference, 25.0)
+        self.assertEqual(
+            PCMLikeNoiseModel(g_max=20.0, prog_coeff=coeff).prog_coeff_g_max_reference, 20.0
+        )
+        self.assertEqual(HermesNoiseModel(num_devices=2).prog_coeff_g_max_reference, 20.7)
+        self.assertEqual(HermesNoiseModel(num_devices=1).prog_coeff_g_max_reference, 10.35)
+        self.assertEqual(
+            HermesNoiseModel(g_max=10.0, prog_coeff=coeff).prog_coeff_g_max_reference, 10.0
+        )
+        self.assertEqual(ReRamWan2022NoiseModel(g_max=25.0).coeff_g_max_reference, 40.0)
+        self.assertEqual(
+            ReRamWan2022NoiseModel(coeff_dic={1.0: coeff}, g_max=25.0).coeff_g_max_reference,
+            25.0,
+        )
+
+    def test_reram_default_reference_scaling(self):
+        """Test that the 40 uS reference scales the default ReRAM noise (#830)."""
+        stds = {}
+        for g_max in (25.0, 40.0):
+            manual_seed(0)
+            model = ReRamWan2022NoiseModel(g_max=g_max)
+            g_target = full((200000,), 0.5 * g_max)
+            stds[g_max] = (model.apply_programming_noise_to_conductance(g_target) - g_target).std()
+
+        self.assertAlmostEqual(float(stds[25.0] / stds[40.0]), 25.0 / 40.0, delta=0.02)
 
 
 class ConductanceConverterTest(AihwkitTestCase):
