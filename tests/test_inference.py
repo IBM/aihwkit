@@ -97,10 +97,7 @@ class NoiseModelTest(AihwkitTestCase):
                 ),
                 40.0,
             ),
-            (
-                HermesNoiseModel(g_max=20.0, prog_coeff=coeff, prog_coeff_g_max_reference=40.0),
-                40.0,
-            ),
+            (HermesNoiseModel(g_max=20.0, prog_coeff=coeff, prog_coeff_g_max_reference=40.0), 40.0),
             (HermesNoiseModel(g_max=20.0, prog_coeff_g_max_reference=40.0), 40.0),
         ]
         for model, reference in models:
@@ -125,8 +122,7 @@ class NoiseModelTest(AihwkitTestCase):
         )
         self.assertEqual(ReRamWan2022NoiseModel(g_max=25.0).coeff_g_max_reference, 40.0)
         self.assertEqual(
-            ReRamWan2022NoiseModel(coeff_dic={1.0: coeff}, g_max=25.0).coeff_g_max_reference,
-            25.0,
+            ReRamWan2022NoiseModel(coeff_dic={1.0: coeff}, g_max=25.0).coeff_g_max_reference, 25.0
         )
 
     def test_reram_default_reference_scaling(self):
