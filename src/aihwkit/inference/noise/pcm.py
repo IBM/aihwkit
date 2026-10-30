@@ -91,7 +91,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             default_reference = self.g_max
 
         # an explicitly given reference always takes precedence
-        self.prog_coeff_g_max_reference = (
+        self.prog_coeff_g_max_reference: Optional[float] = (
             default_reference if prog_coeff_g_max_reference is None else prog_coeff_g_max_reference
         )
 
