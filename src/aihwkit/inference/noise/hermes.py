@@ -76,10 +76,11 @@ class HermesNoiseModel(BaseNoiseModel):
         drift_scale: Scale for the  drift coefficient.
         prog_coeff_g_max_reference: reference :math:`g_\max` value
             when fitting the coefficients, since the result of the
-            polynomial fit is given in uS. If
-            ``prog_coeff_g_max_reference`` is not given and
-            `prog_coeffs` are given explicitly, it will be set to
-            ``g_max`` of the conductance converter.
+            polynomial fit is given in uS. If given, it is always
+            used. If not given, it defaults to the reference of the
+            fitted default coefficients (20.7 uS for two devices,
+            10.35 uS for one device) or, if `prog_coeff` is given
+            explicitly, to ``g_max`` of the conductance converter.
 
     .. _`Nandakumar et al. ICECS (2019)`: https://ieeexplore.ieee.org/document/8964852
     .. _`Le Gallo et al. Nat. Electron. (2023)`: https://www.nature.com/articles/s41928-023-01010-1
@@ -132,20 +133,23 @@ class HermesNoiseModel(BaseNoiseModel):
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
 
-        if prog_coeff_g_max_reference is None:
-            self.prog_coeff_g_max_reference = self.g_max
-
+        default_reference = self.g_max
         if prog_coeff is None:
             # standard g_max are defined in respect to 20.7 or 10.35 uS. Need to
             # adjust for that in case g_max is not equal to the characterized maximum value
             if self.num_devices == 2:
                 self.prog_coeff = [0.16603222, 4.71806468, -8.48101252, 4.68961419]
-                self.prog_coeff_g_max_reference = 20.7
+                default_reference = 20.7
             elif self.num_devices == 1:
                 self.prog_coeff = [0.15781817, 2.32443916, -2.16310839, 0.68841818]
-                self.prog_coeff_g_max_reference = 10.35
+                default_reference = 10.35
         else:
             self.prog_coeff = prog_coeff
+
+        # an explicitly given reference always takes precedence
+        self.prog_coeff_g_max_reference = (
+            default_reference if prog_coeff_g_max_reference is None else prog_coeff_g_max_reference
+        )
 
         self.t_0 = t_0
         self.t_read = t_read

@@ -52,10 +52,11 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         drift_scale: Scale for the  drift coefficient.
         prog_coeff_g_max_reference: reference :math:`g_\max` value
             when fitting the coefficients, since the result of the
-            polynomial fit is given in uS. If
-            ``prog_coeff_g_max_reference`` is not given and
-            `prog_coeffs` are given explicitly, it will be set to
-            ``g_max`` of the conductance converter.
+            polynomial fit is given in uS. If given, it is always
+            used. If not given, it defaults to the reference of the
+            fitted default coefficients (25 uS) or, if `prog_coeff`
+            is given explicitly, to ``g_max`` of the conductance
+            converter.
 
     .. _`Nandakumar et al. ICECS (2019)`: https://ieeexplore.ieee.org/abstract/document/8964852
 
@@ -80,16 +81,19 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
 
-        if prog_coeff_g_max_reference is None:
-            self.prog_coeff_g_max_reference = self.g_max
-
         if prog_coeff is None:
             # standard g_max are defined in respect to 25.0 uS. Need to
             # adjust for that in case g_max is not equal to 25.0 uS
             self.prog_coeff = [0.26348, 1.9650, -1.1731]
-            self.prog_coeff_g_max_reference = 25.0
+            default_reference = 25.0
         else:
             self.prog_coeff = prog_coeff
+            default_reference = self.g_max
+
+        # an explicitly given reference always takes precedence
+        self.prog_coeff_g_max_reference: Optional[float] = (
+            default_reference if prog_coeff_g_max_reference is None else prog_coeff_g_max_reference
+        )
 
         self.t_0 = t_0
         self.t_read = t_read
@@ -184,10 +188,11 @@ class CustomDriftPCMLikeNoiseModel(PCMLikeNoiseModel):
         drift_scale: Scale for the  drift coefficient.
         prog_coeff_g_max_reference: reference :math:`g_\max` value
             when fitting the coefficients, since the result of the
-            polynomial fit is given in uS. If
-            ``prog_coeff_g_max_reference`` is not given and
-            `prog_coeffs` are given explicitly, it will be set to
-            ``g_max`` of the conductance converter.
+            polynomial fit is given in uS. If given, it is always
+            used. If not given, it defaults to the reference of the
+            fitted default coefficients (25 uS) or, if `prog_coeff`
+            is given explicitly, to ``g_max`` of the conductance
+            converter.
 
     .. _`N. Li et al. AEM (2023)`: https://onlinelibrary.wiley.com/doi/pdf/10.1002/aelm.202201190
 

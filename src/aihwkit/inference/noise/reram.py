@@ -55,10 +55,11 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
         noise_scale: Additional scale for the noise.
         coeff_g_max_reference: reference :math:`g_\max` value
             when fitting the coefficients, since the result of the
-            polynomial fit is given in uS. If
-            ``coeff_g_max_reference`` is not given and
-            `coeffs` are given explicitely, it will be set to
-            ``g_max`` of the conductance converter.
+            polynomial fit is given in uS. If given, it is always
+            used. If not given, it defaults to the reference of the
+            fitted default coefficients (40 uS) or, if `coeff_dic`
+            is given explicitly, to ``g_max`` of the conductance
+            converter.
 
     .. _`Wan et al. Nature (2022)`: https://www.nature.com/articles/s41586-022-04992-8
 
@@ -79,9 +80,6 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
 
-        if coeff_g_max_reference is None:
-            self.coeff_g_max_reference = self.g_max
-
         if coeff_dic is None:
             # standard g_max are defined in respect to 40.0 uS. Need to
             # adjust for that in case g_max is not equal to 40.0 uS
@@ -91,7 +89,14 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
                 3600 * 24.0: [-16.458, 47.095, -50.773, 22.086, 0.701][::-1],
                 3600 * 24.0 * 2: [-11.934, 37.062, -43.507, 20.274, 0.782][::-1],
             }
-            self.prog_coeff_g_max_reference = 40.0
+            default_reference = 40.0
+        else:
+            default_reference = self.g_max
+
+        # an explicitly given reference always takes precedence
+        self.coeff_g_max_reference = (
+            default_reference if coeff_g_max_reference is None else coeff_g_max_reference
+        )
         self.coeff_dic = coeff_dic
         self.noise_scale = noise_scale
 

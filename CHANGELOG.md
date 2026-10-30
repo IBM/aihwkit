@@ -12,6 +12,16 @@ The format is based on [Keep a Changelog], and this project adheres to
 * `Fixed` for any bug fixes.
 * `Security` in case of vulnerabilities.
 
+## Unreleased
+
+### Changed
+
+* `ReRamWan2022NoiseModel` now applies the 40 µS reference of its default coefficients, so programming and drift noise are scaled by `g_max / 40` when `g_max` differs from 40 µS [(\#830)](https://github.com/IBM/aihwkit/issues/830)
+
+### Fixed
+
+* An explicitly given `coeff_g_max_reference` / `prog_coeff_g_max_reference` no longer raises an `AttributeError` and is no longer overwritten by the default reference in `ReRamWan2022NoiseModel`, `PCMLikeNoiseModel`, `CustomDriftPCMLikeNoiseModel` and `HermesNoiseModel` [(\#830)](https://github.com/IBM/aihwkit/issues/830)
+
 ## [1.2.0] - 2026/10/21
 
 ### Added 
