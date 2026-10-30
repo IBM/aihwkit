@@ -133,18 +133,18 @@ class HermesNoiseModel(BaseNoiseModel):
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
 
+        default_reference = self.g_max
         if prog_coeff is None:
             # standard g_max are defined in respect to 20.7 or 10.35 uS. Need to
             # adjust for that in case g_max is not equal to the characterized maximum value
             if self.num_devices == 2:
                 self.prog_coeff = [0.16603222, 4.71806468, -8.48101252, 4.68961419]
                 default_reference = 20.7
-            else:
+            elif self.num_devices == 1:
                 self.prog_coeff = [0.15781817, 2.32443916, -2.16310839, 0.68841818]
                 default_reference = 10.35
         else:
             self.prog_coeff = prog_coeff
-            default_reference = self.g_max
 
         # an explicitly given reference always takes precedence
         self.prog_coeff_g_max_reference = (
