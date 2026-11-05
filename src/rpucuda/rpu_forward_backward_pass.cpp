@@ -705,7 +705,8 @@ inline bool finalizeOutputImplStage5(ARGS) {
         bound_test_passed = false;
       } else if (value < -bound) {
         value = -bound;
-        bound_test_passed = !io.bm_test_negative_bound;
+        // Ignoring a negative saturation must not clear an earlier positive failure.
+        bound_test_passed = bound_test_passed && !io.bm_test_negative_bound;
       }
     } else {
       value = value > bound ? bound : value;
@@ -951,6 +952,7 @@ void ForwardBackwardPassIOManaged<T>::forwardVector(
       nm_scale_value = computeNoiseManagement(
           x_input, this->x_size_, x_inc, NoiseManagementType::AbsMaxNPSum, aux_nm_value_, f_io_);
       reduction_due_to_bound_management = 1.0; // reset to 1.0
+      nm = true; // The NPSum retry enables NM even if the first pass had none.
     }
 
     bm_round++;

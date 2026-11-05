@@ -35,7 +35,7 @@ __global__ void kernelAbsMaxNPSum(
     const T *nsum_values,
     const T out_bound,
     const T assumed_wmax,
-    const T bm_max // io.max_bm_res/io.inp_res
+    const T bm_max // io.max_bm_res/io.inp_res, or negative when DAC resolution is unlimited
 
 ) {
   int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -47,8 +47,11 @@ __global__ void kernelAbsMaxNPSum(
     T psum = psum_values[tid];
     T nsum = -nsum_values[tid];
     T sum = MAX(psum, nsum);
-    scale_values[tid] = MAX(amax, MIN(sum * w_max / out_bound, amax * bm_max));
-    ;
+    T npsum_scale = sum * w_max / out_bound;
+    if (bm_max >= (T)0.0) {
+      npsum_scale = MIN(npsum_scale, amax * bm_max);
+    }
+    scale_values[tid] = MAX(amax, npsum_scale);
   }
 }
 
@@ -428,7 +431,7 @@ void NoiseManager<T>::compute(
         dev_scale_values_->getData(), m_batch, this->amaximizer_->getMaxValues(),
         dev_psum_values_->getDataConst(), dev_nsum_values_->getDataConst(),
         isinf((float)io.out_bound) ? (T)1.0 : io.out_bound, io.nm_assumed_wmax,
-        io.inp_res > (T)0.0 ? io.max_bm_res / io.inp_res : (T)1.0);
+        io.inp_res > (T)0.0 ? io.max_bm_res / io.inp_res : (T)-1.0);
     return;
   }
 

@@ -79,9 +79,9 @@ class BoundManagementType(Enum):
     ITERATIVE_WORST_CASE = "IterativeWorstCase"
     """Worst case bound management.
 
-    Uses ``AbsMax`` noise management for the first pass and only when output
-    bound is hit, the ``AbsMaxNPSum`` for the second. Thus, at most 2 passes
-    are computed.
+    Uses the configured noise management for the first pass. If the output
+    bound is hit, uses ``AbsMaxNPSum`` for the second pass. Further passes
+    halve the input until the bound is met or a retry limit is reached.
     """
 
     SHIFT = "Shift"
