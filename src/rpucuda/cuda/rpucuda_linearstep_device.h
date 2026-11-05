@@ -51,7 +51,8 @@ public:
           tmp_slope[kk + 1] = w_slope_up[i][j];
         }
       } dev_slope_->assign(tmp_slope);
-      dev_write_noise_std_->setConst(getPar().getScaledWriteNoise());
+      dev_write_noise_std_->setConst(
+          getPar().write_noise_std * (getPar().dw_min == (T)0.0 ? (T)1.0 : getPar().dw_min));
 
       this->context_->synchronize();
       delete[] tmp_slope;);
@@ -67,6 +68,8 @@ public:
   T *get1ParamsData() override {
     return getPar().usesPersistentWeight() ? this->dev_persistent_weights_->getData() : nullptr;
   };
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
   T getWeightGranularityNoise() const override {
     // need to make sure that random states are enabled
     return getPar().usesPersistentWeight()
