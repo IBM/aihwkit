@@ -77,7 +77,7 @@ class AnalogSequential(AnalogContainerBase, Sequential):
     @classmethod
     def from_digital(cls, module: Sequential, *args: Any, **kwargs: Any) -> "AnalogSequential":
         """Construct AnalogSequential in-place from Sequential."""
-        return cls(OrderedDict(mod for mod in module.named_children()))
+        return cls(OrderedDict(module._modules.items()))  # pylint: disable=protected-access
 
     @classmethod
     def to_digital(cls, module: "AnalogSequential", *args: Any, **kwargs: Any) -> Sequential:

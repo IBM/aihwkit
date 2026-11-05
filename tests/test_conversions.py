@@ -76,6 +76,25 @@ class ConversionLayerTest(ParametrizedTestCase):
         self.train_model_torch(new_model, loss_func, x_b, y_b)
         self.assertTensorAlmostEqual(loss_func(new_model(x_b), y_b), loss_func(model(x_b), y_b))
 
+    def test_conversion_repeated_linear_sequential(self):
+        """Test converting a sequential with a shared linear layer."""
+        for inplace in (False, True):
+            with self.subTest(inplace=inplace):
+                layer = Linear(1, 1, bias=False)
+                layer.weight.detach().fill_(0.25)
+                model = Sequential(layer, layer)
+                x_input = Tensor([[1.0]])
+                if self.use_cuda:
+                    model.cuda()
+                    x_input = x_input.cuda()
+
+                analog_model = convert_to_analog(model, FloatingPointRPUConfig(), inplace=inplace)
+
+                self.assertEqual(len(analog_model), 2)
+                self.assertIsInstance(analog_model[0], AnalogLinear)
+                self.assertIs(analog_model[0], analog_model[1])
+                self.assertEqual(analog_model(x_input).item(), 0.0625)
+
     def test_conversion_lenet(self):
         """Convert Lenet"""
 
