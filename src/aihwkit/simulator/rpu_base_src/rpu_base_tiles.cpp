@@ -473,6 +473,73 @@ void declare_rpu_tiles(py::module &m, std::string type_name_add) {
            )pbdoc")
 
       .def(
+          "forward_with_output_clip_mask",
+          [](Class &self, const torch::Tensor &x_input_, bool bias = false, bool x_trans = false,
+             bool d_trans = false, bool is_test = false, bool non_blocking = false) {
+            auto x_input = x_input_.contiguous();
+            CHECK_TORCH_INPUT(x_input);
+
+            if (x_input.dim() < 1) {
+              throw std::runtime_error(
+                  "Invalid x_input dimensions: expected at least 1 dimensional tensor");
+            }
+            int in_size = x_trans ? x_input.size(0) : x_input.size(-1);
+            int expected_in_size = self.getXSize() - (bias ? 1 : 0);
+            int out_size = self.getDSize();
+
+            // Validate the x_input dimensions (before computing m_batch).
+            if (in_size != expected_in_size) {
+              std::string shape_str = x_trans ? ("[*, " + std::to_string(expected_in_size) + "]")
+                                              : ("[" + std::to_string(expected_in_size) + ",*]");
+              throw std::runtime_error(
+                  "Invalid x_input dimensions: expected " + shape_str + " tensor");
+            }
+            int m_batch = x_input.numel() / in_size;
+
+            // Build the buffers: drop the input feature axis and add the
+            // output axis (first if d_trans, else last), so that both hold
+            // exactly m_batch * out_size values for any x_trans / d_trans.
+            // The mask is initialized by forwardWithOutputClipMask itself.
+            std::vector<int64_t> dims(x_input.sizes().begin(), x_input.sizes().end());
+            dims.erase(x_trans ? dims.begin() : dims.end() - 1);
+            dims.insert(d_trans ? dims.begin() : dims.end(), out_size);
+            torch::Tensor d_output = torch::empty(dims, x_input.options());
+            torch::Tensor clip_mask = torch::empty(dims, x_input.options().dtype(torch::kBool));
+
+            // Call RPU function.
+            std::lock_guard<std::mutex> lock(self.mutex_);
+            self.forwardWithOutputClipMask(
+                reinterpret_cast<T_RPU *>(x_input.template data_ptr<T>()),
+                reinterpret_cast<T_RPU *>(d_output.template data_ptr<T>()),
+                clip_mask.template data_ptr<bool>(), bias, m_batch, x_trans, d_trans, is_test);
+            return py::make_tuple(d_output, clip_mask);
+          },
+          py::arg("x_input"), py::arg("bias") = false, py::arg("x_trans") = false,
+          py::arg("d_trans") = false, py::arg("is_test") = false, py::arg("non_blocking") = false,
+          R"pbdoc(
+           Compute the forward pass and the ADC output clip mask.
+
+           Same as ``forward``, but additionally returns a boolean mask of the
+           same shape as the output that is true where the output was clipped
+           by the ADC, i.e. exceeded the output bound after output noise and
+           quantization, before any noise or bound management rescaling. For
+           bound management, the mask of the finally accepted round is
+           returned. The mask is false where the ADC is bypassed (e.g. perfect
+           forward). Only one-pass and perfect forward are supported.
+
+           Args:
+               x_input: ``[N,*, x_size (- 1)]`` input :math:`\mathbf{x}` torch::Tensor.
+               bias: whether to use bias.
+               x_trans: whether the ``x_input`` matrix is transposed, i.e. of size
+                   ``[x_size (- 1), *, N]``
+               d_trans: whether the ``d`` matrix is transposed.
+               is_test: whether inference (true) mode or training (false)
+
+           Returns:
+               tuple: ``(d_output, clip_mask)``, both ``[N, *, d_size]`` or ``[d_size, *, N]``.
+           )pbdoc")
+
+      .def(
           "backward",
           [](Class &self, const torch::Tensor &d_input_, bool bias = false, bool d_trans = false,
              bool x_trans = false, bool non_blocking = false) {
