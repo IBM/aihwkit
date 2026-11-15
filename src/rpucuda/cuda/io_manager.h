@@ -41,6 +41,11 @@ public:
   bool applyToOutput(
       OutputIteratorT dev_output, const bool trans = false, const bool with_out_noise = true);
 
+  /* Non-owning device destination for the ADC clip mask written by the
+     next applyToOutput call(s), same layout as dev_output. nullptr
+     (default) disables recording. */
+  inline void setOutputClipMask(bool *mask) { output_clip_mask_ = mask; };
+
   // only valid after init
   inline T *getInBuffer() const { return temp_input_applied_; };
   inline T *getOutBuffer() const { return temp_output_applied_; };
@@ -128,6 +133,7 @@ private:
   int nthreads_ = 0;
   int nblocks_batch_max_ = 0;
 
+  bool *output_clip_mask_ = nullptr;
   const IOMetaParameter<T> *io_;
   T *temp_input_applied_ = nullptr;
   T *temp_output_applied_ = nullptr;

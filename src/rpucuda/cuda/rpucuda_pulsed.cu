@@ -573,6 +573,39 @@ template <typename T> void RPUCudaPulsed<T>::applyWeightUpdate(T *dw_and_current
 /* FORWARD */
 
 template <typename T>
+void RPUCudaPulsed<T>::forwardWithOutputClipMask(
+    const T *X_input,
+    T *D_output,
+    bool *mask,
+    bool bias,
+    int m_batch,
+    bool x_trans,
+    bool d_trans,
+    bool is_test) {
+
+  const auto &f_io = getMetaPar().f_io;
+  if (!f_io.isPerfect() && f_io.mv_type != AnalogMVType::OnePass) {
+    RPU_FATAL("Output clip mask is only supported for perfect or one-pass forward.");
+  }
+
+  // outputs that never reach the ADC (perfect forward) keep a false
+  // mask. Zeroed on the same stream as the forward kernels.
+  CUDA_CALL(cudaMemsetAsync(
+      mask, 0, (size_t)m_batch * this->getDSize() * sizeof(bool), this->context_->getStream()));
+
+  // forward() reaches the output kernels with D_output itself (inc 1 or
+  // the d_trans matrix layout), so the mask shares its layout and index
+  f_iom_->setOutputClipMask(mask);
+  try {
+    this->forward(X_input, D_output, bias, m_batch, x_trans, d_trans, is_test);
+  } catch (...) {
+    f_iom_->setOutputClipMask(nullptr);
+    throw;
+  }
+  f_iom_->setOutputClipMask(nullptr);
+}
+
+template <typename T>
 void RPUCudaPulsed<T>::forwardMatrix(
     const T *X_input, T *D_output, int m_batch, bool x_trans, bool d_trans, bool is_test) {
   this->forwardMatrixIterator(X_input, D_output, m_batch, x_trans, d_trans, is_test);

@@ -390,7 +390,8 @@ __global__ void kernelOutputManagement(
     const bool sto_round,
     const T out_scale,
     const T asymmetry,
-    curandState *random_states) {
+    curandState *random_states,
+    bool *output_clip_mask) {
   bool sr = sto_round;
   bool stoch_if = sr || std > (T)0.0;
   STOCH_DEFINITIONS(stoch_if, size);
@@ -408,6 +409,10 @@ __global__ void kernelOutputManagement(
     ADD_NOISE;
 
     DISCRETIZE_VALUE_STOCH;
+
+    if (output_clip_mask != nullptr) {
+      output_clip_mask[idx] = value > bu || value < bl;
+    }
 
     BOUND_CHECK;
 
@@ -438,7 +443,8 @@ __global__ void kernelOutputManagementBatch(
     const T sto_round,
     const T out_scale,
     const T asymmetry,
-    curandState *random_states) {
+    curandState *random_states,
+    bool *output_clip_mask) {
   const int total_size = size * m_batch;
   const bool sr = sto_round;
   const bool stoch_if = sr || std > (T)0.0;
@@ -461,6 +467,10 @@ __global__ void kernelOutputManagementBatch(
     APPLY_ASYMMETRY;
 
     DISCRETIZE_VALUE_STOCH;
+
+    if (output_clip_mask != nullptr) {
+      output_clip_mask[idx] = value > bu || value < bl;
+    }
 
     BOUND_CHECK;
 
@@ -490,7 +500,8 @@ __global__ void kernelOutputBoundManagement(
     const bool bm_test_negative_bound,
     const T asymmetry,
     curandState *random_states,
-    int *bound_exceeded) {
+    int *bound_exceeded,
+    bool *output_clip_mask) {
   const int size = in_size;
   T std = out_noise;
   T res = resolution;
@@ -511,6 +522,8 @@ __global__ void kernelOutputBoundManagement(
       APPLY_ASYMMETRY;
 
       DISCRETIZE_VALUE_STOCH;
+
+      if (output_clip_mask != nullptr) { output_clip_mask[idx] = value > bu || value < bl; }
 
       if (value > bu) {
         value = bu;
@@ -553,7 +566,8 @@ __global__ void kernelOutputBoundManagementBatch(
     const T out_scale,
     const bool bm_test_negative_bound,
     const T asymmetry,
-    curandState *random_states) {
+    curandState *random_states,
+    bool *output_clip_mask) {
 
   const int m_batch = m_batch_in;
   const int size = size_in;
@@ -581,6 +595,8 @@ __global__ void kernelOutputBoundManagementBatch(
       APPLY_ASYMMETRY;
 
       DISCRETIZE_VALUE_STOCH;
+
+      if (output_clip_mask != nullptr) { output_clip_mask[idx] = value > bu || value < bl; }
 
       if (value > bu) {
         value = bu;
@@ -857,7 +873,7 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
         dev_scale_values_->getData(), -io_->out_bound, io_->out_bound, io_->out_res,
         io_->out_sto_round, temp_out_scale_, io_->bm_test_negative_bound, io_->out_asymmetry,
         context_->getRandomStates(MIN(nblocks_om * nthreads_, out_size_)),
-        dev_any_exceeded_->getData());
+        dev_any_exceeded_->getData(), output_clip_mask_);
   } else {
 
     kernelOutputBoundManagementBatch<<<nblocks_om_batch, nthreads_, 0, s>>>(
@@ -867,7 +883,8 @@ bool InputOutputManager<T>::applyToOutputWithBoundManagement(
         dev_any_exceeded_->getData(),   // out
         with_out_noise ? io_->out_noise : (T)0.0, -io_->out_bound, io_->out_bound, io_->out_res,
         io_->out_sto_round, temp_out_scale_, io_->bm_test_negative_bound, io_->out_asymmetry,
-        context_->getRandomStates(MIN(nblocks_om_batch * nthreads_, out_size_ * m_batch)));
+        context_->getRandomStates(MIN(nblocks_om_batch * nthreads_, out_size_ * m_batch)),
+        output_clip_mask_);
   }
 
   dev_any_exceeded_->copyTo(h_exceeded_);
@@ -913,7 +930,7 @@ bool InputOutputManager<T>::applyToOutput(
           (dev_output, temp_output_applied_, out_size_, with_out_noise ? io_->out_noise : (T)0.0,
            nm_scale_values, -io_->out_bound, io_->out_bound, io_->out_res, io_->out_sto_round,
            temp_out_scale_, io_->out_asymmetry,
-           context_->getRandomStates(MIN(nblocks_om * nthreads_, out_size_))));
+           context_->getRandomStates(MIN(nblocks_om * nthreads_, out_size_)), output_clip_mask_));
 
     } else {
       // batched
@@ -922,7 +939,8 @@ bool InputOutputManager<T>::applyToOutput(
           (dev_output, temp_output_applied_, out_size_, m_batch, out_trans, nm_scale_values,
            with_out_noise ? io_->out_noise : (T)0.0, -io_->out_bound, io_->out_bound, io_->out_res,
            io_->out_sto_round, temp_out_scale_, io_->out_asymmetry,
-           context_->getRandomStates(MIN(nblocks_om_batch * nthreads_, out_size_ * m_batch))));
+           context_->getRandomStates(MIN(nblocks_om_batch * nthreads_, out_size_ * m_batch)),
+           output_clip_mask_));
     }
 
     return true; // no bound managment
