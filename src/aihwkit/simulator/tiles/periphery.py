@@ -37,11 +37,30 @@ from torch.linalg import lstsq
 from aihwkit.exceptions import TileError, ConfigError
 from aihwkit.simulator.tiles.base import BaseTile, SimulatorTileWrapper, SimulatorTile
 
+from aihwkit.simulator.parameters.enums import AnalogMVType
 from aihwkit.simulator.parameters.mapping import MappingParameter
 from aihwkit.simulator.parameters.pre_post import PrePostProcessingRPU, InputRangeParameter
 from aihwkit.simulator.digital_low_precision.base_quantized_classes import QuantizationManager
 from aihwkit.simulator.digital_low_precision.quantizers import QMethods
 from aihwkit.simulator.digital_low_precision.range_estimators import RangeEstimators
+from aihwkit.simulator.rpu_base import tiles as rpu_base_tiles
+
+
+def _get_output_clip_mask_tile_classes() -> Tuple[type, ...]:
+    """Return the native (pulsed) tile classes that record the ADC output clip mask."""
+    classes = []
+    for module in [rpu_base_tiles] + [
+        getattr(rpu_base_tiles, name)
+        for name in ("half", "double", "bfloat16")
+        if hasattr(rpu_base_tiles, name)
+    ]:
+        for name in ("AnalogTile", "CudaAnalogTile"):
+            if hasattr(module, name):
+                classes.append(getattr(module, name))
+    return tuple(classes)
+
+
+OUTPUT_CLIP_MASK_TILE_CLASSES = _get_output_clip_mask_tile_classes()
 
 
 class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
@@ -852,6 +871,28 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
             x_input = self.apply_input_range(x_input, not is_test) / self.input_range
         return x_input
 
+    def supports_output_clip_mask(self) -> bool:
+        """Whether the tile can record the ADC output clip mask natively.
+
+        This is the case for the (non-indexed) forward of the native
+        analog tiles with a perfect or one-pass forward. In this case,
+        the output gradient mask uses whether the ADC actually clipped
+        the output (before any noise or bound management rescaling)
+        instead of comparing the final output to the output bound.
+
+        Returns:
+            Whether the native output clip mask is supported.
+        """
+        if not isinstance(self.tile, OUTPUT_CLIP_MASK_TILE_CLASSES):
+            return False
+        if not callable(getattr(self.tile, "forward_with_output_clip_mask", None)):
+            # native extension built without the clip mask binding
+            return False
+        forward = getattr(self.rpu_config, "forward", None)
+        if forward is None:
+            return False
+        return forward.is_perfect or forward.mv_type in (AnalogMVType.ONE_PASS, AnalogMVType.IDEAL)
+
     def post_forward(
         self, x_output: Tensor, dim: int, is_test: bool = False, ctx: Any = None
     ) -> Tensor:
@@ -872,8 +913,13 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         if self.handle_output_bound:
             bound = self.get_forward_out_bound()  # pylint: disable=assignment-from-none
         if bound is not None and ctx is not None:
-            # pylint: disable=invalid-unary-operand-type
-            grad_zero_msk = logical_or(x_output >= bound, x_output <= -bound)
+            grad_zero_msk = getattr(ctx, "output_clip_mask", None)
+            if grad_zero_msk is not None:
+                # ADC clip mask recorded by the native forward
+                ctx.output_clip_mask = None
+            else:
+                # pylint: disable=invalid-unary-operand-type
+                grad_zero_msk = logical_or(x_output >= bound, x_output <= -bound)
             ctx.saved_analog_tensors.append(grad_zero_msk)
 
         # Only applies to QuantizedTorchInferenceTile, as it applies the
@@ -1055,9 +1101,20 @@ class TileWithPeriphery(BaseTile, SimulatorTileWrapper):
         """
         # We use no-grad as we do it explicitly in the optimizer.
         x_input = self.pre_forward(x_input, 0 if self.in_trans else x_input.dim() - 1, is_test, ctx)
-        x_output = self.tile.forward(
-            x_input, self.analog_bias, self.in_trans, self.out_trans, is_test, self.non_blocking
-        )
+        if (
+            ctx is not None
+            and self.handle_output_bound
+            and self.get_forward_out_bound() is not None
+            and self.supports_output_clip_mask()
+        ):
+            # the mask is consumed by post_forward for the output gradient
+            x_output, ctx.output_clip_mask = self.tile.forward_with_output_clip_mask(
+                x_input, self.analog_bias, self.in_trans, self.out_trans, is_test, self.non_blocking
+            )
+        else:
+            x_output = self.tile.forward(
+                x_input, self.analog_bias, self.in_trans, self.out_trans, is_test, self.non_blocking
+            )
         return self.post_forward(
             x_output, 0 if self.out_trans else x_output.dim() - 1, is_test, ctx
         )
