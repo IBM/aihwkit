@@ -77,6 +77,16 @@ public:
 
   void applyWeightUpdate(T *dw_and_current_weights_out) override;
 
+  void forwardWithOutputClipMask(
+      const T *X_input,
+      T *D_output,
+      bool *mask,
+      bool bias,
+      int m_batch,
+      bool x_trans,
+      bool d_trans,
+      bool is_test) override;
+
   virtual const PulsedMetaParameter<T> &getMetaPar() const { return par_; };
 
   void getDeviceParameterNames(std::vector<std::string> &names) const override;
@@ -119,6 +129,11 @@ private:
   // helpers
   std::unique_ptr<PulsedRPUWeightUpdater<T>> pwu_ = nullptr;
   std::unique_ptr<ForwardBackwardPassIOManaged<T>> fb_pass_ = nullptr;
+
+  // set only during forwardWithOutputClipMask (non-owning)
+  bool *fwd_clip_mask_ = nullptr;
+  const T *fwd_clip_mask_output_base_ = nullptr;
+  void clearOutputClipMask();
 
   PulsedMetaParameter<T> par_;
   // void initialize(PulsedMetaParameter<T> *p, int x_sz, int d_sz);
