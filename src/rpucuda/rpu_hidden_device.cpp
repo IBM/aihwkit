@@ -5,6 +5,7 @@
  */
 
 #include "rpu_hidden_device.h"
+#include "rpu_parallel_init.h"
 #include "math_util.h"
 
 namespace RPU {
@@ -49,11 +50,22 @@ void HiddenStepRPUDevice<T>::populate(
   T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
   T up_down_std = par.hs_up_down_dtod;
 
-  for (int j = 0; j < this->x_size_; ++j) {
-    for (int i = 0; i < this->d_size_; ++i) {
+  const bool parallel_init = useParallelDeviceInit(this->size_);
+  const auto row_seeds =
+      parallel_init ? makeDeviceInitRowSeeds(rng, this->d_size_) : std::vector<unsigned int>();
+  const int outer_count = parallel_init ? this->d_size_ : this->x_size_;
+  const int inner_count = parallel_init ? this->x_size_ : this->d_size_;
 
-      T gain = ((T)1.0 + par.hs_dw_min_dtod * rng->sampleGauss());
-      T r = up_down_std * rng->sampleGauss();
+#pragma omp parallel for if(parallel_init) schedule(static)
+  for (int outer = 0; outer < outer_count; ++outer) {
+    RealWorldRNG<T> row_rng(parallel_init ? row_seeds[outer] : 1);
+    RealWorldRNG<T> *cell_rng = parallel_init ? &row_rng : rng;
+    for (int inner = 0; inner < inner_count; ++inner) {
+      int i = parallel_init ? outer : inner;
+      int j = parallel_init ? inner : outer;
+
+      T gain = ((T)1.0 + par.hs_dw_min_dtod * cell_rng->sampleGauss());
+      T r = up_down_std * cell_rng->sampleGauss();
       hs_scale_up_[i][j] = (up_bias + gain + r) * par.hs_dw_min;
       hs_scale_down_[i][j] = (down_bias + gain - r) * par.hs_dw_min;
       hidden_weights_[i][j] = (T)0.0;
