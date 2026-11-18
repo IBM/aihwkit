@@ -129,6 +129,10 @@ public:
 
   void populateFBParameter(const IOMetaParameter<T> &f_io_, const IOMetaParameter<T> &b_io_);
 
+  /* Non-owning destination for the ADC clip mask of the next output
+     finalization(s). nullptr (default) disables recording. */
+  void setOutputClipMask(bool *mask) { out_clip_mask_ = mask; }
+
   inline bool computeAnalogMV(
       T **weights,
       const T *org_in_values,
@@ -145,6 +149,8 @@ public:
       const bool is_test);
 
 protected:
+  bool *out_clip_mask_ = nullptr;
+
   inline void applyOutputWeightNoise(
       T **weights,
       T *out_values,

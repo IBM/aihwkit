@@ -497,9 +497,50 @@ void RPUPulsed<T>::populateParameter(
 /*********************************************************************************/
 /* Vector forward/backward/update */
 
+template <typename T> void RPUPulsed<T>::clearOutputClipMask() {
+  fwd_clip_mask_ = nullptr;
+  fwd_clip_mask_output_base_ = nullptr;
+  fb_pass_->setOutputClipMask(nullptr);
+}
+
+template <typename T>
+void RPUPulsed<T>::forwardWithOutputClipMask(
+    const T *X_input,
+    T *D_output,
+    bool *mask,
+    bool bias,
+    int m_batch,
+    bool x_trans,
+    bool d_trans,
+    bool is_test) {
+
+  const auto &f_io = getMetaPar().f_io;
+  if (!f_io.isPerfect() && f_io.mv_type != AnalogMVType::OnePass) {
+    RPU_FATAL("Output clip mask is only supported for perfect or one-pass forward.");
+  }
+
+  // outputs that never reach the ADC (perfect forward, noise management
+  // short-cut for zero inputs) keep a false mask
+  std::fill(mask, mask + (size_t)m_batch * this->getDSize(), false);
+
+  fwd_clip_mask_ = mask;
+  fwd_clip_mask_output_base_ = D_output;
+  try {
+    this->forward(X_input, D_output, bias, m_batch, x_trans, d_trans, is_test);
+  } catch (...) {
+    clearOutputClipMask();
+    throw;
+  }
+  clearOutputClipMask();
+}
+
 template <typename T>
 void RPUPulsed<T>::forwardVector(
     const T *x_input, T *d_output, int x_inc, int d_inc, bool is_test) {
+  if (fwd_clip_mask_ != nullptr) {
+    // mask mirrors the layout of D_output (incl. the d_inc stride used below)
+    fb_pass_->setOutputClipMask(fwd_clip_mask_ + (d_output - fwd_clip_mask_output_base_));
+  }
   fb_pass_->forwardVector(
       this->getFBWeights(is_test), x_input, x_inc, d_output, d_inc, this->getFwdAlpha(), is_test);
 };
