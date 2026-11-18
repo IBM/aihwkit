@@ -225,18 +225,24 @@ void PulsedRPUWeightUpdater<T>::updateVectorWithDevice(
 
   auto *rpu_device = static_cast<PulsedRPUDeviceBase<T> *>(rpu_device_in);
 
-  // check learning rate and update management
-  T weight_granularity = rpu_device->getWeightGranularity();
-
-  // pulsed device update
   if (up_.d_sparsity) {
     up_._d_sparsity = getCurrentDSparsity();
   }
   rpu_device->initUpdateCycle(
       weights, up_, learning_rate, m_batch_info, x_input, x_inc, d_input, d_inc);
-  // potentially modify the LR from the device side
-
   T pc_learning_rate = rpu_device->getPulseCountLearningRate(learning_rate, m_batch_info, up_);
+  if (rpu_device->hasInfiniteGranularityUpdate()) {
+    T abs_lr = learning_rate < (T)0.0 ? -learning_rate : learning_rate;
+    rpu_device->doInfiniteGranularityUpdate(
+        weights, x_input, x_inc, d_input, d_inc, abs_lr, &*rng_);
+  }
+  if (!rpu_device->hasPulsedUpdate()) {
+    rpu_device->finishUpdateCycle(weights, up_, learning_rate, m_batch_info);
+    return;
+  }
+
+  // pulsed device update
+  T weight_granularity = rpu_device->getWeightGranularity();
   d_noz_ = 0;
   x_noz_ = 0;
 

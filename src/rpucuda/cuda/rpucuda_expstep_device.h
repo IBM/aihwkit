@@ -42,7 +42,7 @@ public:
       es_par_arr[3] = par.es_gamma_up;
       es_par_arr[4] = par.es_a;
       es_par_arr[5] = par.es_b;
-      es_par_arr[6] = par.getScaledWriteNoise();
+      es_par_arr[6] = par.write_noise_std * (par.dw_min == (T)0.0 ? (T)1.0 : par.dw_min);
       es_par_arr[7] = par.dw_min_std_add;
       es_par_arr[8] = par.dw_min_std_slope;
       dev_es_par_->assign(es_par_arr);
@@ -64,6 +64,9 @@ public:
                ? PulsedRPUDeviceCuda<T>::getWeightGranularityNoise() + (T)1e-6
                : PulsedRPUDeviceCuda<T>::getWeightGranularityNoise();
   }
+
+  void doInfiniteGranularityUpdate(
+      T *dev_weights, const T *grad_matrix, curandState_t *dev_states) override;
 
 private:
   std::unique_ptr<CudaArray<T>> dev_es_par_ = nullptr;
