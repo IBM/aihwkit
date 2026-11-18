@@ -10,6 +10,7 @@
 
 from copy import deepcopy
 from typing import List, Optional
+from warnings import warn
 
 from numpy import log as numpy_log
 from numpy import sqrt, interp
@@ -55,7 +56,8 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             polynomial fit is given in uS. If
             ``prog_coeff_g_max_reference`` is not given and
             `prog_coeffs` are given explicitly, it will be set to
-            ``g_max`` of the conductance converter.
+            ``g_max`` of the conductance converter. With the default
+            coefficients it is 25 uS; overriding it issues a warning.
 
     .. _`Nandakumar et al. ICECS (2019)`: https://ieeexplore.ieee.org/abstract/document/8964852
 
@@ -80,16 +82,29 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
 
-        if prog_coeff_g_max_reference is None:
-            self.prog_coeff_g_max_reference = self.g_max
-
         if prog_coeff is None:
             # standard g_max are defined in respect to 25.0 uS. Need to
             # adjust for that in case g_max is not equal to 25.0 uS
             self.prog_coeff = [0.26348, 1.9650, -1.1731]
             self.prog_coeff_g_max_reference = 25.0
+            if (
+                prog_coeff_g_max_reference is not None
+                and prog_coeff_g_max_reference != self.prog_coeff_g_max_reference
+            ):
+                warn(
+                    f"{self.__class__.__name__}: the default coefficients were fitted with a "
+                    f"reference g_max of {self.prog_coeff_g_max_reference} uS, which is the "
+                    f"value set to prog_coeff_g_max_reference. Overriding it with "
+                    f"prog_coeff_g_max_reference={prog_coeff_g_max_reference} uS could result "
+                    f"in unexpected noise values differing from the measured hardware ones."
+                )
+                self.prog_coeff_g_max_reference = prog_coeff_g_max_reference
         else:
             self.prog_coeff = prog_coeff
+            if prog_coeff_g_max_reference is None:
+                self.prog_coeff_g_max_reference = self.g_max
+            else:
+                self.prog_coeff_g_max_reference = prog_coeff_g_max_reference
 
         self.t_0 = t_0
         self.t_read = t_read
