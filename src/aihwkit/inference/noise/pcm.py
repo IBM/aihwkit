@@ -10,7 +10,6 @@
 
 from copy import deepcopy
 from typing import List, Optional
-from warnings import warn
 
 from numpy import log as numpy_log
 from numpy import sqrt, interp
@@ -40,7 +39,9 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         g_converter: instantiated class of the conductance converter
             (defaults to single pair)
         g_max: In :math:`\mu S`, the maximal conductance, ie the value
-            the absolute max of the weights will be mapped to.
+            the absolute max of the weights will be mapped to. It cannot be
+            larger than ``prog_coeff_g_max_reference`` (25 uS for the default
+            coefficients), and a smaller value issues a warning.
         t_read: Parameter of the 1/f fit (in seconds).
         t_0: Parameter of the drift fit (first reading time).
 
@@ -57,7 +58,7 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             ``prog_coeff_g_max_reference`` is not given and
             `prog_coeffs` are given explicitly, it will be set to
             ``g_max`` of the conductance converter. With the default
-            coefficients it is 25 uS; overriding it issues a warning.
+            coefficients it is fixed to 25 uS and the given value is ignored.
 
     .. _`Nandakumar et al. ICECS (2019)`: https://ieeexplore.ieee.org/abstract/document/8964852
 
@@ -87,24 +88,14 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             # adjust for that in case g_max is not equal to 25.0 uS
             self.prog_coeff = [0.26348, 1.9650, -1.1731]
             self.prog_coeff_g_max_reference = 25.0
-            if (
-                prog_coeff_g_max_reference is not None
-                and prog_coeff_g_max_reference != self.prog_coeff_g_max_reference
-            ):
-                warn(
-                    f"{self.__class__.__name__}: the default coefficients were fitted with a "
-                    f"reference g_max of {self.prog_coeff_g_max_reference} uS, which is the "
-                    f"value set to prog_coeff_g_max_reference. Overriding it with "
-                    f"prog_coeff_g_max_reference={prog_coeff_g_max_reference} uS could result "
-                    f"in unexpected noise values differing from the measured hardware ones."
-                )
-                self.prog_coeff_g_max_reference = prog_coeff_g_max_reference
         else:
             self.prog_coeff = prog_coeff
             if prog_coeff_g_max_reference is None:
                 self.prog_coeff_g_max_reference = self.g_max
             else:
                 self.prog_coeff_g_max_reference = prog_coeff_g_max_reference
+
+        self._check_g_max_reference(self.g_max, self.prog_coeff_g_max_reference)
 
         self.t_0 = t_0
         self.t_read = t_read
@@ -186,7 +177,9 @@ class CustomDriftPCMLikeNoiseModel(PCMLikeNoiseModel):
         g_converter: instantiated class of the conductance converter
             (defaults to single pair)
         g_max: In :math:`\mu S`, the maximal conductance, ie the value
-            the absolute max of the weights will be mapped to.
+            the absolute max of the weights will be mapped to. It cannot be
+            larger than ``prog_coeff_g_max_reference`` (25 uS for the default
+            coefficients), and a smaller value issues a warning.
         t_read: Parameter of the 1/f fit (in seconds).
         t_0: Parameter of the drift fit (first reading time).
 

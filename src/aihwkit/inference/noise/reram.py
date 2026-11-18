@@ -10,7 +10,6 @@
 
 from copy import deepcopy
 from typing import List, Optional, Dict
-from warnings import warn
 
 from torch import randn_like, Tensor
 from torch.autograd import no_grad
@@ -52,7 +51,10 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
         g_converter: Instantiated class of the conductance converter
             (defaults to single pair).
         g_max: In :math:`\mu S`, the maximal conductance, i.e. the value
-            the absolute max of the weights will be mapped to.
+            the absolute max of the weights will be mapped to. It cannot be
+            larger than ``prog_coeff_g_max_reference``, and a smaller value
+            issues a warning. With the default coefficients it defaults to
+            40 uS when neither ``g_max`` nor ``g_converter`` are given.
         noise_scale: Additional scale for the noise.
         coeff_g_max_reference: reference :math:`g_\max` value
             when fitting the coefficients, since the result of the
@@ -60,7 +62,7 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
             ``coeff_g_max_reference`` is not given and
             `coeffs` are given explicitely, it will be set to
             ``g_max`` of the conductance converter. With the default
-            coefficients it is 40 uS; overriding it issues a warning.
+            coefficients it is fixed to 40 uS and the given value is ignored.
             The value is stored as ``prog_coeff_g_max_reference``.
 
     .. _`Wan et al. Nature (2022)`: https://www.nature.com/articles/s41586-022-04992-8
@@ -75,6 +77,10 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
         noise_scale: float = 1.0,
         coeff_g_max_reference: Optional[float] = None,
     ):
+        # Fix g_max now: the default coefficients are characterized up to 40.0 uS
+        if coeff_dic is None and g_max is None:
+            g_max = 40.0
+
         g_converter = deepcopy(g_converter) or SinglePairConductanceConverter(g_max=g_max)
         super().__init__(g_converter)
 
@@ -91,22 +97,12 @@ class ReRamWan2022NoiseModel(BaseNoiseModel):
                 3600 * 24.0 * 2: [-11.934, 37.062, -43.507, 20.274, 0.782][::-1],
             }
             self.prog_coeff_g_max_reference = 40.0
-            if (
-                coeff_g_max_reference is not None
-                and coeff_g_max_reference != self.prog_coeff_g_max_reference
-            ):
-                warn(
-                    f"ReRamWan2022NoiseModel: the default coefficients were fitted with a "
-                    f"reference g_max of {self.prog_coeff_g_max_reference} uS, which is the "
-                    f"value set to prog_coeff_g_max_reference. Overriding it with "
-                    f"coeff_g_max_reference={coeff_g_max_reference} uS could result in "
-                    f"unexpected noise values differing from the measured hardware ones."
-                )
-                self.prog_coeff_g_max_reference = coeff_g_max_reference
         elif coeff_g_max_reference is None:
             self.prog_coeff_g_max_reference = self.g_max
         else:
             self.prog_coeff_g_max_reference = coeff_g_max_reference
+
+        self._check_g_max_reference(self.g_max, self.prog_coeff_g_max_reference)
         self.coeff_dic = coeff_dic
         self.noise_scale = noise_scale
 
