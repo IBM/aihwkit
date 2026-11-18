@@ -39,7 +39,9 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         g_converter: instantiated class of the conductance converter
             (defaults to single pair)
         g_max: In :math:`\mu S`, the maximal conductance, ie the value
-            the absolute max of the weights will be mapped to.
+            the absolute max of the weights will be mapped to. It cannot be
+            larger than ``prog_coeff_g_max_reference`` (25 uS for the default
+            coefficients), and a smaller value issues a warning.
         t_read: Parameter of the 1/f fit (in seconds).
         t_0: Parameter of the drift fit (first reading time).
 
@@ -55,7 +57,8 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             polynomial fit is given in uS. If
             ``prog_coeff_g_max_reference`` is not given and
             `prog_coeffs` are given explicitly, it will be set to
-            ``g_max`` of the conductance converter.
+            ``g_max`` of the conductance converter. With the default
+            coefficients it is fixed to 25 uS and the given value is ignored.
 
     .. _`Nandakumar et al. ICECS (2019)`: https://ieeexplore.ieee.org/abstract/document/8964852
 
@@ -80,9 +83,6 @@ class PCMLikeNoiseModel(BaseNoiseModel):
         if self.g_max is None:
             raise ValueError("g_max cannot be established from g_converter")
 
-        if prog_coeff_g_max_reference is None:
-            self.prog_coeff_g_max_reference = self.g_max
-
         if prog_coeff is None:
             # standard g_max are defined in respect to 25.0 uS. Need to
             # adjust for that in case g_max is not equal to 25.0 uS
@@ -90,6 +90,12 @@ class PCMLikeNoiseModel(BaseNoiseModel):
             self.prog_coeff_g_max_reference = 25.0
         else:
             self.prog_coeff = prog_coeff
+            if prog_coeff_g_max_reference is None:
+                self.prog_coeff_g_max_reference = self.g_max
+            else:
+                self.prog_coeff_g_max_reference = prog_coeff_g_max_reference
+
+        self._check_g_max_reference(self.g_max, self.prog_coeff_g_max_reference)
 
         self.t_0 = t_0
         self.t_read = t_read
@@ -171,7 +177,9 @@ class CustomDriftPCMLikeNoiseModel(PCMLikeNoiseModel):
         g_converter: instantiated class of the conductance converter
             (defaults to single pair)
         g_max: In :math:`\mu S`, the maximal conductance, ie the value
-            the absolute max of the weights will be mapped to.
+            the absolute max of the weights will be mapped to. It cannot be
+            larger than ``prog_coeff_g_max_reference`` (25 uS for the default
+            coefficients), and a smaller value issues a warning.
         t_read: Parameter of the 1/f fit (in seconds).
         t_0: Parameter of the drift fit (first reading time).
 
