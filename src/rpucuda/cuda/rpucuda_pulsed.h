@@ -95,6 +95,16 @@ protected:
       bool d_trans = false) override;
 
 public:
+  void forwardWithOutputClipMask(
+      const T *X_input,
+      T *D_output,
+      bool *mask,
+      bool bias,
+      int m_batch,
+      bool x_trans,
+      bool d_trans,
+      bool is_test) override;
+
   // indexed interface optimized
   void forwardIndexed(
       const T *X_input,

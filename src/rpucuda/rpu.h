@@ -423,6 +423,26 @@ public:
       bool x_trans = false,
       bool d_trans = false,
       bool is_test = false);
+
+  /* Same as forward, but additionally writes into mask (same size and
+     layout as D_output) whether each output was clipped by the ADC
+     (i.e. exceeded the output bound after output noise and
+     quantization, before any noise or bound management rescaling). For
+     bound management, the mask of the finally accepted round is
+     kept. The mask stays false where the ADC is bypassed (e.g. perfect
+     forward). */
+  virtual void forwardWithOutputClipMask(
+      const T *X_input,
+      T *D_output,
+      bool *mask,
+      bool bias,
+      int m_batch,
+      bool x_trans,
+      bool d_trans,
+      bool is_test) {
+    RPU_FATAL("Output clip mask is not supported by this tile.");
+  };
+
   void backward(
       const T *D_input,
       T *X_output,
