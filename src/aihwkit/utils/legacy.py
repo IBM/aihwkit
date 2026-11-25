@@ -115,10 +115,13 @@ def convert_legacy_checkpoint(
                 rpu_config.mapping.max_input_size = 0
                 rpu_config.mapping.max_output_size = 0
 
-            if isinstance(rpu_config.noise_model, PCMLikeNoiseModel) and not hasattr(
-                rpu_config.noise_model, "prog_coeff_g_max_reference"
+            noise_model = rpu_config.noise_model
+            if (
+                isinstance(noise_model, PCMLikeNoiseModel)
+                and not hasattr(noise_model, "prog_coeff_g_max_reference")
+                and noise_model.g_max is not None
             ):
-                rpu_config.noise_model.prog_coeff_g_max_reference = rpu_config.noise_model.g_max
+                noise_model.prog_coeff_g_max_reference = noise_model.g_max
 
             if not hasattr(rpu_config, "pre_post"):
                 rpu_config.pre_post = PrePostProcessingParameter()

@@ -7,6 +7,8 @@
 """Base class for the phenomenological noise models for inference."""
 
 from typing import List, Tuple, Optional
+from warnings import warn
+
 from torch import Tensor
 from torch.autograd import no_grad
 
@@ -22,6 +24,36 @@ class BaseNoiseModel:
 
     def __eq__(self, other: object) -> bool:
         return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
+
+    def _check_g_max_reference(self, g_max: float, g_max_reference: float) -> None:
+        """Check ``g_max`` against the programming noise reference ``g_max``.
+
+        Args:
+            g_max: maximal conductance in :math:`\\mu S` used by the model.
+            g_max_reference: reference :math:`g_\\max` in :math:`\\mu S` the
+                programming noise coefficients were fitted with.
+
+        Raises:
+            ValueError: if ``g_max`` is larger than ``g_max_reference``, since
+                the coefficients are not characterized beyond it.
+
+        Warns:
+            UserWarning: if ``g_max`` is smaller than ``g_max_reference``.
+        """
+        name = self.__class__.__name__
+        if g_max > g_max_reference:
+            raise ValueError(
+                f"{name}: g_max ({g_max} uS) cannot be larger than "
+                f"prog_coeff_g_max_reference ({g_max_reference} uS), the maximal "
+                f"conductance the programming noise coefficients are characterized for."
+            )
+        if g_max < g_max_reference:
+            warn(
+                f"{name}: g_max ({g_max} uS) is smaller than prog_coeff_g_max_reference "
+                f"({g_max_reference} uS). The programming noise is scaled by "
+                f"g_max / prog_coeff_g_max_reference, which could result in unexpected "
+                f"noise values differing from the measured hardware ones."
+            )
 
     def __str__(
         self, exclude_keys: Optional[List[str]] = None, keys: Optional[List[str]] = None
