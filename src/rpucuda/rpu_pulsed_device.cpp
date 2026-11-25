@@ -5,6 +5,7 @@
  */
 
 #include "rpu_pulsed_device.h"
+#include "rpu_parallel_init.h"
 #include "math_util.h"
 #include "utility_functions.h"
 #include <limits>
@@ -105,8 +106,8 @@ template <typename T> void PulsedRPUDevice<T>::allocateContainers() {
   w_persistent_ = Array_2D_Get<T>(d_sz, x_sz);
 
   // we better set everything to zero.
-  for (int j = 0; j < x_sz; ++j) {
-    for (int i = 0; i < d_sz; ++i) {
+  for (int i = 0; i < d_sz; ++i) {
+    for (int j = 0; j < x_sz; ++j) {
       w_max_bound_[i][j] = std::numeric_limits<T>::max();
       w_min_bound_[i][j] = std::numeric_limits<T>::min();
       w_scale_up_[i][j] = (T)0.0;
@@ -612,19 +613,30 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
     RPU_FATAL("The closed interval [w_min,w_max] needs to contain 0.");
   }
 
-  for (int j = 0; j < this->x_size_; ++j) {
-    for (int i = 0; i < this->d_size_; ++i) {
+  const bool parallel_init = useParallelDeviceInit(this->size_);
+  const auto row_seeds =
+      parallel_init ? makeDeviceInitRowSeeds(rng, this->d_size_) : std::vector<unsigned int>();
+  const int outer_count = parallel_init ? this->d_size_ : this->x_size_;
+  const int inner_count = parallel_init ? this->x_size_ : this->d_size_;
 
-      w_max_bound_[i][j] = par.w_max * ((T)1.0 + par.w_max_dtod * rng->sampleGauss());
-      w_min_bound_[i][j] = par.w_min * ((T)1.0 + par.w_min_dtod * rng->sampleGauss());
+#pragma omp parallel for if(parallel_init) schedule(static)
+  for (int outer = 0; outer < outer_count; ++outer) {
+    RealWorldRNG<T> row_rng(parallel_init ? row_seeds[outer] : 1);
+    RealWorldRNG<T> *cell_rng = parallel_init ? &row_rng : rng;
+    for (int inner = 0; inner < inner_count; ++inner) {
+      int i = parallel_init ? outer : inner;
+      int j = parallel_init ? inner : outer;
+
+      w_max_bound_[i][j] = par.w_max * ((T)1.0 + par.w_max_dtod * cell_rng->sampleGauss());
+      w_min_bound_[i][j] = par.w_min * ((T)1.0 + par.w_min_dtod * cell_rng->sampleGauss());
       T gain;
       if (par.dw_min_dtod_log_normal) {
-        gain = expf(gain_std * rng->sampleGauss());
+        gain = expf(gain_std * cell_rng->sampleGauss());
       } else {
-        gain = ((T)1.0 + gain_std * rng->sampleGauss());
+        gain = ((T)1.0 + gain_std * cell_rng->sampleGauss());
       }
 
-      T r = up_down_std * rng->sampleGauss();
+      T r = up_down_std * cell_rng->sampleGauss();
       w_scale_up_[i][j] = (up_bias + gain + r) * par.dw_min; // to reduce mults in updates
       w_scale_down_[i][j] = (down_bias + gain - r) * par.dw_min;
 
@@ -681,14 +693,14 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
       }
 
       // corrupt devices
-      if (par.corrupt_devices_prob > rng->sampleUniform()) {
+      if (par.corrupt_devices_prob > cell_rng->sampleUniform()) {
         // stuck somewhere in min_max
         T mn =
             MAX(MIN(w_max_bound_[i][j], w_min_bound_[i][j]), -(T)fabsf(par.corrupt_devices_range));
         T mx =
             MIN(MAX(w_max_bound_[i][j], w_min_bound_[i][j]), (T)fabsf(par.corrupt_devices_range));
 
-        T value = mn + (mx - mn) * rng->sampleUniform();
+        T value = mn + (mx - mn) * cell_rng->sampleUniform();
         w_max_bound_[i][j] = value;
         w_min_bound_[i][j] = value;
         w_scale_up_[i][j] = (T)0.0;
@@ -706,14 +718,14 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
       //--------------------
       // diffusion
       {
-        T t = (T)fabsf(par.diffusion * ((T)1.0 + par.diffusion_dtod * rng->sampleGauss()));
+        T t = (T)fabsf(par.diffusion * ((T)1.0 + par.diffusion_dtod * cell_rng->sampleGauss()));
         w_diffusion_rate_[i][j] = t;
       }
 
       //--------------------
       // reset
       { // additive dtod
-        T t = par.reset + par.reset_dtod * rng->sampleGauss();
+        T t = par.reset + par.reset_dtod * cell_rng->sampleGauss();
         w_reset_bias_[i][j] = t;
       }
 
@@ -721,7 +733,7 @@ void PulsedRPUDevice<T>::populate(const PulsedRPUDeviceMetaParameter<T> &p, Real
       // decay
       {
         if (par.lifetime > (T)0.0) {
-          T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * rng->sampleGauss());
+          T t = par.lifetime * ((T)1.0 + par.lifetime_dtod * cell_rng->sampleGauss());
           w_decay_scale_[i][j] = (t > (T)1.0) ? (T)((T)1. - ((T)1. / t)) : (T)0.0;
         } else {
           // meaning no decay

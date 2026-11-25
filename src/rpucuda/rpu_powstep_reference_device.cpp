@@ -5,6 +5,7 @@
  */
 
 #include "rpu_powstep_reference_device.h"
+#include "rpu_parallel_init.h"
 #include "utility_functions.h"
 #include <chrono>
 #include <cmath>
@@ -32,11 +33,17 @@ void PowStepReferenceRPUDevice<T>::populate(
   T up_bias = up_down > (T)0.0 ? (T)0.0 : up_down;
   T down_bias = up_down > (T)0.0 ? -up_down : (T)0.0;
 
+  const bool parallel_init = useParallelDeviceInit(this->size_);
+  const auto row_seeds =
+      parallel_init ? makeDeviceInitRowSeeds(rng, this->d_size_) : std::vector<unsigned int>();
+#pragma omp parallel for if(parallel_init) schedule(static)
   for (int i = 0; i < this->d_size_; ++i) {
+    RealWorldRNG<T> row_rng(parallel_init ? row_seeds[i] : 1);
+    RealWorldRNG<T> *cell_rng = parallel_init ? &row_rng : rng;
     for (int j = 0; j < this->x_size_; ++j) {
 
-      T gain = (T)1.0 + gain_std * rng->sampleGauss();
-      T r = up_down_std * rng->sampleGauss();
+      T gain = (T)1.0 + gain_std * cell_rng->sampleGauss();
+      T r = up_down_std * cell_rng->sampleGauss();
 
       w_gamma_up_[i][j] = (up_bias + gain + r) * gamma;
       w_gamma_down_[i][j] = (down_bias + gain - r) * gamma;
@@ -47,7 +54,7 @@ void PowStepReferenceRPUDevice<T>::populate(
       }
 
       // reference
-      w_reference_[i][j] = par.reference_mean + par.reference_std * rng->sampleGauss();
+      w_reference_[i][j] = par.reference_mean + par.reference_std * cell_rng->sampleGauss();
 
       if (par.subtract_symmetry_point &&
           (this->w_max_bound_[i][j] > (T)0.0 && this->w_min_bound_[i][j] < (T)0.0)) {
