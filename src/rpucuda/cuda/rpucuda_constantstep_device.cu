@@ -114,6 +114,54 @@ pwukpvec_t<T> ConstantStepRPUDeviceCuda<T>::getUpdateKernels(
 
 #undef ARGS
 
+/*********************************************************************************/
+/* infinite granularity update */
+
+namespace {
+constexpr int IG_THREADS_PER_BLOCK = 256;
+
+inline int ig_num_blocks(int total_size) {
+  return (total_size + IG_THREADS_PER_BLOCK - 1) / IG_THREADS_PER_BLOCK;
+}
+
+template <typename T>
+__global__ void kernelIGConstantStep(
+    T *weights, const T *grad_matrix, const param_t *params, int total_size) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_size) {
+    return;
+  }
+
+  T G = grad_matrix[idx];
+  if (G == (T)0.0) {
+    return;
+  }
+
+  param4_t p = reinterpret_cast<const param4_t *>(params)[idx];
+  T wmin = p.x;
+  T scale_down = p.y;
+  T wmax = p.z;
+  T scale_up = p.w;
+
+  T response = (G < (T)0.0) ? scale_down : scale_up;
+  T w = weights[idx];
+  w += G * response;
+  w = (w > wmax) ? wmax : w;
+  w = (w < wmin) ? wmin : w;
+  weights[idx] = w;
+}
+} // namespace
+
+template <typename T>
+void ConstantStepRPUDeviceCuda<T>::doInfiniteGranularityUpdate(
+    T *dev_weights, const T *grad_matrix, curandState_t *dev_states) {
+  UNUSED(dev_states);
+  int total_size = this->x_size_ * this->d_size_;
+  kernelIGConstantStep<T>
+      <<<ig_num_blocks(total_size), IG_THREADS_PER_BLOCK, 0, this->context_->getStream()>>>(
+          dev_weights, grad_matrix, this->get4ParamsData(), total_size);
+}
+
 template class ConstantStepRPUDeviceCuda<float>;
 #ifdef RPU_USE_DOUBLE
 template class ConstantStepRPUDeviceCuda<double>;

@@ -293,7 +293,6 @@ void VectorRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
     RPU_FATAL("Expected " << names.size() << " data pointers!");
   }
 
-  T weight_granularity = (T)0.0;
   size_t m = 0;
   for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
     std::vector<std::string> n;
@@ -313,14 +312,10 @@ void VectorRPUDevice<T>::setDeviceParameter(T **out_weights, const std::vector<T
 
     rpu_device_vec_[k]->setDeviceParameter(weights_vec_[k], v);
 
-    T weight_granularity_device = rpu_device_vec_[k]->getWeightGranularity();
-    weight_granularity += weight_granularity_device;
-
     m++;
   }
   this->reduceToWeights(out_weights); // need to update the weights
-  weight_granularity /= rpu_device_vec_.size();
-  this->setWeightGranularity(weight_granularity);
+  updateWeightGranularity();
 };
 
 template <typename T>
@@ -407,18 +402,12 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
   // average of all
   rpu_device_vec_.clear();
   reduce_weightening_.clear();
-  T weight_granularity = (T)0.0;
   for (int k = 0; k < n_devices_; k++) {
     rpu_device_vec_.push_back(
         std::unique_ptr<PulsedRPUDeviceBase<T>>(
             par.vec_par[k]->createDevice(this->x_size_, this->d_size_, rng)));
-    weight_granularity += rpu_device_vec_.back()->getWeightGranularity();
-
     reduce_weightening_.push_back((T)1.0 / (T)n_devices_); // average per default
   }
-  weight_granularity = weight_granularity / (T)n_devices_;
-  this->setWeightGranularity(weight_granularity);
-
   // default weightening can be overwritten by given gamma_vec
   if (par.gamma_vec.size()) {
     if (par.gamma_vec.size() != (size_t)n_devices_) {
@@ -426,6 +415,81 @@ void VectorRPUDevice<T>::populate(const VectorRPUDeviceMetaParameter<T> &p, Real
     }
     reduce_weightening_ = par.gamma_vec;
   }
+  updateWeightGranularity();
+}
+
+template <typename T> void VectorRPUDevice<T>::updateWeightGranularity() {
+  std::vector<T> granularities;
+  for (const auto &device : rpu_device_vec_) {
+    granularities.push_back(device->getWeightGranularity());
+  }
+  this->setWeightGranularity(getPar().calcPulsedWeightGranularity(granularities));
+}
+
+template <typename T> bool VectorRPUDevice<T>::hasInfiniteGranularityUpdate() const {
+  if (getPar().singleDeviceUpdate()) {
+    return rpu_device_vec_[current_device_idx_]->hasInfiniteGranularityUpdate();
+  }
+  for (const auto &device : rpu_device_vec_) {
+    if (device->hasInfiniteGranularityUpdate()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T> bool VectorRPUDevice<T>::hasPulsedUpdate() const {
+  if (getPar().singleDeviceUpdate()) {
+    return rpu_device_vec_[current_device_idx_]->hasPulsedUpdate();
+  }
+  for (size_t k = 0; k < rpu_device_vec_.size(); ++k) {
+    if (getPar().hasPulsedContribution(k) && rpu_device_vec_[k]->hasPulsedUpdate()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T>
+T VectorRPUDevice<T>::getPulsedUpdateWeight() const {
+  if (getPar().singleDeviceUpdate()) {
+    return rpu_device_vec_[current_device_idx_]->getPulsedUpdateWeight();
+  }
+  T pulsed_weight = (T)0.0;
+  for (size_t k = 0; k < rpu_device_vec_.size(); ++k) {
+    pulsed_weight += getPar().getReductionWeight(k) * rpu_device_vec_[k]->getPulsedUpdateWeight();
+  }
+  const T sum = getPar().getReductionWeightSum();
+  return sum > (T)0.0 ? pulsed_weight / sum : (T)0.0;
+}
+
+template <typename T>
+T VectorRPUDevice<T>::getPulseCountLearningRate(
+    T learning_rate, int m_batch_info, const PulsedUpdateMetaParameter<T> &up) {
+  UNUSED(m_batch_info);
+  UNUSED(up);
+  return getPar().implements() == DeviceUpdateType::Vector && !getPar().singleDeviceUpdate() &&
+                 hasInfiniteGranularityUpdate()
+             ? learning_rate * getPulsedUpdateWeight()
+             : learning_rate;
+}
+
+template <typename T>
+void VectorRPUDevice<T>::doInfiniteGranularityUpdate(
+    T **weights, const T *x_input, int x_inc, const T *d_input, int d_inc,
+    T learning_rate, RNG<T> *rng) {
+  if (getPar().implements() != DeviceUpdateType::Vector) {
+    RPU_FATAL("Infinite granularity updates are not supported for transfer or one-sided devices.");
+  }
+  learning_rate = getPar().getInfiniteGranularityLearningRate(learning_rate);
+  for (int k = 0; k < n_devices_; ++k) {
+    if ((!getPar().singleDeviceUpdate() || k == current_device_idx_) &&
+        rpu_device_vec_[k]->hasInfiniteGranularityUpdate()) {
+      rpu_device_vec_[k]->doInfiniteGranularityUpdate(
+          weights_vec_[k], x_input, x_inc, d_input, d_inc, learning_rate, rng);
+    }
+  }
+  reduceToWeights(weights);
 }
 
 /*********************************************************************************/
@@ -472,13 +536,17 @@ void VectorRPUDevice<T>::doSparseUpdate(
     T **weights, int i, const int *x_signed_indices, int x_count, int d_sign, RNG<T> *rng) {
 
   if (getPar().singleDeviceUpdate()) {
-    rpu_device_vec_[current_device_idx_]->doSparseUpdate(
-        weights_vec_[current_device_idx_], i, x_signed_indices, x_count, d_sign, rng);
+    if (rpu_device_vec_[current_device_idx_]->hasPulsedUpdate()) {
+      rpu_device_vec_[current_device_idx_]->doSparseUpdate(
+          weights_vec_[current_device_idx_], i, x_signed_indices, x_count, d_sign, rng);
+    }
   } else {
 
     for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
-      rpu_device_vec_[k]->doSparseUpdate(
-          weights_vec_[k], i, x_signed_indices, x_count, d_sign, rng);
+      if (getPar().hasPulsedContribution(k) && rpu_device_vec_[k]->hasPulsedUpdate()) {
+        rpu_device_vec_[k]->doSparseUpdate(
+            weights_vec_[k], i, x_signed_indices, x_count, d_sign, rng);
+      }
     }
   }
 
@@ -498,12 +566,16 @@ void VectorRPUDevice<T>::doSparseUpdate(
 template <typename T>
 void VectorRPUDevice<T>::doDenseUpdate(T **weights, int *coincidences, RNG<T> *rng) {
   if (getPar().singleDeviceUpdate()) {
-    rpu_device_vec_[current_device_idx_]->doDenseUpdate(
-        weights_vec_[current_device_idx_], coincidences, rng);
+    if (rpu_device_vec_[current_device_idx_]->hasPulsedUpdate()) {
+      rpu_device_vec_[current_device_idx_]->doDenseUpdate(
+          weights_vec_[current_device_idx_], coincidences, rng);
+    }
   } else {
 
     for (size_t k = 0; k < rpu_device_vec_.size(); k++) {
-      rpu_device_vec_[k]->doDenseUpdate(weights_vec_[k], coincidences, rng);
+      if (getPar().hasPulsedContribution(k) && rpu_device_vec_[k]->hasPulsedUpdate()) {
+        rpu_device_vec_[k]->doDenseUpdate(weights_vec_[k], coincidences, rng);
+      }
     }
   }
   this->reduceToWeights(weights);
